@@ -12523,13 +12523,6 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:stream"
 
 /***/ }),
 
-/***/ 6466:
-/***/ ((module) => {
-
-module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:stream/promises");
-
-/***/ }),
-
 /***/ 3136:
 /***/ ((module) => {
 
@@ -14506,7 +14499,7 @@ class InternalServerError extends APIError {
 
 /***/ }),
 
-/***/ 9240:
+/***/ 9080:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
@@ -14565,7 +14558,7 @@ const sleep = (ms, signal) => new Promise((resolve) => {
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/errors.mjs
 var errors = __nccwpck_require__(2533);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/version.mjs
-const VERSION = '0.121.0'; // x-release-please-version
+const VERSION = '0.123.0'; // x-release-please-version
 //# sourceMappingURL=version.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
@@ -14995,7 +14988,7 @@ function redactSensitive(body) {
 async function checkCredentialsFileSafety(path, onWarn = (m) => console.warn(`anthropic-sdk: ${m}`)) {
     if (typeof process === 'undefined' || process.platform === 'win32')
         return;
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+    const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     let resolved = path;
     let st;
     try {
@@ -15025,8 +15018,7 @@ async function checkCredentialsFileSafety(path, onWarn = (m) => console.warn(`an
  * Creates the parent directory with mode 0700 and the file with mode 0600.
  */
 async function writeCredentialsFileAtomic(targetPath, data) {
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { fs, path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     const dir = path.dirname(targetPath);
     await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
     // Unique temp name avoids two concurrent writers (different processes or
@@ -15294,8 +15286,7 @@ const loadConfigWithSource = async (profile) => {
         return null;
     }
     validateProfileName(profileName);
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { fs, path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     const configPath = path.join(rootConfigPath, 'configs', `${profileName}.json`);
     let configRaw;
     try {
@@ -15395,7 +15386,7 @@ const loadCredentials = async () => {
     if (!credentialsPath) {
         return null;
     }
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+    const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     let raw;
     try {
         raw = await fs.promises.readFile(credentialsPath, 'utf-8');
@@ -15439,14 +15430,14 @@ const getCredentialsPath = async (config, profile) => {
         return null;
     }
     validateProfileName(profileName);
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     return path.join(rootConfigPath, 'credentials', `${profileName}.json`);
 };
 const getRootConfigPath = async () => {
     if (!supportsLocalConfigFiles()) {
         return null;
     }
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     // ANTHROPIC_CONFIG_DIR is treated as a trusted path: it is set by the
     // process operator, not by remote input, so it is not validated.
     const configDir = (0,utils/* readEnv */.sx)('ANTHROPIC_CONFIG_DIR');
@@ -15490,8 +15481,7 @@ const getActiveProfileName = async () => {
     if (profileName) {
         return profileName;
     }
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { fs, path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     const filePath = path.join(rootConfigPath, 'active_config');
     try {
         return (await fs.promises.readFile(filePath, 'utf-8')).trim() || 'default';
@@ -15515,7 +15505,7 @@ function identityTokenFromFile(path) {
         throw new core_error/* AnthropicError */.pJ('Identity token file path is empty');
     }
     return async () => {
-        const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+        const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
         let content;
         try {
             content = await fs.promises.readFile(path, 'utf-8');
@@ -15636,7 +15626,7 @@ function oidcFederationProvider(config) {
  */
 function userOAuthProvider(config) {
     return async (opts) => {
-        const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+        const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
         await checkCredentialsFileSafety(config.credentialsPath, config.onSafetyWarning);
         let raw;
         try {
@@ -15876,7 +15866,7 @@ function resolveIdentityTokenProvider(auth) {
  */
 function cachedExchangeProvider(exchange, credentialsPath, onCacheWriteError, onSafetyWarning) {
     return async (opts) => {
-        const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+        const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
         await checkCredentialsFileSafety(credentialsPath, onSafetyWarning);
         // Try cached credentials file
         let existing;
@@ -16389,7 +16379,7 @@ async function defaultParseResponse(client, props) {
             (0,utils_log/* loggerFor */.WG)(client).debug('response', response.status, response.url, response.headers, response.body);
             // Note: there is an invariant here that isn't represented in the type system
             // that if you set `stream: true` the response type must also be `Stream<T>`
-            return streaming_Stream.fromSSEResponse(response, props.controller);
+            return streaming_Stream.fromSSEResponse(response, props.controller, client);
         }
         // fetch refuses to read the body when the status code is 204.
         if (response.status === 204) {
@@ -16534,11 +16524,11 @@ function createMiddlewareContext(options, client) {
             // Streams are single-consumer, so caching one would hand later callers
             // an already-consumed stream; every call gets a fresh clone-backed one.
             if (options?.stream && response.ok) {
-                return parseMiddlewareResponse(response, options);
+                return parseMiddlewareResponse(response, options, client);
             }
             let parsed = cache.get(response);
             if (!parsed) {
-                parsed = parseMiddlewareResponse(response, options);
+                parsed = parseMiddlewareResponse(response, options, client);
                 cache.set(response, parsed);
             }
             return parsed;
@@ -16550,7 +16540,7 @@ function createMiddlewareContext(options, client) {
  * `internal/parse.ts`), reading through a clone so the body stays available
  * to the rest of the chain and the client itself.
  */
-async function parseMiddlewareResponse(response, options) {
+async function parseMiddlewareResponse(response, options, client) {
     if (response.bodyUsed || response.body?.locked) {
         throw new core_error/* AnthropicError */.pJ('cannot ctx.parse() a response whose body was already consumed; ' +
             'call ctx.parse() instead of reading the body, or read via response.clone()');
@@ -16561,7 +16551,7 @@ async function parseMiddlewareResponse(response, options) {
         // A fresh controller rather than the request's own: aborting (or
         // `break`ing out of) the middleware's stream must not cancel the
         // in-flight request the client is still reading.
-        return streaming_Stream.fromSSEResponse(response.clone(), new AbortController());
+        return streaming_Stream.fromSSEResponse(response.clone(), new AbortController(), client);
     }
     // fetch refuses to read the body when the status code is 204.
     if (response.status === 204) {
@@ -16964,12 +16954,10 @@ const createForm = async (body, fetch, stripFilenames = true) => {
     await Promise.all(Object.entries(body || {}).map(([key, value]) => addFormValue(form, key, value, stripFilenames)));
     return form;
 };
-// We check for Blob not File because Bun.File doesn't inherit from File,
-// but they both inherit from Blob and have a `name` property at runtime.
-const isNamedBlob = (value) => value instanceof Blob && 'name' in value;
+// Blob, not File: bare Blobs and Bun.file() results don't inherit from File.
 const isUploadable = (value) => typeof value === 'object' &&
     value !== null &&
-    (value instanceof Response || isAsyncIterable(value) || isNamedBlob(value));
+    (value instanceof Response || isAsyncIterable(value) || value instanceof Blob);
 const hasUploadableValue = (value) => {
     if (isUploadable(value))
         return true;
@@ -17004,11 +16992,17 @@ const addFormValue = async (form, key, value, stripFilenames) => {
     else if (isAsyncIterable(value)) {
         form.append(key, makeFile([await new Response(ReadableStreamFrom(value)).blob()], getName(value, stripFilenames)));
     }
-    else if (isNamedBlob(value)) {
-        form.append(key, makeFile([value], getName(value, stripFilenames), { type: value.type }));
+    else if (value instanceof Blob) {
+        form.append(key, makeFile([value], getName(value, stripFilenames) || undefined, { type: value.type }));
     }
     else if (Array.isArray(value)) {
         await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry, stripFilenames)));
+    }
+    else if (typeof value.then === 'function') {
+        throw new TypeError(`Received a Promise for "${key}"; await it first, e.g. \`await toFile(...)\``);
+    }
+    else if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+        throw new TypeError(`Received ${value.constructor.name} for "${key}"; to upload raw bytes, wrap them with \`await toFile(bytes, 'filename')\``);
     }
     else if (typeof value === 'object') {
         await Promise.all(Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop, stripFilenames)));
@@ -17777,11 +17771,11 @@ class Files extends APIResource {
      */
     list(params = {}, options) {
         const { betas, ...query } = params ?? {};
-        return this._client.getAPIList('/v1/files?beta=true', (Page), {
+        return this._client.getAPIList('/v1/files?beta=true', (PageCursor), {
             query,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -17801,7 +17795,7 @@ class Files extends APIResource {
         return this._client.delete(path `/v1/files/${fileID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -17825,8 +17819,8 @@ class Files extends APIResource {
             ...options,
             headers: buildHeaders([
                 {
-                    'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString(),
                     Accept: 'application/binary',
+                    ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined),
                 },
                 options?.headers,
             ]),
@@ -17847,7 +17841,7 @@ class Files extends APIResource {
         return this._client.get(path `/v1/files/${fileID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -17868,7 +17862,7 @@ class Files extends APIResource {
             body,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 stainlessHelperHeaderFromFile(body.file),
                 options?.headers,
             ]),
@@ -18055,14 +18049,27 @@ var dist = __nccwpck_require__(5487);
 
 
 class Webhooks extends APIResource {
-    unwrap(body, { headers, key }) {
-        if (headers !== undefined) {
-            const keyStr = key === undefined ? this._client.webhookKey : key;
-            if (keyStr === null)
-                throw new Error('Webhook key must not be null in order to unwrap');
-            const wh = new dist/* Webhook */.KD(keyStr);
-            wh.verify(body, headers);
-        }
+    /**
+     * Parses a webhook payload into an event without verifying its signature. Prefer
+     * `unwrap()` unless you have already verified the signature yourself.
+     */
+    parseUnverified(body) {
+        return JSON.parse(body);
+    }
+    /**
+     * Verifies the webhook signature from the `webhook-id`, `webhook-timestamp` and
+     * `webhook-signature` headers using your webhook signing key, then parses the
+     * payload into an event. Fails if the signature is missing or invalid.
+     */
+    unwrap(body, options) {
+        const headers = options?.headers;
+        if (headers == null)
+            throw new Error('Webhook headers are required in order to verify the signature');
+        const keyStr = options.key === undefined ? this._client.webhookKey : options.key;
+        if (!keyStr)
+            throw new Error('Webhook key must not be null or empty in order to unwrap');
+        const wh = new dist/* Webhook */.KD(keyStr);
+        wh.verify(body, headers);
         return JSON.parse(body);
     }
 }
@@ -21745,6 +21752,9 @@ class BetaMessageStream {
                 if (event.context_management != null) {
                     snapshot.context_management = event.context_management;
                 }
+                if (event.input_transformations != null) {
+                    snapshot.input_transformations = event.input_transformations;
+                }
                 // The remaining usage counters are cumulative whole-message totals that are
                 // omitted when they don't apply, so overwrite when present and never add.
                 if (event.usage.input_tokens != null) {
@@ -22651,6 +22661,55 @@ class APIKeys extends APIResource {
     }
 }
 //# sourceMappingURL=api-keys.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/organization/compliance-settings.mjs
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+
+class ComplianceSettings extends APIResource {
+    /**
+     * Retrieve your organization's Compliance Settings.
+     *
+     * Compliance Settings is a singleton resource: there is exactly one per
+     * organization, addressed without an identifier. The `state` field reflects
+     * whether the Compliance API is enabled. An organization with a parent
+     * organization reads the state inherited from the parent's configuration.
+     *
+     * @example
+     * ```ts
+     * const betaComplianceSettings =
+     *   await client.beta.organization.complianceSettings.retrieve();
+     * ```
+     */
+    retrieve(options) {
+        return this._client.get('/v1/organizations/compliance_settings?beta=true', options);
+    }
+    /**
+     * Update your organization's Compliance Settings.
+     *
+     * Setting `state` to `enabled` turns on the Compliance API and begins capturing
+     * organization activity events. Setting it to `disabled` turns both off. `state`
+     * reflects whether the Compliance API is enabled.
+     *
+     * A request that sets `state` to its current value succeeds and leaves the
+     * resource unchanged. A `disabled` request stays in effect until a later `enabled`
+     * request or the organization's next provisioning action that enables Access
+     * Transparency: enabling Access Transparency also enables the Compliance API,
+     * which serves its activity events, so such provisioning (including re-runs)
+     * re-enables the Compliance API even after a `disabled` request. Automated
+     * provisioning never disables compliance settings.
+     *
+     * @example
+     * ```ts
+     * const betaComplianceSettings =
+     *   await client.beta.organization.complianceSettings.update({
+     *     state: { type: 'enabled' },
+     *   });
+     * ```
+     */
+    update(body, options) {
+        return this._client.post('/v1/organizations/compliance_settings?beta=true', { body, ...options });
+    }
+}
+//# sourceMappingURL=compliance-settings.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/organization/external-keys.mjs
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
@@ -22852,9 +22911,8 @@ class RateLimits extends APIResource {
      * API-surface category such as the Files API or Message Batches) and contains the
      * set of limiter values that apply to it.
      *
-     * This endpoint currently returns every matching entry in a single page regardless
-     * of `limit`; follow `next_page` so that clients keep working when pagination is
-     * enabled.
+     * When `limit` is omitted, every matching entry is returned in a single page; when
+     * `limit` truncates the result, follow `next_page` to fetch the remaining entries.
      *
      * @example
      * ```ts
@@ -23825,9 +23883,8 @@ class rate_limits_RateLimits extends APIResource {
      * Groups without overrides inherit the organization limits and are not listed; use
      * `GET /v1/organizations/rate_limits` to see those.
      *
-     * This endpoint currently returns every matching entry in a single page regardless
-     * of `limit`; follow `next_page` so that clients keep working when pagination is
-     * enabled.
+     * When `limit` is omitted, every matching entry is returned in a single page; when
+     * `limit` truncates the result, follow `next_page` to fetch the remaining entries.
      *
      * @example
      * ```ts
@@ -24157,6 +24214,8 @@ workspaces_workspaces_Workspaces.ServiceAccounts = service_accounts_ServiceAccou
 
 
 
+
+
 class Organization extends APIResource {
     constructor() {
         super(...arguments);
@@ -24168,6 +24227,7 @@ class Organization extends APIResource {
         this.users = new Users(this._client);
         this.workspaces = new workspaces_workspaces_Workspaces(this._client);
         this.rateLimits = new RateLimits(this._client);
+        this.complianceSettings = new ComplianceSettings(this._client);
     }
     /**
      * Retrieve information about the organization associated with the authenticated
@@ -24191,6 +24251,7 @@ Organization.ServiceAccounts = ServiceAccounts;
 Organization.Users = Users;
 Organization.Workspaces = workspaces_workspaces_Workspaces;
 Organization.RateLimits = RateLimits;
+Organization.ComplianceSettings = ComplianceSettings;
 //# sourceMappingURL=organization.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/sessions/events.mjs
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
@@ -24746,10 +24807,10 @@ class versions_Versions extends APIResource {
      *
      * @example
      * ```ts
-     * const version = await client.beta.skills.versions.create(
-     *   'skill_id',
-     *   { files: [fs.createReadStream('path/to/file')] },
-     * );
+     * const betaSkillVersion =
+     *   await client.beta.skills.versions.create('skill_id', {
+     *     files: [fs.createReadStream('path/to/file')],
+     *   });
      * ```
      */
     create(skillID, params, options) {
@@ -24758,7 +24819,7 @@ class versions_Versions extends APIResource {
             body,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         }, this._client, false));
@@ -24768,10 +24829,10 @@ class versions_Versions extends APIResource {
      *
      * @example
      * ```ts
-     * const version = await client.beta.skills.versions.retrieve(
-     *   'version',
-     *   { skill_id: 'skill_id' },
-     * );
+     * const betaSkillVersion =
+     *   await client.beta.skills.versions.retrieve('version', {
+     *     skill_id: 'skill_id',
+     *   });
      * ```
      */
     retrieve(version, params, options) {
@@ -24779,7 +24840,7 @@ class versions_Versions extends APIResource {
         return this._client.get(path `/v1/skills/${skill_id}/versions/${version}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24790,7 +24851,7 @@ class versions_Versions extends APIResource {
      * @example
      * ```ts
      * // Automatically fetches more pages as needed.
-     * for await (const versionListResponse of client.beta.skills.versions.list(
+     * for await (const betaSkillVersion of client.beta.skills.versions.list(
      *   'skill_id',
      * )) {
      *   // ...
@@ -24803,7 +24864,7 @@ class versions_Versions extends APIResource {
             query,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24813,10 +24874,10 @@ class versions_Versions extends APIResource {
      *
      * @example
      * ```ts
-     * const version = await client.beta.skills.versions.delete(
-     *   'version',
-     *   { skill_id: 'skill_id' },
-     * );
+     * const betaDeletedSkillVersion =
+     *   await client.beta.skills.versions.delete('version', {
+     *     skill_id: 'skill_id',
+     *   });
      * ```
      */
     delete(version, params, options) {
@@ -24824,7 +24885,7 @@ class versions_Versions extends APIResource {
         return this._client.delete(path `/v1/skills/${skill_id}/versions/${version}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24849,8 +24910,8 @@ class versions_Versions extends APIResource {
             ...options,
             headers: buildHeaders([
                 {
-                    'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString(),
                     Accept: 'application/binary',
+                    ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined),
                 },
                 options?.headers,
             ]),
@@ -24878,7 +24939,7 @@ class Skills extends APIResource {
      *
      * @example
      * ```ts
-     * const skill = await client.beta.skills.create({
+     * const betaSkill = await client.beta.skills.create({
      *   files: [fs.createReadStream('path/to/file')],
      * });
      * ```
@@ -24889,7 +24950,7 @@ class Skills extends APIResource {
             body,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         }, this._client, false));
@@ -24899,7 +24960,9 @@ class Skills extends APIResource {
      *
      * @example
      * ```ts
-     * const skill = await client.beta.skills.retrieve('skill_id');
+     * const betaSkill = await client.beta.skills.retrieve(
+     *   'skill_id',
+     * );
      * ```
      */
     retrieve(skillID, params = {}, options) {
@@ -24907,7 +24970,7 @@ class Skills extends APIResource {
         return this._client.get(path `/v1/skills/${skillID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24918,7 +24981,7 @@ class Skills extends APIResource {
      * @example
      * ```ts
      * // Automatically fetches more pages as needed.
-     * for await (const skillListResponse of client.beta.skills.list()) {
+     * for await (const betaSkill of client.beta.skills.list()) {
      *   // ...
      * }
      * ```
@@ -24929,7 +24992,7 @@ class Skills extends APIResource {
             query,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24939,7 +25002,9 @@ class Skills extends APIResource {
      *
      * @example
      * ```ts
-     * const skill = await client.beta.skills.delete('skill_id');
+     * const betaDeletedSkill = await client.beta.skills.delete(
+     *   'skill_id',
+     * );
      * ```
      */
     delete(skillID, params = {}, options) {
@@ -24947,7 +25012,7 @@ class Skills extends APIResource {
         return this._client.delete(path `/v1/skills/${skillID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -27745,14 +27810,19 @@ const DEFAULT_BETAS = (/* unused pure expression or super */ null && (['fallback
  * Remove `fallback` blocks replayed in history. They only parse under the
  * server-side fallback beta, which belongs to the caller-owned server-side
  * `fallbacks` feature — this middleware never sends it, so a request
- * replaying them would 400. An assistant turn left empty is dropped whole.
+ * replaying them would 400. A turn the strip leaves empty is dropped whole;
+ * a turn that was already empty is kept — it may carry other payload (e.g. a
+ * directive-only system message's `output_config`).
  */
 function stripFallbackBlocks(body) {
-    const messages = body.messages
-        .map((message) => Array.isArray(message.content) ?
-        { ...message, content: message.content.filter((block) => block.type !== 'fallback') }
-        : message)
-        .filter((message) => !Array.isArray(message.content) || message.content.length > 0);
+    const messages = body.messages.flatMap((message) => {
+        if (!Array.isArray(message.content))
+            return [message];
+        const content = message.content.filter((block) => block.type !== 'fallback');
+        if (content.length === message.content.length)
+            return [message];
+        return content.length > 0 ? [{ ...message, content }] : [];
+    });
     return { ...body, messages };
 }
 /**
@@ -28037,6 +28107,9 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
     // The refusal whose token is currently in flight — surfaced verbatim (with a
     // recommended_model added) if every fallback request fails and we degrade.
     let refusalDetails = a.refused.stopDetails;
+    // That refused hop's suppressed message_start `input_transformations`, which
+    // ride on the surfaced refusal delta (none for A: its start reached the client).
+    let refusalInputTransformations = a.refused.inputTransformations;
     // One `message` entry per refused hop, in order — A first. Failed hops are
     // skipped (no usage came back); the serving hop is appended as
     // `fallback_message` when its message_delta arrives.
@@ -28137,6 +28210,9 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
                     stop_details: stopDetails,
                 },
                 usage: (lastUsage ?? {}),
+                ...(refusalInputTransformations !== undefined && {
+                    input_transformations: refusalInputTransformations,
+                }),
             });
             yield emit('message_stop', { type: 'message_stop' });
             return;
@@ -28157,6 +28233,7 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
         // continues.
         token = b.refused.token;
         refusalDetails = b.refused.stopDetails;
+        refusalInputTransformations = b.refused.inputTransformations;
         base = continuation;
         partial = b.refused.hasPrefillClaim ? toPrefillBlocks(b.blocks) : [];
         iterations.push(toIterationUsage('message', model, b.refused.usage));
@@ -28173,7 +28250,8 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
  * spliced hop (`splice` set) has its message_start suppressed (the client
  * already saw A's), its block indices shifted by `indexBase`, and its
  * terminal message_delta's usage rewritten to the `usage.iterations`
- * chain shape.
+ * chain shape, with the suppressed message_start's `input_transformations`
+ * forwarded onto it.
  *
  * A refusal that can be chained — it carries a `fallback_credit_token` and a
  * fallback entry remains — ends the hop early: open blocks are closed, the
@@ -28186,12 +28264,18 @@ async function* consumeHop(args) {
     const tracker = new BlockTracker(indexBase);
     let model;
     let startUsage = null;
+    // A spliced hop's message_start is suppressed, so its `input_transformations`
+    // must ride on the re-emitted terminal message_delta — the way a server-side
+    // fallback reports the serving model's list.
+    let startInputTransformations;
     for await (const sse of Stream.rawEvents(response, controller)) {
         const p = safeJSON(sse.data);
         switch (p?.type) {
             case 'message_start': {
                 model = p.message.model;
                 startUsage = p.message.usage;
+                if ('input_transformations' in p.message)
+                    startInputTransformations = p.message.input_transformations;
                 if (splice)
                     continue;
                 break;
@@ -28235,6 +28319,7 @@ async function* consumeHop(args) {
                                 hasPrefillClaim: details.fallback_has_prefill_claim === true,
                                 usage,
                                 stopDetails: details,
+                                inputTransformations: splice ? startInputTransformations : undefined,
                             },
                             model,
                             blocks: tracker.contentBlocks(),
@@ -28270,6 +28355,9 @@ async function* consumeHop(args) {
                         toIterationUsage('fallback_message', splice.model, usage),
                     ];
                     p.usage = usage;
+                    if (!('input_transformations' in p) && startInputTransformations !== undefined) {
+                        p.input_transformations = startInputTransformations;
+                    }
                     yield emit('message_delta', p);
                     continue;
                 }
@@ -28514,7 +28602,9 @@ const castToError = (err) => {
         return err;
     if (typeof err === 'object' && err !== null) {
         try {
-            if (Object.prototype.toString.call(err) === '[object Error]') {
+            const tag = Object.prototype.toString.call(err);
+            // cross-realm errors (e.g. undici's abort `DOMException` under jest) fail `instanceof Error`
+            if (tag === '[object Error]' || tag === '[object DOMException]') {
                 // @ts-ignore - not all envs have native support for cause yet
                 const error = new Error(err.message, err.cause ? { cause: err.cause } : {});
                 if (err.stack)
@@ -59772,8 +59862,8 @@ var esm = __nccwpck_require__(9519);
 var loader = __nccwpck_require__(3833);
 // EXTERNAL MODULE: ./runners/core/skill-cache.mjs
 var skill_cache = __nccwpck_require__(7328);
-// EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/index.mjs + 101 modules
-var sdk = __nccwpck_require__(9240);
+// EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/index.mjs + 102 modules
+var sdk = __nccwpck_require__(9080);
 ;// CONCATENATED MODULE: ./node_modules/@google/generative-ai/dist/index.mjs
 /**
  * Contains the list of OpenAPI data types
