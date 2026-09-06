@@ -13,7 +13,7 @@
   "dependencies": {
     "commander": "^15.0.0",
     "ora": "^9.4.1",
-    "@inquirer/prompts": "^8.6.0"
+    "@inquirer/prompts": "^8.7.1"
   },
   "engines": {
     "node": "22.x"
