@@ -59,7 +59,9 @@ Place `.river-review.json` in the repository root to customize review model sett
   - `ranking.weights`: Per-signal weights for `pathProximity` / `symbolUsage` / `siblingTest` / `commitRecency`, each in `0.0`–`1.0`. Equal weighting if omitted.
   - `tokenizer`: Only `heuristic` is accepted (reserved for future expansion).
 - `artifacts`
-  - Declares paths to input artifacts. Accepts these 12 IDs: `pbi-input` / `plan` / `todo` / `test-cases` / `review-self` / `review-external` / `diff` / `junit` / `coverage` / `lint` / `typecheck` / `findings-pool`.
+  - Declares paths to input artifacts. It accepts these 14 IDs.
+    - Markdown: `pbi-input` / `plan` / `design` / `todo` / `test-cases` / `review-self` / `review-external`
+    - Diff and tool output: `diff` / `junit` / `coverage` / `lint` / `typecheck` / `findings-pool` / `tdd-ledger`
   - Each value is a string path, or an object `{ "path": "...", "optional": <boolean> }` (`optional` is a boolean).
   - Unknown keys are accepted for forward compatibility (catchall). See the [Artifact Input Contract](./artifact-input-contract.md) for the resolution order and per-artifact contract.
 

@@ -397,6 +397,7 @@ describe('artifactsConfigSchema (#802 Phase 2a)', () => {
     const result = artifactsConfigSchema.safeParse({
       'pbi-input': './pbi-input.md',
       plan: './plan.md',
+      design: './design.md',
       todo: './todo.md',
       'test-cases': './test-cases.md',
       'review-self': './review-self.md',
@@ -426,6 +427,14 @@ describe('artifactsConfigSchema (#802 Phase 2a)', () => {
   test('rejects an invalid value for a known artifact ID', () => {
     assert.ok(!artifactsConfigSchema.safeParse({ plan: 123 }).success);
     assert.ok(!artifactsConfigSchema.safeParse({ plan: { optional: true } }).success);
+  });
+
+  // #2011 AC7 P3-4: `design` is a declared key, not a `.catchall` passthrough,
+  // so an invalid value must be rejected the same way `plan` is.
+  test('rejects an invalid value for the design artifact ID', () => {
+    assert.ok(!artifactsConfigSchema.safeParse({ design: 123 }).success);
+    assert.ok(!artifactsConfigSchema.safeParse({ design: { optional: true } }).success);
+    assert.ok(artifactsConfigSchema.safeParse({ design: './docs/design.md' }).success);
   });
 });
 

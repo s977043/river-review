@@ -47162,6 +47162,7 @@ const artifactPathConfigSchema = schemas/* union */.KC([
 const artifactsConfigSchema = schemas/* object */.Ik({
     'pbi-input': artifactPathConfigSchema.optional(),
     plan: artifactPathConfigSchema.optional(),
+    design: artifactPathConfigSchema.optional(),
     todo: artifactPathConfigSchema.optional(),
     'test-cases': artifactPathConfigSchema.optional(),
     'review-self': artifactPathConfigSchema.optional(),

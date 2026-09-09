@@ -81,7 +81,7 @@ These nine types are a breakdown of the five categories used as an introduction 
 
 Upstream, River Review checks requirements, design, ADRs, and plans to reduce risk in later phases. Midstream, it reviews code and pull requests to keep design intent, plan, and diff aligned. Downstream, it checks tests, QA, completion reports, and release readiness.
 
-Those nine types are the **conceptual** review targets. The implemented input contract is the 13 inputs defined in [Artifact Input Contract](../reference/artifact-input-contract.en.md) (`plan`, `diff`, `junit`, `test-cases`, and others), so not every one of the nine has a dedicated input type. Skill coverage is also uneven across phases. Security Report and Operations Artifact in particular are defined as target areas, but their input contract and skills are still being expanded. For how far the CLI is implemented today, see [Review scope and use cases](./review-scope.en.md).
+Those nine types are the **conceptual** review targets. The implemented input contract is the 14 inputs defined in [Artifact Input Contract](../reference/artifact-input-contract.en.md) (`plan`, `diff`, `junit`, `test-cases`, and others), so not every one of the nine has a dedicated input type. Skill coverage is also uneven across phases. Security Report and Operations Artifact in particular are defined as target areas, but their input contract and skills are still being expanded. For how far the CLI is implemented today, see [Review scope and use cases](./review-scope.en.md).
 
 ## More decision material, no transfer of responsibility
 
