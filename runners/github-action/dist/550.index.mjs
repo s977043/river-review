@@ -375,39 +375,33 @@ async function executeFlow({
     const { step, record } = describe(index);
     const { id, kind } = record;
 
-    // 予約 primitive。`human-escalation` は常に record-only で、P4 でも動かない。
-    // `derive-gate` は **`judgment.deriveGate` が注入されたときだけ** dispatch する
-    // （#2011 AC7 P4-1）。注入が無ければ P3 までと同じ `not-implemented` に留まる。
-    if (kind === 'primitive' && RESERVED_PRIMITIVES.includes(id)) {
-      const gateInjected = id === 'derive-gate' && typeof judgment.deriveGate === 'function';
-      if (!gateInjected) {
-        steps.push({ ...record, outcome: 'not-implemented', reason: `reserved primitive "${id}"` });
-        continue;
-      }
-      if (observe) {
-        // observe は「何が動くはずか」を並べるモードで、副作用を持たせない。
-        // 注入済みでも呼ばず、動く見込みであることだけを記録する。
-        steps.push({
-          ...record,
-          outcome: 'not-implemented',
-          reason: 'derive-gate: judgment injected (observe mode does not dispatch)',
-        });
-        continue;
-      }
-      try {
-        judgment.deriveGate();
-        steps.push({ ...record, outcome: 'executed' });
-      } catch (error) {
-        const reason = `derive-gate threw: ${error?.message ?? String(error)}`;
-        const outcome = unsatisfiedOutcome(step, index);
-        steps.push({ ...record, outcome, reason });
-        if (outcome === 'stopped') return stoppedResult(STOP_REASON_NOT_EXECUTED);
-      }
+    // 予約 primitive のうち **`human-escalation` は常に record-only** で、P4 でも動かない。
+    // `derive-gate` だけが `judgment.deriveGate` の注入時に dispatch する（#2011 AC7 P4）。
+    // 注入が無ければ P3 までと同じ `not-implemented` に留まる。
+    //
+    // dispatch そのものは下の共通経路へ委ねる。ここで独自に呼ぶと、`when` の評価と
+    // `onUnsatisfied` の 3 値が効かない別経路になる（P4 の敵対的レビューで blocker 2 件）。
+    const gateInjected = id === 'derive-gate' && typeof judgment.deriveGate === 'function';
+    if (kind === 'primitive' && RESERVED_PRIMITIVES.includes(id) && !gateInjected) {
+      steps.push({ ...record, outcome: 'not-implemented', reason: `reserved primitive "${id}"` });
+      continue;
+    }
+    if (gateInjected && observe) {
+      // observe は「何が動くはずか」を並べるモードで、副作用を持たせない。
+      // 注入済みでも呼ばず、動く見込みであることだけを記録する。
+      steps.push({
+        ...record,
+        outcome: 'not-implemented',
+        reason: 'derive-gate: judgment injected (observe mode does not dispatch)',
+      });
       continue;
     }
 
     const capabilityKey = kind === 'reviewer' ? REVIEWER_CAPABILITY_KEY : id;
-    const capability = capabilityMap.get(capabilityKey);
+    // `derive-gate` の実体は `judgment.deriveGate` であって `capabilities` ではない。
+    // 注入口を 1 つに保つ設計（本ファイル冒頭）を守りつつ、`when` / `onUnsatisfied` /
+    // 例外処理は他の step と同じ共通経路に載せるため、ここで解決だけ差し替える。
+    const capability = gateInjected ? judgment.deriveGate : capabilityMap.get(capabilityKey);
     const hasCapability = typeof capability === 'function';
 
     // Event 1: `when` does not hold.
