@@ -551,17 +551,125 @@ describe('flow-runner: capabilities', () => {
     assert.equal(called, 0);
   });
 
-  test('judgment is accepted but not wired in P1: derive-gate stays not-implemented', async () => {
-    let called = 0;
+  // #2011 AC7 P4-1: `derive-gate` は `judgment.deriveGate` が注入されたときだけ動く。
+  // P3 までは「注入しても動かない」が契約だった。ここを更新する。
+  test('derive-gate dispatches only when judgment.deriveGate is injected', async () => {
     const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
-    const result = await executeFlow({
+
+    // 未注入: P3 までと同じく not-implemented のまま。
+    const bare = await executeFlow({ document, mode: 'execute' });
+    assert.deepEqual(outcomesOf(bare), ['not-implemented']);
+    assert.match(bare.steps[0].reason, /reserved primitive/);
+
+    // 注入あり: execute で 1 回だけ呼ばれる。
+    let called = 0;
+    const injected = await executeFlow({
       document,
       mode: 'execute',
       judgment: { deriveGate: () => (called += 1) },
     });
+    assert.equal(called, 1);
+    assert.deepEqual(outcomesOf(injected), ['executed']);
+    assert.equal(injected.stopped, false);
+  });
+
+  test('observe mode never dispatches derive-gate even when injected', async () => {
+    // observe は「何が動くはずか」を並べるモードなので副作用を持たせない。
+    let called = 0;
+    const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
+    const result = await executeFlow({
+      document,
+      mode: 'observe',
+      judgment: { deriveGate: () => (called += 1) },
+    });
     assert.equal(called, 0);
     assert.deepEqual(outcomesOf(result), ['not-implemented']);
+    assert.match(result.steps[0].reason, /observe mode does not dispatch/);
+  });
+
+  test('human-escalation stays record-only whatever is injected', async () => {
+    // 予約 primitive 2 つのうち、P4 で動くのは derive-gate だけである。
+    let called = 0;
+    const document = { id: 'x', steps: [{ use: 'human-escalation' }] };
+    const result = await executeFlow({
+      document,
+      mode: 'execute',
+      judgment: { deriveGate: () => (called += 1) },
+      capabilities: { 'human-escalation': () => (called += 1) },
+    });
+    assert.equal(called, 0);
+    assert.deepEqual(outcomesOf(result), ['not-implemented']);
+    assert.match(result.steps[0].reason, /reserved primitive/);
+  });
+
+  // 敵対的レビュー（PR #2192）が出した blocker 2 件の pin。
+  // dispatch を共通経路へ載せる前は、独自分岐が `await` せず `when` も見なかった。
+  test('an async deriveGate rejection is caught, not left unhandled', async () => {
+    const document = { id: 'x', steps: [{ use: 'derive-gate', onUnsatisfied: 'degrade' }] };
+    const result = await executeFlow({
+      document,
+      mode: 'execute',
+      judgment: {
+        deriveGate: async () => {
+          throw new Error('async-boom');
+        },
+      },
+    });
+    assert.equal(result.steps[0].outcome, 'degraded');
+    assert.match(result.steps[0].reason, /async-boom/);
+  });
+
+  test('derive-gate honours `when` like every other step', async () => {
+    // `when` 不成立なら注入済みでも呼ばない。独自分岐は `when` の前に居たため
+    // `onUnsatisfied: stop` でも実行してしまっていた。
+    const document = {
+      id: 'x',
+      inputs: [{ name: 'evidence', required: false }],
+      steps: [
+        {
+          use: 'derive-gate',
+          when: { input: 'evidence', state: 'present' },
+          onUnsatisfied: 'stop',
+        },
+      ],
+    };
+    let called = 0;
+    const result = await executeFlow({
+      document,
+      mode: 'execute',
+      inputs: {},
+      judgment: { deriveGate: () => (called += 1) },
+    });
+    assert.equal(called, 0);
+    assert.equal(result.steps[0].outcome, 'stopped');
+    assert.equal(result.stopped, true);
+  });
+
+  test('a derive-gate that throws is recorded, not propagated', async () => {
+    const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
+    const result = await executeFlow({
+      document,
+      mode: 'execute',
+      judgment: {
+        deriveGate: () => {
+          throw new Error('boom');
+        },
+      },
+    });
+    assert.equal(result.stopped, true);
+    // 共通経路に載せたので、文言は他の step と同じ `capability "…" failed:` になる。
+    // 独自分岐の頃は `derive-gate threw:` という専用文言だった。
+    assert.match(result.steps[0].reason, /capability "derive-gate" failed: boom/);
+  });
+
+  test('judgment and judgment.deriveGate are type-checked', async () => {
+    const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
     await assert.rejects(executeFlow({ document, judgment: 'x' }), FlowRunnerError);
+    // 関数以外の deriveGate は呼び出し側の誤りなので例外にする。
+    // 未注入（undefined）は正常なので、そちらは throw しない。
+    await assert.rejects(executeFlow({ document, judgment: { deriveGate: 'x' } }), FlowRunnerError);
+    const ok = await executeFlow({ document, judgment: { deriveGate: undefined } });
+    assert.deepEqual(outcomesOf(ok), ['not-implemented']);
   });
 
   test('Human authority is unchanged: every agent contract declares canApproveMerge: false', () => {
