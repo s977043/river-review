@@ -90,12 +90,24 @@ export const modules = {
 //   `onUnsatisfied: "degrade"`), with `reason` saying why. The return value
 //   is stored verbatim as `result`.
 //
-//   `judgment` is RESERVED for P4: the connection point through which a gate
-//   is derived. The design is that `derive-gate` dispatches only when
-//   `judgment.deriveGate` is injected — never through `capabilities`, so a
-//   caller cannot smuggle a gate in as an ordinary capability. P1 does not
-//   implement that dispatch: `derive-gate` stays `not-implemented` whatever
-//   `judgment` holds, and `human-escalation` is always record-only.
+//   `judgment` is the connection point through which a gate is derived (P4).
+//   `derive-gate` dispatches only when `judgment.deriveGate` is injected —
+//   never through `capabilities`, so a caller cannot smuggle a gate in as an
+//   ordinary capability. Without the injection it stays `not-implemented`,
+//   and `human-escalation` is always record-only whatever is injected.
+//
+//   **This module builds no argument for the gate.** `deriveGate` is called
+//   with the same `context` every other step receives, and the injector is
+//   expected to close over whatever the decision needs. The reason is that
+//   `deriveGateDecision` (`src/lib/gate-decision.mjs`) takes 18 named inputs
+//   that live outside the Flow vocabulary — artifact findings, risk-map
+//   digests, `strictBlock`, `deterministicUnrunnable`. Both existing callers
+//   already assemble those themselves before calling it
+//   (`src/lib/review-plan.mjs`, `src/lib/run-gate.mjs`); notably each counts
+//   `blockingFindings` from its own artifact. Having the runner assemble them
+//   instead would drag severity vocabulary into a module that deliberately
+//   holds none, and would route this run's own results back into the
+//   judgment (RA-1).
 //
 //   Steps marked `parallel: true` form contiguous runs (schema `steps`
 //   description). P1 does not run them concurrently; it walks them in index
@@ -245,9 +257,11 @@ function declaredInputNames(document) {
  * @param {object} params.document  `resolveFlowEntry().document`
  * @param {Record<string, Function>} [params.capabilities]
  * @param {Record<string, unknown>} [params.inputs]
- * @param {object} [params.judgment]  RESERVED (P4): `{ deriveGate }` is the
- *   only path through which `derive-gate` will ever dispatch. P1 accepts and
- *   ignores it; `derive-gate` stays `not-implemented`.
+ * @param {object} [params.judgment]  `{ deriveGate }` is the only path through
+ *   which `derive-gate` dispatches (P4). Omit it and that step stays
+ *   `not-implemented`. `deriveGate` receives the ordinary step `context` and
+ *   NO gate arguments: the injector closes over what the decision needs. See
+ *   the `judgment` note at the top of this file for why.
  * @param {'observe'|'execute'} [params.mode]  `observe` (default) records a
  *   missing capability as `not-implemented` and continues; `execute` treats
  *   it as unsatisfied per `onUnsatisfied`.
