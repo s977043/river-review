@@ -573,6 +573,38 @@ describe('flow-runner: capabilities', () => {
     assert.equal(injected.stopped, false);
   });
 
+  // #2011 AC7 P4-3: runner は gate の引数を 1 つも組み立てない。
+  // `deriveGateDecision`（src/lib/gate-decision.mjs）は 18 個の名前付き入力を取るが、
+  // その大半は artifact / risk-map 由来で Flow の語彙に無い。既存の 2 呼び出し元
+  // （review-plan.mjs / run-gate.mjs）も自分で組み立ててから渡している。
+  // runner が組み立てると severity 語彙を持ち込むことになり、この run 自身の結果を
+  // 判定へ環流させる（RA-1 違反）。注入側がクロージャで閉じるのが契約である。
+  test('deriveGate receives the ordinary step context and no gate arguments', async () => {
+    let received;
+    let argCount = -1;
+    const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
+    await executeFlow({
+      document,
+      mode: 'execute',
+      judgment: {
+        deriveGate: function (...args) {
+          argCount = args.length;
+          received = args[0];
+        },
+      },
+    });
+    assert.equal(argCount, 1, 'gate 用の追加引数を渡していない');
+    assert.deepEqual(
+      Object.keys(received).sort(),
+      ['degraded', 'document', 'index', 'inputs', 'reason', 'step'],
+      '他の step と同じ context である'
+    );
+    // 判定語彙が context に混ざっていないこと。runner は severity を知らない。
+    for (const key of ['blockingFindings', 'severity', 'decision', 'gate', 'loopSignal']) {
+      assert.equal(key in received, false, `context に判定語彙 ${key} が混ざっている`);
+    }
+  });
+
   test('observe mode never dispatches derive-gate even when injected', async () => {
     // observe は「何が動くはずか」を並べるモードなので副作用を持たせない。
     let called = 0;
