@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.109.0](https://github.com/s977043/river-review/compare/v1.108.0...v1.109.0) (2026-09-09)
+
+
+### Features
+
+* **config:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P3-4 design role に Artifact Input Contract の ID を対応付ける ([#2199](https://github.com/s977043/river-review/issues/2199)) ([e935bb9](https://github.com/s977043/river-review/commit/e935bb928bf8e081a391eda13d9dcd05797a3410))
+
 ## [1.108.0](https://github.com/s977043/river-review/compare/v1.107.0...v1.108.0) (2026-09-09)
 
 
