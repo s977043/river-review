@@ -551,17 +551,80 @@ describe('flow-runner: capabilities', () => {
     assert.equal(called, 0);
   });
 
-  test('judgment is accepted but not wired in P1: derive-gate stays not-implemented', async () => {
-    let called = 0;
+  // #2011 AC7 P4-1: `derive-gate` は `judgment.deriveGate` が注入されたときだけ動く。
+  // P3 までは「注入しても動かない」が契約だった。ここを更新する。
+  test('derive-gate dispatches only when judgment.deriveGate is injected', async () => {
     const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
-    const result = await executeFlow({
+
+    // 未注入: P3 までと同じく not-implemented のまま。
+    const bare = await executeFlow({ document, mode: 'execute' });
+    assert.deepEqual(outcomesOf(bare), ['not-implemented']);
+    assert.match(bare.steps[0].reason, /reserved primitive/);
+
+    // 注入あり: execute で 1 回だけ呼ばれる。
+    let called = 0;
+    const injected = await executeFlow({
       document,
       mode: 'execute',
       judgment: { deriveGate: () => (called += 1) },
     });
+    assert.equal(called, 1);
+    assert.deepEqual(outcomesOf(injected), ['executed']);
+    assert.equal(injected.stopped, false);
+  });
+
+  test('observe mode never dispatches derive-gate even when injected', async () => {
+    // observe は「何が動くはずか」を並べるモードなので副作用を持たせない。
+    let called = 0;
+    const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
+    const result = await executeFlow({
+      document,
+      mode: 'observe',
+      judgment: { deriveGate: () => (called += 1) },
+    });
     assert.equal(called, 0);
     assert.deepEqual(outcomesOf(result), ['not-implemented']);
+    assert.match(result.steps[0].reason, /observe mode does not dispatch/);
+  });
+
+  test('human-escalation stays record-only whatever is injected', async () => {
+    // 予約 primitive 2 つのうち、P4 で動くのは derive-gate だけである。
+    let called = 0;
+    const document = { id: 'x', steps: [{ use: 'human-escalation' }] };
+    const result = await executeFlow({
+      document,
+      mode: 'execute',
+      judgment: { deriveGate: () => (called += 1) },
+      capabilities: { 'human-escalation': () => (called += 1) },
+    });
+    assert.equal(called, 0);
+    assert.deepEqual(outcomesOf(result), ['not-implemented']);
+    assert.match(result.steps[0].reason, /reserved primitive/);
+  });
+
+  test('a derive-gate that throws is recorded, not propagated', async () => {
+    const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
+    const result = await executeFlow({
+      document,
+      mode: 'execute',
+      judgment: {
+        deriveGate: () => {
+          throw new Error('boom');
+        },
+      },
+    });
+    assert.equal(result.stopped, true);
+    assert.match(result.steps[0].reason, /derive-gate threw: boom/);
+  });
+
+  test('judgment and judgment.deriveGate are type-checked', async () => {
+    const document = { id: 'x', steps: [{ use: 'derive-gate' }] };
     await assert.rejects(executeFlow({ document, judgment: 'x' }), FlowRunnerError);
+    // 関数以外の deriveGate は呼び出し側の誤りなので例外にする。
+    // 未注入（undefined）は正常なので、そちらは throw しない。
+    await assert.rejects(executeFlow({ document, judgment: { deriveGate: 'x' } }), FlowRunnerError);
+    const ok = await executeFlow({ document, judgment: { deriveGate: undefined } });
+    assert.deepEqual(outcomesOf(ok), ['not-implemented']);
   });
 
   test('Human authority is unchanged: every agent contract declares canApproveMerge: false', () => {
