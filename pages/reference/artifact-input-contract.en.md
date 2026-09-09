@@ -21,7 +21,7 @@ The input artifacts recognized by River Review are listed below. See "Legend" at
 | ----------------- | -------------------- | ------------ | --------------- | --------------------------------------------------- | -------------------------------------------------------------- |
 | `pbi-input`       | `pbi-input.md`       | Markdown     | Optional (rec.) | Free-form                                           | Input spec / background of the Product Backlog Item            |
 | `plan`            | `plan.md`            | Markdown     | Optional (rec.) | Free-form                                           | Implementation plan and design rationale                       |
-| `design`          | `design.md`          | Markdown     | Optional (rec.) | Free-form                                           | Design document (architecture and technical premises)          |
+| `design`          | — (no default)       | Markdown     | Optional (rec.) | Free-form                                           | Design document (architecture and technical premises)          |
 | `todo`            | `todo.md`            | Markdown     | Optional        | Free-form (checklist)                               | Implementation tasks and progress                              |
 | `test-cases`      | `test-cases.md`      | Markdown     | Optional        | Free-form (bullets or tables)                       | Test case design                                               |
 | `review-self`     | `review-self.md`     | Markdown     | Optional        | Free-form                                           | Self-review by the author                                      |
@@ -42,6 +42,7 @@ The input artifacts recognized by River Review are listed below. See "Legend" at
   - `Optional`: Missing files are tolerated; related skills are skipped or degraded.
   - `Optional (rec.)`: Missing is allowed, but review quality drops meaningfully.
 - **Format**: Encoding and syntax. Multiple accepted formats are comma-separated.
+- **Example filename**: The well-known filename probed by current-directory detection, the third channel described in "Input channels" below. An artifact marked `— (no default)` is excluded from that probe and resolves only when supplied explicitly via a CLI argument or the config file.
 
 ## Per-artifact Contract
 
@@ -108,6 +109,8 @@ Example:
 
 An artifact that supplies the design document. A Flow's declared `design` input resolves to this same-named artifact ID.
 
+- **How to supply it**: Always supply it explicitly, with `--artifact design=<path>` or `artifacts.design` in the config file. It has no well-known filename for current-directory detection.
+- **Why it has no default filename**: `design` is a required input of `design-review` / `technical-review`, and a default binding on a required input would let a file that merely sits in the working tree declare the input satisfied (see [Runner CLI Reference](./runner-cli-reference.en.md#entry-acceptance-scope)).
 - **Format**: UTF-8 Markdown. Describes architecture, design decisions, and technical premises.
 - **Size guideline**: 100 KB or less per file recommended.
 - **Flows that require it**: `design-review` / `technical-review`

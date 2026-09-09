@@ -27,13 +27,12 @@ const CFG_DIR = '/repo/cfg';
 
 // ---------------------------------------------------------------------------
 describe('CWD_DEFAULTS', () => {
-  test('exports all 14 canonical artifact IDs from the contract', () => {
+  test('exports all 13 canonical artifact IDs from the contract', () => {
     const ids = Object.keys(CWD_DEFAULTS);
-    assert.equal(ids.length, 14);
+    assert.equal(ids.length, 13);
     for (const id of [
       'pbi-input',
       'plan',
-      'design',
       'todo',
       'test-cases',
       'review-self',
@@ -57,12 +56,14 @@ describe('CWD_DEFAULTS', () => {
     assert.equal(CWD_DEFAULTS['tdd-ledger'], 'tdd-ledger.json');
   });
 
-  // #2011 AC7 P3-4: the Flow input name `design` is bound by the same-named
-  // resolution in flow-input-bindings, so the ID must exist here with the same
-  // cwd-default shape as `plan` (its precedent: also a Markdown design/plan
-  // document that is REQUIRED on two Flows).
-  test('design default is design.md', () => {
-    assert.equal(CWD_DEFAULTS.design, 'design.md');
+  // #2011 AC7 P3-4. `design` is the first Artifact Input Contract ID that has
+  // NO cwd default. It is a REQUIRED input on design-review and
+  // technical-review, and runner-cli-reference.md § "--entry の受理範囲"
+  // declares that required inputs carry no default binding: a file that merely
+  // sits in the working tree must not declare a required input satisfied.
+  // Adding `design` here would silently make that published statement false.
+  test('design has no cwd default: required Flow inputs carry no default binding', () => {
+    assert.equal(CWD_DEFAULTS.design, undefined);
   });
 });
 
@@ -227,12 +228,12 @@ describe('resolveArtifact — priority order', () => {
 
 // ---------------------------------------------------------------------------
 describe('resolveAllArtifacts', () => {
-  test('returns a record with all 14 known IDs', async () => {
+  test('returns a record with all 13 known IDs', async () => {
     const fsImpl = makeFsStub([]);
     const result = await resolveAllArtifacts({ cwd: CWD, fsImpl });
-    assert.equal(Object.keys(result).length, 14);
+    assert.equal(Object.keys(result).length, 13);
     assert.ok('plan' in result);
-    assert.ok('design' in result);
+    assert.ok(!('design' in result));
     assert.ok('typecheck' in result);
     assert.ok('findings-pool' in result);
     assert.ok('tdd-ledger' in result);
