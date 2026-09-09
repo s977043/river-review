@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.108.0](https://github.com/s977043/river-review/compare/v1.107.0...v1.108.0) (2026-09-09)
+
+
+### Features
+
+* **flow:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P4 derive-gate を judgment 注入時のみ実行する ([#2192](https://github.com/s977043/river-review/issues/2192)) ([a358b16](https://github.com/s977043/river-review/commit/a358b162259621792211ce939b09bcf1d99d2159))
+
 ## [1.107.0](https://github.com/s977043/river-review/compare/v1.106.4...v1.107.0) (2026-09-09)
 
 
