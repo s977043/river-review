@@ -46721,6 +46721,7 @@ async function loadAllSkillMetadata(options = {}) {
 const CWD_DEFAULTS = Object.freeze({
   'pbi-input': 'pbi-input.md',
   plan: 'plan.md',
+  design: 'design.md',
   todo: 'todo.md',
   'test-cases': 'test-cases.md',
   'review-self': 'review-self.md',
@@ -47162,6 +47163,7 @@ const artifactPathConfigSchema = schemas/* union */.KC([
 const artifactsConfigSchema = schemas/* object */.Ik({
     'pbi-input': artifactPathConfigSchema.optional(),
     plan: artifactPathConfigSchema.optional(),
+    design: artifactPathConfigSchema.optional(),
     todo: artifactPathConfigSchema.optional(),
     'test-cases': artifactPathConfigSchema.optional(),
     'review-self': artifactPathConfigSchema.optional(),
