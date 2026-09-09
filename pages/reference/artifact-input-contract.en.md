@@ -21,6 +21,7 @@ The input artifacts recognized by River Review are listed below. See "Legend" at
 | ----------------- | -------------------- | ------------ | --------------- | --------------------------------------------------- | -------------------------------------------------------------- |
 | `pbi-input`       | `pbi-input.md`       | Markdown     | Optional (rec.) | Free-form                                           | Input spec / background of the Product Backlog Item            |
 | `plan`            | `plan.md`            | Markdown     | Optional (rec.) | Free-form                                           | Implementation plan and design rationale                       |
+| `design`          | `design.md`          | Markdown     | Optional (rec.) | Free-form                                           | Design document (architecture and technical premises)          |
 | `todo`            | `todo.md`            | Markdown     | Optional        | Free-form (checklist)                               | Implementation tasks and progress                              |
 | `test-cases`      | `test-cases.md`      | Markdown     | Optional        | Free-form (bullets or tables)                       | Test case design                                               |
 | `review-self`     | `review-self.md`     | Markdown     | Optional        | Free-form                                           | Self-review by the author                                      |
@@ -102,6 +103,18 @@ Example:
   }
 }
 ```
+
+### `design`
+
+An artifact that supplies the design document. A Flow's declared `design` input resolves to this same-named artifact ID.
+
+- **Format**: UTF-8 Markdown. Describes architecture, design decisions, and technical premises.
+- **Size guideline**: 100 KB or less per file recommended.
+- **Flows that require it**: `design-review` / `technical-review`
+- **Flows that treat it as optional**: `plan-review` / `requirements-review` / `research-review`
+- **When absent (Flows that require it)**: The input is reported as unbound.
+- **When absent (Flows that treat it as optional)**: The related observation is skipped.
+- **Distinct from the `stage` vocabulary**: The `design` listed in the `stage` vocabulary above is a value of `reviewSignals.stage` and does not share a vocabulary space with artifact IDs. The names match, but the two are unrelated.
 
 ### `review-self` / `review-external`
 

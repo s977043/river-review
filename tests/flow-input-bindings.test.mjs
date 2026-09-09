@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test, { describe } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve as resolvePath } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+import { resolveAllArtifacts } from '../src/config/artifact-resolver.mjs';
 import {
   DEFAULT_FLOW_INPUT_BINDINGS,
   ENTRY_FLOW_INPUT_BINDING_OVERRIDES,
@@ -166,5 +170,44 @@ describe('Flow input bindings', () => {
       },
       unboundInputNames: [],
     });
+  });
+  // #2011 AC7 P3-4. Cross-checks the real production path rather than this
+  // module alone: the Flow document on disk, the artifact resolver's cwd
+  // default, and the same-named binding must line up. `design` is bound by the
+  // same-named rule (flow-input-bindings.mjs:73-83), so it must NOT appear in
+  // DEFAULT_FLOW_INPUT_BINDINGS -- a role default there would be redundant and
+  // would let an unrelated file satisfy a REQUIRED input.
+  test('design resolves end-to-end from a design.md in cwd to the design-review Flow input', async () => {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const flow = JSON.parse(
+      readFileSync(resolvePath(__dirname, '../flows/design-review.flow.json'), 'utf8')
+    );
+    assert.equal(
+      flow.inputs.find((input) => input.name === 'design')?.required,
+      true,
+      'design-review must keep design REQUIRED for this test to mean anything'
+    );
+    assert.equal(DEFAULT_FLOW_INPUT_BINDINGS.design, undefined);
+
+    const cwd = '/repo';
+    const fsImpl = {
+      access(candidate) {
+        return candidate === '/repo/design.md'
+          ? Promise.resolve()
+          : Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      },
+    };
+    const resolved = await resolveAllArtifacts({ cwd, fsImpl });
+    assert.equal(resolved.design.path, '/repo/design.md');
+    assert.equal(resolved.design.source, 'cwd');
+
+    const result = resolveFlowInputBindings({ entry: 'design-review', document: flow, resolved });
+    assert.equal(result.inputs.design, '/repo/design.md');
+    assert.deepEqual(result.inputSources.design, {
+      kind: 'direct',
+      id: 'design',
+      source: 'cwd',
+    });
+    assert.ok(!result.unboundInputNames.includes('design'));
   });
 });

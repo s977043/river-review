@@ -247,6 +247,7 @@ export const artifactsConfigSchema = z
   .object({
     'pbi-input': artifactPathConfigSchema.optional(),
     plan: artifactPathConfigSchema.optional(),
+    design: artifactPathConfigSchema.optional(),
     todo: artifactPathConfigSchema.optional(),
     'test-cases': artifactPathConfigSchema.optional(),
     'review-self': artifactPathConfigSchema.optional(),

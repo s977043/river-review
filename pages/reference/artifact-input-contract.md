@@ -21,6 +21,7 @@ River Review が認識する入力アーティファクトは以下の通りで�
 | ----------------- | -------------------- | ------------ | -------------- | --------------------------------------------------- | ------------------------------------------------- |
 | `pbi-input`       | `pbi-input.md`       | Markdown     | 任意（推奨）   | フリーフォーム                                      | PBI（Product Backlog Item）の入力仕様・背景       |
 | `plan`            | `plan.md`            | Markdown     | 任意（推奨）   | フリーフォーム                                      | 実装計画・設計判断の記録                          |
+| `design`          | `design.md`          | Markdown     | 任意（推奨）   | フリーフォーム                                      | 設計文書（アーキテクチャ・技術的前提）            |
 | `todo`            | `todo.md`            | Markdown     | 任意           | フリーフォーム（チェックリスト）                    | 実装タスクと進捗                                  |
 | `test-cases`      | `test-cases.md`      | Markdown     | 任意           | フリーフォーム（箇条書き／表）                      | テストケース設計                                  |
 | `review-self`     | `review-self.md`     | Markdown     | 任意           | フリーフォーム                                      | 実装者によるセルフレビュー                        |
@@ -103,6 +104,18 @@ River Review が認識する入力アーティファクトは以下の通りで�
   }
 }
 ```
+
+### `design`
+
+設計文書を供給するアーティファクトです。Flow が宣言する `design` 入力は、同名の本 artifact ID として解決されます。
+
+- **形式**: UTF-8 Markdown。アーキテクチャ・設計判断・技術的前提を記述する。
+- **サイズ目安**: 1 ファイルあたり 100KB 以下を推奨する。
+- **必須入力とする Flow**: `design-review` / `technical-review`
+- **任意入力とする Flow**: `plan-review` / `requirements-review` / `research-review`
+- **欠損時（必須入力の Flow）**: 当該入力を未束縛として報告する。
+- **欠損時（任意入力の Flow）**: 該当する観点をスキップする。
+- **`stage` 語彙との区別**: 前掲の `stage` 語彙にある `design` は `reviewSignals.stage` が取る値であり、artifact ID と同じ語彙空間に属さない。名前が同じでも、両者に対応関係はない。
 
 ### `review-self` / `review-external`
 

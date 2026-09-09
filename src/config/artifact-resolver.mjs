@@ -20,6 +20,7 @@ import fs from 'node:fs/promises';
 export const CWD_DEFAULTS = Object.freeze({
   'pbi-input': 'pbi-input.md',
   plan: 'plan.md',
+  design: 'design.md',
   todo: 'todo.md',
   'test-cases': 'test-cases.md',
   'review-self': 'review-self.md',
