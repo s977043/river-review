@@ -21,6 +21,7 @@ The input artifacts recognized by River Review are listed below. See "Legend" at
 | ----------------- | -------------------- | ------------ | --------------- | --------------------------------------------------- | -------------------------------------------------------------- |
 | `pbi-input`       | `pbi-input.md`       | Markdown     | Optional (rec.) | Free-form                                           | Input spec / background of the Product Backlog Item            |
 | `plan`            | `plan.md`            | Markdown     | Optional (rec.) | Free-form                                           | Implementation plan and design rationale                       |
+| `design`          | — (no default)       | Markdown     | Optional (rec.) | Free-form                                           | Design document (architecture and technical premises)          |
 | `todo`            | `todo.md`            | Markdown     | Optional        | Free-form (checklist)                               | Implementation tasks and progress                              |
 | `test-cases`      | `test-cases.md`      | Markdown     | Optional        | Free-form (bullets or tables)                       | Test case design                                               |
 | `review-self`     | `review-self.md`     | Markdown     | Optional        | Free-form                                           | Self-review by the author                                      |
@@ -41,6 +42,7 @@ The input artifacts recognized by River Review are listed below. See "Legend" at
   - `Optional`: Missing files are tolerated; related skills are skipped or degraded.
   - `Optional (rec.)`: Missing is allowed, but review quality drops meaningfully.
 - **Format**: Encoding and syntax. Multiple accepted formats are comma-separated.
+- **Example filename**: The well-known filename probed by current-directory detection, the third channel described in "Input channels" below. An artifact marked `— (no default)` is excluded from that probe and resolves only when supplied explicitly via a CLI argument or the config file.
 
 ## Per-artifact Contract
 
@@ -102,6 +104,20 @@ Example:
   }
 }
 ```
+
+### `design`
+
+An artifact that supplies the design document. A Flow's declared `design` input resolves to this same-named artifact ID.
+
+- **How to supply it**: Always supply it explicitly, with `--artifact design=<path>` or `artifacts.design` in the config file. It has no well-known filename for current-directory detection.
+- **Why it has no default filename**: `design` is a required input of `design-review` / `technical-review`, and a default binding on a required input would let a file that merely sits in the working tree declare the input satisfied (see [Runner CLI Reference](./runner-cli-reference.en.md#entry-acceptance-scope)).
+- **Format**: UTF-8 Markdown. Describes architecture, design decisions, and technical premises.
+- **Size guideline**: 100 KB or less per file recommended.
+- **Flows that require it**: `design-review` / `technical-review`
+- **Flows that treat it as optional**: `plan-review` / `requirements-review` / `research-review`
+- **When absent (Flows that require it)**: The input is reported as unbound.
+- **When absent (Flows that treat it as optional)**: The related observation is skipped.
+- **Distinct from the `stage` vocabulary**: The `design` listed in the `stage` vocabulary above is a value of `reviewSignals.stage` and does not share a vocabulary space with artifact IDs. The names match, but the two are unrelated.
 
 ### `review-self` / `review-external`
 
@@ -188,8 +204,9 @@ Example:
 
 ### `diff`
 
-- **Format**: unified diff (`git diff` compatible). Binary diffs are ignored.
+- **Format**: unified diff (`git diff` compatible). Binary diffs are ignored when the diff is supplied as an artifact. (When `review plan|exec --base <ref>` obtains the diff from git, the changed-file set comes from `git diff --name-only`, so binary changes and 100% renames are included.)
 - **Requirement**: A diff must be supplied by **some channel**. When no artifact is specified, River Review internally runs `git diff <mergeBase>..HEAD` and uses the result as the diff.
+- **Precedence against `--base`** (#2046): an explicitly specified artifact (tier 1 CLI argument / tier 2 config file) wins over `review plan|exec --base <ref>` — provided the file exists at that path; when it does not, the `--base` range is used and a warning says so. `--base` wins over tier 3 directory auto-detection (`diff.patch`). Either way, the discarded input is announced as a warning on stderr.
 - **When the resulting diff is empty**: If the supplied diff (explicit or fallback) is empty, `status` is set to `no-changes` and review skills are not executed.
 
 ### `junit`

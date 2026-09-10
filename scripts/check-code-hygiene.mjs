@@ -9,6 +9,11 @@
 //   3. mkdtemp-cleanup: tests/** で mkdtemp / mkdtempSync を使うのに、
 //      cleanup（rm / rmSync / after / finally）が同一ファイルに 1 つも無い
 //      （#1335 ×2、#1375 で再発）
+//   5. heredoc-size: シェルスクリプトの heredoc 本体が 512 バイトを超える
+//      （homebrew の bash 5.3.15 は本体が 512B を超える heredoc で決定論的に
+//      deadlock する。#1951 が 3 本を printf へ書き換えたがガードを残さず、
+//      16 日後に追加された scripts/pr-unstall.sh で再発した = #2144）
+//      → printf '%s\n' の連なりへ置き換える
 //   4. phantom-dep: src/lib/** の import が package.json の dependencies に
 //      未宣言（transitive 依存に依存する phantom dependency）。src/lib は
 //      publish/bundle される production コードなので、直接 import は必ず
@@ -53,6 +58,12 @@ export function packageBaseOf(spec) {
 }
 
 const SCAN_DIRS = ['src', 'scripts', 'tests', 'tools', 'runners'];
+// heredoc-size の走査対象。実行されるシェルスクリプトだけを見る。
+const SHELL_SCAN_DIRS = ['scripts', 'hooks', join('.claude', 'hooks')];
+const SHELL_EXTS = new Set(['.sh', '.bash']);
+// bash 5.3.15（homebrew）が deadlock する下限。510 は通り 520 は止まる実測から、
+// 既知の記述（#1951）と合わせて 512 を境界にする。
+const HEREDOC_MAX_BYTES = 512;
 const EXTS = new Set(['.mjs', '.js', '.cjs']);
 // 除外 path（生成物 / 依存 / 意図的 fixture / worktree）
 const EXCLUDE = [
@@ -121,6 +132,60 @@ function collectFiles() {
       if (statSync(abs).isDirectory()) files.push(...walk(abs));
     } catch {
       /* dir absent: skip */
+    }
+  }
+  return files;
+}
+
+/**
+ * シェルスクリプトの heredoc 本体のバイト数を測る。
+ *
+ * **コメント行と行内コメントは走査しない。** 手当ての経緯を書いたコメントには
+ * `cat >&2 <<EOF` のような**説明のための文字列**が残っており、素朴に正規表現を
+ * 当てるとそれを実物の heredoc として数えてしまう（2026-09-09 に実際に踏んだ）。
+ *
+ * @param {string} rel repo からの相対パス
+ * @param {string} text ファイル内容
+ * @returns {{file: string, line: number, tag: string, bytes: number}[]}
+ */
+function findLargeHeredocs(rel, text) {
+  const out = [];
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // コメントを落としてから探す。行頭コメントも行内コメントも同じ扱いでよい
+    // （行頭コメントは `split('#')[0]` が空文字になる）。判定を 1 本にしておくと、
+    // canary が「除外が効いているか」を 1 つの変異で弁別できる。
+    const code = line.split('#')[0];
+    const m =
+      /<<-?\s*(?:'([A-Za-z_][A-Za-z0-9_]*)'|"([A-Za-z_][A-Za-z0-9_]*)"|([A-Za-z_][A-Za-z0-9_]*))/.exec(
+        code
+      );
+    if (!m) continue;
+    const tag = m[1] ?? m[2] ?? m[3];
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() !== tag) j++;
+    if (j >= lines.length) continue; // 終端が見つからない: heredoc ではない
+    let bytes = 0;
+    for (let k = i + 1; k < j; k++) bytes += Buffer.byteLength(lines[k], 'utf8') + 1;
+    if (bytes > HEREDOC_MAX_BYTES) out.push({ file: rel, line: i + 1, tag, bytes });
+    i = j;
+  }
+  return out;
+}
+
+function collectShellFiles() {
+  const files = [];
+  for (const d of SHELL_SCAN_DIRS) {
+    const abs = join(ROOT, d);
+    try {
+      if (!statSync(abs).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    for (const name of readdirSync(abs)) {
+      const ext = name.slice(name.lastIndexOf('.'));
+      if (SHELL_EXTS.has(ext)) files.push(join(abs, name));
     }
   }
   return files;
@@ -215,6 +280,17 @@ function main() {
     phantomDeps.push(...found.phantomDeps);
   }
 
+  const largeHeredocs = [];
+  for (const file of collectShellFiles()) {
+    let text;
+    try {
+      text = readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+    largeHeredocs.push(...findLargeHeredocs(relative(ROOT, file), text));
+  }
+
   let hasError = false;
 
   if (duplicateImports.length > 0) {
@@ -268,10 +344,24 @@ function main() {
     hasError = true;
   }
 
+  if (largeHeredocs.length > 0) {
+    console.error(
+      `\n❌ heredoc-size: ${HEREDOC_MAX_BYTES} バイトを超える heredoc を ${largeHeredocs.length} 件検出:`
+    );
+    for (const v of largeHeredocs) {
+      console.error(`  ${v.file}:${v.line}  <<${v.tag} の本体が ${v.bytes} バイト`);
+    }
+    console.error(
+      '\nhomebrew の bash 5.3.15 は本体が 512 バイトを超える heredoc で決定論的に deadlock します（#2144）。' +
+        "printf '%s\\n' の連なりへ置き換えてください（#1951 と同じ書き換え）。"
+    );
+    hasError = true;
+  }
+
   if (hasError) process.exit(1);
 
   console.log(
-    '✅ code hygiene OK（duplicate-import / tmp-literal / mkdtemp-cleanup / phantom-dep）'
+    '✅ code hygiene OK（duplicate-import / tmp-literal / mkdtemp-cleanup / phantom-dep / heredoc-size）'
   );
 }
 

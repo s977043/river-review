@@ -1,0 +1,22 @@
+{
+  "caseId": "task-checkpoint-paired",
+  "description": "The same neutral trigger reaches the CLI through two adapters: the Claude Code Stop hook names the entry inside its script, the GitHub Action passes its `entry` input through verbatim. Both must pin the same Flow.",
+  "trigger": "task-checkpoint",
+  "entry": "review-task",
+  "expected": {
+    "flow": "task-completion-review",
+    "flowVersion": "0.1.0",
+    "evidenceRequirements": ["diff", "tasks"]
+  },
+  "adapters": {
+    "claude": {
+      "hooksFile": "hooks/hooks.json",
+      "event": "Stop",
+      "surface": "scripts/plugin-task-checkpoint-hook.sh"
+    },
+    "github-action": {
+      "surface": "runners/github-action/action.yml",
+      "input": "entry"
+    }
+  }
+}

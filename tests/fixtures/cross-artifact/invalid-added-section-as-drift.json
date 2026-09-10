@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "kind": "cross-artifact-consistency",
+  "edges": [],
+  "semanticDrift": {
+    "fileMembership": null,
+    "axes": [
+      {
+        "axis": "test-strategy",
+        "status": "changed",
+        "judgment": "agentic",
+        "baselinePresent": false,
+        "findingCode": "SEMANTIC_DRIFT",
+        "summary": "baseline に無い節の追記を意味変化として報告している"
+      }
+    ]
+  },
+  "degradations": [],
+  "findings": []
+}

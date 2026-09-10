@@ -272,7 +272,7 @@ describe('river promote propose input validation (schema invariants)', () => {
     ]);
     const control = seed([
       feedback(1, 'a'.repeat(16)),
-      { ...feedback(2, 'b'.repeat(16)), skillId: 'skill id' },
+      { ...feedback(2, 'b'.repeat(16)), skillId: 'skill\u0000id' },
     ]);
     t.after(tooLong.cleanup);
     t.after(control.cleanup);

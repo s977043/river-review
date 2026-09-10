@@ -1,0 +1,39 @@
+{
+  "purpose": "technical-viability",
+  "version": "0.1.0",
+  "question": "宣言された技術的前提は Evidence 上成立するか。",
+  "description": "Reviews the technical premises a design declares — runtime, API, library, performance, security, compatibility — and never whether a technology is preferable. Evidence is the whole discipline: what can be established mechanically is established first, every candidate verdict passes verify-findings, and a premise whose evidence lies outside the supplied artifacts leaves through human-escalation as an open question.",
+  "stage": "technical",
+  "phase": "upstream",
+  "subject": ["design"],
+  "baseline": {
+    "kind": "none",
+    "description": "A premise either holds on the supplied evidence or it does not; there is nothing to regress against, so this Flow declares no compare-baseline step."
+  },
+  "evidence": [
+    {
+      "artifact": "design",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "The design carries the premises under review; without it the run stops with DETERMINISTIC_UNRUNNABLE."
+    },
+    {
+      "artifact": "tests",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent test evidence degrades the performance and compatibility judgments to declared-only and records the degradation."
+    },
+    {
+      "artifact": "requirements",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent requirements skip the premise-versus-requirement cross-check and record the reason."
+    },
+    {
+      "artifact": "diff",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent code skips the premise-versus-code cross-check and records the reason."
+    }
+  ]
+}

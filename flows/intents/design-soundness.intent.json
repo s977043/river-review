@@ -1,0 +1,39 @@
+{
+  "purpose": "design-soundness",
+  "version": "0.1.0",
+  "question": "この設計から実装へ進んでよいか。",
+  "description": "Reviews a design before implementation proceeds from it. Boundary, traceability, risk register and validation plan are judged on the design itself; the cross-checks against requirements, plan and code are what keep the judgment from becoming a single all-in-one upstream verdict, which is a Non-goal of #2017.",
+  "stage": "design",
+  "phase": "upstream",
+  "subject": ["design"],
+  "baseline": {
+    "kind": "none",
+    "description": "A design is judged against the requirements it must satisfy rather than against a previous design, so this Flow declares no compare-baseline step."
+  },
+  "evidence": [
+    {
+      "artifact": "design",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "The design is the subject; without it the run stops with DETERMINISTIC_UNRUNNABLE."
+    },
+    {
+      "artifact": "requirements",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent requirements remove the design-versus-requirement cross-check; the design-internal review still runs and the degradation is recorded."
+    },
+    {
+      "artifact": "plan",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent plan skips the design-versus-plan cross-check and records the reason."
+    },
+    {
+      "artifact": "diff",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent code skips the design-versus-code cross-check and records the reason."
+    }
+  ]
+}

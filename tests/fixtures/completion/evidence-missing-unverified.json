@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "task",
+  "mode": "observe",
+  "state": "UNVERIFIED",
+  "reasonCodes": ["REQUIREMENT_EVIDENCE_MISSING", "EVIDENCE_SOURCE_UNAVAILABLE"],
+  "verification": {
+    "requirements": { "total": 2, "satisfied": 1, "violated": 0, "unverified": 1 },
+    "acceptanceCriteria": { "total": 2, "verified": 1, "unverified": 1 }
+  },
+  "tasks": { "total": 1, "complete": 1, "unsupportedClaims": 0 },
+  "unsupportedClaims": [],
+  "unresolvedRefs": ["AC-2"],
+  "evidence": [
+    { "kind": "tasks", "state": "present" },
+    { "kind": "diff", "state": "present" },
+    { "kind": "tests", "state": "missing", "note": "No test evidence was produced for this task." }
+  ]
+}

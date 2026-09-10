@@ -8,6 +8,11 @@ import {
   ensureGitRepo,
   detectDefaultBranch,
   findMergeBase,
+  findMergeBaseCandidate,
+  resolveRefToCommit,
+  resolveRefToCommitCandidate,
+  resolveBaseMergeBase,
+  BaseRefError,
   getHeadSha,
   isWorkingTreeDirty,
   listChangedFiles,
@@ -110,6 +115,60 @@ describe('findMergeBase', () => {
     const base = await findMergeBase(dir, 'nonexistent-branch');
     const head = (await runGit(['rev-parse', 'HEAD'], dir)).stdout.trim();
     assert.equal(base, head);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveRefToCommit / resolveBaseMergeBase (#2085)
+// ---------------------------------------------------------------------------
+
+describe('resolveRefToCommit (#2085 wrapper pin)', () => {
+  test('returns exactly the sha resolveRefToCommitCandidate reports', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      initialFiles: { 'a.txt': 'initial\n' },
+    });
+    t.after(cleanup);
+    const head = (await runGit(['rev-parse', 'HEAD'], dir)).stdout.trim();
+
+    const candidate = await resolveRefToCommitCandidate(dir, 'main');
+    assert.equal(candidate.sha, head);
+    assert.equal(candidate.ref, 'main');
+    assert.equal(await resolveRefToCommit(dir, 'main'), candidate.sha);
+
+    const missing = await resolveRefToCommitCandidate(dir, 'nonexistent-branch');
+    assert.deepEqual(missing, { sha: null, ref: null });
+    assert.equal(await resolveRefToCommit(dir, 'nonexistent-branch'), null);
+  });
+
+  test('findMergeBase keeps the same wrapper shape', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      initialFiles: { 'a.txt': 'initial\n' },
+    });
+    t.after(cleanup);
+    const candidate = await findMergeBaseCandidate(dir, 'main');
+    assert.equal(await findMergeBase(dir, 'main'), candidate.mergeBase);
+  });
+});
+
+describe('resolveBaseMergeBase unresolvable --base (#2085 candidate-order pin)', () => {
+  test('lists the tried candidates in resolver order: origin/<ref> then <ref>', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      initialFiles: { 'a.txt': 'initial\n' },
+    });
+    t.after(cleanup);
+    await assert.rejects(
+      () => resolveBaseMergeBase(dir, 'nonexistent-branch', 'HEAD'),
+      (err) => {
+        assert.ok(err instanceof BaseRefError);
+        // Order is part of the contract: the first candidate the resolvers walk
+        // is `origin/<ref>`. Reversing baseRefCandidates() must fail this line.
+        assert.ok(
+          err.message.includes('(tried "origin/nonexistent-branch" and "nonexistent-branch")'),
+          err.message
+        );
+        return true;
+      }
+    );
   });
 });
 

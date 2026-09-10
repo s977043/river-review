@@ -15,7 +15,7 @@ __webpack_require__.d(__webpack_exports__, {
   runReviewPlan: () => (/* binding */ runReviewPlan)
 });
 
-// UNUSED EXPORTS: REVIEW_GATE_SEVERITIES, computeReplayDrift
+// UNUSED EXPORTS: computeReplayDrift, resolveChangedFiles, resolveDiffSource
 
 // EXTERNAL MODULE: external "node:path"
 var external_node_path_ = __webpack_require__(6760);
@@ -192,9 +192,9 @@ async function _fileExists(filePath, fsImpl) {
 // EXTERNAL MODULE: ./src/lib/diff-processor.mjs
 var diff_processor = __webpack_require__(3249);
 // EXTERNAL MODULE: ./runners/core/review-runner.mjs + 4 modules
-var review_runner = __webpack_require__(1030);
-// EXTERNAL MODULE: ./src/lib/review-engine.mjs
-var review_engine = __webpack_require__(2010);
+var review_runner = __webpack_require__(735);
+// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 11 modules
+var review_engine = __webpack_require__(2368);
 // EXTERNAL MODULE: ./src/lib/risk-map.mjs + 1 modules
 var risk_map = __webpack_require__(2374);
 // EXTERNAL MODULE: ./src/lib/planner-utils.mjs
@@ -1004,6 +1004,8 @@ var gate_decision = __webpack_require__(5801);
 var deterministic_gate = __webpack_require__(8817);
 // EXTERNAL MODULE: ./src/lib/deterministic-exec-gate.mjs
 var deterministic_exec_gate = __webpack_require__(4709);
+// EXTERNAL MODULE: ./src/lib/finding-factory.mjs
+var finding_factory = __webpack_require__(7563);
 // EXTERNAL MODULE: external "node:crypto"
 var external_node_crypto_ = __webpack_require__(7598);
 ;// CONCATENATED MODULE: ./src/lib/review-plan.mjs
@@ -1033,6 +1035,7 @@ var external_node_crypto_ = __webpack_require__(7598);
  * Pure-ish module: config loader, resolver, buildExecutionPlan and the
  * diff reader are injectable for tests.
  */
+
 
 
 
@@ -1155,6 +1158,88 @@ function finalizeArtifact(
 const VALID_PLANNER_MODES = new Set(planner_utils/* PLANNER_MODES */.Er);
 const MODEL_HINTS = new Set(['cheap', 'balanced', 'high-accuracy']);
 
+/**
+ * Decide which of two possible diff sources supplies the review diff, and say
+ * on stderr when the two disagree (#2046 review, major 1).
+ *
+ * `pages/reference/artifact-input-contract.md` § `diff` declares that River
+ * Review runs git itself only when the diff is NOT supplied as an artifact, so
+ * an artifact the caller actually specified — `--artifact diff=<path>` (tier
+ * `cli`) or `artifacts.diff` in the config (tier `config`) — wins over
+ * `--base`. The cwd-default `diff.patch` (tier `cwd`) is auto-detected rather
+ * than specified, so a typed `--base` wins over it; #2046 exists precisely
+ * because a stale file in the working directory must not decide the range.
+ *
+ * Either way the loser is announced. Silently discarding the caller's input is
+ * the failure mode #2046 was filed about; replacing it with a different silent
+ * discard would not be a fix.
+ *
+ * @param {{diffText: string, context?: object}|undefined} diffOverride
+ * @param {{exists?: boolean, path?: string|null, source?: string|null}|undefined} diffRes
+ * @param {{warn?: (msg: string) => void}} [opts] injectable for tests
+ * @returns {{useOverride: boolean}}
+ */
+function resolveDiffSource(diffOverride, diffRes, { warn = console.warn } = {}) {
+  const hasOverride = diffOverride != null && typeof diffOverride.diffText === 'string';
+  if (!hasOverride) return { useOverride: false };
+
+  const artifactPresent = Boolean(diffRes?.exists && diffRes.path);
+  const artifactSpecified = diffRes?.source === 'cli' || diffRes?.source === 'config';
+  const artifactExplicit = artifactPresent && artifactSpecified;
+
+  // A specified-but-missing artifact loses to `--base` on the `exists` check
+  // alone, which reads as "the artifact took precedence" to nobody: the caller
+  // named a file and got a git range instead. Say so before falling through.
+  if (artifactSpecified && !artifactPresent) {
+    warn(
+      `Warning: the \`diff\` artifact specified via ` +
+        `${diffRes.source === 'cli' ? '--artifact diff=' : 'river.config'} (${diffRes.path}) ` +
+        'does not exist; using the --base range instead.'
+    );
+  }
+
+  if (artifactExplicit) {
+    warn(
+      `Warning: --base is ignored for the review diff. The \`diff\` artifact specified via ` +
+        `${diffRes.source === 'cli' ? '--artifact diff=' : 'river.config'} (${diffRes.path}) ` +
+        'takes precedence (pages/reference/artifact-input-contract.md § diff).'
+    );
+    return { useOverride: false };
+  }
+  if (artifactPresent) {
+    warn(
+      `Warning: --base takes precedence over the auto-detected diff artifact ${diffRes.path}; ` +
+        'that file is not used. Pass --artifact diff=<path> to use it instead.'
+    );
+  }
+  return { useOverride: true };
+}
+
+/**
+ * The changed-file set for a diff that {@link resolveDiffSource} selected.
+ *
+ * When the diff came from `--base`, git already answered this question
+ * (`git diff --name-only`, via collectRepoDiff) and that answer is the SSoT:
+ * `parseUnifiedDiff` only sees entries carrying `---`/`+++` headers, so
+ * deriving the set from the diff text drops binary changes and pure renames
+ * (#2046 review). A rename-only range parsed to zero files and produced an
+ * `ok` review of nothing. Artifact-supplied diffs have no git answer, so there
+ * the parsed set stays the only available one.
+ *
+ * @param {{context?: {changedFiles?: string[]}}|undefined} diffOverride
+ * @param {boolean} useOverride
+ * @param {{files?: Array<{path?: string}>}} parsedDiff
+ * @returns {string[]}
+ */
+function resolveChangedFiles(diffOverride, useOverride, parsedDiff) {
+  if (useOverride && Array.isArray(diffOverride?.context?.changedFiles)) {
+    return [...diffOverride.context.changedFiles];
+  }
+  // Exclude /dev/null (the deletion/creation sentinel) so deleted or created
+  // files are not reported as a literal path.
+  return (parsedDiff?.files ?? []).map((f) => f?.path).filter((p) => p && p !== '/dev/null');
+}
+
 /** Raised for argument/config errors that map to CLI exit code 3. */
 class ReviewPlanError extends Error {
   constructor(message) {
@@ -1226,6 +1311,12 @@ async function runReviewExecReplay({
   cwd = process.cwd(),
   cliArtifacts = {},
   artifactsDir,
+  // #2046: diff resolved by the caller from `--base` (see
+  // src/cli/commands/review.mjs resolveBaseRepoDiff): `{ diffText, context }`.
+  // Precedence against the `diff` artifact is decided by resolveDiffSource;
+  // when this source wins, an empty `diffText` means "the base range is empty"
+  // and must NOT fall back to a stale on-disk diff artifact.
+  diffOverride,
   loadConfigImpl = loader/* loadConfig */.Z9,
   resolveAllArtifactsImpl = resolveAllArtifacts,
   generateReviewImpl = review_engine/* generateReview */.G1,
@@ -1338,6 +1429,11 @@ async function runReviewExecReplay({
 
   let executionTrace = null;
   let replayDrift = null;
+  let replayChangedFiles = [];
+  let useOverrideForContext = false;
+  // Whether a diff was actually resolved on this run. `[]` must mean "we looked
+  // and the range was empty", never "we never looked" (#2046 review round 3).
+  let replayDiffResolved = false;
   // Captured from config (when loaded for execution) so finalizeArtifact can
   // surface usage.provider / usage.model when an LLM actually runs.
   let modelConfigForUsage = null;
@@ -1362,23 +1458,25 @@ async function runReviewExecReplay({
       cwd: detectionRoot,
     });
     const diffRes = resolved?.diff;
-    if (diffRes?.exists && diffRes.path) {
+    const { useOverride } = resolveDiffSource(diffOverride, diffRes);
+    useOverrideForContext = useOverride;
+    if (useOverride ? diffOverride.diffText.length > 0 : diffRes?.exists && diffRes.path) {
       let diffText;
-      try {
-        diffText = await readFileImpl(diffRes.path);
-      } catch (err) {
-        throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+      if (useOverride) {
+        diffText = diffOverride.diffText;
+      } else {
+        try {
+          diffText = await readFileImpl(diffRes.path);
+        } catch (err) {
+          throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+        }
       }
       const parsedDiff = (0,diff_processor/* parseUnifiedDiff */.rj)(diffText);
+      replayDiffResolved = true;
+      replayChangedFiles = resolveChangedFiles(diffOverride, useOverride, parsedDiff);
       // #936: report (non-blocking) membership drift between the replay-time
       // diff and the source plan's snapshot. Null when the snapshot predates A2-3.
-      replayDrift = computeReplayDrift(
-        // Exclude /dev/null (deletion/creation sentinel) so deleted/created
-        // files are not reported as literal drift paths, matching the
-        // changed-files extraction used elsewhere.
-        (parsedDiff.files ?? []).map((f) => f?.path).filter((p) => p && p !== '/dev/null'),
-        sourceSnapshot
-      );
+      replayDrift = computeReplayDrift(replayChangedFiles, sourceSnapshot);
       let review;
       try {
         review = await generateReviewImpl({
@@ -1402,6 +1500,13 @@ async function runReviewExecReplay({
       const rawFindings = Array.isArray(review?.findings) ? review.findings : [];
       artifact.findings = rawFindings.map((f, i) => normalizeFindingForArtifact(f, i, phase));
       executionTrace = {
+        // #1868: generateReview が debug.execution へ積んだ観測（ADR-006 の
+        // promptCompiler など）を先に展開してから、経路側の trace キーを重ねる。
+        // 展開しないと replay 経路だけ観測が欠測し、欠測は「差が無かった」と
+        // 区別できない。順序は「経路側が勝つ」で固定する。skillsExecuted 等は
+        // この経路が artifact 契約として持つ値であり、engine 側が将来同名キーを
+        // 足しても上書きされてはならない。
+        ...(review?.debug?.execution ?? {}),
         skillsExecuted: selectedSkills.length,
         findingsCount: artifact.findings.length,
         llmUsed: review?.debug?.llmUsed === true,
@@ -1410,6 +1515,28 @@ async function runReviewExecReplay({
         replaySnapshotUsed: sourceSnapshot != null,
       };
     }
+  } else if (diffOverride != null) {
+    // `review exec --plan <file> --dry-run` (and a source plan with no selected
+    // skills) never reaches the diff-resolution block above, so `--base` is not
+    // consumed here at all. Announcing it is the same rule the precedence
+    // decision follows: an input the caller typed is never dropped in silence
+    // (#2046 review round 3, major 1).
+    console.warn(
+      'Warning: --base has no effect on this run: `review exec --plan <file>` echoes the ' +
+        'source plan without resolving a diff (--dry-run, or the source plan selected no skills).'
+    );
+  }
+
+  // #2046 review: the replay path accepts `--base` too, so it reports the
+  // reviewed range in the same place the plan path does. Emitted ONLY when a
+  // diff was actually resolved — an artifact that declares `changedFiles: []`
+  // for a run that never looked at any diff is worse than one that stays
+  // silent, because a consumer cannot tell the two apart.
+  if (replayDiffResolved) {
+    artifact.context = {
+      ...(useOverrideForContext && diffOverride.context ? diffOverride.context : {}),
+      changedFiles: replayChangedFiles,
+    };
   }
 
   if (debug || executionTrace) {
@@ -1476,9 +1603,6 @@ function resolveReviewOutputFormat({
   );
 }
 
-const REVIEW_GATE_SEVERITIES = (/* unused pure expression or super */ null && (['info', 'minor', 'major', 'critical']));
-const SEVERITY_RANK = { info: 0, minor: 1, major: 2, critical: 3 };
-
 /**
  * Evaluate the review gate exit code from an artifact's findings (#976).
  *
@@ -1498,7 +1622,7 @@ function evaluateReviewGate(
   let maxRank = -1;
   let maxSeverity = null;
   for (const f of findings) {
-    const rank = SEVERITY_RANK[f?.severity];
+    const rank = finding_factory/* SEVERITY_RANK */.f3[f?.severity];
     if (rank !== undefined && rank > maxRank) {
       maxRank = rank;
       maxSeverity = f.severity;
@@ -1507,8 +1631,8 @@ function evaluateReviewGate(
   if (advisoryOnly || maxRank < 0) {
     return { code: 0, level: 'pass', maxSeverity };
   }
-  const failRank = SEVERITY_RANK[failOn] ?? SEVERITY_RANK.critical;
-  const warnRank = SEVERITY_RANK[warnOn] ?? SEVERITY_RANK.major;
+  const failRank = finding_factory/* SEVERITY_RANK */.f3[failOn] ?? finding_factory/* SEVERITY_RANK */.f3.critical;
+  const warnRank = finding_factory/* SEVERITY_RANK */.f3[warnOn] ?? finding_factory/* SEVERITY_RANK */.f3.major;
   if (maxRank >= failRank) return { code: 1, level: 'fail', maxSeverity };
   if (maxRank >= warnRank) return { code: 2, level: 'warn', maxSeverity };
   return { code: 0, level: 'pass', maxSeverity };
@@ -1596,6 +1720,12 @@ async function runReviewPlan({
   skillIds = null,
   availableContexts,
   availableDependencies,
+  // #2046: diff resolved by the caller from `--base` (see
+  // src/cli/commands/review.mjs resolveBaseRepoDiff): `{ diffText, context }`.
+  // Precedence against the `diff` artifact is decided by resolveDiffSource;
+  // when this source wins, an empty `diffText` means "the base range is empty"
+  // and must NOT fall back to a stale on-disk diff artifact.
+  diffOverride,
   humanApprovalAdjudicator,
   now = () => new Date().toISOString(),
   loadConfigImpl = loader/* loadConfig */.Z9,
@@ -1677,21 +1807,30 @@ async function runReviewPlan({
   };
 
   const diffRes = resolved?.diff;
+  const { useOverride } = resolveDiffSource(diffOverride, diffRes);
   let executionTrace = null;
-  if (diffRes?.exists && diffRes.path) {
+  // Same rule as the replay path: `changedFiles: []` may only be written when a
+  // diff source was actually consulted. `--base` counts as consulted even when
+  // the range came back empty — that empty answer is git's, and knowing which
+  // range produced it is the point of #2046.
+  let diffResolved = useOverride;
+  if (useOverride ? diffOverride.diffText.length > 0 : diffRes?.exists && diffRes.path) {
+    diffResolved = true;
     let diffText;
-    try {
-      diffText = await readFileImpl(diffRes.path);
-    } catch (err) {
-      throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+    if (useOverride) {
+      diffText = diffOverride.diffText;
+    } else {
+      try {
+        diffText = await readFileImpl(diffRes.path);
+      } catch (err) {
+        throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+      }
     }
     // Parse the diff once and reuse the result. The same parser used to
     // power deriveChangedFiles (planning input) also exposes the per-file
     // structure generateReview needs (execution input).
     const parsedDiff = (0,diff_processor/* parseUnifiedDiff */.rj)(diffText);
-    const changedFiles = (parsedDiff.files ?? [])
-      .map((f) => f.path)
-      .filter((p) => p && p !== '/dev/null');
+    const changedFiles = resolveChangedFiles(diffOverride, useOverride, parsedDiff);
     gateChangedFiles = changedFiles;
 
     // Declare which artifact contexts are actually available so the plan
@@ -1792,6 +1931,10 @@ async function runReviewPlan({
       if (execGate.strictBlock === true) gateStrictBlock = true;
       gateDeterministicUnrunnable = execGate.deterministicUnrunnable === true;
       executionTrace = {
+        // #1868: replay 経路（runReviewExecReplay）と同じ順序で engine 側の
+        // debug.execution 観測を引き継ぐ。2 経路で挙動を揃えないと、同じ設定でも
+        // 経路によって観測が残ったり消えたりする。
+        ...(review?.debug?.execution ?? {}),
         skillsExecuted: artifact.plan.selectedSkills.length,
         findingsCount: artifact.findings.length,
         llmUsed: review?.debug?.llmUsed === true,
@@ -1800,9 +1943,25 @@ async function runReviewPlan({
       };
     }
   } else {
-    // No diff artifact resolved and no git fallback in this slice:
-    // per cli-review-plan-spec.md this is a no-op review, not an error.
+    // No diff resolved — neither a diff artifact nor (since #2046) a non-empty
+    // `--base` range: per cli-review-plan-spec.md this is a no-op review, not
+    // an error.
     artifact.status = 'no-changes';
+  }
+
+  // #2046 review (major 3): `context` is the schema's existing home for the
+  // reviewed range (schemas/review-artifact.schema.json `context`, documented
+  // in pages/reference/review-artifact.md) — not a new debug field.
+  // `changedFiles` means "the file paths included in the review diff", so it is
+  // filled whichever source supplied that diff. The range fields (repoRoot /
+  // defaultBranch / mergeBase) exist only when git resolved the range from
+  // `--base`, the empty-range case included: knowing WHICH range came back
+  // empty is the whole point of #2046.
+  if (diffResolved) {
+    artifact.context = {
+      ...(useOverride && diffOverride.context ? diffOverride.context : {}),
+      changedFiles: gateChangedFiles,
+    };
   }
 
   if (debug || executionDeferred || executionTrace) {

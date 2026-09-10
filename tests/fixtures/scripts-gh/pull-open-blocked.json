@@ -1,0 +1,9 @@
+{
+  "number": 102,
+  "state": "open",
+  "merged": false,
+  "mergeable_state": "clean",
+  "title": "fix(y): #99 blocked example",
+  "head": { "ref": "fix/99-blocked", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+  "labels": [{ "name": "blocked" }]
+}

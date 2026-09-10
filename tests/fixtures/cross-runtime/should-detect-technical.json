@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "caseId": "should-detect-technical",
+  "caseClass": "should-detect",
+  "description": "A technical premise that does not hold. Both runtimes raise the same critical finding; they label one minor finding under different taxonomies, which is declared as model variation.",
+  "expectation": "conformant",
+  "pinned": {
+    "entry": "review-technical",
+    "flow": "technical-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "51aaca2f4075d12c089b1055fb60e99589d1fd358c0b7aa6b645b2dc70f05792",
+    "artifactSetSha256": "154ce5873d2d1f8f897faed62255d539d574fb32efe19bd40f562791a3382d8a",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": null
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "external-dependencies",
+            "version": "1.0.0"
+          },
+          {
+            "id": "integration-contracts",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "a9590c609c226d0f"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "unverified-throughput-premise",
+            "taxonomy": "evidence-gap",
+            "severity": "critical",
+            "target": {
+              "path": "docs/design/throughput.md",
+              "anchor": null
+            }
+          },
+          {
+            "semanticKey": "stale-dependency-version",
+            "taxonomy": "dependency-hygiene",
+            "severity": "minor",
+            "target": {
+              "path": "package.json",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["premise-evidence", "dependency-risk"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "external-dependencies",
+            "version": "1.0.0"
+          },
+          {
+            "id": "integration-contracts",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "a9590c609c226d0f"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "unverified-throughput-premise",
+            "taxonomy": "evidence-gap",
+            "severity": "critical",
+            "target": {
+              "path": "docs/design/throughput.md",
+              "anchor": null
+            }
+          },
+          {
+            "semanticKey": "stale-dependency-version",
+            "taxonomy": "supply-chain",
+            "severity": "minor",
+            "target": {
+              "path": "package.json",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["premise-evidence", "dependency-risk"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [
+    {
+      "field": "agentic.findings.taxonomy",
+      "layer": "agentic",
+      "reasonClass": "model-variation",
+      "evidence": "pinned.model is null, so each host ran its own default model; the two labels name the same defect at the same location."
+    }
+  ],
+  "expected": {
+    "deterministicConformance": 1,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "pass",
+    "failedGates": []
+  }
+}

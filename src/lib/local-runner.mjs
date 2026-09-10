@@ -9,9 +9,10 @@ import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import {
   detectDefaultBranch,
   ensureGitRepo,
-  findMergeBase,
   getHeadSha,
   isWorkingTreeDirty,
+  normalizeBaseRef,
+  resolveBaseMergeBase,
 } from './git.mjs';
 import { createOpenAIPlanner } from './openai-planner.mjs';
 import { normalizePlannerMode, PHASES } from './planner-utils.mjs';
@@ -156,8 +157,26 @@ async function collectLocalContext({
   const riskMap = await loadRiskMap(repoRoot);
   // When --base is provided, compare against the explicit ref instead of the
   // auto-detected default branch. Falls back to detection when unset.
-  const defaultBranch = baseRef ?? (await detectDefaultBranch(repoRoot));
-  const mergeBase = await findMergeBase(repoRoot, defaultBranch);
+  //
+  // #2057: the value used to be handed straight to findMergeBase, which falls
+  // back to `rev-parse HEAD` for a ref it cannot resolve — so `--base <typo>`
+  // exited 0 having reviewed HEAD..working-tree instead of failing, and the
+  // same flag meant something different here than on the `review` surface.
+  // resolveBaseMergeBase (src/lib/git.mjs) is the shared contract lifted out of
+  // review.mjs's resolveBaseRepoDiff in #2049: it trims, rejects a blank or
+  // unresolvable ref with BaseRefError, and reports (does not throw on) a ref
+  // that shares no history with HEAD. `detectDefaultBranch` stays lazy — it is
+  // only consulted when `--base` is absent, exactly as before.
+  const normalizedBaseRef = normalizeBaseRef(baseRef);
+  const detectedDefaultBranch =
+    normalizedBaseRef === null ? await detectDefaultBranch(repoRoot) : null;
+  const { mergeBase, warning: baseRefWarning } = await resolveBaseMergeBase(
+    repoRoot,
+    baseRef,
+    detectedDefaultBranch
+  );
+  if (baseRefWarning) console.warn(baseRefWarning);
+  const defaultBranch = normalizedBaseRef ?? detectedDefaultBranch;
   // #1715 (#1574 producer Slice 2): the HEAD the review was taken against, plus
   // whether the working tree had changes HEAD does not carry.
   //

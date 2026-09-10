@@ -1,0 +1,39 @@
+{
+  "purpose": "task-completion",
+  "version": "0.1.0",
+  "question": "この Task を DONE と宣言できる Evidence があるか。",
+  "description": "Reviews one task's claim of completion. The question is about evidence sufficiency, so the absence of test evidence changes the answer rather than being ignored.",
+  "stage": "task-completion",
+  "phase": "midstream",
+  "subject": ["tasks", "diff", "tests"],
+  "baseline": {
+    "kind": "none",
+    "description": "A task is judged against its own acceptance evidence, not against a previous run."
+  },
+  "evidence": [
+    {
+      "artifact": "tasks",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "Without the task statement there is no completion claim to judge."
+    },
+    {
+      "artifact": "diff",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "Without the diff there is nothing to check the claim against."
+    },
+    {
+      "artifact": "tests",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent test evidence does not skip the completion judgment: it runs in a reduced form and the missing evidence is recorded, because an absence of tests is itself part of the answer."
+    },
+    {
+      "artifact": "plan",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent plan skips the task-versus-plan cross-check and records the reason."
+    }
+  ]
+}

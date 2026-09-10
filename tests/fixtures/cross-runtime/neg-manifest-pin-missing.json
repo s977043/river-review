@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "caseId": "neg-manifest-pin-missing",
+  "caseClass": "clean-positive",
+  "description": "Negative fixture isolating the pin check: every provenance block reports resolved on both runtimes, but Codex recorded no policy sha256. Status alone would call this manifest complete, which is the \"manifest 欠損を replay 可能と誤認しない\" failure #2015 names. Deterministic conformance stays 100% because the blocks agree, so only manifest completeness fails.",
+  "expectation": "non-conformant",
+  "pinned": {
+    "entry": "review-plan",
+    "flow": "plan-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "aaf2f703239db23b5b6751bc00642b78dc688b45c12cd62d7635929aed888269",
+    "artifactSetSha256": "d0946200fea58ae193e576d635ae63b150d3f8224078087ec0cd77d62a2c46ff",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "plan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "e3c2ca48edfb599c"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "plan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "e3c2ca48edfb599c"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [],
+  "expected": {
+    "deterministicConformance": 1,
+    "manifestCompleteness": 0.8571428571428571,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "fail",
+    "failedGates": ["manifest-completeness"]
+  }
+}

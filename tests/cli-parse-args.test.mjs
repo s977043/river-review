@@ -5,7 +5,7 @@
 // 各テストは < 50ms で完走する想定。
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -885,15 +885,35 @@ test('parseArgs --phase rejects a value normalizePhase would silently default', 
 // 本番の API 面が増える）。抽出は 2 つの正規表現だけで行い、テスト側に
 // トークンの写しを持たない — 写しを持つと、次に増えるオプションで同じ
 // 「更新漏れ」が起きるだけになる。
+// 比較側の走査は `src/cli.mjs` だけでは足りない。オプション連鎖は
+// `src/cli/parse/` へ順次移設しており（リファクタリング Step 4）、移した分を
+// 数え落とすと `extra` が誤って膨らむ。ディレクトリごと読むことで、次にどれだけ
+// 移しても走査範囲を直さずに済む。宣言側の `KNOWN_OPTION_TOKENS` は
+// `src/cli.mjs` に残っているので、そちらは従来どおり 1 ファイルから取る。
 test('KNOWN_OPTION_TOKENS covers exactly the tokens parseArgs compares (#1797)', () => {
   const source = readFileSync(new URL('../src/cli.mjs', import.meta.url), 'utf8');
+  const parseDir = new URL('../src/cli/parse/', import.meta.url);
+  const parseSources = readdirSync(parseDir)
+    .filter((name) => name.endsWith('.mjs'))
+    .map((name) => readFileSync(new URL(name, parseDir), 'utf8'));
+  assert.ok(parseSources.length > 0, 'src/cli/parse/ に .mjs が 1 件も無い');
+  // コメントを落としてから比較する。走査は正規表現なので、コメント内に書かれた
+  // `arg === '--x'` という**説明のための文字列**まで「parseArgs が解釈する
+  // トークン」として拾ってしまう。src/cli/parse/ をディレクトリごと読むように
+  // した結果、無関係なモジュールの説明コメント 1 行でこの検査が落ちる状態に
+  // なっていた（2026-09-09 の範囲レビュー minor、再現済み）。
+  const stripComments = (text) =>
+    text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[^\n]*?\/\/.*$/gm, '');
+  const comparedSource = [source, ...parseSources].map(stripComments).join('\n');
   const setStart = source.indexOf('const KNOWN_OPTION_TOKENS');
   const setEnd = source.indexOf('function takeFreeTextValue');
   assert.ok(setStart > 0 && setEnd > setStart, 'KNOWN_OPTION_TOKENS の定義が見つからない');
   const declared = new Set(
     [...source.slice(setStart, setEnd).matchAll(/'(--[a-z0-9-]+)'/g)].map((m) => m[1])
   );
-  const compared = new Set([...source.matchAll(/arg === '(--[a-z0-9-]+)'/g)].map((m) => m[1]));
+  const compared = new Set(
+    [...comparedSource.matchAll(/arg === '(--[a-z0-9-]+)'/g)].map((m) => m[1])
+  );
 
   assert.ok(compared.size > 0, 'parseArgs のオプション比較を 1 件も抽出できていない');
   const missing = [...compared].filter((t) => !declared.has(t)).sort();

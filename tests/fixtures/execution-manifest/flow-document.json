@@ -1,0 +1,16 @@
+{
+  "id": "fixture-review",
+  "version": "0.1.0",
+  "description": "Positive fixture for the flow pin derivation (#2037). Frozen on purpose: the sha256 of its canonicalJson form is asserted as a golden value in tests/execution-manifest.test.mjs, so editing this document must change that value in the same commit. It validates against schemas/flow.schema.json, which the same test checks, so the pin is taken over a real Flow document rather than an arbitrary object.",
+  "intent": { "purpose": "fixture-purpose" },
+  "inputs": [{ "name": "plan", "required": true, "description": "The plan under review." }],
+  "steps": [
+    { "use": "resolve-intent" },
+    { "use": "resolve-artifacts" },
+    { "use": "select-skills" },
+    { "use": "verify-findings" },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate", "run-record"]
+}

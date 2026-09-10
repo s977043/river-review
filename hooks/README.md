@@ -5,11 +5,12 @@
 
 ## スクリプト一覧
 
-| スクリプト                      | 用途                                                                                       | 呼び出し元                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| `format.sh`                     | 変更ファイルにPrettierを実行                                                               | `.claude/hooks/format.sh`                                             |
-| `hooks.json`                    | プラグイン配布用 PostToolUse hook 定義                                                     | プラグインインストール先（Claude Code）                               |
-| `scripts/plugin-format-hook.sh` | プラグイン同梱の自己完結フォーマッター（リポジトリ上は `hooks/` ではなく `scripts/` 配下） | `hooks.json`（`${CLAUDE_PLUGIN_ROOT}/scripts/plugin-format-hook.sh`） |
+| スクリプト                               | 用途                                                                                                                     | 呼び出し元                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `format.sh`                              | 変更ファイルにPrettierを実行                                                                                             | `.claude/hooks/format.sh`                                                      |
+| `hooks.json`                             | プラグイン配布用 hook 定義（`PostToolUse` と `Stop`）                                                                    | プラグインインストール先（Claude Code）                                        |
+| `scripts/plugin-format-hook.sh`          | プラグイン同梱の自己完結フォーマッター（リポジトリ上は `hooks/` ではなく `scripts/` 配下）                               | `hooks.json`（`${CLAUDE_PLUGIN_ROOT}/scripts/plugin-format-hook.sh`）          |
+| `scripts/plugin-task-checkpoint-hook.sh` | `Stop` 時に `river review plan --plan-only --entry review-task` で Review Artifact を出力する adapter（`scripts/` 配下） | `hooks.json`（`${CLAUDE_PLUGIN_ROOT}/scripts/plugin-task-checkpoint-hook.sh`） |
 
 ### `plugin-format-hook.sh` の defer 挙動
 

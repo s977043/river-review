@@ -62,6 +62,8 @@ git branch -d <branch-name>
 git worktree prune
 ```
 
+委託ワーカー用の `.claude/worktrees/<slug>` は `scripts/worker-bootstrap.sh <branch>` で作ります。PR マージ後の後始末（remove / branch -D / fetch --prune / ff-only）は `scripts/worker-cleanup.sh <branch>` にまとめています。
+
 ## Windows（WSL）での注意事項
 
 - `\\wsl.localhost\Ubuntu\...`のようなUNCパス経由では`husky`や`prettier`がCMD.EXEで実行されエラーになることがある

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "task",
+  "mode": "observe",
+  "state": "COMPLETE",
+  "reasonCodes": ["ALL_REQUIREMENTS_SATISFIED"],
+  "verification": {
+    "requirements": { "total": 1, "satisfied": 1, "violated": 0, "unverified": 0 },
+    "acceptanceCriteria": { "total": 1, "verified": 1, "unverified": 0 }
+  },
+  "tasks": { "total": 1, "complete": 1, "unsupportedClaims": 0 },
+  "evidence": [
+    { "kind": "diff", "state": "present" },
+    { "kind": "tests", "state": "present" }
+  ],
+  "canApproveMerge": true
+}

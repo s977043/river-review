@@ -16,6 +16,8 @@ The following elements are treated as "public interfaces":
 - CLI gate-decision exit codes (`0` / `1` / `2` / `3` as returned by `--fail-on` / `--warn-on` / `--gate`)
 - Idempotent update method for PR comments (marker)
 
+The CLI entry above covers command and option names and their meanings. It does not cover which surfaces accept a given option; that acceptance scope follows **Beta**, the label of the CLI surface as a whole (see "Versioning (Handling Breaking Changes)" below).
+
 Exit codes are declared at two granularities by purpose. Only the gate-decision codes above, the ones CI reads as the gate result, belong to the Stable Contract. Usage-error exit codes (failure to interpret arguments) are excluded and follow **Beta**, the label of the CLI surface as a whole. See "Exit Code Stability" below for the reasoning.
 
 ## Component Stability Labels
@@ -28,17 +30,17 @@ Current stability level for each surface.
 | **Beta**         | API may change in minor versions. Deprecation notice given before removal |
 | **Experimental** | May change or be removed without notice. Use for evaluation only          |
 
-| Surface                                                       | Label        | Notes                                                                               |
-| ------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------- |
-| GitHub Action                                                 | Beta         | v0.x, breaking changes possible                                                     |
-| CLI (`river` command)                                         | Beta         | Surface is Beta; only the elements listed in the Stable Contract are held to Stable |
-| Skill Schema (`schemas/skill.schema.json`)                    | Beta         | CI-validated, field extensions possible                                             |
-| Flow Schema (`schemas/flow.schema.json`)                      | Experimental | Contract added in #2013; no execution engine yet                                    |
-| Agent Contract (`schemas/agent-contract.schema.json`)         | Experimental | Contract added in #2014; no execution engine yet                                    |
-| Execution Manifest (`schemas/execution-manifest.schema.json`) | Experimental | Contract added in #2015; the Review Artifact linkage is additive and optional       |
-| Node API (`runners/node-api/`)                                | Experimental | `private: true`, not published to npm                                               |
-| Agent Skills bridge                                           | Experimental | Added in v0.9.0, still maturing                                                     |
-| Riverbed Memory                                               | Experimental | Design phase, stabilization planned for v1                                          |
+| Surface                                                       | Label        | Notes                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub Action                                                 | Beta         | v0.x, breaking changes possible                                                                                                                                                                                                                                        |
+| CLI (`river` command)                                         | Beta         | Surface is Beta; only the elements listed in the Stable Contract are held to Stable                                                                                                                                                                                    |
+| Skill Schema (`schemas/skill.schema.json`)                    | Beta         | CI-validated, field extensions possible                                                                                                                                                                                                                                |
+| Flow Schema (`schemas/flow.schema.json`)                      | Experimental | Contract added in #2013; no execution engine yet. `schemas/flow-entry-map.schema.json` and `flows/entry-map.json` carry the same Experimental label                                                                                                                    |
+| Agent Contract (`schemas/agent-contract.schema.json`)         | Experimental | Contract added in #2014; no execution engine yet                                                                                                                                                                                                                       |
+| Execution Manifest (`schemas/execution-manifest.schema.json`) | Experimental | Contract added in #2015; the Review Artifact linkage is additive and optional. Since #2054 PR-4, `river run --save` records under `.river/runs/*.json` and `river review plan` / `review exec` (replay included) artifacts carry `executionManifest` as their last key |
+| Node API (`runners/node-api/`)                                | Experimental | `private: true`, not published to npm                                                                                                                                                                                                                                  |
+| Agent Skills bridge                                           | Experimental | Added in v0.9.0, still maturing                                                                                                                                                                                                                                        |
+| Riverbed Memory                                               | Experimental | Design phase, stabilization planned for v1                                                                                                                                                                                                                             |
 
 ## CLI (`river`) Reference (Minimal)
 
@@ -60,6 +62,8 @@ Current stability level for each surface.
 - `--output <text|markdown|json|yaml|html>`: Output format (GitHub Actions uses `markdown`; see [YAML output](./output-format-yaml.en.md) for `yaml` and [HTML output](./output-format-html.en.md) for the self-contained `html` report)
 - `--context <list>`: Available contexts (e.g., `diff,fullFile`)
 - `--dependency <list>`: Available dependencies (e.g., `code_search,test_runner`)
+- `--base <ref>`: Branch / ref the diff is taken against (`run`, `skills`, and `review plan|exec|route` share one resolution path, and a surface that reads no diff does not accept the flag at all; which surfaces accept it, how the value is validated, and the exit code of the resulting usage error are all outside the Stable Contract — the [Runner CLI reference](./runner-cli-reference.en.md) is the SSoT)
+- `--entry <name>` (Beta): accepted by `review plan` and `review exec`; appends the review Flow pin (`flow`) and its required inputs (`evidenceRequirements`) to the emitted artifact, and on `review exec` also the per-step outcomes of running that Flow (`steps`, record only in Epic #2011 AC7 P2). The flag and the three fields are outside the Stable Contract — the [Runner CLI reference](./runner-cli-reference.en.md#entry-acceptance-scope) is the SSoT
 
 ### Exit Codes
 
@@ -105,6 +109,10 @@ See `runners/github-action/action.yml` for definition.
 - `max_cost`: Abort if estimate exceeds limit
 - `node_version`: Node.js version for Action execution
 
+### inputs (Beta)
+
+- `entry`: a review Flow entry name (a key of `entries` in `flows/entry-map.json`). When set, the step runs `review plan --plan-only --entry <value>` and emits the Review Artifact (with `flow` and `evidenceRequirements`); left empty (default) the `run` path is unchanged. The value is forwarded verbatim and the Action holds no judgment about it (ADR-009 D3). When `entry` is set, `gate` / `dry_run` / `estimate` / `max_cost` / `comment` / `inline_comments` do not apply (plan-only runs no review, so there is nothing to gate or to post). #2054 PR-5; the [Runner CLI reference](./runner-cli-reference.en.md#entry-acceptance-scope) is the SSoT
+
 ### outputs (Stable)
 
 - `comment_path`: Path to Markdown output in Actions runner temp area (used for posting PR comment)
@@ -113,6 +121,16 @@ See `runners/github-action/action.yml` for definition.
 
 - **Updates** comment containing `<!-- river-review -->` marker; creates new if missing.
 - Truncates tail if comment body is too long (limit exists).
+
+## Claude Code plugin hooks (Beta)
+
+`hooks/hooks.json` ships two lifecycle hooks: `PostToolUse` (runs the consumer project's prettier after Write / Edit) and, since #2054 PR-5, `Stop`. `Stop` runs `scripts/plugin-task-checkpoint-hook.sh`, which emits a Review Artifact through `river review plan --plan-only --entry review-task`. It is the Claude Code adapter for the neutral `task-checkpoint` trigger and carries nothing but the entry name (ADR-009 D3).
+
+- No model call and no cost (plan-only)
+- Takes 1–7 seconds (5.0–5.4 s over 3 runs on the river-review repository itself, 6.7 s on another machine; a large repository may hit the `timeout: 60` cutoff)
+- Writes under `$TMPDIR/river-review-task-checkpoint/`, never into the working tree, keeping up to 20 previous artifacts (`RIVER_TASK_CHECKPOINT_KEEP`); pruning runs before the write, so at most 21 exist after a run
+- Skips with exit 0 when no CLI is available (no npm install and no `node_modules` in the plugin) or when the run fails, so the session is never blocked. The hook requires `CLAUDE_PLUGIN_ROOT/node_modules`: install the npm package, or run `npm ci` in the plugin directory
+- Opt out with the environment variable `RIVER_TASK_CHECKPOINT_HOOK=0`, or `/plugin disable river-review@river-review-marketplace`
 
 ## Versioning (Handling Breaking Changes)
 
@@ -123,9 +141,10 @@ Changing the following requires a major version bump as a breaking change:
 - Changing/Removing Action inputs / outputs
 - Changing required fields in Skill Schema, or changing meanings of existing fields
 
-The following is not treated as a breaking change and ships in a minor or patch release:
+The following are not treated as breaking changes and ship in a minor or patch release:
 
 - Changing a usage-error exit code (failure to interpret arguments); it follows the Beta label of the CLI surface as a whole
+- Narrowing which surfaces accept an option, where the dropped surfaces never consumed its value (#2065). "Changing/Removing `river` CLI option names or meanings" above means removing the option itself. On a surface that stopped accepting the flag, the call itself now fails as a usage error and exits 1, so that surface no longer runs. Because the value was never read, dropping the flag from the call reproduces the previous result exactly, which makes the migration a one-line edit at the call site — so narrowing acceptance is not breaking. The affected surfaces and the migration steps are listed in the [Runner / CLI reference](./runner-cli-reference.en.md#base-acceptance-scope). Resolving a trailing subcommand word (#2081) is the exception: dropping the flag from `river skills --base main import` does not bring back the review of `import/`, and `river skills --output json import`, which carries no `--base`, runs as the subcommand in the same way. Write a directory that shares a subcommand's name as `river skills ./import`
 
 For stable Action behavior, we recommend **pinning to a release tag** (e.g., `@v1.22.0`) instead of `@main`.
 

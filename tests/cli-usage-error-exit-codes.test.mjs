@@ -80,6 +80,39 @@
 // #1746 W1 も #1753 B1 も「その書き方が表に無かった」ことが検出漏れの原因なので、
 // 部分的な pin では同じ入口を開けたままにすることになる。
 //
+// ---------------------------------------------------------------------------
+// #2065 の掃引について
+// ---------------------------------------------------------------------------
+// `--base` をコマンド別 allowlist の対象にした変更でも同じ手順を取った。
+// **測定範囲は 37 のコマンド面 × 6〜7 変種 = 228 形**である（変種は plain /
+// 解決できる ref / 解決できない ref / 空白のみ / 値欠落 / 重複指定 の 6 つ。
+// パスを取る 6 面にはフラグ先行語順 `<コマンド> --base main <パス>` を足して
+// 7 つとした）。BEFORE と AFTER の両実装で掃引し、exit code が変わった 53 形を
+// CASES へ収めている。
+//
+// ★ **「全量」は必ず測定範囲つきで書くこと。** 範囲を書かずに「変化した N 形の
+//   全量」と断言すると、掃引していない形まで守られているように読める。この
+//   pin は実際に 2 度続けて範囲の取りこぼしで訂正している（下記）。
+//
+// **この掃引で本 Issue の中核にあたるのは「解決できる ref」の変種である**。
+// 解決できない ref だけを見ると #2046 / #2051 / #2057 で塞いだ「値の検証」と
+// 区別がつかず、「その面が値を消費しないこと」を pin したことにならない。
+//
+// **掃引の面リストは src/cli.mjs の語彙から導くこと。** 初回は手で列挙して
+// `skills import` を落とし（PR #2073 レビュー指摘 major 2）、2 回目は
+// サブコマンド無しの `river runs`（`runs list` として動く実在の面）と
+// フラグ先行語順を落とした（同 敵対的レビュー）。面の SSoT は
+// `COMMAND_USAGE` のキーと、`SKILLS_SUBCOMMANDS` / `EVOLVE_SUBCOMMANDS` /
+// `REVIEW_SUBCOMMANDS` / `RUNS_SUBCOMMANDS` / `FEEDBACK_SUBCOMMANDS` /
+// `SUPPRESSION_SUBCOMMANDS` および `promote` のサブコマンド語であり、
+// **サブコマンドを取る面ではサブコマンド無しの形も 1 面として数えること**。
+//
+// なお exit code の差分そのものは fixture 依存である。`river runs --base main`
+// は stored run が無い repo だと BEFORE も exit 1 になり差分に現れない（この
+// 一時 repo では BEFORE が 0 なので現れる）。`runs diff` は逆にこの repo では
+// BEFORE も exit 1 で現れない。**収録は exit code が動いたかではなく
+// 「parse 層で新たに拒否されるようになったか」で決めること。**
+//
 // canary の役割は「正しさの主張」ではなく「変更の全量可視化」にある。
 // 今後の変更でも *この表の差分 = 挙動変更の全量* という不変条件を保つこと。
 // 期待値を書き換えるときは、必ず EXPECTED_CONTRACT_COUNTS も併せて更新する。
@@ -155,7 +188,56 @@ const CONTRACTS = {
 // VALID_CASES の 1 行（88 -> 89）だけである。
 // #1880（`evolve prompt-ab` の新設）で、prompt-compare と同じ 2 形
 // （未知オプション / 余剰 positional）を追加し C3 が 107 -> 109 になった。
-const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 109, C4: 1 };
+// #2046 で `review plan --base` の解決できない ref / 空白のみの値を
+// invalid-value 2 件として追加し、C3 が 109 -> 111 になった。
+// #2051 / #2057 で同じ 2 形を `skills` 面と `run` 面へ広げ（`--base` の意味が
+// subcommand ごとに割れていた問題の解消）、C3 が 111 -> 115 になった。
+// #2065 でコマンド別 allowlist を入れ、`--base` を読まない面の形を 44 行
+// 追加して C3 が 115 -> 159 になった。BEFORE / AFTER の機械掃引
+// （37 面 × 6〜7 変種 = 228 形）で exit code が変わったのは 53 件で、うち
+// 4 件（`review verify`）は 3 -> 1、残り 49 件は 0 -> 1 の移動である。
+// 収録行数（44）と変化形（53）が一致しない理由は CASES 内の #2065 ブロック
+// 冒頭に書いてある（重複指定は代表 1 形のみ / `runs diff` は逆に変化形では
+// ないが収録）。
+// #2081 で `skills` の後置サブコマンド形（`skills --base main import` など
+// 4 面）を unknown-option 4 件として追加し、C3 が 159 -> 163 になった。
+// #2065 の掃引はフラグ先行語順を「パスを取る 6 面」にしか足しておらず、
+// サブコマンドを後置した形（`<コマンド> --base main <サブコマンド>`）を
+// 1 形も測っていなかった。`review` / `evolve` は後置語を解決するが `skills`
+// は解決せず対象パスとして飲んでいたため、同名ディレクトリが cwd にあると
+// `--base` を捨てたままレビューが走り exit 0 だった。一時 repo には
+// `import/` / `export/` / `resolve/` を置き、BEFORE が exit 0 になる条件で
+// pin している（無いと "Not a git repository" の exit 1 で差分が消える。
+// 上の「fixture 依存」と同じ注意）。`list/` だけは置かない。既存の
+// `skills -- list` の行が「`./list` が無いので exit 1」を前提に pin されて
+// おり、置くとその行が exit 0 へ動くためである。したがって `list` の
+// 後置形は BEFORE も exit 1 で、この行は exit code では守られず、parse 層で
+// 拒否されること（usage error）の記録として収録している。
+// 同 PR のレビュー（round 3）でパス併記形 `skills --dry-run . import` を
+// surplus-positional 1 件として追加し、C3 が 163 -> 164 になった。分岐に
+// `!parsed.targetConsumed` が無いと `.` を target に飲んだ上で `import` を
+// サブコマンドとして受理し、パスを黙って捨てて exit 0 になる（前置形
+// `skills import .` は exit 1 のままなので語順で判定が割れる）。
+// 範囲レビュー v1.100.0（3ac089e1..1a8e8c1c）の minor で、後置 `resolve` に固有
+// オプションを付けた形 `skills --path a.txt resolve` を unknown-option 1 件として
+// 追加し、C3 が 164 -> 165 になった。挙動は #2089 以前から exit 1 で変えて
+// いない。前置形 `skills resolve --path a.txt` が exit 0 なのに対し後置形は
+// 拒否される、という語順依存の契約が pin 無しだったための明文化である。
+// #2054 PR-3 で `review plan --entry <name>`（Beta）を新設し、値欠落 /
+// 未知の entry 名 / `--entry` を読まない面（`doctor`）の 3 形を追加して
+// C3 が 165 -> 168 になった。BEFORE（v1.100.0 = 1a8e8c1c）では 3 形とも
+// `Error: unknown option --entry.` の exit 1 であり、exit code は動いていない。
+// 収録の理由は上の「parse 層で新たに拒否されるようになったか」で、未知の
+// entry 名は許容値の列挙つきで、`doctor` は #2065 の allowlist
+// （`COMMAND_SCOPED_OPTIONS`）で拒否される形へ変わったためである。受理形
+// `review plan --plan-only --entry review-plan` は exit 1 -> 0 へ動き、
+// VALID_CASES 側へ pin した（97 -> 98）。
+// 2026-09-09 の pin 追加で C3 が 168 -> 173 になった。`--artifact` の不正形 4 種
+// （値欠落 / `=` なし / `=` が先頭 / 値が `-` 始まり）と、`review plan` 面の代表 1 形
+// である。**exit code は動いていない**（追加前後とも 5 形すべて exit 1）。収録の理由は
+// 変異注入で穴が実測されたことにある。入口の検査を `if (false)` へ落としてもフル
+// スイート 4718 件が全緑で、実出力は exit 1 から exit 3 へ変わっていた。
+const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 173, C4: 1 };
 
 /** 一時 repo 配下の「存在しないパス」に実行時に差し替えるプレースホルダ。 */
 const NONEXISTENT_PATH = '<nonexistent-path>';
@@ -187,6 +269,22 @@ const CASES = [
     surface: 'run',
     kind: 'invalid-value',
     argv: ['run', '.', '--phase', 'BOGUS'],
+    contract: 'C3',
+  },
+  {
+    // #2057: `run` は `--base` を読むが解決可否を検証せず、findMergeBase が
+    // HEAD へフォールバックしていたため typo が exit 0 のまま通っていた。
+    // review / skills と同じ経路（resolveBaseMergeBase）を通すので exit 1（C3）。
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    // 同じ根。trim 前は空白のみの値がそのまま findMergeBase へ渡っていた。
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--base', '   '],
     contract: 'C3',
   },
   { surface: 'run', kind: 'unknown-option', argv: ['run', '.', '--nope'], contract: 'C3' },
@@ -229,9 +327,48 @@ const CASES = [
     contract: 'C3',
   },
   {
+    // #2046: `--base` の値は parse を通るが、git が解決できない ref だと
+    // findMergeBase が HEAD へフォールバックし、exit 0 のまま「差分なし」を
+    // 返していた。ハンドラ層で拒否するので help は出さず exit 1（C3）。
+    surface: 'review plan',
+    kind: 'invalid-value',
+    argv: ['review', 'plan', '--plan-only', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    // 同じ根。trim 前は空白のみの値が「非空の ref」として扱われていた。
+    surface: 'review plan',
+    kind: 'invalid-value',
+    argv: ['review', 'plan', '--plan-only', '--base', '   '],
+    contract: 'C3',
+  },
+  {
     surface: 'review plan',
     kind: 'surplus-positional',
     argv: ['review', 'plan', '.', 'extra', '--plan-only'],
+    contract: 'C3',
+  },
+  {
+    // #2054 PR-3: `--entry` は値を取る。
+    surface: 'review plan',
+    kind: 'value-missing',
+    argv: ['review', 'plan', '--plan-only', '--entry'],
+    contract: 'C3',
+  },
+  {
+    // #2054 PR-3: entry 名は entry map の `entries` キーに限る。parse 層で
+    // 許容値を列挙して拒否する（ハンドラ層の exit 3 ではない）。
+    surface: 'review plan',
+    kind: 'invalid-value',
+    argv: ['review', 'plan', '--plan-only', '--entry', 'nosuch'],
+    contract: 'C3',
+  },
+  {
+    // #2054 PR-3: `--entry` を読むのは `review plan` だけ。他の面は #2065 の
+    // allowlist（`COMMAND_SCOPED_OPTIONS`）で usage error になる。
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: ['doctor', '.', '--entry', 'review-plan'],
     contract: 'C3',
   },
 
@@ -246,6 +383,49 @@ const CASES = [
     surface: 'review exec',
     kind: 'invalid-value',
     argv: ['review', 'exec', '--dry-run', '--output', 'bogus'],
+    contract: 'C3',
+  },
+  // `--artifact` の不正形 4 種（範囲レビュー由来の pin 追加、2026-09-09）。
+  // 実装は値を 1 つ shift したうえで「値がある / `-` 始まりでない / `=` の位置が
+  // 1 以上」の 3 条件を検査し、外れたら usage error にする。この検査を
+  // `if (false)` にする変異を入れてもフルスイート 4718 件が全緑のままだった。
+  // no-op ではない: `review plan --artifact bogus` の実出力が
+  // exit 1 `Error: --artifact requires <id>=<path> ...` から
+  // exit 3 `... supports only --plan-only ...` へ変わる。
+  // #2160 / #2162 で `--artifact` の解決順と配線を触った直後に、その入口の
+  // 検証だけが pin されていなかったため、4 条件を分けて収録する。
+  {
+    surface: 'review exec',
+    kind: 'value-missing',
+    argv: ['review', 'exec', '--entry', 'review-plan', '--artifact'],
+    contract: 'C3',
+  },
+  {
+    // `=` を含まない。id と path に割れないので受理できない。
+    surface: 'review exec',
+    kind: 'invalid-value',
+    argv: ['review', 'exec', '--entry', 'review-plan', '--artifact', 'bogus'],
+    contract: 'C3',
+  },
+  {
+    // `=` が先頭にあり id が空。`eq <= 0` の境界そのもの。
+    surface: 'review exec',
+    kind: 'invalid-value',
+    argv: ['review', 'exec', '--entry', 'review-plan', '--artifact', '=p.md'],
+    contract: 'C3',
+  },
+  {
+    // 次のオプションを値として飲まない。値欠落を「`-` 始まり」で弁別する枝。
+    surface: 'review exec',
+    kind: 'invalid-value',
+    argv: ['review', 'exec', '--entry', 'review-plan', '--artifact', '--output'],
+    contract: 'C3',
+  },
+  {
+    // 面を 1 つに絞らない。`review plan` でも同じ検査が働く。
+    surface: 'review plan',
+    kind: 'invalid-value',
+    argv: ['review', 'plan', '--plan-only', '--artifact', 'bogus'],
     contract: 'C3',
   },
   {
@@ -464,6 +644,22 @@ const CASES = [
     surface: 'skills',
     kind: 'surplus-positional',
     argv: ['skills', 'list', 'extra'],
+    contract: 'C3',
+  },
+  {
+    // #2051: `skills` は `--base` を受理しながら値を読まず、常に自動検出の
+    // デフォルトブランチを基準にしていた。値を読むようにしたので、review 面と
+    // 同じく解決できない ref はハンドラ層で exit 1（C3）。
+    surface: 'skills',
+    kind: 'invalid-value',
+    argv: ['skills', '.', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    // 同じ根（trim 前は空白のみの値が「非空の ref」として通っていた）。
+    surface: 'skills',
+    kind: 'invalid-value',
+    argv: ['skills', '.', '--base', '   '],
     contract: 'C3',
   },
 
@@ -935,6 +1131,425 @@ const CASES = [
   },
   { surface: 'eval', kind: 'unknown-option', argv: ['eval', '--nope'], contract: 'C3' },
   { surface: 'eval', kind: 'surplus-positional', argv: ['eval', 'extra'], contract: 'C3' },
+
+  // ---------------------------------------------------------------------------
+  // #2065: `--base` はコマンド別 allowlist の対象になった（44 行）
+  // ---------------------------------------------------------------------------
+  // `--base` を読まない面が受理して値を捨てていた（#2051 対応候補 2）。
+  //
+  // **測定範囲**: 37 のコマンド面 × 6〜7 変種 = 228 形を BEFORE / AFTER の両
+  // 実装で機械掃引した。変種は plain / 解決できる ref / 解決できない ref /
+  // 空白のみ / 値欠落 / 重複指定 の 6 つで、パスを取る 6 面にはフラグ先行語順
+  // （`<コマンド> --base main <パス>`）を足して 7 つとした。この範囲で exit
+  // code が変わったのは 53 形（13 面）である。**「掃引したすべての argv」では
+  // なく「この 228 形の中で」という意味の全量である。**
+  //
+  // 変わらなかったもの: `--base` を実際に読む 5 面（run / skills /
+  // review plan|exec|route）、値欠落、`promote` 7 面 / `evolve` 4 面
+  // （BEFORE から exit 1）、未知サブコマンド語の形（下記 minor 1）。
+  //
+  // 掃引の面リストは src/cli.mjs の語彙から機械的に作ること。初回はここを手で
+  // 列挙して `skills import` を落とし（レビュー指摘 major 2）、2 回目は
+  // サブコマンド無しの `river runs` とフラグ先行語順を落とした（敵対的
+  // レビュー）。面の SSoT は COMMAND_USAGE のキーと、SKILLS_SUBCOMMANDS /
+  // EVOLVE_SUBCOMMANDS / REVIEW_SUBCOMMANDS / RUNS_SUBCOMMANDS および
+  // feedback / suppression / promote のサブコマンド語であり、**サブコマンドを
+  // 取る面ではサブコマンド無しの形も 1 つの面として数えること**
+  // （`river runs` は `runs list` として動く）。
+  //
+  // 下の行数（44）が変化形の 53 と一致しないのは 2 つの理由による:
+  //   - 重複指定は 13 面すべてで単発形と等価だったため、代表 1 形のみ pin した
+  //     （13 形のうち 1 形だけを収録）
+  //   - `runs diff` の 3 行は逆に、変化形ではないが収録している。新たに拒否は
+  //     されるものの、この一時 repo には指定した run が存在せず BEFORE も
+  //     exit 1（ENOENT）だったため差分に現れない。実在する run を 2 つ指定した
+  //     呼び出しでは 0 -> 1 になるので契約としてここに置いてある
+  //
+  // 変種は 3 つ:
+  //   base-main  = 解決できる ref。**この形が本 Issue の中核**で、BEFORE は
+  //                どの面でも exit 0（`review verify` だけ exit 3）だった。
+  //   base-bogus = 解決できない ref
+  //   base-blank = 空白のみの値
+  // 対象外の面では 3 変種とも parse 層で落ちるため値の中身を区別しない。
+  // kind は `unknown-option`（その面にとって未知のオプション）とした。
+  // promote / evolve が `PROMOTE_SHARED_OPTIONS` / `EVOLVE_SHARED_OPTIONS` で
+  // 出す `unknown option for promote: --base` と同じ分類である。
+  //
+  // `review verify` の 3 -> 1 について: BEFORE の exit 3 は `#802 Phase 3` の
+  // 未実装経路（`runReviewVerify` が出す "execution is not implemented yet"）
+  // であって `--base` を処理した結果ではない。verify のオプション契約
+  // （pages/reference/cli-review-verify-spec.md）は `--artifact` / `--plan` /
+  // `--target` を挙げており `--base` を含まない。parse 層の usage error は
+  // ハンドラより前に出るので exit 1（C3）へ移る。
+  {
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: ['doctor', '.', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: ['doctor', '.', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: ['doctor', '.', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    // 語順: `<コマンド> <フラグ> <パス>`。v1.72.0 の回帰（この語順を拒否した）
+    // と同じ形なので、パス先行と別に pin する。
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: ['doctor', '--base', 'main', '.'],
+    contract: 'C3',
+  },
+  {
+    // 重複指定。`--base` は last-wins の素の代入なので、2 回書いても
+    // `parsed.base` が非 null になるだけで単発形と等価である。13 面すべてで
+    // 単発形と同じ結果になることを掃引で確認したうえで、代表 1 形だけを
+    // pin してその等価性を機械固定する（全面 × 重複は組み合わせ爆発する）。
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: ['doctor', '.', '--base', 'main', '--base', 'HEAD'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills list',
+    kind: 'unknown-option',
+    argv: ['skills', 'list', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills list',
+    kind: 'unknown-option',
+    argv: ['skills', 'list', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills list',
+    kind: 'unknown-option',
+    argv: ['skills', 'list', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills resolve',
+    kind: 'unknown-option',
+    argv: ['skills', 'resolve', '--path', 'a.txt', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills resolve',
+    kind: 'unknown-option',
+    argv: ['skills', 'resolve', '--path', 'a.txt', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills resolve',
+    kind: 'unknown-option',
+    argv: ['skills', 'resolve', '--path', 'a.txt', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills import',
+    kind: 'unknown-option',
+    argv: ['skills', 'import', '--from', 'incoming', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills import',
+    kind: 'unknown-option',
+    argv: ['skills', 'import', '--from', 'incoming', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills import',
+    kind: 'unknown-option',
+    argv: ['skills', 'import', '--from', 'incoming', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills export',
+    kind: 'unknown-option',
+    argv: ['skills', 'export', '--to', 'exported', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills export',
+    kind: 'unknown-option',
+    argv: ['skills', 'export', '--to', 'exported', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills export',
+    kind: 'unknown-option',
+    argv: ['skills', 'export', '--to', 'exported', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    // サブコマンド無しの `river runs` は `runs list` として動く実在の面
+    // （src/cli/commands/runs.mjs:21 の `!parsed.runsSubcommand ||
+    // parsed.runsSubcommand === 'list'`）。初回の掃引はサブコマンド付きの形
+    // だけを見ていてこの 3 形を落としていた（PR #2073 の敵対的レビュー）。
+    surface: 'runs',
+    kind: 'unknown-option',
+    argv: ['runs', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs',
+    kind: 'unknown-option',
+    argv: ['runs', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  { surface: 'runs', kind: 'unknown-option', argv: ['runs', '--base', '   '], contract: 'C3' },
+  {
+    surface: 'runs list',
+    kind: 'unknown-option',
+    argv: ['runs', 'list', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs list',
+    kind: 'unknown-option',
+    argv: ['runs', 'list', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs list',
+    kind: 'unknown-option',
+    argv: ['runs', 'list', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    // 上のブロック冒頭の注記を参照。この 3 行だけは exit code が動いていない
+    // （BEFORE も C3）。run が見つからず ENOENT で落ちていた形が、`--base` の
+    // usage error で落ちる形に変わっただけである。実在する run を 2 つ渡した
+    // 呼び出しでは 0 -> 1 になる。
+    surface: 'runs diff',
+    kind: 'unknown-option',
+    argv: ['runs', 'diff', 'r1', 'r2', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs diff',
+    kind: 'unknown-option',
+    argv: ['runs', 'diff', 'r1', 'r2', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs diff',
+    kind: 'unknown-option',
+    argv: ['runs', 'diff', 'r1', 'r2', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs summary',
+    kind: 'unknown-option',
+    argv: ['runs', 'summary', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs summary',
+    kind: 'unknown-option',
+    argv: ['runs', 'summary', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs summary',
+    kind: 'unknown-option',
+    argv: ['runs', 'summary', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs digest',
+    kind: 'unknown-option',
+    argv: ['runs', 'digest', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs digest',
+    kind: 'unknown-option',
+    argv: ['runs', 'digest', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'runs digest',
+    kind: 'unknown-option',
+    argv: ['runs', 'digest', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    surface: 'review verify',
+    kind: 'unknown-option',
+    argv: ['review', 'verify', '--base', 'main'],
+    contract: 'C3',
+  },
+  {
+    surface: 'review verify',
+    kind: 'unknown-option',
+    argv: ['review', 'verify', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  {
+    surface: 'review verify',
+    kind: 'unknown-option',
+    argv: ['review', 'verify', '--base', '   '],
+    contract: 'C3',
+  },
+  { surface: 'eval', kind: 'unknown-option', argv: ['eval', '--base', 'main'], contract: 'C3' },
+  {
+    surface: 'eval',
+    kind: 'unknown-option',
+    argv: ['eval', '--base', 'no-such-ref-xyz'],
+    contract: 'C3',
+  },
+  { surface: 'eval', kind: 'unknown-option', argv: ['eval', '--base', '   '], contract: 'C3' },
+  {
+    // BEFORE は exit 0 で `.river/memory/index.json` へ書き込みまで完了して
+    // いた。AFTER は parse 層で落ちるので、下の「副作用ゼロ」不変条件の
+    // 対象にもなる。
+    surface: 'feedback add',
+    kind: 'unknown-option',
+    argv: [
+      'feedback',
+      'add',
+      '--type',
+      'false_positive',
+      '--skill',
+      'demo-skill',
+      '--base',
+      'main',
+    ],
+    contract: 'C3',
+  },
+  {
+    surface: 'feedback add',
+    kind: 'unknown-option',
+    argv: [
+      'feedback',
+      'add',
+      '--type',
+      'false_positive',
+      '--skill',
+      'demo-skill',
+      '--base',
+      'no-such-ref-xyz',
+    ],
+    contract: 'C3',
+  },
+  {
+    surface: 'feedback add',
+    kind: 'unknown-option',
+    argv: ['feedback', 'add', '--type', 'false_positive', '--skill', 'demo-skill', '--base', '   '],
+    contract: 'C3',
+  },
+  {
+    // feedback add と同じく BEFORE は書き込みまで完了していた形。
+    surface: 'suppression add',
+    kind: 'unknown-option',
+    argv: [
+      'suppression',
+      'add',
+      '--fingerprint',
+      '0123456789abcdef',
+      '--feedback',
+      'false_positive',
+      '--rationale',
+      'because',
+      '--base',
+      'main',
+    ],
+    contract: 'C3',
+  },
+  {
+    surface: 'suppression add',
+    kind: 'unknown-option',
+    argv: [
+      'suppression',
+      'add',
+      '--fingerprint',
+      '0123456789abcdef',
+      '--feedback',
+      'false_positive',
+      '--rationale',
+      'because',
+      '--base',
+      'no-such-ref-xyz',
+    ],
+    contract: 'C3',
+  },
+  {
+    surface: 'suppression add',
+    kind: 'unknown-option',
+    argv: [
+      'suppression',
+      'add',
+      '--fingerprint',
+      '0123456789abcdef',
+      '--feedback',
+      'false_positive',
+      '--rationale',
+      'because',
+      '--base',
+      '   ',
+    ],
+    contract: 'C3',
+  },
+  {
+    // #2081: サブコマンドを `--base` の後ろへ置いた形。`review` / `evolve` と
+    // 違い `skills` は後置語を解決せず対象パスとして飲んでいたため、cwd に
+    // `import/` があると `--base main` を捨てたままレビューが走り exit 0
+    // だった（同名ディレクトリは上の before フックで用意している）。前置形
+    // `skills import --base main` と同じ usage error（exit 1）になることを pin。
+    surface: 'skills import',
+    kind: 'unknown-option',
+    argv: ['skills', '--base', 'main', 'import'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills export',
+    kind: 'unknown-option',
+    argv: ['skills', '--base', 'main', 'export'],
+    contract: 'C3',
+  },
+  {
+    // `list/` は一時 repo に置いていない（`skills -- list` の行が `./list` の
+    // 不在を前提にしている）ので、この行だけは BEFORE も exit 1。
+    surface: 'skills list',
+    kind: 'unknown-option',
+    argv: ['skills', '--base', 'main', 'list'],
+    contract: 'C3',
+  },
+  {
+    surface: 'skills resolve',
+    kind: 'unknown-option',
+    argv: ['skills', '--base', 'main', 'resolve'],
+    contract: 'C3',
+  },
+  {
+    // #2081 round 3: パスを先に取った後の後置語はサブコマンドではなく余剰
+    // positional（前置形 `skills import .` と同じ `unexpected argument`）。
+    // `!parsed.targetConsumed` ガードが無いとパスを黙って捨てて exit 0 になる。
+    surface: 'skills import',
+    kind: 'surplus-positional',
+    argv: ['skills', '--dry-run', '.', 'import'],
+    contract: 'C3',
+  },
+  {
+    // 範囲レビュー v1.100.0 minor: 後置 `resolve` はサブコマンド固有オプション
+    // （`--path`）を受け付けない。前置形 `skills resolve --path a.txt` は exit 0
+    // だが、後置形は `takeTrailingPositional` より前の共通 parse で
+    // `unknown option --path` になる（#2089 以前からの挙動）。仕様変更ではなく、
+    // 「後置形は共通オプションのみ」という現行契約の明文化として pin する。
+    surface: 'skills resolve',
+    kind: 'unknown-option',
+    argv: ['skills', '--path', 'a.txt', 'resolve'],
+    contract: 'C3',
+  },
 ];
 
 /**
@@ -1048,6 +1663,14 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
         'a.txt': 'a\n',
         // `skills list` が ENOENT にならないための最小構成（上のヘッダー参照）。
         'skills/.gitkeep': '',
+        // #2081: `skills` のサブコマンド語と同名のディレクトリ。これが無いと
+        // `skills --base main import` は BEFORE でも "Not a git repository" の
+        // exit 1 になり、後置サブコマンドを解決する修正を戻しても canary が
+        // 動かない。`list/` を置かない理由は EXPECTED_CONTRACT_COUNTS の注記と
+        // 上の `skills -- list` の行を参照。
+        'import/.gitkeep': '',
+        'export/.gitkeep': '',
+        'resolve/.gitkeep': '',
         // `eval` の既定 cases パス。空配列なら評価対象 0 件で正常終了する。
         'tests/fixtures/review-eval/cases.json': '[]\n',
       },
@@ -1096,11 +1719,11 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // テーブルそのものの健全性（転記ミス・重複の検出）
   // ---------------------------------------------------------------------------
 
-  test('the matrix pins 110 usage-error cases and every row is unique', () => {
+  test('the matrix pins 174 usage-error cases and every row is unique', () => {
     assert.equal(
       CASES.length,
-      110,
-      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件'
+      174,
+      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）'
     );
     const keys = new Set(CASES.map(caseKey));
     assert.equal(keys.size, CASES.length, '同一 (surface, kind, argv) の行が重複している');
@@ -1127,15 +1750,15 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // 「フラグ先行形を拒否」も v1.72.1 の「`--phase Upstream` を誤拒否」も
   // 壊したのは**成功側**であり、守りが薄いのは逆だった。行を消すだけで
   // 黙って保護が減るのを防ぐ。
-  test('the success-side table pins 91 legitimate argv forms', () => {
+  test('the success-side table pins 99 legitimate argv forms', () => {
     assert.equal(
       VALID_CASES.length,
-      91,
-      'コマンド面ごとの正常形: run 13 (#1759 C3 で --context 未知語彙 1行追加) / doctor 5 / skills 13 / runs 7 (#1759 B2 で1行追加) / review 19 / eval 2 / feedback 2 / suppression 6 / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
+      99,
+      'コマンド面ごとの正常形: run 14 (#1759 C3 で --context 未知語彙 1行追加、#2065 で run --base main を1行追加) / doctor 5 / skills 16 (#2051 で skills --base main を1行追加、#2081 で後置サブコマンド 1行と ./import 明示パス 1行追加) / runs 7 (#1759 B2 で1行追加) / review 23 (#2046 で review plan --base を1行追加、#2065 で review exec --base を1行追加、#2054 PR-3 で review plan --entry を1行追加、#2011 AC7 P2 で review exec --entry を1行追加) / eval 2 / feedback 2 / suppression 6 / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
     );
   });
 
-  test('the contract distribution is C1:0 / C2:0 / C3:109 / C4:1 (0 of 110 exit 0)', () => {
+  test('the contract distribution is C1:0 / C2:0 / C3:173 / C4:1 (0 of 174 exit 0)', () => {
     const counts = { C1: 0, C2: 0, C3: 0, C4: 0 };
     for (const testCase of CASES) counts[testCase.contract] += 1;
     assert.deepEqual(
@@ -1290,8 +1913,15 @@ const VALID_CASES = [
   // 居続けること」だけを固定する。
   { argv: ['run', '.', '--context', 'BOGUS_CONTEXT'], command: 'run' },
   { argv: ['run', '.', '--gate', '--fail-on', 'major'], command: 'run' },
+  // #2065: コマンド別 allowlist が `--base` を読む面まで巻き込んでいないこと。
+  // `run` は allowlist の対象面なので、解決できる ref はそのまま受理される。
+  { argv: ['run', '.', '--base', 'main'], command: 'run' },
   { argv: ['doctor', '.', '--output', 'json'], command: 'doctor' },
   { argv: ['skills', '.', '--phase', 'upstream'], command: 'skills' },
+  // #2051: `skills` が `--base` を読むようになった後も、有効な ref を渡す形が
+  // parse 層で弾かれないことを固定する（受理 -> 無視 だった頃から argv の形は
+  // 変わっていないので、後方互換の対照でもある）。
+  { argv: ['skills', '.', '--base', 'main'], command: 'skills' },
   { argv: ['skills', 'list', '--source', 'all'], command: 'skills' },
   {
     argv: ['skills', 'import', '--from', './some-dir', '--dry-run', '--loose'],
@@ -1302,6 +1932,20 @@ const VALID_CASES = [
     command: 'skills',
   },
   { argv: ['skills', 'resolve', '--path', 'a.js', '--path', 'b.js'], command: 'skills' },
+  // #2081: 後置サブコマンドが対象パスではなくサブコマンドとして解決されること。
+  // 前置形 `skills list --source all` と同じ parse 結果になる。
+  {
+    argv: ['skills', '--source', 'all', 'list'],
+    command: 'skills',
+    expect: { skillsSubcommand: 'list' },
+  },
+  // サブコマンド語と同名のディレクトリは `./` 付きの明示パスで従来どおり届く。
+  {
+    argv: ['skills', './import'],
+    command: 'skills',
+    target: './import',
+    expect: { skillsSubcommand: null },
+  },
   { argv: ['runs', 'list', '--output', 'json'], command: 'runs' },
   { argv: ['runs', 'diff', 'id1', 'id2', 'id3'], command: 'runs' },
   {
@@ -1335,10 +1979,38 @@ const VALID_CASES = [
     command: 'review',
   },
   { argv: ['review', 'exec', '--dry-run', '--plan', './plan.json'], command: 'review' },
+  // #2065: `review exec` も `--base` を読む面（resolveBaseRepoDiff 経由）。
+  // 同じ `review` コマンドでも `verify` だけが対象外になるので、サブコマンド
+  // 単位の allowlist が exec 側を巻き込んでいないことを固定する。
+  { argv: ['review', 'exec', '--dry-run', '--base', 'main'], command: 'review' },
   { argv: ['review', 'verify', '--plan', './plan.json'], command: 'review' },
   {
     argv: ['review', 'route', '.', '--format', 'markdown', '--base', 'main'],
     command: 'review',
+  },
+  {
+    // #2046: `review plan --base <ref>` は parse では受理されていたが、値を読む
+    // 側が居らず黙って無視されていた（route だけが読んでいた）。plan 側でも
+    // 値が使われるようにしたので、この形が成功側に居続けることを pin する。
+    // 表に無かったことが、v1.72.0 / v1.72.1 と同じ「成功側の穴」にあたる。
+    argv: ['review', 'plan', '.', '--base', 'main', '--plan-only'],
+    command: 'review',
+    target: '.',
+    expect: { base: 'main' },
+  },
+  {
+    // #2054 PR-3: `--entry <name>` は `review plan` で受理される（Beta）。
+    // BEFORE は `unknown option --entry` の exit 1 だった形。
+    argv: ['review', 'plan', '--plan-only', '--entry', 'review-plan'],
+    command: 'review',
+    expect: { entry: 'review-plan' },
+  },
+  {
+    // Epic #2011 AC7 P2: `review exec --entry <name>` も受理する（Beta）。
+    // #2054 PR-3 〜 本変更の間は #2065 の allowlist で exit 1 だった形。
+    argv: ['review', 'exec', '--entry', 'review-plan'],
+    command: 'review',
+    expect: { entry: 'review-plan' },
   },
   { argv: ['eval', '--cases', './cases.json', '--verbose'], command: 'eval' },
   {
@@ -1756,6 +2428,74 @@ describe('#1709 Slice 3: legitimate flag combinations are not rejected by strict
 // VALID_CASES / CASES は exit code と usageError しか見ないため、「`--` の後ろの
 // `--dry-run` がフラグとして有効になっていない」ことの直接証明にはならない
 // （どちらの実装でも exit 1 になりうる）。ここで parse 結果のフィールドまで見る。
+// -----------------------------------------------------------------------------
+// #2054 PR-3: 不明な `--entry` を拒否するのは parse 層である
+// -----------------------------------------------------------------------------
+//
+// CASES は exit code しか見ないため、この契約を守れない。parse 層の検査を外しても
+// ハンドラ層が同じ exit 1 で落ちるので、`--entry nosuch` の行は緑のまま通る
+// （2026-09-09 実測）。層が入れ替わったことはメッセージにしか出ない。
+// -----------------------------------------------------------------------------
+// #1755: `review` の副コマンド不足を拒否するのは parse 層である
+// -----------------------------------------------------------------------------
+//
+// これも exit code では守れない。parse 層の検査を外してもハンドラ層が同じ exit 1
+// で落ちるので、CASES の該当行は緑のまま通る（2026-09-09 実測）。差が出るのは
+// 語順の案内文が付くかどうかだけである。
+describe('#1755: a missing review subcommand is rejected by the parse layer', () => {
+  test('the message carries the word-order hint that only parse adds', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-review-subcommand-parse-',
+      initialFiles: { 'a.txt': 'a\n' },
+      changedFiles: { 'a.txt': 'a\nb\n' },
+    });
+    t.after(cleanup);
+
+    const result = await runCliInProcess(['review'], {
+      cwd: dir,
+      env: { RIVER_OFFLINE: '1', NO_COLOR: '1', RIVER_PHASE: undefined },
+    });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /requires a subcommand/);
+    assert.match(
+      result.stderr,
+      /may be written before or after the options/,
+      'parse 層の案内文が出ていない。ハンドラ層が代わりに落としている'
+    );
+    // 呼び出し側が `usageError` を呼んでいることまで見る。落とすと使い方の案内が
+    // 消え、代わりにハンドラ層の同じ文言が二重に出る（exit code は 1 のまま）。
+    assert.match(result.stderr, /^Usage: river review /m, 'usageError が呼ばれていない');
+    assert.equal(
+      result.stderr.match(/requires a subcommand/g)?.length,
+      1,
+      'ハンドラ層のメッセージが重複して出ている'
+    );
+  });
+});
+
+describe('#2054 PR-3: an unknown --entry is rejected by the parse layer', () => {
+  test('the message comes from parse, not from the handler', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-entry-parse-layer-',
+      initialFiles: { 'a.txt': 'a\n' },
+      changedFiles: { 'a.txt': 'a\nb\n' },
+    });
+    t.after(cleanup);
+
+    const result = await runCliInProcess(['review', 'plan', '--plan-only', '--entry', 'nosuch'], {
+      cwd: dir,
+      env: { RIVER_OFFLINE: '1', NO_COLOR: '1', RIVER_PHASE: undefined },
+    });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /unknown --entry "nosuch"/);
+    assert.doesNotMatch(
+      result.stderr,
+      /\(known:/,
+      'ハンドラ層のメッセージが出ている。parse 層の検査が働いていない'
+    );
+  });
+});
+
 describe('#1759 A1: `--` ends option parsing', () => {
   test('a flag-looking token after `--` is not activated as a flag', () => {
     const parsed = parseArgs(['run', '--', '--dry-run']);
@@ -1769,6 +2509,34 @@ describe('#1759 A1: `--` ends option parsing', () => {
     assert.equal(parsed.usageError, false);
     assert.equal(parsed.target, '.');
     assert.equal(parsed.dryRun, false);
+  });
+
+  // `--` 経由で取り込んだパスは「候補サブコマンド」ではない。#1755 が直した
+  // 矛盾（`river review -- plan` が `"plan" is not a river review subcommand` と
+  // 言う）は `terminatorTookPositional` が担っているが、exit code は両方 1 なので
+  // CASES / VALID_CASES では守れない。実際に、その代入を落とす変異を入れても
+  // tests/cli-parse-args.test.mjs と本ファイルは全緑のままだった（2026-09-09 実測）。
+  // メッセージまで見るテストをここに置く。
+  test('a path taken via `--` is not reported as a candidate subcommand (#1755)', async (t) => {
+    // `plan` が実在しないと `--` の存在検査で先に落ち、この分岐へ到達しない。
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-terminator-subcommand-',
+      initialFiles: { 'plan/.gitkeep': '', 'a.txt': 'a\n' },
+      changedFiles: { 'a.txt': 'a\nb\n' },
+    });
+    t.after(cleanup);
+
+    const result = await runCliInProcess(['review', '--', 'plan'], {
+      cwd: dir,
+      env: { RIVER_OFFLINE: '1', NO_COLOR: '1', RIVER_PHASE: undefined },
+    });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /requires a subcommand/);
+    assert.doesNotMatch(
+      result.stderr,
+      /is not a river review subcommand/,
+      '`--` の後ろのパスを候補サブコマンドとして報告している（#1755 の矛盾が再発）'
+    );
   });
 
   test('`--` does not turn a subcommand word into a subcommand', () => {

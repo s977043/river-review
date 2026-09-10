@@ -1,6 +1,47 @@
 export const id = 573;
-export const ids = [573];
+export const ids = [573,168];
 export const modules = {
+
+/***/ 168:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+var node_child_process__WEBPACK_IMPORTED_MODULE_0___namespace_cache;
+var node_crypto__WEBPACK_IMPORTED_MODULE_1___namespace_cache;
+var node_fs__WEBPACK_IMPORTED_MODULE_2___namespace_cache;
+var node_path__WEBPACK_IMPORTED_MODULE_4___namespace_cache;
+var node_stream__WEBPACK_IMPORTED_MODULE_5___namespace_cache;
+var node_util__WEBPACK_IMPORTED_MODULE_6___namespace_cache;
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Et: () => (/* reexport fake namespace object from non-harmony */ node_crypto__WEBPACK_IMPORTED_MODULE_1___namespace_cache || (node_crypto__WEBPACK_IMPORTED_MODULE_1___namespace_cache = __webpack_require__.t(node_crypto__WEBPACK_IMPORTED_MODULE_1__, 2))),
+/* harmony export */   Td: () => (/* reexport fake namespace object from non-harmony */ node_stream__WEBPACK_IMPORTED_MODULE_5___namespace_cache || (node_stream__WEBPACK_IMPORTED_MODULE_5___namespace_cache = __webpack_require__.t(node_stream__WEBPACK_IMPORTED_MODULE_5__, 2))),
+/* harmony export */   ZS: () => (/* reexport fake namespace object from non-harmony */ node_util__WEBPACK_IMPORTED_MODULE_6___namespace_cache || (node_util__WEBPACK_IMPORTED_MODULE_6___namespace_cache = __webpack_require__.t(node_util__WEBPACK_IMPORTED_MODULE_6__, 2))),
+/* harmony export */   fs: () => (/* reexport fake namespace object from non-harmony */ node_fs__WEBPACK_IMPORTED_MODULE_2___namespace_cache || (node_fs__WEBPACK_IMPORTED_MODULE_2___namespace_cache = __webpack_require__.t(node_fs__WEBPACK_IMPORTED_MODULE_2__, 2))),
+/* harmony export */   hV: () => (/* reexport fake namespace object from non-harmony */ node_child_process__WEBPACK_IMPORTED_MODULE_0___namespace_cache || (node_child_process__WEBPACK_IMPORTED_MODULE_0___namespace_cache = __webpack_require__.t(node_child_process__WEBPACK_IMPORTED_MODULE_0__, 2))),
+/* harmony export */   path: () => (/* reexport fake namespace object from non-harmony */ node_path__WEBPACK_IMPORTED_MODULE_4___namespace_cache || (node_path__WEBPACK_IMPORTED_MODULE_4___namespace_cache = __webpack_require__.t(node_path__WEBPACK_IMPORTED_MODULE_4__, 2)))
+/* harmony export */ });
+/* harmony import */ var node_child_process__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(1421);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(7598);
+/* harmony import */ var node_fs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3024);
+/* harmony import */ var node_os__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(8161);
+/* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(6760);
+/* harmony import */ var node_stream__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(7075);
+/* harmony import */ var node_util__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(7975);
+/**
+ * The one module under `src/` that may import Node built-ins (eslint enforces this).
+ * The package.json `browser` field swaps it for `./node.browser`, so only touch its
+ * exports on code paths that run on Node-compatible runtimes.
+ */
+
+
+
+
+
+
+
+
+//# sourceMappingURL=node.mjs.map
+
+/***/ }),
 
 /***/ 2573:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
@@ -27,7 +68,6 @@ __webpack_require__.d(__webpack_exports__, {
   betaWriteTool: () => (/* binding */ betaWriteTool),
   extractSkillArchive: () => (/* reexport */ extractSkillArchive),
   resolvePath: () => (/* binding */ resolvePath),
-  resolveSkillVersion: () => (/* reexport */ resolveSkillVersion),
   setupSkills: () => (/* reexport */ setupSkills)
 });
 
@@ -49,8 +89,8 @@ var external_node_readline_ = __webpack_require__(481);
 var error = __webpack_require__(5064);
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs
 var ToolError = __webpack_require__(7618);
-// EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/index.mjs + 101 modules
-var sdk = __webpack_require__(9240);
+// EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/index.mjs + 102 modules
+var sdk = __webpack_require__(9080);
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/utils.mjs
 var utils = __webpack_require__(8223);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/lib/transform-json-schema.mjs
@@ -221,6 +261,8 @@ function betaJSONSchemaOutputFormat(jsonSchema, options) {
 //# sourceMappingURL=json-schema.mjs.map
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/utils/promise.mjs
 var promise = __webpack_require__(7793);
+// EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/node.mjs
+var node = __webpack_require__(168);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/tools/agent-toolset/fs-util.mjs
 /**
  * Shared, Node-only filesystem helpers for the agent toolset's file tools:
@@ -230,16 +272,15 @@ var promise = __webpack_require__(7793);
  */
 
 
-
-
+const fs = node.fs.promises;
 /** Mode for directories the file tools create — not world-writable under a 0 umask. */
 const DIR_CREATE_MODE = 0o755;
 /** Mode for files the file tools create. */
 const FILE_CREATE_MODE = 0o644;
 /** True when `p` is `root` itself or lexically contained within it. */
 function isWithin(root, p) {
-    const rel = external_node_path_.relative(root, p);
-    return rel === '' || (!rel.startsWith('..' + external_node_path_.sep) && rel !== '..' && !external_node_path_.isAbsolute(rel));
+    const rel = node.path.relative(root, p);
+    return rel === '' || (!rel.startsWith('..' + node.path.sep) && rel !== '..' && !node.path.isAbsolute(rel));
 }
 /**
  * The first entry of `roots` whose canonical form contains the
@@ -251,7 +292,7 @@ function isWithin(root, p) {
  */
 async function containingRoot(roots, target) {
     for (const root of roots) {
-        if (isWithin(await canonicalize(external_node_path_.resolve(root)), target))
+        if (isWithin(await canonicalize(node.path.resolve(root)), target))
             return root;
     }
     return undefined;
@@ -283,21 +324,21 @@ async function canonicalize(abs) {
     for (;;) {
         let real;
         try {
-            real = await promises_.realpath(prefix);
+            real = await fs.realpath(prefix);
         }
         catch (realpathErr) {
             let isLink;
             try {
-                isLink = (await promises_.lstat(prefix)).isSymbolicLink();
+                isLink = (await fs.lstat(prefix)).isSymbolicLink();
             }
             catch (lstatErr) {
                 const code = errnoCode(lstatErr);
                 if (code !== 'ENOENT' && code !== 'ENOTDIR')
                     throw lstatErr;
-                const parent = external_node_path_.dirname(prefix);
+                const parent = node.path.dirname(prefix);
                 if (parent === prefix)
                     throw lstatErr;
-                tail.push(external_node_path_.basename(prefix));
+                tail.push(node.path.basename(prefix));
                 prefix = parent;
                 continue;
             }
@@ -306,10 +347,10 @@ async function canonicalize(abs) {
             if (++hops > MAX_SYMLINK_HOPS) {
                 throw Object.assign(new Error('too many levels of symbolic links'), { code: 'ELOOP' });
             }
-            prefix = external_node_path_.resolve(external_node_path_.dirname(prefix), await promises_.readlink(prefix));
+            prefix = node.path.resolve(node.path.dirname(prefix), await fs.readlink(prefix));
             continue;
         }
-        return tail.length ? external_node_path_.join(real, ...tail.reverse()) : real;
+        return tail.length ? node.path.join(real, ...tail.reverse()) : real;
     }
 }
 /**
@@ -334,10 +375,10 @@ async function canonicalize(abs) {
  */
 async function confineToRoot(root, p, opts) {
     const allowedRoots = opts?.allowedRoots ?? [];
-    const realRoot = await canonicalize(external_node_path_.resolve(root));
+    const realRoot = await canonicalize(node.path.resolve(root));
     let real;
     try {
-        real = await canonicalize(external_node_path_.resolve(realRoot, p));
+        real = await canonicalize(node.path.resolve(realRoot, p));
     }
     catch (err) {
         throw new ToolError/* ToolError */.v(fsErrorMessage(err, `path ${JSON.stringify(p)}`));
@@ -356,21 +397,21 @@ async function confineToRoot(root, p, opts) {
  * a crash mid-write never leaves the target half-written.
  */
 async function atomicWriteFile(targetPath, content) {
-    const dir = external_node_path_.dirname(targetPath);
-    const tempPath = external_node_path_.join(dir, `.tmp-${process.pid}-${(0,external_node_crypto_.randomUUID)()}`);
+    const dir = node.path.dirname(targetPath);
+    const tempPath = node.path.join(dir, `.tmp-${process.pid}-${node/* crypto.randomUUID */.Et.randomUUID()}`);
     let handle;
     try {
-        handle = await promises_.open(tempPath, 'wx', FILE_CREATE_MODE);
+        handle = await fs.open(tempPath, 'wx', FILE_CREATE_MODE);
         await handle.writeFile(content, 'utf-8');
         await handle.sync();
         await handle.close();
         handle = undefined;
-        await promises_.rename(tempPath, targetPath);
+        await fs.rename(tempPath, targetPath);
     }
     catch (err) {
         if (handle)
             await handle.close().catch(() => { });
-        await promises_.unlink(tempPath).catch(() => { });
+        await fs.unlink(tempPath).catch(() => { });
         throw err;
     }
 }
@@ -407,12 +448,6 @@ function fsErrorMessage(err, file) {
     }
 }
 //# sourceMappingURL=fs-util.mjs.map
-// EXTERNAL MODULE: external "node:util"
-var external_node_util_ = __webpack_require__(7975);
-// EXTERNAL MODULE: external "node:stream"
-var external_node_stream_ = __webpack_require__(7075);
-// EXTERNAL MODULE: external "node:stream/promises"
-var external_node_stream_promises_ = __webpack_require__(6466);
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/utils/log.mjs
 var utils_log = __webpack_require__(7412);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/tools/agent-toolset/skills.mjs
@@ -426,13 +461,8 @@ var utils_log = __webpack_require__(7412);
 
 
 
-
-
-
-
-
-
-const execFileAsync = (0,external_node_util_.promisify)(external_node_child_process_.execFile);
+const skills_fs = node.fs.promises;
+const execFileAsync = node/* util.promisify */.ZS.promisify(node/* child_process.execFile */.hV.execFile);
 /**
  * Download the session agent's skills into `{ctx.workdir}/skills/<name>/`.
  *
@@ -472,34 +502,35 @@ async function setupSkills(ctx) {
         // (managed-agents / skills) themselves — no need to pass `betas` here.
         session = await client.beta.sessions.retrieve(sessionId);
     }
-    const skillsRoot = external_node_path_.resolve(ctx.workdir, 'skills');
+    const skillsRoot = node.path.resolve(ctx.workdir, 'skills');
     const created = [];
     for (const skill of session.agent.skills) {
         try {
-            const versionId = await resolveSkillVersion(client, skill.skill_id, skill.version);
-            const version = await client.beta.skills.versions.retrieve(versionId, { skill_id: skill.skill_id });
+            const version = await client.beta.skills.versions.retrieve(skill.version, { skill_id: skill.skill_id });
             // The directory is the skill's name, reduced to a single safe path
             // component so a hostile name can't escape `skillsRoot`.
-            let dirname = external_node_path_.basename(version.name.trim());
+            let dirname = node.path.basename(version.name.trim());
             if (dirname === '' || dirname === '.' || dirname === '..')
                 dirname = skill.skill_id;
-            const dest = external_node_path_.resolve(skillsRoot, dirname);
-            if (dest !== skillsRoot && !dest.startsWith(skillsRoot + external_node_path_.sep)) {
+            const dest = node.path.resolve(skillsRoot, dirname);
+            if (dest !== skillsRoot && !dest.startsWith(skillsRoot + node.path.sep)) {
                 log.warn('skill name escapes the skills dir; skipping', {
                     component: 'agent-tool-context',
                     name: version.name,
                 });
                 continue;
             }
-            const resp = await client.beta.skills.versions.download(versionId, { skill_id: skill.skill_id });
-            await promises_.rm(dest, { recursive: true, force: true });
-            await promises_.mkdir(dest, { recursive: true, mode: DIR_CREATE_MODE });
+            // `skill.version` may be the alias `"latest"`, which only the retrieve
+            // endpoint resolves; download by the concrete id it returned.
+            const resp = await client.beta.skills.versions.download(version.id, { skill_id: skill.skill_id });
+            await skills_fs.rm(dest, { recursive: true, force: true });
+            await skills_fs.mkdir(dest, { recursive: true, mode: DIR_CREATE_MODE });
             created.push(dest);
             await extractSkillArchive(resp, dest);
             log.info('downloaded skill', {
                 component: 'agent-tool-context',
                 skill_id: skill.skill_id,
-                version: versionId,
+                version: version.id,
                 dest,
             });
         }
@@ -513,31 +544,11 @@ async function setupSkills(ctx) {
     }
     return async () => {
         for (const dest of created) {
-            await promises_.rm(dest, { recursive: true, force: true }).catch((e) => {
+            await skills_fs.rm(dest, { recursive: true, force: true }).catch((e) => {
                 log.warn('failed to clean up skill', { component: 'agent-tool-context', dest, error: String(e) });
             });
         }
     };
-}
-/**
- * Resolve `version` to the concrete numeric timestamp the
- * `/v1/skills/{id}/versions/{version}` endpoints require — `session.agent.skills[].version`
- * can be an alias such as `"latest"`, which those endpoints reject. Numeric
- * versions pass through unchanged.
- */
-async function resolveSkillVersion(client, skillId, version) {
-    if (/^\d+$/.test(version))
-        return version;
-    let newest;
-    for await (const v of client.beta.skills.versions.list(skillId)) {
-        if (/^\d+$/.test(v.version) && (newest === undefined || BigInt(v.version) > BigInt(newest))) {
-            newest = v.version;
-        }
-    }
-    if (newest === undefined) {
-        throw new error/* AnthropicError */.pJ(`skill ${JSON.stringify(skillId)} has no concrete version to resolve ${JSON.stringify(version)} against`);
-    }
-    return newest;
 }
 /** Reject archive members that are absolute or contain a `..` component. */
 function assertSafeMemberNames(names) {
@@ -545,7 +556,7 @@ function assertSafeMemberNames(names) {
         const entry = raw.trim();
         if (!entry)
             continue;
-        if (external_node_path_.isAbsolute(entry) || entry.split(/[\\/]/).includes('..')) {
+        if (node.path.isAbsolute(entry) || entry.split(/[\\/]/).includes('..')) {
             throw new error/* AnthropicError */.pJ(`refusing to extract unsafe archive member: ${entry}`);
         }
     }
@@ -609,9 +620,9 @@ function classifyArchiveListing(cmd, names, typed) {
  * but a real directory.
  */
 async function assertOnlyPlainEntries(dir) {
-    for (const entry of await promises_.readdir(dir, { withFileTypes: true })) {
+    for (const entry of await skills_fs.readdir(dir, { withFileTypes: true })) {
         if (entry.isDirectory())
-            await assertOnlyPlainEntries(external_node_path_.join(dir, entry.name));
+            await assertOnlyPlainEntries(node.path.join(dir, entry.name));
         else if (!entry.isFile())
             throw new error/* AnthropicError */.pJ(INCONSISTENT_LISTING);
     }
@@ -687,13 +698,13 @@ function archiveTopDir(names) {
  * done uniformly by staging + promote rather than per-tool flags).
  */
 async function extractSkillArchive(resp, dest) {
-    const tmp = external_node_path_.join(dest, `.skill-archive-${process.pid}-${Date.now()}`);
+    const tmp = node.path.join(dest, `.skill-archive-${process.pid}-${Date.now()}`);
     if (!resp.body) {
         throw new error/* AnthropicError */.pJ('skill download response had no body');
     }
-    await (0,external_node_stream_promises_.pipeline)(external_node_stream_.Readable.fromWeb(resp.body), external_node_fs_.createWriteStream(tmp));
-    const stage = external_node_path_.join(external_node_path_.dirname(dest), `.skill-stage-${process.pid}-${Date.now()}`);
-    const excludeFile = external_node_path_.join(external_node_path_.dirname(dest), `.skill-exclude-${process.pid}-${Date.now()}`);
+    await node/* stream.promises */.Td.promises.pipeline(node/* stream.Readable */.Td.Readable.fromWeb(resp.body), node.fs.createWriteStream(tmp));
+    const stage = node.path.join(node.path.dirname(dest), `.skill-stage-${process.pid}-${Date.now()}`);
+    const excludeFile = node.path.join(node.path.dirname(dest), `.skill-exclude-${process.pid}-${Date.now()}`);
     try {
         // Sniff the first bytes: zip archives start with "PK\x03\x04"; treat
         // anything else as a tar.* archive (`tar -xf` autodetects gzip/bzip2/xz).
@@ -707,7 +718,7 @@ async function extractSkillArchive(resp, dest) {
         const { plain, special } = classifyArchiveListing(archiveCmd, names, typed);
         assertSafeMemberNames([...plain, ...special]);
         const top = archiveTopDir(plain);
-        await promises_.mkdir(stage, { recursive: true, mode: DIR_CREATE_MODE });
+        await skills_fs.mkdir(stage, { recursive: true, mode: DIR_CREATE_MODE });
         // `unzip` exits non-zero when every member is excluded, so only run the
         // extractor when there is something to extract.
         if (plain.length > 0) {
@@ -717,18 +728,18 @@ async function extractSkillArchive(resp, dest) {
         // Promote the wrapper's contents (or the staged tree itself, if the
         // archive wasn't wrapped) into the already-created empty `dest`. `stage`
         // is a sibling of `dest`, so each rename stays on one filesystem.
-        const srcRoot = top ? external_node_path_.join(stage, top) : stage;
-        const entries = await promises_.readdir(srcRoot).catch((e) => {
+        const srcRoot = top ? node.path.join(stage, top) : stage;
+        const entries = await skills_fs.readdir(srcRoot).catch((e) => {
             throw errnoCode(e) === 'ENOENT' ? new error/* AnthropicError */.pJ(INCONSISTENT_LISTING) : e;
         });
         for (const entry of entries) {
-            await promises_.rename(external_node_path_.join(srcRoot, entry), external_node_path_.join(dest, entry));
+            await skills_fs.rename(node.path.join(srcRoot, entry), node.path.join(dest, entry));
         }
     }
     finally {
-        await promises_.rm(tmp, { force: true });
-        await promises_.rm(excludeFile, { force: true });
-        await promises_.rm(stage, { recursive: true, force: true });
+        await skills_fs.rm(tmp, { force: true });
+        await skills_fs.rm(excludeFile, { force: true });
+        await skills_fs.rm(stage, { recursive: true, force: true });
     }
 }
 /**
@@ -744,12 +755,12 @@ async function extractArgs(cmd, archive, stage, special, excludeFile) {
     }
     if (patterns.length === 0)
         return ['-xf', archive, '-C', stage];
-    await promises_.writeFile(excludeFile, patterns.join('\n') + '\n', { flag: 'wx', mode: 0o600 });
+    await skills_fs.writeFile(excludeFile, patterns.join('\n') + '\n', { flag: 'wx', mode: 0o600 });
     return ['-xf', archive, '-C', stage, '-X', excludeFile];
 }
 /** Read the first `n` bytes of `file`. */
 async function readHead(file, n) {
-    const handle = await promises_.open(file, 'r');
+    const handle = await skills_fs.open(file, 'r');
     try {
         const buf = Buffer.alloc(n);
         const { bytesRead } = await handle.read(buf, 0, n, 0);
@@ -775,16 +786,15 @@ var backoff = __webpack_require__(7594);
  */
 
 
-
-
-
+const fsp = node.fs.promises;
+const C = node.fs.constants;
 // Owner-only regardless of umask: the store holds downloaded user/model content.
 const OWNER_ONLY_DIR_MODE = 0o700;
 const OWNER_ONLY_FILE_MODE = 0o600;
 const OWNER_ONLY_EXEC_MODE = 0o700;
 // 0 where the platform lacks them; `open` refuses such platforms.
-const O_NOFOLLOW = external_node_fs_.constants.O_NOFOLLOW ?? 0;
-const O_NONBLOCK = external_node_fs_.constants.O_NONBLOCK ?? 0;
+const O_NOFOLLOW = C.O_NOFOLLOW ?? 0;
+const O_NONBLOCK = C.O_NONBLOCK ?? 0;
 /** A refused operation — input the store will not act on. OS errors propagate with their `.code`. */
 class FileStoreError extends Error {
     constructor(reason, relPath) {
@@ -846,14 +856,14 @@ class FileStore {
             // lstat, not a follow-and-swallow existence check: following symlinks or
             // swallowing permission errors would mark a real directory ours to
             // delete on dispose.
-            await promises_.lstat(root);
+            await fsp.lstat(root);
         }
         catch (e) {
             if (e.code !== 'ENOENT')
                 throw e;
             removedOnDispose = true;
         }
-        return new FileStore(external_node_path_.resolve(root), removedOnDispose, opts?.utf8 ?? false);
+        return new FileStore(node.path.resolve(root), removedOnDispose, opts?.utf8 ?? false);
     }
     /** Create the root directory and any missing ancestors; already existing is fine. */
     async createRoot() {
@@ -872,7 +882,7 @@ class FileStore {
     async dispose() {
         if (!this.removedOnDispose)
             return;
-        await promises_.rm(this.rootPath, { recursive: true, force: true });
+        await fsp.rm(this.rootPath, { recursive: true, force: true });
     }
     /**
      * Write `data` (`string` UTF-8 or bytes) atomically to the file at `relPath`.
@@ -889,7 +899,7 @@ class FileStore {
         const dest = this.resolveUnderRoot(relPath);
         const payload = typeof data === 'string' ? (0,bytes/* encodeUTF8 */.YH)(data) : data;
         this.requireUtf8(relPath, payload);
-        await makeDirsBelowRoot(this.rootPath, external_node_path_.dirname(dest));
+        await makeDirsBelowRoot(this.rootPath, node.path.dirname(dest));
         await replaceViaTemp(dest, payload, opts?.executable ?? false);
     }
     /** The file's bytes; `null` when absent. */
@@ -952,7 +962,7 @@ class FileStore {
         const dest = this.resolveUnderRoot(relPath);
         let st;
         try {
-            st = await promises_.lstat(dest, { bigint: true });
+            st = await fsp.lstat(dest, { bigint: true });
         }
         catch (e) {
             if (e.code === 'ENOENT')
@@ -963,7 +973,7 @@ class FileStore {
             throw new FileStoreError(FileStoreError.IS_A_SYMLINK, relPath);
         if (!st.isFile())
             throw new FileStoreError(FileStoreError.NOT_A_FILE, relPath);
-        const rel = external_node_path_.relative(this.rootPath, dest).split(external_node_path_.sep).join('/');
+        const rel = node.path.relative(this.rootPath, dest).split(node.path.sep).join('/');
         return this.hashViaCache(rel, dest, _internals.nowNs());
     }
     /**
@@ -977,11 +987,11 @@ class FileStore {
             return;
         // stat, not lstat: a dangling symlink at dst reads as absent and is
         // atomically replaced by the rename, like any other rename target.
-        const dstExists = await promises_.stat(d).then(() => true, () => false);
+        const dstExists = await fsp.stat(d).then(() => true, () => false);
         if (dstExists)
             throw new FileStoreError(FileStoreError.MOVE_DESTINATION_EXISTS, dst);
-        await makeDirsBelowRoot(this.rootPath, external_node_path_.dirname(d));
-        await promises_.rename(s, d);
+        await makeDirsBelowRoot(this.rootPath, node.path.dirname(d));
+        await fsp.rename(s, d);
     }
     /** Delete a file or subtree; absent — and the banned store root — do nothing. */
     async remove(relPath) {
@@ -991,7 +1001,7 @@ class FileStore {
         let st;
         try {
             // lstat: a dangling symlink must still be unlinked.
-            st = await promises_.lstat(dest, { bigint: true });
+            st = await fsp.lstat(dest, { bigint: true });
         }
         catch (e) {
             if (e.code === 'ENOENT')
@@ -999,11 +1009,11 @@ class FileStore {
             throw e;
         }
         if (st.isDirectory()) {
-            await promises_.rm(dest, { recursive: true, force: true });
+            await fsp.rm(dest, { recursive: true, force: true });
         }
         else {
             try {
-                await promises_.unlink(dest);
+                await fsp.unlink(dest);
             }
             catch (e) {
                 if (e.code !== 'ENOENT')
@@ -1014,10 +1024,10 @@ class FileStore {
     resolveUnderRoot(relPath) {
         const norm = relPath.replace(/\\/g, '/').replace(/^\/+/, '');
         const parts = norm.split('/').filter((p) => p !== '' && p !== '.');
-        if (external_node_path_.posix.isAbsolute(norm) || parts.includes('..')) {
+        if (node.path.posix.isAbsolute(norm) || parts.includes('..')) {
             throw new FileStoreError(FileStoreError.ESCAPES_ROOT, relPath);
         }
-        return parts.length === 0 ? this.rootPath : external_node_path_.join(this.rootPath, ...parts);
+        return parts.length === 0 ? this.rootPath : node.path.join(this.rootPath, ...parts);
     }
     requireUtf8(relPath, data) {
         if (!this.decoder)
@@ -1032,7 +1042,7 @@ class FileStore {
     async hashViaCache(rel, full, walkStartNs) {
         let st;
         try {
-            st = await promises_.lstat(full, { bigint: true });
+            st = await fsp.lstat(full, { bigint: true });
         }
         catch (e) {
             if (e.code === 'ENOENT')
@@ -1075,7 +1085,7 @@ async function makeDirAndAncestors(dir) {
     let current = dir;
     for (;;) {
         try {
-            await promises_.stat(current);
+            await fsp.stat(current);
             break;
         }
         catch (e) {
@@ -1084,14 +1094,14 @@ async function makeDirAndAncestors(dir) {
                 throw e;
         }
         missing.push(current);
-        const parent = external_node_path_.dirname(current);
+        const parent = node.path.dirname(current);
         if (parent === current)
             break;
         current = parent;
     }
     for (const directory of missing.reverse()) {
         try {
-            await promises_.mkdir(directory, { mode: OWNER_ONLY_DIR_MODE });
+            await fsp.mkdir(directory, { mode: OWNER_ONLY_DIR_MODE });
         }
         catch (e) {
             if (e.code !== 'EEXIST')
@@ -1102,14 +1112,14 @@ async function makeDirAndAncestors(dir) {
 async function makeDirsBelowRoot(root, dir) {
     // Never the root itself: only createRoot() makes it, so a write racing an
     // rm -rf of the folder fails with ENOENT instead of re-creating it.
-    const below = external_node_path_.relative(root, dir);
+    const below = node.path.relative(root, dir);
     if (below === '')
         return;
     let current = root;
-    for (const part of below.split(external_node_path_.sep)) {
-        current = external_node_path_.join(current, part);
+    for (const part of below.split(node.path.sep)) {
+        current = node.path.join(current, part);
         try {
-            await promises_.mkdir(current, { mode: OWNER_ONLY_DIR_MODE });
+            await fsp.mkdir(current, { mode: OWNER_ONLY_DIR_MODE });
         }
         catch (e) {
             if (e.code !== 'EEXIST')
@@ -1119,20 +1129,20 @@ async function makeDirsBelowRoot(root, dir) {
 }
 async function replaceViaTemp(dest, data, isExecutable) {
     const mode = isExecutable ? OWNER_ONLY_EXEC_MODE : OWNER_ONLY_FILE_MODE;
-    const tmp = external_node_path_.join(external_node_path_.dirname(dest), `.fs-${(0,external_node_crypto_.randomBytes)(8).toString('hex')}.tmp`);
+    const tmp = node.path.join(node.path.dirname(dest), `.fs-${node/* crypto.randomBytes */.Et.randomBytes(8).toString('hex')}.tmp`);
     let handle;
     try {
-        handle = await promises_.open(tmp, external_node_fs_.constants.O_WRONLY | external_node_fs_.constants.O_CREAT | external_node_fs_.constants.O_EXCL | O_NOFOLLOW, mode);
+        handle = await fsp.open(tmp, C.O_WRONLY | C.O_CREAT | C.O_EXCL | O_NOFOLLOW, mode);
         await handle.writeFile(data);
         await handle.close();
         handle = undefined;
-        await promises_.rename(tmp, dest);
+        await fsp.rename(tmp, dest);
     }
     catch (err) {
         // Best-effort temp cleanup; never mask the original error.
         if (handle)
             await handle.close().catch(() => { });
-        await promises_.unlink(tmp).catch(() => { });
+        await fsp.unlink(tmp).catch(() => { });
         throw err;
     }
 }
@@ -1140,7 +1150,7 @@ async function openRegularFile(relPath, dest) {
     // O_NONBLOCK: a FIFO fails the fstat check below instead of blocking the open.
     let handle;
     try {
-        handle = await promises_.open(dest, external_node_fs_.constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+        handle = await fsp.open(dest, C.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
     }
     catch (e) {
         // FreeBSD reports EMLINK rather than ELOOP for O_NOFOLLOW.
@@ -1163,8 +1173,8 @@ async function openRegularFile(relPath, dest) {
 }
 /** sha256 of a file's contents, streamed — constant memory on any file size. */
 async function hashFile(full) {
-    const digest = (0,external_node_crypto_.createHash)('sha256');
-    const handle = await openRegularFile(external_node_path_.basename(full), full);
+    const digest = node/* crypto.createHash */.Et.createHash('sha256');
+    const handle = await openRegularFile(node.path.basename(full), full);
     const buf = new Uint8Array(1024 * 1024);
     try {
         for (;;) {
@@ -1190,16 +1200,16 @@ async function filenamesInDir(root, under, base) {
     const out = [];
     await walk(base, (full, entry) => {
         if (entry.isFile())
-            out.push([external_node_path_.relative(root, full).split(external_node_path_.sep).join('/'), full]);
+            out.push([node.path.relative(root, full).split(node.path.sep).join('/'), full]);
     });
     out.sort();
     return out;
 }
 async function symlinksInDir(root, under, base) {
-    const relOf = (full) => external_node_path_.relative(root, full).split(external_node_path_.sep).join('/');
+    const relOf = (full) => node.path.relative(root, full).split(node.path.sep).join('/');
     let st;
     try {
-        st = await promises_.lstat(base, { bigint: true });
+        st = await fsp.lstat(base, { bigint: true });
     }
     catch (e) {
         const code = e.code;
@@ -1223,7 +1233,7 @@ async function symlinksInDir(root, under, base) {
 async function requireDir(under, base) {
     let st;
     try {
-        st = await promises_.lstat(base, { bigint: true });
+        st = await fsp.lstat(base, { bigint: true });
     }
     catch (e) {
         // Absent — including "under a file" (ENOTDIR) — is an empty listing.
@@ -1243,7 +1253,7 @@ async function walk(base, visit) {
         const dir = stack.pop();
         let entries;
         try {
-            entries = await promises_.readdir(dir, { withFileTypes: true });
+            entries = await fsp.readdir(dir, { withFileTypes: true });
         }
         catch (e) {
             if (e.code === 'ENOENT')
@@ -1251,7 +1261,7 @@ async function walk(base, visit) {
             throw e;
         }
         for (const entry of entries) {
-            const full = external_node_path_.join(dir, entry.name);
+            const full = node.path.join(dir, entry.name);
             visit(full, entry);
             if (entry.isDirectory() && !entry.isSymbolicLink())
                 stack.push(full);
@@ -1312,7 +1322,6 @@ var _SessionMemoryStores_instances, _SessionMemoryStores_client, _SessionMemoryS
 
 
 
-
 /**
  * Time bound the worker puts on each teardown pass — the final
  * {@link SessionMemoryStores.finish}, then {@link SessionMemoryStores.flushWrites} —
@@ -1326,7 +1335,9 @@ const MEMORY_FLUSH_TIMEOUT_MS = 30000;
 const MARKER_PATH = '.anthropic-memory-store';
 const MARKER_VERSION = 1;
 function markerSha(memoryStoreId) {
-    return (0,external_node_crypto_.createHash)('sha256').update(`version ${MARKER_VERSION}\n${memoryStoreId}`, 'utf-8').digest('hex');
+    return node/* crypto.createHash */.Et.createHash('sha256')
+        .update(`version ${MARKER_VERSION}\n${memoryStoreId}`, 'utf-8')
+        .digest('hex');
 }
 /** How long a file must stay missing locally before its server delete goes out. */
 const DELETE_CORROBORATION_MS = 30000;
@@ -1635,7 +1646,7 @@ _SessionMemoryStores_client = new WeakMap(), _SessionMemoryStores_workdir = new 
     }
     // No mount_path at all: nothing points the agent anywhere, so the workdir
     // is as good a home as any.
-    return external_node_path_.join((0,tslib/* __classPrivateFieldGet */.g)(this, _SessionMemoryStores_workdir, "f"), 'memory', resource.name || resource.memory_store_id);
+    return node.path.join((0,tslib/* __classPrivateFieldGet */.g)(this, _SessionMemoryStores_workdir, "f"), 'memory', resource.name || resource.memory_store_id);
 }, _SessionMemoryStores_scanMarker = async function _SessionMemoryStores_scanMarker(store) {
     const local = await store.files.hashtree();
     const marker = local[MARKER_PATH];
@@ -2217,7 +2228,7 @@ async function settledOrAborted(p, signal) {
  * (symlink-aware) and are safe without a sandbox; `bash` is unrestricted and
  * should run inside one. See {@link AgentToolContext}.
  */
-var _BashSession_instances, _BashSession_proc, _BashSession_buf, _BashSession_truncated, _BashSession_closed, _BashSession_waiting, _BashSession_append;
+var _BashSession_instances, _BashSession_proc, _BashSession_buf, _BashSession_truncated, _BashSession_closed, _BashSession_waiting, _BashSession_append, _LineRangeCollector_instances, _LineRangeCollector_filePath, _LineRangeCollector_startLine, _LineRangeCollector_endLine, _LineRangeCollector_start, _LineRangeCollector_end, _LineRangeCollector_limit, _LineRangeCollector_line, _LineRangeCollector_collected, _LineRangeCollector_collectedBytes, _LineRangeCollector_collect, _LineRangeCollector_overLimitError;
 
 
 
@@ -2238,6 +2249,8 @@ const BASH_DEFAULT_TIMEOUT_MS = 120000;
 // memory) when AgentToolContext.maxFileBytes is unset. The reject-vs-truncate
 // behaviour remains a separate question pending CMA validation.
 const DEFAULT_MAX_FILE_BYTES = 256 * 1024;
+const READ_STREAM_CHUNK_BYTES = 64 * 1024;
+const NEWLINE = Buffer.from('\n');
 const GREP_OUTPUT_LIMIT = 100 * 1024;
 const GREP_MAX_LINE_LENGTH = 2000;
 const GLOB_RESULT_LIMIT = 200;
@@ -2584,6 +2597,9 @@ function betaReadTool(ctx) {
             if (!file_path)
                 throw new ToolError/* ToolError */.v('read: file_path is required');
             const abs = await resolvePath(ctx, file_path);
+            if (view_range?.length && view_range.length !== 2) {
+                throw new ToolError/* ToolError */.v('read: view_range must be [start_line, end_line]');
+            }
             let data;
             try {
                 // stat() before any open(): the size cap stops a multi-GB file from
@@ -2595,8 +2611,12 @@ function betaReadTool(ctx) {
                 }
                 const limit = resolveMaxBytes(ctx.maxFileBytes);
                 if (limit !== null && st.size > limit) {
-                    throw new ToolError/* ToolError */.v(`read: ${file_path} is ${st.size} bytes, exceeds ${limit}-byte limit. ` +
-                        'Use bash (head/tail/sed) to read a slice.');
+                    if (!view_range?.length) {
+                        throw new ToolError/* ToolError */.v(`read: ${file_path} is ${st.size} bytes, exceeds ${limit}-byte limit. ` +
+                            'Use the view_range parameter to read specific line ranges, e.g. view_range: [1, 500].');
+                    }
+                    const [startLine, endLine] = view_range;
+                    return await readRangeStreaming(abs, file_path, startLine, endLine, limit);
                 }
                 data = await promises_.readFile(abs, 'utf8');
             }
@@ -2607,8 +2627,6 @@ function betaReadTool(ctx) {
             }
             if (!view_range?.length)
                 return data;
-            if (view_range.length !== 2)
-                throw new ToolError/* ToolError */.v('read: view_range must be [start_line, end_line]');
             const [startLine, endLine] = view_range;
             const lines = data.split('\n');
             const start = Math.max(0, startLine - 1);
@@ -2617,6 +2635,88 @@ function betaReadTool(ctx) {
         },
     });
 }
+/** Returns lines `[startLine, endLine]` of the file at `abs`, capping the selected bytes at `limit`. */
+async function readRangeStreaming(abs, filePath, startLine, endLine, limit) {
+    const lines = new LineRangeCollector(filePath, startLine, endLine, limit);
+    if (lines.rangeIsEmpty())
+        return '';
+    // Byte chunks rather than readline: a single huge line must never be buffered
+    // whole, so memory stays bounded by `limit` plus one chunk.
+    const stream = external_node_fs_.createReadStream(abs, { highWaterMark: READ_STREAM_CHUNK_BYTES });
+    try {
+        for await (const chunk of stream) {
+            lines.collectFrom(chunk);
+            if (lines.rangeIsCollected())
+                break;
+        }
+    }
+    finally {
+        stream.destroy();
+    }
+    return lines.text();
+}
+/** Collects the bytes of lines `[startLine, endLine]` from consecutive file chunks, capped at `limit`. */
+class LineRangeCollector {
+    constructor(filePath, startLine, endLine, limit) {
+        _LineRangeCollector_instances.add(this);
+        _LineRangeCollector_filePath.set(this, void 0);
+        _LineRangeCollector_startLine.set(this, void 0);
+        _LineRangeCollector_endLine.set(this, void 0);
+        _LineRangeCollector_start.set(this, void 0);
+        _LineRangeCollector_end.set(this, void 0);
+        _LineRangeCollector_limit.set(this, void 0);
+        _LineRangeCollector_line.set(this, 0);
+        _LineRangeCollector_collected.set(this, []);
+        _LineRangeCollector_collectedBytes.set(this, 0);
+        (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_filePath, filePath, "f");
+        (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_startLine, startLine, "f");
+        (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_endLine, endLine, "f");
+        (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_start, Math.max(0, startLine - 1), "f");
+        (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_end, endLine > 0 ? endLine : Infinity, "f");
+        (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_limit, limit, "f");
+    }
+    rangeIsEmpty() {
+        return (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_end, "f") <= (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_start, "f");
+    }
+    rangeIsCollected() {
+        return (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_line, "f") >= (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_end, "f");
+    }
+    collectFrom(chunk) {
+        var _a;
+        let lineStart = 0;
+        while (lineStart < chunk.length && !this.rangeIsCollected()) {
+            const newline = chunk.indexOf(0x0a, lineStart);
+            const lineEnd = newline < 0 ? chunk.length : newline;
+            if ((0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_line, "f") >= (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_start, "f")) {
+                (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_instances, "m", _LineRangeCollector_collect).call(this, chunk.subarray(lineStart, lineEnd), newline >= 0);
+            }
+            if (newline < 0)
+                break;
+            (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_line, (_a = (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_line, "f"), _a++, _a), "f");
+            lineStart = newline + 1;
+        }
+    }
+    text() {
+        return Buffer.concat((0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_collected, "f"), (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_collectedBytes, "f")).toString('utf8');
+    }
+}
+_LineRangeCollector_filePath = new WeakMap(), _LineRangeCollector_startLine = new WeakMap(), _LineRangeCollector_endLine = new WeakMap(), _LineRangeCollector_start = new WeakMap(), _LineRangeCollector_end = new WeakMap(), _LineRangeCollector_limit = new WeakMap(), _LineRangeCollector_line = new WeakMap(), _LineRangeCollector_collected = new WeakMap(), _LineRangeCollector_collectedBytes = new WeakMap(), _LineRangeCollector_instances = new WeakSet(), _LineRangeCollector_collect = function _LineRangeCollector_collect(lineBytes, newlineTerminated) {
+    (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_collected, "f").push(lineBytes);
+    (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_collectedBytes, (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_collectedBytes, "f") + lineBytes.length, "f");
+    if (newlineTerminated && (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_line, "f") + 1 < (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_end, "f")) {
+        (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_collected, "f").push(NEWLINE);
+        (0,tslib/* __classPrivateFieldSet */.G)(this, _LineRangeCollector_collectedBytes, (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_collectedBytes, "f") + NEWLINE.length, "f");
+    }
+    if ((0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_collectedBytes, "f") > (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_limit, "f"))
+        throw (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_instances, "m", _LineRangeCollector_overLimitError).call(this);
+}, _LineRangeCollector_overLimitError = function _LineRangeCollector_overLimitError() {
+    if ((0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_end, "f") - (0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_start, "f") === 1) {
+        return new ToolError/* ToolError */.v(`read: line ${(0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_start, "f") + 1} of ${(0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_filePath, "f")} alone exceeds ${(0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_limit, "f")}-byte limit. ` +
+            'The read tool cannot return part of a line, so view_range cannot narrow this further.');
+    }
+    return new ToolError/* ToolError */.v(`read: view_range [${(0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_startLine, "f")}, ${(0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_endLine, "f")}] of ${(0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_filePath, "f")} exceeds ${(0,tslib/* __classPrivateFieldGet */.g)(this, _LineRangeCollector_limit, "f")}-byte limit. ` +
+        'Narrow the view_range to read a smaller portion.');
+};
 function betaWriteTool(ctx) {
     rejectUnrestrictedPaths(ctx.unrestrictedPaths);
     return betaTool({
@@ -2685,7 +2785,7 @@ function betaEditTool(ctx) {
                 const limit = resolveMaxBytes(ctx.maxFileBytes);
                 if (limit !== null && st.size > limit) {
                     throw new ToolError/* ToolError */.v(`edit: ${file_path} is ${st.size} bytes, exceeds ${limit}-byte limit. ` +
-                        'Use bash (sed/awk) to edit a large file.');
+                        'The edit tool loads the whole file and cannot modify a file this large.');
                 }
                 data = await promises_.readFile(abs, 'utf8');
             }

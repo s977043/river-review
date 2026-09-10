@@ -1,0 +1,86 @@
+{
+  "version": "0.3.0",
+  "description": "User-facing entry names for the review Flows: the four core stage entries from #2016 and the four upstream review entries from #2017. The entry name is what a person types or asks for; the Flow id and version are what the judgment is recorded against. This document carries no host vocabulary on purpose: how an entry is surfaced belongs to agents/contracts/adapter-map.json, and which Flow it resolves to belongs here, so the two hosts have nothing to disagree about.",
+  "entries": {
+    "review-plan": {
+      "flow": "plan-review",
+      "flowVersion": "0.1.0",
+      "description": "Can execution safely start from this plan?"
+    },
+    "review-replan": {
+      "flow": "replan-review",
+      "flowVersion": "0.1.0",
+      "description": "Is this plan change justified and does it leave the upstream contract intact?"
+    },
+    "review-task": {
+      "flow": "task-completion-review",
+      "flowVersion": "0.1.0",
+      "description": "Is there evidence to declare this task DONE?"
+    },
+    "review-final": {
+      "flow": "final-review",
+      "flowVersion": "0.1.0",
+      "description": "Are the goal and requirements met, rather than merely every task closed?"
+    },
+    "review-research": {
+      "flow": "research-review",
+      "flowVersion": "0.1.0",
+      "description": "May this research result be used as the ground for requirements, design and plan?"
+    },
+    "review-requirements": {
+      "flow": "requirements-review",
+      "flowVersion": "0.1.0",
+      "description": "May design and implementation proceed from these requirements?"
+    },
+    "review-design": {
+      "flow": "design-review",
+      "flowVersion": "0.1.0",
+      "description": "May implementation proceed from this design?"
+    },
+    "review-technical": {
+      "flow": "technical-review",
+      "flowVersion": "0.1.0",
+      "description": "Do the declared technical premises hold on the evidence supplied?"
+    }
+  },
+  "triggers": {
+    "task-checkpoint": {
+      "entries": ["review-task"],
+      "requiredEvidence": ["tasks", "diff"],
+      "mode": "observe",
+      "description": "The executor is about to declare a Task DONE, or a person asks for a checkpoint. Resolves to the task-completion entry; the required evidence is the Flow's own required inputs."
+    },
+    "artifact-ready": {
+      "entries": [
+        "review-research",
+        "review-requirements",
+        "review-design",
+        "review-technical",
+        "review-plan",
+        "review-replan"
+      ],
+      "selectBy": "artifactKind",
+      "mode": "observe",
+      "description": "An upstream artifact (research, requirements, design, technical premises, plan, revised plan) became reviewable. Which of the listed entries applies is decided by the artifact kind; the required evidence is therefore the selected Flow's required inputs, not fixed here."
+    },
+    "before-publish": {
+      "entries": ["review-final"],
+      "requiredEvidence": ["requirements", "diff"],
+      "mode": "observe",
+      "description": "The change is about to be published for others (a pull request is created, updated or marked ready). Resolves to the final entry."
+    },
+    "before-merge": {
+      "entries": ["review-final"],
+      "requiredEvidence": ["requirements", "diff"],
+      "independence": "execution-isolated",
+      "mode": "observe",
+      "description": "The final checkpoint before a merge decision. Same entry as before-publish, but the review run must be execution-isolated from the implementation run; a result that does not meet that tier is supporting evidence only. The merge decision itself stays with the hosting platform and the human."
+    },
+    "after-change": {
+      "entries": [],
+      "profile": "fast-verification",
+      "mode": "observe",
+      "description": "One or more edits settled into a stable change set. Starts no Flow: only the deterministic fast-verification profile applies, scoped to the changed files. The empty entries list is the declaration, not an omission."
+    }
+  }
+}

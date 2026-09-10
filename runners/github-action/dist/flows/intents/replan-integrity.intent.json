@@ -1,0 +1,34 @@
+{
+  "purpose": "replan-integrity",
+  "version": "0.1.0",
+  "question": "計画変更は合理的で、上流の契約を壊していないか。",
+  "description": "Reviews a changed plan against the plan it replaces. The subject is the delta, so the previous plan is required rather than optional.",
+  "stage": "replan",
+  "phase": "upstream",
+  "subject": ["plan", "requirements", "baseline"],
+  "baseline": {
+    "kind": "previous-plan",
+    "required": true,
+    "description": "A replan without the plan it replaces is a plan review, not a replan review, so the absence is a stop rather than a degrade."
+  },
+  "evidence": [
+    {
+      "artifact": "plan",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "The new plan is the subject."
+    },
+    {
+      "artifact": "baseline",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "The previous plan. Without it the delta cannot be computed, so the run stops with DETERMINISTIC_UNRUNNABLE instead of silently reviewing the new plan alone."
+    },
+    {
+      "artifact": "requirements",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent requirements remove the upstream-contract cross-check; the plan-to-plan delta review still runs and the degradation is recorded."
+    }
+  ]
+}

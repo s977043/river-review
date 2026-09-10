@@ -51,6 +51,7 @@ Use **npm**.
 
 - **Editable**: `pages/`, `skills/`, `schemas/`, `scripts/`, `tests/`, `.github/`, `.claude/`, `AGENT_LEARNINGS.md`
 - **Ask before editing**: `docs/`, `assets/`, `src/`, `runners/`, `README.md`, `README.en.md`, `AGENTS.md`
+  - 例外: `docs/development/worker-discipline-template.md` への**規律 1 行の追記**は事前確認を要しない。`/orchestrate` の Step 4 が「観測した失敗をその場で定型側へ移す」ことを求めており、確認を挟むと還流が次セッションへ持ち越されて失敗が繰り返される。**追記のみが対象で、既存行の書き換え・削除・節の再構成は従来どおり事前確認が要る。**
 - **Never edit**: `package-lock.json`, `LICENSE*`, `CITATION.cff`
 
 ## Verification Criteria

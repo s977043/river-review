@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "caseId": "should-not-detect-clean-plan",
+  "caseClass": "should-not-detect",
+  "description": "A plan that deliberately looks suspicious but is correct. Neither runtime may invent a finding.",
+  "expectation": "conformant",
+  "pinned": {
+    "entry": "review-plan",
+    "flow": "plan-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "91abef9c11b146889149b691943cfd536002904fbab34461a0cf27f090716b32",
+    "artifactSetSha256": "a14056a109b106fa6baedd8f8f42efe2a349f7497e96f1b75d26566b0ada02f9",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "plan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "8e2af0dd9b5d681c"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "plan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "8e2af0dd9b5d681c"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [],
+  "expected": {
+    "deterministicConformance": 1,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "pass",
+    "failedGates": []
+  }
+}

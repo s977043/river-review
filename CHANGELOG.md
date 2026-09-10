@@ -1,5 +1,242 @@
 # Changelog
 
+## [1.109.0](https://github.com/s977043/river-review/compare/v1.108.0...v1.109.0) (2026-09-09)
+
+
+### Features
+
+* **config:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P3-4 design role に Artifact Input Contract の ID を対応付ける ([#2199](https://github.com/s977043/river-review/issues/2199)) ([e935bb9](https://github.com/s977043/river-review/commit/e935bb928bf8e081a391eda13d9dcd05797a3410))
+
+## [1.108.0](https://github.com/s977043/river-review/compare/v1.107.0...v1.108.0) (2026-09-09)
+
+
+### Features
+
+* **flow:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P4 derive-gate を judgment 注入時のみ実行する ([#2192](https://github.com/s977043/river-review/issues/2192)) ([a358b16](https://github.com/s977043/river-review/commit/a358b162259621792211ce939b09bcf1d99d2159))
+
+## [1.107.0](https://github.com/s977043/river-review/compare/v1.106.4...v1.107.0) (2026-09-09)
+
+
+### Features
+
+* **scripts:** heredoc サイズの機械検査を code hygiene へ追加する ([#2186](https://github.com/s977043/river-review/issues/2186)) ([00edc26](https://github.com/s977043/river-review/commit/00edc263beb731045e61bb1acdbf0f797c3d75ce))
+
+## [1.106.4](https://github.com/s977043/river-review/compare/v1.106.3...v1.106.4) (2026-09-09)
+
+
+### Bug Fixes
+
+* **tests:** オプション語彙の走査でコメントを除外する ([#2183](https://github.com/s977043/river-review/issues/2183)) ([c4697ae](https://github.com/s977043/river-review/commit/c4697ae952b0b6ca60caf53ba1dab88c6e2fbb98))
+
+## [1.106.3](https://github.com/s977043/river-review/compare/v1.106.2...v1.106.3) (2026-09-09)
+
+
+### Bug Fixes
+
+* **scripts:** pr-unstall の 422 出力を heredoc から printf へ変える ([#2172](https://github.com/s977043/river-review/issues/2172)) ([b142d35](https://github.com/s977043/river-review/commit/b142d357e28eb72ff058d4e68afff6967b7063da))
+
+## [1.106.2](https://github.com/s977043/river-review/compare/v1.106.1...v1.106.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* **scripts:** doc 列挙の実体を git の追跡対象に限定する ([#2165](https://github.com/s977043/river-review/issues/2165)) ([4ce4fb2](https://github.com/s977043/river-review/commit/4ce4fb23e7858ea5de12c41778ff8bbf78d84057))
+
+## [1.106.1](https://github.com/s977043/river-review/compare/v1.106.0...v1.106.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **cli:** 存在しない明示 artifact が既定束縛に上書きされるのを止める ([#2160](https://github.com/s977043/river-review/issues/2160)) ([d72ecc7](https://github.com/s977043/river-review/commit/d72ecc7d516dd1ca75e0356e84e3aea3afa714b1)), closes [#2011](https://github.com/s977043/river-review/issues/2011)
+
+## [1.106.0](https://github.com/s977043/river-review/compare/v1.105.0...v1.106.0) (2026-09-08)
+
+
+### Features
+
+* **cli:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P3-3 停止理由を未束縛と束縛先なしに分ける ([#2158](https://github.com/s977043/river-review/issues/2158)) ([fe84717](https://github.com/s977043/river-review/commit/fe847177bb0706f010474f6d1ef7d9b45df01ef1))
+
+## [1.105.0](https://github.com/s977043/river-review/compare/v1.104.4...v1.105.0) (2026-09-08)
+
+
+### Features
+
+* **cli:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P3-1 Flow 入力の解決を --debug から切り離す ([#2155](https://github.com/s977043/river-review/issues/2155)) ([28cd3ee](https://github.com/s977043/river-review/commit/28cd3ee64be948e590e9bdc2c34a6e713e8c9c02))
+* **cli:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P3-2 標準 artifact ID を Flow 入力へ結ぶ既定値を入れる ([#2157](https://github.com/s977043/river-review/issues/2157)) ([0d57d28](https://github.com/s977043/river-review/commit/0d57d28fb80f719ce35348b91cd280a2889442c0))
+
+## [1.104.4](https://github.com/s977043/river-review/compare/v1.104.3...v1.104.4) (2026-09-07)
+
+
+### Bug Fixes
+
+* **scripts:** merge-chain が最後の PR をマージした直後に落ちるのを止める ([#2148](https://github.com/s977043/river-review/issues/2148)) ([aefb587](https://github.com/s977043/river-review/commit/aefb5872a047c1410470de2d2346f6c4b3cafbe1))
+
+## [1.104.3](https://github.com/s977043/river-review/compare/v1.104.2...v1.104.3) (2026-09-07)
+
+
+### Bug Fixes
+
+* **scripts:** hook command の実行対象を引用状態を追って抽出する ([#2145](https://github.com/s977043/river-review/issues/2145)) ([bb6dbe9](https://github.com/s977043/river-review/commit/bb6dbe9401a0280ec6a2ce0d1fdbfca9a009e89d))
+
+## [1.104.2](https://github.com/s977043/river-review/compare/v1.104.1...v1.104.2) (2026-09-07)
+
+
+### Bug Fixes
+
+* **scripts:** checkpoint hook の剪定で SIGPIPE により 141 終了するのを止める ([#2142](https://github.com/s977043/river-review/issues/2142)) ([65aa523](https://github.com/s977043/river-review/commit/65aa523a2fb349b1d9e2884fbd9849ccf5a7abd0)), closes [#2135](https://github.com/s977043/river-review/issues/2135)
+
+## [1.104.1](https://github.com/s977043/river-review/compare/v1.104.0...v1.104.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* **scripts:** hook command の実行対象が plugin root を脱出したら検証で落とす ([#2136](https://github.com/s977043/river-review/issues/2136)) ([d4b27ee](https://github.com/s977043/river-review/commit/d4b27eedeb49b3876887ec7d052271ca7b159624))
+
+## [1.104.0](https://github.com/s977043/river-review/compare/v1.103.0...v1.104.0) (2026-09-06)
+
+
+### Features
+
+* **cli:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P2 review exec --entry で Flow を observe 実行し steps[] を artifact に付ける ([#2124](https://github.com/s977043/river-review/issues/2124)) ([036b0df](https://github.com/s977043/river-review/commit/036b0df7655c1563d95e8039629f0c57bb4939c5))
+* **flow:** [#2011](https://github.com/s977043/river-review/issues/2011) AC7 P1 flow-runner の骨格を追加する（実行なし） ([#2123](https://github.com/s977043/river-review/issues/2123)) ([449435c](https://github.com/s977043/river-review/commit/449435c121246e191edc02d6b5bcfb840663c6d3))
+
+
+### Bug Fixes
+
+* [#2119](https://github.com/s977043/river-review/issues/2119) v1.103.0 範囲レビューの minor 10 件を解消する ([#2120](https://github.com/s977043/river-review/issues/2120)) ([1789de0](https://github.com/s977043/river-review/commit/1789de016b6149209503877c935a56d5ee716fe2))
+* **scripts:** [#2117](https://github.com/s977043/river-review/issues/2117) hooks/hooks.json の script 実在検査を manifest 宣言なしでも走らせる ([#2122](https://github.com/s977043/river-review/issues/2122)) ([d14f84b](https://github.com/s977043/river-review/commit/d14f84bc07ab64f91e02f35ff51f0ede2013579d))
+
+## [1.103.0](https://github.com/s977043/river-review/compare/v1.102.0...v1.103.0) (2026-09-05)
+
+
+### Features
+
+* **adapter:** [#2054](https://github.com/s977043/river-review/issues/2054) PR-5 entry 名を hook / Action input から渡し dist に flows と schema を同梱する ([#2117](https://github.com/s977043/river-review/issues/2117)) ([7d21f1a](https://github.com/s977043/river-review/commit/7d21f1a4630e22fdbdd22a768b714447b085407d))
+
+## [1.102.0](https://github.com/s977043/river-review/compare/v1.101.0...v1.102.0) (2026-09-05)
+
+
+### Features
+
+* **cli:** [#2054](https://github.com/s977043/river-review/issues/2054) PR-4 run record と review artifact に Execution Manifest を配線する ([#2111](https://github.com/s977043/river-review/issues/2111)) ([9056304](https://github.com/s977043/river-review/commit/9056304a08341eb5065d8c4853a4ef39c1b73cdd))
+
+
+### Bug Fixes
+
+* **scripts:** [#2102](https://github.com/s977043/river-review/issues/2102) merge-chain.sh の読み取り失敗を exit 2 で止め false green を防ぐ ([#2109](https://github.com/s977043/river-review/issues/2109)) ([b838128](https://github.com/s977043/river-review/commit/b838128daee54c4cfc445a02493a4c36e6a44461))
+
+## [1.101.0](https://github.com/s977043/river-review/compare/v1.100.0...v1.101.0) (2026-09-05)
+
+
+### Features
+
+* **cli:** [#2054](https://github.com/s977043/river-review/issues/2054) PR-3 flow-loader を新設し review plan --entry で Flow pin を載せる ([#2103](https://github.com/s977043/river-review/issues/2103)) ([b4fc00f](https://github.com/s977043/river-review/commit/b4fc00f0914aa48eff8e10531bf7bc8673007901))
+
+## [1.100.0](https://github.com/s977043/river-review/compare/v1.99.3...v1.100.0) (2026-09-05)
+
+
+### Features
+
+* **flows:** [#2054](https://github.com/s977043/river-review/issues/2054) PR-1 trigger registry を entry-map に宣言のみ追加する ([#2093](https://github.com/s977043/river-review/issues/2093)) ([23ccc8a](https://github.com/s977043/river-review/commit/23ccc8abac83b9b5faa9f2876265464d00f750cf))
+* **trigger:** [#2054](https://github.com/s977043/river-review/issues/2054) 工程イベントを Flow entry と pin へ解決する純関数 resolver を追加する ([#2092](https://github.com/s977043/river-review/issues/2092)) ([2b06f96](https://github.com/s977043/river-review/commit/2b06f963be7bdea3363c6ec4227b0d77b1491a40))
+
+
+### Bug Fixes
+
+* **cli:** [#2081](https://github.com/s977043/river-review/issues/2081) skills の後置サブコマンドを対象パスではなくサブコマンドとして解決する ([#2089](https://github.com/s977043/river-review/issues/2089)) ([e2e3eaf](https://github.com/s977043/river-review/commit/e2e3eaf62e88013f9e28cb024c0e76d559850eba))
+
+## [1.99.3](https://github.com/s977043/river-review/compare/v1.99.2...v1.99.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* **cli:** [#2076](https://github.com/s977043/river-review/issues/2076) --base 拒否メッセージに復旧手順を 1 文加える ([#2080](https://github.com/s977043/river-review/issues/2080)) ([86a20cd](https://github.com/s977043/river-review/commit/86a20cdfd4491cf498fc6918170f8aeaa229801a))
+* **git:** [#2071](https://github.com/s977043/river-review/issues/2071) --base の警告を merge base の出所と一致させる ([#2079](https://github.com/s977043/river-review/issues/2079)) ([4742362](https://github.com/s977043/river-review/commit/4742362012a964b97e503784672d1a3da6b9fe95))
+
+## [1.99.2](https://github.com/s977043/river-review/compare/v1.99.1...v1.99.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* **cli:** [#2065](https://github.com/s977043/river-review/issues/2065) --base を読まない 14 面で usage error にする（exit 0/3 → 1）([#2073](https://github.com/s977043/river-review/issues/2073)) ([801760f](https://github.com/s977043/river-review/commit/801760f50893ea13c1452b2308460b2f18f70103))
+* **git:** [#2067](https://github.com/s977043/river-review/issues/2067) --base が HEAD の子孫のときの誤診断を分岐する ([#2070](https://github.com/s977043/river-review/issues/2070)) ([3b9e29c](https://github.com/s977043/river-review/commit/3b9e29c141cdd9ffbeb6adc20cff5686de652e8c))
+
+## [1.99.1](https://github.com/s977043/river-review/compare/v1.99.0...v1.99.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **scripts:** [#2055](https://github.com/s977043/river-review/issues/2055) 制御文字チェックの追跡 symlink 経由のリポジトリ外読み取りと無限ループを塞ぐ ([#2068](https://github.com/s977043/river-review/issues/2068)) ([63cb72d](https://github.com/s977043/river-review/commit/63cb72dd9c20c2042a905399604f02ed3fdddc6c))
+
+## [1.99.0](https://github.com/s977043/river-review/compare/v1.98.0...v1.99.0) (2026-09-04)
+
+
+### Features
+
+* **scripts:** [#2055](https://github.com/s977043/river-review/issues/2055) ソースへの C0 制御文字混入を機械検査する ([#2062](https://github.com/s977043/river-review/issues/2062)) ([2961be8](https://github.com/s977043/river-review/commit/2961be861a4d864d514c860a1340299265ad88c1))
+
+
+### Bug Fixes
+
+* **cli:** [#2051](https://github.com/s977043/river-review/issues/2051) [#2057](https://github.com/s977043/river-review/issues/2057) --base を skills / run でも review と同じ経路で解決する ([#2064](https://github.com/s977043/river-review/issues/2064)) ([22da923](https://github.com/s977043/river-review/commit/22da923ee040974b9d07ce156641f5900c61f731))
+* **scripts:** [#2058](https://github.com/s977043/river-review/issues/2058) [#2059](https://github.com/s977043/river-review/issues/2059) RA-1 の severity 対応表を向きまで照合し ADR-009 D7-4 の矛盾を解消する ([#2063](https://github.com/s977043/river-review/issues/2063)) ([02802a2](https://github.com/s977043/river-review/commit/02802a2a831906892794acacef2fb76fd767eb86))
+
+## [1.98.0](https://github.com/s977043/river-review/compare/v1.97.1...v1.98.0) (2026-09-04)
+
+
+### Features
+
+* **scripts:** [#2027](https://github.com/s977043/river-review/issues/2027) Runtime Adapter Invariants RA-1 / RA-2 を機械検査へ落とす ([#2050](https://github.com/s977043/river-review/issues/2050)) ([2c53759](https://github.com/s977043/river-review/commit/2c537597e2c6e14ba90e1cee3ecfc60dbb0149fa))
+
+
+### Bug Fixes
+
+* **cli:** [#2046](https://github.com/s977043/river-review/issues/2046) review plan が --base を route と同じ経路で解決する ([#2049](https://github.com/s977043/river-review/issues/2049)) ([1dbe027](https://github.com/s977043/river-review/commit/1dbe0275cbf16d0d940bd1fe5f22406d14f536c5))
+* **scripts:** [#2050](https://github.com/s977043/river-review/issues/2050) RA-1 の SSoT 参照 traversal と証跡規則の ReDoS を塞ぐ ([#2060](https://github.com/s977043/river-review/issues/2060)) ([de6995d](https://github.com/s977043/river-review/commit/de6995d9cf286f19ccef5670b8f1b4c014f53802))
+
+## [1.97.1](https://github.com/s977043/river-review/compare/v1.97.0...v1.97.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **manifest:** [#2037](https://github.com/s977043/river-review/issues/2037) flow ブロックの resolve 経路を決めて deterministic replay を成立させる ([#2048](https://github.com/s977043/river-review/issues/2048)) ([b73d321](https://github.com/s977043/river-review/commit/b73d3213284a51bbd6e9e5ea0302c7646e75952d))
+
+## [1.97.0](https://github.com/s977043/river-review/compare/v1.96.0...v1.97.0) (2026-09-03)
+
+
+### Features
+
+* [#2020](https://github.com/s977043/river-review/issues/2020) cross-runtime conformance kit を追加する ([#2045](https://github.com/s977043/river-review/issues/2045)) ([612f991](https://github.com/s977043/river-review/commit/612f9912fad6ab13db6d6186fa4301549127f977))
+
+## [1.96.0](https://github.com/s977043/river-review/compare/v1.95.0...v1.96.0) (2026-09-03)
+
+
+### Features
+
+* **schemas:** [#2018](https://github.com/s977043/river-review/issues/2018) Cross-Artifact Consistency の契約と検証を追加する ([#2042](https://github.com/s977043/river-review/issues/2042)) ([84cd204](https://github.com/s977043/river-review/commit/84cd20414eea685abbae769f3e77f01cc32f0c24))
+* **schemas:** [#2019](https://github.com/s977043/river-review/issues/2019) Completion / Convergence の契約と検証を追加する ([#2043](https://github.com/s977043/river-review/issues/2043)) ([c6c9a43](https://github.com/s977043/river-review/commit/c6c9a43439c81afc6bba6bf6651a15b85f2d4f80))
+
+## [1.95.0](https://github.com/s977043/river-review/compare/v1.94.0...v1.95.0) (2026-09-03)
+
+
+### Features
+
+* **flows:** [#2017](https://github.com/s977043/river-review/issues/2017) 実装前の上流 4 レビューを Flow として定義する ([#2040](https://github.com/s977043/river-review/issues/2040)) ([f7da9b0](https://github.com/s977043/river-review/commit/f7da9b03dbc2022981c79f6aa4491d2a2decf6b6))
+
+## [1.94.0](https://github.com/s977043/river-review/compare/v1.93.0...v1.94.0) (2026-09-03)
+
+
+### Features
+
+* **flows:** [#2016](https://github.com/s977043/river-review/issues/2016) 4 つの core review entry flow と Review Intent を定義する ([#2035](https://github.com/s977043/river-review/issues/2035)) ([48cf09f](https://github.com/s977043/river-review/commit/48cf09f7ef8010da2ff3e26064e3b4dea835f83a))
+
+## [1.93.0](https://github.com/s977043/river-review/compare/v1.92.0...v1.93.0) (2026-09-03)
+
+
+### Features
+
+* **schemas:** [#2015](https://github.com/s977043/river-review/issues/2015) Execution Manifest と replay 可否判定を追加する ([#2032](https://github.com/s977043/river-review/issues/2032)) ([5f35f52](https://github.com/s977043/river-review/commit/5f35f522f64621f9370f4935ae353850e9d30cb6))
+
 ## [1.92.0](https://github.com/s977043/river-review/compare/v1.91.0...v1.92.0) (2026-09-03)
 
 

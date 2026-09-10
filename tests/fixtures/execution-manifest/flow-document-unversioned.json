@@ -1,0 +1,7 @@
+{
+  "id": "fixture-review-unversioned",
+  "description": "Negative fixture for the flow pin derivation (#2037): a Flow document with no `version`. schemas/flow.schema.json requires `version`, so this document is invalid there too — the test asserts BOTH, because the point is that an unversioned document must be rejected rather than pinned under a null version.",
+  "intent": { "purpose": "fixture-purpose" },
+  "steps": [{ "use": "resolve-intent" }],
+  "outputs": ["findings"]
+}

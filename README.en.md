@@ -229,7 +229,7 @@ Pin to a release tag such as `@v1.14.0` for stability. Alternatively, use the fl
 
 <!-- x-release-please-start-version -->
 
-Latest release: [v1.92.0](https://github.com/s977043/river-review/releases/latest)
+Latest release: [v1.109.0](https://github.com/s977043/river-review/releases/latest)
 
 <!-- x-release-please-end -->
 
@@ -327,6 +327,8 @@ What you get (namespaced by plugin name):
 - Skills: the orchestrator `river-review` plus `river-review-code`, `river-review-security`, `river-review-performance`, `river-review-architecture`, `river-review-testing`, `river-review-frontend`, `river-review-docs`, `adversarial-review`, `review-team`, and `unknown-coverage-review` — addressable as `/river-review:<skill-name>`
 
 Manage: `/plugin enable|disable|uninstall river-review@river-review-marketplace`.
+
+> **Stop hook (Beta)**: at session end (`Stop`) the plugin runs `river review plan --plan-only --entry review-task` and writes a Review Artifact under `$TMPDIR/river-review-task-checkpoint/` (up to 20 previous artifacts are kept, so at most 21 exist after a run). The hook requires `CLAUDE_PLUGIN_ROOT/node_modules`: install the npm package, or run `npm ci` in the plugin directory. No model call, no cost; it takes 1–7 seconds (5.0–5.4 s over 3 runs on this repository, 6.7 s on another machine; a large repository may hit the 60 s timeout). It skips when no CLI is available. Opt out with `RIVER_TASK_CHECKPOINT_HOOK=0` or by disabling the plugin. Details: [Stable Interfaces](https://river-review.the3396.com/reference/stable-interfaces).
 
 Local development / testing without installing:
 

@@ -1,5 +1,5 @@
 {
-  "description": "Optional auto-format hook for the river-review plugin. Runs the consumer project's prettier on changed files after Write/Edit; skips silently when prettier is not installed.",
+  "description": "Lifecycle hooks for the river-review plugin. PostToolUse: run the consumer project's prettier on changed files after Write/Edit (skips silently when prettier is not installed). Stop: adapter for the neutral task-checkpoint trigger — emit a Review Artifact pinned to the review-task Flow entry (#2054 PR-5); the hook carries only the entry name and never blocks the session.",
   "hooks": {
     "PostToolUse": [
       {
@@ -9,6 +9,17 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/plugin-format-hook.sh\"",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/plugin-task-checkpoint-hook.sh\"",
+            "timeout": 60
           }
         ]
       }

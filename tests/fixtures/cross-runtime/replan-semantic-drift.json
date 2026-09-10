@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "caseId": "replan-semantic-drift",
+  "caseClass": "replan-semantic-drift",
+  "description": "A re-plan silently changes what the upstream contract promised. Both runtimes must call the drift.",
+  "expectation": "conformant",
+  "pinned": {
+    "entry": "review-replan",
+    "flow": "replan-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "c8961ed3e52762f56ad114bf9418f0007f8bf5cb8e60eb897c7d123090550ae9",
+    "artifactSetSha256": "2be2dec19e88929221addca6dce746637a7ed8efe225b1eef477e5a83ce0a66c",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-replan",
+          "resolvedFlow": "replan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          },
+          {
+            "id": "baseline-resolvable",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "8e9dcdab917b10f0"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "scope-narrowed-without-approval",
+            "taxonomy": "semantic-drift",
+            "severity": "critical",
+            "target": {
+              "path": "docs/plan.md",
+              "anchor": "step-3"
+            }
+          }
+        ],
+        "criterionCoverage": ["baseline-comparison", "contract-preservation"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-replan",
+          "resolvedFlow": "replan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          },
+          {
+            "id": "baseline-resolvable",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "8e9dcdab917b10f0"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "scope-narrowed-without-approval",
+            "taxonomy": "semantic-drift",
+            "severity": "critical",
+            "target": {
+              "path": "docs/plan.md",
+              "anchor": "step-3"
+            }
+          }
+        ],
+        "criterionCoverage": ["baseline-comparison", "contract-preservation"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [],
+  "expected": {
+    "deterministicConformance": 1,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "pass",
+    "failedGates": []
+  }
+}

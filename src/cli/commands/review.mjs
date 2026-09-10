@@ -6,9 +6,92 @@
 // relative import depth differ from the original inline block.
 import path from 'node:path';
 import process from 'node:process';
-import { ensureGitRepo, detectDefaultBranch, findMergeBase } from '../../lib/git.mjs';
+import {
+  ensureGitRepo,
+  detectDefaultBranch,
+  normalizeBaseRef,
+  resolveBaseMergeBase,
+} from '../../lib/git.mjs';
 import { collectRepoDiff } from '../../lib/diff-processor.mjs';
+import { resolveFlowInputBindings } from '../../lib/flow-input-bindings.mjs';
 import { SkillLoaderError, resolveSkillSet } from '../../../runners/core/skill-loader.mjs';
+
+/**
+ * Resolve the git diff for `--base` (or the auto-detected default branch).
+ *
+ * SSoT for how every `review` subcommand turns `--base` into a diff: the
+ * route path (`runReviewRoute`) and the plan/exec path both call this, so the
+ * two cannot drift into different ranges for the same `--base` (#2046).
+ *
+ * An explicitly typed `--base` that git cannot resolve is a usage error, not a
+ * silent empty range: `findMergeBase` falls back to HEAD for an unknown ref, so
+ * without this check `--base no-such-ref` reviewed nothing and exited 0
+ * (#2046 review, major 2). The auto-detected default branch keeps the old
+ * fallback — it is not something the user typed.
+ *
+ * @param {Record<string, unknown>} parsed - parseArgs() result.
+ * @returns {Promise<{targetPath: string, repoRoot: string, defaultBranch: string,
+ *   mergeBase: string, repoDiff: object}>}
+ */
+export function resolveBaseRef(parsed) {
+  // Delegates to the shared normalizer in src/lib/git.mjs — the `skills` and
+  // `run` surfaces trim `--base` through the same function (#2051 / #2057), so
+  // "blank means usage error" cannot drift between them.
+  return normalizeBaseRef(parsed?.base);
+}
+
+async function resolveBaseRepoDiff(parsed) {
+  const targetPath = path.resolve(parsed.target);
+  const repoRoot = await ensureGitRepo(targetPath);
+  const defaultBranch = await detectDefaultBranch(repoRoot);
+  // #2051 / #2057: the validation this used to inline now lives in
+  // resolveBaseMergeBase (src/lib/git.mjs) so `skills` and `run` share it
+  // verbatim. Behavior here is unchanged — same messages, same exit path.
+  const { baseRef, mergeBase, warning } = await resolveBaseMergeBase(
+    repoRoot,
+    parsed?.base,
+    defaultBranch
+  );
+  if (warning) console.warn(warning);
+  const repoDiff = await collectRepoDiff(repoRoot, mergeBase);
+  return { targetPath, repoRoot, defaultBranch, mergeBase, baseRef, repoDiff };
+}
+
+/**
+ * Flow inputs the plan execution proves were supplied, keyed by Flow input
+ * name, for `executeFlow`'s required-input check and `when` clauses (Epic
+ * #2011 AC7 P3-1). Two sources:
+ *
+ *   - `context.changedFiles` exists only when the review diff resolved
+ *     (review-plan.mjs sets `context` under `diffResolved`), so it stands for
+ *     the Flow input `diff`.
+ *   - `resolved` is the resolver result returned by `runReviewPlan`. The
+ *     CLI-side binding SSoT maps compatible contract IDs to Flow roles while
+ *     preserving direct CLI input precedence.
+ *
+ * @param {Record<string, unknown>} artifact
+ * @param {Record<string, unknown>|undefined} resolved - Resolver result from
+ *   the plan execution; unavailable on replay.
+ * @param {object} document - the resolved Flow document (`inputs[]` names).
+ * @returns {{inputs: Record<string, unknown>, inputSources: Record<string, unknown>, unboundInputNames: string[]}}
+ */
+function resolvedFlowInputs(artifact, entry, document, resolved) {
+  const { inputs, inputSources, unboundInputNames } = resolveFlowInputBindings({
+    entry,
+    document,
+    resolved,
+  });
+  const declaresDiff =
+    Array.isArray(document?.inputs) && document.inputs.some((input) => input?.name === 'diff');
+  if (declaresDiff && !('diff' in inputs) && Array.isArray(artifact?.context?.changedFiles)) {
+    inputs.diff = artifact.context.changedFiles;
+  }
+  if ('diff' in inputs) {
+    const index = unboundInputNames.indexOf('diff');
+    if (index !== -1) unboundInputNames.splice(index, 1);
+  }
+  return { inputs, inputSources, unboundInputNames };
+}
 
 /**
  * Handle the `review` command (plan | exec | verify | route).
@@ -91,7 +174,37 @@ export async function runReviewCommand(parsed) {
         throw err;
       }
     }
+    // #2046: `--base <ref>` used to be parsed and then read by nobody on this
+    // path, so `review plan --base <ref>` silently reported `no-changes` while
+    // `review route --base <ref>` saw the very diff it was pointed at. Resolve
+    // it through the SAME helper the route path uses, and hand the resulting
+    // diff (plus the range context) to the plan/replay layer. Only when
+    // `--base` is actually given: without it the artifact-resolution path is
+    // untouched, so existing callers keep their behavior.
+    //
+    // Precedence against the `diff` artifact is decided in review-plan.mjs,
+    // where the artifact's resolution tier (cli / config / cwd-default) is
+    // known — an explicitly specified artifact wins, per
+    // pages/reference/artifact-input-contract.md.
+    let diffOverride;
+    if (resolveBaseRef(parsed) !== null) {
+      const { repoRoot, defaultBranch, mergeBase, repoDiff } = await resolveBaseRepoDiff(parsed);
+      diffOverride = {
+        diffText: repoDiff.rawDiffText,
+        // schemas/review-artifact.schema.json `context` (additionalProperties:
+        // false). Only the four range fields are filled: the token estimates
+        // there describe the OPTIMIZED diff text, which is not the text handed
+        // to the planner below, so claiming them would be wrong.
+        context: {
+          repoRoot,
+          defaultBranch,
+          mergeBase,
+          changedFiles: repoDiff.changedFiles,
+        },
+      };
+    }
     let artifact;
+    let resolved;
     try {
       if (isExecPlanReplay) {
         artifact = await runReviewExecReplay({
@@ -104,6 +217,7 @@ export async function runReviewCommand(parsed) {
           cwd: path.resolve(parsed.target),
           cliArtifacts: parsed.cliArtifacts,
           artifactsDir: parsed.artifactsDir,
+          diffOverride,
         });
       } else {
         artifact = await runReviewPlan({
@@ -124,7 +238,9 @@ export async function runReviewCommand(parsed) {
           // into selection without env vars.
           availableContexts: parsed.availableContexts ?? undefined,
           availableDependencies: parsed.availableDependencies ?? undefined,
+          diffOverride,
         });
+        resolved = artifact.resolved;
       }
     } catch (err) {
       if (err instanceof ReviewPlanError) {
@@ -132,6 +248,80 @@ export async function runReviewCommand(parsed) {
         return 3;
       }
       throw err;
+    }
+    // #2054 PR-3 (Beta): `review plan --entry <name>` pins the artifact to a
+    // review Flow entry. Only the pin and the Flow's declared required inputs
+    // are attached, both additive; nothing above (skill selection, decision,
+    // gate) reads them, so the artifact without `--entry` is byte-identical to
+    // the one produced before this flag existed (tests/cli-review-plan-entry
+    // pins that). Reading `flows/` goes through the single Flow loader; an
+    // unreadable flows directory is a loud exit 1, never a silent "no Flow".
+    let resolvedFlow = null;
+    if (parsed.entry !== null && parsed.entry !== undefined) {
+      const { FlowLoaderError, resolveFlowEntry } = await import('../../lib/flow-loader.mjs');
+      try {
+        resolvedFlow = resolveFlowEntry(parsed.entry);
+        artifact.flow = resolvedFlow.flow;
+        artifact.evidenceRequirements = resolvedFlow.evidenceRequirements;
+      } catch (err) {
+        if (err instanceof FlowLoaderError) {
+          console.error(`Error: ${err.message}`);
+          return 1;
+        }
+        throw err;
+      }
+    }
+    // Epic #2011 AC7 P2 (Beta, record only): on `review exec --entry <name>`
+    // run the pinned Flow document through the single Flow runner and append
+    // the per-step outcomes as `steps`, additively, right after the pin.
+    // `capabilities` is empty in this slice, so every step lands on
+    // `not-implemented` / `skipped` / `stopped`, and a Flow whose required
+    // inputs the artifact cannot vouch for (see `resolvedFlowInputs`) records
+    // every step as `stopped`. Nothing here reads the runner's `stopped` / `stopReason`
+    // back into `gate` / `decision` (RA-1) — both were finalized above and
+    // stay byte-identical to the run without `--entry`. `review plan --entry`
+    // and `exec --dry-run` / `exec --plan` keep the pin only: they run no
+    // review, so there is nothing for a step to record.
+    if (resolvedFlow !== null && isExecExecute) {
+      const { executeFlow } = await import('../../lib/flow-runner.mjs');
+      const flowInputs = resolvedFlowInputs(
+        artifact,
+        parsed.entry,
+        resolvedFlow.document,
+        resolved
+      );
+      const result = await executeFlow({
+        document: resolvedFlow.document,
+        capabilities: {},
+        ...flowInputs,
+        // Record only: `observe` continues past a missing capability as
+        // `not-implemented` and lists every step even when a required input
+        // is missing. `judgment` is reserved for P4 and not passed here.
+        mode: 'observe',
+      });
+      artifact.steps = result.steps;
+    }
+    // #2054 PR-4 (Epic #2011 AC6): pin what this run used as an Execution
+    // Manifest, additively, as the LAST top-level key. Built after every
+    // judgment above (skill selection, decision, gate, Flow pin) so none of
+    // them can read it; `attachExecutionManifest` copies the artifact rather
+    // than mutating it. The `flow` block is `resolved` only when `--entry`
+    // resolved a Flow document on this very run — the parsed document is handed
+    // to the resolver so the manifest never reads `flows/` itself (#2037).
+    // Fail-soft: a manifest that cannot be built is a loud warning and an
+    // artifact without the key, never a lost review.
+    try {
+      const { produceExecutionManifest } =
+        await import('../../lib/execution-manifest-producer.mjs');
+      const { attachExecutionManifest } = await import('../../lib/execution-manifest.mjs');
+      const manifest = await produceExecutionManifest({
+        artifact,
+        flowDocument: resolvedFlow?.document ?? null,
+        expectedFlowVersion: resolvedFlow?.flow?.version ?? null,
+      });
+      artifact = attachExecutionManifest(artifact, manifest);
+    } catch (err) {
+      console.error(`Warning: execution manifest not attached: ${err.message}`);
     }
     const outputFilePath = parsed.outputFile ? path.resolve(parsed.outputFile) : null;
     const summaryFilePath = parsed.summaryFile ? path.resolve(parsed.summaryFile) : null;
@@ -231,11 +421,12 @@ async function runReviewRoute(parsed) {
     const { routeReviewMode, formatRouterResultMarkdown } =
       await import('../../lib/review-mode-router.mjs');
     const { loadRiskMap } = await import('../../lib/risk-map.mjs');
-    const routeTargetPath = path.resolve(parsed.target);
-    const repoRoot = await ensureGitRepo(routeTargetPath);
-    const defaultBranch = await detectDefaultBranch(repoRoot);
-    const mergeBase = await findMergeBase(repoRoot, parsed.base ?? defaultBranch);
-    const repoDiff = await collectRepoDiff(repoRoot, mergeBase);
+    const {
+      targetPath: routeTargetPath,
+      repoRoot,
+      repoDiff,
+      baseRef,
+    } = await resolveBaseRepoDiff(parsed);
     const riskMap = await loadRiskMap(repoRoot).catch((err) => {
       console.warn(`Warning: could not load risk-map.yaml: ${err?.message ?? err}`);
       return null;
@@ -245,6 +436,10 @@ async function runReviewRoute(parsed) {
       diffText: repoDiff.rawDiffText,
       riskMap,
       targetPath: routeTargetPath,
+      // #2046: the suggested next command must review the range this routing
+      // decision was made against, otherwise following it re-resolves a
+      // different range (the issue's "なぜ問題か").
+      baseRef,
     });
     const outputFormat = parsed.formatExplicit
       ? parsed.format

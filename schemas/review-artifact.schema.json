@@ -285,7 +285,7 @@
         "changedFiles": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "List of file paths included in the review diff."
+          "description": "File paths changed in the reviewed range. For a `--base` review this is git's own answer (`git diff --name-only`), so it also covers changes the diff text carries no hunk for — pure renames and binary changes included. It is therefore the changed-file set of the range, not the set of paths appearing in the diff text. When the diff came from an artifact instead, there is no git answer and the set is the one parsed out of the diff text."
         },
         "tokenEstimate": {
           "type": "number",
@@ -316,6 +316,47 @@
         "manifestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       },
       "required": ["kind", "manifestId", "manifestKey", "manifestHash"]
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Review Flow pin the artifact was produced under (#2054 PR-3, Beta). Additive and optional: present only when `river review plan --entry <name>` was given, so artifacts without it keep the exact key set they had before. `entry` is the user-facing entry name from flows/entry-map.json, `id` / `version` identify the Flow document, and `sha256` is the digest of its canonical JSON as derived by deriveFlowPin in src/lib/execution-manifest.mjs — the same pin resolveTrigger (src/lib/trigger-resolver.mjs) mints. Carries no judgment: nothing in the artifact's gate / decision / findings is derived from it.",
+      "required": ["entry", "id", "version", "sha256"],
+      "properties": {
+        "entry": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "evidenceRequirements": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Input names the pinned Flow declares as `required: true` (#2054 PR-3, Beta). Additive and optional; emitted together with `flow`. A declaration of what the Flow needs, not a record of what was supplied."
+    },
+    "steps": {
+      "type": "array",
+      "description": "Per-step records of running the pinned Flow through src/lib/flow-runner.mjs (Epic #2011 AC7 P2, Beta): the runner's StepOutcome shape, verbatim. Additive and optional: present only on `river review exec --entry <name>`, in the Flow document's step order (`index` is the position in the document's `steps`). One record per Flow step even when a required input was not provable from the artifact (observe mode then records every step as `stopped`). Record only: no capability is wired in this slice, so outcomes are `not-implemented` / `skipped` / `stopped`, and nothing in `gate` / `decision` / `findings` is derived from this array (RA-1). `outcome` and `kind` are the runner's closed sets (STEP_OUTCOMES in flow-runner.mjs).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "id", "kind", "parallel", "parallelRun", "outcome"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["primitive", "reviewer"] },
+          "parallel": { "type": "boolean" },
+          "parallelRun": { "type": ["integer", "null"], "minimum": 0 },
+          "outcome": {
+            "type": "string",
+            "enum": ["executed", "skipped", "degraded", "stopped", "not-implemented"]
+          },
+          "reason": { "type": "string", "minLength": 1 },
+          "result": {
+            "description": "Whatever the capability returned for an `executed` step. Never present in P2 (no capability is wired)."
+          }
+        }
+      }
     },
     "debug": {
       "type": "object",

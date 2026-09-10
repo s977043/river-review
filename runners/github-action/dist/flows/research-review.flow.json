@@ -1,0 +1,72 @@
+{
+  "id": "research-review",
+  "version": "0.1.0",
+  "description": "Research adequacy review (#2017, Epic #2011 Phase 6). Answers whether a research result may be used as the ground for requirements, design and plan. #2017 deliberately does not mint a dedicated research artifact kind: the write-up arrives inside the generic `artifacts` input, so no vocabulary is added to schemas/review-intent.schema.json or schemas/agent-contract.schema.json before real usage justifies it. Freshness and source availability are the two judgments this Flow must not assert as facts, because the Non-goals of #2017 exclude a built-in web search: the Flow therefore routes them through verify-findings and human-escalation instead of letting them reach derive-gate as verdicts.",
+  "intent": { "purpose": "research-adequacy" },
+  "inputs": [
+    {
+      "name": "artifacts",
+      "required": true,
+      "description": "The review subject as supplied by the host, including the research write-up and whatever sources it carries with it."
+    },
+    {
+      "name": "requirements",
+      "description": "Requirements the research is cited as the ground for. Optional: absence degrades the claim-versus-use cross-check rather than stopping the Flow."
+    },
+    {
+      "name": "design",
+      "description": "Design the research is cited as the ground for. Optional: absence skips the design cross-check."
+    },
+    {
+      "name": "plan",
+      "description": "Plan the research is cited as the ground for. Optional: absence skips the plan cross-check."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    {
+      "use": "resolve-artifacts",
+      "description": "Missing `artifacts` stops here (required input): with no write-up there is no subject."
+    },
+    {
+      "use": "select-skills",
+      "description": "Existing upstream-phase selection; no Flow-local list."
+    },
+    { "use": "select-agents" },
+    {
+      "use": "parallel-review",
+      "description": "Claim-to-source correspondence, fact versus inference, alternatives considered, and unresolved unknowns, judged on the write-up itself.",
+      "onUnsatisfied": "degrade"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Research claims against the requirements they are cited for. Runs unconditionally; without requirements it degrades to a write-up-internal review and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Research claims against the design they are cited for.",
+      "when": { "input": "design", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Research claims against the plan they are cited for.",
+      "when": { "input": "plan", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "verify-findings",
+      "description": "Evidence gate for the two judgments #2017 forbids asserting as facts. A candidate finding that a source is stale, superseded or missing must cite something in the supplied artifacts; one that cannot does not survive this step and is never restated as a fact downstream."
+    },
+    {
+      "use": "human-escalation",
+      "description": "Freshness and source availability that cannot be settled from the supplied artifacts leave the run as an open question for a person, not as a verdict. Degrades to recording the open question when no escalation channel is available.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED", "UNDETERMINED"]
+}

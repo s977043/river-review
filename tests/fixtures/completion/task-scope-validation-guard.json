@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "task",
+  "mode": "observe",
+  "state": "INCOMPLETE",
+  "reasonCodes": ["REQUIREMENT_UNSATISFIED"],
+  "tasks": { "total": 1, "complete": 0, "unsupportedClaims": 0 },
+  "evidence": [{ "kind": "diff", "state": "present" }],
+  "validation": {
+    "state": "GOAL_MET",
+    "rationale": "A single task must not be allowed to declare the overall goal achieved."
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "purpose": "plan-readiness",
+  "version": "0.1.0",
+  "question": "この計画で安全に実行を開始できるか。",
+  "description": "Reviews a plan before any task starts. The judgment is about readiness to begin, not about code that does not exist yet.",
+  "stage": "plan",
+  "phase": "upstream",
+  "subject": ["plan", "requirements", "design"],
+  "baseline": {
+    "kind": "none",
+    "description": "A first plan has nothing to regress against; the judgment is absolute, so this Flow declares no compare-baseline step."
+  },
+  "evidence": [
+    {
+      "artifact": "plan",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "Without the plan there is no subject; the run stops with DETERMINISTIC_UNRUNNABLE."
+    },
+    {
+      "artifact": "requirements",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent requirements remove the plan-versus-requirement cross-check; the remaining plan-internal review still runs and the degradation is recorded."
+    },
+    {
+      "artifact": "design",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent design skips the design cross-check and records the reason."
+    }
+  ]
+}

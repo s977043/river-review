@@ -1,0 +1,45 @@
+{
+  "purpose": "final-convergence",
+  "version": "0.1.0",
+  "question": "全 Task の終了ではなく、Goal / Requirement を満たしたか。",
+  "description": "Reviews convergence on the goal. Task exhaustion is explicitly not the criterion, so requirements are required evidence and tasks are only supporting evidence.",
+  "stage": "final",
+  "phase": "downstream",
+  "subject": ["requirements", "diff", "tasks", "findings"],
+  "baseline": {
+    "kind": "previous-run-record",
+    "description": "Regression against the previous run record is informative but not required; its absence skips the comparison rather than stopping the run."
+  },
+  "evidence": [
+    {
+      "artifact": "requirements",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "The goal is the subject. Without it the Flow would degenerate into a task-completion review, which is a different question."
+    },
+    {
+      "artifact": "diff",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "Without the diff there is nothing to judge convergence over."
+    },
+    {
+      "artifact": "tasks",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent task records remove the coverage cross-check; convergence is still judged from requirements and diff, and the degradation is recorded."
+    },
+    {
+      "artifact": "tests",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent test evidence reduces the completion judgment rather than removing it."
+    },
+    {
+      "artifact": "baseline",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent baseline skips the regression comparison and records the reason; the rest of the Flow is unaffected."
+    }
+  ]
+}

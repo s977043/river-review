@@ -17,6 +17,7 @@ import {
   parseMarkdownTableColumn,
   parseSkillStreamCounts,
   parseSurfaceBulletNames,
+  resetTrackedPathsCache,
   resolveIgnoreKeys,
   unwrapCodeSpan,
 } from '../scripts/check-doc-enumerations.mjs';
@@ -1147,6 +1148,28 @@ test('pipeline-callsites spec fails when the checklist section heading disappear
   });
   assert.equal(errors.length, 1);
   assert.match(errors[0], /宣言側のマーカー/);
+});
+
+// 列挙は git の追跡対象だけを見る。作業ツリーに落ちた未追跡ファイルを「実体」に数えると、
+// clean checkout の CI は緑のまま手元だけが赤くなり、ローカル検証が信用できなくなる。
+// 2026-09-08 の実測では旧版 CLI が書いた `skills/agent-skills/as-*` 5 件がこの経路で
+// 3 件の失敗を出していた（同一コミットの CI は緑）。
+test('an untracked directory under skills/agent-skills does not fail the check', async (t) => {
+  const dir = path.join(REPO_ROOT, 'skills', 'agent-skills', 'as-untracked-probe-doc-enum');
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, 'SKILL.md'), '---\nname: untracked-probe\n---\n', 'utf8');
+  t.after(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+    resetTrackedPathsCache();
+  });
+  resetTrackedPathsCache();
+
+  const { errors } = await checkDocEnumerations();
+  assert.deepEqual(
+    errors.filter((e) => e.includes('as-untracked-probe-doc-enum')),
+    [],
+    `untracked dir leaked into the enumeration: ${errors.join(', ')}`
+  );
 });
 
 test('checkDocEnumerations passes on the current repo state', async () => {

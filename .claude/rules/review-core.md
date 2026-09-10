@@ -11,6 +11,7 @@ globs:
 - 重要度ラベルと出力形式: `docs/review/output-format.md`
 - レビュー観点: `docs/review/viewpoints.md`
 - レビューポリシー全体: `pages/reference/review-policy.md`
+- severity 内部語彙と出力スキーマ対応の実体: `src/lib/finding-factory.mjs`
 
 ## Severityの語彙マッピング
 

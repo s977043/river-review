@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/flow.schema.json",
+  "title": "River Review Flow definition",
+  "description": "Runtime-independent definition of WHEN and HOW review judgment is executed (#2013, Epic #2011). Skill = what to judge, Agent = who is responsible, Flow = when/how judgment is executed. A Flow document declares an ordered step list only; it never declares judgment criteria. Per ADR-009 D3/D4 the criteria (which skill is selected, severity vocabulary, gate/completion meaning) stay in `skills/**`, `docs/review/**`, `pages/reference/**` and `src/lib/**`, so every step object here is closed and carries no parameter bag. Unknown vocabulary is rejected at load time: every enum is closed and every object sets `additionalProperties: false`, so an unknown `use:` primitive, an unknown `reviewer:` role, or an unknown stop condition fails validation instead of being silently skipped. That matches the repository-wide fail-safe direction recorded in `src/lib/gate-decision.mjs` (\"everything unknown or undetermined maps to NO_GO\").",
+  "type": "object",
+  "required": ["id", "version", "intent", "steps", "outputs"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "description": "Flow identifier. Unique within the repository, stable across versions.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "version": {
+      "description": "Semantic version of this Flow as a versioned asset, following the `packs:`/`skills:` convention (`schemas/pack.schema.json`). This is an asset version, not an artifact `schemaVersion`. The same `id` + `version` MUST mean the same execution semantics on every runtime (Claude Code, Codex, CLI). Breaking changes follow the policy in `pages/reference/stable-interfaces.md`.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent": {
+      "description": "Why this Flow exists. Declarative label only; it does not select skills.",
+      "type": "object",
+      "required": ["purpose"],
+      "additionalProperties": false,
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        }
+      }
+    },
+    "inputs": {
+      "description": "Named inputs the Flow may branch on. A step's `when` clause must reference a name declared here, which keeps conditional execution free of an expression language. JSON Schema cannot express that cross-field reference, so it is enforced by `tests/flow-schema.test.mjs` rather than by this document.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/input" }
+    },
+    "steps": {
+      "description": "Ordered execution units. Array order IS the execution order: a conforming runtime MUST execute the steps in index order, so two runtimes given the same document produce the same ordering. Steps marked `parallel: true` may run concurrently with the adjacent `parallel: true` steps that form one contiguous run, but the run occupies the position of its first member and its results are collected in index order, so the observable ordering stays deterministic.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "outputs": {
+      "description": "Artifacts this Flow is responsible for producing.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/output" }
+    },
+    "stopConditions": {
+      "description": "Conditions that stop the Flow. Values reuse the existing gate reason vocabulary (`GATE_REASON_CODES` in `src/lib/gate-decision.mjs`) rather than introducing a second reason-code system; `tests/flow-schema.test.mjs` pins the two lists together. The #2013 sketch values map onto it as `missing-required-artifact` -> `DETERMINISTIC_UNRUNNABLE` and `human-judgment-required` -> `HUMAN_APPROVAL_REQUIRED`.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/stopCondition" }
+    }
+  },
+  "$defs": {
+    "stepPrimitive": {
+      "description": "The Flow step vocabulary. Single source of truth for the primitive names; every other document referring to a primitive MUST use one of these spellings. Each primitive names an existing capability rather than new behaviour (for example `select-skills` -> `selectSkills` in `runners/core/review-runner.mjs`, `derive-gate` -> `deriveGateDecision` in `src/lib/gate-decision.mjs`).",
+      "enum": [
+        "resolve-intent",
+        "resolve-artifacts",
+        "select-skills",
+        "select-agents",
+        "deterministic-check",
+        "parallel-review",
+        "cross-artifact-review",
+        "verify-findings",
+        "compare-baseline",
+        "detect-semantic-drift",
+        "evaluate-completion",
+        "derive-gate",
+        "human-escalation",
+        "persist-artifact"
+      ]
+    },
+    "reviewerRole": {
+      "description": "Reviewer lens role id, used by the `reviewer:` step key. Values are exactly the keys of `REVIEWER_ROLES` in `src/lib/reviewer-orchestrator.mjs`; `tests/flow-schema.test.mjs` pins the two lists together so a Flow cannot invent a third role ledger. A reviewer lens is a different axis from the logical Agent (\"who is responsible\") that Epic #2011 / #2014 will define as `review-orchestrator` / `specialist-reviewer` / `finding-verifier` / `consistency-judge` / `completion-judge`; writing one of those names here MUST fail validation. The `agent:` key is deliberately unused and reserved for that logical Agent vocabulary, so #2014 can add it without a breaking rename.",
+      "enum": [
+        "bug-hunter",
+        "security-scanner",
+        "test-gap",
+        "dependency-reviewer",
+        "frontend-reviewer",
+        "ci-cd-reviewer"
+      ]
+    },
+    "output": {
+      "enum": ["findings", "coverage", "completion", "gate", "baseline-diff", "run-record"]
+    },
+    "stopCondition": {
+      "enum": [
+        "GATE_CONFIG_CHANGED",
+        "HUMAN_APPROVAL_REQUIRED",
+        "DECISION_ESCALATED",
+        "OSCILLATION_DETECTED",
+        "RISK_MAP_HUMAN_REVIEW",
+        "UNKNOWN_RISK_ACTION",
+        "STRICT_BLOCK",
+        "DETERMINISTIC_UNRUNNABLE",
+        "SKIPPED_BY_POLICY",
+        "NOT_EXECUTED",
+        "BLOCKING_FINDINGS",
+        "MINOR_FINDINGS_OBSERVE",
+        "UNDETERMINED",
+        "RISK_MAP_OBSERVE",
+        "CONVERGED_CLEAN",
+        "UNKNOWN_SIGNAL"
+      ]
+    },
+    "input": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "required": {
+          "description": "When true and the input is absent, the Flow stops. Absent means false.",
+          "type": "boolean"
+        },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "when": {
+      "description": "Conditional execution, deliberately limited to presence of a declared input. There is no expression language: a Flow may not encode judgment criteria (ADR-009 D3).",
+      "type": "object",
+      "required": ["input", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "input": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "state": { "enum": ["present", "absent"] }
+      }
+    },
+    "onUnsatisfied": {
+      "description": "What a runtime does when a step cannot run as declared (its input is missing, its underlying capability is unavailable, or it fails). The three outcomes are distinct: `stop` halts the Flow and derives a gate carrying a `stopConditions` reason; `skip` does not execute the step, records a reason (the `{skill, reasons}` shape already used by the `skipped` entries that `selectSkills` builds in `runners/core/review-runner.mjs`; `evaluateSkill` itself returns `{ok, reasons}`) and continues; `degrade` executes a reduced form, records the degradation (the `plannerFallback` / partial-failure shape already used by `runners/core/review-runner.mjs` and `src/lib/reviewer-orchestrator.mjs`) and continues. Omitting the key means `stop`: the default is the safe side, so a Flow can only opt into continuing.",
+      "enum": ["stop", "skip", "degrade"]
+    },
+    "step": {
+      "description": "Exactly one of `use` (a Flow primitive) or `reviewer` (a reviewer lens role). Both objects are closed and carry no parameter bag, so selection criteria cannot be embedded in a Flow. `agent:` is NOT a step key here: it is reserved for the logical Agent vocabulary that Epic #2011 / #2014 defines, which is a separate axis from the reviewer lens (see `$defs/reviewerRole`).",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["use"],
+          "additionalProperties": false,
+          "properties": {
+            "use": { "$ref": "#/$defs/stepPrimitive" },
+            "description": { "type": "string", "minLength": 1 },
+            "when": { "$ref": "#/$defs/when" },
+            "parallel": {
+              "description": "Marks this step as a member of the contiguous parallel run it belongs to. Absent means false (sequential).",
+              "type": "boolean"
+            },
+            "onUnsatisfied": { "$ref": "#/$defs/onUnsatisfied" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["reviewer"],
+          "additionalProperties": false,
+          "properties": {
+            "reviewer": { "$ref": "#/$defs/reviewerRole" },
+            "description": { "type": "string", "minLength": 1 },
+            "when": { "$ref": "#/$defs/when" },
+            "parallel": {
+              "description": "Marks this step as a member of the contiguous parallel run it belongs to. Absent means false (sequential).",
+              "type": "boolean"
+            },
+            "onUnsatisfied": { "$ref": "#/$defs/onUnsatisfied" }
+          }
+        }
+      ]
+    }
+  }
+}

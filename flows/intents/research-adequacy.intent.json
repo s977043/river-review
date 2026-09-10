@@ -1,0 +1,39 @@
+{
+  "purpose": "research-adequacy",
+  "version": "0.1.0",
+  "question": "この調査結果を要件・設計・計画の根拠として使ってよいか。",
+  "description": "Reviews a research write-up before anything is derived from it. The subject arrives inside the generic `artifacts` bundle rather than a dedicated research kind, matching flows/research-review.flow.json. Freshness and source availability are deliberately absent from this evidence list: a built-in web search is a Non-goal of #2017, so those two questions leave the run through human-escalation as open questions instead of being declared answerable from evidence.",
+  "stage": "research",
+  "phase": "upstream",
+  "subject": ["artifacts"],
+  "baseline": {
+    "kind": "none",
+    "description": "A research write-up is judged on its own claim-to-source correspondence, not against a previous one, so this Flow declares no compare-baseline step."
+  },
+  "evidence": [
+    {
+      "artifact": "artifacts",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "The write-up and whatever sources it carries are the subject. Without them there is nothing to judge, and the run stops with DETERMINISTIC_UNRUNNABLE."
+    },
+    {
+      "artifact": "requirements",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent requirements remove the claim-versus-use cross-check; the write-up-internal review still runs and the degradation is recorded."
+    },
+    {
+      "artifact": "design",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent design skips the design cross-check and records the reason."
+    },
+    {
+      "artifact": "plan",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent plan skips the plan cross-check and records the reason."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "number": 2086,
+  "state": "closed",
+  "merged": true,
+  "title": "test(cli): merged example",
+  "head": {
+    "ref": "fix/2074-option-consumer-check",
+    "sha": "3ab39cc3dc1f607a0dd5e72a732c6e583a0ef57d"
+  },
+  "labels": []
+}

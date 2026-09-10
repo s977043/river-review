@@ -1,0 +1,5 @@
+[
+  { "id": 1, "user": { "login": "vercel[bot]", "type": "Bot" }, "body": "preview" },
+  { "id": 2, "user": { "login": "github-actions[bot]", "type": "Bot" }, "body": "river review" },
+  { "id": 3, "user": { "login": "s977043", "type": "User" }, "body": "please split this PR" }
+]

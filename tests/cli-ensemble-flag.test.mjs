@@ -108,12 +108,17 @@ describe('--ensemble flag (#911 Phase 3 Slice B)', () => {
         `ensemble parsing failed: ${r.stderr}`
       );
 
-      // Find tmp file created by --ensemble. We accept any file under os.tmpdir()
-      // whose name starts with "river-ensemble-" and contains both review bodies.
-      // The cleanup hook fires on process exit, so the file is gone by now — we
-      // verify behavior structurally instead: there should be NO leftover files.
+      // The tmp file is named `river-ensemble-<pid>-<timestamp>.md` (src/cli.mjs)
+      // and the cleanup hook fires on process exit, so it is gone by now — we
+      // verify behavior structurally instead: there should be NO leftover file
+      // for THIS child process. Scope by the child's pid: other processes on the
+      // same runner (e.g. tests/cli-option-consumer-check.test.mjs, which parses
+      // `--ensemble` in-process) may legitimately hold their own tmp files
+      // while this test runs (#2087 finding 3).
+      assert.ok(Number.isInteger(r.pid) && r.pid > 0, `child pid missing: ${r.pid}`);
+      const prefix = `river-ensemble-${r.pid}-`;
       const remaining = readdirSyncSafe(os.tmpdir()).filter(
-        (n) => n.startsWith('river-ensemble-') && n.endsWith('.md')
+        (n) => n.startsWith(prefix) && n.endsWith('.md')
       );
       // Subprocess already exited and ran the cleanup hook; remaining should be 0.
       assert.equal(remaining.length, 0, `tmp files not cleaned up: ${remaining.join(', ')}`);

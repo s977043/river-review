@@ -106,7 +106,7 @@
         "version": { "type": ["string", "null"] },
         "sha256": { "$ref": "#/$defs/sha256" }
       },
-      "description": "The flow definition this run executed (schemas/flow.schema.json, #2013). No flow INSTANCE document exists in this repository yet (no flows/ directory and no *.flow.json file), so this block resolves as `missing` until a producer supplies one. The agent roster, by contrast, does have instance documents: agents/contracts/*.agent.json (#2014)."
+      "description": "The flow definition this run executed (schemas/flow.schema.json, #2013). Flow INSTANCE documents now exist — #2016 landed flows/*.flow.json plus flows/entry-map.json — but src/lib/execution-manifest.mjs does not read them, because #2016 also pins an observe-mode guarantee that no module under src/ or runners/ loads that directory (tests/flow-definitions.test.mjs). The caller therefore passes the parsed document as `flowDocument` and `deriveFlowPin` hashes it (#2037); `sha256` is the digest of canonicalJson(document), not of the file bytes, so re-formatting the document does not invalidate the pin. A run that supplies no document leaves this block `missing`, which REPLAY_PINS treats as not replayable. The agent roster is the same shape: agents/contracts/*.agent.json (#2014) carry no checksum, so the caller hashes those too."
     },
     "agents": {
       "type": "object",

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted—#2012（親 Epic #2011）で、River Review の第一級配布面を Claude Code / Codex Plugin として固定し、Runtime Adapter が Review Judgment を再定義しない不変条件を記録します。本 ADR が扱うのは配布境界と不変条件の宣言までです。検査スクリプトの実装、および Flow / Agent / Execution Manifest の schema は含みません。
+Accepted—#2012（親 Epic #2011）で、River Review の第一級配布面を Claude Code / Codex Plugin として固定し、Runtime Adapter が Review Judgment を再定義しない不変条件を記録します。本 ADR が扱うのは配布境界と不変条件の宣言までです。検査スクリプトの実装、および Flow / Agent / Execution Manifest の schema は含みません。検査は #2027（PR #2050）で実装済みであり、D7 が未決として残した点の決着は D7 節末尾の「後日追記」に記録しています（#2059）。
 
 ## Context
 
@@ -24,10 +24,10 @@ Accepted—#2012（親 Epic #2011）で、River Review の第一級配布面を 
 
 [`scripts/validate-plugin-manifest.mjs`](../../scripts/validate-plugin-manifest.mjs)（`npm run plugin:validate`）は次を検査します。
 
-- 2 つの manifest の `version` が `package.json` と一致すること（`:342` と `:440`）
-- `.claude-plugin` 側の参照パスが実在すること（`:359`）
-- 2 つの manifest 間の parity 6 組。`skills` / `repository` / `displayName` / `composerIcon` / `homepage` / `author.name` が対象である（`checkCrossManifestParity` `:161`）
-- `commands/` と `agents/` に置いた資産が manifest へ登録済みであること（逆方向ドリフト検査 `checkAssetRegistration` `:203`）
+- 2 つの manifest の `version` が `package.json` と一致すること（`validatePluginManifest`）
+- `.claude-plugin` 側の参照パスが実在すること（`validatePluginManifest`）
+- 2 つの manifest 間の parity 6 組。`skills` / `repository` / `displayName` / `composerIcon` / `homepage` / `author.name` が対象である（`checkCrossManifestParity`）
+- `commands/` と `agents/` に置いた資産が manifest へ登録済みであること（逆方向ドリフト検査 `checkAssetRegistration`）
 
 一方で「host 固有ディレクトリを配布資産として参照しない」および「host 固有ファイルへ Review Judgment を複製しない」を検査する仕組みは、同スクリプトに存在しません。
 
@@ -89,12 +89,12 @@ invocation mechanics に属し、adapter が変えてよい対象は次のとお
 
 不変条件は 4 つとし、いずれも述語の形で書きます。
 
-| ID   | 述語                                                                                                                                              | 現在の検証手段                                            |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| RA-1 | `.claude/**` / `.codex/**` / 2 つの plugin manifest は、Review Judgment の正本を定義しない                                                        | 未実装。追加先は `scripts/validate-plugin-manifest.mjs`   |
-| RA-2 | manifest が参照する実体パスは host 非依存のトップレベル（`commands/` `agents/` `skills/` `assets/`）に限り、`.claude/**` / `.codex/**` を含まない | 未実装。現況は適合（Context の実測）                      |
-| RA-3 | 2 つの manifest の `skills` は同一パスを指す                                                                                                      | 実装済み。`checkCrossManifestParity` `:161`               |
-| RA-4 | 2 つの manifest の `version` は `package.json` と一致する                                                                                         | 実装済み。`validate-plugin-manifest.mjs` `:342` と `:440` |
+| ID   | 述語                                                                                                                                              | 現在の検証手段                                                                                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RA-1 | `.claude/**` / `.codex/**` / 2 つの plugin manifest は、Review Judgment の正本を定義しない                                                        | 実装済み（active）。`checkReviewJudgmentDuplication`（`scripts/validate-plugin-manifest.mjs`）。検出範囲と棚卸しは [`ra1-runtime-adapter-inventory.md`](../development/ra1-runtime-adapter-inventory.md)（#2027） |
+| RA-2 | manifest が参照する実体パスは host 非依存のトップレベル（`commands/` `agents/` `skills/` `assets/`）に限り、`.claude/**` / `.codex/**` を含まない | 実装済み（active）。`checkManifestHostIndependentRefs`（`scripts/validate-plugin-manifest.mjs`）（#2027）                                                                                                         |
+| RA-3 | 2 つの manifest の `skills` は同一パスを指す                                                                                                      | 実装済み。`checkCrossManifestParity`（`scripts/validate-plugin-manifest.mjs`）                                                                                                                                    |
+| RA-4 | 2 つの manifest の `version` は `package.json` と一致する                                                                                         | 実装済み。`validate-plugin-manifest.mjs` の `validatePluginManifest`（2 つの manifest それぞれで `package.json` の `version` と突き合わせる）                                                                     |
 
 RA-1 と RA-2 を検査へ落とす際の述語は、次の 3 要素で定義します。実装は本 ADR の範囲外です。
 
@@ -145,6 +145,18 @@ fallback が変えるのは起動経路だけです。選ばれる skill、sever
 2. [`.claude/rules/review-core.md`](../../.claude/rules/review-core.md)（40 行）の扱いを固定する。同ファイルは severity の対応表を持ち、冒頭で SSoT 3 本を参照しており、manifest からも参照されないため配布対象ではない。ただし D3-3 の逐語一致まで見ると、参照先 3 本に `blocker` が現れないため除外条件を満たさない。対応表の出典へ `src/lib/finding-factory.mjs` を加えるか、対応表そのものを落とすかは、RA-1 実装時に決める
 3. `docs/CLI-architecture.md` の「Thin adapter 原則」節から本 ADR を参照し、「正規実行面」の語が自動化経路を指すことを読者が辿れるようにする
 4. `.claude/commands/**` の棚卸し。RA-1 の対象は `git ls-files '.claude/**/*.md'` 基準で 37 件ある。本 ADR が扱ったのは項番 2 の `review-core.md` 1 件だけである。たとえば [`.claude/commands/merge-check.md`](../../.claude/commands/merge-check.md) は `:156` と `:162` で MERGE_OK / BLOCKED の判定条件を定義している。これは D3 が禁じる「gate / decision の判定条件」に当たる。同ファイルが宣言する SSoT は `docs/governance.md`（`:9`）である。これを D3-3 の除外 SSoT 一覧へ加えるか否かは未決とし、RA-1 実装時に決める。したがって RA-1 の検査を実装した時点で、`.claude/commands/**` から既存違反が出る見込みである
+
+#### 後日追記—#2027（PR #2050）で決まったこと
+
+上の 4 点は本 ADR の時点の記録であり、項番 2 と項番 4 は未決のまま残していました。RA-1 の検査を実装した #2027 で次のように決まりました。決定時点の記録を保つため、上の本文は書き換えません。
+
+- 項番 2 は「対応表を残し、出典へ `src/lib/finding-factory.mjs` を足す」で決着した。D3-3 の除外条件はこれで成立する
+- 項番 4 の `.claude/commands/**` は、既存違反の発生源としては解消した。変えたのは `gate-decision-condition` 規則が verdict とみなす語彙であり、製品の gate 語彙（`src/lib/gate-decision.mjs` の `GATE_DECISIONS`）へ限定した
+- **対象パス集合は変えていない。** `.claude/**` は `RA1_TARGET_PATHSPECS` に残っており、`.claude/commands/**` のファイルが製品の gate 語彙を D3-3 の出典なしで定義すれば、今も違反になる
+- `merge-check.md` の `MERGE_OK` / `BLOCKED` が判定するのはリポジトリの作業手順であり、レビューではない。製品の gate 語彙とは名前空間が異なるという読みによる
+- したがって項番 4 末尾の「既存違反が出る見込み」は実現しなかった。2026-09-04 の実測で `.claude/commands/**` の違反は 0 件である
+
+判断の根拠と実測は [`ra1-runtime-adapter-inventory.md`](../development/ra1-runtime-adapter-inventory.md) の「決定 1」節に記録しています。
 
 ## Non-goals
 

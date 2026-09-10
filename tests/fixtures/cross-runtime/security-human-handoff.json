@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "caseId": "security-human-handoff",
+  "caseClass": "security-human-handoff",
+  "description": "A high-risk security change. Both runtimes must hand the decision to a human rather than deciding it.",
+  "expectation": "conformant",
+  "pinned": {
+    "entry": "review-technical",
+    "flow": "technical-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "48d6447860a9900b047b283bb2022f6fe52b453819df4ba57d6352b58b0647b9",
+    "artifactSetSha256": "f53b9540c83aa34d5fa1ff3999c74731c6d0aa85a6a4abf3b162699b380b64b5",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "trust-boundaries-authz",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "ESCALATE",
+          "reasonCode": "HUMAN_APPROVAL_REQUIRED",
+          "inputsHash": "1955c0b4e727483b"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "authz-boundary-widened",
+            "taxonomy": "trust-boundary",
+            "severity": "critical",
+            "target": {
+              "path": "src/auth/policy.ts",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["trust-boundary", "least-privilege"],
+        "completionState": "undetermined",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": true
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "trust-boundaries-authz",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "ESCALATE",
+          "reasonCode": "HUMAN_APPROVAL_REQUIRED",
+          "inputsHash": "1955c0b4e727483b"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "authz-boundary-widened",
+            "taxonomy": "trust-boundary",
+            "severity": "critical",
+            "target": {
+              "path": "src/auth/policy.ts",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["trust-boundary", "least-privilege"],
+        "completionState": "undetermined",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": true
+      }
+    }
+  ],
+  "declaredDivergences": [],
+  "expected": {
+    "deterministicConformance": 1,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "pass",
+    "failedGates": []
+  }
+}

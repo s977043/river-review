@@ -24,6 +24,22 @@ import { DEPTH_TO_REVIEW_MODE } from './lib/review-plan-generator.mjs';
 // It now lives in src/lib/expires-at.mjs so the CLI and the library share one
 // definition; the accepted set of `--expires` values is unchanged.
 import { parseExpiresAt } from './lib/expires-at.mjs';
+import { listFlowEntryNames } from './lib/flow-loader.mjs';
+import { acceptsPositionalPath, takePositionalPath } from './cli/parse/positionals.mjs';
+import { consumeTerminator } from './cli/parse/terminator.mjs';
+import {
+  EVOLVE_SUBCOMMANDS,
+  FEEDBACK_SUBCOMMANDS,
+  PROMOTE_ID_SUBCOMMANDS,
+  REVIEW_SUBCOMMANDS,
+  RUNS_SUBCOMMANDS,
+  SKILLS_SUBCOMMANDS,
+  SUBCOMMAND_ONLY_COMMANDS,
+  SUPPRESSION_SUBCOMMANDS,
+} from './cli/parse/vocabulary.mjs';
+import { consumeEagerCommand } from './cli/parse/eager-command.mjs';
+import { consumeOption } from './cli/parse/options.mjs';
+import { applyPhaseFallback, checkReviewSubcommand } from './cli/parse/postprocess.mjs';
 import { runReviewCommand } from './cli/commands/review.mjs';
 import { runSkillsCommand } from './cli/commands/skills.mjs';
 import { runRunsCommand } from './cli/commands/runs.mjs';
@@ -53,9 +69,12 @@ Commands:
   skills resolve        Show which skills apply to the given --path files
   doctor <path>         Check setup and print hints for common issues
   review plan           Resolve upstream artifacts and emit a Review Artifact
-                        (Phase 3 slice: --plan-only only)
+                        (Phase 3 slice: --plan-only only; --base <ref> diffs
+                         against that ref instead of the diff artifact;
+                         --entry <name> pins a review Flow entry, Beta)
   review exec           Run the review and emit a Review Artifact with findings
-                        (--dry-run: plan only; --plan <file>: replay an existing plan)
+                        (--dry-run: plan only; --plan <file>: replay an existing plan;
+                         --entry <name> pins a review Flow entry and records steps, Beta)
   review route          Recommend a review mode (light|standard|team|human-required)
                         for the current diff (--format json|markdown; --base <ref>)
   eval                  Run review fixtures evaluation (must_include checks)
@@ -144,6 +163,12 @@ Options:
                     Use "auto" to select roles automatically based on diff content and risk signals.
   --baseline <path> Path to a previous review JSON (findings array) for regression comparison
   --base <ref>      Branch or ref to diff against (e.g. main). Default: auto-detected default branch
+                    Accepted only by: run, skills (no subcommand), review plan|exec|route.
+                    Other surfaces reject it (#2065) — they never read a diff.
+  --entry <name>    (review plan|exec, Beta) Review Flow entry to pin the artifact to
+                    (review-plan|review-task|review-final|... from the entry map).
+                    Adds flow and evidenceRequirements to the artifact; review exec also
+                    records the Flow's per-step outcomes as steps. No other output changes.
   --skill-set <name> Restrict review to a named skill set from skills/registry.yaml
                     (e.g. basic, typescript, comprehensive). Default: all applicable skills
   --depth <name>    Force review depth: quick|standard|thorough. Default: auto-detected from diff size
@@ -228,32 +253,6 @@ const EAGER_COMMANDS = new Set(
 );
 
 /**
- * Eager-branch commands that take a subcommand word and never a positional
- * path. The arms above the fall-through in the eager branch have already
- * consumed their subcommand word, so the fall-through (which reads a
- * positional `<path>`) must skip exactly these.
- */
-const SUBCOMMAND_ONLY_COMMANDS = new Set(['runs', 'suppression', 'feedback', 'promote']);
-
-/**
- * `skills` subcommands (`skills import|export|list|resolve` take options, not a
- * positional path — see `acceptsPositionalPath`).
- */
-const SKILLS_SUBCOMMANDS = new Set(['import', 'export', 'list', 'resolve']);
-
-/**
- * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay`, ADR-006
- * `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
- * "first non-flag token") keeps `river evolve <path>` working.
- */
-const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'prompt-ab']);
-
-/**
- * `promote` subcommands that take an optional positional candidate id.
- */
-const PROMOTE_ID_SUBCOMMANDS = new Set(['approve', 'reject', 'template', 'review-effectiveness']);
-
-/**
  * Global options the shared parser handles for `evolve`. Anything else starting
  * with `-` is rejected rather than silently ignored.
  */
@@ -279,15 +278,6 @@ const PROMOTE_SHARED_OPTIONS = new Set(['--output', '--dry-run', '-h', '--help',
  */
 const SEVERITY_VALUES = Object.keys(SEVERITY_RANK);
 
-/** Values accepted by `--output`. */
-const OUTPUT_MODES = ['text', 'markdown', 'json', 'yaml', 'html'];
-
-/** Values accepted by `--format` (review plan|exec|verify|route). */
-const REVIEW_FORMATS = ['text', 'markdown', 'json'];
-
-/** Values accepted by `skills list --source`. */
-const SKILLS_LIST_SOURCES = ['rr', 'agent', 'all'];
-
 /**
  * Fingerprint algorithms accepted by `suppression add --fingerprint-algo`
  * (#1797). Mirrors the `fingerprintAlgo` enum of
@@ -299,64 +289,223 @@ const SKILLS_LIST_SOURCES = ['rr', 'agent', 'all'];
 const SUPPRESSION_FINGERPRINT_ALGOS = ['v1', 'v2'];
 
 /**
- * `river review` subcommands (#802 Phase 3), at module scope because BOTH the
- * eager branch inside `parseArgs` and `takeTrailingPositional` below need it:
- * `review` had no vocabulary at all, so a subcommand written after the options
- * was swallowed as the path (#1755).
+ * Which subcommand words name a real surface, per command (#2065 review).
  *
- * `SKILLS_SUBCOMMANDS` / `EVOLVE_SUBCOMMANDS` sit alongside it above. Hoisting
- * them out of `parseArgs` is a pure relocation: `takeTrailingPositional`
- * already consulted `REVIEW_SUBCOMMANDS` before the hoist, but for `evolve`
- * it only approximated the eager branch's decision with `existsSync` (#1759
- * B1). `takeTrailingPositional` now checks `EVOLVE_SUBCOMMANDS` first, the
- * same priority the eager branch uses, so `river evolve aggregate --min 2`
- * and `river evolve --min 2 aggregate` agree even when a directory named
- * `aggregate` exists in cwd.
+ * `bare` says whether the command WITHOUT a subcommand is itself a surface:
+ * `river runs` runs as `runs list`, `river skills <path>` is the diff-reviewing
+ * form, and `river evolve <path>` takes a path — but `river feedback` and
+ * `river suppression` are not surfaces, and `river review` without a
+ * subcommand is already rejected earlier in this function.
+ *
+ * `promote` is deliberately ABSENT. Its vocabulary lives only in its handler,
+ * and the parser has no constant for it — but it also never reaches the
+ * command-scoped check, because `parsePromoteOption` consumes `--base` as an
+ * unknown option before `parsed.base` is ever set (measured: `promote list
+ * --base main` exits 1 with ``unknown option for promote: --base`` both before
+ * and after #2065). A command missing from this map is treated as "not a
+ * surface the parser can name", so the check skips it rather than invent one.
+ *
+ * @type {Map<string, {bare: boolean, known: Set<string> | null}>}
  */
-const REVIEW_SUBCOMMANDS = new Set(['plan', 'exec', 'verify', 'route']);
+const SURFACE_SUBCOMMANDS = new Map([
+  ['run', { bare: true, known: null }],
+  ['doctor', { bare: true, known: null }],
+  ['eval', { bare: true, known: null }],
+  ['skills', { bare: true, known: SKILLS_SUBCOMMANDS }],
+  ['runs', { bare: true, known: RUNS_SUBCOMMANDS }],
+  ['review', { bare: false, known: REVIEW_SUBCOMMANDS }],
+  ['feedback', { bare: false, known: FEEDBACK_SUBCOMMANDS }],
+  ['suppression', { bare: false, known: SUPPRESSION_SUBCOMMANDS }],
+  ['evolve', { bare: true, known: EVOLVE_SUBCOMMANDS }],
+]);
 
 /**
- * Whether `parsed.command` still accepts a positional `<path>`.
+ * The surfaces that actually READ `parsed.base` (#2065).
  *
- * The five path-taking surfaces are `run` / `doctor` / `review` /
- * `skills` (without a subcommand) / `evolve` (except `replay`).
+ * Derived by reading every consumer of the value — `src/cli/commands/run.mjs`
+ * (`baseRef: parsed.base`), `src/cli/commands/skills.mjs` (only the
+ * subcommand-less `skills <path>` branch reaches `resolveBaseMergeBase`; the
+ * `import` / `export` / `list` / `resolve` branches return before it), and
+ * `src/cli/commands/review.mjs` (`resolveBaseRepoDiff`, reached from `plan`,
+ * `exec` and `route`; `verify` returns from `runReviewVerify` without ever
+ * touching it, and its own option contract in
+ * `pages/reference/cli-review-verify-spec.md` lists `--artifact` / `--plan` /
+ * `--target` rather than `--base`).
+ *
+ * `tests/cli-base-option-scope.test.mjs` pins this set against the files that
+ * mention `parsed.base` / `resolveBaseMergeBase`, so adding a consumer without
+ * widening the set (or the reverse) fails there rather than silently.
+ *
+ * @type {Set<string>}
+ */
+const BASE_CONSUMING_SURFACES = new Set([
+  'run',
+  'skills',
+  'review plan',
+  'review exec',
+  'review route',
+]);
+
+/**
+ * The surfaces that READ `parsed.entry` (#2054 PR-3, Beta).
+ *
+ * `--entry <name>` names a review Flow entry (a key of the entry map's
+ * `entries`, read through `src/lib/flow-loader.mjs`) and is consumed by
+ * `src/cli/commands/review.mjs` on the `plan` and `exec` paths, where it
+ * attaches the resolved Flow pin to the emitted artifact; on `review exec`
+ * (Epic #2011 AC7 P2) it additionally runs the pinned Flow through
+ * `src/lib/flow-runner.mjs` and records the per-step outcomes as `steps`.
+ * `exec --dry-run` / `exec --plan` share the `review exec` surface word, so
+ * the parse layer lets the token through for them too; the handler attaches
+ * the pin there and runs no steps. Same INVARIANT as `--base` above: every
+ * other surface accepted the token and never read it (before #2054 PR-3 it was
+ * an unknown option on all of them), so dropping it restores the previous
+ * behavior exactly.
+ *
+ * @type {Set<string>}
+ */
+const ENTRY_CONSUMING_SURFACES = new Set(['review plan', 'review exec']);
+
+/**
+ * Command-scoped option allowlist (#2065).
+ *
+ * `KNOWN_OPTION_TOKENS` and the per-option `if` chain inside `parseArgs` are
+ * FLAT: every option they know is accepted by every command. That is why
+ * `doctor --base <ref>`, `runs list --base <ref>` and `eval --base <ref>`
+ * exited 0 while consuming nothing — the same "accepted, therefore effective"
+ * misreading that #2046 / #2051 / #2057 closed on the surfaces that do read the
+ * value. Rather than rebuild the parser around per-command option tables, this
+ * table names the few options whose meaning is surface-specific and the parse
+ * loop stays untouched; the check runs once after the loop (see
+ * `checkCommandScopedOptions`), which is also the only point where the
+ * subcommand word is known regardless of where the caller wrote it
+ * (`river review --base X plan` and `river review plan --base X` are both
+ * accepted orders since #1755).
+ *
+ * `promote` and `evolve` already reject out-of-scope options this way through
+ * `PROMOTE_SHARED_OPTIONS` / `EVOLVE_SHARED_OPTIONS`, so `promote list --base
+ * main` and `evolve aggregate --base main` exited 1 before this change too —
+ * this table extends the same contract to the surfaces those two sets do not
+ * cover.
+ *
+ * INVARIANT: every entry here names an option that the out-of-scope surfaces
+ * ACCEPTED AND NEVER READ. That is the whole reason the table exists, and it is
+ * what makes one shared recovery sentence correct for all of them (#2076):
+ * removing the option cannot change what those surfaces do, because they never
+ * looked at its value. An option whose presence has a side effect on a surface
+ * that does not "read" it does not belong in this table — it needs its own
+ * message, not this one.
+ *
+ * @type {Array<{token: string, given: (parsed: object) => boolean,
+ *   surfaces: Set<string>, why: string}>}
+ */
+const COMMAND_SCOPED_OPTIONS = [
+  {
+    token: '--base',
+    // `--base` requires a value, so a non-null field means it was passed.
+    given: (parsed) => parsed.base !== null,
+    surfaces: BASE_CONSUMING_SURFACES,
+    why: 'that surface does not review a diff',
+  },
+  {
+    token: '--entry',
+    given: (parsed) => parsed.entry !== null,
+    surfaces: ENTRY_CONSUMING_SURFACES,
+    why: 'that surface does not resolve a review Flow entry',
+  },
+];
+
+/**
+ * The surface a parse result names: the command word plus its subcommand when
+ * it has one (`review plan`, `skills list`, `runs digest`). Only one of these
+ * fields can be set at a time — each is written by the eager branch of the
+ * command it belongs to.
+ *
+ * @param {object} parsed
+ * @returns {string}
+ */
+function currentSubcommand(parsed) {
+  return (
+    parsed.reviewSubcommand ??
+    parsed.skillsSubcommand ??
+    parsed.runsSubcommand ??
+    parsed.evolveSubcommand ??
+    parsed.promoteSubcommand ??
+    parsed.suppressionSubcommand ??
+    parsed.feedbackSubcommand ??
+    null
+  );
+}
+
+function currentSurface(parsed) {
+  const subcommand = currentSubcommand(parsed);
+  return subcommand ? `${parsed.command} ${subcommand}` : `${parsed.command}`;
+}
+
+/**
+ * Whether `currentSurface(parsed)` names a surface that actually exists
+ * (#2065 review, minor 1).
+ *
+ * The subcommand word is taken verbatim by the eager branch for `runs` /
+ * `feedback` / `suppression` / `promote` — it is the HANDLER that validates it.
+ * Without this gate, `river runs nosuch --base main` reported
+ * ``--base is not supported by `river runs nosuch` `` and swallowed the far
+ * more useful ``Unknown runs subcommand: nosuch. Use: list | diff | summary |
+ * digest``, naming a surface that does not exist. Both exit 1, so the canary
+ * cannot see the difference — hence the explicit gate.
+ *
+ * When the surface cannot be named, this returns false and the command-scoped
+ * check stands down, leaving the handler to report the real problem. `--base`
+ * is not consumed on any of those paths either way.
  *
  * @param {object} parsed
  * @returns {boolean}
  */
-function acceptsPositionalPath(parsed) {
-  switch (parsed.command) {
-    case 'run':
-    case 'doctor':
-    case 'review':
-      return true;
-    case 'skills':
-      // `skills import|export|list|resolve` take options, not a path.
-      return !parsed.skillsSubcommand;
-    case 'evolve':
-      // `replay` takes NO positional (its dataset comes from --spec).
-      return parsed.evolveSubcommand !== 'replay';
-    default:
-      return false;
-  }
+function isNamedSurface(parsed) {
+  const entry = SURFACE_SUBCOMMANDS.get(parsed.command);
+  if (!entry) return false;
+  const subcommand = currentSubcommand(parsed);
+  if (subcommand === null) return entry.bare;
+  return entry.known !== null && entry.known.has(subcommand);
 }
 
 /**
- * Consume `token` as the positional `<path>` and as nothing else.
+ * Reject an option the current surface accepts but never reads (#2065).
  *
- * This is the reading that applies after the POSIX `--` terminator, where a
- * token must never be re-read as an option or as a subcommand word even when it
- * looks like one.
+ * Runs post-loop, and only for a real command: `parsed.command` is `null` for
+ * a bare `river --base main` (which prints help and exits 0) and `'help'`
+ * whenever `-h` / `--help` appeared anywhere in argv — including AFTER the
+ * option, as in `river run . --base main --help`. Rejecting either would turn
+ * `--help` into a usage error, so both are left alone; neither can be misread
+ * as "a review ran against that ref" because neither runs a review.
  *
  * @param {object} parsed
- * @param {string} token
- * @returns {boolean} true when the token was consumed as the target
+ * @returns {void}
  */
-function takePositionalPath(parsed, token) {
-  if (parsed.targetConsumed || !acceptsPositionalPath(parsed)) return false;
-  parsed.target = token;
-  parsed.targetConsumed = true;
-  return true;
+function checkCommandScopedOptions(parsed) {
+  if (parsed.usageError) return;
+  if (!COMMAND_NAMES.includes(parsed.command)) return;
+  // A typo'd subcommand word is the handler's to report, not this check's.
+  if (!isNamedSurface(parsed)) return;
+  const surface = currentSurface(parsed);
+  for (const rule of COMMAND_SCOPED_OPTIONS) {
+    if (!rule.given(parsed)) continue;
+    if (rule.surfaces.has(surface)) continue;
+    // Sentence order: why it was rejected -> where the option IS read -> how to
+    // recover (#2076). The recovery sentence closes the Error line rather than
+    // taking a line of its own, so that the `Usage:` / ``Run `river --help` ``
+    // pair `usageError` prints below stays the last thing on stderr.
+    console.error(
+      `Error: ${rule.token} is not supported by \`river ${surface}\` — ${rule.why}, ` +
+        `so the value would be accepted and never used. ` +
+        `Surfaces that read ${rule.token}: ${[...rule.surfaces]
+          .map((name) => `river ${name}`)
+          .join(', ')}. ` +
+        `Drop ${rule.token} to get the previous behavior.`
+    );
+    usageError(parsed);
+    return;
+  }
 }
 
 /**
@@ -385,6 +534,27 @@ function takeTrailingPositional(parsed, token) {
   // written after the path (`river review . plan`) resolves as well.
   if (parsed.command === 'review' && !parsed.reviewSubcommand && REVIEW_SUBCOMMANDS.has(token)) {
     parsed.reviewSubcommand = token;
+    return true;
+  }
+  // #2081: `river skills --base main import` swallowed `import` as the target
+  // path, so the `--base` allowlist check (#2065) never saw the subcommand and
+  // the review ran against `import/` when that directory existed. Vocabulary
+  // match only — the eager branch above (`args[0]` right after `skills`) also
+  // matches by vocabulary alone and `river skills bogus` is pinned as "read as
+  // a path" (#1709 未決 7), so an `!existsSync` heuristic here would make the
+  // two word orders disagree again. A directory literally named `import` is
+  // still reachable as `river skills ./import`. `!parsed.targetConsumed`
+  // mirrors the `evolve` branch: once a path has been taken
+  // (`river skills --dry-run . import`), the trailing word is a surplus
+  // positional, exactly as the leading form `skills import .` reports it —
+  // otherwise the path would be swallowed silently and the subcommand run.
+  if (
+    parsed.command === 'skills' &&
+    !parsed.targetConsumed &&
+    !parsed.skillsSubcommand &&
+    SKILLS_SUBCOMMANDS.has(token)
+  ) {
+    parsed.skillsSubcommand = token;
     return true;
   }
   // Mirror the eager branch's priority: a token that matches known
@@ -486,6 +656,7 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--reviewers',
   '--baseline',
   '--base',
+  '--entry',
   '--skill-set',
   '--depth',
   '--save',
@@ -1211,6 +1382,7 @@ function parseArgs(argv) {
     reviewers: null,
     baseline: null,
     base: null,
+    entry: null,
     skillSet: null,
     depth: null,
     save: false,
@@ -1300,92 +1472,16 @@ function parseArgs(argv) {
     // command-specific blocks, so that all five path-taking surfaces behave the
     // same (`evolve` would otherwise report it as its own unknown option).
     if (arg === '--') {
-      let terminatorError = false;
-      while (args.length) {
-        const positional = args.shift();
-        if (parsed.targetConsumed || !acceptsPositionalPath(parsed)) {
-          console.error(`Error: unexpected argument "${positional}".`);
-          usageError(parsed);
-          terminatorError = true;
-          break;
-        }
-        // The token is a path by construction, so it must BE one. Without this
-        // check `river evolve aggregate -- nosuchdir` exited 0 with an empty
-        // aggregate: `--` bypasses the eager branch's "a non-existent,
-        // non-subcommand token is a mistyped subcommand" rejection, turning a
-        // mistyped path into a silent empty result. #1746 W2 already treated
-        // "exit 0 while silently falling back" as a regression.
-        if (!existsSync(positional)) {
-          console.error(
-            `Error: "${positional}" does not exist ` +
-              '(every token after `--` is read as a path, never as an option or a subcommand).'
-          );
-          usageError(parsed);
-          terminatorError = true;
-          break;
-        }
-        takePositionalPath(parsed, positional);
-        terminatorTookPositional = true;
+      const { error, tookPositional } = consumeTerminator(parsed, args);
+      if (tookPositional) terminatorTookPositional = true;
+      if (error) {
+        usageError(parsed);
+        break;
       }
-      if (terminatorError) break;
       continue;
     }
     if (!parsed.command && EAGER_COMMANDS.has(arg)) {
-      parsed.command = arg;
-      // Check for skills subcommands (import/export/list)
-      if (arg === 'skills' && args[0] && SKILLS_SUBCOMMANDS.has(args[0])) {
-        parsed.skillsSubcommand = args.shift();
-      } else if (arg === 'evolve') {
-        if (args[0] && EVOLVE_SUBCOMMANDS.has(args[0])) {
-          parsed.evolveSubcommand = args.shift();
-        }
-        // `replay` takes NO positional: its dataset comes from --spec. Letting
-        // the first token become `parsed.target` would make the command accept
-        // and silently ignore it (`river evolve replay ./typo.json --spec x`).
-        if (parsed.evolveSubcommand !== 'replay' && args[0] && !args[0].startsWith('-')) {
-          const token = args.shift();
-          // A mistyped subcommand (`agregate`) must not be swallowed as a path
-          // and reported as an empty, successful aggregate. Anything that is
-          // neither a known subcommand nor an existing path is an error.
-          if (!parsed.evolveSubcommand && !existsSync(token)) {
-            parsed.evolveSubcommand = token; // handler rejects it with exit 1
-          } else {
-            parsed.target = token;
-            parsed.targetConsumed = true;
-          }
-        }
-        // Surplus positionals are a usage error, never silently discarded.
-        while (args[0] && !args[0].startsWith('-')) {
-          parsed.evolveExtraArgs.push(args.shift());
-        }
-      } else if (arg === 'runs' && args[0] && !args[0].startsWith('-')) {
-        parsed.runsSubcommand = args.shift(); // list | diff | summary | digest
-        // `diff` takes two or more positional run IDs, which may be written
-        // before, after, or interleaved with options (e.g. `--output json`).
-        // Collecting them eagerly here (as a fixed shift-two-then-scan) used to
-        // swallow a leading option as a run ID (#1759 B2): `runs diff --output
-        // json r1 r2` shifted "--output" into runsId1 and "json" into runsId2,
-        // then tried to open a run named "--output" and exited 1 with ENOENT.
-        // Collection now happens token-by-token below (near the promote/evolve
-        // dispatches), so options are left for the shared option handlers.
-      } else if (arg === 'suppression' && args[0] && !args[0].startsWith('-')) {
-        parsed.suppressionSubcommand = args.shift(); // add (only one for now)
-      } else if (arg === 'feedback' && args[0] && !args[0].startsWith('-')) {
-        parsed.feedbackSubcommand = args.shift(); // add (only one for now)
-      } else if (arg === 'promote' && args[0] && !args[0].startsWith('-')) {
-        parsed.promoteSubcommand = args.shift(); // propose | list | approve | reject | template | retire | review-effectiveness
-        // approve/reject/template/review-effectiveness take an optional positional candidate id.
-        if (
-          PROMOTE_ID_SUBCOMMANDS.has(parsed.promoteSubcommand) &&
-          args[0] &&
-          !args[0].startsWith('-')
-        ) {
-          parsed.promoteId = args.shift();
-        }
-      } else if (!SUBCOMMAND_ONLY_COMMANDS.has(arg) && args[0] && !args[0].startsWith('-')) {
-        parsed.target = args.shift();
-        parsed.targetConsumed = true;
-      }
+      consumeEagerCommand(parsed, arg, args);
       continue;
     }
     if (parsed.command === 'suppression') {
@@ -1449,407 +1545,11 @@ function parseArgs(argv) {
       parsed.command = arg;
       break;
     }
-    if (arg === '--plan-only') {
-      parsed.planOnly = true;
-      continue;
-    }
-    if (arg === '--fail-on' || arg === '--warn-on') {
-      const value = args.shift();
-      const sev = value ? value.toLowerCase() : '';
-      if (!SEVERITY_VALUES.includes(sev)) {
-        console.error(
-          `Error: ${arg} must be one of: ${SEVERITY_VALUES.join(', ')} (got "${value ?? ''}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      if (arg === '--fail-on') parsed.failOn = sev;
-      else parsed.warnOn = sev;
-      continue;
-    }
-    if (arg === '--advisory-only') {
-      parsed.advisoryOnly = true;
-      continue;
-    }
-    if (arg === '--gate') {
-      parsed.gate = true;
-      continue;
-    }
-    if (arg === '--offline' || arg === '--rules-only') {
-      parsed.offline = true;
-      continue;
-    }
-    if (arg === '--plan') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --plan option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.planFile = value;
-      continue;
-    }
-    if (arg === '--output-file') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --output-file option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.outputFile = value;
-      continue;
-    }
-    if (arg === '--summary-file') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --summary-file option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.summaryFile = value;
-      continue;
-    }
-    if (arg === '--quiet') {
-      parsed.quiet = true;
-      continue;
-    }
-    if (arg === '--artifacts-dir') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --artifacts-dir option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.artifactsDir = value;
-      continue;
-    }
-    if (arg === '--artifact') {
-      const value = args.shift();
-      const eq = value ? value.indexOf('=') : -1;
-      if (!value || value.startsWith('-') || eq <= 0) {
-        console.error('Error: --artifact requires <id>=<path> (e.g. --artifact plan=./plan.md).');
-        usageError(parsed);
-        break;
-      }
-      parsed.cliArtifacts[value.slice(0, eq)] = value.slice(eq + 1);
-      continue;
-    }
-    if (arg === '--ensemble') {
-      // #911 Phase 3 Slice B. Sugar for "concatenate every *.md file under
-      // <dir> into a single review-external artifact". The synthesis skill
-      // (`independent-review-synthesis`) consumes the merged
-      // file. We deliberately do NOT pin specific reviewer names (Claude /
-      // Codex / Cursor) in the flag — file names carry that information, so
-      // the CLI stays provider-agnostic.
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error(
-          'Error: --ensemble requires a directory path (e.g. --ensemble ./.river/reviews).'
-        );
-        usageError(parsed);
-        break;
-      }
-      if (parsed.cliArtifacts['review-external']) {
-        console.warn(
-          'Warning: --ensemble ignored because --artifact review-external=... is already set. Remove the --artifact flag or drop --ensemble.'
-        );
-        continue;
-      }
-      const dir = path.resolve(process.cwd(), value);
-      let files;
-      try {
-        files = readdirSync(dir)
-          .filter((f) => f.endsWith('.md'))
-          .sort();
-      } catch (err) {
-        console.error(`Error: --ensemble cannot read directory ${value}: ${err.message}`);
-        usageError(parsed);
-        break;
-      }
-      if (files.length === 0) {
-        console.error(`Error: --ensemble found no *.md files in ${value}.`);
-        usageError(parsed);
-        break;
-      }
-      const merged = files
-        .map((f) => `\n\n---\nFrom: ${f}\n---\n\n${readFileSync(path.join(dir, f), 'utf8')}`)
-        .join('');
-      const tmpPath = path.join(os.tmpdir(), `river-ensemble-${process.pid}-${Date.now()}.md`);
-      writeFileSync(tmpPath, merged);
-      process.on('exit', () => {
-        try {
-          unlinkSync(tmpPath);
-        } catch {
-          // ignore cleanup errors — OS will reclaim tmpdir
-        }
-      });
-      parsed.cliArtifacts['review-external'] = tmpPath;
-      continue;
-    }
-    if (arg === '--phase') {
-      if (!args[0] || args[0].startsWith('-')) {
-        console.error('Error: --phase option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const value = args.shift();
-      // #1746 follow-up: an invalid phase used to exit 0 and fall back to the
-      // default (`midstream`) downstream in normalizePhase, so the run silently
-      // reviewed a different phase than the one that was typed. PHASES is the
-      // shared vocabulary in src/lib/planner-utils.mjs.
-      //
-      // Case-insensitive, and the lowercased value is what gets stored. That is
-      // `normalizePhase`'s (src/lib/local-runner.mjs) semantics, pinned by
-      // tests/local-runner-internals.test.mjs "normalizes case" — so
-      // `--phase Upstream` really did run as `upstream` and MUST keep working.
-      // `normalizePhase` itself cannot be the validator here: its contract is to
-      // fall back to `midstream` for anything invalid, which is exactly the
-      // silent fallback this guard removes. It also matches the shape the
-      // sibling enum options in this parser already use (--planner / --output /
-      // --format / --fail-on all lowercase before comparing).
-      const phase = value.toLowerCase();
-      if (!PHASES.includes(phase)) {
-        console.error(`Error: --phase must be one of: ${PHASES.join(', ')} (got "${value}").`);
-        usageError(parsed);
-        break;
-      }
-      parsed.phase = phase;
-      // #1759 C2: marks that --phase already validated and set parsed.phase,
-      // so the post-loop RIVER_PHASE check below must not re-derive it from
-      // the (possibly invalid) env var and must not report a second error.
-      parsed.phaseExplicit = true;
-      continue;
-    }
-    if (arg === '--cases') {
-      const value = args.shift();
-      // #1709 Slice 3 (B3): a trailing `--cases` used to null the field, so
-      // eval silently fell back to the DEFAULT fixtures and printed [PASS].
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --cases option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.fixturesCasesPath = value;
-      continue;
-    }
-    if (arg === '--verbose') {
-      parsed.verbose = true;
-      continue;
-    }
-    if (arg === '--planner') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --planner option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const mode = value.toLowerCase();
-      if (!PLANNER_MODES.includes(mode)) {
-        console.error(
-          `Error: --planner must be one of: ${PLANNER_MODES.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.plannerMode = mode;
-      continue;
-    }
-    if (arg === '--dry-run') {
-      parsed.dryRun = true;
-      continue;
-    }
-    if (arg === '--debug') {
-      parsed.debug = true;
-      continue;
-    }
-    if (arg === '--explain') {
-      parsed.explain = true;
-      continue;
-    }
-    if (arg === '--estimate') {
-      parsed.estimate = true;
-      continue;
-    }
-    if (arg === '--max-cost') {
-      const value = args.shift();
-      parsed.maxCost = value ? Number.parseFloat(value) : null;
-      if (!Number.isFinite(parsed.maxCost) || parsed.maxCost < 0) {
-        console.error('Error: --max-cost requires a non-negative numeric value.');
-        usageError(parsed);
-        break;
-      }
-      continue;
-    }
-    if (arg === '--output') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --output option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const mode = value.toLowerCase();
-      if (!OUTPUT_MODES.includes(mode)) {
-        console.error(
-          `Error: --output must be one of: ${OUTPUT_MODES.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.output = mode;
-      parsed.outputExplicit = true;
-      continue;
-    }
-    if (arg === '--format') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --format option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const mode = value.toLowerCase();
-      if (!REVIEW_FORMATS.includes(mode)) {
-        console.error(
-          `Error: --format must be one of: ${REVIEW_FORMATS.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.format = mode;
-      parsed.formatExplicit = true;
-      continue;
-    }
-    if (arg === '--context') {
-      const value = args.shift();
-      // #1709 Slice 3: a trailing `--context` used to become parseList(undefined)
-      // = [] in silence (same for --dependency below).
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --context option requires a comma-separated list.');
-        usageError(parsed);
-        break;
-      }
-      // Deliberately NOT warned here: `--context` is last-wins (this is a plain
-      // assignment, not a merge), so warning per occurrence reports values that
-      // the run never uses — `--context BOGUS --context diff` warned about
-      // BOGUS even though `diff` is what survives. The warning is emitted once
-      // after the loop, against the surviving list (#1958 review, nit 5).
-      parsed.availableContexts = parseList(value);
-      continue;
-    }
-    if (arg === '--dependency') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --dependency option requires a comma-separated list.');
-        usageError(parsed);
-        break;
-      }
-      parsed.availableDependencies = parseList(value);
-      continue;
-    }
-    if (arg === '--reviewers') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error(
-          'Error: --reviewers option requires a value (e.g. bug-hunter,security-scanner).'
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.reviewers = parseList(value);
-      continue;
-    }
-    if (arg === '--baseline') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --baseline option requires a file path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.baseline = value;
-      continue;
-    }
-    if (arg === '--base') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --base option requires a branch or ref (e.g. --base main).');
-        usageError(parsed);
-        break;
-      }
-      parsed.base = value;
-      continue;
-    }
-    if (arg === '--skill-set') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error(
-          'Error: --skill-set option requires a name (e.g. --skill-set comprehensive).'
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.skillSet = value;
-      continue;
-    }
-    if (arg === '--depth') {
-      const value = args.shift();
-      const valid = Object.keys(DEPTH_TO_REVIEW_MODE);
-      if (!value || !valid.includes(value)) {
-        console.error(`Error: --depth must be one of: ${valid.join(', ')} (got "${value ?? ''}").`);
-        usageError(parsed);
-        break;
-      }
-      parsed.depth = value;
-      continue;
-    }
-    if (arg === '--save') {
-      parsed.save = true;
-      continue;
-    }
-    // Skills subcommand options
-    if (arg === '--from') {
-      const value = args.shift();
-      // #1709 Slice 3: a trailing `--from` / `--to` used to null the field in
-      // silence, so `skills import --from` ran against the default instead.
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --from option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.fromPath = value;
-      continue;
-    }
-    if (arg === '--to') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --to option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.toPath = value;
-      continue;
-    }
-    if (arg === '--strict') {
-      parsed.validationMode = 'strict';
-      continue;
-    }
-    if (arg === '--loose') {
-      parsed.validationMode = 'loose';
-      continue;
-    }
-    if (arg === '--source') {
-      const value = args.shift();
-      if (!value || !SKILLS_LIST_SOURCES.includes(value)) {
-        console.error(
-          `Error: --source must be one of: ${SKILLS_LIST_SOURCES.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.listSource = value;
-      continue;
-    }
-    if (arg === '--include-assets') {
-      parsed.includeAssets = true;
-      continue;
+    const optionResult = consumeOption(parsed, arg, args);
+    if (optionResult === 'continue') continue;
+    if (optionResult === 'break') {
+      usageError(parsed);
+      break;
     }
     if (arg === '-h' || arg === '--help') {
       parsed.command = 'help';
@@ -1887,55 +1587,19 @@ function parseArgs(argv) {
     warnUnknownInputContexts(parsed.availableContexts);
   }
 
-  // `review` needs one of plan | exec | verify | route. The handler reported
-  // both the missing and the unknown case with exit 3 — the code this project
-  // reserves for the `--gate` ESCALATE decision and for handler-level
-  // configuration errors — so an argument-order typo read as "a human must
-  // look at this" (#1755). Detected here instead, which makes it exit 1 like
-  // every other usage error (#1709 contract).
-  if (
-    parsed.command === 'review' &&
-    !parsed.usageError &&
-    !REVIEW_SUBCOMMANDS.has(parsed.reviewSubcommand)
-  ) {
-    // A path taken from after `--` is NOT a candidate subcommand: the caller
-    // declared it to be a path. Reporting it as one produced the contradiction
-    // `river review -- plan` -> `"plan" is not a river review subcommand
-    // (plan | exec | verify | route)`.
-    const got =
-      parsed.reviewSubcommand ??
-      (parsed.targetConsumed && !terminatorTookPositional ? parsed.target : null);
-    console.error(
-      (got === null
-        ? 'Error: river review requires a subcommand (plan | exec | verify | route).'
-        : `Error: "${got}" is not a river review subcommand (plan | exec | verify | route).`) +
-        ' The subcommand may be written before or after the options —' +
-        ' `river review plan --plan-only` and `river review --plan-only plan` are both accepted.'
-    );
+  if (checkReviewSubcommand(parsed, terminatorTookPositional)) {
     usageError(parsed);
   }
 
-  // #1759 C2: RIVER_PHASE used to skip validation entirely and propagate an
-  // invalid value straight through to the printed phase with exit 0, unlike
-  // --phase which already validates against PHASES above. Reuse that same
-  // vocabulary and the same case-insensitive normalization here instead of
-  // writing a second check (CLAUDE.md "Import the SSoT, never re-derive it").
-  //
-  // Only runs when --phase did NOT already set and validate parsed.phase
-  // (parsed.phaseExplicit) and when RIVER_PHASE was actually set to a
-  // non-empty string — unset or empty must keep falling back to the default
-  // ('midstream'), matching the object-literal default above and --phase's
-  // own "not required" contract.
-  if (!parsed.usageError && !parsed.phaseExplicit && process.env.RIVER_PHASE) {
-    const envPhase = process.env.RIVER_PHASE.toLowerCase();
-    if (!PHASES.includes(envPhase)) {
-      console.error(
-        `Error: RIVER_PHASE must be one of: ${PHASES.join(', ')} (got "${process.env.RIVER_PHASE}").`
-      );
-      usageError(parsed);
-    } else {
-      parsed.phase = envPhase;
-    }
+  // #2065: an option the resolved surface accepts but never reads. Placed
+  // after the `review` subcommand check on purpose — that check is what turns
+  // a missing / unknown subcommand into a usage error, and this one must not
+  // report `river review null` on top of it (checkCommandScopedOptions returns
+  // early when parsed.usageError is already set).
+  checkCommandScopedOptions(parsed);
+
+  if (applyPhaseFallback(parsed)) {
+    usageError(parsed);
   }
 
   return parsed;
@@ -2093,6 +1757,16 @@ export {
   // is DERIVED from COMMAND_USAGE rather than written out, only the runtime
   // value can be checked — reading the source cannot recover it.
   EAGER_COMMANDS,
+  // Exported for tests/cli-base-option-scope.test.mjs only (#2065). That test
+  // is the mechanical half of this guard: it pins this set against the files
+  // that actually read `parsed.base`, so a new consumer (or a removed one)
+  // cannot drift from the surfaces the parser lets through.
+  BASE_CONSUMING_SURFACES,
+  ENTRY_CONSUMING_SURFACES,
+  // Also for tests/cli-base-option-scope.test.mjs only (#2065 review, minor 1).
+  // These mirror vocabularies that live in the handler modules, so the test
+  // runs the CLI for every token to pin the mirror against the real dispatch.
+  SURFACE_SUBCOMMANDS,
 };
 
 /**

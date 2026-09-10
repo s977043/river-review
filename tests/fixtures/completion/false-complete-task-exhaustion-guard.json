@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "final",
+  "mode": "observe",
+  "state": "COMPLETE",
+  "reasonCodes": ["ALL_REQUIREMENTS_SATISFIED"],
+  "verification": {
+    "requirements": { "total": 12, "satisfied": 9, "violated": 0, "unverified": 3 },
+    "acceptanceCriteria": { "total": 15, "verified": 13, "unverified": 2 }
+  },
+  "validation": {
+    "state": "NOT_ASSESSED",
+    "rationale": "Every task is closed, so the run claimed convergence without validating the goal."
+  },
+  "tasks": { "total": 8, "complete": 8, "unsupportedClaims": 0 },
+  "unsupportedClaims": [],
+  "unresolvedRefs": ["REQ-7", "AC-12"],
+  "evidence": [
+    { "kind": "requirements", "state": "present" },
+    { "kind": "diff", "state": "present" },
+    { "kind": "tests", "state": "present" }
+  ]
+}

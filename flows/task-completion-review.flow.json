@@ -1,0 +1,46 @@
+{
+  "id": "task-completion-review",
+  "version": "0.1.0",
+  "description": "Task completion review (#2016). Answers whether the evidence supports declaring one task DONE. Absent test evidence degrades the completion judgment instead of skipping it, because an absence of tests is itself part of the answer.",
+  "intent": { "purpose": "task-completion" },
+  "inputs": [
+    { "name": "tasks", "required": true, "description": "The task and its acceptance statement." },
+    { "name": "diff", "required": true, "description": "The change claimed to complete the task." },
+    {
+      "name": "tests",
+      "description": "Test evidence. Optional: absence degrades the completion judgment."
+    },
+    {
+      "name": "plan",
+      "description": "The plan the task belongs to. Optional: absence skips the task-versus-plan cross-check."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    {
+      "use": "resolve-artifacts",
+      "description": "Missing `tasks` or `diff` stops here (both required inputs)."
+    },
+    { "use": "deterministic-check" },
+    { "use": "select-skills", "description": "Existing midstream-phase selection." },
+    { "use": "select-agents" },
+    { "reviewer": "bug-hunter", "parallel": true },
+    { "reviewer": "test-gap", "parallel": true },
+    {
+      "use": "cross-artifact-review",
+      "description": "Task against the plan it belongs to.",
+      "when": { "input": "plan", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    { "use": "verify-findings" },
+    {
+      "use": "evaluate-completion",
+      "description": "Without test evidence this runs in a reduced form and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "coverage", "completion", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED", "BLOCKING_FINDINGS"]
+}

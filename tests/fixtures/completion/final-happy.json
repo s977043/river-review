@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "final",
+  "mode": "observe",
+  "state": "COMPLETE",
+  "reasonCodes": ["ALL_REQUIREMENTS_SATISFIED"],
+  "verification": {
+    "requirements": { "total": 12, "satisfied": 12, "violated": 0, "unverified": 0 },
+    "acceptanceCriteria": { "total": 15, "verified": 15, "unverified": 0 }
+  },
+  "validation": {
+    "state": "GOAL_MET",
+    "rationale": "The stated goal is covered by REQ-1..REQ-12 and each is evidenced by the diff and its tests.",
+    "goalRefs": ["GOAL-1"]
+  },
+  "tasks": { "total": 8, "complete": 8, "unsupportedClaims": 0 },
+  "unsupportedClaims": [],
+  "unresolvedRefs": [],
+  "evidence": [
+    { "kind": "requirements", "state": "present" },
+    { "kind": "diff", "state": "present" },
+    { "kind": "tests", "state": "present" }
+  ]
+}

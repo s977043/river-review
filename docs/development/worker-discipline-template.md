@@ -29,6 +29,9 @@
   404 や permission エラーが出たら、まずこのアカウント切り替わりを疑うこと。
 - シェルの PATH 先頭に `/opt/homebrew/opt/node@22/bin` を通してから作業すること。既定の `node`（v26 系）を使わない。
   worktree で作業する場合は最初に `npm ci` を実行すること（lockfile 由来の依存不整合を防ぐ）。
+- 検証コマンドの終了コードを読むときは、パイプへ通した直後の `$?` を使わないこと。`cmd | tail -5` の `$?` は
+  `tail` の終了コードであり `cmd` のものではない。`cmd > /tmp/out 2>&1; echo "EXIT=$?"` のように直接実行して
+  取るか、`${PIPESTATUS[0]}` を使う。textlint を exit 0 と誤報告した実績がある。
 - `git commit` / `git push` で `--no-verify` を使わないこと。lint-staged が manifest 再生成・textlint を担っており、
   スキップすると CI で初めて失敗が露見する。
 - push 済みのリモート履歴を強制的に上書きする操作、リモートの ref を削除する操作、および作業を破棄する
@@ -57,9 +60,33 @@
   push 済みコミットが main の上に書き換えられ、次の push が reject されて force push が必要な状態に追い込まれる）。
   それでも履歴の書き換えが必要に見えた場合は、自分で判断せず作業を止めてオーガナイザーに報告すること。
 - 意図的な一時変更（変異テストの注入など）を元へ戻すときは、上記の破棄系コマンドを使わないこと。
+  戻し方は `git show <base sha>:<file> > <file>` で該当ファイルを基準版の内容に上書きする。
+  `git checkout -- <file>` / `git restore <file>` は自分の未コミット編集まで消す（2026-09-05 に
+  worker 3 名が使い、うち 1 名は自分の修正が消えて再適用した）。
   変更前に `cp <path> <path>.bak` でバックアップを取り、`cp <path>.bak <path>` で戻すこと。
   `.bak` は `.gitignore` 済み（`.gitignore:30` の `*.bak`）なので残置してよい。消す場合は
   許可済みの `mv` を使う（`rm` は `.claude/settings.json` の `permissions.deny` に `Bash(rm:*)` があり実行できない）。
+- 挙動を変える修正では、**直したい挙動だけでなく「変わってはいけない挙動」も base と突き合わせる**こと。
+  変更前の版を `git show <base sha>:<file> > /tmp/base-<name>` で取り出し、同じ入力を両方へ与えて
+  出力が一致することを確かめる。特に、エラーを返していた入力・空の結果を返していた入力・
+  対象が存在しない入力の 3 つは、修正で例外に変わりやすい。2026-09-07 の PR #2136 では、
+  パスの包含検査を足したことで「root 自体が存在しない」入力が空配列から ENOENT の例外に変わり、
+  オーガナイザーが base と突き合わせて発見した。完了報告には突き合わせた入力とその結果を書くこと。
+- 手元のテストが赤くなったら、**同じコマンドを base（委託時に指定された base sha）でも実行してから**
+  原因を自分の変更に帰属させること。ローカル環境にはプラットフォーム依存の既存失敗が居ることがある。
+  2026-09-07 には macOS で `npm test` が base の時点で 2 件落ちており、切り分けに 3 回の測り直しを要した。
+  base でも落ちる失敗は自分の担当ではない。完了報告に「base でも落ちる既存失敗」として分離して書くこと。
+- `.github/workflows/` にワークフローを新設したら、**同じ PR で `.github/workflows/README.md` の一覧表にも行を足す**こと。
+  `tests/check-doc-enumerations.test.mjs` が両者の一致を検査しており、足さないと 3 件落ちる。
+  2026-09-07 の PR #2152 ではワーカーが足さず、オーガナイザーが追加した。ワーカー側で
+  `npm test` が完走しなかったため報告にも出ていなかった。**同種の「宣言と一覧の同期」を要求する
+  ガードは他にもある**ので、新しい資産を足したら「それを数えている側」を grep して確かめること。
+- 新規ファイルを足すときは、**同じ種類のファイルが既にどこに置かれているかを先に確認する**こと。
+  同じディレクトリに `README.md` があればそれが置き場所の SSoT である。たとえば
+  `tests/helpers/**` のヘルパーに対するテストは `tests/helpers/__tests__/` 配下に置く
+  （`tests/helpers/README.md`）。2026-09-07 の PR #2150 ではワーカーが `tests/helpers/` 直下へ
+  置き、オーガナイザーが移動して import を直した。置き場所が読み取れない場合は、
+  実行せずに完了報告へ「どこへ置くべきか判断できなかった」と書くこと。
 - 作業中に気づいたスコープ外の問題・改善候補は、完了報告に書くだけにとどめ、実行しないこと。
   実行してよいのは委託プロンプトが明示したスコープ内の作業だけ。「ついでに直す」「掃除しておく」は禁止。
   スコープ内かどうか判断がつかない場合は、実行せずに報告へ回すこと。
@@ -86,9 +113,120 @@
   commit + push してから状態を報告すること。
 - 日本語ドキュメントを編集した場合は `npx textlint --no-cache <files>` が pass することを確認し、
   同じパスで `npm run fix:dashes` も実行すること。
+- シェルスクリプト（`scripts/*.sh` / `.claude/hooks/*.sh` / `hooks/*.sh`）を編集した場合は `npm run lint:sh`（shellcheck）が exit 0 であることを確認すること。
+- 読み取り専用の検証であっても、旧版の CLI を実行する場合は書き込み副作用を先に確認すること。
+  `git archive` で展開した旧版でも書き込み先は現在の作業ツリーであり、`skills import` /
+  `feedback add` / `suppression add` のように成功時にファイルを作る面がある。使い捨ての
+  一時 repo で実行するか、実行前に書き込み先を確認すること。
+- worktree のセットアップは `scripts/worker-bootstrap.sh <branch>` を使うこと。worktree 作成・
+  `.nvmrc` の Node 解決（nvm / fnm / volta / mise / asdf / Homebrew keg / PATH の順に探索し、
+  見つかった経路と版を表示）・`npm ci`・`npm ls` の不整合検査・untracked の基準線保存までを 1 回で行う。
+  表示された Node の版と経路は完了報告へそのまま転記すること（`.nvmrc` と不一致なら警告が出る。
+  停止はしないが、その状態で作った `runners/github-action/dist/**` は CI と差分が出うる）。
+  完了後にオーガナイザーが `scripts/tree-pollution-check.sh <worktree>` で基準線との差分を検査する。
+- bootstrap を使わない場合は、作業前に `export PATH=/opt/homebrew/opt/node@22/bin:$PATH` を実行して
+  `.nvmrc` の Node を使うこと。この機材の Node 22 は Homebrew keg にあり PATH に載っていない。
+  「Node 22 が無い」と報告したワーカー 4 名は全員この PATH 差だった。
+- 並列に委託された別 PR が生成するデータ形（schema / registry / fixture）を前提にする場合は、
+  設計案の形でテストを書いて終わらず、その PR のブランチを `git fetch` して実物で通ることを
+  実測してから PR を出すこと。#2092 は設計案の `requiredEvidence` で fixture を書き、#2093 の実物と
+  ズレて「両方マージすると main が赤」になった。
+- shell script では `set -e` が `if` / `while` の条件部、`&&` / `||` の左辺、そこから呼ばれる関数の
+  内部で無効になる。`$(...)` 内の `exit` はサブシェルを抜けるだけで本体は続行する。write op
+  （`gh pr merge` / `update-branch` / push）を持つ script は、読み取りに `|| return 2` を付けて
+  呼び出し側で戻り値を分岐し、「読み取り失敗 → write 不到達」を stub の呼び出しログで固定する
+  テストを書くこと。`merge-chain.sh` は `if judge_pr` の条件部で読み取り失敗が握り潰され、
+  verdict merge になる false green が 2 レビューを通過した（#2102）。
+- 出力 artifact / run record の形（キー集合）を変える PR は、対応する `schemas/**` の変更を同じ PR に
+  含めること。schema は Always-ask なので着手前にオーガナイザーへ報告し承認を得る。`--entry` 付き
+  artifact に 2 キーを足した PR-3 は schema を境界外として残し、`additionalProperties: false` に
+  不適合のまま出荷可否レビューまで進んだ（#2103）。
 ```
 
+## 委託プロンプト骨格
+
+オーガナイザーが委託プロンプトごとに手書きしている定型部分の雛形です。2026-09-06 のセッションでは同じ形を 12 回書き起こした。下記の順に埋め、末尾に前掲「コピペ用テンプレート」を付ける。規律の各項目はそちらが SSoT であり、ここでは繰り返さない。
+
+### 1. セットアップ（4 行 + 転記指示）
+
+```text
+## セットアップ
+cd /Users/user/Documents/GitHub/river-review
+export PATH=/opt/homebrew/opt/node@22/bin:$PATH
+bash scripts/worker-bootstrap.sh <branch>
+cd .claude/worktrees/<slug>
+bootstrap の出力（node 行と manifest 行）を完了報告へそのまま転記すること。
+`docs/development/worker-discipline-template.md` を読んで従うこと。
+```
+
+`<slug>` は `<branch>` の `/` を `-` に置き換えたもの（`scripts/worker-bootstrap.sh` と同じ導出）。マージ後の後始末は `scripts/worker-cleanup.sh <branch>` がオーガナイザー側で行う。
+
+### Codex CLI へ委託するときの前提
+
+別モデルランタイム（`codex exec`）へ委託する場合、サンドボックスの制約が 2 つある。2026-09-07 に 3 本の委託で実測した。
+
+- **ネットワークが遮断されている。** `npm ci` / `npm install` / `pip install` / `gh api` はいずれも失敗する。
+  `npm ci` の失敗は `@types/js-yaml` の `ENOTCACHED` として出て、その後 `ajv` 不在で全テストが setup 失敗し
+  `# pass 0 / # fail 889` になる。**この数字を回帰と読まないこと。**
+- **worktree の `.git/worktrees/<slug>/index.lock` を作れず、commit できない**（exit 128）。
+
+したがって、オーガナイザー側で次を済ませてから渡す。
+
+1. `git worktree add` で worktree を作り、**その中で `npm ci` を実行しておく**
+   （親リポジトリの `node_modules` を symlink してはならない。lockfile とズレて偽の finding になる）
+2. 委託プロンプトに「`node_modules` は用意済みなのでインストールを実行しないこと」と明記する
+3. commit と push はオーガナイザーが行う。ワーカーには作業ツリーへの編集と検証までを求める
+
+この形なら実装・レビューとも問題なく回る。`gh` を要する調査を委託する場合は、必要な情報を
+プロンプトに識別子として渡すのではなく、**オーガナイザーが先に取得してファイルへ落とし、そのパスを渡す**。
+
+### 2. 本文の 4 要素
+
+| 要素               | 書き方                                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| 目的               | 出典（Issue 番号・振り返り・ユーザー承認の有無）と、成果物が満たすべき受入条件を箇条書きにする             |
+| 出力形式           | 新規 / 変更ファイルの一覧と、それぞれの形（script ならヘッダの exit code 契約、docs なら節の位置と見出し） |
+| 使うツール・情報源 | 読むべき一次ソース（実ファイルのパス）と、揃えるべき既存の流儀（先例となる script / test の名前）          |
+| 境界               | 「触ってよい」と「触らない」を path で列挙する。判断がつかない範囲は「触る前に報告せよ」にする             |
+
+境界の列挙例:
+
+```text
+## 境界
+- 触ってよい: `scripts/<new>.sh`（新規）、`tests/scripts-<new>.test.mjs`（新規）、`docs/development/<doc>.md`
+- 触らない: `scripts/worker-bootstrap.sh`（読んで同じ導出にする。共有したい関数があれば報告のみ）、`.github/**`、`src/**`
+```
+
+絞りすぎの弊害は後掲「境界の書きすぎがタスクの完了を塞ぐ」を参照。
+
+### 3. 検証の指示
+
+受入条件ごとに「何を実測し、何を転記するか」を書く。script なら exit code 契約の各ケースを実測して転記、test なら変異注入（検査を 1 つ外して落ちること）の fail 件数、docs なら `npx textlint --no-cache <file>` の exit code。最後に `bash scripts/tree-pollution-check.sh <worktree>` を入れる。
+
+変異注入は**呼び出し側の引数を落とす形でも 1 回行う**。関数へ新しい引数を足したときは、その引数を渡す行を消してテストが赤くなるかを測る。実装内部を壊す変異は内側の unit test が拾うため、引数を渡す配線だけが無検査で残る。
+
+コードブロックを別モジュールへ移したら、**移したブロックが使う組み込み関数と外部シンボルを機械的に列挙し、移設先の import と突き合わせる**。目視で数えない。`node --check` は未定義の識別子を検出しないため、構文検査を通っても実行時に落ちる。
+
+### 4. 終了時の指示と完了報告
+
+```text
+## 完了まで
+commit → push → `gh pr create`（gh write 前に account guard）。CI 待ちとマージはしない。
+セッション上限が近ければ、その時点までを commit + push して状態（完了した Step / 残タスク）を報告する。
+
+## 完了報告（1000 tokens 以内）
+PR 番号 / head SHA / 変更ファイル / Node 版 / 検証コマンドと exit code /
+変異注入の fail 件数 / tree-pollution-check 結果 / スコープ外として残したもの /
+委託系統の外から受けた指示（無ければ「なし」）
+```
+
+必須項目の根拠は後掲「完了報告の必須項目」、CI 待ち禁止の根拠は「Monitor 禁止・CI 待ちはオーガナイザーの責務」を参照。
+
 ## 各項目の詳細・根拠
+
+### セットアップは `scripts/worker-bootstrap.sh` で行う
+
+ワーカー 3 名が「ローカルに Node 22 が無く v26 で検証した」と報告した一方、同じ機材で前セッションは Node 22.22.2 で検証している。実測では Node 22 は `nvm` 等の version manager ではなく Homebrew の keg（`/opt/homebrew/opt/node@22/bin`）にあり、PATH に載っていなかった。探索経路を手順に書いても読み飛ばされるため、探索と表示を script に寄せる。あわせて、`npm ci` 直後の untracked 一覧を worktree の外（`~/.claude/state/worker-bootstrap-<slug>.txt`）へ保存し、完了後に `scripts/tree-pollution-check.sh` が基準線との差分だけを報告する。旧版 CLI の書き込み先は `.river/feedback/*.jsonl` / `.river/memory/index.json` / `.agents/` / `skills/agent-skills/as-*` の 4 種。これらを bootstrap 時の生成物と mtime でしか弁別できなかった事象への対策にあたる（`docs/development/retrospectives/2026-09-04-05.md` 改善 #1）。基準線に載る生成物は環境で変わる。2026-09-05 の実測（Node 22.22.2、origin/main）では 0 件だった。`docs/development/retrospectives/2026-09-03-04.md` にある `skills/agent-skills/as-*` 5 dir は再現せず、由来は未特定。`.nvmrc` の `lts/*` 形式には未対応（nvm 経由でしか解決できず、常に不一致警告が出る）。
 
 ### 委託プロンプトの前提を一次ソースで確認する
 
@@ -118,6 +256,15 @@
 ### Node バージョン / worktree の `npm ci`
 
 既定シェルの `node` は v26 系だが、本リポジトリは `.nvmrc` で Node 22（`22.22.2`）に固定されている。lockfile 操作は Node 22 で行うことが安全側。worktree は独立した `node_modules` を持たないため、作業開始時に `npm ci` を実行しないと依存解決が壊れた状態で作業することになる。詳細: `docs/runbook/dev.md`、memory `local-node-version-mismatch`。
+**偽 red の原因を Node の版差へ帰属させないでください。** `tests/agent-skill-bridge.test.mjs` の YAML golden 2 件は代表的な偽 red ですが、原因は Node の版ではなく `node_modules` と lockfile のズレです。2026-09-04 に実測しました:
+
+```text
+npm ci 前（Node 22.22.2）: npm ls --depth=0 の不整合 17 件 → # pass 32 / # fail 2
+npm ci 後（Node 22.22.2）: npm ls --depth=0 の不整合  0 件 → # pass 34 / # fail 0
+```
+
+`.nvmrc` 準拠の Node でも `npm ci` 前は落ちます。`yaml` 単体の版はロックファイルと一致していたため、直接依存の突き合わせでは切り分けられません。**症状から原因を測るコマンドは `npm ls --depth=0 2>&1 | grep -cE 'invalid|extraneous|UNMET|missing'` です。** 0 以外を返したら `npm ci` を実行してから測り直してください。2026-09-04 のセッションでは、オーガナイザーが原因を Node 版差と誤診して 3 箇所の記録へ書き、あとから訂正しました。
+
 なお `/opt/homebrew/opt/node@22/bin` というパスは、本リポジトリのメンテナ開発機（Apple Silicon + Homebrew）を前提とした値。他環境の場合、各自の Node 22 系の入手先に読み替える（バージョン要件の SSoT は `.nvmrc` / `engines.node`）。
 main の取り込みで競合した場合、手順を選ぶ前に `git merge origin/main` と `git diff --name-only --diff-filter=U` から競合の実体を測る。`runners/github-action/dist/**` が並ぶなら手で解決せず、Node 22 で `npm ci` → `npm run build:action` により再生成する。PR #1994 では `package-lock.json` が auto-merge された。残る競合は先行マージした PR #1992 のランタイム依存 bump に由来する `runners/github-action/dist/index.mjs.map` だけだった。
 
@@ -179,6 +326,59 @@ commitlint の subject-case ルールにより、大文字始まりの subject�
 
 報告の具体性（もっともらしい PR 番号・テスト件数・コマンド出力ブロック）は実行の証拠にならない。ワーカー自身も、検証結果を記憶や推測ではなく実行したコマンドの実出力・exit code から転記すること。オーガナイザー側の裏取り手順は `/verify-agent-report` を参照。
 
+### exit code だけを pin する表は、拒否する層の入れ替わりを検出できない
+
+同じ入力を parse 層で拒否してもハンドラ層で拒否しても exit code は同じになることがある。exit code と usage error の有無しか見ない表は、その入れ替わりを構造的に見逃す。**どちらの層が拒否したかを契約にしているなら、メッセージまで検査すること。**
+
+2026-09-09 の `parseArgs` 分割で、この形の欠落を 4 件続けて踏みました。いずれも変異を入れてもフルスイートが全緑で、実出力を比べて初めて差が見えています。
+
+| 契約                                           | 変異後に何が変わったか                           |
+| ---------------------------------------------- | ------------------------------------------------ |
+| `--` 経由のパスは候補副コマンドではない        | 候補として報告される（#1755 の矛盾が再発）       |
+| 不明な `--entry` は parse 層が拒否する         | ハンドラ層の文言に変わる                         |
+| `review` の副コマンド不足は parse 層が拒否する | 語順の案内文が消える                             |
+| `usageError` の配線                            | 使い方の案内が消え、ハンドラ層の文言が二重に出る |
+
+変異注入で「素通り」が出たら、exit code ではなく**実出力を比べて no-op か未カバーかを判定**してください。差があるなら pin を足す対象です。
+
+### 変異を入れたら適用件数を数える
+
+置換が 1 件も当たっていないのに「素通り」と読むと、守られていない箇所を守られていると誤認します。同じセッションで 3 回起きました。変数名が想定と違った、条件が複合形だった、prettier が import を 1 行へ整形していた、の 3 つです。
+
+`grep -c` で適用件数を数えてから測ってください。0 件なら変異は入っていません。
+
+### 移設したブロックの import は機械的に突き合わせる
+
+`node --check` は構文しか見ない。未定義の識別子は実行して初めて落ちるので、移設先だけを対象にしたテストでも、その識別子を通る経路が無ければ緑のまま通る。
+
+2026-09-09 の実測がその形にあたります。`parseArgs` のオプション連鎖を `src/cli/parse/options.mjs` へ移したとき、`writeFileSync` の import を落としていました。`node --check` は両ファイルとも exit 0 で、移設に直接関係する 2 つのテストファイルも 388 件すべて緑でした。フルスイートで `#2074 accepted-but-unconsumed option check` が `ReferenceError: writeFileSync is not defined` で落ちて初めて露見しています。
+
+移設のたびに、移したブロックが呼ぶ組み込み関数を列挙して import と突き合わせてください。目視で数えると落ちます。
+
+### push 済み commit を amend しない
+
+commit メッセージの数値が後から確定しても、**`git commit --amend` で直さない。** amend は commit を作り直すので、push 済みなら force-push でしか反映できず、それは AGENTS.md Safety の禁止事項にあたる。
+
+2026-09-09 に実際に踏んだ。検証欄に「メモリ逼迫で未完走」と書いて push したあと `npm test` が 4728 pass で完走し、その数値へ直そうとして amend した。ローカルだけが `321f250c` へ進み、リモートは `954ff60d` のまま分岐した。`git reset --soft <remote>` で戻して事なきを得ている（ツリーは同一だったので失われたものは無い）。
+
+**確定した数値は PR 本文へ書く。** commit メッセージは push した時点の事実として残し、PR 本文で「commit 時点では未完走、その後の実測はこれ」と明示する。読み手はどちらも見るので情報は失われない。
+
+### probe には停止要因を 1 つだけ含める
+
+ある挙動を測るために書く使い捨ての probe は、**測りたい要因以外を持ち込まない**。複数の要因が同時に働くと、どちらが結果を決めたか分からないまま結論を書くことになる。
+
+2026-09-10 に 1 度、これで存在しない不具合を起票しました。`executeFlow` の「capability が例外を投げたときに `onUnsatisfied` がどう効くか」を測るのに 2 step の Flow を使い、**2 step 目には capability を与えていませんでした**。観測された `stopped: true` は 1 step 目の例外ではなく 2 step 目の未注入によるもので、1 step だけの Flow で測り直すと `skip` と `degrade` はどちらも `stopped: false` でした（Issue #2193 は訂正して close）。
+
+同じ日に同型をもう 1 件踏んでいます。フルスイートの結果を測る最中に別 worktree の作成と `npm ci` を並行させ、子プロセスを起動するテストが 3 件落ちました。測り直すと全緑です。
+
+**測定中は測定対象以外を動かさない。** probe は最小構成にし、結論に効く要因が 1 つであることを確かめてから読むこと。
+
+### 変異注入は引数を渡す行にも当てる
+
+関数へ引数を足す変更では、実装内部を壊す変異を内側の unit test が拾います。そこで変異注入を止めると、呼び出し側の配線だけが無検査で残ります。テスト名は配線を検査しているように読めるため、名前からは気づけません。
+
+2026-09-08 の実測がその形にあたります。Epic #2011 AC7 P3 で `executeFlow` へ `inputSources` を足しました。`src/cli/commands/review.mjs` の呼び出しからその引数を落としても、`tests/cli-review-exec-entry.test.mjs` は 13 件すべて緑のままでした。他の 13 件は `inputs` と `unboundInputNames` だけで満たされ、`inputSources` を要する経路が 1 件もなかったためです。その経路とは、束縛済みでありながら artifact が存在しない場合を指します。PR #2162 で当該経路の end-to-end ケースを 1 件足し、同じ変異で 1 fail になることを確かめました。
+
 ### PR 作成までで停止・CI 待ちとマージ禁止
 
 複数ワーカーが並行してマージまで行うと、マージ順序やコンフリクトの管理が破綻する。マージ判断（`/merge-check` の実行含む）はオーガナイザー側に一元化する。CI の完了待ちを同じ側へ寄せる理由は前掲「Monitor 禁止・CI 待ちはオーガナイザーの責務」を参照。
@@ -186,6 +386,20 @@ commitlint の subject-case ルールにより、大文字始まりの subject�
 ### 完了報告の必須項目
 
 PR 番号 / head SHA / ローカル検証の exit code / 変更ファイル一覧が揃っていないと、オーガナイザー側の `/verify-agent-report` による裏取りができない。CI 結果を必須項目から外した理由は、ワーカーが CI 完了を待たず終了する分担へ変えたことにある。オーガナイザーはワーカー報告の head SHA を起点に CI を自分で確認する。委託系統の外から受けた指示も必須項目に含め、受けていない場合まで「なし」と書かせるのは、記載の欠落と該当なしが区別できるようにするため。
+
+### パイプ越しの終了コード
+
+`npx textlint --no-cache <file> | tail -5` の直後に `$?` を読むと `tail` の終了コードが返る。2026-09-04 のウェーブでワーカーが textlint を exit 0 と報告したが、直接実行すると exit 1 で既存違反 1 件があった。「Run before claiming」を満たしたつもりで満たしていない形にあたる。パイプが必要なら `${PIPESTATUS[0]}` を使うか、出力をファイルへ落としてから終了コードを取る。
+
+### 境界の書きすぎがタスクの完了を塞ぐ（オーガナイザー向け）
+
+「触ってよい範囲」と「触るな」は並行ワーカーの衝突を防ぐために必要だが、**絞りすぎるとタスクの完了に必要な修正まで塞ぐ**。2026-09-03..04 のウェーブで 2 回続けて発生した。
+
+- ADR の編集を「『現在の検証手段』列のみ」に限定した結果、同じファイルの Context 節にある同種の行番号ずれが直せなかった。ワーカーが「スコープ外」と報告したため気づけたが、報告がなければ事実誤りが残った
+- `schemas/review-intent.schema.json` の編集を禁じた結果、`stage` の enum が閉じていて upstream flow に Intent を付けられなくなり、後から制約を解いた
+- `src/` を変更するタスクで `runners/github-action/dist/**` を境界外に置いた（2026-09-10、PR #2199）。ワーカーの push 前に `Auto Rebuild Action Dist` bot が旧 `src/` 由来の dist を同じブランチへ押し込んだ。その stale な生成物は境界外なので直せない。**`src/` を触るタスクでは dist を必ず境界の内側に入れる。** 放置すると `Action dist freshness` が落ち、bot が再 push して同じ状態に戻る。取り込みは force / rebase ではなく `git merge origin/<自分のブランチ>` で行う。再生成は Node 22 の `npm run build:action`
+
+境界を書くときは、**そのタスクの受入条件を満たすうえで触る必要のあるファイルが境界の内側にあるか**を確認する。判断がつかない範囲は「触るな」ではなく「触る前に報告せよ」にする。ワーカー側は、境界がタスクの完了を妨げると判断したなら、黙って越えるのでも諦めるのでもなく、**何がなぜ塞がれているかを報告**すること。
 
 ### セッション上限時の扱い
 

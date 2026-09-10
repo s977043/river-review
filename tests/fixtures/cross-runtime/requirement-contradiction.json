@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "caseId": "requirement-contradiction",
+  "caseClass": "requirement-contradiction",
+  "description": "Two requirements contradict each other. Both runtimes must reach the contradiction; they cover a different number of criteria, declared as model variation.",
+  "expectation": "conformant",
+  "pinned": {
+    "entry": "review-requirements",
+    "flow": "requirements-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "22f1aaf4e78c29b64dba776e0022d7bee6fb825f4cd11239663dcc71257a91cd",
+    "artifactSetSha256": "e68a3b689ca065f97aab1c21719908ee6af5d6f58440fe936e7527fe08ba39d2",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": null
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-requirements",
+          "resolvedFlow": "requirements-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "requirements-acceptance",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "de847b87aad932eb"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "retention-vs-erasure-conflict",
+            "taxonomy": "requirement-conflict",
+            "severity": "critical",
+            "target": {
+              "path": "docs/requirements.md",
+              "anchor": "R-4"
+            }
+          }
+        ],
+        "criterionCoverage": ["requirement-consistency", "acceptance-testability"],
+        "completionState": "contradicted",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-requirements",
+          "resolvedFlow": "requirements-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "requirements-acceptance",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "de847b87aad932eb"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "retention-vs-erasure-conflict",
+            "taxonomy": "requirement-conflict",
+            "severity": "critical",
+            "target": {
+              "path": "docs/requirements.md",
+              "anchor": "R-4"
+            }
+          }
+        ],
+        "criterionCoverage": ["requirement-consistency"],
+        "completionState": "contradicted",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [
+    {
+      "field": "agentic.criterionCoverage",
+      "layer": "agentic",
+      "reasonClass": "model-variation",
+      "evidence": "pinned.model is null; how many criteria one pass touches is model performance, which #2020 Non-goals decline to rank."
+    }
+  ],
+  "expected": {
+    "deterministicConformance": 1,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "pass",
+    "failedGates": []
+  }
+}

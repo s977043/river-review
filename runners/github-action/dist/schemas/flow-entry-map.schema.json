@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/flow-entry-map.schema.json",
+  "title": "River Review Flow entry map",
+  "description": "Binds a user-facing entry name to a Flow id and version (#2016, Epic #2011). It exists to mechanize one acceptance criterion: Claude Code and Codex expose review entry points differently, and the same entry MUST resolve to the same Flow id and version on both. The runtime axis is therefore deliberately absent from this document — there is no per-runtime branch to diverge — while the surface that carries the entry on each runtime stays in `agents/contracts/adapter-map.json`, the same separation #2014 used to keep an adapter difference out of a judgment difference. This is a naming map, not routing: it selects no skill, reads no path, and applies no condition. Which skills run is decided by the existing selection path (`selectSkills` in `runners/core/review-runner.mjs`), per ADR-009 D3.",
+  "type": "object",
+  "required": ["version", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Semantic version of this map as a versioned asset.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "$ref": "#/$defs/neutralProse"
+    },
+    "entries": {
+      "description": "Keyed by the user-facing entry name. `tests/flow-definitions.test.mjs` pins every target against the Flow documents in `flows/`, so an entry cannot name a Flow the repository does not ship or a version it does not carry.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/entry"
+      }
+    },
+    "triggers": {
+      "description": "Trigger registry (#2054 PR-1, Phase 1 of the Review Placement & Trigger Contract). Keyed by a neutral engineering-event name and resolving to entry names declared under `entries`, never to a Flow id directly, so a Flow is pinned in exactly one place. Optional so that a map without triggers stays valid. The key set is closed: an event a host emits that is not one of the five is an adapter concern and has no row here. Each trigger may say WHEN (the key), WHICH entries, WHAT evidence and budget (`requiredEvidence`, `profile`, `independence`) and the rollout `mode` — and nothing that constitutes a judgment: host names, hook names, shell commands, severities and gate verdicts are rejected structurally (closed key set + enums) and, for the one free-text field, by `$defs/neutralProse`. Nothing under src/ or runners/ reads this key (observe mode, `tests/flow-definitions.test.mjs`).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "enum": [
+          "artifact-ready",
+          "after-change",
+          "task-checkpoint",
+          "before-publish",
+          "before-merge"
+        ]
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/trigger"
+      }
+    }
+  },
+  "$defs": {
+    "neutralProse": {
+      "description": "Free text that must stay free of the vocabulary this registry may not carry: host and hook names, shells, severity labels and gate verdicts. A closed key set cannot police prose, so this pattern does. Ajv accepts no case-insensitive flag, so Capitalized, lowercase and ALL-CAPS spellings are listed; the boundary is any non-alphanumeric character, so `Claude-Code` and `GitHub_Actions` are caught while `bypassed` and `before-merge` stay legal. Applied to every description in this document, not only to the triggers.",
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "(?:^|[^A-Za-z0-9])(?:[Cc]laude|CLAUDE|[Cc]odex|CODEX|[Gg]it[Hh]ub|GITHUB|[Gg]emini|GEMINI|[Cc]opilot|COPILOT|[Pp]ost[Tt]ool[Uu]se|[Pp]re[Tt]ool[Uu]se|[Ss]top[Hh]ook|[Gg]it [Hh]ooks?|[Bb]ash|BASH|[Zz]sh|ZSH|[Ss]hells?|SHELLS?|[Bb]locker|BLOCKER|[Cc]ritical|CRITICAL|[Mm]ajor|MAJOR|[Mm]inor|MINOR|[Nn]it|NIT|[Pp]ass(?:ed|es|ing)?|PASS(?:ED|ES|ING)?|[Ff]ail(?:ed|s|ing|ure|ures)?|FAIL(?:ED|S|ING|URE|URES)?|[Aa]pprov(?:e|ed|es|al|ing)|APPROV(?:E|ED|ES|AL|ING)|[Aa]uto-merge|AUTO-MERGE)(?:$|[^A-Za-z0-9])"
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["entries", "mode"],
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "description": "Entry names (keys of `entries`) this event resolves to. May be empty: an event that starts no Flow declares so here rather than by being absent. `tests/flow-definitions.test.mjs` pins every item against the declared entries.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          }
+        },
+        "requiredEvidence": {
+          "description": "Artifacts that must be present for the event to resolve, in the Flow `inputs[].name` vocabulary. Omitted when the selected entry is not fixed (see `selectBy`) or when no Flow starts.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "artifacts",
+              "requirements",
+              "design",
+              "plan",
+              "diff",
+              "tasks",
+              "tests",
+              "baseline"
+            ]
+          }
+        },
+        "mode": {
+          "description": "Rollout state of the trigger. `off` records nothing; `observe` records the resolution and evidence only and changes no gate, decision or finding; `active` is reserved for a per-trigger opt-in decided later. Not a judgment: it says whether the trigger runs, never what it concludes.",
+          "enum": ["off", "observe", "active"]
+        },
+        "selectBy": {
+          "description": "When `entries` lists more than one entry, the input dimension that picks exactly one of them. Only the artifact kind is a valid selector: selecting by host or by risk would put a judgment in the registry.",
+          "enum": ["artifactKind"]
+        },
+        "independence": {
+          "description": "Minimum independence tier the review run must meet for its result to count as review evidence (Independence Routing table of #2054; derived from provenance by #1760, never self-declared here). Omitted means no requirement beyond the default.",
+          "enum": ["context-isolated", "execution-isolated", "provider-diverse"]
+        },
+        "profile": {
+          "description": "Verification profile applied when the event starts no Flow. `fast-verification` is the only profile: changed-file-scoped deterministic checks with no network and no model call.",
+          "enum": ["fast-verification"]
+        },
+        "description": {
+          "$ref": "#/$defs/neutralProse"
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["flow", "flowVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "flow": {
+          "description": "The `id` of a Flow document in `flows/`.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "flowVersion": {
+          "description": "The `version` of that Flow document. Pinned so an entry cannot silently follow a Flow across a breaking change.",
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "description": {
+          "$ref": "#/$defs/neutralProse"
+        }
+      }
+    }
+  }
+}

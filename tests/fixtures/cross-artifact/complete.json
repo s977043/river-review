@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "kind": "cross-artifact-consistency",
+  "edges": [
+    {
+      "edge": "finding->criterion",
+      "status": "satisfied",
+      "judgment": "deterministic",
+      "inputsPresent": true,
+      "evidence": ["schemas/review-artifact.schema.json findings[].criterionRefs"]
+    },
+    {
+      "edge": "finding->artifact",
+      "status": "satisfied",
+      "judgment": "deterministic",
+      "inputsPresent": true,
+      "evidence": ["schemas/review-artifact.schema.json findings[].artifactRefs"]
+    },
+    {
+      "edge": "acceptance-criterion->test",
+      "status": "missing",
+      "judgment": "deterministic",
+      "inputsPresent": true,
+      "findingCode": "TRACE_MISSING_COVERAGE",
+      "orphans": ["AC-4"],
+      "evidence": ["docs/working/TASK-1/test-cases.md: AC-4 に対応する TC がない"]
+    },
+    {
+      "edge": "task->test",
+      "status": "missing",
+      "judgment": "deterministic",
+      "inputsPresent": true,
+      "findingCode": "TRACE_ORPHAN",
+      "orphans": ["TC-9"],
+      "evidence": ["tests/foo.test.mjs: TC-9 はどの task からも参照されていない"]
+    },
+    {
+      "edge": "requirement->task",
+      "status": "missing",
+      "judgment": "deterministic",
+      "inputsPresent": true,
+      "findingCode": "TRACE_UNKNOWN_ID",
+      "unresolvedRefs": ["REQ-77"],
+      "evidence": ["docs/working/TASK-1/todo.md:12 REQ-77 は requirements に存在しない"]
+    },
+    {
+      "edge": "design->task",
+      "status": "not_required",
+      "judgment": "deterministic",
+      "inputsPresent": true,
+      "evidence": ["design 成果物を要求しない変更（既存パターン踏襲）"]
+    },
+    {
+      "edge": "task->diff",
+      "status": "missing",
+      "judgment": "agentic",
+      "inputsPresent": true,
+      "findingCode": "WHY_MISSING",
+      "evidence": ["src/example.mjs:40-58 に対応する task が todo.md に無い"]
+    }
+  ],
+  "semanticDrift": null,
+  "degradations": [],
+  "findings": [
+    {
+      "code": "TRACE_MISSING_COVERAGE",
+      "judgment": "deterministic",
+      "severity": "warning",
+      "message": "AC-4 を検証する test-case が存在しません",
+      "edge": "acceptance-criterion->test",
+      "criterionRefs": ["AC-4"],
+      "evidence": ["docs/working/TASK-1/test-cases.md"]
+    },
+    {
+      "code": "WHY_MISSING",
+      "judgment": "agentic",
+      "severity": "warning",
+      "message": "src/example.mjs:40-58 の変更に対応する task を追跡できません",
+      "edge": "task->diff",
+      "artifactRefs": ["docs/working/TASK-1/todo.md"],
+      "evidence": ["src/example.mjs:40"]
+    }
+  ]
+}

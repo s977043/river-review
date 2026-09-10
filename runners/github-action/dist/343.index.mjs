@@ -11,6 +11,7 @@ __webpack_require__.r(__webpack_exports__);
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
   BashSession: () => (/* binding */ BashSession),
+  BashTimeoutError: () => (/* binding */ BashTimeoutError),
   betaAgentToolset20260401: () => (/* binding */ betaAgentToolset20260401),
   betaBashTool: () => (/* binding */ betaBashTool),
   betaEditTool: () => (/* binding */ betaEditTool),
@@ -42,8 +43,8 @@ var external_node_readline_ = __webpack_require__(481);
 var error = __webpack_require__(7446);
 // EXTERNAL MODULE: ../../../node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs
 var ToolError = __webpack_require__(852);
-// EXTERNAL MODULE: ../../../node_modules/@anthropic-ai/sdk/index.mjs + 80 modules
-var sdk = __webpack_require__(1755);
+// EXTERNAL MODULE: ../../../node_modules/@anthropic-ai/sdk/index.mjs + 84 modules
+var sdk = __webpack_require__(4218);
 // EXTERNAL MODULE: ../../../node_modules/@anthropic-ai/sdk/internal/utils.mjs + 1 modules
 var utils = __webpack_require__(6051);
 ;// CONCATENATED MODULE: ../../../node_modules/@anthropic-ai/sdk/lib/transform-json-schema.mjs
@@ -248,6 +249,7 @@ async function realpathOrSelf(p) {
 async function canonicalize(abs) {
     const tail = [];
     let prefix = abs;
+    let hops = 0;
     for (;;) {
         let real;
         try {
@@ -263,7 +265,12 @@ async function canonicalize(abs) {
             }
             if (isLink) {
                 // Resolve the symlink ourselves and retry; `tail` (the part below it)
-                // still applies to the link's target.
+                // still applies to the link's target. The hop cap matches Linux
+                // MAXSYMLINKS — the same threshold at which `realpath` itself would
+                // have returned ELOOP — so a cycle of unresolvable links terminates.
+                if (++hops > 40) {
+                    throw new ToolError/* ToolError */.v(`path ${JSON.stringify(abs)} has too many levels of symbolic links`);
+                }
                 prefix = external_node_path_.resolve(external_node_path_.dirname(prefix), await promises_.readlink(prefix));
                 continue;
             }
@@ -280,9 +287,10 @@ async function canonicalize(abs) {
 /**
  * Resolve `p` and confine it to `root`.
  *
- * Unless `allowOutside` is set, absolute inputs are rejected and the
- * **canonical** path is returned — every symlink in `p` (including the leaf,
- * even a dangling one) is resolved before the confinement check, and the
+ * Absolute and relative inputs go through the same canonicalise-then-contain
+ * check — an absolute path that lands inside `root` is permitted, only paths
+ * that resolve *outside* are rejected. Every symlink in `p` (including the
+ * leaf, even a dangling one) is resolved before the confinement check, and the
  * resolved path is what the caller then operates on, so a symlink inside `root`
  * that points outside it can neither pass the check nor be followed afterwards.
  *
@@ -293,19 +301,12 @@ async function canonicalize(abs) {
  */
 async function confineToRoot(root, p, opts) {
     const allowOutside = opts?.allowOutside ?? false;
-    if (external_node_path_.isAbsolute(p)) {
-        if (!allowOutside) {
-            throw new ToolError/* ToolError */.v(`absolute path ${JSON.stringify(p)} not permitted`);
-        }
-        return external_node_path_.resolve(p);
-    }
     const realRoot = await realpathOrSelf(external_node_path_.resolve(root));
     const abs = external_node_path_.resolve(realRoot, p);
     if (allowOutside)
         return abs;
     const real = await canonicalize(abs);
-    const rootSep = realRoot.endsWith(external_node_path_.sep) ? realRoot : realRoot + external_node_path_.sep;
-    if (real !== realRoot && !real.startsWith(rootSep)) {
+    if (real !== realRoot && !real.startsWith(realRoot + external_node_path_.sep)) {
         throw new ToolError/* ToolError */.v(`path ${JSON.stringify(p)} escapes workdir`);
     }
     return real;
@@ -672,6 +673,17 @@ const DEFAULT_MAX_FILE_BYTES = 256 * 1024;
 const GREP_OUTPUT_LIMIT = 100 * 1024;
 const GREP_MAX_LINE_LENGTH = 2000;
 const GLOB_RESULT_LIMIT = 200;
+/**
+ * A bash command exceeded its `timeoutMs`. Carries the timeout so a caller can
+ * tell it apart from an abort without matching on the message text.
+ */
+class BashTimeoutError extends error/* AnthropicError */.pJ {
+    constructor(timeoutMs) {
+        super(`bash command timed out after ${timeoutMs}ms`);
+        this.name = 'BashTimeoutError';
+        this.timeoutMs = timeoutMs;
+    }
+}
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 const fsGlob = promises_.glob;
 function resolveMaxBytes(configured) {
@@ -708,12 +720,14 @@ function betaAgentToolset20260401(ctx) {
     ];
 }
 /**
- * Resolve `p` relative to `ctx.workdir`. Unless `unrestrictedPaths` is set,
- * absolute inputs are rejected and the **canonical** path is returned — every
- * symlink in `p` (including the leaf, even a dangling one) is resolved before
- * the workdir check, and the resolved path is what the tool then operates on, so
- * a symlink inside the workdir that points outside it can neither pass the check
- * nor be followed afterwards. See the trust model on {@link AgentToolContext}.
+ * Resolve `p` against `ctx.workdir`. Absolute and relative inputs go through
+ * the same canonicalise-then-contain check — an absolute path that lands inside
+ * the workdir is permitted, only paths that resolve *outside* are rejected.
+ * Every symlink in `p` (including the leaf, even a dangling one) is resolved
+ * before the workdir check, and the resolved path is what the tool then operates
+ * on, so a symlink inside the workdir that points outside it can neither pass
+ * the check nor be followed afterwards. See the trust model on
+ * {@link AgentToolContext}.
  *
  * Residual TOCTOU: a component could still be swapped for a symlink between this
  * call and the eventual `fs` operation. Closing that fully needs per-component
@@ -794,9 +808,9 @@ class BashSession {
         }
         const timeoutMs = opts.timeoutMs ?? BASH_DEFAULT_TIMEOUT_MS;
         const signal = opts.signal;
-        if (signal?.aborted) {
-            throw new error/* AnthropicError */.pJ('bash command aborted');
-        }
+        // Reject with the signal's own reason, so a caller telling a user cancel
+        // apart from an `AbortSignal.timeout()` sees the platform's name intact.
+        signal?.throwIfAborted();
         (0,tslib/* __classPrivateFieldSet */.G)(this, _BashSession_buf, '', "f");
         (0,tslib/* __classPrivateFieldSet */.G)(this, _BashSession_truncated, false, "f");
         // Per-call nonce so a command that prints a fixed marker can't spoof the
@@ -820,12 +834,12 @@ class BashSession {
                 await Promise.race([
                     sentinelSeen,
                     new Promise((_, reject) => {
-                        timer = setTimeout(() => reject(new error/* AnthropicError */.pJ(`bash command timed out after ${timeoutMs}ms`)), timeoutMs);
+                        timer = setTimeout(() => reject(new BashTimeoutError(timeoutMs)), timeoutMs);
                     }),
                     new Promise((_, reject) => {
                         if (!signal)
                             return;
-                        onAbort = () => reject(new error/* AnthropicError */.pJ('bash command aborted'));
+                        onAbort = () => reject(signal.reason);
                         signal.addEventListener('abort', onAbort, { once: true });
                     }),
                 ]);
@@ -1135,6 +1149,9 @@ function betaGlobTool(ctx) {
             if (!ctx.unrestrictedPaths && pat.split(/[\\/]/).includes('..')) {
                 throw new ToolError/* ToolError */.v('glob: ".." is not permitted in the pattern');
             }
+            // Compare canonical against canonical: a workdir that is itself a
+            // symlink would otherwise falsely reject every realpath'd match below.
+            const realRoot = ctx.unrestrictedPaths ? root : await promises_.realpath(root).catch(() => root);
             const matches = [];
             try {
                 // Native `fs.glob` (Node 22+). `exclude` prunes the noisy dirs the
@@ -1147,10 +1164,24 @@ function betaGlobTool(ctx) {
                     if (!entry.isFile())
                         continue;
                     const full = external_node_path_.join(entry.parentPath, entry.name);
-                    // Defense in depth: drop any match that resolved outside the search
-                    // root (e.g. via a symlinked directory in the tree) when confined.
-                    if (!ctx.unrestrictedPaths && !isWithin(root, full))
-                        continue;
+                    // Drop any match that resolves outside the search root. A pattern
+                    // that *names* a symlinked directory (the model controls the
+                    // pattern, and the bash tool in the same session can plant the
+                    // link) makes `fs.glob` descend through it and report entries with
+                    // the raw parent path, so a lexical check on `full` alone would
+                    // pass `root/link_out/secret` even though it lives outside the
+                    // jail. Resolve-failure (ELOOP, EACCES, a racing unlink) is a deny.
+                    if (!ctx.unrestrictedPaths) {
+                        let real;
+                        try {
+                            real = await promises_.realpath(full);
+                        }
+                        catch {
+                            continue;
+                        }
+                        if (!isWithin(realRoot, real))
+                            continue;
+                    }
                     let mtime = 0;
                     try {
                         mtime = (await promises_.stat(full)).mtimeMs;

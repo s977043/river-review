@@ -1,0 +1,25 @@
+{
+  "id": "research-review",
+  "version": "0.1.0",
+  "description": "Positive fixture for the #2017 evidence discipline. A freshness or source-availability judgment passes verify-findings before derive-gate, and what the supplied artifacts cannot settle leaves through human-escalation as an open question, so the Flow never asserts it as a fact.",
+  "intent": { "purpose": "research-adequacy" },
+  "inputs": [
+    { "name": "artifacts", "required": true, "description": "The research write-up under review." },
+    {
+      "name": "requirements",
+      "description": "Requirements the research is cited as the ground for."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-artifacts" },
+    { "use": "select-skills" },
+    { "use": "parallel-review", "onUnsatisfied": "degrade" },
+    { "use": "cross-artifact-review", "onUnsatisfied": "degrade" },
+    { "use": "verify-findings" },
+    { "use": "human-escalation", "onUnsatisfied": "degrade" },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED", "UNDETERMINED"]
+}

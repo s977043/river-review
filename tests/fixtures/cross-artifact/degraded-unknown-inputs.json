@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "kind": "cross-artifact-consistency",
+  "edges": [
+    {
+      "edge": "requirement->task",
+      "status": "unknown",
+      "judgment": "deterministic",
+      "inputsPresent": false,
+      "evidence": ["requirements artifact が review 入力に渡っていない"]
+    },
+    {
+      "edge": "requirement->test",
+      "status": "unknown",
+      "judgment": "deterministic",
+      "inputsPresent": false,
+      "evidence": ["requirements artifact が review 入力に渡っていない"]
+    },
+    {
+      "edge": "finding->criterion",
+      "status": "satisfied",
+      "judgment": "deterministic",
+      "inputsPresent": true
+    }
+  ],
+  "semanticDrift": null,
+  "degradations": [
+    {
+      "step": "cross-artifact-review",
+      "missingInput": "requirements",
+      "effect": "degrade",
+      "reason": "requirements が渡っていないため requirement 起点の 2 辺を評価できない。欠落として報告しない"
+    }
+  ],
+  "findings": []
+}

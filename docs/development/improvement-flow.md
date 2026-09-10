@@ -71,6 +71,7 @@ CLAUDE.md の AI Misoperation Guard を新設する場合は、同じ PR で [`g
 - 具体コマンドを併記する（抽象的な指示は避ける）
 - 動機となった incident を PR 本文や commit message に含める（ルール本体には含めない）
 - 早めに中間コミットして work を保護する
+- 段落を `#NNNN`（issue / PR 番号）で始めない。markdownlint が ATX 見出しと誤検出し、pre-commit の lint-staged が commit を止める。`PR #NNNN は …` のように番号の前に語を置き、commit 前に `grep -n '^#[0-9]' <file>` が 0 件であることを確認する（2026-09-05..06 の振り返り doc 3 本で毎回再発）
 
 ### Step 4: セルフレビュー
 

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "kind": "cross-artifact-consistency",
+  "edges": [
+    {
+      "edge": "plan->task",
+      "status": "satisfied",
+      "judgment": "deterministic",
+      "inputsPresent": true
+    }
+  ],
+  "semanticDrift": {
+    "fileMembership": {
+      "filesAdded": ["src/added.mjs"],
+      "filesRemoved": [],
+      "summary": "2 changed file(s) at replay vs 1 in source plan (+1/-0); content-level changes not detectable (plan does not snapshot diff bytes)"
+    },
+    "axes": [
+      {
+        "axis": "scope",
+        "status": "changed",
+        "judgment": "agentic",
+        "baselinePresent": true,
+        "findingCode": "SEMANTIC_DRIFT",
+        "summary": "baseline は upstream のみを対象としていたが、改訂版は midstream を含む",
+        "evidence": ["plan.md:18", "baseline-plan.md:16"]
+      },
+      {
+        "axis": "goal",
+        "status": "unchanged",
+        "judgment": "agentic",
+        "baselinePresent": true,
+        "summary": "目的の記述は語順のみ変化している"
+      },
+      {
+        "axis": "risk",
+        "status": "unknown",
+        "judgment": "agentic",
+        "baselinePresent": false,
+        "summary": "baseline に risk 節が無いため、追記が意味変化かを判定できない"
+      },
+      {
+        "axis": "done-condition",
+        "status": "not_required",
+        "judgment": "deterministic",
+        "baselinePresent": true,
+        "summary": "DONE 条件は改訂対象外として明示されている"
+      }
+    ]
+  },
+  "degradations": [
+    {
+      "step": "detect-semantic-drift",
+      "missingInput": "baseline.risk",
+      "effect": "degrade",
+      "reason": "baseline に risk 節が無い。unknown として記録し changed とは扱わない"
+    }
+  ],
+  "findings": [
+    {
+      "code": "SEMANTIC_DRIFT",
+      "judgment": "agentic",
+      "severity": "warning",
+      "message": "改訂版 plan は scope を midstream へ広げていますが、理由が記載されていません",
+      "axis": "scope",
+      "evidence": ["plan.md:18"]
+    }
+  ]
+}

@@ -79,6 +79,16 @@ export function compileRiverbedIndexValidator() {
   });
 }
 
+/** Compiled validator for schemas/review-intent.schema.json (strict on). */
+export function compileReviewIntentValidator() {
+  return compileSchemaFile('review-intent.schema.json', { ajvOptions: { allErrors: true } });
+}
+
+/** Compiled validator for schemas/flow-entry-map.schema.json (strict on). */
+export function compileFlowEntryMapValidator() {
+  return compileSchemaFile('flow-entry-map.schema.json', { ajvOptions: { allErrors: true } });
+}
+
 /** Compiled validator for schemas/agent-contract.schema.json (strict on). */
 export function compileAgentContractValidator() {
   return compileSchemaFile('agent-contract.schema.json', { ajvOptions: { allErrors: true } });
@@ -87,4 +97,11 @@ export function compileAgentContractValidator() {
 /** Compiled validator for schemas/agent-adapter-map.schema.json (strict on). */
 export function compileAgentAdapterMapValidator() {
   return compileSchemaFile('agent-adapter-map.schema.json', { ajvOptions: { allErrors: true } });
+}
+
+/** Compiled validator for schemas/completion-assessment.schema.json (strict on). */
+export function compileCompletionAssessmentValidator() {
+  return compileSchemaFile('completion-assessment.schema.json', {
+    ajvOptions: { allErrors: true },
+  });
 }

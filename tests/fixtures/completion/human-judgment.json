@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "final",
+  "mode": "observe",
+  "state": "HUMAN_JUDGMENT_REQUIRED",
+  "reasonCodes": ["BUSINESS_VALUE_JUDGMENT_REQUIRED", "GOAL_VALIDATION_PENDING"],
+  "verification": {
+    "requirements": { "total": 12, "satisfied": 12, "violated": 0, "unverified": 0 },
+    "acceptanceCriteria": { "total": 15, "verified": 15, "unverified": 0 }
+  },
+  "validation": {
+    "state": "REQUIRES_HUMAN_JUDGMENT",
+    "rationale": "Every requirement is satisfied, but whether the shipped behaviour serves the original business goal is not a judgment River Review makes."
+  },
+  "tasks": { "total": 8, "complete": 8, "unsupportedClaims": 0 },
+  "unsupportedClaims": [],
+  "unresolvedRefs": [],
+  "evidence": [
+    { "kind": "requirements", "state": "present" },
+    { "kind": "diff", "state": "present" },
+    { "kind": "tests", "state": "present" }
+  ],
+  "humanJudgment": {
+    "boundary": "business-value",
+    "question": "Does the delivered change actually achieve the goal it was funded for?"
+  }
+}

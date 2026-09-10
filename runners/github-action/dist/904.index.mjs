@@ -10,8 +10,9 @@ export const modules = {
 /* harmony export */   formatLoopDashboardHtml: () => (/* binding */ formatLoopDashboardHtml)
 /* harmony export */ });
 /* unused harmony export escHtml */
-/* harmony import */ var _scoring_engine_mjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6899);
-/* harmony import */ var _scoring_rubric_mjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(5486);
+/* harmony import */ var _finding_factory_mjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7563);
+/* harmony import */ var _scoring_engine_mjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6899);
+/* harmony import */ var _scoring_rubric_mjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(5486);
 /**
  * HTML output formatter for river-review.
  *
@@ -19,6 +20,7 @@ export const modules = {
  * All user-derived strings are HTML-escaped to prevent XSS.
  * Data is derived from scoreReview (same engine as JSON/YAML formatters).
  */
+
 
 
 
@@ -43,6 +45,16 @@ const SEVERITY_COLOR = {
   major: '#e65100',
   minor: '#f9a825',
   info: '#1565c0',
+};
+
+/**
+ * #1644: chip colors for the finding scope. Keys mirror FINDING_SCOPES in
+ * src/lib/finding-factory.mjs; an unknown value falls back to the neutral grey
+ * rather than being dropped, so the report never hides a value the artifact has.
+ */
+const SCOPE_COLOR = {
+  'in-diff': '#37474f',
+  'pre-existing': '#9e9e9e',
 };
 
 const DECISION_CONFIG = {
@@ -96,7 +108,7 @@ const INLINE_STYLE = [
  */
 function formatHtmlOutput(result, phase) {
   const findings = result.findings ?? [];
-  const score = (0,_scoring_engine_mjs__WEBPACK_IMPORTED_MODULE_0__/* .scoreReview */ .lS)(findings);
+  const score = (0,_scoring_engine_mjs__WEBPACK_IMPORTED_MODULE_1__/* .scoreReview */ .lS)(findings);
 
   const issueCountBySeverity = { critical: 0, major: 0, minor: 0, info: 0 };
   for (const f of findings) {
@@ -105,7 +117,7 @@ function formatHtmlOutput(result, phase) {
   }
 
   // Honor the canonical verdict if the result carries one (#1170 F3).
-  const decision = (0,_scoring_engine_mjs__WEBPACK_IMPORTED_MODULE_0__/* .resolveVerdict */ .Cq)(result.decision, score.verdict);
+  const decision = (0,_scoring_engine_mjs__WEBPACK_IMPORTED_MODULE_1__/* .resolveVerdict */ .Cq)(result.decision, score.verdict);
 
   const riskAssessment = result.plan?.riskAssessment;
   const riskSummary = riskAssessment
@@ -166,9 +178,9 @@ function formatHtmlOutput(result, phase) {
   );
   parts.push('<table>');
   parts.push('<tr><th>Axis</th><th>Score</th><th style="width:200px">Bar</th></tr>');
-  for (const axis of _scoring_rubric_mjs__WEBPACK_IMPORTED_MODULE_1__/* .AXES */ .gR) {
+  for (const axis of _scoring_rubric_mjs__WEBPACK_IMPORTED_MODULE_2__/* .AXES */ .gR) {
     const val = score.axes?.[axis] ?? 0;
-    const label = _scoring_rubric_mjs__WEBPACK_IMPORTED_MODULE_1__/* .AXIS_LABELS_JA */ .Sf?.[axis] ?? axis;
+    const label = _scoring_rubric_mjs__WEBPACK_IMPORTED_MODULE_2__/* .AXIS_LABELS_JA */ .Sf?.[axis] ?? axis;
     const pct = Math.max(0, Math.min(100, val));
     parts.push('<tr>');
     parts.push(`<td>${escHtml(label)}</td>`);
@@ -195,10 +207,33 @@ function formatHtmlOutput(result, phase) {
       const lineNum = f.lineStart ?? f.line;
       const fileRef = f.file ? (lineNum ? `${f.file}:${lineNum}` : f.file) : '';
       parts.push('<tr>');
-      parts.push(`<td><span class="sev" style="background:${color}">${escHtml(sev)}</span></td>`);
+      // #1644: the scope chip shares the severity cell so the column layout is
+      // unchanged, and it follows the JSON artifact's emission rule
+      // (src/cli/render.mjs, `...(f.scope ? { scope: f.scope } : {})`): rendered
+      // only when the finding carries a value, never as an empty placeholder.
+      // It reuses the existing `.sev` chip style rather than adding a rule to
+      // INLINE_STYLE, so a scope-less result stays byte-identical to before
+      // (pinned by tests/render-markdown-digest.test.mjs).
+      // `Object.hasOwn` rather than `?? '#757575'`: `??` only fires on
+      // `undefined`, so an inherited key (`toString`, `constructor`) resolves to
+      // a Function and puts its source text into the style attribute unescaped
+      // — measured, and the opposite of what SCOPE_COLOR's fallback promises.
+      const scopeColor = Object.hasOwn(SCOPE_COLOR, f.scope) ? SCOPE_COLOR[f.scope] : '#757575';
+      const scopeChip = f.scope
+        ? `<span class="sev" style="background:${scopeColor};margin-left:6px">${escHtml(f.scope)}</span>`
+        : '';
+      parts.push(
+        `<td><span class="sev" style="background:${color}">${escHtml(sev)}</span>${scopeChip}</td>`
+      );
       parts.push(`<td><code>${escHtml(fileRef)}</code></td>`);
       parts.push(`<td>${escHtml(f.title ?? '')}</td>`);
-      parts.push(`<td><pre>${escHtml(f.message ?? '')}</pre></td>`);
+      // #1915 A: same rule as the markdown renderer — when the chip above
+      // states a resolved scope, the reviewer's self-reported `Scope:` label is
+      // dropped from the body so one row cannot show two opposite scopes. A
+      // finding with no resolved scope keeps its self-report, which is then the
+      // only scope information the row has.
+      const message = f.scope ? (0,_finding_factory_mjs__WEBPACK_IMPORTED_MODULE_0__/* .stripSelfReportedScope */ ._2)(f.message) : (f.message ?? '');
+      parts.push(`<td><pre>${escHtml(message)}</pre></td>`);
       parts.push(`<td><pre>${escHtml(f.suggestion ?? '')}</pre></td>`);
       parts.push('</tr>');
     }

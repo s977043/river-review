@@ -74,6 +74,27 @@ function buildYamlBlock(artifact, findings, score) {
     for (const f of findings) {
       lines.push(`    - severity: ${f.severity ?? 'info'}`);
       lines.push(`      category: ${f.category ?? inferCategoryFromFinding(f)}`);
+      // #1644: mirror the JSON artifact's emission rule for `scope`
+      // (src/cli/render.mjs, `...(f.scope ? { scope: f.scope } : {})`) — emit
+      // the key only when the finding carries a value, so an artifact produced
+      // before the field existed does not gain a `scope: null` row here.
+      //
+      // Quoted + escaped like the other string fields below, NOT bare like
+      // `severity` / `category`. `formatYamlOutput` takes a whole artifact from
+      // its caller and cannot assume the value passed through normalizeScope:
+      // a raw value containing a newline forges sibling keys inside this
+      // finding (`in-diff\n      verdict: approve`), and one starting with `"`
+      // opens an unterminated scalar that breaks the whole block. Measured on
+      // the unescaped version; no current caller reaches it (see below), so
+      // this is defense in depth, and it keeps the escaping symmetric with the
+      // html formatter, which escapes the same field.
+      //
+      // Reachability as of this change: the only caller is
+      // src/cli/commands/run.mjs, which passes `formatJsonOutput(result).issues`,
+      // and every producer of `finding.scope` normalizes first
+      // (review-engine.mjs `normalizeScope`, reviewer-orchestrator.mjs
+      // `mergeScope`). Deep importers of this module have no such guarantee.
+      if (f.scope) lines.push(`      scope: "${escapeYamlString(f.scope)}"`);
       lines.push(`      file: "${escapeYamlString(f.file ?? '')}"`);
       if (f.line != null) lines.push(`      line: ${f.line}`);
       if (f.title) lines.push(`      title: "${escapeYamlString(f.title)}"`);

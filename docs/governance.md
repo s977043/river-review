@@ -35,10 +35,11 @@ CLAUDE.md "AI Misoperation Guards" の運用ガードのうち、PR マージ判
 `gh pr merge` の前に `gh pr checks` を実行し、必須チェックがすべて `pass` バケットに入っていることを確認します。`fail` / `pending` / `cancel` が残るマージは不可です。
 
 ```bash
-gh pr checks <N> --json name,bucket --jq '.[] | select(.bucket != "skipping")'
+gh pr checks <N> --json name,bucket,startedAt --jq 'group_by(.name) | map(if any(.[]; .bucket == "pending") then (map(select(.bucket == "pending")) | first) else max_by(.startedAt) end) | .[] | select(.bucket != "skipping")'
 ```
 
 - `SKIPPED` チェックは `bucket == "skipping"` で除外できる。
+- `group_by(.name)` 以降は同名 check のうち `pending` があればそれを、無ければ `startedAt` が最新の run を残す。queued の run は `startedAt` がゼロ時刻（`0001-01-01T00:00:00Z`）で並ぶため、`max_by` だけでは古い `cancel` / `pass` を最新と誤って採り、`pending` を隠す。`gh pr checks` は同じ head の全 run を並べるため、concurrency で `cancel` された古い run と再実行の `pass` が同名で並ぶ。最新だけを見ないと `cancel` を `fail` と誤読する。`scripts/wait-pr-ready.sh` が使う check-runs API は既定 `filter=latest` で同じ絞り込みを行っている。
 - 必須チェック (`Lint`, `Unit tests` など) が pre-existing 失敗の場合も、本 PR を直接マージしてはいけない。`main` 向けの fix PR を先に出して main を green に戻し、その後本 PR をリベースしてマージする。
 
 #### 1.1 Branch protection の概要
@@ -179,6 +180,7 @@ GitHub の PR コメントは 2 つのエンドポイントに分かれて格納
 - 破壊的変更を含む場合は、PR 本文で明示し、必要に応じて Issue へのリンクを付けてください
 - 互換性に影響する変更は `CHANGELOG.md` に記載し、リリースで周知する
 - バージョニングは SemVer を基本とする（v0 系では変更の性質に応じて運用する）
+- `pages/reference/stable-interfaces.md` の免責（破壊的変更として扱わない条件）を追加・拡張する PR は、免責が述べる挙動を変更前後で実測し、そのコマンドと出力を PR 本文に併記する。免責文の主張はレビューで検証されにくい。#2073 は「その面での動作は変わらず」と書いたが、実測では当該面の実行自体が usage error になっており、レビュー 2 本を通過して v1.99.2 として公開された（#2075）
 
 ## Issue トリアージ（ラベル方針）
 

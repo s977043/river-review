@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "caseId": "neg-unpinned-inputs",
+  "caseClass": "clean-positive",
+  "description": "Negative fixture: the two runtimes reviewed different Flows, so the pair is a dataset defect rather than a runtime divergence. The comparator must accept the dataset-defect classification and still fail the gate.",
+  "expectation": "non-conformant",
+  "pinned": {
+    "entry": "review-plan",
+    "flow": "plan-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "7c12e633d5ca89cc10947131e6e9965248f40d0ed4a3810bf21e38f19b126a7b",
+    "artifactSetSha256": "485e34efedfb6b8dbe6fec6c7735cc29abbf7cdbf06b1e3a9a8083a3e4541291",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "plan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "3cd31392cae28143"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "design-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "5e9aacfa8a2869ef"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [
+    {
+      "field": "deterministic.routing.resolvedFlow",
+      "layer": "deterministic",
+      "reasonClass": "dataset-defect",
+      "evidence": "the codex observation resolved design-review while pinned.flow is plan-review."
+    },
+    {
+      "field": "deterministic.gate.inputsHash",
+      "layer": "deterministic",
+      "reasonClass": "dataset-defect",
+      "evidence": "the two runs did not review the same Flow, so their gate inputs differ."
+    }
+  ],
+  "expected": {
+    "deterministicConformance": 0.8333333333333334,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "fail",
+    "failedGates": ["deterministic-conformance"]
+  }
+}

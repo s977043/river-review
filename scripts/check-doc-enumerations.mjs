@@ -24,6 +24,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { execFileSync } from 'node:child_process';
 
 import * as yaml from 'js-yaml';
 
@@ -434,24 +435,76 @@ export async function filterExistingPaths(relPaths) {
   return existing;
 }
 
+/**
+ * git が追跡しているパス（index 込み）の集合。追跡外なら null を返す。
+ *
+ * 列挙をファイルシステムだけで行うと、**作業ツリーに落ちた未追跡ファイルが「実体」に混じる**。
+ * CI は clean checkout なので緑のまま、手元だけが赤くなり、ローカル検証が信用できなくなる。
+ * 実際に 2026-09-08 の実測で、旧版 CLI が書いた `skills/agent-skills/as-*` 5 件が
+ * この経路で 3 件の失敗を出していた（同一コミットの CI は緑）。
+ *
+ * 判定を index 込みの `git ls-files` にすると、CI と pre-commit（lint-staged は stage 済み
+ * ファイルを見る）が同じ集合を見る。新規スキルは `git add` した時点で数えられるので、
+ * 「宣言と実体を突き合わせる」目的は保たれる。
+ *
+ * git が無い / repo でない配布形（tarball 等）では null を返し、従来どおり FS を直接見る。
+ */
+let trackedPathsCache;
+function trackedPaths() {
+  if (trackedPathsCache !== undefined) return trackedPathsCache;
+  try {
+    const out = execFileSync('git', ['ls-files', '-z'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const set = new Set(out.split('\0').filter(Boolean));
+    trackedPathsCache = set.size > 0 ? set : null;
+  } catch {
+    trackedPathsCache = null;
+  }
+  return trackedPathsCache;
+}
+
+/** テスト用。`trackedPaths()` のキャッシュを捨てる。 */
+export function resetTrackedPathsCache() {
+  trackedPathsCache = undefined;
+}
+
+/** `relDir/name` 配下に追跡ファイルが 1 つでもあるか。 */
+function isTrackedDir(tracked, relDir, name) {
+  const prefix = `${relDir}/${name}/`;
+  for (const file of tracked) if (file.startsWith(prefix)) return true;
+  return false;
+}
+
 /** repo-relative なディレクトリ直下のサブディレクトリ名を返す（存在しなければ throw）。 */
 async function listDirectories(relDir) {
   const entries = await fs.readdir(path.join(ROOT, relDir), { withFileTypes: true });
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const names = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const tracked = trackedPaths();
+  if (!tracked) return names;
+  return names.filter((name) => isTrackedDir(tracked, relDir, name));
 }
 
 /** コマンドディレクトリ直下の *.md（README.md を除く）を返す。 */
 async function listCommandFiles(relDir) {
   const files = await listMarkdownFiles(relDir);
-  return files.filter((file) => file !== 'README.md');
+  const named = files.filter((file) => file !== 'README.md');
+  const tracked = trackedPaths();
+  if (!tracked) return named;
+  return named.filter((file) => tracked.has(`${relDir}/${file}`));
 }
 
 /** repo-relative なディレクトリ直下の workflow ファイル名（*.yml / *.yaml）を返す。 */
 async function listWorkflowFiles(relDir) {
   const entries = await fs.readdir(path.join(ROOT, relDir), { withFileTypes: true });
-  return entries
+  const names = entries
     .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
     .map((entry) => entry.name);
+  const tracked = trackedPaths();
+  if (!tracked) return names;
+  return names.filter((name) => tracked.has(`${relDir}/${name}`));
 }
 
 /** パイプライン call site チェックリストの所在（#1827）。 */

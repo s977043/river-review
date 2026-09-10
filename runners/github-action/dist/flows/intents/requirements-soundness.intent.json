@@ -1,0 +1,39 @@
+{
+  "purpose": "requirements-soundness",
+  "version": "0.1.0",
+  "question": "この要件から設計・実装へ進んでよいか。",
+  "description": "Reviews requirements before design and implementation proceed from them. The judgment is about the requirement set itself — contradiction, terminology conflict, constraint conflict, feasibility, testability — and never about code that does not exist yet.",
+  "stage": "requirements",
+  "phase": "upstream",
+  "subject": ["requirements"],
+  "baseline": {
+    "kind": "none",
+    "description": "A requirement set is judged as it stands rather than against an earlier revision, so this Flow declares no compare-baseline step."
+  },
+  "evidence": [
+    {
+      "artifact": "requirements",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "The requirement set is the subject; without it the run stops with DETERMINISTIC_UNRUNNABLE."
+    },
+    {
+      "artifact": "design",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent design skips the constraint-conflict cross-check and records the reason."
+    },
+    {
+      "artifact": "plan",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent plan skips the feasibility cross-check and records the reason."
+    },
+    {
+      "artifact": "tests",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent test evidence degrades the testability judgment to a requirements-only one rather than skipping it: that no test evidence exists is part of the answer, not a reason to stop asking."
+    }
+  ]
+}

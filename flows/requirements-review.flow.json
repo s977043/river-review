@@ -1,0 +1,65 @@
+{
+  "id": "requirements-review",
+  "version": "0.1.0",
+  "description": "Requirements soundness review (#2017, Epic #2011 Phase 6). Answers whether design and implementation may proceed from these requirements. #2017 reuses the existing upstream requirements judgment rather than adding one: the Flow names nothing, and the requirement-side judgments (scope, terminology, acceptance criteria, edge cases, non-functional requirements) are reached through the existing selection path and the consistency-judge Agent Contract. The judgments #2017 adds over that baseline — contradiction, constraint conflict, terminology conflict, feasibility, testability — are expressed as distinct cross-artifact steps here rather than as new judgment criteria.",
+  "intent": { "purpose": "requirements-soundness" },
+  "inputs": [
+    {
+      "name": "requirements",
+      "required": true,
+      "description": "The requirements under review."
+    },
+    {
+      "name": "design",
+      "description": "Design the requirements are checked against for constraint conflict. Optional: absence skips that cross-check."
+    },
+    {
+      "name": "plan",
+      "description": "Plan the requirements are checked against for feasibility. Optional: absence skips that cross-check."
+    },
+    {
+      "name": "tests",
+      "description": "Existing test evidence used for the testability judgment. Optional: absence degrades that judgment rather than skipping it, because a requirement with no way to test it is part of the answer, not a reason to stop asking."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    {
+      "use": "resolve-artifacts",
+      "description": "Missing `requirements` stops here (required input)."
+    },
+    {
+      "use": "select-skills",
+      "description": "Existing upstream-phase selection; no Flow-local list."
+    },
+    { "use": "select-agents" },
+    {
+      "use": "cross-artifact-review",
+      "description": "Requirement against requirement: contradiction between two statements in the same set, and terminology used with two meanings across the set. Runs unconditionally on the required input.",
+      "onUnsatisfied": "degrade"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Requirements against design: constraint conflict, where a requirement and a declared design constraint cannot both hold.",
+      "when": { "input": "design", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Requirements against plan: whether what is required is reachable by what is planned.",
+      "when": { "input": "plan", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Testability: whether each requirement states an observable condition someone could check. Degrades to a requirements-only judgment when no test evidence is supplied, and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    { "reviewer": "test-gap", "parallel": true },
+    { "use": "verify-findings" },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED"]
+}

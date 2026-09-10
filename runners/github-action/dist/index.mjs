@@ -9194,6 +9194,14 @@ function captureSegment(state, start, end, checkJson) {
   }
 }
 
+function chargeMergeWork(state) {
+  state.totalMergeKeys += 1;
+
+  if (state.maxTotalMergeKeys !== -1 && state.totalMergeKeys > state.maxTotalMergeKeys) {
+    throwError(state, 'merge keys exceeded maxTotalMergeKeys (' + state.maxTotalMergeKeys + ')');
+  }
+}
+
 function mergeMappings(state, destination, source, overridableKeys) {
   var sourceKeys, key, index, quantity;
 
@@ -9201,14 +9209,15 @@ function mergeMappings(state, destination, source, overridableKeys) {
     throwError(state, 'cannot merge mappings; the provided source object is unacceptable');
   }
 
+  // Count the source mapping itself to bound sequences of empty mappings.
+  chargeMergeWork(state);
+
   sourceKeys = Object.keys(source);
 
   for (index = 0, quantity = sourceKeys.length; index < quantity; index += 1) {
     key = sourceKeys[index];
 
-    if (state.maxTotalMergeKeys !== -1 && ++state.totalMergeKeys > state.maxTotalMergeKeys) {
-      throwError(state, 'merge keys exceeded maxTotalMergeKeys (' + state.maxTotalMergeKeys + ')');
-    }
+    chargeMergeWork(state);
 
     if (!_hasOwnProperty.call(destination, key)) {
       setProperty(destination, key, source[key]);
@@ -9253,6 +9262,10 @@ function storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valu
 
   if (keyTag === 'tag:yaml.org,2002:merge') {
     if (Array.isArray(valueNode)) {
+      if (valueNode.length > 100) {
+        throwError(state, 'abnormal merge sequence size');
+      }
+
       for (index = 0, quantity = valueNode.length; index < quantity; index += 1) {
         mergeMappings(state, _result, valueNode[index], overridableKeys);
       }
@@ -11773,7 +11786,7 @@ var _toString       = Object.prototype.toString;
 function resolveYamlOmap(data) {
   if (data === null) return true;
 
-  var objectKeys = [], index, length, pair, pairKey, pairHasKey,
+  var objectKeys = {}, index, length, pair, pairKey, pairHasKey,
       object = data;
 
   for (index = 0, length = object.length; index < length; index += 1) {
@@ -11791,8 +11804,8 @@ function resolveYamlOmap(data) {
 
     if (!pairHasKey) return false;
 
-    if (objectKeys.indexOf(pairKey) === -1) objectKeys.push(pairKey);
-    else return false;
+    if (_hasOwnProperty.call(objectKeys, pairKey)) return false;
+    Object.defineProperty(objectKeys, pairKey, { value: true });
   }
 
   return true;
@@ -12502,6 +12515,13 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
 
 /***/ }),
 
+/***/ 1708:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:process");
+
+/***/ }),
+
 /***/ 481:
 /***/ ((module) => {
 
@@ -12513,13 +12533,6 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:readlin
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:stream");
-
-/***/ }),
-
-/***/ 6466:
-/***/ ((module) => {
-
-module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:stream/promises");
 
 /***/ }),
 
@@ -14499,7 +14512,7 @@ class InternalServerError extends APIError {
 
 /***/ }),
 
-/***/ 9240:
+/***/ 9080:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
@@ -14558,7 +14571,7 @@ const sleep = (ms, signal) => new Promise((resolve) => {
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/errors.mjs
 var errors = __nccwpck_require__(2533);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/version.mjs
-const VERSION = '0.121.0'; // x-release-please-version
+const VERSION = '0.123.0'; // x-release-please-version
 //# sourceMappingURL=version.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
@@ -14988,7 +15001,7 @@ function redactSensitive(body) {
 async function checkCredentialsFileSafety(path, onWarn = (m) => console.warn(`anthropic-sdk: ${m}`)) {
     if (typeof process === 'undefined' || process.platform === 'win32')
         return;
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+    const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     let resolved = path;
     let st;
     try {
@@ -15018,8 +15031,7 @@ async function checkCredentialsFileSafety(path, onWarn = (m) => console.warn(`an
  * Creates the parent directory with mode 0700 and the file with mode 0600.
  */
 async function writeCredentialsFileAtomic(targetPath, data) {
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { fs, path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     const dir = path.dirname(targetPath);
     await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
     // Unique temp name avoids two concurrent writers (different processes or
@@ -15287,8 +15299,7 @@ const loadConfigWithSource = async (profile) => {
         return null;
     }
     validateProfileName(profileName);
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { fs, path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     const configPath = path.join(rootConfigPath, 'configs', `${profileName}.json`);
     let configRaw;
     try {
@@ -15388,7 +15399,7 @@ const loadCredentials = async () => {
     if (!credentialsPath) {
         return null;
     }
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+    const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     let raw;
     try {
         raw = await fs.promises.readFile(credentialsPath, 'utf-8');
@@ -15432,14 +15443,14 @@ const getCredentialsPath = async (config, profile) => {
         return null;
     }
     validateProfileName(profileName);
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     return path.join(rootConfigPath, 'credentials', `${profileName}.json`);
 };
 const getRootConfigPath = async () => {
     if (!supportsLocalConfigFiles()) {
         return null;
     }
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     // ANTHROPIC_CONFIG_DIR is treated as a trusted path: it is set by the
     // process operator, not by remote input, so it is not validated.
     const configDir = (0,utils/* readEnv */.sx)('ANTHROPIC_CONFIG_DIR');
@@ -15483,8 +15494,7 @@ const getActiveProfileName = async () => {
     if (profileName) {
         return profileName;
     }
-    const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
-    const path = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 6760, 19));
+    const { fs, path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     const filePath = path.join(rootConfigPath, 'active_config');
     try {
         return (await fs.promises.readFile(filePath, 'utf-8')).trim() || 'default';
@@ -15508,7 +15518,7 @@ function identityTokenFromFile(path) {
         throw new core_error/* AnthropicError */.pJ('Identity token file path is empty');
     }
     return async () => {
-        const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+        const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
         let content;
         try {
             content = await fs.promises.readFile(path, 'utf-8');
@@ -15629,7 +15639,7 @@ function oidcFederationProvider(config) {
  */
 function userOAuthProvider(config) {
     return async (opts) => {
-        const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+        const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
         await checkCredentialsFileSafety(config.credentialsPath, config.onSafetyWarning);
         let raw;
         try {
@@ -15869,7 +15879,7 @@ function resolveIdentityTokenProvider(auth) {
  */
 function cachedExchangeProvider(exchange, credentialsPath, onCacheWriteError, onSafetyWarning) {
     return async (opts) => {
-        const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 3024, 19));
+        const { fs } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
         await checkCredentialsFileSafety(credentialsPath, onSafetyWarning);
         // Try cached credentials file
         let existing;
@@ -16382,7 +16392,7 @@ async function defaultParseResponse(client, props) {
             (0,utils_log/* loggerFor */.WG)(client).debug('response', response.status, response.url, response.headers, response.body);
             // Note: there is an invariant here that isn't represented in the type system
             // that if you set `stream: true` the response type must also be `Stream<T>`
-            return streaming_Stream.fromSSEResponse(response, props.controller);
+            return streaming_Stream.fromSSEResponse(response, props.controller, client);
         }
         // fetch refuses to read the body when the status code is 204.
         if (response.status === 204) {
@@ -16527,11 +16537,11 @@ function createMiddlewareContext(options, client) {
             // Streams are single-consumer, so caching one would hand later callers
             // an already-consumed stream; every call gets a fresh clone-backed one.
             if (options?.stream && response.ok) {
-                return parseMiddlewareResponse(response, options);
+                return parseMiddlewareResponse(response, options, client);
             }
             let parsed = cache.get(response);
             if (!parsed) {
-                parsed = parseMiddlewareResponse(response, options);
+                parsed = parseMiddlewareResponse(response, options, client);
                 cache.set(response, parsed);
             }
             return parsed;
@@ -16543,7 +16553,7 @@ function createMiddlewareContext(options, client) {
  * `internal/parse.ts`), reading through a clone so the body stays available
  * to the rest of the chain and the client itself.
  */
-async function parseMiddlewareResponse(response, options) {
+async function parseMiddlewareResponse(response, options, client) {
     if (response.bodyUsed || response.body?.locked) {
         throw new core_error/* AnthropicError */.pJ('cannot ctx.parse() a response whose body was already consumed; ' +
             'call ctx.parse() instead of reading the body, or read via response.clone()');
@@ -16554,7 +16564,7 @@ async function parseMiddlewareResponse(response, options) {
         // A fresh controller rather than the request's own: aborting (or
         // `break`ing out of) the middleware's stream must not cancel the
         // in-flight request the client is still reading.
-        return streaming_Stream.fromSSEResponse(response.clone(), new AbortController());
+        return streaming_Stream.fromSSEResponse(response.clone(), new AbortController(), client);
     }
     // fetch refuses to read the body when the status code is 204.
     if (response.status === 204) {
@@ -16957,12 +16967,10 @@ const createForm = async (body, fetch, stripFilenames = true) => {
     await Promise.all(Object.entries(body || {}).map(([key, value]) => addFormValue(form, key, value, stripFilenames)));
     return form;
 };
-// We check for Blob not File because Bun.File doesn't inherit from File,
-// but they both inherit from Blob and have a `name` property at runtime.
-const isNamedBlob = (value) => value instanceof Blob && 'name' in value;
+// Blob, not File: bare Blobs and Bun.file() results don't inherit from File.
 const isUploadable = (value) => typeof value === 'object' &&
     value !== null &&
-    (value instanceof Response || isAsyncIterable(value) || isNamedBlob(value));
+    (value instanceof Response || isAsyncIterable(value) || value instanceof Blob);
 const hasUploadableValue = (value) => {
     if (isUploadable(value))
         return true;
@@ -16997,11 +17005,17 @@ const addFormValue = async (form, key, value, stripFilenames) => {
     else if (isAsyncIterable(value)) {
         form.append(key, makeFile([await new Response(ReadableStreamFrom(value)).blob()], getName(value, stripFilenames)));
     }
-    else if (isNamedBlob(value)) {
-        form.append(key, makeFile([value], getName(value, stripFilenames), { type: value.type }));
+    else if (value instanceof Blob) {
+        form.append(key, makeFile([value], getName(value, stripFilenames) || undefined, { type: value.type }));
     }
     else if (Array.isArray(value)) {
         await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry, stripFilenames)));
+    }
+    else if (typeof value.then === 'function') {
+        throw new TypeError(`Received a Promise for "${key}"; await it first, e.g. \`await toFile(...)\``);
+    }
+    else if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+        throw new TypeError(`Received ${value.constructor.name} for "${key}"; to upload raw bytes, wrap them with \`await toFile(bytes, 'filename')\``);
     }
     else if (typeof value === 'object') {
         await Promise.all(Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop, stripFilenames)));
@@ -17770,11 +17784,11 @@ class Files extends APIResource {
      */
     list(params = {}, options) {
         const { betas, ...query } = params ?? {};
-        return this._client.getAPIList('/v1/files?beta=true', (Page), {
+        return this._client.getAPIList('/v1/files?beta=true', (PageCursor), {
             query,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -17794,7 +17808,7 @@ class Files extends APIResource {
         return this._client.delete(path `/v1/files/${fileID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -17818,8 +17832,8 @@ class Files extends APIResource {
             ...options,
             headers: buildHeaders([
                 {
-                    'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString(),
                     Accept: 'application/binary',
+                    ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined),
                 },
                 options?.headers,
             ]),
@@ -17840,7 +17854,7 @@ class Files extends APIResource {
         return this._client.get(path `/v1/files/${fileID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -17861,7 +17875,7 @@ class Files extends APIResource {
             body,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'files-api-2025-04-14'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 stainlessHelperHeaderFromFile(body.file),
                 options?.headers,
             ]),
@@ -18048,14 +18062,27 @@ var dist = __nccwpck_require__(5487);
 
 
 class Webhooks extends APIResource {
-    unwrap(body, { headers, key }) {
-        if (headers !== undefined) {
-            const keyStr = key === undefined ? this._client.webhookKey : key;
-            if (keyStr === null)
-                throw new Error('Webhook key must not be null in order to unwrap');
-            const wh = new dist/* Webhook */.KD(keyStr);
-            wh.verify(body, headers);
-        }
+    /**
+     * Parses a webhook payload into an event without verifying its signature. Prefer
+     * `unwrap()` unless you have already verified the signature yourself.
+     */
+    parseUnverified(body) {
+        return JSON.parse(body);
+    }
+    /**
+     * Verifies the webhook signature from the `webhook-id`, `webhook-timestamp` and
+     * `webhook-signature` headers using your webhook signing key, then parses the
+     * payload into an event. Fails if the signature is missing or invalid.
+     */
+    unwrap(body, options) {
+        const headers = options?.headers;
+        if (headers == null)
+            throw new Error('Webhook headers are required in order to verify the signature');
+        const keyStr = options.key === undefined ? this._client.webhookKey : options.key;
+        if (!keyStr)
+            throw new Error('Webhook key must not be null or empty in order to unwrap');
+        const wh = new dist/* Webhook */.KD(keyStr);
+        wh.verify(body, headers);
         return JSON.parse(body);
     }
 }
@@ -21738,6 +21765,9 @@ class BetaMessageStream {
                 if (event.context_management != null) {
                     snapshot.context_management = event.context_management;
                 }
+                if (event.input_transformations != null) {
+                    snapshot.input_transformations = event.input_transformations;
+                }
                 // The remaining usage counters are cumulative whole-message totals that are
                 // omitted when they don't apply, so overwrite when present and never add.
                 if (event.usage.input_tokens != null) {
@@ -22644,6 +22674,55 @@ class APIKeys extends APIResource {
     }
 }
 //# sourceMappingURL=api-keys.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/organization/compliance-settings.mjs
+// File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+
+class ComplianceSettings extends APIResource {
+    /**
+     * Retrieve your organization's Compliance Settings.
+     *
+     * Compliance Settings is a singleton resource: there is exactly one per
+     * organization, addressed without an identifier. The `state` field reflects
+     * whether the Compliance API is enabled. An organization with a parent
+     * organization reads the state inherited from the parent's configuration.
+     *
+     * @example
+     * ```ts
+     * const betaComplianceSettings =
+     *   await client.beta.organization.complianceSettings.retrieve();
+     * ```
+     */
+    retrieve(options) {
+        return this._client.get('/v1/organizations/compliance_settings?beta=true', options);
+    }
+    /**
+     * Update your organization's Compliance Settings.
+     *
+     * Setting `state` to `enabled` turns on the Compliance API and begins capturing
+     * organization activity events. Setting it to `disabled` turns both off. `state`
+     * reflects whether the Compliance API is enabled.
+     *
+     * A request that sets `state` to its current value succeeds and leaves the
+     * resource unchanged. A `disabled` request stays in effect until a later `enabled`
+     * request or the organization's next provisioning action that enables Access
+     * Transparency: enabling Access Transparency also enables the Compliance API,
+     * which serves its activity events, so such provisioning (including re-runs)
+     * re-enables the Compliance API even after a `disabled` request. Automated
+     * provisioning never disables compliance settings.
+     *
+     * @example
+     * ```ts
+     * const betaComplianceSettings =
+     *   await client.beta.organization.complianceSettings.update({
+     *     state: { type: 'enabled' },
+     *   });
+     * ```
+     */
+    update(body, options) {
+        return this._client.post('/v1/organizations/compliance_settings?beta=true', { body, ...options });
+    }
+}
+//# sourceMappingURL=compliance-settings.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/organization/external-keys.mjs
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
@@ -22845,9 +22924,8 @@ class RateLimits extends APIResource {
      * API-surface category such as the Files API or Message Batches) and contains the
      * set of limiter values that apply to it.
      *
-     * This endpoint currently returns every matching entry in a single page regardless
-     * of `limit`; follow `next_page` so that clients keep working when pagination is
-     * enabled.
+     * When `limit` is omitted, every matching entry is returned in a single page; when
+     * `limit` truncates the result, follow `next_page` to fetch the remaining entries.
      *
      * @example
      * ```ts
@@ -23818,9 +23896,8 @@ class rate_limits_RateLimits extends APIResource {
      * Groups without overrides inherit the organization limits and are not listed; use
      * `GET /v1/organizations/rate_limits` to see those.
      *
-     * This endpoint currently returns every matching entry in a single page regardless
-     * of `limit`; follow `next_page` so that clients keep working when pagination is
-     * enabled.
+     * When `limit` is omitted, every matching entry is returned in a single page; when
+     * `limit` truncates the result, follow `next_page` to fetch the remaining entries.
      *
      * @example
      * ```ts
@@ -24150,6 +24227,8 @@ workspaces_workspaces_Workspaces.ServiceAccounts = service_accounts_ServiceAccou
 
 
 
+
+
 class Organization extends APIResource {
     constructor() {
         super(...arguments);
@@ -24161,6 +24240,7 @@ class Organization extends APIResource {
         this.users = new Users(this._client);
         this.workspaces = new workspaces_workspaces_Workspaces(this._client);
         this.rateLimits = new RateLimits(this._client);
+        this.complianceSettings = new ComplianceSettings(this._client);
     }
     /**
      * Retrieve information about the organization associated with the authenticated
@@ -24184,6 +24264,7 @@ Organization.ServiceAccounts = ServiceAccounts;
 Organization.Users = Users;
 Organization.Workspaces = workspaces_workspaces_Workspaces;
 Organization.RateLimits = RateLimits;
+Organization.ComplianceSettings = ComplianceSettings;
 //# sourceMappingURL=organization.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/sessions/events.mjs
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
@@ -24739,10 +24820,10 @@ class versions_Versions extends APIResource {
      *
      * @example
      * ```ts
-     * const version = await client.beta.skills.versions.create(
-     *   'skill_id',
-     *   { files: [fs.createReadStream('path/to/file')] },
-     * );
+     * const betaSkillVersion =
+     *   await client.beta.skills.versions.create('skill_id', {
+     *     files: [fs.createReadStream('path/to/file')],
+     *   });
      * ```
      */
     create(skillID, params, options) {
@@ -24751,7 +24832,7 @@ class versions_Versions extends APIResource {
             body,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         }, this._client, false));
@@ -24761,10 +24842,10 @@ class versions_Versions extends APIResource {
      *
      * @example
      * ```ts
-     * const version = await client.beta.skills.versions.retrieve(
-     *   'version',
-     *   { skill_id: 'skill_id' },
-     * );
+     * const betaSkillVersion =
+     *   await client.beta.skills.versions.retrieve('version', {
+     *     skill_id: 'skill_id',
+     *   });
      * ```
      */
     retrieve(version, params, options) {
@@ -24772,7 +24853,7 @@ class versions_Versions extends APIResource {
         return this._client.get(path `/v1/skills/${skill_id}/versions/${version}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24783,7 +24864,7 @@ class versions_Versions extends APIResource {
      * @example
      * ```ts
      * // Automatically fetches more pages as needed.
-     * for await (const versionListResponse of client.beta.skills.versions.list(
+     * for await (const betaSkillVersion of client.beta.skills.versions.list(
      *   'skill_id',
      * )) {
      *   // ...
@@ -24796,7 +24877,7 @@ class versions_Versions extends APIResource {
             query,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24806,10 +24887,10 @@ class versions_Versions extends APIResource {
      *
      * @example
      * ```ts
-     * const version = await client.beta.skills.versions.delete(
-     *   'version',
-     *   { skill_id: 'skill_id' },
-     * );
+     * const betaDeletedSkillVersion =
+     *   await client.beta.skills.versions.delete('version', {
+     *     skill_id: 'skill_id',
+     *   });
      * ```
      */
     delete(version, params, options) {
@@ -24817,7 +24898,7 @@ class versions_Versions extends APIResource {
         return this._client.delete(path `/v1/skills/${skill_id}/versions/${version}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24842,8 +24923,8 @@ class versions_Versions extends APIResource {
             ...options,
             headers: buildHeaders([
                 {
-                    'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString(),
                     Accept: 'application/binary',
+                    ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined),
                 },
                 options?.headers,
             ]),
@@ -24871,7 +24952,7 @@ class Skills extends APIResource {
      *
      * @example
      * ```ts
-     * const skill = await client.beta.skills.create({
+     * const betaSkill = await client.beta.skills.create({
      *   files: [fs.createReadStream('path/to/file')],
      * });
      * ```
@@ -24882,7 +24963,7 @@ class Skills extends APIResource {
             body,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         }, this._client, false));
@@ -24892,7 +24973,9 @@ class Skills extends APIResource {
      *
      * @example
      * ```ts
-     * const skill = await client.beta.skills.retrieve('skill_id');
+     * const betaSkill = await client.beta.skills.retrieve(
+     *   'skill_id',
+     * );
      * ```
      */
     retrieve(skillID, params = {}, options) {
@@ -24900,7 +24983,7 @@ class Skills extends APIResource {
         return this._client.get(path `/v1/skills/${skillID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24911,7 +24994,7 @@ class Skills extends APIResource {
      * @example
      * ```ts
      * // Automatically fetches more pages as needed.
-     * for await (const skillListResponse of client.beta.skills.list()) {
+     * for await (const betaSkill of client.beta.skills.list()) {
      *   // ...
      * }
      * ```
@@ -24922,7 +25005,7 @@ class Skills extends APIResource {
             query,
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -24932,7 +25015,9 @@ class Skills extends APIResource {
      *
      * @example
      * ```ts
-     * const skill = await client.beta.skills.delete('skill_id');
+     * const betaDeletedSkill = await client.beta.skills.delete(
+     *   'skill_id',
+     * );
      * ```
      */
     delete(skillID, params = {}, options) {
@@ -24940,7 +25025,7 @@ class Skills extends APIResource {
         return this._client.delete(path `/v1/skills/${skillID}?beta=true`, {
             ...options,
             headers: buildHeaders([
-                { 'anthropic-beta': [...(betas ?? []), 'skills-2025-10-02'].toString() },
+                { ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined) },
                 options?.headers,
             ]),
         });
@@ -27738,14 +27823,19 @@ const DEFAULT_BETAS = (/* unused pure expression or super */ null && (['fallback
  * Remove `fallback` blocks replayed in history. They only parse under the
  * server-side fallback beta, which belongs to the caller-owned server-side
  * `fallbacks` feature — this middleware never sends it, so a request
- * replaying them would 400. An assistant turn left empty is dropped whole.
+ * replaying them would 400. A turn the strip leaves empty is dropped whole;
+ * a turn that was already empty is kept — it may carry other payload (e.g. a
+ * directive-only system message's `output_config`).
  */
 function stripFallbackBlocks(body) {
-    const messages = body.messages
-        .map((message) => Array.isArray(message.content) ?
-        { ...message, content: message.content.filter((block) => block.type !== 'fallback') }
-        : message)
-        .filter((message) => !Array.isArray(message.content) || message.content.length > 0);
+    const messages = body.messages.flatMap((message) => {
+        if (!Array.isArray(message.content))
+            return [message];
+        const content = message.content.filter((block) => block.type !== 'fallback');
+        if (content.length === message.content.length)
+            return [message];
+        return content.length > 0 ? [{ ...message, content }] : [];
+    });
     return { ...body, messages };
 }
 /**
@@ -28030,6 +28120,9 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
     // The refusal whose token is currently in flight — surfaced verbatim (with a
     // recommended_model added) if every fallback request fails and we degrade.
     let refusalDetails = a.refused.stopDetails;
+    // That refused hop's suppressed message_start `input_transformations`, which
+    // ride on the surfaced refusal delta (none for A: its start reached the client).
+    let refusalInputTransformations = a.refused.inputTransformations;
     // One `message` entry per refused hop, in order — A first. Failed hops are
     // skipped (no usage came back); the serving hop is appended as
     // `fallback_message` when its message_delta arrives.
@@ -28130,6 +28223,9 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
                     stop_details: stopDetails,
                 },
                 usage: (lastUsage ?? {}),
+                ...(refusalInputTransformations !== undefined && {
+                    input_transformations: refusalInputTransformations,
+                }),
             });
             yield emit('message_stop', { type: 'message_stop' });
             return;
@@ -28150,6 +28246,7 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
         // continues.
         token = b.refused.token;
         refusalDetails = b.refused.stopDetails;
+        refusalInputTransformations = b.refused.inputTransformations;
         base = continuation;
         partial = b.refused.hasPrefillClaim ? toPrefillBlocks(b.blocks) : [];
         iterations.push(toIterationUsage('message', model, b.refused.usage));
@@ -28166,7 +28263,8 @@ async function* splicedEvents({ request, response, next, ctx, fallbacks, firstHo
  * spliced hop (`splice` set) has its message_start suppressed (the client
  * already saw A's), its block indices shifted by `indexBase`, and its
  * terminal message_delta's usage rewritten to the `usage.iterations`
- * chain shape.
+ * chain shape, with the suppressed message_start's `input_transformations`
+ * forwarded onto it.
  *
  * A refusal that can be chained — it carries a `fallback_credit_token` and a
  * fallback entry remains — ends the hop early: open blocks are closed, the
@@ -28179,12 +28277,18 @@ async function* consumeHop(args) {
     const tracker = new BlockTracker(indexBase);
     let model;
     let startUsage = null;
+    // A spliced hop's message_start is suppressed, so its `input_transformations`
+    // must ride on the re-emitted terminal message_delta — the way a server-side
+    // fallback reports the serving model's list.
+    let startInputTransformations;
     for await (const sse of Stream.rawEvents(response, controller)) {
         const p = safeJSON(sse.data);
         switch (p?.type) {
             case 'message_start': {
                 model = p.message.model;
                 startUsage = p.message.usage;
+                if ('input_transformations' in p.message)
+                    startInputTransformations = p.message.input_transformations;
                 if (splice)
                     continue;
                 break;
@@ -28228,6 +28332,7 @@ async function* consumeHop(args) {
                                 hasPrefillClaim: details.fallback_has_prefill_claim === true,
                                 usage,
                                 stopDetails: details,
+                                inputTransformations: splice ? startInputTransformations : undefined,
                             },
                             model,
                             blocks: tracker.contentBlocks(),
@@ -28263,6 +28368,9 @@ async function* consumeHop(args) {
                         toIterationUsage('fallback_message', splice.model, usage),
                     ];
                     p.usage = usage;
+                    if (!('input_transformations' in p) && startInputTransformations !== undefined) {
+                        p.input_transformations = startInputTransformations;
+                    }
                     yield emit('message_delta', p);
                     continue;
                 }
@@ -28507,7 +28615,9 @@ const castToError = (err) => {
         return err;
     if (typeof err === 'object' && err !== null) {
         try {
-            if (Object.prototype.toString.call(err) === '[object Error]') {
+            const tag = Object.prototype.toString.call(err);
+            // cross-realm errors (e.g. undici's abort `DOMException` under jest) fail `instanceof Error`
+            if (tag === '[object Error]' || tag === '[object DOMException]') {
                 // @ts-ignore - not all envs have native support for cause yet
                 const error = new Error(err.message, err.cause ? { cause: err.cause } : {});
                 if (err.stack)
@@ -35761,13 +35871,12 @@ minimatch.unescape = unescape_unescape;
 
 /***/ }),
 
-/***/ 2314:
+/***/ 8816:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
-  EB: () => (/* binding */ ZodStringFormat),
   YO: () => (/* binding */ array),
   zM: () => (/* binding */ schemas_boolean),
   k5: () => (/* binding */ schemas_enum),
@@ -35778,228 +35887,7 @@ __nccwpck_require__.d(__webpack_exports__, {
   L5: () => (/* binding */ unknown)
 });
 
-// UNUSED EXPORTS: ZodAny, ZodArray, ZodBase64, ZodBase64URL, ZodBigInt, ZodBigIntFormat, ZodBoolean, ZodCIDRv4, ZodCIDRv6, ZodCUID, ZodCUID2, ZodCatch, ZodCodec, ZodCustom, ZodCustomStringFormat, ZodDate, ZodDefault, ZodDiscriminatedUnion, ZodE164, ZodEmail, ZodEmoji, ZodEnum, ZodExactOptional, ZodFile, ZodFunction, ZodGUID, ZodIPv4, ZodIPv6, ZodIntersection, ZodJWT, ZodKSUID, ZodLazy, ZodLiteral, ZodMAC, ZodMap, ZodNaN, ZodNanoID, ZodNever, ZodNonOptional, ZodNull, ZodNullable, ZodNumber, ZodNumberFormat, ZodObject, ZodOptional, ZodPipe, ZodPrefault, ZodPreprocess, ZodPromise, ZodReadonly, ZodRecord, ZodSet, ZodString, ZodSuccess, ZodSymbol, ZodTemplateLiteral, ZodTransform, ZodTuple, ZodType, ZodULID, ZodURL, ZodUUID, ZodUndefined, ZodUnion, ZodUnknown, ZodVoid, ZodXID, ZodXor, _ZodString, _default, _function, any, base64, base64url, bigint, catch, check, cidrv4, cidrv6, codec, cuid, cuid2, custom, date, describe, discriminatedUnion, e164, email, emoji, exactOptional, file, float32, float64, function, guid, hash, hex, hostname, httpUrl, instanceof, int, int32, int64, intersection, invertCodec, ipv4, ipv6, json, jwt, keyof, ksuid, lazy, literal, looseObject, looseRecord, mac, map, meta, nan, nanoid, nativeEnum, never, nonoptional, null, nullable, nullish, optional, partialRecord, pipe, prefault, preprocess, promise, readonly, record, refine, set, strictObject, stringFormat, stringbool, success, superRefine, symbol, templateLiteral, transform, tuple, uint32, uint64, ulid, undefined, url, uuid, uuidv4, uuidv6, uuidv7, void, xid, xor
-
-;// CONCATENATED MODULE: ./node_modules/zod/v4/core/core.js
-var _a;
-/** A special constant with type `never` */
-const NEVER = /*@__PURE__*/ Object.freeze({
-    status: "aborted",
-});
-function $constructor(name, initializer, params) {
-    function init(inst, def) {
-        if (!inst._zod) {
-            Object.defineProperty(inst, "_zod", {
-                value: {
-                    def,
-                    constr: _,
-                    traits: new Set(),
-                },
-                enumerable: false,
-            });
-        }
-        if (inst._zod.traits.has(name)) {
-            return;
-        }
-        inst._zod.traits.add(name);
-        initializer(inst, def);
-        // support prototype modifications
-        const proto = _.prototype;
-        const keys = Object.keys(proto);
-        for (let i = 0; i < keys.length; i++) {
-            const k = keys[i];
-            if (!(k in inst)) {
-                inst[k] = proto[k].bind(inst);
-            }
-        }
-    }
-    // doesn't work if Parent has a constructor with arguments
-    const Parent = params?.Parent ?? Object;
-    class Definition extends Parent {
-    }
-    Object.defineProperty(Definition, "name", { value: name });
-    function _(def) {
-        var _a;
-        const inst = params?.Parent ? new Definition() : this;
-        init(inst, def);
-        (_a = inst._zod).deferred ?? (_a.deferred = []);
-        for (const fn of inst._zod.deferred) {
-            fn();
-        }
-        return inst;
-    }
-    Object.defineProperty(_, "init", { value: init });
-    Object.defineProperty(_, Symbol.hasInstance, {
-        value: (inst) => {
-            if (params?.Parent && inst instanceof params.Parent)
-                return true;
-            return inst?._zod?.traits?.has(name);
-        },
-    });
-    Object.defineProperty(_, "name", { value: name });
-    return _;
-}
-//////////////////////////////   UTILITIES   ///////////////////////////////////////
-const $brand = Symbol("zod_brand");
-class $ZodAsyncError extends Error {
-    constructor() {
-        super(`Encountered Promise during synchronous parse. Use .parseAsync() instead.`);
-    }
-}
-class $ZodEncodeError extends Error {
-    constructor(name) {
-        super(`Encountered unidirectional transform during encode: ${name}`);
-        this.name = "ZodEncodeError";
-    }
-}
-(_a = globalThis).__zod_globalConfig ?? (_a.__zod_globalConfig = {});
-const globalConfig = globalThis.__zod_globalConfig;
-function config(newConfig) {
-    if (newConfig)
-        Object.assign(globalConfig, newConfig);
-    return globalConfig;
-}
-
-;// CONCATENATED MODULE: ./node_modules/zod/v4/core/regexes.js
-
-/**
- * @deprecated CUID v1 is deprecated by its authors due to information leakage
- * (timestamps embedded in the id). Use {@link cuid2} instead.
- * See https://github.com/paralleldrive/cuid.
- */
-const cuid = /^[cC][0-9a-z]{6,}$/;
-const cuid2 = /^[0-9a-z]+$/;
-const ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
-const xid = /^[0-9a-vA-V]{20}$/;
-const ksuid = /^[A-Za-z0-9]{27}$/;
-const nanoid = /^[a-zA-Z0-9_-]{21}$/;
-/** ISO 8601-1 duration regex. Does not support the 8601-2 extensions like negative durations or fractional/negative components. */
-const duration = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/;
-/** Implements ISO 8601-2 extensions like explicit +- prefixes, mixing weeks with other units, and fractional/negative components. */
-const extendedDuration = /^[-+]?P(?!$)(?:(?:[-+]?\d+Y)|(?:[-+]?\d+[.,]\d+Y$))?(?:(?:[-+]?\d+M)|(?:[-+]?\d+[.,]\d+M$))?(?:(?:[-+]?\d+W)|(?:[-+]?\d+[.,]\d+W$))?(?:(?:[-+]?\d+D)|(?:[-+]?\d+[.,]\d+D$))?(?:T(?=[\d+-])(?:(?:[-+]?\d+H)|(?:[-+]?\d+[.,]\d+H$))?(?:(?:[-+]?\d+M)|(?:[-+]?\d+[.,]\d+M$))?(?:[-+]?\d+(?:[.,]\d+)?S)?)??$/;
-/** A regex for any UUID-like identifier: 8-4-4-4-12 hex pattern */
-const guid = /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
-/** Returns a regex for validating an RFC 9562/4122 UUID.
- *
- * @param version Optionally specify a version 1-8. If no version is specified, all versions are supported. */
-const uuid = (version) => {
-    if (!version)
-        return /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
-    return new RegExp(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-${version}[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$`);
-};
-const uuid4 = /*@__PURE__*/ (/* unused pure expression or super */ null && (uuid(4)));
-const uuid6 = /*@__PURE__*/ (/* unused pure expression or super */ null && (uuid(6)));
-const uuid7 = /*@__PURE__*/ (/* unused pure expression or super */ null && (uuid(7)));
-/** Practical email validation */
-const email = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/;
-/** Equivalent to the HTML5 input[type=email] validation implemented by browsers. Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email */
-const html5Email = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-/** The classic emailregex.com regex for RFC 5322-compliant emails */
-const rfc5322Email = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-/** A loose regex that allows Unicode characters, enforces length limits, and that's about it. */
-const unicodeEmail = /^[^\s@"]{1,64}@[^\s@]{1,255}$/u;
-const idnEmail = (/* unused pure expression or super */ null && (unicodeEmail));
-const browserEmail = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-// from https://thekevinscott.com/emojis-in-javascript/#writing-a-regular-expression
-const _emoji = `^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$`;
-function emoji() {
-    return new RegExp(_emoji, "u");
-}
-const ipv4 = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
-const ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
-const mac = (delimiter) => {
-    const escapedDelim = util.escapeRegex(delimiter ?? ":");
-    return new RegExp(`^(?:[0-9A-F]{2}${escapedDelim}){5}[0-9A-F]{2}$|^(?:[0-9a-f]{2}${escapedDelim}){5}[0-9a-f]{2}$`);
-};
-const cidrv4 = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/([0-9]|[1-2][0-9]|3[0-2])$/;
-const cidrv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:?){0,6})\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$/;
-// https://stackoverflow.com/questions/7860392/determine-if-string-is-in-base64-using-javascript
-const base64 = /^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$/;
-const base64url = /^[A-Za-z0-9_-]*$/;
-// based on https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address
-// export const hostname: RegExp = /^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/;
-const hostname = /^(?=.{1,253}\.?$)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[-0-9a-zA-Z]{0,61}[0-9a-zA-Z])?)*\.?$/;
-const domain = /^([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-const httpProtocol = /^https?$/;
-// https://blog.stevenlevithan.com/archives/validate-phone-number#r4-3 (regex sans spaces)
-// E.164: leading digit must be 1-9; total digits (excluding '+') between 7-15
-const e164 = /^\+[1-9]\d{6,14}$/;
-// const dateSource = `((\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-((0[13578]|1[02])-(0[1-9]|[12]\\d|3[01])|(0[469]|11)-(0[1-9]|[12]\\d|30)|(02)-(0[1-9]|1\\d|2[0-8])))`;
-const dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))`;
-const date = /*@__PURE__*/ new RegExp(`^${dateSource}$`);
-function timeSource(args) {
-    const hhmm = `(?:[01]\\d|2[0-3]):[0-5]\\d`;
-    const regex = typeof args.precision === "number"
-        ? args.precision === -1
-            ? `${hhmm}`
-            : args.precision === 0
-                ? `${hhmm}:[0-5]\\d`
-                : `${hhmm}:[0-5]\\d\\.\\d{${args.precision}}`
-        : `${hhmm}(?::[0-5]\\d(?:\\.\\d+)?)?`;
-    return regex;
-}
-function time(args) {
-    return new RegExp(`^${timeSource(args)}$`);
-}
-// Adapted from https://stackoverflow.com/a/3143231
-function datetime(args) {
-    const time = timeSource({ precision: args.precision });
-    const opts = ["Z"];
-    if (args.local)
-        opts.push("");
-    // if (args.offset) opts.push(`([+-]\\d{2}:\\d{2})`);
-    if (args.offset)
-        opts.push(`([+-](?:[01]\\d|2[0-3]):[0-5]\\d)`);
-    const timeRegex = `${time}(?:${opts.join("|")})`;
-    return new RegExp(`^${dateSource}T(?:${timeRegex})$`);
-}
-const string = (params) => {
-    const regex = params ? `[\\s\\S]{${params?.minimum ?? 0},${params?.maximum ?? ""}}` : `[\\s\\S]*`;
-    return new RegExp(`^${regex}$`);
-};
-const bigint = /^-?\d+n?$/;
-const integer = /^-?\d+$/;
-const number = /^-?\d+(?:\.\d+)?$/;
-const regexes_boolean = /^(?:true|false)$/i;
-const _null = /^null$/i;
-
-const _undefined = /^undefined$/i;
-
-// regex for string with no uppercase letters
-const lowercase = /^[^A-Z]*$/;
-// regex for string with no lowercase letters
-const uppercase = /^[^a-z]*$/;
-// regex for hexadecimal strings (any length)
-const hex = /^[0-9a-fA-F]*$/;
-// Hash regexes for different algorithms and encodings
-// Helper function to create base64 regex with exact length and padding
-function fixedBase64(bodyLength, padding) {
-    return new RegExp(`^[A-Za-z0-9+/]{${bodyLength}}${padding}$`);
-}
-// Helper function to create base64url regex with exact length (no padding)
-function fixedBase64url(length) {
-    return new RegExp(`^[A-Za-z0-9_-]{${length}}$`);
-}
-// MD5 (16 bytes): base64 = 24 chars total (22 + "==")
-const md5_hex = /^[0-9a-fA-F]{32}$/;
-const md5_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(22, "==")));
-const md5_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(22)));
-// SHA1 (20 bytes): base64 = 28 chars total (27 + "=")
-const sha1_hex = /^[0-9a-fA-F]{40}$/;
-const sha1_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(27, "=")));
-const sha1_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(27)));
-// SHA256 (32 bytes): base64 = 44 chars total (43 + "=")
-const sha256_hex = /^[0-9a-fA-F]{64}$/;
-const sha256_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(43, "=")));
-const sha256_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(43)));
-// SHA384 (48 bytes): base64 = 64 chars total (no padding)
-const sha384_hex = /^[0-9a-fA-F]{96}$/;
-const sha384_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(64, "")));
-const sha384_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(64)));
-// SHA512 (64 bytes): base64 = 88 chars total (86 + "==")
-const sha512_hex = /^[0-9a-fA-F]{128}$/;
-const sha512_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(86, "==")));
-const sha512_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(86)));
+// UNUSED EXPORTS: ZodAny, ZodArray, ZodBase64, ZodBase64URL, ZodBigInt, ZodBigIntFormat, ZodBoolean, ZodCIDRv4, ZodCIDRv6, ZodCUID, ZodCUID2, ZodCatch, ZodCodec, ZodCreditCard, ZodCustom, ZodCustomStringFormat, ZodDate, ZodDefault, ZodDiscriminatedUnion, ZodE164, ZodEmail, ZodEmoji, ZodEnum, ZodExactOptional, ZodFile, ZodFunction, ZodGUID, ZodIPv4, ZodIPv6, ZodISODate, ZodISODateTime, ZodISODuration, ZodISOTime, ZodIntersection, ZodJWT, ZodKSUID, ZodLazy, ZodLiteral, ZodMAC, ZodMap, ZodNaN, ZodNanoID, ZodNever, ZodNonOptional, ZodNull, ZodNullable, ZodNumber, ZodNumberFormat, ZodObject, ZodOptional, ZodPipe, ZodPrefault, ZodPreprocess, ZodPromise, ZodReadonly, ZodRecord, ZodSet, ZodString, ZodStringFormat, ZodSuccess, ZodSymbol, ZodTemplateLiteral, ZodTransform, ZodTuple, ZodType, ZodULID, ZodURL, ZodUUID, ZodUndefined, ZodUnion, ZodUnknown, ZodVoid, ZodXID, ZodXor, _ZodString, _default, _function, any, base64, base64url, bigint, catch, check, cidrv4, cidrv6, codec, creditCard, cuid, cuid2, custom, date, describe, discriminatedUnion, e164, email, emoji, exactOptional, file, float32, float64, function, guid, hash, hex, hostname, httpUrl, instanceof, int, int32, int64, intersection, invertCodec, ipv4, ipv6, json, jwt, keyof, ksuid, lazy, literal, looseObject, looseRecord, mac, map, meta, nan, nanoid, nativeEnum, never, nonoptional, null, nullable, nullish, optional, partialRecord, pipe, prefault, preprocess, promise, readonly, record, refine, set, strictObject, stringFormat, stringbool, success, superRefine, symbol, templateLiteral, transform, tuple, uint32, uint64, ulid, undefined, url, uuid, uuidv4, uuidv6, uuidv7, void, xid, xor
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/util.js
 
@@ -36009,6 +35897,9 @@ function assertEqual(val) {
 }
 function assertNotEqual(val) {
     return val;
+}
+function toZod() {
+    return (schema) => schema;
 }
 function assertIs(_arg) { }
 function assertNever(_x) {
@@ -36054,13 +35945,13 @@ function cleanRegex(source) {
 function floatSafeRemainder(val, step) {
     const ratio = val / step;
     const roundedRatio = Math.round(ratio);
-    // Use a relative epsilon scaled to the magnitude of the result
-    const tolerance = Number.EPSILON * Math.max(Math.abs(ratio), 1);
+    // `val` and `step` each round to a double before the division rounds again, so a true decimal multiple's quotient can sit up to 1.5 of these scaled epsilons from the integer. A 1x tolerance therefore rejected 2.03 as a multiple of 0.07; 4x covers the worst case with margin.
+    const tolerance = 4 * Number.EPSILON * Math.max(Math.abs(ratio), 1);
     if (Math.abs(ratio - roundedRatio) < tolerance)
         return 0;
     return ratio - roundedRatio;
 }
-const EVALUATING = /* @__PURE__*/ Symbol("evaluating");
+const EVALUATING = /* @__PURE__*/ (/* unused pure expression or super */ null && (Symbol("evaluating")));
 function defineLazy(object, key, getter) {
     let value = undefined;
     Object.defineProperty(object, key, {
@@ -36088,7 +35979,7 @@ function defineLazy(object, key, getter) {
 function objectClone(obj) {
     return Object.create(Object.getPrototypeOf(obj), Object.getOwnPropertyDescriptors(obj));
 }
-function assignProp(target, prop, value) {
+function util_assignProp(target, prop, value) {
     Object.defineProperty(target, prop, {
         value,
         writable: true,
@@ -36147,8 +36038,7 @@ function util_isObject(data) {
     return typeof data === "object" && data !== null && !Array.isArray(data);
 }
 const util_allowsEval = /* @__PURE__*/ cached(() => {
-    // Skip the probe under `jitless`: strict CSPs report the caught `new Function`
-    // as a `securitypolicyviolation` even though the throw is swallowed.
+    // Skip the probe under `jitless`: strict CSPs report the caught `new Function` as a `securitypolicyviolation` even though the throw is swallowed.
     if (globalConfig.jitless) {
         return false;
     }
@@ -36326,16 +36216,17 @@ function stringifyPrimitive(value) {
 }
 function optionalKeys(shape) {
     return Object.keys(shape).filter((k) => {
-        return shape[k]._zod.optin === "optional" && shape[k]._zod.optout === "optional";
+        return shape[k]._zod.optin !== undefined && shape[k]._zod.optout === "optional";
     });
 }
-const NUMBER_FORMAT_RANGES = {
+// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle.
+const NUMBER_FORMAT_RANGES = /*@__PURE__*/ (() => ({
     safeint: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
     int32: [-2147483648, 2147483647],
     uint32: [0, 4294967295],
     float32: [-3.4028234663852886e38, 3.4028234663852886e38],
     float64: [-Number.MAX_VALUE, Number.MAX_VALUE],
-};
+}))();
 const BIGINT_FORMAT_RANGES = {
     int64: [/* @__PURE__*/ BigInt("-9223372036854775808"), /* @__PURE__*/ BigInt("9223372036854775807")],
     uint64: [/* @__PURE__*/ BigInt(0), /* @__PURE__*/ BigInt("18446744073709551615")],
@@ -36350,15 +36241,16 @@ function pick(schema, mask) {
     const def = mergeDefs(schema._zod.def, {
         get shape() {
             const newShape = {};
-            for (const key in mask) {
-                if (!(key in currDef.shape)) {
-                    throw new Error(`Unrecognized key: "${key}"`);
+            // `for...in` skips symbols, so a symbol in the mask would select nothing
+            for (const key of Reflect.ownKeys(mask)) {
+                if (!Object.prototype.hasOwnProperty.call(currDef.shape, key)) {
+                    throw new Error(`Unrecognized key: "${String(key)}"`);
                 }
                 if (!mask[key])
                     continue;
-                newShape[key] = currDef.shape[key];
+                util_assignProp(newShape, key, currDef.shape[key]);
             }
-            assignProp(this, "shape", newShape); // self-caching
+            util_assignProp(this, "shape", newShape); // self-caching
             return newShape;
         },
         checks: [],
@@ -36375,15 +36267,15 @@ function omit(schema, mask) {
     const def = mergeDefs(schema._zod.def, {
         get shape() {
             const newShape = { ...schema._zod.def.shape };
-            for (const key in mask) {
-                if (!(key in currDef.shape)) {
-                    throw new Error(`Unrecognized key: "${key}"`);
+            for (const key of Reflect.ownKeys(mask)) {
+                if (!Object.prototype.hasOwnProperty.call(currDef.shape, key)) {
+                    throw new Error(`Unrecognized key: "${String(key)}"`);
                 }
                 if (!mask[key])
                     continue;
                 delete newShape[key];
             }
-            assignProp(this, "shape", newShape); // self-caching
+            util_assignProp(this, "shape", newShape); // self-caching
             return newShape;
         },
         checks: [],
@@ -36397,10 +36289,9 @@ function extend(schema, shape) {
     const checks = schema._zod.def.checks;
     const hasChecks = checks && checks.length > 0;
     if (hasChecks) {
-        // Only throw if new shape overlaps with existing shape
-        // Use getOwnPropertyDescriptor to check key existence without accessing values
+        // Only throw if new shape overlaps with existing shape. Use getOwnPropertyDescriptor to check key existence without accessing values
         const existingShape = schema._zod.def.shape;
-        for (const key in shape) {
+        for (const key of Reflect.ownKeys(shape)) {
             if (Object.getOwnPropertyDescriptor(existingShape, key) !== undefined) {
                 throw new Error("Cannot overwrite keys on object schemas containing refinements. Use `.safeExtend()` instead.");
             }
@@ -36409,7 +36300,7 @@ function extend(schema, shape) {
     const def = mergeDefs(schema._zod.def, {
         get shape() {
             const _shape = { ...schema._zod.def.shape, ...shape };
-            assignProp(this, "shape", _shape); // self-caching
+            util_assignProp(this, "shape", _shape); // self-caching
             return _shape;
         },
     });
@@ -36422,20 +36313,23 @@ function safeExtend(schema, shape) {
     const def = mergeDefs(schema._zod.def, {
         get shape() {
             const _shape = { ...schema._zod.def.shape, ...shape };
-            assignProp(this, "shape", _shape); // self-caching
+            util_assignProp(this, "shape", _shape); // self-caching
             return _shape;
         },
     });
     return clone(schema, def);
 }
 function merge(a, b) {
+    if (!b?._zod?.def) {
+        throw new Error("Invalid input to merge: expected an object schema. To merge a plain shape, use `.extend()`.");
+    }
     if (a._zod.def.checks?.length) {
         throw new Error(".merge() cannot be used on object schemas containing refinements. Use .safeExtend() instead.");
     }
     const def = mergeDefs(a._zod.def, {
         get shape() {
             const _shape = { ...a._zod.def.shape, ...b._zod.def.shape };
-            assignProp(this, "shape", _shape); // self-caching
+            util_assignProp(this, "shape", _shape); // self-caching
             return _shape;
         },
         get catchall() {
@@ -36445,21 +36339,21 @@ function merge(a, b) {
     });
     return clone(a, def);
 }
-function partial(Class, schema, mask) {
+function partial(Class, schema, mask, name = "partial") {
     const currDef = schema._zod.def;
     const checks = currDef.checks;
     const hasChecks = checks && checks.length > 0;
     if (hasChecks) {
-        throw new Error(".partial() cannot be used on object schemas containing refinements");
+        throw new Error(`.${name}() cannot be used on object schemas containing refinements`);
     }
     const def = mergeDefs(schema._zod.def, {
         get shape() {
             const oldShape = schema._zod.def.shape;
             const shape = { ...oldShape };
             if (mask) {
-                for (const key in mask) {
-                    if (!(key in oldShape)) {
-                        throw new Error(`Unrecognized key: "${key}"`);
+                for (const key of Reflect.ownKeys(mask)) {
+                    if (!Object.prototype.hasOwnProperty.call(oldShape, key)) {
+                        throw new Error(`Unrecognized key: "${String(key)}"`);
                     }
                     if (!mask[key])
                         continue;
@@ -36473,7 +36367,8 @@ function partial(Class, schema, mask) {
                 }
             }
             else {
-                for (const key in oldShape) {
+                // the spread copies symbol keys; `for...in` would not reach them
+                for (const key of Reflect.ownKeys(oldShape)) {
                     // if (oldShape[key]!._zod.optin === "optional") continue;
                     shape[key] = Class
                         ? new Class({
@@ -36483,7 +36378,7 @@ function partial(Class, schema, mask) {
                         : oldShape[key];
                 }
             }
-            assignProp(this, "shape", shape); // self-caching
+            util_assignProp(this, "shape", shape); // self-caching
             return shape;
         },
         checks: [],
@@ -36496,9 +36391,9 @@ function required(Class, schema, mask) {
             const oldShape = schema._zod.def.shape;
             const shape = { ...oldShape };
             if (mask) {
-                for (const key in mask) {
-                    if (!(key in shape)) {
-                        throw new Error(`Unrecognized key: "${key}"`);
+                for (const key of Reflect.ownKeys(mask)) {
+                    if (!Object.prototype.hasOwnProperty.call(shape, key)) {
+                        throw new Error(`Unrecognized key: "${String(key)}"`);
                     }
                     if (!mask[key])
                         continue;
@@ -36510,7 +36405,7 @@ function required(Class, schema, mask) {
                 }
             }
             else {
-                for (const key in oldShape) {
+                for (const key of Reflect.ownKeys(oldShape)) {
                     // overwrite with non-optional
                     shape[key] = new Class({
                         type: "nonoptional",
@@ -36518,7 +36413,7 @@ function required(Class, schema, mask) {
                     });
                 }
             }
-            assignProp(this, "shape", shape); // self-caching
+            util_assignProp(this, "shape", shape); // self-caching
             return shape;
         },
     });
@@ -36535,8 +36430,7 @@ function aborted(x, startIndex = 0) {
     }
     return false;
 }
-// Checks for explicit abort (continue === false), as opposed to implicit abort (continue === undefined).
-// Used to respect `abort: true` in .refine() even for checks that have a `when` function.
+// Checks for explicit abort (continue === false), as opposed to implicit abort (continue === undefined). Used to respect `abort: true` in .refine() even for checks that have a `when` function.
 function explicitlyAborted(x, startIndex = 0) {
     if (x.aborted === true)
         return true;
@@ -36558,15 +36452,34 @@ function prefixIssues(path, issues) {
 function unwrapMessage(message) {
     return typeof message === "string" ? message : message?.message;
 }
+/* A check holds no link back to the schema it is attached to — the same check instance is shared by every clone of that schema — so the owner is stamped onto the issues a check just raised, at the only point where both are in scope. Runs on the failure path only; `start` is the issue count from before the check ran. */
+function attachSchema(issues, start, inst) {
+    var _a;
+    for (let i = start; i < issues.length; i++) {
+        (_a = issues[i]).schema ?? (_a.schema = inst);
+    }
+}
 function finalizeIssue(iss, ctx, config) {
+    var _a;
+    // A schema that raised an issue itself owns it outright, and outranks any stamp an enclosing check left in `attachSchema`. String formats and z.custom() are schema and check at once, so when they act as a check they defer to that stamp instead.
+    const traits = iss.inst?._zod?.traits;
+    if (traits?.has("$ZodType")) {
+        if (traits.has("$ZodCheck"))
+            (_a = iss).schema ?? (_a.schema = iss.inst);
+        else
+            iss.schema = iss.inst;
+    }
+    // Decreasing specificity, first map to return a message wins. `inst` is whatever raised the issue, so a check's own map outranks the owning schema's.
+    const schemaError = iss.schema !== iss.inst ? iss.schema?._zod.def?.error : undefined;
     const message = iss.message
         ? iss.message
         : (unwrapMessage(iss.inst?._zod.def?.error?.(iss)) ??
+            unwrapMessage(schemaError?.(iss)) ??
             unwrapMessage(ctx?.error?.(iss)) ??
             unwrapMessage(config.customError?.(iss)) ??
             unwrapMessage(config.localeError?.(iss)) ??
             "Invalid input");
-    const { inst: _inst, continue: _continue, input: _input, ...rest } = iss;
+    const { inst: _inst, schema: _schema, continue: _continue, input: _input, ...rest } = iss;
     rest.path ?? (rest.path = []);
     rest.message = message;
     if (ctx?.reportInput) {
@@ -36583,6 +36496,21 @@ function getSizableOrigin(input) {
     if (input instanceof File)
         return "file";
     return "unknown";
+}
+const highSurrogate = /[\uD800-\uDBFF]/;
+// Code points in `str`: a surrogate pair counts once, a lone surrogate as itself. Hand-rolled because the string iterator allocates and runs ~250x slower on this path; the regex probe exits ~50x quicker for a string with no astral characters.
+function codePointLength(str) {
+    const units = str.length;
+    if (!highSurrogate.test(str))
+        return units;
+    let count = units;
+    for (let i = 0; i < units - 1; i++) {
+        if ((str.charCodeAt(i) & 0xfc00) === 0xd800 && (str.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+            count--;
+            i++;
+        }
+    }
+    return count;
 }
 function getLengthableOrigin(input) {
     if (Array.isArray(input))
@@ -36676,6 +36604,700 @@ function uint8ArrayToHex(bytes) {
 class Class {
     constructor(..._args) { }
 }
+//////////    PROTOTYPE INSTALLERS     //////////
+//
+// Members live on the prototype and materialize per instance on first read, which keeps own-property count under the step where V8 stops using inline slots. Changing anything here means re-measuring runtime, memory and bundle size together — see "The three axes" in AGENTS.md.
+/**
+ * Installs a trait's members on its prototype. Each value builds that member for the instance on first read; the built value shadows the accessor as an own property, so a detached `const { parse } = schema` keeps working.
+ *
+ * Call this from a `proto` initializer, which runs once per prototype — never per instance.
+ */
+function members(proto, table) {
+    for (const key in table) {
+        const desc = Object.getOwnPropertyDescriptor(table, key);
+        // a getter installs as written, so it stays live: `description` reads through to the registry on every access. not enumerable: an object literal's is, and a prototype member never was
+        if (desc.get)
+            Object.defineProperty(proto, key, { ...desc, enumerable: false });
+        // a method materializes bound on first read, which is what keeps a detached member working: `const opt = schema.optional; opt()`
+        else
+            defineBound(proto, key, desc.value);
+    }
+}
+/** Shadows a prototype member with an own value, so a getter that builds from the instance runs once. */
+function own(inst, key, value, enumerable = true) {
+    Object.defineProperty(inst, key, { configurable: true, writable: true, enumerable, value });
+    return value;
+}
+/** Like {@link own}, for a member that was never an own data property and has to stay out of `Object.keys`. */
+function hide(inst, key, value) {
+    return own(inst, key, value, false);
+}
+function defineBound(proto, key, fn) {
+    Object.defineProperty(proto, key, {
+        configurable: true,
+        get() {
+            // vitest's spyOn calls a prototype getter bare to find the function it wraps, so a nullish receiver answers the raw method
+            return this == null ? fn : own(this, key, fn.bind(this));
+        },
+        set(value) {
+            own(this, key, value);
+        },
+    });
+}
+/** Returns the prototype to install on, or `undefined` if this group is already installed on it. */
+function claim(inst, sentinel) {
+    const proto = Object.getPrototypeOf(inst);
+    // Runs on every construction, so `in` rather than the costlier `hasOwnProperty.call`. Sentinels are keys the group itself defines.
+    return sentinel in proto ? undefined : proto;
+}
+// The internals whose init chain is installing. A second call for the same one is a derived constructor overriding its base, so it must not construct another schema in between or the override is dropped.
+let installing;
+// Set while a getter is running, so a value that resolved through a recursion break is not memoized. One shared descriptor shadows the key for the duration, which costs no per-key allocation.
+let broke = false;
+const breaker = {
+    configurable: true,
+    get() {
+        broke = true;
+        return undefined;
+    },
+};
+/**
+ * Installs a lazily-derived internal on the `_zod` prototype of `inst`'s
+ * constructor, computed from the internals object itself and cached there on
+ * first read. One accessor per constructor rather than one per instance.
+ */
+function defineLazyInternal(inst, key, compute) {
+    const proto = Object.getPrototypeOf(inst._zod);
+    if (key in proto && installing !== inst._zod) {
+        // A repeat construction: everything is installed already. Cleared here so the reference is not held past the first construction of every type.
+        installing = undefined;
+        return;
+    }
+    installing = inst._zod;
+    Object.defineProperty(proto, key, {
+        configurable: true,
+        get() {
+            // Shadowed before computing so a re-entrant read from a recursive schema resolves to undefined instead of running the getter again.
+            Object.defineProperty(this, key, breaker);
+            const outer = broke;
+            broke = false;
+            try {
+                const value = compute(this);
+                // A result that resolved through a recursion break is recomputed once the graph is complete; everything else memoizes, undefined included.
+                if (broke)
+                    delete this[key];
+                else
+                    Object.defineProperty(this, key, { configurable: true, writable: true, value });
+                broke = broke || outer;
+                return value;
+            }
+            catch (err) {
+                // A compute that threw memoizes nothing, so a later read runs it again and fails the same way. The shadow goes with it, since leaving it installed would answer undefined for every later read.
+                delete this[key];
+                broke = broke || outer;
+                throw err;
+            }
+        },
+        set(value) {
+            Object.defineProperty(this, key, { configurable: true, writable: true, value });
+        },
+    });
+}
+/**
+ * Installs `key` on `inst`'s prototype, computed by `make` on first read and cached there as an own
+ * data property. One accessor per constructor rather than one per instance, because an own accessor
+ * puts every instance after the first into v8 dictionary mode. The key doubles as the sentinel.
+ */
+function installLazyProp(inst, key, make, enumerable) {
+    const proto = claim(inst, key);
+    if (!proto)
+        return;
+    Object.defineProperty(proto, key, {
+        configurable: true,
+        get() {
+            // Shadowed before computing, so a re-entrant read from a self-referential shape resolves to undefined instead of running the getter again. A data property rather than an accessor: an own accessor is the dictionary-mode transition this exists to avoid.
+            const desc = { configurable: true, writable: true, enumerable, value: undefined };
+            Object.defineProperty(this, key, desc);
+            // a compute that throws leaves the shadow behind, so later reads answer undefined instead of re-throwing; `defineLazy` did the same, and `defineLazyInternal`'s delete-on-catch would cost bytes in every bundle for a case only a throwing user getter reaches
+            desc.value = make(this);
+            Object.defineProperty(this, key, desc);
+            return desc.value;
+        },
+        set(value) {
+            Object.defineProperty(this, key, { configurable: true, writable: true, enumerable, value });
+        },
+    });
+}
+/** Marks the thunk `_catch` synthesises for a constant catch value. `Function.length` cannot tell that thunk from a user callback — rest and defaulted parameters both report arity 0 — and a user callback reads `ctx.error`, whose issues only finalize correctly against the caller's per-parse error map. Provenance can say what arity cannot. A plain string key rather than `Symbol.for`, whose call at module scope no bundler can prove pure — the same shape that anchored `urlCanParse` into every build. */
+const CONSTANT_CATCH = "~constantCatch";
+/** Wraps a constant catch value in a thunk tagged with {@link CONSTANT_CATCH}. */
+function constantCatch(value) {
+    const fn = () => value;
+    fn[CONSTANT_CATCH] = true;
+    return fn;
+}
+
+;// CONCATENATED MODULE: ./node_modules/zod/v4/core/core.js
+var _a;
+
+/** A special constant with type `never` */
+const NEVER = /*@__PURE__*/ Object.freeze({
+    status: "aborted",
+});
+/* Shared descriptor for installing `_zod`; defineProperty reads it
+ * synchronously, so reusing one object avoids a per-instance allocation. */
+const _zodDesc = { value: undefined, enumerable: false };
+// null where suppressing the capture would be unrecoverable: `parse()` puts the frames back with `captureStackTrace`, so without it the throw would lose its stack. also latched to null once `stackTraceLimit` proves unassignable, which a realm can do at any point by hardening Error
+let _E = "captureStackTrace" in Error ? Error : null;
+// v8 captures a stack trace inside the Error constructor, which dominates a failed parse; costs only the frames, and parse() restores those. the constructor must RUN: Object.create is cheaper and passes instanceof, but Error.isError and util.types.isNativeError check an internal slot
+function newError(Definition) {
+    const E = _E;
+    if (E) {
+        const saved = E.stackTraceLimit;
+        if (typeof saved === "number") {
+            try {
+                E.stackTraceLimit = 0;
+            }
+            catch {
+                _E = null;
+                return new Definition();
+            }
+            try {
+                return new Definition();
+            }
+            finally {
+                E.stackTraceLimit = saved;
+            }
+        }
+    }
+    return new Definition();
+}
+function $constructor(name, initializer, 
+/** This trait's members, installed once on every prototype that composes it. They cannot be declared in the initializer above: that runs per instance, and the prototype is shared. */
+proto, params) {
+    // Prototype for this constructor's `_zod` internals. Lazily-derived fields (`values`, `pattern`, `optin`, …) install here once rather than as an accessor on every instance.
+    const zodProto = {};
+    // Assigning the fields in the constructor body is what gives instances in-object slots; building the object literally and reparenting it costs a second allocation and a generic property copy.
+    function Internals(def) {
+        this.def = def;
+        this.constr = _;
+        this.traits = new Set();
+    }
+    Internals.prototype = zodProto;
+    const protoMembers = proto;
+    // One trait's members land on every prototype whose chain composes it, so the answer is per prototype rather than per trait.
+    const initialized = protoMembers && new WeakSet();
+    function init(inst, def) {
+        if (!inst._zod) {
+            _zodDesc.value = new Internals(def);
+            try {
+                Object.defineProperty(inst, "_zod", _zodDesc);
+            }
+            finally {
+                // Cleared even on throw, so the shared descriptor never leaks one instance's internals into the next.
+                _zodDesc.value = undefined;
+            }
+        }
+        if (inst._zod.traits.has(name)) {
+            return;
+        }
+        inst._zod.traits.add(name);
+        initializer(inst, def);
+        if (initialized) {
+            // `super(def)` from a user subclass gives `this` a prototype the subclass owns, and installing there would overwrite whatever the subclass declared. `constr` built the instance, so its prototype is the one below the subclass's that should carry the members. A receiver whose chain never reaches that prototype installs on its own, which for a plain object handed straight to `init` means `Object.prototype` — unchanged from before.
+            const own = Object.getPrototypeOf(inst);
+            const ctorProto = inst._zod.constr.prototype;
+            let up = own;
+            while (up && up !== ctorProto)
+                up = Object.getPrototypeOf(up);
+            const target = up ?? own;
+            if (!initialized.has(target)) {
+                initialized.add(target);
+                members(target, protoMembers);
+            }
+        }
+        // support prototype modifications; for-in avoids the array allocation of Object.keys on the (usually empty) prototype
+        const proto = _.prototype;
+        for (const k in proto) {
+            if (!Object.prototype.hasOwnProperty.call(proto, k))
+                continue;
+            if (!(k in inst)) {
+                inst[k] = proto[k].bind(inst);
+            }
+        }
+    }
+    // doesn't work if Parent has a constructor with arguments
+    const Parent = params?.Parent ?? Object;
+    class Definition extends Parent {
+    }
+    Object.defineProperty(Definition, "name", { value: name });
+    function _(def) {
+        const inst = params?.Parent ? newError(Definition) : this;
+        init(inst, def);
+        const deferred = inst._zod.deferred;
+        if (deferred) {
+            for (const fn of deferred) {
+                fn();
+            }
+            // Released: initializers run once, and the list would otherwise be retained for the schema's lifetime.
+            inst._zod.deferred = undefined;
+        }
+        // Global post-processor hook. Internal: installed by `import "zod/compile"` to enable AOT compilation for every constructed schema. Runs last, once the instance is fully built, because it hands the instance to compile(). The post-processor is expected to be reentrancy-guarded by its own implementation.
+        const pp = globalThis.__zod_globalConfig?.postProcessor;
+        if (pp)
+            pp(inst);
+        return inst;
+    }
+    Object.defineProperty(_, "init", { value: init });
+    Object.defineProperty(_, Symbol.hasInstance, {
+        value: (inst) => {
+            if (params?.Parent && inst instanceof params.Parent)
+                return true;
+            return inst?._zod?.traits?.has(name);
+        },
+    });
+    Object.defineProperty(_, "name", { value: name });
+    return _;
+}
+//////////////////////////////   UTILITIES   ///////////////////////////////////////
+const $brand = /*@__PURE__*/ (/* unused pure expression or super */ null && (Symbol("zod_brand")));
+class $ZodAsyncError extends Error {
+    constructor() {
+        super(`Encountered Promise during synchronous parse. Use .parseAsync() instead.`);
+    }
+}
+class $ZodEncodeError extends Error {
+    constructor(name) {
+        super(`Encountered unidirectional transform during encode: ${name}`);
+        this.name = "ZodEncodeError";
+    }
+}
+(_a = globalThis).__zod_globalConfig ?? (_a.__zod_globalConfig = {});
+const globalConfig = globalThis.__zod_globalConfig;
+function config(newConfig) {
+    if (newConfig)
+        Object.assign(globalConfig, newConfig);
+    return globalConfig;
+}
+
+;// CONCATENATED MODULE: ./node_modules/zod/v4/core/memoizer.js
+class $ZodCyclicError extends Error {
+    constructor() {
+        super(`Cannot parse a reference cycle that closes through a transform`);
+        this.name = "ZodCyclicError";
+    }
+}
+/** Keyed off the context object every schema in one parse call already shares. */
+const STATE = "~memo";
+const NO_ISSUES = [];
+// Receivers prefix paths in place, so the cache and every hand-out need their own copies.
+function cloneIssues(issues) {
+    return issues.map((iss) => (iss.path ? { ...iss, path: iss.path.slice() } : { ...iss }));
+}
+const recursive = /*@__PURE__*/ new WeakMap();
+/** Whether this schema's subtree contains a cycle, so one parse can re-enter it. */
+function isRecursive(inst, stack) {
+    const cached = recursive.get(inst);
+    if (cached !== undefined)
+        return cached;
+    // Relative to the walk in progress, so not cached.
+    if (stack.has(inst))
+        return true;
+    stack.add(inst);
+    let result = false;
+    const check = (child) => {
+        if (!result && child?._zod && isRecursive(child, stack))
+            result = true;
+    };
+    const def = inst._zod.def;
+    const kind = def.type;
+    switch (kind) {
+        case "object": {
+            // `Reflect.ownKeys` rather than `Object.keys`, so a cycle through a declared symbol key is still seen
+            for (const key of Reflect.ownKeys(def.shape))
+                check(def.shape[key]);
+            check(def.catchall);
+            break;
+        }
+        case "array":
+            check(def.element);
+            break;
+        case "tuple":
+            for (const el of def.items)
+                check(el);
+            check(def.rest);
+            break;
+        case "record":
+        case "map":
+            check(def.keyType);
+            check(def.valueType);
+            break;
+        case "set":
+            check(def.valueType);
+            break;
+        case "union":
+            for (const el of def.options)
+                check(el);
+            break;
+        case "intersection":
+            check(def.left);
+            check(def.right);
+            break;
+        case "optional":
+        case "nullable":
+        case "default":
+        case "prefault":
+        case "catch":
+        case "readonly":
+        case "nonoptional":
+        case "promise":
+        case "success":
+            check(def.innerType);
+            break;
+        case "pipe":
+            check(def.in);
+            check(def.out);
+            break;
+        case "function":
+            check(def.input);
+            check(def.output);
+            break;
+        // reading `_zod.innerType` resolves the getter once and caches it
+        case "lazy":
+            check(inst._zod.innerType);
+            break;
+        // a leaf by choice: `parts` are regex fragments, not data positions
+        case "template_literal":
+        // leaves
+        case "string":
+        case "number":
+        case "int":
+        case "boolean":
+        case "bigint":
+        case "symbol":
+        case "undefined":
+        case "null":
+        case "void":
+        case "never":
+        case "any":
+        case "unknown":
+        case "date":
+        case "nan":
+        case "enum":
+        case "literal":
+        case "file":
+        case "transform":
+        case "custom":
+            break;
+        default: {
+            // a new built-in kind becomes a compile error here
+            kind;
+            // a user-defined kind can still hold children, and only its author knows where, so fall back to scanning the def — skipping accessors, since reading one can run user code
+            for (const key in def) {
+                const desc = Object.getOwnPropertyDescriptor(def, key);
+                if (!desc || desc.get)
+                    continue;
+                const value = desc.value;
+                if (!value || typeof value !== "object")
+                    continue;
+                if (value._zod)
+                    check(value);
+                else if (Array.isArray(value))
+                    for (const el of value)
+                        check(el);
+            }
+        }
+    }
+    stack.delete(inst);
+    recursive.set(inst, result);
+    return result;
+}
+/**
+ * Whether one parse can re-enter this schema, i.e. its subtree contains a cycle.
+ * Exported for `z.compile`, which refuses to compile such a schema: cycle
+ * breaking is driven from here off state keyed on the parse context, and a
+ * generated fast path has no context to key on.
+ */
+function isRecursiveSchema(inst) {
+    return isRecursive(inst, new Set());
+}
+function bucketFor(state, inst) {
+    let bucket = state.buckets.get(inst);
+    if (!bucket) {
+        bucket = new Map();
+        state.buckets.set(inst, bucket);
+    }
+    return bucket;
+}
+// Set immediately before delegating to core and cleared immediately after, so `alloc` registers only for a visit this module is driving.
+let handoff;
+// Allocated but unfinished entries. `alloc` and the matching pop both happen in the synchronous part of a parse, so they nest even when children are async, and one stack serves every schema.
+const memoizer_open = [];
+const memo = {
+    alloc(_inst, payload, empty) {
+        const bucket = handoff;
+        if (!bucket)
+            return empty;
+        handoff = undefined;
+        const entry = { value: empty, issues: null };
+        bucket.set(payload.value, entry);
+        memoizer_open.push(entry);
+        return empty;
+    },
+    guard(inst) {
+        var _a;
+        (_a = inst._zod).deferred ?? (_a.deferred = []);
+        inst._zod.deferred.push(() => {
+            const base = inst._zod.parse;
+            const wrapped = (payload, ctx) => {
+                // The value is a placeholder a back-edge is still waiting on, so the cycle closes through this transform. Its output can't exist in time to bind.
+                if (ctx.direction !== "backward" && isBackEdge(ctx, payload.value))
+                    throw new $ZodCyclicError();
+                return base(payload, ctx);
+            };
+            inst._zod.parse = wrapped;
+            if (inst._zod.run === base)
+                inst._zod.run = wrapped;
+        });
+    },
+    attach(inst) {
+        var _a;
+        let isRecursiveInst;
+        // `bucket` memoized for one parse; a recursive schema is re-entered many times and its bucket never changes
+        let lastCtx;
+        let lastBucket;
+        // Wraps `parse` in a deferred so it sees the container's final parse. Core's own deferred copies `parse` into `run` when there are no checks, and it ran first, so `run` is patched to match; with checks, `run` reads `parse` dynamically.
+        (_a = inst._zod).deferred ?? (_a.deferred = []);
+        inst._zod.deferred.push(() => {
+            const base = inst._zod.parse;
+            const wrapped = (payload, ctx) => {
+                if (isRecursiveInst === undefined) {
+                    isRecursiveInst = isRecursive(inst, new Set());
+                    if (!isRecursiveInst) {
+                        // Nothing here can ever fire, so take it back out.
+                        inst._zod.parse = base;
+                        if (inst._zod.run === wrapped)
+                            inst._zod.run = base;
+                        return base(payload, ctx);
+                    }
+                }
+                const input = payload.value;
+                if (input === null || typeof input !== "object")
+                    return base(payload, ctx);
+                let state = ctx[STATE];
+                if (!state) {
+                    state = { buckets: new Map(), backEdges: undefined };
+                    ctx[STATE] = state;
+                }
+                let bucket;
+                if (lastCtx === ctx) {
+                    bucket = lastBucket;
+                }
+                else {
+                    bucket = bucketFor(state, inst);
+                    lastCtx = ctx;
+                    lastBucket = bucket;
+                }
+                const hit = bucket.get(input);
+                if (hit) {
+                    payload.value = hit.value;
+                    if (hit.issues) {
+                        if (hit.issues.length)
+                            payload.issues.push(...cloneIssues(hit.issues));
+                    }
+                    else {
+                        // Still being parsed: its own checks cover it, so skip them here.
+                        payload.memo = true;
+                        state.backEdges ?? (state.backEdges = new Set());
+                        state.backEdges.add(hit.value);
+                    }
+                    return payload;
+                }
+                handoff = bucket;
+                const depth = memoizer_open.length;
+                const result = base(payload, ctx);
+                handoff = undefined;
+                // A container that rejected its input outright allocated nothing.
+                const entry = memoizer_open.length > depth ? memoizer_open.pop() : undefined;
+                // Both paths written out so the sync one allocates no closure. It runs once per node, and capturing here cost more than everything else combined.
+                if (result instanceof Promise) {
+                    return result.then((r) => {
+                        if (entry)
+                            entry.issues = r.issues.length ? cloneIssues(r.issues) : NO_ISSUES;
+                        return r;
+                    });
+                }
+                if (entry)
+                    entry.issues = result.issues.length ? cloneIssues(result.issues) : NO_ISSUES;
+                return result;
+            };
+            inst._zod.parse = wrapped;
+            if (inst._zod.run === base)
+                inst._zod.run = wrapped;
+        });
+    },
+};
+/** The memoizer that gives containers cycle support. `zod` installs it by default; `zod/mini` opts in with `config({ memoizer: memoizer() })`. */
+function memoizer() {
+    return memo;
+}
+/** Whether this value is a node a back-edge resolved to before it finished. */
+function isBackEdge(ctx, value) {
+    const backEdges = ctx[STATE]?.backEdges;
+    return backEdges !== undefined && value !== null && typeof value === "object" && backEdges.has(value);
+}
+
+;// CONCATENATED MODULE: ./node_modules/zod/v4/core/regexes.js
+
+/**
+ * @deprecated CUID v1 is deprecated by its authors due to information leakage
+ * (timestamps embedded in the id). Use {@link cuid2} instead.
+ * See https://github.com/paralleldrive/cuid.
+ */
+const cuid = /^[cC][0-9a-z]{6,}$/;
+const cuid2 = /^[0-9a-z]+$/;
+const ulid = /^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$/;
+const xid = /^[0-9a-vA-V]{20}$/;
+const ksuid = /^[A-Za-z0-9]{27}$/;
+const nanoid = /^[a-zA-Z0-9_-]{21}$/;
+function nanoidOfLength(length) {
+    return new RegExp(`^[a-zA-Z0-9_-]{${length}}$`);
+}
+/** ISO 8601-1 duration regex. Does not support the 8601-2 extensions like negative durations or fractional/negative components. */
+const duration = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/;
+/** Implements ISO 8601-2 extensions like explicit +- prefixes, mixing weeks with other units, and fractional/negative components. */
+const extendedDuration = /^[-+]?P(?!$)(?:(?:[-+]?\d+Y)|(?:[-+]?\d+[.,]\d+Y$))?(?:(?:[-+]?\d+M)|(?:[-+]?\d+[.,]\d+M$))?(?:(?:[-+]?\d+W)|(?:[-+]?\d+[.,]\d+W$))?(?:(?:[-+]?\d+D)|(?:[-+]?\d+[.,]\d+D$))?(?:T(?=[\d+-])(?:(?:[-+]?\d+H)|(?:[-+]?\d+[.,]\d+H$))?(?:(?:[-+]?\d+M)|(?:[-+]?\d+[.,]\d+M$))?(?:[-+]?\d+(?:[.,]\d+)?S)?)??$/;
+/** A regex for any UUID-like identifier: 8-4-4-4-12 hex pattern */
+const guid = /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
+/** Returns a regex for validating an RFC 9562/4122 UUID.
+ *
+ * @param version Optionally specify a version 1-8. If no version is specified, all versions are supported. */
+const uuid = (version) => {
+    if (!version)
+        return /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
+    return new RegExp(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-${version}[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$`);
+};
+const uuid4 = /*@__PURE__*/ (/* unused pure expression or super */ null && (uuid(4)));
+const uuid6 = /*@__PURE__*/ (/* unused pure expression or super */ null && (uuid(6)));
+const uuid7 = /*@__PURE__*/ (/* unused pure expression or super */ null && (uuid(7)));
+/** Practical email validation */
+const email = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/;
+/** Equivalent to the HTML5 input[type=email] validation implemented by browsers. Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/email */
+const html5Email = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+/** The classic emailregex.com regex for RFC 5322-compliant emails */
+const rfc5322Email = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+/** A loose regex that allows Unicode characters, enforces length limits, and that's about it. */
+const unicodeEmail = /^[^\s@"]{1,64}@[^\s@]{1,255}$/u;
+const idnEmail = (/* unused pure expression or super */ null && (unicodeEmail));
+const browserEmail = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+// from https://thekevinscott.com/emojis-in-javascript/#writing-a-regular-expression
+// Single character class, not an alternation: the two properties overlap (U+1F9B0-U+1F9B3), so `(A|B)+` backtracks exponentially on a failed match.
+const _emoji = `^[\\p{Extended_Pictographic}\\p{Emoji_Component}]+$`;
+function emoji() {
+    return new RegExp(_emoji, "u");
+}
+const ipv4 = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
+const ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
+const mac = (delimiter) => {
+    const escapedDelim = util.escapeRegex(delimiter ?? ":");
+    return new RegExp(`^(?:[0-9A-F]{2}${escapedDelim}){5}[0-9A-F]{2}$|^(?:[0-9a-f]{2}${escapedDelim}){5}[0-9a-f]{2}$`);
+};
+const cidrv4 = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/([0-9]|[1-2][0-9]|3[0-2])$/;
+const cidrv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$/;
+// https://stackoverflow.com/questions/7860392/determine-if-string-is-in-base64-using-javascript
+const base64 = /^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$/;
+const base64url = /^[A-Za-z0-9_-]*$/;
+// based on https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address
+// export const hostname: RegExp = /^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/;
+const hostname = /^(?=.{1,253}\.?$)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[-0-9a-zA-Z]{0,61}[0-9a-zA-Z])?)*\.?$/;
+const domain = /^(?=.{1,253}$)([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
+const httpProtocol = /^https?$/;
+// https://blog.stevenlevithan.com/archives/validate-phone-number#r4-3 (regex sans spaces) E.164: leading digit must be 1-9; total digits (excluding '+') between 7-15
+const e164 = /^\+[1-9]\d{6,14}$/;
+// Credit card shape: 12–19 digits, optionally separated by single spaces or single hyphens. ISO/IEC 7812 caps the PAN at 19 digits; 12 is the shortest issued length (Maestro).
+const creditCard = /^\d(?:[ -]?\d){11,18}$/;
+const dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))`;
+/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */
+function regexes_anchor(source) {
+    return new RegExp(`^${source}$`);
+}
+const date = /*@__PURE__*/ regexes_anchor(dateSource);
+function timeSource(args) {
+    const hhmm = `(?:[01]\\d|2[0-3]):[0-5]\\d`;
+    const regex = typeof args.precision === "number"
+        ? args.precision === -1
+            ? `${hhmm}`
+            : args.precision === 0
+                ? `${hhmm}:[0-5]\\d`
+                : `${hhmm}:[0-5]\\d\\.\\d{${args.precision}}`
+        : args.seconds
+            ? `${hhmm}:[0-5]\\d(?:\\.\\d+)?`
+            : `${hhmm}(?::[0-5]\\d(?:\\.\\d+)?)?`;
+    return regex;
+}
+function time(args) {
+    return new RegExp(`^${timeSource(args)}$`);
+}
+// Adapted from https://stackoverflow.com/a/3143231
+function datetime(args) {
+    const opts = ["Z"];
+    // if (args.offset) opts.push(`([+-]\\d{2}:\\d{2})`);
+    if (args.offset)
+        opts.push(`([+-](?:[01]\\d|2[0-3]):[0-5]\\d)`);
+    // RFC 3339 mandates seconds wherever the time carries a `Z` or an offset, so only the unqualified form `local` adds may omit them
+    const qualified = `${timeSource({ precision: args.precision, seconds: true })}(?:${opts.join("|")})`;
+    const timeRegex = args.local ? `${qualified}|${timeSource({ precision: args.precision })}` : qualified;
+    return new RegExp(`^${dateSource}T(?:${timeRegex})$`);
+}
+const string = (params) => {
+    const regex = params ? `[\\s\\S]{${params?.minimum ?? 0},${params?.maximum ?? ""}}` : `[\\s\\S]*`;
+    return new RegExp(`^${regex}$`);
+};
+const bigint = /^-?\d+n?$/;
+const integer = /^-?\d+$/;
+const number = /^-?\d+(?:\.\d+)?$/;
+const regexes_boolean = /^(?:true|false)$/i;
+const _null = /^null$/i;
+
+const _undefined = /^undefined$/i;
+
+// regex for string with no uppercase letters
+const lowercase = /^[^A-Z]*$/;
+// regex for string with no lowercase letters
+const uppercase = /^[^a-z]*$/;
+// regex for hexadecimal strings (any length)
+const hex = /^[0-9a-fA-F]*$/;
+// Hash regexes for different algorithms and encodings
+// Helper function to create base64 regex with exact length and padding
+function fixedBase64(bodyLength, padding) {
+    return new RegExp(`^[A-Za-z0-9+/]{${bodyLength}}${padding}$`);
+}
+// Helper function to create base64url regex with exact length (no padding)
+function fixedBase64url(length) {
+    return new RegExp(`^[A-Za-z0-9_-]{${length}}$`);
+}
+// MD5 (16 bytes): base64 = 24 chars total (22 + "==")
+const md5_hex = /^[0-9a-fA-F]{32}$/;
+const md5_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(22, "==")));
+const md5_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(22)));
+// SHA1 (20 bytes): base64 = 28 chars total (27 + "=")
+const sha1_hex = /^[0-9a-fA-F]{40}$/;
+const sha1_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(27, "=")));
+const sha1_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(27)));
+// SHA256 (32 bytes): base64 = 44 chars total (43 + "=")
+const sha256_hex = /^[0-9a-fA-F]{64}$/;
+const sha256_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(43, "=")));
+const sha256_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(43)));
+// SHA384 (48 bytes): base64 = 64 chars total (no padding)
+const sha384_hex = /^[0-9a-fA-F]{96}$/;
+const sha384_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(64, "")));
+const sha384_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(64)));
+// SHA512 (64 bytes): base64 = 88 chars total (86 + "==")
+const sha512_hex = /^[0-9a-fA-F]{128}$/;
+const sha512_base64 = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64(86, "==")));
+const sha512_base64url = /*@__PURE__*/ (/* unused pure expression or super */ null && (fixedBase64url(86)));
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/checks.js
 // import { $ZodType } from "./schemas.js";
@@ -36688,6 +37310,16 @@ const $ZodCheck = /*@__PURE__*/ $constructor("$ZodCheck", (inst, def) => {
     inst._zod.def = def;
     (_a = inst._zod).onattach ?? (_a.onattach = []);
 });
+/** Default `when` for size-based checks: run only on non-nullish values with a `size`. */
+const _whenHasSize = (payload) => {
+    const val = payload.value;
+    return !util.nullish(val) && val.size !== undefined;
+};
+/** Default `when` for length-based checks: run only on non-nullish values with a `length`. */
+const _whenHasLength = (payload) => {
+    const val = payload.value;
+    return !nullish(val) && val.length !== undefined;
+};
 const numericOriginMap = {
     number: "number",
     bigint: "bigint",
@@ -36711,7 +37343,7 @@ const $ZodCheckLessThan = /*@__PURE__*/ $constructor("$ZodCheckLessThan", (inst,
             return;
         }
         payload.issues.push({
-            origin,
+            origin: numericOriginMap[typeof payload.value] ?? origin,
             code: "too_big",
             maximum: typeof def.value === "object" ? def.value.getTime() : def.value,
             input: payload.value,
@@ -36739,7 +37371,7 @@ const $ZodCheckGreaterThan = /*@__PURE__*/ $constructor("$ZodCheckGreaterThan", 
             return;
         }
         payload.issues.push({
-            origin,
+            origin: numericOriginMap[typeof payload.value] ?? origin,
             code: "too_small",
             minimum: typeof def.value === "object" ? def.value.getTime() : def.value,
             input: payload.value,
@@ -36760,7 +37392,8 @@ const $ZodCheckMultipleOf =
         if (typeof payload.value !== typeof def.value)
             throw new Error("Cannot mix number and bigint in multiple_of check.");
         const isMultiple = typeof payload.value === "bigint"
-            ? payload.value % def.value === BigInt(0)
+            ? // `value % 0n` throws, and nothing is a multiple of zero — the number branch already fails this way via NaN
+                def.value !== BigInt(0) && payload.value % def.value === BigInt(0)
             : floatSafeRemainder(payload.value, def.value) === 0;
         if (isMultiple)
             return;
@@ -36911,10 +37544,7 @@ const $ZodCheckBigIntFormat = /*@__PURE__*/ (/* unused pure expression or super 
 const $ZodCheckMaxSize = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodCheckMaxSize", (inst, def) => {
     var _a;
     $ZodCheck.init(inst, def);
-    (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-        const val = payload.value;
-        return !util.nullish(val) && val.size !== undefined;
-    });
+    (_a = inst._zod.def).when ?? (_a.when = _whenHasSize);
     inst._zod.onattach.push((inst) => {
         const curr = (inst._zod.bag.maximum ?? Number.POSITIVE_INFINITY);
         if (def.maximum < curr)
@@ -36939,10 +37569,7 @@ const $ZodCheckMaxSize = /*@__PURE__*/ (/* unused pure expression or super */ nu
 const $ZodCheckMinSize = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodCheckMinSize", (inst, def) => {
     var _a;
     $ZodCheck.init(inst, def);
-    (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-        const val = payload.value;
-        return !util.nullish(val) && val.size !== undefined;
-    });
+    (_a = inst._zod.def).when ?? (_a.when = _whenHasSize);
     inst._zod.onattach.push((inst) => {
         const curr = (inst._zod.bag.minimum ?? Number.NEGATIVE_INFINITY);
         if (def.minimum > curr)
@@ -36967,10 +37594,7 @@ const $ZodCheckMinSize = /*@__PURE__*/ (/* unused pure expression or super */ nu
 const $ZodCheckSizeEquals = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodCheckSizeEquals", (inst, def) => {
     var _a;
     $ZodCheck.init(inst, def);
-    (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-        const val = payload.value;
-        return !util.nullish(val) && val.size !== undefined;
-    });
+    (_a = inst._zod.def).when ?? (_a.when = _whenHasSize);
     inst._zod.onattach.push((inst) => {
         const bag = inst._zod.bag;
         bag.minimum = def.size;
@@ -36997,10 +37621,7 @@ const $ZodCheckSizeEquals = /*@__PURE__*/ (/* unused pure expression or super */
 const $ZodCheckMaxLength = /*@__PURE__*/ $constructor("$ZodCheckMaxLength", (inst, def) => {
     var _a;
     $ZodCheck.init(inst, def);
-    (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-        const val = payload.value;
-        return !nullish(val) && val.length !== undefined;
-    });
+    (_a = inst._zod.def).when ?? (_a.when = _whenHasLength);
     inst._zod.onattach.push((inst) => {
         const curr = (inst._zod.bag.maximum ?? Number.POSITIVE_INFINITY);
         if (def.maximum < curr)
@@ -37008,7 +37629,9 @@ const $ZodCheckMaxLength = /*@__PURE__*/ $constructor("$ZodCheckMaxLength", (ins
     });
     inst._zod.check = (payload) => {
         const input = payload.value;
-        const length = input.length;
+        const units = input.length;
+        // Strings are measured in Unicode code points, not UTF-16 units. A code point is at most two units, so a string that already fits in units fits in code points; only an overflow has to be counted.
+        const length = typeof input === "string" && units > def.maximum ? codePointLength(input) : units;
         if (length <= def.maximum)
             return;
         const origin = getLengthableOrigin(input);
@@ -37026,10 +37649,7 @@ const $ZodCheckMaxLength = /*@__PURE__*/ $constructor("$ZodCheckMaxLength", (ins
 const $ZodCheckMinLength = /*@__PURE__*/ $constructor("$ZodCheckMinLength", (inst, def) => {
     var _a;
     $ZodCheck.init(inst, def);
-    (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-        const val = payload.value;
-        return !nullish(val) && val.length !== undefined;
-    });
+    (_a = inst._zod.def).when ?? (_a.when = _whenHasLength);
     inst._zod.onattach.push((inst) => {
         const curr = (inst._zod.bag.minimum ?? Number.NEGATIVE_INFINITY);
         if (def.minimum > curr)
@@ -37037,7 +37657,11 @@ const $ZodCheckMinLength = /*@__PURE__*/ $constructor("$ZodCheckMinLength", (ins
     });
     inst._zod.check = (payload) => {
         const input = payload.value;
-        const length = input.length;
+        const units = input.length;
+        // A code point is one or two UTF-16 units, so fewer units than the floor can never reach it and twice the floor always clears it. Only in between is the exact count in doubt.
+        const length = typeof input === "string" && units >= def.minimum && units < def.minimum * 2
+            ? codePointLength(input)
+            : units;
         if (length >= def.minimum)
             return;
         const origin = getLengthableOrigin(input);
@@ -37055,10 +37679,7 @@ const $ZodCheckMinLength = /*@__PURE__*/ $constructor("$ZodCheckMinLength", (ins
 const $ZodCheckLengthEquals = /*@__PURE__*/ $constructor("$ZodCheckLengthEquals", (inst, def) => {
     var _a;
     $ZodCheck.init(inst, def);
-    (_a = inst._zod.def).when ?? (_a.when = (payload) => {
-        const val = payload.value;
-        return !nullish(val) && val.length !== undefined;
-    });
+    (_a = inst._zod.def).when ?? (_a.when = _whenHasLength);
     inst._zod.onattach.push((inst) => {
         const bag = inst._zod.bag;
         bag.minimum = def.length;
@@ -37067,7 +37688,11 @@ const $ZodCheckLengthEquals = /*@__PURE__*/ $constructor("$ZodCheckLengthEquals"
     });
     inst._zod.check = (payload) => {
         const input = payload.value;
-        const length = input.length;
+        const units = input.length;
+        // A code point is one or two UTF-16 units, so outside `[length, length * 2]` units the target is missed either way — and missed in the same direction in both measures.
+        const length = typeof input === "string" && units >= def.length && units <= def.length * 2
+            ? codePointLength(input)
+            : units;
         if (length === def.length)
             return;
         const origin = getLengthableOrigin(input);
@@ -37140,7 +37765,10 @@ const $ZodCheckUpperCase = /*@__PURE__*/ $constructor("$ZodCheckUpperCase", (ins
 const $ZodCheckIncludes = /*@__PURE__*/ $constructor("$ZodCheckIncludes", (inst, def) => {
     $ZodCheck.init(inst, def);
     const escapedRegex = escapeRegex(def.includes);
-    const pattern = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
+    // `String.prototype.includes(sub, position)` matches `sub` at `position`
+    // OR LATER, so the pattern must allow at least `position` leading chars
+    // (`{N,}`), not exactly `position` chars (`{N}`).
+    const pattern = new RegExp(typeof def.position === "number" ? `^.{${def.position},}${escapedRegex}` : escapedRegex);
     def.pattern = pattern;
     inst._zod.onattach.push((inst) => {
         const bag = inst._zod.bag;
@@ -37256,11 +37884,11 @@ const $ZodCheckOverwrite = /*@__PURE__*/ $constructor("$ZodCheckOverwrite", (ins
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/doc.js
 class Doc {
-    constructor(args = []) {
+    constructor(args = [], closed = {}) {
         this.content = [];
         this.indent = 0;
-        if (this)
-            this.args = args;
+        this.args = args;
+        this.closed = closed;
     }
     indented(fn) {
         this.indent += 1;
@@ -37283,42 +37911,95 @@ class Doc {
     }
     compile() {
         const F = Function;
-        const args = this?.args;
         const content = this?.content ?? [``];
-        const lines = [...content.map((x) => `  ${x}`)];
-        // console.log(lines.join("\n"));
-        return new F(...args, lines.join("\n"));
+        const factory = new F(...Object.keys(this.closed), `return function (${this.args.join(", ")}) {\n${content.join("\n")}\n};`);
+        return factory(...Object.values(this.closed));
     }
 }
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/errors.js
 
 
+/* Computing the message eagerly is expensive (pretty-printed JSON of all
+ * issues), so defer it until first read. The accessor functions and
+ * descriptors are shared across instances to keep error construction
+ * cheap; the computed message is cached on the internals object. The
+ * setter preserves plain assignment semantics for consumers that
+ * overwrite `message`. */
+function _getMessage() {
+    const internals = this._zod;
+    internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
+    return internals.message;
+}
+function _setMessage(value) {
+    this._zod.message = value;
+}
+const _messageDesc = {
+    get: _getMessage,
+    set: _setMessage,
+    enumerable: true,
+    configurable: true,
+};
+const errors_zodDesc = { value: undefined, enumerable: false };
+const _issuesDesc = { value: undefined, enumerable: false };
+/* Prototypes that already carry the lazy `toString`. Seeded with the
+ * intrinsics so that `init` on a foreign object — it accepts any object —
+ * can never install an accessor onto a prototype we do not own. */
+const _installedToString = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 const initializer = (inst, def) => {
     inst.name = "$ZodError";
-    Object.defineProperty(inst, "_zod", {
-        value: inst._zod,
-        enumerable: false,
-    });
-    Object.defineProperty(inst, "issues", {
-        value: def,
-        enumerable: false,
-    });
-    inst.message = JSON.stringify(def, jsonStringifyReplacer, 2);
-    Object.defineProperty(inst, "toString", {
-        value: () => inst.message,
-        enumerable: false,
-    });
+    errors_zodDesc.value = inst._zod;
+    Object.defineProperty(inst, "_zod", errors_zodDesc);
+    _issuesDesc.value = def;
+    Object.defineProperty(inst, "issues", _issuesDesc);
+    // Clear the shared slots; a retained `value` pins the last error's issues.
+    errors_zodDesc.value = undefined;
+    _issuesDesc.value = undefined;
+    Object.defineProperty(inst, "message", _messageDesc);
+    /* `toString` lives as a non-enumerable lazy getter on the shared
+     * prototype; on first access it caches a per-instance closure so
+     * detached usage still works. */
+    const proto = Object.getPrototypeOf(inst);
+    if (!_installedToString.has(proto)) {
+        _installedToString.add(proto);
+        Object.defineProperty(proto, "toString", {
+            configurable: true,
+            enumerable: false,
+            get() {
+                const value = () => this.message;
+                Object.defineProperty(this, "toString", { value, configurable: true, writable: true });
+                return value;
+            },
+            set(value) {
+                Object.defineProperty(this, "toString", { value, configurable: true, writable: true });
+            },
+        });
+    }
 };
 const $ZodError = $constructor("$ZodError", initializer);
-const $ZodRealError = $constructor("$ZodError", initializer, { Parent: Error });
+const $ZodRealError = $constructor("$ZodError", initializer, undefined, {
+    Parent: Error,
+});
+/** Get-or-create `obj[key]` as an own data property. A path segment naming an inherited member
+ * ("toString", "constructor") would otherwise read through to the prototype, and assigning
+ * "__proto__" would hit the setter instead of creating a key. */
+function node(obj, key, make) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (key === "__proto__") {
+            Object.defineProperty(obj, key, { value: make(), writable: true, enumerable: true, configurable: true });
+        }
+        else {
+            obj[key] = make();
+        }
+    }
+    return obj[key];
+}
 function flattenError(error, mapper = (issue) => issue.message) {
     const fieldErrors = {};
     const formErrors = [];
     for (const sub of error.issues) {
         if (sub.path.length > 0) {
-            fieldErrors[sub.path[0]] = fieldErrors[sub.path[0]] || [];
-            fieldErrors[sub.path[0]].push(mapper(sub));
+            node(fieldErrors, sub.path[0], () => []).push(mapper(sub));
         }
         else {
             formErrors.push(mapper(sub));
@@ -37350,14 +38031,32 @@ function formatError(error, mapper = (issue) => issue.message) {
                     while (i < fullpath.length) {
                         const el = fullpath[i];
                         const terminal = i === fullpath.length - 1;
-                        if (!terminal) {
-                            curr[el] = curr[el] || { _errors: [] };
+                        // `_errors` is reserved by this legacy format, so merge a matching path segment into the current node instead of treating its array as a child.
+                        if (el === "_errors") {
+                            if (terminal)
+                                curr._errors.push(mapper(issue));
+                            i++;
+                            continue;
                         }
-                        else {
-                            curr[el] = curr[el] || { _errors: [] };
-                            curr[el]._errors.push(mapper(issue));
+                        // A path element may collide with an inherited property name such as
+                        // "__proto__" or "constructor". Truthiness checks read the prototype
+                        // (so no node is created, then ._errors.push throws), and bracket
+                        // assignment of "__proto__" hits the setter instead of creating an
+                        // own key. Guard the read with hasOwnProperty and create the node
+                        // with defineProperty so any path element becomes a real own key.
+                        if (!Object.prototype.hasOwnProperty.call(curr, el)) {
+                            Object.defineProperty(curr, el, {
+                                value: { _errors: [] },
+                                enumerable: true,
+                                writable: true,
+                                configurable: true,
+                            });
                         }
-                        curr = curr[el];
+                        const node = curr[el];
+                        if (terminal) {
+                            node._errors.push(mapper(issue));
+                        }
+                        curr = node;
                         i++;
                     }
                 }
@@ -37370,7 +38069,7 @@ function formatError(error, mapper = (issue) => issue.message) {
 function treeifyError(error, mapper = (issue) => issue.message) {
     const result = { errors: [] };
     const processError = (error, path = []) => {
-        var _a, _b;
+        var _a;
         for (const issue of error.issues) {
             if (issue.code === "invalid_union" && issue.errors.length) {
                 // regular union error
@@ -37395,12 +38094,24 @@ function treeifyError(error, mapper = (issue) => issue.message) {
                     const terminal = i === fullpath.length - 1;
                     if (typeof el === "string") {
                         curr.properties ?? (curr.properties = {});
-                        (_a = curr.properties)[el] ?? (_a[el] = { errors: [] });
+                        // el may collide with an inherited property name ("__proto__",
+                        // "constructor", ...); ??= reads the prototype so the node is never
+                        // created and curr.errors.push throws. Guard with hasOwnProperty and
+                        // create the node with defineProperty so "__proto__" becomes a real
+                        // own key rather than invoking the prototype setter.
+                        if (!Object.prototype.hasOwnProperty.call(curr.properties, el)) {
+                            Object.defineProperty(curr.properties, el, {
+                                value: { errors: [] },
+                                enumerable: true,
+                                writable: true,
+                                configurable: true,
+                            });
+                        }
                         curr = curr.properties[el];
                     }
                     else {
                         curr.items ?? (curr.items = []);
-                        (_b = curr.items)[el] ?? (_b[el] = { errors: [] });
+                        (_a = curr.items)[el] ?? (_a[el] = { errors: [] });
                         curr = curr.items[el];
                     }
                     if (terminal) {
@@ -37482,31 +38193,41 @@ function prettifyError(error) {
 
 
 
-const _parse = (_Err) => (schema, value, _ctx, _params) => {
-    const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
-    const result = schema._zod.run({ value, issues: [] }, ctx);
-    if (result instanceof Promise) {
-        throw new $ZodAsyncError();
-    }
-    if (result.issues.length) {
-        const e = new (_params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
-        captureStackTrace(e, _params?.callee);
-        throw e;
-    }
-    return result.value;
+// Always both keys, so the `_params` read site in `_parse` sees one object shape rather than two.
+function finalizeParams(callee, params) {
+    return { callee: params?.callee ?? callee, Err: params?.Err };
+}
+const _parse = (_Err) => {
+    const fn = (schema, value, _ctx, _params) => {
+        const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
+        const result = schema._zod.run({ value, issues: [] }, ctx);
+        if (result instanceof Promise) {
+            throw new $ZodAsyncError();
+        }
+        if (result.issues.length) {
+            const e = new (_params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+            captureStackTrace(e, _params?.callee ?? fn);
+            throw e;
+        }
+        return result.value;
+    };
+    return fn;
 };
 const parse_parse = /* @__PURE__*/ _parse($ZodRealError);
-const _parseAsync = (_Err) => async (schema, value, _ctx, params) => {
-    const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
-    let result = schema._zod.run({ value, issues: [] }, ctx);
-    if (result instanceof Promise)
-        result = await result;
-    if (result.issues.length) {
-        const e = new (params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
-        captureStackTrace(e, params?.callee);
-        throw e;
-    }
-    return result.value;
+const _parseAsync = (_Err) => {
+    const fn = async (schema, value, _ctx, params) => {
+        const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
+        let result = schema._zod.run({ value, issues: [] }, ctx);
+        if (result instanceof Promise)
+            result = await result;
+        if (result.issues.length) {
+            const e = new (params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+            captureStackTrace(e, params?.callee ?? fn);
+            throw e;
+        }
+        return result.value;
+    };
+    return fn;
 };
 const parse_parseAsync = /* @__PURE__*/ _parseAsync($ZodRealError);
 const _safeParse = (_Err) => (schema, value, _ctx) => {
@@ -37536,22 +38257,73 @@ const _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
         : { success: true, data: result.value };
 };
 const safeParseAsync = /* @__PURE__*/ _safeParseAsync($ZodRealError);
-const _encode = (_Err) => (schema, value, _ctx) => {
-    const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
-    return _parse(_Err)(schema, value, ctx);
+// registry mirrors of the compiler's sentinels, so this module never imports the compiler
+const COMPILE_INVALID = /* @__PURE__ */ (/* unused pure expression or super */ null && (Symbol.for("zod.compile.invalid")));
+const COMPILE_FALLBACK = /* @__PURE__ */ (/* unused pure expression or super */ null && (Symbol.for("zod.compile.fallback")));
+// Deliberately tiny, because v8 will not inline a body carrying the fallback's object literals and throw. Everything that is not the compiled happy path lives in validateFallback, and that split is worth ~35% on a compiled schema.
+const validate = ((schema, value, _ctx) => {
+    const validator = schema._zod.bag.validator;
+    if (validator !== undefined && validator(value) !== COMPILE_INVALID)
+        return true;
+    return validateFallback(schema, value, _ctx);
+});
+function validateFallback(schema, value, _ctx) {
+    const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
+    const fallbackRun = schema._zod.bag.fallbackRun;
+    let result;
+    if (fallbackRun) {
+        // skip nested fast paths on the fallback, so user callbacks keep the at-most-twice bound
+        ctx[COMPILE_FALLBACK] = true;
+        result = fallbackRun({ value, issues: [] }, ctx);
+    }
+    else {
+        result = schema._zod.run({ value, issues: [] }, ctx);
+    }
+    if (result instanceof Promise) {
+        throw new core.$ZodAsyncError();
+    }
+    return result.issues.length === 0;
+}
+// no fast path: the compiler keeps async parses on the runtime, because a promise-returning callback that is not declared async compiles to a throw
+const validateAsync = async (schema, value, _ctx) => {
+    const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
+    let result = schema._zod.run({ value, issues: [] }, ctx);
+    if (result instanceof Promise)
+        result = await result;
+    return result.issues.length === 0;
+};
+const _encode = (_Err) => {
+    const parse = _parse(_Err);
+    const fn = (schema, value, _ctx, _params) => {
+        const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
+        return parse(schema, value, ctx, finalizeParams(fn, _params));
+    };
+    return fn;
 };
 const encode = /* @__PURE__*/ _encode($ZodRealError);
-const _decode = (_Err) => (schema, value, _ctx) => {
-    return _parse(_Err)(schema, value, _ctx);
+const _decode = (_Err) => {
+    const parse = _parse(_Err);
+    const fn = (schema, value, _ctx, _params) => {
+        return parse(schema, value, _ctx, finalizeParams(fn, _params));
+    };
+    return fn;
 };
 const decode = /* @__PURE__*/ _decode($ZodRealError);
-const _encodeAsync = (_Err) => async (schema, value, _ctx) => {
-    const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
-    return _parseAsync(_Err)(schema, value, ctx);
+const _encodeAsync = (_Err) => {
+    const parseAsync = _parseAsync(_Err);
+    const fn = async (schema, value, _ctx, _params) => {
+        const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
+        return (await parseAsync(schema, value, ctx, finalizeParams(fn, _params)));
+    };
+    return fn;
 };
 const encodeAsync = /* @__PURE__*/ _encodeAsync($ZodRealError);
-const _decodeAsync = (_Err) => async (schema, value, _ctx) => {
-    return _parseAsync(_Err)(schema, value, _ctx);
+const _decodeAsync = (_Err) => {
+    const parseAsync = _parseAsync(_Err);
+    const fn = async (schema, value, _ctx, _params) => {
+        return await parseAsync(schema, value, _ctx, finalizeParams(fn, _params));
+    };
+    return fn;
 };
 const decodeAsync = /* @__PURE__*/ _decodeAsync($ZodRealError);
 const _safeEncode = (_Err) => (schema, value, _ctx) => {
@@ -37576,8 +38348,8 @@ const safeDecodeAsync = /* @__PURE__*/ _safeDecodeAsync($ZodRealError);
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/versions.js
 const version = {
     major: 4,
-    minor: 4,
-    patch: 3,
+    minor: 5,
+    patch: 4,
 };
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/schemas.js
@@ -37594,19 +38366,20 @@ const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
     inst._zod.def = def; // set _def property
     inst._zod.bag = inst._zod.bag || {}; // initialize _bag object
     inst._zod.version = version;
-    const checks = [...(inst._zod.def.checks ?? [])];
+    const defChecks = inst._zod.def.checks;
     // if inst is itself a checks.$ZodCheck, run it as a check
-    if (inst._zod.traits.has("$ZodCheck")) {
-        checks.unshift(inst);
-    }
+    const checks = inst._zod.traits.has("$ZodCheck")
+        ? [inst, ...(defChecks ?? [])]
+        : defChecks?.length
+            ? [...defChecks]
+            : [];
     for (const ch of checks) {
         for (const fn of ch._zod.onattach) {
             fn(inst);
         }
     }
     if (checks.length === 0) {
-        // deferred initializer
-        // inst._zod.parse is not yet defined
+        // deferred initializer inst._zod.parse is not yet defined
         (_a = inst._zod).deferred ?? (_a.deferred = []);
         inst._zod.deferred?.push(() => {
             inst._zod.run = inst._zod.parse;
@@ -37614,6 +38387,8 @@ const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
     }
     else {
         const runChecks = (payload, checks, ctx) => {
+            if (payload.memo)
+                return payload;
             let isAborted = aborted(payload);
             let asyncResult;
             for (const ch of checks) {
@@ -37638,6 +38413,7 @@ const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
                         const nextLen = payload.issues.length;
                         if (nextLen === currLen)
                             return;
+                        attachSchema(payload.issues, currLen, inst);
                         if (!isAborted)
                             isAborted = aborted(payload, currLen);
                     });
@@ -37646,6 +38422,7 @@ const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
                     const nextLen = payload.issues.length;
                     if (nextLen === currLen)
                         continue;
+                    attachSchema(payload.issues, currLen, inst);
                     if (!isAborted)
                         isAborted = aborted(payload, currLen);
                 }
@@ -37677,8 +38454,7 @@ const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
                 return inst._zod.parse(payload, ctx);
             }
             if (ctx.direction === "backward") {
-                // run canary
-                // initial pass (no checks)
+                // run canary initial pass (no checks)
                 const canary = inst._zod.parse({ value: payload.value, issues: [] }, { ...ctx, skipChecks: true });
                 if (canary instanceof Promise) {
                     return canary.then((canary) => {
@@ -37697,21 +38473,31 @@ const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
             return runChecks(result, checks, ctx);
         };
     }
-    // Lazy initialize ~standard to avoid creating objects for every schema
-    defineLazy(inst, "~standard", () => ({
+}, {
+    // Wrappers extend this by installing a richer factory over it; reading it eagerly would defeat the laziness.
+    get "~standard"() {
+        return hide(this, "~standard", standardProps(this));
+    },
+    set "~standard"(value) {
+        own(this, "~standard", value);
+    },
+});
+/** The Standard Schema surface for `inst`. Shared so wrappers can extend it without forcing it. */
+const toStandardResult = (r) => r.success ? { value: r.data } : { issues: r.error?.issues };
+function standardProps(inst) {
+    return {
         validate: (value) => {
             try {
-                const r = safeParse(inst, value);
-                return r.success ? { value: r.data } : { issues: r.error?.issues };
+                return toStandardResult(safeParse(inst, value));
             }
             catch (_) {
-                return safeParseAsync(inst, value).then((r) => (r.success ? { value: r.data } : { issues: r.error?.issues }));
+                return safeParseAsync(inst, value).then(toStandardResult);
             }
         },
         vendor: "zod",
         version: 1,
-    }));
-});
+    };
+}
 
 const $ZodString = /*@__PURE__*/ $constructor("$ZodString", (inst, def) => {
     $ZodType.init(inst, def);
@@ -37767,66 +38553,89 @@ const $ZodEmail = /*@__PURE__*/ $constructor("$ZodEmail", (inst, def) => {
     def.pattern ?? (def.pattern = email);
     $ZodStringFormat.init(inst, def);
 });
+/** The `://` guard rejected the input before the URL constructor saw it. */
+const URL_BAD_FORMAT = 1;
+/** The URL constructor rejected the input. */
+const URL_UNPARSEABLE = 2;
+/** Parses a URL for `$ZodURL`, applying the one guard the URL constructor cannot express. Returns the parsed URL, or a code naming the stage that rejected it — the runtime needs that distinction to pick an issue note, and compiled code only needs to know it is not a URL. */
+function parseURLObject(trimmed, def) {
+    // When normalize is off, require :// for http/https URLs. This prevents strings like "http:example.com" or "https:/path" from being silently accepted
+    if (!def.normalize && def.protocol?.source === httpProtocol.source && !/^https?:\/\//i.test(trimmed)) {
+        return URL_BAD_FORMAT;
+    }
+    try {
+        // @ts-ignore
+        return new URL(trimmed);
+    }
+    catch {
+        return URL_UNPARSEABLE;
+    }
+}
+const asciiTabOrNewline = /[\t\n\r]/g;
+/** The URL parser deletes every ASCII tab, LF and CR from its input before it parses, so `new URL("https://exa\nmple.com")` reports on `example.com`. Applying the same deletion to the returned value closes the half of that divergence which can move the host; the parser's other rewrite, stripping C0 controls at the edges, cannot. */
+function stripTabAndNewline(value) {
+    return value.replace(asciiTabOrNewline, "");
+}
+function urlHostnameOk(url, hostname) {
+    hostname.lastIndex = 0;
+    return hostname.test(url.hostname);
+}
+function urlProtocolOk(url, protocol) {
+    protocol.lastIndex = 0;
+    return protocol.test(url.protocol.endsWith(":") ? url.protocol.slice(0, -1) : url.protocol);
+}
 const $ZodURL = /*@__PURE__*/ $constructor("$ZodURL", (inst, def) => {
     $ZodStringFormat.init(inst, def);
     inst._zod.check = (payload) => {
         try {
             // Trim whitespace from input
             const trimmed = payload.value.trim();
-            // When normalize is off, require :// for http/https URLs
-            // This prevents strings like "http:example.com" or "https:/path" from being silently accepted
-            if (!def.normalize && def.protocol?.source === httpProtocol.source) {
-                if (!/^https?:\/\//i.test(trimmed)) {
-                    payload.issues.push({
-                        code: "invalid_format",
-                        format: "url",
-                        note: "Invalid URL format",
-                        input: payload.value,
-                        inst,
-                        continue: !def.abort,
-                    });
-                    return;
-                }
+            const url = parseURLObject(trimmed, def);
+            if (url === URL_BAD_FORMAT) {
+                payload.issues.push({
+                    code: "invalid_format",
+                    format: "url",
+                    note: "Invalid URL format",
+                    input: payload.value,
+                    inst,
+                    continue: !def.abort,
+                });
+                return;
             }
-            // @ts-ignore
-            const url = new URL(trimmed);
-            if (def.hostname) {
-                def.hostname.lastIndex = 0;
-                if (!def.hostname.test(url.hostname)) {
-                    payload.issues.push({
-                        code: "invalid_format",
-                        format: "url",
-                        note: "Invalid hostname",
-                        pattern: def.hostname.source,
-                        input: payload.value,
-                        inst,
-                        continue: !def.abort,
-                    });
-                }
+            if (url === URL_UNPARSEABLE) {
+                payload.issues.push({
+                    code: "invalid_format",
+                    format: "url",
+                    input: payload.value,
+                    inst,
+                    continue: !def.abort,
+                });
+                return;
             }
-            if (def.protocol) {
-                def.protocol.lastIndex = 0;
-                if (!def.protocol.test(url.protocol.endsWith(":") ? url.protocol.slice(0, -1) : url.protocol)) {
-                    payload.issues.push({
-                        code: "invalid_format",
-                        format: "url",
-                        note: "Invalid protocol",
-                        pattern: def.protocol.source,
-                        input: payload.value,
-                        inst,
-                        continue: !def.abort,
-                    });
-                }
+            if (def.hostname && !urlHostnameOk(url, def.hostname)) {
+                payload.issues.push({
+                    code: "invalid_format",
+                    format: "url",
+                    note: "Invalid hostname",
+                    pattern: def.hostname.source,
+                    input: payload.value,
+                    inst,
+                    continue: !def.abort,
+                });
+            }
+            if (def.protocol && !urlProtocolOk(url, def.protocol)) {
+                payload.issues.push({
+                    code: "invalid_format",
+                    format: "url",
+                    note: "Invalid protocol",
+                    pattern: def.protocol.source,
+                    input: payload.value,
+                    inst,
+                    continue: !def.abort,
+                });
             }
             // Set the output value based on normalize flag
-            if (def.normalize) {
-                // Use normalized URL
-                payload.value = url.href;
-            }
-            else {
-                // Preserve the original input (trimmed)
-                payload.value = trimmed;
-            }
+            payload.value = def.normalize ? url.href : stripTabAndNewline(trimmed);
             return;
         }
         catch (_) {
@@ -37845,7 +38654,9 @@ const $ZodEmoji = /*@__PURE__*/ $constructor("$ZodEmoji", (inst, def) => {
     $ZodStringFormat.init(inst, def);
 });
 const $ZodNanoID = /*@__PURE__*/ $constructor("$ZodNanoID", (inst, def) => {
-    def.pattern ?? (def.pattern = nanoid);
+    if (def.length !== undefined && (!Number.isInteger(def.length) || def.length < 1))
+        throw new Error(`Invalid nanoid length: ${def.length}`);
+    def.pattern ?? (def.pattern = def.length === undefined ? nanoid : nanoidOfLength(def.length));
     $ZodStringFormat.init(inst, def);
 });
 /**
@@ -37876,6 +38687,13 @@ const $ZodKSUID = /*@__PURE__*/ $constructor("$ZodKSUID", (inst, def) => {
 const $ZodISODateTime = /*@__PURE__*/ $constructor("$ZodISODateTime", (inst, def) => {
     def.pattern ?? (def.pattern = datetime(def));
     $ZodStringFormat.init(inst, def);
+    // these two drop the offset or seconds `date-time` requires — on the bag not the def, since `z.string().check(...)` lands the format on a different schema
+    if (def.local || def.precision === -1) {
+        inst._zod.bag.laxFormat = true;
+        inst._zod.onattach.push((s) => {
+            s._zod.bag.laxFormat = true;
+        });
+    }
 });
 const $ZodISODate = /*@__PURE__*/ $constructor("$ZodISODate", (inst, def) => {
     def.pattern ?? (def.pattern = date);
@@ -37894,17 +38712,26 @@ const $ZodIPv4 = /*@__PURE__*/ $constructor("$ZodIPv4", (inst, def) => {
     $ZodStringFormat.init(inst, def);
     inst._zod.bag.format = `ipv4`;
 });
+/** An IPv6 address is written with hex digits, colons and dots, and nothing else. The guard is what makes the check below an IPv6 check: `new URL("http://[...]")` parses an authority, not an address, so `@` and `\` re-delimit it and `"::@1\\"` validates against the host `0.0.0.1`. The URL parser also deletes ASCII tab, LF and CR rather than failing, which is how `"::1\n"` validated as `::1`. */
+const ipv6Alphabet = /^[0-9a-fA-F:.]+$/;
+function isValidIPv6(value) {
+    if (!ipv6Alphabet.test(value))
+        return false;
+    try {
+        // @ts-ignore
+        new URL(`http://[${value}]`);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 const $ZodIPv6 = /*@__PURE__*/ $constructor("$ZodIPv6", (inst, def) => {
     def.pattern ?? (def.pattern = ipv6);
     $ZodStringFormat.init(inst, def);
     inst._zod.bag.format = `ipv6`;
     inst._zod.check = (payload) => {
-        try {
-            // @ts-ignore
-            new URL(`http://[${payload.value}]`);
-            // return;
-        }
-        catch {
+        if (!isValidIPv6(payload.value)) {
             payload.issues.push({
                 code: "invalid_format",
                 format: "ipv6",
@@ -37924,26 +38751,25 @@ const $ZodCIDRv4 = /*@__PURE__*/ $constructor("$ZodCIDRv4", (inst, def) => {
     def.pattern ?? (def.pattern = cidrv4);
     $ZodStringFormat.init(inst, def);
 });
+function isValidCIDRv6(value) {
+    const parts = value.split("/");
+    if (parts.length !== 2)
+        return false;
+    const [address, prefix] = parts;
+    if (!prefix)
+        return false;
+    const prefixNum = Number(prefix);
+    if (`${prefixNum}` !== prefix)
+        return false;
+    if (prefixNum < 0 || prefixNum > 128)
+        return false;
+    return isValidIPv6(address);
+}
 const $ZodCIDRv6 = /*@__PURE__*/ $constructor("$ZodCIDRv6", (inst, def) => {
     def.pattern ?? (def.pattern = cidrv6); // not used for validation
     $ZodStringFormat.init(inst, def);
     inst._zod.check = (payload) => {
-        const parts = payload.value.split("/");
-        try {
-            if (parts.length !== 2)
-                throw new Error();
-            const [address, prefix] = parts;
-            if (!prefix)
-                throw new Error();
-            const prefixNum = Number(prefix);
-            if (`${prefixNum}` !== prefix)
-                throw new Error();
-            if (prefixNum < 0 || prefixNum > 128)
-                throw new Error();
-            // @ts-ignore
-            new URL(`http://[${address}]`);
-        }
-        catch {
+        if (!isValidCIDRv6(payload.value)) {
             payload.issues.push({
                 code: "invalid_format",
                 format: "cidrv6",
@@ -38016,6 +38842,41 @@ const $ZodE164 = /*@__PURE__*/ $constructor("$ZodE164", (inst, def) => {
     def.pattern ?? (def.pattern = e164);
     $ZodStringFormat.init(inst, def);
 });
+//////////////////////////////   ZodCreditCard   //////////////////////////////
+const CC_SANITIZE = /[- ]/g;
+/** Luhn checksum on a digit-only string. Adapted from valibot (MIT). */
+function isLuhnAlgo(digits) {
+    let length = digits.length;
+    let bit = 1;
+    let sum = 0;
+    while (length) {
+        const value = +digits[--length];
+        bit ^= 1;
+        sum += bit ? [0, 2, 4, 6, 8, 1, 3, 5, 7, 9][value] : value;
+    }
+    return sum % 10 === 0;
+}
+function isValidCreditCard(input) {
+    if (!regexes.creditCard.test(input))
+        return false;
+    return isLuhnAlgo(input.replace(CC_SANITIZE, ""));
+}
+const $ZodCreditCard = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodCreditCard", (inst, def) => {
+    // Shape only — the Luhn check below is not expressible as a pattern, so consumers of `pattern` (JSON Schema, template literals) get the length and separator rules alone.
+    def.pattern ?? (def.pattern = regexes.creditCard);
+    $ZodStringFormat.init(inst, def);
+    inst._zod.check = (payload) => {
+        if (isValidCreditCard(payload.value))
+            return;
+        payload.issues.push({
+            code: "invalid_format",
+            format: "credit_card",
+            input: payload.value,
+            inst,
+            continue: !def.abort,
+        });
+    };
+})));
 //////////////////////////////   ZodJWT   //////////////////////////////
 function isValidJWT(token, algorithm = null) {
     try {
@@ -38084,7 +38945,7 @@ const $ZodNumber = /*@__PURE__*/ $constructor("$ZodNumber", (inst, def) => {
             ? Number.isNaN(input)
                 ? "NaN"
                 : !Number.isFinite(input)
-                    ? "Infinity"
+                    ? String(input)
                     : undefined
             : undefined;
         payload.issues.push({
@@ -38122,9 +38983,9 @@ const $ZodBoolean = /*@__PURE__*/ $constructor("$ZodBoolean", (inst, def) => {
         return payload;
     };
 });
-const $ZodBigInt = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodBigInt", (inst, def) => {
+const $ZodBigInt = /*@__PURE__*/ $constructor("$ZodBigInt", (inst, def) => {
     $ZodType.init(inst, def);
-    inst._zod.pattern = regexes.bigint;
+    inst._zod.pattern = bigint;
     inst._zod.parse = (payload, _ctx) => {
         if (def.coerce)
             try {
@@ -38141,7 +39002,7 @@ const $ZodBigInt = /*@__PURE__*/ (/* unused pure expression or super */ null && 
         });
         return payload;
     };
-})));
+});
 const $ZodBigIntFormat = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodBigIntFormat", (inst, def) => {
     checks.$ZodCheckBigIntFormat.init(inst, def);
     $ZodBigInt.init(inst, def); // no format checks
@@ -38262,6 +39123,8 @@ function handleArrayResult(result, final, index) {
 }
 const $ZodArray = /*@__PURE__*/ $constructor("$ZodArray", (inst, def) => {
     $ZodType.init(inst, def);
+    const memo = globalConfig.memoizer;
+    memo?.attach(inst);
     inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
         if (!Array.isArray(input)) {
@@ -38273,7 +39136,7 @@ const $ZodArray = /*@__PURE__*/ $constructor("$ZodArray", (inst, def) => {
             });
             return payload;
         }
-        payload.value = Array(input.length);
+        payload.value = memo ? memo.alloc(inst, payload, Array(input.length), ctx) : Array(input.length);
         const proms = [];
         for (let i = 0; i < input.length; i++) {
             const item = input[i];
@@ -38294,16 +39157,21 @@ const $ZodArray = /*@__PURE__*/ $constructor("$ZodArray", (inst, def) => {
         return payload; //handleArrayResultsAsync(parseResults, final);
     };
 });
-function handlePropertyResult(result, final, key, input, isOptionalIn, isOptionalOut) {
+function handlePropertyResult(result, final, key, input, optin, optout) {
     const isPresent = key in input;
+    const isOptionalOut = optout === "optional";
+    // The middle rung means "absence permitted, nothing supplied in its place", so an absent key contributes nothing — whatever the schema made of `undefined` is invented, not substituted. Only `optional` reaches this with a value: `defaulted` substitutes, and a schema that isn't optional-out has to keep the key.
+    if (!isPresent && isOptionalOut && optin === "optional") {
+        return;
+    }
     if (result.issues.length) {
         // For optional-in/out schemas, ignore errors on absent keys.
-        if (isOptionalIn && isOptionalOut && !isPresent) {
+        if (optin !== undefined && isOptionalOut && !isPresent) {
             return;
         }
         final.issues.push(...prefixIssues(key, result.issues));
     }
-    if (!isPresent && !isOptionalIn) {
+    if (!isPresent && optin === undefined) {
         if (!result.issues.length) {
             final.issues.push({
                 code: "invalid_type",
@@ -38323,17 +39191,25 @@ function handlePropertyResult(result, final, key, input, isOptionalIn, isOptiona
         final.value[key] = result.value;
     }
 }
+// one shared instance; a fresh [] per schema cost 56 bytes retained
+const NO_SYMBOL_KEYS = [];
 function normalizeDef(def) {
     const keys = Object.keys(def.shape);
-    for (const k of keys) {
+    const ownSymbols = Object.getOwnPropertySymbols(def.shape);
+    const symbolKeys = ownSymbols.length ? ownSymbols : NO_SYMBOL_KEYS;
+    // aliases `keys` when there are no symbols, so a string-only shape keeps one array
+    const allKeys = symbolKeys.length ? [...keys, ...symbolKeys] : keys;
+    for (const k of allKeys) {
         if (!def.shape?.[k]?._zod?.traits?.has("$ZodType")) {
-            throw new Error(`Invalid element at key "${k}": expected a Zod schema`);
+            throw new Error(`Invalid element at key "${String(k)}": expected a Zod schema`);
         }
     }
     const okeys = optionalKeys(def.shape);
     return {
         ...def,
-        keys,
+        allKeys,
+        symbolKeys,
+        // string-only: handleCatchall matches it against `for...in`, which never yields a symbol
         keySet: new Set(keys),
         numKeys: keys.length,
         optionalKeys: new Set(okeys),
@@ -38344,25 +39220,28 @@ function handleCatchall(proms, input, payload, ctx, def, inst) {
     const keySet = def.keySet;
     const _catchall = def.catchall._zod;
     const t = _catchall.def.type;
-    const isOptionalIn = _catchall.optin === "optional";
-    const isOptionalOut = _catchall.optout === "optional";
+    const optin = _catchall.optin;
+    const optout = _catchall.optout;
     for (const key in input) {
-        // skip __proto__ so it can't replace the result prototype via the
-        // assignment setter on the plain {} we build into
-        if (key === "__proto__")
-            continue;
+        // Must precede the __proto__ branch: a declared key is not unrecognized, even though the shape loop deliberately strips __proto__ from the parsed output.
         if (keySet.has(key))
             continue;
+        // Don't copy an undeclared __proto__ into the result; assignment to a plain {} would replace the result prototype. But in strict mode it is still an unknown key, so report it before skipping.
+        if (key === "__proto__") {
+            if (t === "never")
+                unrecognized.push(key);
+            continue;
+        }
         if (t === "never") {
             unrecognized.push(key);
             continue;
         }
         const r = _catchall.run({ value: input[key], issues: [] }, ctx);
         if (r instanceof Promise) {
-            proms.push(r.then((r) => handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut)));
+            proms.push(r.then((r) => handlePropertyResult(r, payload, key, input, optin, optout)));
         }
         else {
-            handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut);
+            handlePropertyResult(r, payload, key, input, optin, optout);
         }
     }
     if (unrecognized.length) {
@@ -38371,6 +39250,8 @@ function handleCatchall(proms, input, payload, ctx, def, inst) {
             keys: unrecognized,
             input,
             inst,
+            // Describes the shape of the input, not the validity of the parsed value, so it never aborts. The parse still fails; the schema's own checks just get to run first, and an enclosing intersection can reconcile the key against a sibling operand.
+            continue: true,
         });
     }
     if (!proms.length)
@@ -38379,6 +39260,8 @@ function handleCatchall(proms, input, payload, ctx, def, inst) {
         return payload;
     });
 }
+// Whichever object a def's `shape` currently answers from: the one the caller passed until the first read, the frozen copy after it. Keyed by def, so a def rebuilt by a builder is simply absent rather than inheriting the source's. Read its keys with `Object.keys`, which does not invoke them — that is what lets a discriminated union check its discriminator without resolving an option whose getters reference the union being constructed.
+const propShapes = new WeakMap();
 const $ZodObject = /*@__PURE__*/ $constructor("$ZodObject", (inst, def) => {
     // requires cast because technically $ZodObject doesn't extend
     $ZodType.init(inst, def);
@@ -38386,26 +39269,33 @@ const $ZodObject = /*@__PURE__*/ $constructor("$ZodObject", (inst, def) => {
     const desc = Object.getOwnPropertyDescriptor(def, "shape");
     if (!desc?.get) {
         const sh = def.shape;
+        propShapes.set(def, sh);
         Object.defineProperty(def, "shape", {
             get: () => {
                 const newSh = { ...sh };
                 Object.defineProperty(def, "shape", {
                     value: newSh,
                 });
+                propShapes.set(def, newSh);
                 return newSh;
             },
         });
     }
     const _normalized = cached(() => normalizeDef(def));
-    defineLazy(inst._zod, "propValues", () => {
-        const shape = def.shape;
+    defineLazyInternal(inst, "propValues", (zod) => {
+        const shape = zod.def.shape;
         const propValues = {};
         for (const key in shape) {
             const field = shape[key]._zod;
             if (field.values) {
-                propValues[key] ?? (propValues[key] = new Set());
+                if (!Object.prototype.hasOwnProperty.call(propValues, key)) {
+                    util_assignProp(propValues, key, new Set());
+                }
                 for (const v of field.values)
                     propValues[key].add(v);
+                // An omittable slot reads back as undefined at a discriminator lookup, so it has to claim undefined: two options that can both omit the key are not discriminable on it.
+                if (field.optin !== undefined)
+                    propValues[key].add(undefined);
             }
         }
         return propValues;
@@ -38413,6 +39303,8 @@ const $ZodObject = /*@__PURE__*/ $constructor("$ZodObject", (inst, def) => {
     const isObject = util_isObject;
     const catchall = def.catchall;
     let value;
+    const memo = globalConfig.memoizer;
+    memo?.attach(inst);
     inst._zod.parse = (payload, ctx) => {
         value ?? (value = _normalized.value);
         const input = payload.value;
@@ -38425,19 +39317,21 @@ const $ZodObject = /*@__PURE__*/ $constructor("$ZodObject", (inst, def) => {
             });
             return payload;
         }
-        payload.value = {};
+        payload.value = memo ? memo.alloc(inst, payload, {}, ctx) : {};
         const proms = [];
         const shape = value.shape;
-        for (const key of value.keys) {
+        for (const key of value.allKeys) {
+            if (key === "__proto__")
+                continue;
             const el = shape[key];
-            const isOptionalIn = el._zod.optin === "optional";
-            const isOptionalOut = el._zod.optout === "optional";
+            const optin = el._zod.optin;
+            const optout = el._zod.optout;
             const r = el._zod.run({ value: input[key], issues: [] }, ctx);
             if (r instanceof Promise) {
-                proms.push(r.then((r) => handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut)));
+                proms.push(r.then((r) => handlePropertyResult(r, payload, key, input, optin, optout)));
             }
             else {
-                handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut);
+                handlePropertyResult(r, payload, key, input, optin, optout);
             }
         }
         if (!catchall) {
@@ -38451,58 +39345,59 @@ const $ZodObjectJIT = /*@__PURE__*/ $constructor("$ZodObjectJIT", (inst, def) =>
     $ZodObject.init(inst, def);
     const superParse = inst._zod.parse;
     const _normalized = cached(() => normalizeDef(def));
+    const memo = globalConfig.memoizer;
     const generateFastpass = (shape) => {
-        const doc = new Doc(["shape", "payload", "ctx"]);
         const normalized = _normalized.value;
-        const parseStr = (key) => {
-            const k = esc(key);
-            return `shape[${k}]._zod.run({ value: input[${k}], issues: [] }, ctx)`;
-        };
+        const syms = normalized.symbolKeys;
+        // a symbol has no source literal, so it is read as `syms[i]` off the closed-over scope
+        const doc = new Doc(["payload", "ctx"], { shape, inst, memo, syms });
+        const parseStr = (k) => `shape[${k}]._zod.run({ value: input[${k}], issues: [] }, ctx)`;
+        // Prefixes in place, like util.prefixIssues does for every interpreted path.
+        const prefixStr = (id, k) => `
+          for (let i = 0; i < ${id}.issues.length; i++) {
+            const iss = ${id}.issues[i];
+            iss.path = iss.path ? [${k}, ...iss.path] : [${k}];
+            payload.issues.push(iss);
+          }`;
         doc.write(`const input = payload.value;`);
         const ids = Object.create(null);
         let counter = 0;
-        for (const key of normalized.keys) {
+        for (const key of normalized.allKeys) {
             ids[key] = `key_${counter++}`;
         }
         // A: preserve key order {
-        doc.write(`const newResult = {};`);
-        for (const key of normalized.keys) {
+        doc.write(memo ? `const newResult = memo.alloc(inst, payload, {}, ctx);` : `const newResult = {};`);
+        for (const key of normalized.allKeys) {
+            if (key === "__proto__")
+                continue;
             const id = ids[key];
-            const k = esc(key);
+            const k = typeof key === "symbol" ? `syms[${syms.indexOf(key)}]` : esc(key);
+            const isPresent = `${k} in input`;
             const schema = shape[key];
-            const isOptionalIn = schema?._zod?.optin === "optional";
+            const optin = schema?._zod?.optin;
+            const isOptionalIn = optin !== undefined;
             const isOptionalOut = schema?._zod?.optout === "optional";
-            doc.write(`const ${id} = ${parseStr(key)};`);
+            doc.write(`const ${id} = ${parseStr(k)};`);
             if (isOptionalIn && isOptionalOut) {
-                // For optional-in/out schemas, ignore errors on absent keys
+                // For optional-in/out schemas, ignore errors on absent keys — and, like the interpreted path, drop the value produced alongside them. The middle rung goes further: it permits absence without supplying anything in its place, so an absent key contributes nothing at all.
+                const assign = optin === "optional" ? `${id}_present` : `${id}.value !== undefined || ${id}_present`;
                 doc.write(`
-        if (${id}.issues.length) {
-          if (${k} in input) {
-            payload.issues = payload.issues.concat(${id}.issues.map(iss => ({
-              ...iss,
-              path: iss.path ? [${k}, ...iss.path] : [${k}]
-            })));
+        const ${id}_present = ${isPresent};
+        if (!${id}.issues.length || ${id}_present) {
+          if (${id}.issues.length) {${prefixStr(id, k)}
+          }
+
+          if (${assign}) {
+            newResult[${k}] = ${id}.value;
           }
         }
-        
-        if (${id}.value === undefined) {
-          if (${k} in input) {
-            newResult[${k}] = undefined;
-          }
-        } else {
-          newResult[${k}] = ${id}.value;
-        }
-        
+
       `);
             }
             else if (!isOptionalIn) {
                 doc.write(`
-        const ${id}_present = ${k} in input;
-        if (${id}.issues.length) {
-          payload.issues = payload.issues.concat(${id}.issues.map(iss => ({
-            ...iss,
-            path: iss.path ? [${k}, ...iss.path] : [${k}]
-          })));
+        const ${id}_present = ${isPresent};
+        if (${id}.issues.length) {${prefixStr(id, k)}
         }
         if (!${id}_present && !${id}.issues.length) {
           payload.issues.push({
@@ -38514,39 +39409,31 @@ const $ZodObjectJIT = /*@__PURE__*/ $constructor("$ZodObjectJIT", (inst, def) =>
         }
 
         if (${id}_present) {
-          if (${id}.value === undefined) {
-            newResult[${k}] = undefined;
-          } else {
-            newResult[${k}] = ${id}.value;
-          }
+          newResult[${k}] = ${id}.value;
         }
 
       `);
             }
             else {
                 doc.write(`
-        if (${id}.issues.length) {
-          payload.issues = payload.issues.concat(${id}.issues.map(iss => ({
-            ...iss,
-            path: iss.path ? [${k}, ...iss.path] : [${k}]
-          })));
+        if (${id}.issues.length) {${prefixStr(id, k)}
         }
         
         if (${id}.value === undefined) {
-          if (${k} in input) {
+          if (${isPresent}) {
             newResult[${k}] = undefined;
           }
         } else {
           newResult[${k}] = ${id}.value;
         }
-        
+
       `);
             }
         }
         doc.write(`payload.value = newResult;`);
         doc.write(`return payload;`);
-        const fn = doc.compile();
-        return (payload, ctx) => fn(shape, payload, ctx);
+        // closing `shape` in is what pays: turbofan specializes the parser against that one shape object, so every `shape[k]._zod.run` folds to a known callee. as a parameter it stays a generic load and measures 13% slower even with the forwarding frame gone
+        return doc.compile();
     };
     let fastpass;
     const isObject = util_isObject;
@@ -38601,17 +39488,21 @@ function handleUnionResults(results, final, inst, ctx) {
 }
 const $ZodUnion = /*@__PURE__*/ $constructor("$ZodUnion", (inst, def) => {
     $ZodType.init(inst, def);
-    defineLazy(inst._zod, "optin", () => def.options.some((o) => o._zod.optin === "optional") ? "optional" : undefined);
-    defineLazy(inst._zod, "optout", () => def.options.some((o) => o._zod.optout === "optional") ? "optional" : undefined);
-    defineLazy(inst._zod, "values", () => {
-        if (def.options.every((o) => o._zod.values)) {
-            return new Set(def.options.flatMap((option) => Array.from(option._zod.values)));
+    defineLazyInternal(inst, "optin", (zod) => zod.def.options.some((o) => o._zod.optin === "defaulted")
+        ? "defaulted"
+        : zod.def.options.some((o) => o._zod.optin !== undefined)
+            ? "optional"
+            : undefined);
+    defineLazyInternal(inst, "optout", (zod) => zod.def.options.some((o) => o._zod.optout === "optional") ? "optional" : undefined);
+    defineLazyInternal(inst, "values", (zod) => {
+        if (zod.def.options.every((o) => o._zod.values)) {
+            return new Set(zod.def.options.flatMap((option) => Array.from(option._zod.values)));
         }
         return undefined;
     });
-    defineLazy(inst._zod, "pattern", () => {
-        if (def.options.every((o) => o._zod.pattern)) {
-            const patterns = def.options.map((o) => o._zod.pattern);
+    defineLazyInternal(inst, "pattern", (zod) => {
+        if (zod.def.options.every((o) => o._zod.pattern)) {
+            const patterns = zod.def.options.map((o) => o._zod.pattern);
             return new RegExp(`^(${patterns.map((p) => cleanRegex(p.source)).join("|")})$`);
         }
         return undefined;
@@ -38646,12 +39537,16 @@ const $ZodUnion = /*@__PURE__*/ $constructor("$ZodUnion", (inst, def) => {
     };
 });
 function handleExclusiveUnionResults(results, final, inst, ctx) {
-    const successes = results.filter((r) => r.issues.length === 0);
-    if (successes.length === 1) {
-        final.value = successes[0].value;
+    const matches = [];
+    for (let i = 0; i < results.length; i++) {
+        if (results[i].issues.length === 0)
+            matches.push(i);
+    }
+    if (matches.length === 1) {
+        final.value = results[matches[0]].value;
         return final;
     }
-    if (successes.length === 0) {
+    if (matches.length === 0) {
         // No matches - same as regular union
         final.issues.push({
             code: "invalid_union",
@@ -38668,6 +39563,7 @@ function handleExclusiveUnionResults(results, final, inst, ctx) {
             inst,
             errors: [],
             inclusive: false,
+            matches,
         });
     }
     return final;
@@ -38702,27 +39598,52 @@ const $ZodXor = /*@__PURE__*/ (/* unused pure expression or super */ null && (co
         });
     };
 })));
+/** Returns the option of `union` whose discriminator claims `value`. */
+function getDiscriminatedOption(union, value) {
+    const internals = union._zod;
+    let map = internals.bag.optionsMap;
+    if (!map) {
+        map = new Map();
+        const { options, discriminator } = internals.def;
+        for (const option of options) {
+            // First declaration wins, matching the order the parse path resolves a duplicate in.
+            for (const v of option._zod.propValues?.[discriminator] ?? [])
+                if (!map.has(v))
+                    map.set(v, option);
+        }
+        internals.bag.optionsMap = map;
+    }
+    return map.get(value);
+}
 const $ZodDiscriminatedUnion = 
 /*@__PURE__*/
 (/* unused pure expression or super */ null && (core.$constructor("$ZodDiscriminatedUnion", (inst, def) => {
     def.inclusive = false;
     $ZodUnion.init(inst, def);
     const _super = inst._zod.parse;
-    util.defineLazy(inst._zod, "propValues", () => {
+    util.defineLazyInternal(inst, "propValues", (zod) => {
         const propValues = {};
-        for (const option of def.options) {
+        for (const option of zod.def.options) {
             const pv = option._zod.propValues;
             if (!pv || Object.keys(pv).length === 0)
-                throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(option)}"`);
+                throw new Error(`Invalid discriminated union option at index "${zod.def.options.indexOf(option)}"`);
             for (const [k, v] of Object.entries(pv)) {
-                if (!propValues[k])
-                    propValues[k] = new Set();
+                if (!Object.prototype.hasOwnProperty.call(propValues, k)) {
+                    util.assignProp(propValues, k, new Set());
+                }
                 for (const val of v) {
                     propValues[k].add(val);
                 }
             }
         }
         return propValues;
+    });
+    // Checked now rather than in the lookup map below, so an option that lacks the discriminator fails at the `discriminatedUnion` call instead of on the first object parsed. Options whose shape cannot be enumerated without resolving it — pipes, lazies, and objects rebuilt by a builder such as `.extend()` — are left to the map.
+    def.options.forEach((option, i) => {
+        const propShape = propShapes.get(option._zod.def);
+        if (propShape && !Object.prototype.hasOwnProperty.call(propShape, def.discriminator)) {
+            throw new Error(`Invalid discriminated union option at index "${i}"`);
+        }
     });
     const disc = util.cached(() => {
         const opts = def.options;
@@ -38757,8 +39678,7 @@ const $ZodDiscriminatedUnion =
         }
         // Fall back to union matching when the fast discriminator path fails:
         // - explicitly enabled via unionFallback, or
-        // - during backward direction (encode), since codec-based discriminators
-        //   have different values in forward vs backward directions
+        // - during backward direction (encode), since codec-based discriminators have different values in forward vs backward directions
         if (def.unionFallback || ctx.direction === "backward") {
             return _super(payload, ctx);
         }
@@ -38804,7 +39724,11 @@ function mergeValues(a, b) {
         const bKeys = Object.keys(b);
         const sharedKeys = Object.keys(a).filter((key) => bKeys.indexOf(key) !== -1);
         const newObj = { ...a, ...b };
+        if (Object.prototype.hasOwnProperty.call(newObj, "__proto__"))
+            delete newObj.__proto__;
         for (const key of sharedKeys) {
+            if (key === "__proto__")
+                continue;
             const sharedValue = mergeValues(a[key], b[key]);
             if (!sharedValue.valid) {
                 return {
@@ -38838,51 +39762,65 @@ function mergeValues(a, b) {
     return { valid: false, mergeErrorPath: [] };
 }
 function handleIntersectionResults(result, left, right) {
-    // Track which side(s) report each key as unrecognized
+    // Track which side(s) reject each key. A key rejection is reported only when BOTH sides reject it, so a key owned by one branch survives the other's key schema. strictObject reports these as unrecognized_keys; a record with an open key schema reports one invalid_key per key.
     const unrecKeys = new Map();
     let unrecIssue;
-    for (const iss of left.issues) {
-        if (iss.code === "unrecognized_keys") {
+    const keyIssues = new Map();
+    const collect = (iss, side) => {
+        let keys;
+        if (iss.code === "unrecognized_keys" && !iss.path?.length) {
             unrecIssue ?? (unrecIssue = iss);
-            for (const k of iss.keys) {
-                if (!unrecKeys.has(k))
-                    unrecKeys.set(k, {});
-                unrecKeys.get(k).l = true;
-            }
+            keys = iss.keys;
+        }
+        else if (iss.code === "invalid_key" && iss.origin === "record" && iss.path?.length === 1) {
+            const k = String(iss.path[0]);
+            if (!keyIssues.has(k))
+                keyIssues.set(k, iss);
+            keys = [k];
         }
         else {
-            result.issues.push(iss);
+            return false;
         }
+        for (const k of keys) {
+            if (!unrecKeys.has(k))
+                unrecKeys.set(k, {});
+            unrecKeys.get(k)[side] = true;
+        }
+        return true;
+    };
+    for (const iss of left.issues) {
+        if (!collect(iss, "l"))
+            result.issues.push(iss);
     }
     for (const iss of right.issues) {
-        if (iss.code === "unrecognized_keys") {
-            for (const k of iss.keys) {
-                if (!unrecKeys.has(k))
-                    unrecKeys.set(k, {});
-                unrecKeys.get(k).r = true;
-            }
-        }
-        else {
+        if (!collect(iss, "r"))
             result.issues.push(iss);
+    }
+    // Report only keys rejected by BOTH sides
+    const bothKeys = [...unrecKeys].filter(([, f]) => f.l && f.r).map(([k]) => k);
+    if (bothKeys.length) {
+        const aggregated = unrecIssue ? bothKeys.filter((k) => unrecIssue.keys.includes(k)) : [];
+        if (aggregated.length)
+            result.issues.push({ ...unrecIssue, keys: aggregated });
+        for (const k of bothKeys) {
+            if (!aggregated.includes(k) && keyIssues.has(k))
+                result.issues.push(keyIssues.get(k));
         }
     }
-    // Report only keys unrecognized by BOTH sides
-    const bothKeys = [...unrecKeys].filter(([, f]) => f.l && f.r).map(([k]) => k);
-    if (bothKeys.length && unrecIssue) {
-        result.issues.push({ ...unrecIssue, keys: bothKeys });
-    }
-    if (aborted(result))
-        return result;
     const merged = mergeValues(left.value, right.value);
     if (!merged.valid) {
+        if (aborted(result))
+            return result;
         throw new Error(`Unmergable intersection. Error path: ` + `${JSON.stringify(merged.mergeErrorPath)}`);
     }
     result.value = merged.data;
     return result;
 }
-const $ZodTuple = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodTuple", (inst, def) => {
+const $ZodTuple = /*@__PURE__*/ $constructor("$ZodTuple", (inst, def) => {
     $ZodType.init(inst, def);
     const items = def.items;
+    const memo = globalConfig.memoizer;
+    memo?.attach(inst);
     inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
         if (!Array.isArray(input)) {
@@ -38894,7 +39832,7 @@ const $ZodTuple = /*@__PURE__*/ (/* unused pure expression or super */ null && (
             });
             return payload;
         }
-        payload.value = [];
+        payload.value = memo ? memo.alloc(inst, payload, [], ctx) : [];
         const proms = [];
         const optinStart = getTupleOptStart(items, "optin");
         const optoutStart = getTupleOptStart(items, "optout");
@@ -38921,10 +39859,7 @@ const $ZodTuple = /*@__PURE__*/ (/* unused pure expression or super */ null && (
                 });
             }
         }
-        // Run every item in parallel, collecting results into an indexed
-        // array. The post-processing in `handleTupleResults` walks them in
-        // order so it can decide whether an absent optional-output error can
-        // truncate the tail or must be reported to preserve required output.
+        // Run every item in parallel, collecting results into an indexed array. The post-processing in `handleTupleResults` walks them in order so it can decide whether an absent optional-output error can truncate the tail or must be reported to preserve required output.
         const itemResults = new Array(items.length);
         for (let i = 0; i < items.length; i++) {
             const r = items[i]._zod.run({ value: input[i], issues: [] }, ctx);
@@ -38956,33 +39891,38 @@ const $ZodTuple = /*@__PURE__*/ (/* unused pure expression or super */ null && (
         }
         return handleTupleResults(itemResults, payload, items, input, optoutStart);
     };
-})));
+});
 function getTupleOptStart(items, key) {
     for (let i = items.length - 1; i >= 0; i--) {
-        if (items[i]._zod[key] !== "optional")
+        // optin is a three-rung ladder so any rung above `undefined` permits an absent slot; optout stays two-valued.
+        const omittable = key === "optin" ? items[i]._zod.optin !== undefined : items[i]._zod.optout === "optional";
+        if (!omittable)
             return i + 1;
     }
     return 0;
 }
 function handleTupleResult(result, final, index) {
     if (result.issues.length) {
-        final.issues.push(...util.prefixIssues(index, result.issues));
+        final.issues.push(...prefixIssues(index, result.issues));
     }
     final.value[index] = result.value;
 }
 function handleTupleResults(itemResults, final, items, input, optoutStart) {
-    // Walk results in order. Mirror $ZodObject's swallow-on-absent-optional
-    // rule, but only after `optoutStart`: the first index where the output
-    // tuple tail can be absent.
+    // Walk results in order. Mirror $ZodObject's swallow-on-absent-optional rule, but only after `optoutStart`: the first index where the output tuple tail can be absent.
     for (let i = 0; i < items.length; i++) {
         const r = itemResults[i];
         const isPresent = i < input.length;
+        // The array analog of `handlePropertyResult`'s absent-key early return: the middle rung permits absence without supplying anything in its place, so the tail truncates here instead of materializing whatever the item made of `undefined`.
+        if (!isPresent && i >= optoutStart && items[i]._zod.optin === "optional") {
+            final.value.length = i;
+            break;
+        }
         if (r.issues.length) {
             if (!isPresent && i >= optoutStart) {
                 final.value.length = i;
                 break;
             }
-            final.issues.push(...util.prefixIssues(i, r.issues));
+            final.issues.push(...prefixIssues(i, r.issues));
         }
         final.value[i] = r.value;
     }
@@ -39004,6 +39944,8 @@ function handleTupleResults(itemResults, final, items, input, optoutStart) {
 }
 const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodRecord", (inst, def) => {
     $ZodType.init(inst, def);
+    const memo = core.globalConfig.memoizer;
+    memo?.attach(inst);
     inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
         if (!util.isPlainObject(input)) {
@@ -39017,12 +39959,15 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
         }
         const proms = [];
         const values = def.keyType._zod.values;
-        if (values) {
-            payload.value = {};
+        if (values && !def.partial) {
+            payload.value = memo ? memo.alloc(inst, payload, {}, ctx) : {};
             const recordKeys = new Set();
             for (const key of values) {
                 if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
                     recordKeys.add(typeof key === "number" ? key.toString() : key);
+                    // A declared __proto__ is stripped but is not an unrecognized key.
+                    if (key === "__proto__")
+                        continue;
                     const keyResult = def.keyType._zod.run({ value: key, issues: [] }, ctx);
                     if (keyResult instanceof Promise) {
                         throw new Error("Async schemas not supported in object keys currently");
@@ -39039,6 +39984,8 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
                         continue;
                     }
                     const outKey = keyResult.value;
+                    if (outKey === "__proto__")
+                        continue;
                     const result = def.valueType._zod.run({ value: input[key], issues: [] }, ctx);
                     if (result instanceof Promise) {
                         proms.push(result.then((result) => {
@@ -39059,8 +40006,16 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
             let unrecognized;
             for (const key in input) {
                 if (!recordKeys.has(key)) {
-                    unrecognized = unrecognized ?? [];
-                    unrecognized.push(key);
+                    if (def.mode === "loose") {
+                        // skip __proto__ so it can't replace the result prototype via the assignment setter on the plain {} we build into
+                        if (key === "__proto__")
+                            continue;
+                        payload.value[key] = input[key];
+                    }
+                    else {
+                        unrecognized = unrecognized ?? [];
+                        unrecognized.push(key);
+                    }
                 }
             }
             if (unrecognized && unrecognized.length > 0) {
@@ -39069,11 +40024,14 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
                     input,
                     inst,
                     keys: unrecognized,
+                    continue: true,
                 });
             }
         }
         else {
-            payload.value = {};
+            payload.value = memo ? memo.alloc(inst, payload, {}, ctx) : {};
+            // An enumerable key schema declares which keys the record owns, so a key outside the set is unrecognized. A non-enumerable one (regex, refine) is a constraint every key must satisfy, so a failing key is invalid. Only the former is reconcilable against the other side of an intersection.
+            let unrecognized;
             // Reflect.ownKeys for Symbol-key support; filter non-enumerable to match z.object()
             for (const key of Reflect.ownKeys(input)) {
                 if (key === "__proto__")
@@ -39084,8 +40042,7 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
                 if (keyResult instanceof Promise) {
                     throw new Error("Async schemas not supported in object keys currently");
                 }
-                // Numeric string fallback: if key is a numeric string and failed, retry with Number(key)
-                // This handles z.number(), z.literal([1, 2, 3]), and unions containing numeric literals
+                // Numeric string fallback: if key is a numeric string and failed, retry with Number(key). This handles z.number(), z.literal([1, 2, 3]), and unions containing numeric literals
                 const checkNumericKey = typeof key === "string" && regexes.number.test(key) && keyResult.issues.length;
                 if (checkNumericKey) {
                     const retryResult = def.keyType._zod.run({ value: Number(key), issues: [] }, ctx);
@@ -39101,6 +40058,10 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
                         // Pass through unchanged
                         payload.value[key] = input[key];
                     }
+                    else if (values) {
+                        unrecognized = unrecognized ?? [];
+                        unrecognized.push(key);
+                    }
                     else {
                         // Default "strict" behavior: error on invalid key
                         payload.issues.push({
@@ -39114,21 +40075,34 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
                     }
                     continue;
                 }
+                // the guard above tests the raw input key, but the key schema can normalize an ordinary key into __proto__; re-check the key we actually write under
+                const outKey = keyResult.value;
+                if (outKey === "__proto__")
+                    continue;
                 const result = def.valueType._zod.run({ value: input[key], issues: [] }, ctx);
                 if (result instanceof Promise) {
                     proms.push(result.then((result) => {
                         if (result.issues.length) {
                             payload.issues.push(...util.prefixIssues(key, result.issues));
                         }
-                        payload.value[keyResult.value] = result.value;
+                        payload.value[outKey] = result.value;
                     }));
                 }
                 else {
                     if (result.issues.length) {
                         payload.issues.push(...util.prefixIssues(key, result.issues));
                     }
-                    payload.value[keyResult.value] = result.value;
+                    payload.value[outKey] = result.value;
                 }
+            }
+            if (unrecognized && unrecognized.length > 0) {
+                payload.issues.push({
+                    code: "unrecognized_keys",
+                    input,
+                    inst,
+                    keys: unrecognized,
+                    continue: true,
+                });
             }
         }
         if (proms.length) {
@@ -39139,6 +40113,8 @@ const $ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && 
 })));
 const $ZodMap = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodMap", (inst, def) => {
     $ZodType.init(inst, def);
+    const memo = core.globalConfig.memoizer;
+    memo?.attach(inst);
     inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
         if (!(input instanceof Map)) {
@@ -39151,7 +40127,7 @@ const $ZodMap = /*@__PURE__*/ (/* unused pure expression or super */ null && (co
             return payload;
         }
         const proms = [];
-        payload.value = new Map();
+        payload.value = memo ? memo.alloc(inst, payload, new Map(), ctx) : new Map();
         for (const [key, value] of input) {
             const keyResult = def.keyType._zod.run({ value: key, issues: [] }, ctx);
             const valueResult = def.valueType._zod.run({ value: value, issues: [] }, ctx);
@@ -39203,6 +40179,8 @@ function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
 }
 const $ZodSet = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodSet", (inst, def) => {
     $ZodType.init(inst, def);
+    const memo = core.globalConfig.memoizer;
+    memo?.attach(inst);
     inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
         if (!(input instanceof Set)) {
@@ -39215,7 +40193,7 @@ const $ZodSet = /*@__PURE__*/ (/* unused pure expression or super */ null && (co
             return payload;
         }
         const proms = [];
-        payload.value = new Set();
+        payload.value = memo ? memo.alloc(inst, payload, new Set(), ctx) : new Set();
         for (const item of input) {
             const result = def.valueType._zod.run({ value: item, issues: [] }, ctx);
             if (result instanceof Promise) {
@@ -39240,10 +40218,9 @@ const $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
     const values = getEnumValues(def.entries);
     const valuesSet = new Set(values);
     inst._zod.values = valuesSet;
-    inst._zod.pattern = new RegExp(`^(${values
-        .filter((k) => propertyKeyTypes.has(typeof k))
-        .map((o) => (typeof o === "string" ? escapeRegex(o) : o.toString()))
-        .join("|")})$`);
+    const patternValues = values.filter((k) => propertyKeyTypes.has(typeof k));
+    // unmatchable fallback, RE2-safe: an empty alternation would compile to /^()$/, which matches ""
+    inst._zod.pattern = new RegExp(patternValues.length ? `^(${patternValues.map((o) => escapeRegex(o.toString())).join("|")})$` : "^[^\\s\\S]$");
     inst._zod.parse = (payload, _ctx) => {
         const input = payload.value;
         if (valuesSet.has(input)) {
@@ -39260,14 +40237,14 @@ const $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
 });
 const $ZodLiteral = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodLiteral", (inst, def) => {
     $ZodType.init(inst, def);
-    if (def.values.length === 0) {
-        throw new Error("Cannot create literal schema with no valid values");
-    }
     const values = new Set(def.values);
     inst._zod.values = values;
-    inst._zod.pattern = new RegExp(`^(${def.values
-        .map((o) => (typeof o === "string" ? util.escapeRegex(o) : o ? util.escapeRegex(o.toString()) : String(o)))
-        .join("|")})$`);
+    // unmatchable fallback, RE2-safe: an empty alternation would compile to /^()$/, which matches ""
+    inst._zod.pattern = new RegExp(def.values.length
+        ? `^(${def.values
+            .map((o) => (typeof o === "string" ? util.escapeRegex(o) : o ? util.escapeRegex(o.toString()) : String(o)))
+            .join("|")})$`
+        : "^[^\\s\\S]$");
     inst._zod.parse = (payload, _ctx) => {
         const input = payload.value;
         if (values.has(input)) {
@@ -39301,6 +40278,7 @@ const $ZodFile = /*@__PURE__*/ (/* unused pure expression or super */ null && (c
 const $ZodTransform = /*@__PURE__*/ $constructor("$ZodTransform", (inst, def) => {
     $ZodType.init(inst, def);
     inst._zod.optin = "optional";
+    globalConfig.memoizer?.guard(inst);
     inst._zod.parse = (payload, ctx) => {
         if (ctx.direction === "backward") {
             throw new $ZodEncodeError(inst.constructor.name);
@@ -39310,7 +40288,6 @@ const $ZodTransform = /*@__PURE__*/ $constructor("$ZodTransform", (inst, def) =>
             const output = _out instanceof Promise ? _out : Promise.resolve(_out);
             return output.then((output) => {
                 payload.value = output;
-                payload.fallback = true;
                 return payload;
             });
         }
@@ -39318,37 +40295,37 @@ const $ZodTransform = /*@__PURE__*/ $constructor("$ZodTransform", (inst, def) =>
             throw new $ZodAsyncError();
         }
         payload.value = _out;
-        payload.fallback = true;
         return payload;
     };
 });
-function handleOptionalResult(result, input) {
-    if (input === undefined && (result.issues.length || result.fallback)) {
-        return { issues: [], value: undefined };
-    }
-    return result;
+function handleOptionalResult(payload, result) {
+    // A substituting schema that still failed has no usable answer; yield undefined. Its issues are simply dropped: it ran on a payload of its own, so there is no shared array to truncate and nothing of the caller's to lose with it.
+    payload.value = result.issues.length ? undefined : result.value;
+    return payload;
 }
 const $ZodOptional = /*@__PURE__*/ $constructor("$ZodOptional", (inst, def) => {
     $ZodType.init(inst, def);
-    inst._zod.optin = "optional";
+    // .optional() propagates absence rather than substituting for it, so a defaulted inner keeps its rung.
+    defineLazyInternal(inst, "optin", (zod) => zod.def.innerType._zod.optin === "defaulted" ? "defaulted" : "optional");
     inst._zod.optout = "optional";
-    defineLazy(inst._zod, "values", () => {
-        return def.innerType._zod.values ? new Set([...def.innerType._zod.values, undefined]) : undefined;
+    defineLazyInternal(inst, "values", (zod) => {
+        const values = zod.def.innerType._zod.values;
+        return values ? new Set([...values, undefined]) : undefined;
     });
-    defineLazy(inst._zod, "pattern", () => {
-        const pattern = def.innerType._zod.pattern;
+    defineLazyInternal(inst, "pattern", (zod) => {
+        const pattern = zod.def.innerType._zod.pattern;
         return pattern ? new RegExp(`^(${cleanRegex(pattern.source)})?$`) : undefined;
     });
     inst._zod.parse = (payload, ctx) => {
-        if (def.innerType._zod.optin === "optional") {
-            const input = payload.value;
-            const result = def.innerType._zod.run(payload, ctx);
-            if (result instanceof Promise)
-                return result.then((r) => handleOptionalResult(r, input));
-            return handleOptionalResult(result, input);
-        }
         if (payload.value === undefined) {
-            return payload;
+            // Only the top rung substitutes a value for absence; everything else leaves it intact, which is what .optional() means.
+            if (def.innerType._zod.optin !== "defaulted")
+                return payload;
+            // Its own payload, for the same reason $ZodCatch gets one: a pipe forwards an unrecognized key through the caller's issues array, and this must not read that as the substituting schema failing and drop it.
+            const result = def.innerType._zod.run({ value: payload.value, issues: [] }, ctx);
+            if (result instanceof Promise)
+                return result.then((result) => handleOptionalResult(payload, result));
+            return handleOptionalResult(payload, result);
         }
         return def.innerType._zod.run(payload, ctx);
     };
@@ -39357,8 +40334,8 @@ const $ZodExactOptional = /*@__PURE__*/ $constructor("$ZodExactOptional", (inst,
     // Call parent init - inherits optin/optout = "optional"
     $ZodOptional.init(inst, def);
     // Override values/pattern to NOT add undefined
-    defineLazy(inst._zod, "values", () => def.innerType._zod.values);
-    defineLazy(inst._zod, "pattern", () => def.innerType._zod.pattern);
+    defineLazyInternal(inst, "values", (zod) => zod.def.innerType._zod.values);
+    defineLazyInternal(inst, "pattern", (zod) => zod.def.innerType._zod.pattern);
     // Override parse to just delegate (no undefined handling)
     inst._zod.parse = (payload, ctx) => {
         return def.innerType._zod.run(payload, ctx);
@@ -39366,14 +40343,14 @@ const $ZodExactOptional = /*@__PURE__*/ $constructor("$ZodExactOptional", (inst,
 });
 const $ZodNullable = /*@__PURE__*/ $constructor("$ZodNullable", (inst, def) => {
     $ZodType.init(inst, def);
-    defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
-    defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
-    defineLazy(inst._zod, "pattern", () => {
-        const pattern = def.innerType._zod.pattern;
+    defineLazyInternal(inst, "optin", (zod) => zod.def.innerType._zod.optin);
+    defineLazyInternal(inst, "optout", (zod) => zod.def.innerType._zod.optout);
+    defineLazyInternal(inst, "pattern", (zod) => {
+        const pattern = zod.def.innerType._zod.pattern;
         return pattern ? new RegExp(`^(${cleanRegex(pattern.source)}|null)$`) : undefined;
     });
-    defineLazy(inst._zod, "values", () => {
-        return def.innerType._zod.values ? new Set([...def.innerType._zod.values, null]) : undefined;
+    defineLazyInternal(inst, "values", (zod) => {
+        return zod.def.innerType._zod.values ? new Set([...zod.def.innerType._zod.values, null]) : undefined;
     });
     inst._zod.parse = (payload, ctx) => {
         // Forward direction (decode): allow null to pass through
@@ -39385,8 +40362,8 @@ const $ZodNullable = /*@__PURE__*/ $constructor("$ZodNullable", (inst, def) => {
 const $ZodDefault = /*@__PURE__*/ $constructor("$ZodDefault", (inst, def) => {
     $ZodType.init(inst, def);
     // inst._zod.qin = "true";
-    inst._zod.optin = "optional";
-    defineLazy(inst._zod, "values", () => def.innerType._zod.values);
+    inst._zod.optin = "defaulted";
+    defineLazyInternal(inst, "values", (zod) => zod.def.innerType._zod.values);
     inst._zod.parse = (payload, ctx) => {
         if (ctx.direction === "backward") {
             return def.innerType._zod.run(payload, ctx);
@@ -39415,8 +40392,8 @@ function handleDefaultResult(payload, def) {
 }
 const $ZodPrefault = /*@__PURE__*/ $constructor("$ZodPrefault", (inst, def) => {
     $ZodType.init(inst, def);
-    inst._zod.optin = "optional";
-    defineLazy(inst._zod, "values", () => def.innerType._zod.values);
+    inst._zod.optin = "defaulted";
+    defineLazyInternal(inst, "values", (zod) => zod.def.innerType._zod.values);
     inst._zod.parse = (payload, ctx) => {
         if (ctx.direction === "backward") {
             return def.innerType._zod.run(payload, ctx);
@@ -39430,8 +40407,8 @@ const $ZodPrefault = /*@__PURE__*/ $constructor("$ZodPrefault", (inst, def) => {
 });
 const $ZodNonOptional = /*@__PURE__*/ $constructor("$ZodNonOptional", (inst, def) => {
     $ZodType.init(inst, def);
-    defineLazy(inst._zod, "values", () => {
-        const v = def.innerType._zod.values;
+    defineLazyInternal(inst, "values", (zod) => {
+        const v = zod.def.innerType._zod.values;
         return v ? new Set([...v].filter((x) => x !== undefined)) : undefined;
     });
     inst._zod.parse = (payload, ctx) => {
@@ -39470,47 +40447,40 @@ const $ZodSuccess = /*@__PURE__*/ (/* unused pure expression or super */ null &&
         return payload;
     };
 })));
+function handleCatchResult(payload, result, def, ctx) {
+    if (!result.issues.length) {
+        payload.value = result.value;
+        // The value carries up, so the flag describing it has to carry with it: a back-edge into a node still being parsed must not be frozen by an enclosing readonly, and its checks belong to the node itself. Guarded so the ordinary case adds no own property.
+        if (result.memo)
+            payload.memo = true;
+        return payload;
+    }
+    // Spread the inner's own payload, not ours: `value` has to stay the input the catch was handed, and the inner ran on a payload of its own so its issues are already private to this call.
+    payload.value = def.catchValue({
+        ...result,
+        value: payload.value,
+        error: {
+            issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+        },
+        input: payload.value,
+    });
+    return payload;
+}
 const $ZodCatch = /*@__PURE__*/ $constructor("$ZodCatch", (inst, def) => {
     $ZodType.init(inst, def);
-    inst._zod.optin = "optional";
-    defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
-    defineLazy(inst._zod, "values", () => def.innerType._zod.values);
+    defineLazyInternal(inst, "optin", (zod) => zod.def.innerType._zod.optin === "defaulted" ? "defaulted" : "optional");
+    defineLazyInternal(inst, "optout", (zod) => zod.def.innerType._zod.optout);
+    defineLazyInternal(inst, "values", (zod) => zod.def.innerType._zod.values);
     inst._zod.parse = (payload, ctx) => {
         if (ctx.direction === "backward") {
             return def.innerType._zod.run(payload, ctx);
         }
         // Forward direction (decode): apply catch logic
-        const result = def.innerType._zod.run(payload, ctx);
+        const result = def.innerType._zod.run({ value: payload.value, issues: [] }, ctx);
         if (result instanceof Promise) {
-            return result.then((result) => {
-                payload.value = result.value;
-                if (result.issues.length) {
-                    payload.value = def.catchValue({
-                        ...payload,
-                        error: {
-                            issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config())),
-                        },
-                        input: payload.value,
-                    });
-                    payload.issues = [];
-                    payload.fallback = true;
-                }
-                return payload;
-            });
+            return result.then((result) => handleCatchResult(payload, result, def, ctx));
         }
-        payload.value = result.value;
-        if (result.issues.length) {
-            payload.value = def.catchValue({
-                ...payload,
-                error: {
-                    issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config())),
-                },
-                input: payload.value,
-            });
-            payload.issues = [];
-            payload.fallback = true;
-        }
-        return payload;
+        return handleCatchResult(payload, result, def, ctx);
     };
 });
 const $ZodNaN = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodNaN", (inst, def) => {
@@ -39530,10 +40500,10 @@ const $ZodNaN = /*@__PURE__*/ (/* unused pure expression or super */ null && (co
 })));
 const $ZodPipe = /*@__PURE__*/ $constructor("$ZodPipe", (inst, def) => {
     $ZodType.init(inst, def);
-    defineLazy(inst._zod, "values", () => def.in._zod.values);
-    defineLazy(inst._zod, "optin", () => def.in._zod.optin);
-    defineLazy(inst._zod, "optout", () => def.out._zod.optout);
-    defineLazy(inst._zod, "propValues", () => def.in._zod.propValues);
+    defineLazyInternal(inst, "values", (zod) => zod.def.in._zod.values);
+    defineLazyInternal(inst, "optin", (zod) => zod.def.in._zod.optin);
+    defineLazyInternal(inst, "optout", (zod) => zod.def.out._zod.optout);
+    defineLazyInternal(inst, "propValues", (zod) => zod.def.in._zod.propValues);
     inst._zod.parse = (payload, ctx) => {
         if (ctx.direction === "backward") {
             const right = def.out._zod.run(payload, ctx);
@@ -39550,19 +40520,20 @@ const $ZodPipe = /*@__PURE__*/ $constructor("$ZodPipe", (inst, def) => {
     };
 });
 function handlePipeResult(left, next, ctx) {
-    if (left.issues.length) {
+    // Any issue stops the pipe, so a failing refinement never feeds its transform. An unrecognized key is the exception: it describes the input's extra properties, not the value being piped, and an enclosing intersection may yet reconcile it.
+    if (left.issues.some((iss) => iss.code !== "unrecognized_keys")) {
         // prevent further checks
         left.aborted = true;
         return left;
     }
-    return next._zod.run({ value: left.value, issues: left.issues, fallback: left.fallback }, ctx);
+    return next._zod.run({ value: left.value, issues: left.issues }, ctx);
 }
 const $ZodCodec = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodCodec", (inst, def) => {
     $ZodType.init(inst, def);
-    util.defineLazy(inst._zod, "values", () => def.in._zod.values);
-    util.defineLazy(inst._zod, "optin", () => def.in._zod.optin);
-    util.defineLazy(inst._zod, "optout", () => def.out._zod.optout);
-    util.defineLazy(inst._zod, "propValues", () => def.in._zod.propValues);
+    util.defineLazyInternal(inst, "values", (zod) => zod.def.in._zod.values);
+    util.defineLazyInternal(inst, "optin", (zod) => zod.def.in._zod.optin);
+    util.defineLazyInternal(inst, "optout", (zod) => zod.def.out._zod.optout);
+    util.defineLazyInternal(inst, "propValues", (zod) => zod.def.in._zod.propValues);
     inst._zod.parse = (payload, ctx) => {
         const direction = ctx.direction || "forward";
         if (direction === "forward") {
@@ -39616,10 +40587,10 @@ const $ZodPreprocess = /*@__PURE__*/ (/* unused pure expression or super */ null
 })));
 const $ZodReadonly = /*@__PURE__*/ $constructor("$ZodReadonly", (inst, def) => {
     $ZodType.init(inst, def);
-    defineLazy(inst._zod, "propValues", () => def.innerType._zod.propValues);
-    defineLazy(inst._zod, "values", () => def.innerType._zod.values);
-    defineLazy(inst._zod, "optin", () => def.innerType?._zod?.optin);
-    defineLazy(inst._zod, "optout", () => def.innerType?._zod?.optout);
+    defineLazyInternal(inst, "propValues", (zod) => zod.def.innerType._zod.propValues);
+    defineLazyInternal(inst, "values", (zod) => zod.def.innerType._zod.values);
+    defineLazyInternal(inst, "optin", (zod) => zod.def.innerType?._zod?.optin);
+    defineLazyInternal(inst, "optout", (zod) => zod.def.innerType?._zod?.optout);
     inst._zod.parse = (payload, ctx) => {
         if (ctx.direction === "backward") {
             return def.innerType._zod.run(payload, ctx);
@@ -39632,7 +40603,9 @@ const $ZodReadonly = /*@__PURE__*/ $constructor("$ZodReadonly", (inst, def) => {
     };
 });
 function handleReadonlyResult(payload) {
-    payload.value = Object.freeze(payload.value);
+    // A repeat visit hands back a node that is still being built; freezing it here would make the rest of its keys fail to assign.
+    if (!payload.memo)
+        payload.value = Object.freeze(payload.value);
     return payload;
 }
 const $ZodTemplateLiteral = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodTemplateLiteral", (inst, def) => {
@@ -39686,33 +40659,35 @@ const $ZodTemplateLiteral = /*@__PURE__*/ (/* unused pure expression or super */
 })));
 const $ZodFunction = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodFunction", (inst, def) => {
     $ZodType.init(inst, def);
-    inst._def = def;
+    // Defined, not assigned: the classic prototype exposes `_def` as a getter with no setter.
+    Object.defineProperty(inst, "_def", { value: def });
     inst._zod.def = def;
     inst.implement = (func) => {
         if (typeof func !== "function") {
             throw new Error("implement() must be called with a function");
         }
-        return function (...args) {
+        // Defined inline so the closure stays anonymous: binding it to a `const` first names it, which costs 256 bytes per implemented function.
+        return Object.defineProperty(function (...args) {
             const parsedArgs = inst._def.input ? parse(inst._def.input, args) : args;
             const result = Reflect.apply(func, this, parsedArgs);
             if (inst._def.output) {
                 return parse(inst._def.output, result);
             }
             return result;
-        };
+        }, "_zod", { value: inst._zod, enumerable: false });
     };
     inst.implementAsync = (func) => {
         if (typeof func !== "function") {
             throw new Error("implementAsync() must be called with a function");
         }
-        return async function (...args) {
+        return Object.defineProperty(async function (...args) {
             const parsedArgs = inst._def.input ? await parseAsync(inst._def.input, args) : args;
             const result = await Reflect.apply(func, this, parsedArgs);
             if (inst._def.output) {
                 return await parseAsync(inst._def.output, result);
             }
             return result;
-        };
+        }, "_zod", { value: inst._zod, enumerable: false });
     };
     inst._zod.parse = (payload, _ctx) => {
         if (typeof payload.value !== "function") {
@@ -39771,19 +40746,17 @@ const $ZodPromise = /*@__PURE__*/ (/* unused pure expression or super */ null &&
 })));
 const $ZodLazy = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("$ZodLazy", (inst, def) => {
     $ZodType.init(inst, def);
-    // Cache the resolved inner type on the shared `def` so all clones of this
-    // lazy (e.g. via `.describe()`/`.meta()`) share the same inner instance,
-    // preserving identity for cycle detection on recursive schemas.
+    // Cache the resolved inner type on the shared `def` so all clones of this lazy (e.g. via `.describe()`/`.meta()`) share the same inner instance, preserving identity for cycle detection on recursive schemas.
     util.defineLazy(inst._zod, "innerType", () => {
         const d = def;
         if (!d._cachedInner)
             d._cachedInner = def.getter();
         return d._cachedInner;
     });
-    util.defineLazy(inst._zod, "pattern", () => inst._zod.innerType?._zod?.pattern);
-    util.defineLazy(inst._zod, "propValues", () => inst._zod.innerType?._zod?.propValues);
-    util.defineLazy(inst._zod, "optin", () => inst._zod.innerType?._zod?.optin ?? undefined);
-    util.defineLazy(inst._zod, "optout", () => inst._zod.innerType?._zod?.optout ?? undefined);
+    util.defineLazyInternal(inst, "pattern", (zod) => zod.innerType?._zod?.pattern);
+    util.defineLazyInternal(inst, "propValues", (zod) => zod.innerType?._zod?.propValues);
+    util.defineLazyInternal(inst, "optin", (zod) => zod.innerType?._zod?.optin ?? undefined);
+    util.defineLazyInternal(inst, "optout", (zod) => zod.innerType?._zod?.optout ?? undefined);
     inst._zod.parse = (payload, ctx) => {
         const inner = inst._zod.innerType;
         return inner._zod.run(payload, ctx);
@@ -39823,8 +40796,8 @@ function handleRefineResult(result, payload, input, inst) {
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/registries.js
 var registries_a;
-const $output = Symbol("ZodOutput");
-const $input = Symbol("ZodInput");
+const $output = /*@__PURE__*/ (/* unused pure expression or super */ null && (Symbol("ZodOutput")));
+const $input = /*@__PURE__*/ (/* unused pure expression or super */ null && (Symbol("ZodInput")));
 class $ZodRegistry {
     constructor() {
         this._map = new WeakMap();
@@ -40120,6 +41093,16 @@ function _e164(Class, params) {
         check: "string_format",
         abort: false,
         ...normalizeParams(params),
+    });
+}
+// @__NO_SIDE_EFFECTS__
+function _creditCard(Class, params) {
+    return new Class({
+        type: "string",
+        format: "credit_card",
+        check: "string_format",
+        abort: false,
+        ...util.normalizeParams(params),
     });
 }
 // @__NO_SIDE_EFFECTS__
@@ -40541,6 +41524,10 @@ function _property(property, schema, params) {
     });
 }
 // @__NO_SIDE_EFFECTS__
+function _properties(shape) {
+    return Object.entries(shape).map(([property, schema]) => new checks.$ZodCheckProperty({ check: "property", property, schema }));
+}
+// @__NO_SIDE_EFFECTS__
 function _mime(types, params) {
     return new checks.$ZodCheckMimeType({
         check: "mime_type",
@@ -40611,7 +41598,7 @@ function _xor(Class, options, params) {
 function _discriminatedUnion(Class, discriminator, options, params) {
     return new Class({
         type: "union",
-        options,
+        options: options,
         discriminator,
         ...util.normalizeParams(params),
     });
@@ -40768,7 +41755,7 @@ function _catch(Class, innerType, catchValue) {
     return new Class({
         type: "catch",
         innerType,
-        catchValue: (typeof catchValue === "function" ? catchValue : () => catchValue),
+        catchValue: (typeof catchValue === "function" ? catchValue : util.constantCatch(catchValue)),
     });
 }
 // @__NO_SIDE_EFFECTS__
@@ -40844,7 +41831,8 @@ function _superRefine(fn, params) {
                 if (_issue.fatal)
                     _issue.continue = false;
                 _issue.code ?? (_issue.code = "custom");
-                _issue.input ?? (_issue.input = payload.value);
+                if (!("input" in _issue))
+                    _issue.input = payload.value;
                 _issue.inst ?? (_issue.inst = ch);
                 _issue.continue ?? (_issue.continue = !ch._zod.def.abort); // abort is always undefined, so this is always true...
                 payload.issues.push(util_issue(_issue));
@@ -40939,13 +41927,15 @@ function _stringbool(Classes, _params) {
         }),
         error: params.error,
     });
+    codec._zod.bag.truthy = truthyArray;
+    codec._zod.bag.falsy = falsyArray;
+    codec._zod.bag.case = params.case ?? "insensitive";
     return codec;
 }
 // @__NO_SIDE_EFFECTS__
 function _stringFormat(Class, format, fnOrRegex, _params = {}) {
     const params = util.normalizeParams(_params);
     const def = {
-        ...util.normalizeParams(_params),
         check: "string_format",
         type: "string",
         format,
@@ -40961,6 +41951,17 @@ function _stringFormat(Class, format, fnOrRegex, _params = {}) {
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/to-json-schema.js
 
+
+function assignProps(target, ...sources) {
+    for (const source of sources) {
+        for (const key of Reflect.ownKeys(source)) {
+            if (Object.prototype.propertyIsEnumerable.call(source, key)) {
+                util_assignProp(target, key, source[key]);
+            }
+        }
+    }
+    return target;
+}
 // function initializeContext<T extends schemas.$ZodType>(inputs: JSONSchemaGeneratorParams<T>): ToJSONSchemaContext<T> {
 //   return {
 //     processor: inputs.processor,
@@ -40985,10 +41986,30 @@ function to_json_schema_initializeContext(params) {
         io: params?.io ?? "output",
         counter: 0,
         seen: new Map(),
+        sharedDefsExtractedFor: undefined,
+        sharedEmitDoneFor: undefined,
         cycles: params?.cycles ?? "ref",
         reused: params?.reused ?? "inline",
+        intersections: [],
+        deferred: [],
         external: params?.external ?? undefined,
     };
+}
+/**
+ * Applies the `unrepresentable` setting at a site that has no JSON Schema equivalent. Throws
+ * `message` unless the setting (or the handler's return value) says otherwise. Returns `true` if a
+ * custom JSON Schema was written into `json`, in which case the caller must not write its own.
+ */
+function handleUnrepresentable(schema, ctx, json, params, message) {
+    const result = typeof ctx.unrepresentable === "function"
+        ? ctx.unrepresentable({ zodSchema: schema, path: params.path, message })
+        : ctx.unrepresentable;
+    if (result === "any")
+        return false;
+    if (result === undefined || result === "throw")
+        throw new Error(message);
+    Object.assign(json, result);
+    return true;
 }
 function to_json_schema_process(schema, ctx, _params = { path: [], schemaPath: [] }) {
     var _a;
@@ -41007,6 +42028,8 @@ function to_json_schema_process(schema, ctx, _params = { path: [], schemaPath: [
     // initialize
     const result = { schema: {}, count: 1, cycle: undefined, path: _params.path };
     ctx.seen.set(schema, result);
+    ctx.sharedDefsExtractedFor = undefined;
+    ctx.sharedEmitDoneFor = undefined;
     // custom method overrides default behavior
     const overrideSchema = schema._zod.toJSONSchema?.();
     if (overrideSchema) {
@@ -41041,7 +42064,7 @@ function to_json_schema_process(schema, ctx, _params = { path: [], schemaPath: [
     // metadata
     const meta = ctx.metadataRegistry.get(schema);
     if (meta)
-        Object.assign(result.schema, meta);
+        assignProps(result.schema, meta);
     if (ctx.io === "input" && isTransforming(schema)) {
         // examples/defaults only apply to output type of pipe
         delete result.schema.examples;
@@ -41055,6 +42078,10 @@ function to_json_schema_process(schema, ctx, _params = { path: [], schemaPath: [
     const _result = ctx.seen.get(schema);
     return _result.schema;
 }
+// Escape a reference token for use in a JSON Pointer fragment (RFC 6901): `~` becomes `~0` and `/` becomes `~1`. The `~` replacement must run first.
+function encodeJSONPointerSegment(segment) {
+    return segment.replace(/~/g, "~0").replace(/\//g, "~1");
+}
 function to_json_schema_extractDefs(ctx, schema
 // params: EmitParams
 ) {
@@ -41062,6 +42089,9 @@ function to_json_schema_extractDefs(ctx, schema
     const root = ctx.seen.get(schema);
     if (!root)
         throw new Error("Unprocessed schema. This is a bug in Zod.");
+    // With `external` set, every registered schema resolves through the external branch of `makeURI`, so the root branch below produces the same ref the external branch would — this pass is identical whichever schema it is called with, and only needs to run once.
+    if (ctx.external && ctx.sharedDefsExtractedFor === ctx.external)
+        return;
     // Track ids to detect duplicates across different schemas
     const idToSchema = new Map();
     for (const entry of ctx.seen.entries()) {
@@ -41074,12 +42104,9 @@ function to_json_schema_extractDefs(ctx, schema
             idToSchema.set(id, entry[0]);
         }
     }
-    // returns a ref to the schema
-    // defId will be empty if the ref points to an external schema (or #)
+    // returns a ref to the schema defId will be empty if the ref points to an external schema (or #)
     const makeURI = (entry) => {
-        // comparing the seen objects because sometimes
-        // multiple schemas map to the same seen object.
-        // e.g. lazy
+        // comparing the seen objects because sometimes multiple schemas map to the same seen object. e.g. lazy
         // external is configured
         const defsSegment = ctx.target === "draft-2020-12" ? "$defs" : "definitions";
         if (ctx.external) {
@@ -41092,19 +42119,19 @@ function to_json_schema_extractDefs(ctx, schema
             // otherwise, add to __shared
             const id = entry[1].defId ?? entry[1].schema.id ?? `schema${ctx.counter++}`;
             entry[1].defId = id; // set defId so it will be reused if needed
-            return { defId: id, ref: `${uriGenerator("__shared")}#/${defsSegment}/${id}` };
+            return { defId: id, ref: `${uriGenerator("__shared")}#/${defsSegment}/${encodeJSONPointerSegment(id)}` };
         }
-        if (entry[1] === root) {
-            return { ref: "#" };
-        }
-        // self-contained schema
         const uriPrefix = `#`;
         const defUriPrefix = `${uriPrefix}/${defsSegment}/`;
+        // an id-less root has nowhere to be extracted to, so it stays inline and self-references as `#`
+        if (entry[1] === root && !entry[1].schema.id) {
+            return { ref: uriPrefix };
+        }
+        // self-contained schema
         const defId = entry[1].schema.id ?? `__schema${ctx.counter++}`;
-        return { defId, ref: defUriPrefix + defId };
+        return { defId, ref: defUriPrefix + encodeJSONPointerSegment(defId) };
     };
-    // stored cached version in `def` property
-    // remove all properties, set $ref
+    // stored cached version in `def` property remove all properties, set $ref
     const extractToDef = (entry) => {
         // if the schema is already a reference, do not extract it
         if (entry[1].schema.$ref) {
@@ -41113,8 +42140,7 @@ function to_json_schema_extractDefs(ctx, schema
         const seen = entry[1];
         const { ref, defId } = makeURI(entry);
         seen.def = { ...seen.schema };
-        // defId won't be set if the schema is a reference to an external schema
-        // or if the schema is the root schema
+        // defId won't be set if the schema is a reference to an external schema or if the schema is the root schema
         if (defId)
             seen.defId = defId;
         // wipe away all properties except $ref
@@ -41173,6 +42199,143 @@ function to_json_schema_extractDefs(ctx, schema
             }
         }
     }
+    if (ctx.external)
+        ctx.sharedDefsExtractedFor = ctx.external;
+}
+/** Rewrites `anyOf: [{type: "a"}, {type: "b"}]` to `type: ["a", "b"]`, which every JSON Schema draft treats as equivalent and most consumers render far better for the nullable case. Only branches that are a bare type assertion qualify — anything carrying a constraint, `$ref`, `const` or metadata is left alone. Runs after `flattenRef`, so a branch an override decorated or `$defs` extraction turned into a `$ref` is no longer bare and correctly stays in `anyOf`. `oneOf` is excluded: `integer` and `number` overlap, so "exactly one" and "at least one" are not the same there. OpenAPI 3.0 is excluded: its `type` must be a single string. */
+function compactTypeUnion(schema) {
+    const options = schema.anyOf;
+    if (!Array.isArray(options) || options.length === 0 || schema.type !== undefined)
+        return;
+    const types = [];
+    for (const option of options) {
+        if (!option || typeof option !== "object")
+            return;
+        // A branch that is itself a compactible union folds into this one — nested `anyOf` and a flat `type` array say the same thing. Compacting it first also makes the result independent of the order this pass walks the seen map in.
+        compactTypeUnion(option);
+        const keys = Object.keys(option);
+        if (keys.length !== 1 || keys[0] !== "type")
+            return;
+        const type = option.type;
+        for (const member of Array.isArray(type) ? type : [type]) {
+            if (typeof member !== "string")
+                return;
+            if (!types.includes(member))
+                types.push(member);
+        }
+    }
+    delete schema.anyOf;
+    // A `type` array must be non-empty and unique (metaschema); a single member is spelled as a bare string.
+    schema.type = types.length === 1 ? types[0] : types;
+}
+/** Keywords `foldIntersection` knows how to combine. Anything else — `$ref`, `patternProperties`,
+ * an annotation like `description` — makes a member unfoldable, so a constraint this does not
+ * understand leaves the `allOf` alone instead of being silently dropped or misattributed. */
+const FOLDABLE_KEYS = new Set(["type", "properties", "required", "additionalProperties"]);
+const UNION_KEYS = ["oneOf", "anyOf"];
+/** A member's constraint on a key it does not declare itself. A `catchall` states one; `false`, an absent `additionalProperties`, and the empty schema a loose object emits state nothing. */
+function undeclaredConstraint(member) {
+    const extra = member.additionalProperties;
+    if (extra === undefined || extra === false || typeof extra !== "object" || extra === null)
+        return null;
+    return Object.keys(extra).length ? extra : null;
+}
+/** Combines object members into the single object they describe together, or returns `null` if any of them carries a keyword outside {@link FOLDABLE_KEYS}. */
+function foldObjects(members) {
+    const objects = [];
+    for (const member of members) {
+        // A boolean subschema is legal JSON Schema and carries no keywords to fold.
+        if (typeof member !== "object" || member.type !== "object")
+            return null;
+        for (const key in member) {
+            if (!FOLDABLE_KEYS.has(key))
+                return null;
+        }
+        objects.push(member);
+    }
+    const properties = {};
+    const required = new Set();
+    for (const object of objects) {
+        for (const key in object.properties) {
+            // `in` would report a `__proto__` key as already present via the prototype chain and skip it.
+            if (Object.prototype.hasOwnProperty.call(properties, key))
+                continue;
+            // Every member constrains this key: the ones that declare it say how, and a `catchall` member constrains it too even though it does not name it. The key has to satisfy all of them, which is the same intersection one level down.
+            const parts = [];
+            for (const other of objects) {
+                const part = other.properties?.[key] ?? undeclaredConstraint(other);
+                if (part === null || part === undefined)
+                    continue;
+                if (!parts.some((seen) => JSON.stringify(seen) === JSON.stringify(part)))
+                    parts.push(part);
+            }
+            const merged = parts.length === 1
+                ? parts[0]
+                : (foldObjects(parts) ?? { allOf: parts });
+            util_assignProp(properties, key, merged);
+        }
+        for (const key of object.required ?? [])
+            required.add(key);
+    }
+    const folded = { type: "object", properties };
+    if (required.size)
+        folded.required = [...required];
+    // A key no member declares is rejected only when every member rejects it, so the fold is closed only when every member is. Otherwise it carries whatever the `catchall` members demand of such a key.
+    if (objects.every((object) => object.additionalProperties === false)) {
+        folded.additionalProperties = false;
+    }
+    else {
+        const constraints = [];
+        for (const object of objects) {
+            const constraint = undeclaredConstraint(object);
+            if (constraint && !constraints.some((seen) => JSON.stringify(seen) === JSON.stringify(constraint)))
+                constraints.push(constraint);
+        }
+        if (constraints.length === 1)
+            folded.additionalProperties = constraints[0];
+        else if (constraints.length > 1)
+            folded.additionalProperties = { allOf: constraints };
+    }
+    return folded;
+}
+/** `additionalProperties` in an `allOf` member sees only that member's own `properties`, so two
+ * closed object members reject each other's keys and the schema validates nothing. Zod's parser
+ * pools the key sets instead — `handleIntersectionResults` reports a key as unrecognized only when
+ * *every* side rejects it — so the emitted schema has to pool them too, and folding the members
+ * into one object is the encoding that says so on every target.
+ *
+ * This runs from `finalize`, after `extractDefs`, which is what keeps it clear of the `$ref`
+ * machinery: a member extracted into `$defs` is already a `$ref` by now and declines to fold, so it
+ * keeps its reference and its own closedness rather than being inlined as a stale copy. */
+function foldIntersection(json) {
+    const allOf = json.allOf;
+    if (!Array.isArray(allOf) || allOf.length < 2)
+        return;
+    // An `override` runs before this pass and may have written object keywords onto the intersection itself. Those are deliberate, so decline rather than overwrite them.
+    for (const key of FOLDABLE_KEYS)
+        if (key in json)
+            return;
+    // An intersection distributes over a union: `A & (X | Y)` is `(A & X) | (A & Y)`. Only the first union is distributed over; a second one stays among the members every branch folds against, where it fails the object check and declines the whole intersection rather than multiplying out.
+    const unions = allOf.filter((m) => UNION_KEYS.some((k) => Array.isArray(m[k])));
+    let folded = null;
+    if (!unions.length) {
+        folded = foldObjects(allOf);
+    }
+    else {
+        const union = unions[0];
+        const keyword = UNION_KEYS.find((k) => Array.isArray(union[k]));
+        if (Object.keys(union).length !== 1)
+            return;
+        const rest = allOf.filter((m) => m !== union);
+        const branches = union[keyword].map((branch) => foldObjects([...rest, branch]));
+        if (branches.some((b) => !b))
+            return;
+        folded = { [keyword]: branches };
+    }
+    if (!folded)
+        return;
+    delete json.allOf;
+    assignProps(json, folded);
 }
 function to_json_schema_finalize(ctx, schema) {
     const root = ctx.seen.get(schema);
@@ -41199,10 +42362,10 @@ function to_json_schema_finalize(ctx, schema) {
                 schema.allOf.push(refSchema);
             }
             else {
-                Object.assign(schema, refSchema);
+                assignProps(schema, refSchema);
             }
             // restore child's own properties (child wins)
-            Object.assign(schema, _cached);
+            assignProps(schema, _cached);
             const isParentRef = zodSchema._zod.parent === ref;
             // For parent chain, child is a refinement - remove parent-only properties
             if (isParentRef) {
@@ -41225,9 +42388,7 @@ function to_json_schema_finalize(ctx, schema) {
                 }
             }
         }
-        // If parent was extracted (has $ref), propagate $ref to this schema
-        // This handles cases like: readonly().meta({id}).describe()
-        // where processor sets ref to innerType but parent should be referenced
+        // If parent was extracted (has $ref), propagate $ref to this schema. This handles cases like: readonly().meta({id}).describe() where processor sets ref to innerType but parent should be referenced
         const parent = zodSchema._zod.parent;
         if (parent && parent !== ref) {
             // Ensure parent is processed first so its def has inherited properties
@@ -41254,8 +42415,38 @@ function to_json_schema_finalize(ctx, schema) {
             path: seen.path ?? [],
         });
     };
-    for (const entry of [...ctx.seen.entries()].reverse()) {
-        flattenRef(entry[0]);
+    // Flattening walks the whole map and clears each `ref` as it goes, so a second call over the same map is a no-op scan. Skip it outright once it has run for a registry conversion.
+    if (!ctx.external || ctx.sharedEmitDoneFor !== ctx.external) {
+        for (const entry of [...ctx.seen.entries()].reverse()) {
+            flattenRef(entry[0]);
+        }
+        if (ctx.target !== "openapi-3.0") {
+            for (const entry of ctx.seen.entries()) {
+                compactTypeUnion(entry[1].def ?? entry[1].schema);
+            }
+        }
+        for (const rewrite of ctx.deferred)
+            rewrite();
+        // After flattening, every member that was extracted is a `$ref`, so the fold sees the final shape. A schema that inherits an intersection — through `z.lazy`, or any `ref` chain — holds the same `allOf` array, so fold by array identity to catch every copy.
+        if (ctx.intersections.length) {
+            const carriers = new Map();
+            for (const seen of ctx.seen.values()) {
+                for (const json of [seen.schema, seen.def]) {
+                    const allOf = json?.allOf;
+                    if (!Array.isArray(allOf))
+                        continue;
+                    const existing = carriers.get(allOf);
+                    if (existing)
+                        existing.push(json);
+                    else
+                        carriers.set(allOf, [json]);
+                }
+            }
+            for (const allOf of ctx.intersections) {
+                for (const json of carriers.get(allOf) ?? [])
+                    foldIntersection(json);
+            }
+        }
     }
     const result = {};
     if (ctx.target === "draft-2020-12") {
@@ -41279,24 +42470,26 @@ function to_json_schema_finalize(ctx, schema) {
             throw new Error("Schema is missing an `id` property");
         result.$id = ctx.external.uri(id);
     }
-    Object.assign(result, root.def ?? root.schema);
-    // The `id` in `.meta()` is a Zod-specific registration tag used to extract
-    // schemas into $defs — it is not user-facing JSON Schema metadata. Strip it
-    // from the output body where it would otherwise leak. The id is preserved
-    // implicitly via the $defs key (and via $ref paths).
+    // when the root was extracted into $defs, `root.schema` is the `$ref` wrapper and `root.def` is the body that now lives under $defs
+    assignProps(result, root.defId ? root.schema : (root.def ?? root.schema));
+    // The `id` in `.meta()` is a Zod-specific registration tag used to extract schemas into $defs — it is not user-facing JSON Schema metadata. Strip it from the output body where it would otherwise leak. The id is preserved implicitly via the $defs key (and via $ref paths).
     const rootMetaId = ctx.metadataRegistry.get(schema)?.id;
     if (rootMetaId !== undefined && result.id === rootMetaId)
         delete result.id;
-    // build defs object
+    // build defs object. With `external`, `defs` is the shared object every schema writes into, so the same entries are reassigned on every call. Without it, `defs` is fresh per call and must be rebuilt.
     const defs = ctx.external?.defs ?? {};
-    for (const entry of ctx.seen.entries()) {
-        const seen = entry[1];
-        if (seen.def && seen.defId) {
-            if (seen.def.id === seen.defId)
-                delete seen.def.id;
-            defs[seen.defId] = seen.def;
+    if (!ctx.external || ctx.sharedEmitDoneFor !== ctx.external) {
+        for (const entry of ctx.seen.entries()) {
+            const seen = entry[1];
+            if (seen.def && seen.defId) {
+                if (seen.def.id === seen.defId)
+                    delete seen.def.id;
+                util_assignProp(defs, seen.defId, seen.def);
+            }
         }
     }
+    if (ctx.external)
+        ctx.sharedEmitDoneFor = ctx.external;
     // set definitions in result
     if (ctx.external) {
     }
@@ -41311,9 +42504,7 @@ function to_json_schema_finalize(ctx, schema) {
         }
     }
     try {
-        // this "finalizes" this schema and ensures all cycles are removed
-        // each call to finalize() is functionally independent
-        // though the seen map is shared
+        // this "finalizes" this schema and ensures all cycles are removed each call to finalize() is functionally independent though the seen map is shared
         const finalized = JSON.parse(JSON.stringify(result));
         Object.defineProperty(finalized, "~standard", {
             value: {
@@ -41352,7 +42543,8 @@ function isTransforming(_schema, _ctx) {
         def.type === "nullable" ||
         def.type === "readonly" ||
         def.type === "default" ||
-        def.type === "prefault") {
+        def.type === "prefault" ||
+        def.type === "catch") {
         return isTransforming(def.innerType, ctx);
     }
     if (def.type === "intersection") {
@@ -41412,6 +42604,7 @@ const createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params)
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/core/json-schema-processors.js
 
 
+
 const formatMap = {
     guid: "uuid",
     url: "uri",
@@ -41423,7 +42616,7 @@ const formatMap = {
 const stringProcessor = (schema, ctx, _json, _params) => {
     const json = _json;
     json.type = "string";
-    const { minimum, maximum, format, patterns, contentEncoding } = schema._zod
+    const { minimum, maximum, format, patterns, contentEncoding, laxFormat } = schema._zod
         .bag;
     if (typeof minimum === "number")
         json.minLength = minimum;
@@ -41434,21 +42627,20 @@ const stringProcessor = (schema, ctx, _json, _params) => {
         json.format = formatMap[format] ?? format;
         if (json.format === "")
             delete json.format; // empty format is not valid
-        // JSON Schema format: "time" requires a full time with offset or Z
-        // z.iso.time() does not include timezone information, so format: "time" should never be used
-        if (format === "time") {
+        // `z.iso.time()` is never full-time, and `laxFormat` carries the datetime shapes that also accept what their keyword forbids
+        if (format === "time" || laxFormat) {
             delete json.format;
         }
     }
     if (contentEncoding)
         json.contentEncoding = contentEncoding;
     if (patterns && patterns.size > 0) {
-        const regexes = [...patterns];
-        if (regexes.length === 1)
-            json.pattern = regexes[0].source;
-        else if (regexes.length > 1) {
+        const patternList = [...patterns];
+        if (patternList.length === 1)
+            json.pattern = patternList[0].source;
+        else if (patternList.length > 1) {
             json.allOf = [
-                ...regexes.map((regex) => ({
+                ...patternList.map((regex) => ({
                     ...(ctx.target === "draft-07" || ctx.target === "draft-04" || ctx.target === "openapi-3.0"
                         ? { type: "string" }
                         : {}),
@@ -41458,7 +42650,7 @@ const stringProcessor = (schema, ctx, _json, _params) => {
         }
     }
 };
-const numberProcessor = (schema, ctx, _json, _params) => {
+const numberProcessor = (schema, ctx, _json, params) => {
     const json = _json;
     const { minimum, maximum, format, multipleOf, exclusiveMaximum, exclusiveMinimum } = schema._zod.bag;
     if (typeof format === "string" && format.includes("int"))
@@ -41493,21 +42685,22 @@ const numberProcessor = (schema, ctx, _json, _params) => {
     else if (typeof maximum === "number") {
         json.maximum = maximum;
     }
-    if (typeof multipleOf === "number")
-        json.multipleOf = multipleOf;
+    if (typeof multipleOf === "number") {
+        // JSON Schema requires a divisor strictly greater than zero, and a non-finite one does not survive JSON at all. A negative divisor accepts exactly what its absolute value accepts, so it still maps; zero, NaN and Infinity have no keyword form.
+        if (Number.isFinite(multipleOf) && multipleOf !== 0)
+            json.multipleOf = Math.abs(multipleOf);
+        else
+            handleUnrepresentable(schema, ctx, json, params, `A multipleOf divisor of ${multipleOf} cannot be represented in JSON Schema`);
+    }
 };
 const booleanProcessor = (_schema, _ctx, json, _params) => {
     json.type = "boolean";
 };
-const bigintProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("BigInt cannot be represented in JSON Schema");
-    }
+const bigintProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "BigInt cannot be represented in JSON Schema");
 };
-const symbolProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Symbols cannot be represented in JSON Schema");
-    }
+const symbolProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Symbols cannot be represented in JSON Schema");
 };
 const nullProcessor = (_schema, ctx, json, _params) => {
     if (ctx.target === "openapi-3.0") {
@@ -41519,15 +42712,11 @@ const nullProcessor = (_schema, ctx, json, _params) => {
         json.type = "null";
     }
 };
-const undefinedProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Undefined cannot be represented in JSON Schema");
-    }
+const undefinedProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Undefined cannot be represented in JSON Schema");
 };
-const voidProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Void cannot be represented in JSON Schema");
-    }
+const voidProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Void cannot be represented in JSON Schema");
 };
 const neverProcessor = (_schema, _ctx, json, _params) => {
     json.not = {};
@@ -41538,14 +42727,17 @@ const anyProcessor = (_schema, _ctx, _json, _params) => {
 const unknownProcessor = (_schema, _ctx, _json, _params) => {
     // empty schema accepts anything
 };
-const dateProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Date cannot be represented in JSON Schema");
-    }
+const dateProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Date cannot be represented in JSON Schema");
 };
 const enumProcessor = (schema, _ctx, json, _params) => {
     const def = schema._zod.def;
     const values = getEnumValues(def.entries);
+    // an empty enum accepts nothing, same as z.never()
+    if (values.length === 0) {
+        json.not = {};
+        return;
+    }
     // Number enums can have both string and number values
     if (values.every((v) => typeof v === "number"))
         json.type = "number";
@@ -41553,25 +42745,25 @@ const enumProcessor = (schema, _ctx, json, _params) => {
         json.type = "string";
     json.enum = values;
 };
-const literalProcessor = (schema, ctx, json, _params) => {
+const literalProcessor = (schema, ctx, json, params) => {
     const def = schema._zod.def;
+    // a literal with no values accepts nothing, same as z.never()
+    if (def.values.length === 0) {
+        json.not = {};
+        return;
+    }
     const vals = [];
     for (const val of def.values) {
         if (val === undefined) {
-            if (ctx.unrepresentable === "throw") {
-                throw new Error("Literal `undefined` cannot be represented in JSON Schema");
-            }
-            else {
-                // do not add to vals
-            }
+            // a custom schema replaces the whole literal, so there is nothing left to accumulate
+            if (handleUnrepresentable(schema, ctx, json, params, "Literal `undefined` cannot be represented in JSON Schema"))
+                return;
+            // otherwise do not add to vals
         }
         else if (typeof val === "bigint") {
-            if (ctx.unrepresentable === "throw") {
-                throw new Error("BigInt literals cannot be represented in JSON Schema");
-            }
-            else {
-                vals.push(Number(val));
-            }
+            if (handleUnrepresentable(schema, ctx, json, params, "BigInt literals cannot be represented in JSON Schema"))
+                return;
+            vals.push(Number(val));
         }
         else {
             vals.push(val);
@@ -41602,10 +42794,8 @@ const literalProcessor = (schema, ctx, json, _params) => {
         json.enum = vals;
     }
 };
-const nanProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("NaN cannot be represented in JSON Schema");
-    }
+const nanProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "NaN cannot be represented in JSON Schema");
 };
 const templateLiteralProcessor = (schema, _ctx, json, _params) => {
     const _json = json;
@@ -41644,30 +42834,20 @@ const fileProcessor = (schema, _ctx, json, _params) => {
 const successProcessor = (_schema, _ctx, json, _params) => {
     json.type = "boolean";
 };
-const customProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Custom types cannot be represented in JSON Schema");
-    }
+const customProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Custom types cannot be represented in JSON Schema");
 };
-const functionProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Function types cannot be represented in JSON Schema");
-    }
+const functionProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Function types cannot be represented in JSON Schema");
 };
-const transformProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Transforms cannot be represented in JSON Schema");
-    }
+const transformProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Transforms cannot be represented in JSON Schema");
 };
-const mapProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Map cannot be represented in JSON Schema");
-    }
+const mapProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Map cannot be represented in JSON Schema");
 };
-const setProcessor = (_schema, ctx, _json, _params) => {
-    if (ctx.unrepresentable === "throw") {
-        throw new Error("Set cannot be represented in JSON Schema");
-    }
+const setProcessor = (schema, ctx, json, params) => {
+    handleUnrepresentable(schema, ctx, json, params, "Set cannot be represented in JSON Schema");
 };
 // ==================== COMPOSITE TYPE PROCESSORS ====================
 const arrayProcessor = (schema, ctx, _json, params) => {
@@ -41684,27 +42864,49 @@ const arrayProcessor = (schema, ctx, _json, params) => {
         path: [...params.path, "items"],
     });
 };
+// Transform and catch set `optin = "optional"` at runtime so the parser lets them observe an
+// absent key, but their declared input type stays required. An input JSON Schema describes the
+// declared type, so resolve past them to the schema that actually carries the optionality.
+// Used by both `objectProcessor` (for `required`) and `tupleProcessor` (for `minItems`); see
+// wiki/optionality.md, "The JSON Schema emitter reads the *static* value".
+function inputOptin(schema) {
+    const def = schema._zod.def;
+    if (def.type === "pipe" && def.in._zod.traits.has("$ZodTransform")) {
+        return inputOptin(def.out);
+    }
+    if (def.type === "catch") {
+        return inputOptin(def.innerType);
+    }
+    return schema._zod.optin;
+}
 const objectProcessor = (schema, ctx, _json, params) => {
     const json = _json;
     const def = schema._zod.def;
+    const shape = def.shape;
+    // dropping it while still emitting `additionalProperties: false` would emit a schema that rejects data this one requires
+    const symbolKeys = Object.getOwnPropertySymbols(shape);
+    if (symbolKeys.length &&
+        handleUnrepresentable(schema, ctx, json, params, "Symbol keys cannot be represented in JSON Schema")) {
+        return;
+    }
     json.type = "object";
     json.properties = {};
-    const shape = def.shape;
     for (const key in shape) {
-        json.properties[key] = to_json_schema_process(shape[key], ctx, {
+        // assignProp so a __proto__ key becomes an own property instead of hitting the inherited setter on the plain {} we build into
+        util_assignProp(json.properties, key, to_json_schema_process(shape[key], ctx, {
             ...params,
             path: [...params.path, "properties", key],
-        });
+        }));
     }
     // required keys
     const allKeys = new Set(Object.keys(shape));
     const requiredKeys = new Set([...allKeys].filter((key) => {
-        const v = def.shape[key]._zod;
+        const field = def.shape[key];
         if (ctx.io === "input") {
-            return v.optin === undefined;
+            return inputOptin(field) === undefined;
         }
         else {
-            return v.optout === undefined;
+            return field._zod.optout === undefined;
         }
     }));
     if (requiredKeys.size > 0) {
@@ -41729,8 +42931,7 @@ const objectProcessor = (schema, ctx, _json, params) => {
 };
 const unionProcessor = (schema, ctx, json, params) => {
     const def = schema._zod.def;
-    // Exclusive unions (inclusive === false) use oneOf (exactly one match) instead of anyOf (one or more matches)
-    // This includes both z.xor() and discriminated unions
+    // Exclusive unions (inclusive === false) use oneOf (exactly one match) instead of anyOf (one or more matches). This includes both z.xor() and discriminated unions
     const isExclusive = def.inclusive === false;
     const options = def.options.map((x, i) => to_json_schema_process(x, ctx, {
         ...params,
@@ -41759,6 +42960,8 @@ const intersectionProcessor = (schema, ctx, json, params) => {
         ...(isSimpleIntersection(b) ? b.allOf : [b]),
     ];
     json.allOf = allOf;
+    // Recorded innermost first, so a nested intersection has already folded by the time this one is considered. The array is the handle rather than the schema, because a wrapper that inherits this schema shares the same array; `finalize` folds every object holding it. See `foldIntersection`.
+    ctx.intersections.push(allOf);
 };
 const tupleProcessor = (schema, ctx, _json, params) => {
     const json = _json;
@@ -41776,11 +42979,28 @@ const tupleProcessor = (schema, ctx, _json, params) => {
             path: [...params.path, restPath, ...(ctx.target === "openapi-3.0" ? [def.items.length] : [])],
         })
         : null;
+    let minItems = def.items.length;
+    while (minItems > 0) {
+        const item = def.items[minItems - 1];
+        const optional = ctx.io === "input" ? inputOptin(item) !== undefined : item._zod.optout === "optional";
+        if (!optional)
+            break;
+        minItems--;
+    }
+    const maxItems = def.items.length;
+    const isClosed = !def.rest;
     if (ctx.target === "draft-2020-12") {
         json.prefixItems = prefixItems;
-        if (rest) {
+        if (isClosed) {
+            json.items = false;
+        }
+        else if (rest) {
             json.items = rest;
         }
+        if (minItems > 0)
+            json.minItems = minItems;
+        if (isClosed)
+            json.maxItems = maxItems;
     }
     else if (ctx.target === "openapi-3.0") {
         json.items = {
@@ -41789,31 +43009,117 @@ const tupleProcessor = (schema, ctx, _json, params) => {
         if (rest) {
             json.items.anyOf.push(rest);
         }
-        json.minItems = prefixItems.length;
-        if (!rest) {
-            json.maxItems = prefixItems.length;
-        }
+        if (minItems > 0)
+            json.minItems = minItems;
+        if (isClosed)
+            json.maxItems = maxItems;
     }
     else {
         json.items = prefixItems;
-        if (rest) {
+        if (isClosed) {
+            json.additionalItems = false;
+        }
+        else if (rest) {
             json.additionalItems = rest;
         }
+        if (minItems > 0)
+            json.minItems = minItems;
+        if (isClosed)
+            json.maxItems = maxItems;
     }
-    // length
+    // explicit user-defined length checks take precedence
     const { minimum, maximum } = schema._zod.bag;
     if (typeof minimum === "number")
         json.minItems = minimum;
     if (typeof maximum === "number")
         json.maxItems = maximum;
 };
+/** JSON object keys are always strings, so a numeric record key schema is re-expressed over the
+ * numeric-string form the record parser matches. Deferred to `finalize`, after the flatten: a key
+ * behind a wrapper only carries its own `type` before then, and a union key only has its branches.
+ *
+ * A numeric bound cannot apply to a property name, so `minimum` and its siblings are dropped rather
+ * than carried over: keeping them beside `type: "string"` reproduces the match-nothing schema this
+ * exists to fix. A key that carries one therefore emits wider than the record parses — `z.record(z.number().min(5), V)`
+ * accepts `"3"` — which is the deliberate trade, since throwing on it would reject an ordinary schema
+ * outright. */
+function stringifyKeyNames(bySchema, json, visited) {
+    // an extracted key that rewrites cannot go on sharing its definition — the string form a key position needs is not the number form every other reference wants — so it inlines. One that does not rewrite keeps the `$ref`.
+    if (json.$ref) {
+        // a recursive key holds its own reference inside its definition, so a node already on the path is left alone rather than resolved again
+        if (visited.has(json))
+            return json;
+        visited.add(json);
+        const def = bySchema.get(json)?.def;
+        if (!def)
+            return json;
+        const inlined = stringifyKeyNames(bySchema, def, visited);
+        return inlined === def ? json : inlined;
+    }
+    for (const keyword of ["anyOf", "oneOf"]) {
+        const branches = json[keyword];
+        if (!Array.isArray(branches))
+            continue;
+        const mapped = branches.map((branch) => stringifyKeyNames(bySchema, branch, visited));
+        // rebuilding regardless would detach a key that had nothing to re-express, dropping its `$ref` and leaking the internal `id`
+        if (mapped.some((branch, i) => branch !== branches[i]))
+            json = { ...json, [keyword]: mapped };
+    }
+    // a member that already admits a string leaves the key unconstrained, so the node's own type re-expresses only when every member is numeric
+    const types = Array.isArray(json.type) ? json.type : [json.type];
+    const numericType = !types.includes("string") && types.some((t) => t === "number" || t === "integer");
+    // a heterogeneous key carries no type at all, so its numeric members are caught here instead
+    const values = json.enum ?? (json.const !== undefined ? [json.const] : undefined);
+    if (!numericType && !values?.some((v) => typeof v === "number"))
+        return json;
+    const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format, id, ...rest } = json;
+    if (rest.enum)
+        rest.enum = rest.enum.map((v) => (typeof v === "number" ? String(v) : v));
+    else if (typeof rest.const === "number")
+        rest.const = String(rest.const);
+    // a heterogeneous key keeps its absent type: the stringified members already say what a key may be
+    if (!numericType)
+        return rest;
+    rest.type = "string";
+    if (!values)
+        rest.pattern = (types.includes("number") ? number : integer).source;
+    return rest;
+}
+/** Every record of one conversion, so the carriers are found in a single pass rather than once per record. */
+const pendingRecords = new WeakMap();
+function rewriteKeyNames(ctx) {
+    // an extracted key is resolved by the object `extractToDef` left in its place, so the map is built once rather than searched per reference. `_zod.toJSONSchema` can hand the same object to two schemas, so the first entry carrying a body wins, as a search would have found it.
+    const bySchema = new Map();
+    for (const entry of ctx.seen.values()) {
+        if (entry.def && !bySchema.has(entry.schema))
+            bySchema.set(entry.schema, entry);
+    }
+    const rewrites = new Map();
+    for (const record of pendingRecords.get(ctx) ?? []) {
+        const seen = ctx.seen.get(record);
+        const names = (seen?.def ?? seen?.schema)?.propertyNames;
+        if (!names || names === true || rewrites.has(names))
+            continue;
+        const rewritten = stringifyKeyNames(bySchema, names, new Set());
+        if (rewritten !== names)
+            rewrites.set(names, rewritten);
+    }
+    if (!rewrites.size)
+        return;
+    // the flatten has already copied each record's own properties onto every wrapper by reference, and an extracted body is another such copy, so every carrier holding a rewritten key is updated together
+    for (const entry of ctx.seen.values()) {
+        for (const carrier of [entry.schema, entry.def]) {
+            const rewritten = carrier && rewrites.get(carrier.propertyNames);
+            if (rewritten)
+                carrier.propertyNames = rewritten;
+        }
+    }
+}
 const recordProcessor = (schema, ctx, _json, params) => {
     const json = _json;
     const def = schema._zod.def;
     json.type = "object";
-    // For looseRecord with regex patterns, use patternProperties
-    // This correctly represents "only validate keys matching the pattern" semantics
-    // and composes well with allOf (intersections)
+    // For looseRecord with regex patterns, use patternProperties. This correctly represents "only validate keys matching the pattern" semantics and composes well with allOf (intersections)
     const keyType = def.keyType;
     const keyBag = keyType._zod.bag;
     const patterns = keyBag?.patterns;
@@ -41825,7 +43131,7 @@ const recordProcessor = (schema, ctx, _json, params) => {
         });
         json.patternProperties = {};
         for (const pattern of patterns) {
-            json.patternProperties[pattern.source] = valueSchema;
+            util_assignProp(json.patternProperties, pattern.source, valueSchema);
         }
     }
     else {
@@ -41835,6 +43141,13 @@ const recordProcessor = (schema, ctx, _json, params) => {
                 ...params,
                 path: [...params.path, "propertyNames"],
             });
+            let pending = pendingRecords.get(ctx);
+            if (!pending) {
+                pending = [];
+                pendingRecords.set(ctx, pending);
+                ctx.deferred.push(() => rewriteKeyNames(ctx));
+            }
+            pending.push(schema);
         }
         json.additionalProperties = to_json_schema_process(def.valueType, ctx, {
             ...params,
@@ -41843,10 +43156,12 @@ const recordProcessor = (schema, ctx, _json, params) => {
     }
     // Add required for keys with discrete values (enum, literal, etc.)
     const keyValues = keyType._zod.values;
-    if (keyValues) {
+    // Every key shares one value schema, so an optional-in value makes the whole key set omittable on input. Output keeps them: the exhaustive branch assigns every key, even one whose value came back undefined.
+    const omittableOnInput = ctx.io === "input" && inputOptin(def.valueType) !== undefined;
+    if (keyValues && !def.partial && !omittableOnInput) {
         const validKeyValues = [...keyValues].filter((v) => typeof v === "string" || typeof v === "number");
         if (validKeyValues.length > 0) {
-            json.required = validKeyValues;
+            json.required = validKeyValues.map(String);
         }
     }
 };
@@ -41868,20 +43183,42 @@ const nonoptionalProcessor = (schema, ctx, _json, params) => {
     const seen = ctx.seen.get(schema);
     seen.ref = def.innerType;
 };
+/** Round-trips a default value through JSON so the emitted schema is guaranteed to be valid JSON.
+ * A BigInt has no reliable encoding, so it goes through `unrepresentable` like any other
+ * unrepresentable value. Returns a sentinel when the caller must not write a default of its own. */
+const UNREPRESENTABLE_DEFAULT = Symbol();
+function serializeDefaultValue(value, schema, ctx, json, params) {
+    let unrepresentable = false;
+    const serialized = JSON.stringify(value, (_, val) => {
+        if (typeof val !== "bigint")
+            return val;
+        unrepresentable = true;
+        return null;
+    });
+    if (!unrepresentable)
+        return JSON.parse(serialized);
+    handleUnrepresentable(schema, ctx, json, params, "BigInt defaults cannot be represented in JSON Schema");
+    return UNREPRESENTABLE_DEFAULT;
+}
 const defaultProcessor = (schema, ctx, json, params) => {
     const def = schema._zod.def;
     to_json_schema_process(def.innerType, ctx, params);
     const seen = ctx.seen.get(schema);
     seen.ref = def.innerType;
-    json.default = JSON.parse(JSON.stringify(def.defaultValue));
+    const value = serializeDefaultValue(def.defaultValue, schema, ctx, json, params);
+    if (value !== UNREPRESENTABLE_DEFAULT)
+        json.default = value;
 };
 const prefaultProcessor = (schema, ctx, json, params) => {
     const def = schema._zod.def;
     to_json_schema_process(def.innerType, ctx, params);
     const seen = ctx.seen.get(schema);
     seen.ref = def.innerType;
-    if (ctx.io === "input")
-        json._prefault = JSON.parse(JSON.stringify(def.defaultValue));
+    if (ctx.io !== "input")
+        return;
+    const value = serializeDefaultValue(def.defaultValue, schema, ctx, json, params);
+    if (value !== UNREPRESENTABLE_DEFAULT)
+        json._prefault = value;
 };
 const catchProcessor = (schema, ctx, json, params) => {
     const def = schema._zod.def;
@@ -41893,7 +43230,8 @@ const catchProcessor = (schema, ctx, json, params) => {
         catchValue = def.catchValue(undefined);
     }
     catch {
-        throw new Error("Dynamic catch values are not supported in JSON Schema");
+        handleUnrepresentable(schema, ctx, json, params, "Dynamic catch values are not supported in JSON Schema");
+        return;
     }
     json.default = catchValue;
 };
@@ -41995,7 +43333,7 @@ function toJSONSchema(input, params) {
         for (const entry of registry._idmap.entries()) {
             const [key, schema] = entry;
             extractDefs(ctx, schema);
-            schemas[key] = finalize(ctx, schema);
+            assignProp(schemas, key, finalize(ctx, schema));
         }
         if (Object.keys(defs).length > 0) {
             const defsSegment = ctx.target === "draft-2020-12" ? "$defs" : "definitions";
@@ -42012,83 +43350,185 @@ function toJSONSchema(input, params) {
     return finalize(ctx, input);
 }
 
-;// CONCATENATED MODULE: ./node_modules/zod/v4/classic/iso.js
+;// CONCATENATED MODULE: ./node_modules/zod/v4/locales/en.js
 
-
-const ZodISODateTime = /*@__PURE__*/ $constructor("ZodISODateTime", (inst, def) => {
-    $ZodISODateTime.init(inst, def);
-    ZodStringFormat.init(inst, def);
-});
-function iso_datetime(params) {
-    return _isoDateTime(ZodISODateTime, params);
-}
-const ZodISODate = /*@__PURE__*/ $constructor("ZodISODate", (inst, def) => {
-    $ZodISODate.init(inst, def);
-    ZodStringFormat.init(inst, def);
-});
-function iso_date(params) {
-    return _isoDate(ZodISODate, params);
-}
-const ZodISOTime = /*@__PURE__*/ $constructor("ZodISOTime", (inst, def) => {
-    $ZodISOTime.init(inst, def);
-    ZodStringFormat.init(inst, def);
-});
-function iso_time(params) {
-    return _isoTime(ZodISOTime, params);
-}
-const ZodISODuration = /*@__PURE__*/ $constructor("ZodISODuration", (inst, def) => {
-    $ZodISODuration.init(inst, def);
-    ZodStringFormat.init(inst, def);
-});
-function iso_duration(params) {
-    return _isoDuration(ZodISODuration, params);
+const error = () => {
+    const Sizable = {
+        string: { unit: "characters", verb: "to have" },
+        file: { unit: "bytes", verb: "to have" },
+        array: { unit: "items", verb: "to have" },
+        set: { unit: "items", verb: "to have" },
+        map: { unit: "entries", verb: "to have" },
+    };
+    function getSizing(origin) {
+        return Sizable[origin] ?? null;
+    }
+    const FormatDictionary = {
+        regex: "input",
+        email: "email address",
+        url: "URL",
+        emoji: "emoji",
+        uuid: "UUID",
+        uuidv4: "UUIDv4",
+        uuidv6: "UUIDv6",
+        nanoid: "nanoid",
+        guid: "GUID",
+        cuid: "cuid",
+        cuid2: "cuid2",
+        ulid: "ULID",
+        xid: "XID",
+        ksuid: "KSUID",
+        datetime: "ISO datetime",
+        date: "ISO date",
+        time: "ISO time",
+        duration: "ISO duration",
+        ipv4: "IPv4 address",
+        ipv6: "IPv6 address",
+        mac: "MAC address",
+        cidrv4: "IPv4 range",
+        cidrv6: "IPv6 range",
+        base64: "base64-encoded string",
+        base64url: "base64url-encoded string",
+        json_string: "JSON string",
+        e164: "E.164 number",
+        credit_card: "credit card number",
+        jwt: "JWT",
+        template_literal: "input",
+    };
+    // type names: missing keys = do not translate (use raw value via ?? fallback)
+    const TypeDictionary = {
+        // Compatibility: "nan" -> "NaN" for display
+        nan: "NaN",
+        // All other type names omitted - they fall back to raw values via ?? operator
+    };
+    function getTypeName(type, input) {
+        if (type === "number" && typeof input === "number" && !Number.isFinite(input)) {
+            return String(input);
+        }
+        return TypeDictionary[type] ?? type;
+    }
+    return (issue) => {
+        switch (issue.code) {
+            case "invalid_type": {
+                const expected = getTypeName(issue.expected);
+                const receivedType = parsedType(issue.input);
+                const received = getTypeName(receivedType, issue.input);
+                return `Invalid input: expected ${expected}, received ${received}`;
+            }
+            case "invalid_value":
+                if (issue.values.length === 1)
+                    return `Invalid input: expected ${stringifyPrimitive(issue.values[0])}`;
+                return `Invalid option: expected one of ${joinValues(issue.values, "|")}`;
+            case "too_big": {
+                const adj = issue.exact ? "exactly " : issue.inclusive ? "<=" : "<";
+                const sizing = getSizing(issue.origin);
+                if (sizing)
+                    return `Too big: expected ${issue.origin ?? "value"} to have ${adj}${issue.maximum.toString()} ${sizing.unit ?? "elements"}`;
+                return `Too big: expected ${issue.origin ?? "value"} to be ${adj}${issue.maximum.toString()}`;
+            }
+            case "too_small": {
+                const adj = issue.exact ? "exactly " : issue.inclusive ? ">=" : ">";
+                const sizing = getSizing(issue.origin);
+                if (sizing) {
+                    return `Too small: expected ${issue.origin} to have ${adj}${issue.minimum.toString()} ${sizing.unit}`;
+                }
+                return `Too small: expected ${issue.origin} to be ${adj}${issue.minimum.toString()}`;
+            }
+            case "invalid_format": {
+                const _issue = issue;
+                if (_issue.format === "starts_with") {
+                    return `Invalid string: must start with "${_issue.prefix}"`;
+                }
+                if (_issue.format === "ends_with")
+                    return `Invalid string: must end with "${_issue.suffix}"`;
+                if (_issue.format === "includes")
+                    return `Invalid string: must include "${_issue.includes}"`;
+                if (_issue.format === "regex")
+                    return `Invalid string: must match pattern ${_issue.pattern}`;
+                return `Invalid ${FormatDictionary[_issue.format] ?? issue.format}`;
+            }
+            case "not_multiple_of":
+                return `Invalid number: must be a multiple of ${issue.divisor}`;
+            case "unrecognized_keys":
+                return `Unrecognized key${issue.keys.length > 1 ? "s" : ""}: ${joinValues(issue.keys, ", ")}`;
+            case "invalid_key":
+                return `Invalid key in ${issue.origin}`;
+            case "invalid_union":
+                if (issue.options && Array.isArray(issue.options) && issue.options.length > 0) {
+                    const opts = issue.options.map((o) => `'${o}'`).join(" | ");
+                    return `Invalid discriminator value. Expected ${opts}`;
+                }
+                if (issue.inclusive === false) {
+                    return "Invalid input: more than one option matched";
+                }
+                return "Invalid input";
+            case "invalid_element":
+                return `Invalid value in ${issue.origin}`;
+            default:
+                return `Invalid input`;
+        }
+    };
+};
+/* harmony default export */ function en() {
+    return {
+        localeError: error(),
+    };
 }
 
 ;// CONCATENATED MODULE: ./node_modules/zod/v4/classic/errors.js
 
 
 
+/* Prototypes that already carry the lazy helper methods. Seeded with the
+ * intrinsics so that `init` on a foreign object — it accepts any object —
+ * can never install an accessor onto a prototype we do not own. */
+const _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
+/* Helper methods live as non-enumerable lazy getters on the shared
+ * prototype instead of own properties on every instance. On first
+ * access the getter allocates the per-instance closure and caches it
+ * as a non-enumerable own property, so detached usage still works and
+ * the allocation only happens for methods actually touched. */
+function _lazyMethod(proto, key, make) {
+    Object.defineProperty(proto, key, {
+        configurable: true,
+        enumerable: false,
+        get() {
+            const value = make(this);
+            Object.defineProperty(this, key, { value, configurable: true, writable: true });
+            return value;
+        },
+        set(value) {
+            Object.defineProperty(this, key, { value, configurable: true, writable: true });
+        },
+    });
+}
 const errors_initializer = (inst, issues) => {
     $ZodError.init(inst, issues);
     inst.name = "ZodError";
-    Object.defineProperties(inst, {
-        format: {
-            value: (mapper) => formatError(inst, mapper),
-            // enumerable: false,
-        },
-        flatten: {
-            value: (mapper) => flattenError(inst, mapper),
-            // enumerable: false,
-        },
-        addIssue: {
-            value: (issue) => {
-                inst.issues.push(issue);
-                inst.message = JSON.stringify(inst.issues, jsonStringifyReplacer, 2);
-            },
-            // enumerable: false,
-        },
-        addIssues: {
-            value: (issues) => {
-                inst.issues.push(...issues);
-                inst.message = JSON.stringify(inst.issues, jsonStringifyReplacer, 2);
-            },
-            // enumerable: false,
-        },
-        isEmpty: {
-            get() {
-                return inst.issues.length === 0;
-            },
-            // enumerable: false,
+    const proto = Object.getPrototypeOf(inst);
+    if (_installedErrorProtos.has(proto))
+        return;
+    _installedErrorProtos.add(proto);
+    _lazyMethod(proto, "format", (self) => (mapper) => formatError(self, mapper));
+    _lazyMethod(proto, "flatten", (self) => (mapper) => flattenError(self, mapper));
+    _lazyMethod(proto, "addIssue", (self) => (issue) => {
+        self.issues.push(issue);
+        self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
+    });
+    _lazyMethod(proto, "addIssues", (self) => (issues) => {
+        self.issues.push(...issues);
+        self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
+    });
+    Object.defineProperty(proto, "isEmpty", {
+        configurable: true,
+        enumerable: false,
+        get() {
+            return this.issues.length === 0;
         },
     });
-    // Object.defineProperty(inst, "isEmpty", {
-    //   get() {
-    //     return inst.issues.length === 0;
-    //   },
-    // });
 };
 const ZodError = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("ZodError", errors_initializer)));
-const ZodRealError = /*@__PURE__*/ $constructor("ZodError", errors_initializer, {
+const ZodRealError = /*@__PURE__*/ $constructor("ZodError", errors_initializer, undefined, {
     Parent: Error,
 });
 // /** @deprecated Use `z.core.$ZodErrorMapCtx` instead. */
@@ -42101,6 +43541,7 @@ const classic_parse_parse = /* @__PURE__ */ _parse(ZodRealError);
 const classic_parse_parseAsync = /* @__PURE__ */ _parseAsync(ZodRealError);
 const parse_safeParse = /* @__PURE__ */ _safeParse(ZodRealError);
 const parse_safeParseAsync = /* @__PURE__ */ _safeParseAsync(ZodRealError);
+
 // Codec functions
 const parse_encode = /* @__PURE__ */ _encode(ZodRealError);
 const parse_decode = /* @__PURE__ */ _decode(ZodRealError);
@@ -42119,197 +43560,185 @@ const parse_safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
 
 
-// Lazy-bind builder methods.
-//
-// Builder methods (`.optional`, `.array`, `.refine`, ...) live as
-// non-enumerable getters on each concrete schema constructor's
-// prototype. On first access from an instance the getter allocates
-// `fn.bind(this)` and caches it as an own property on that instance,
-// so detached usage (`const m = schema.optional; m()`) still works
-// and the per-instance allocation only happens for methods actually
-// touched.
-//
-// One install per (prototype, group), memoized by `_installedGroups`.
-const _installedGroups = /* @__PURE__ */ new WeakMap();
-function _installLazyMethods(inst, group, methods) {
-    const proto = Object.getPrototypeOf(inst);
-    let installed = _installedGroups.get(proto);
-    if (!installed) {
-        installed = new Set();
-        _installedGroups.set(proto, installed);
-    }
-    if (installed.has(group))
-        return;
-    installed.add(group);
-    for (const key in methods) {
-        const fn = methods[key];
-        Object.defineProperty(proto, key, {
-            configurable: true,
-            enumerable: false,
-            get() {
-                const bound = fn.bind(this);
-                Object.defineProperty(this, key, {
-                    configurable: true,
-                    writable: true,
-                    enumerable: true,
-                    value: bound,
-                });
-                return bound;
-            },
-            set(v) {
-                Object.defineProperty(this, key, {
-                    configurable: true,
-                    writable: true,
-                    enumerable: true,
-                    value: v,
-                });
-            },
-        });
-    }
+// Register English as the default locale on first ZodType construction. Hooked into the `ZodType` `$constructor` (rather than a top-level `config(en())` in `external.ts`) so bundlers honoring `sideEffects: false` can't tree-shake it out — see #5953, #5725. An explicit `z.config(z.locales.xx())` call wins regardless of order, since this only sets the default when none is present.
+function _ensureDefaultLocale() {
+    if (!globalConfig.localeError)
+        config(en());
+}
+// the default memoizer is read by the core container init, which runs before `ZodType.init`, so each container calls this first
+function _ensureDefaultMemoizer() {
+    if (!globalConfig.memoizer)
+        config({ memoizer: memoizer() });
 }
 const ZodType = /*@__PURE__*/ $constructor("ZodType", (inst, def) => {
+    _ensureDefaultLocale();
     $ZodType.init(inst, def);
-    Object.assign(inst["~standard"], {
-        jsonSchema: {
-            input: createStandardJSONSchemaMethod(inst, "input"),
-            output: createStandardJSONSchemaMethod(inst, "output"),
-        },
-    });
-    inst.toJSONSchema = createToJSONSchemaMethod(inst, {});
     inst.def = def;
     inst.type = def.type;
-    Object.defineProperty(inst, "_def", { value: def });
-    // Parse-family is intentionally kept as per-instance closures: these are
-    // the hot path AND the most-detached methods (`arr.map(schema.parse)`,
-    // `const { parse } = schema`, etc.). Eager closures here mean callers pay
-    // ~12 closure allocations per schema but get monomorphic call sites and
-    // detached usage that "just works".
-    inst.parse = (data, params) => classic_parse_parse(inst, data, params, { callee: inst.parse });
-    inst.safeParse = (data, params) => parse_safeParse(inst, data, params);
-    inst.parseAsync = async (data, params) => classic_parse_parseAsync(inst, data, params, { callee: inst.parseAsync });
-    inst.safeParseAsync = async (data, params) => parse_safeParseAsync(inst, data, params);
-    inst.spa = inst.safeParseAsync;
-    inst.encode = (data, params) => parse_encode(inst, data, params);
-    inst.decode = (data, params) => parse_decode(inst, data, params);
-    inst.encodeAsync = async (data, params) => parse_encodeAsync(inst, data, params);
-    inst.decodeAsync = async (data, params) => parse_decodeAsync(inst, data, params);
-    inst.safeEncode = (data, params) => parse_safeEncode(inst, data, params);
-    inst.safeDecode = (data, params) => parse_safeDecode(inst, data, params);
-    inst.safeEncodeAsync = async (data, params) => parse_safeEncodeAsync(inst, data, params);
-    inst.safeDecodeAsync = async (data, params) => parse_safeDecodeAsync(inst, data, params);
-    // All builder methods are placed on the internal prototype as lazy-bind
-    // getters. On first access per-instance, a bound thunk is allocated and
-    // cached as an own property; subsequent accesses skip the getter. This
-    // means: no per-instance allocation for unused methods, full
-    // detachability preserved (`const m = schema.optional; m()` works), and
-    // shared underlying function references across all instances.
-    _installLazyMethods(inst, "ZodType", {
-        check(...chks) {
-            const def = this.def;
-            return this.clone(mergeDefs(def, {
-                checks: [
-                    ...(def.checks ?? []),
-                    ...chks.map((ch) => typeof ch === "function" ? { _zod: { check: ch, def: { check: "custom" }, onattach: [] } } : ch),
-                ],
-            }), { parent: true });
-        },
-        with(...chks) {
-            return this.check(...chks);
-        },
-        clone(def, params) {
-            return clone(this, def, params);
-        },
-        brand() {
-            return this;
-        },
-        register(reg, meta) {
-            reg.add(this, meta);
-            return this;
-        },
-        refine(check, params) {
-            return this.check(refine(check, params));
-        },
-        superRefine(refinement, params) {
-            return this.check(superRefine(refinement, params));
-        },
-        overwrite(fn) {
-            return this.check(_overwrite(fn));
-        },
-        optional() {
-            return optional(this);
-        },
-        exactOptional() {
-            return exactOptional(this);
-        },
-        nullable() {
-            return nullable(this);
-        },
-        nullish() {
-            return optional(nullable(this));
-        },
-        nonoptional(params) {
-            return nonoptional(this, params);
-        },
-        array() {
-            return array(this);
-        },
-        or(arg) {
-            return union([this, arg]);
-        },
-        and(arg) {
-            return intersection(this, arg);
-        },
-        transform(tx) {
-            return pipe(this, transform(tx));
-        },
-        default(d) {
-            return schemas_default(this, d);
-        },
-        prefault(d) {
-            return prefault(this, d);
-        },
-        catch(params) {
-            return schemas_catch(this, params);
-        },
-        pipe(target) {
-            return pipe(this, target);
-        },
-        readonly() {
-            return readonly(this);
-        },
-        describe(description) {
-            const cl = this.clone();
-            globalRegistry.add(cl, { description });
-            return cl;
-        },
-        meta(...args) {
-            // overloaded: meta() returns the registered metadata, meta(data)
-            // returns a clone with `data` registered. The mapped type picks
-            // up the second overload, so we accept variadic any-args and
-            // return `any` to satisfy both at runtime.
-            if (args.length === 0)
-                return globalRegistry.get(this);
-            const cl = this.clone();
-            globalRegistry.add(cl, args[0]);
-            return cl;
-        },
-        isOptional() {
-            return this.safeParse(undefined).success;
-        },
-        isNullable() {
-            return this.safeParse(null).success;
-        },
-        apply(fn) {
-            return fn(this);
-        },
-    });
-    Object.defineProperty(inst, "description", {
-        get() {
-            return globalRegistry.get(inst)?.description;
-        },
-        configurable: true,
-    });
     return inst;
+}, {
+    check(...chks) {
+        const def = this.def;
+        return this.clone(mergeDefs(def, {
+            checks: [
+                ...(def.checks ?? []),
+                ...chks.map((ch) => typeof ch === "function" ? { _zod: { check: ch, def: { check: "custom" }, onattach: [] } } : ch),
+            ],
+        }), { parent: true });
+    },
+    with(...chks) {
+        return this.check(...chks);
+    },
+    clone(def, params) {
+        return clone(this, def, params);
+    },
+    brand() {
+        return this;
+    },
+    register(reg, meta) {
+        reg.add(this, meta);
+        return this;
+    },
+    refine(check, params) {
+        return this.check(refine(check, params));
+    },
+    superRefine(refinement, params) {
+        return this.check(superRefine(refinement, params));
+    },
+    overwrite(fn) {
+        return this.check(_overwrite(fn));
+    },
+    optional() {
+        return optional(this);
+    },
+    exactOptional() {
+        return exactOptional(this);
+    },
+    nullable() {
+        return nullable(this);
+    },
+    nullish() {
+        return optional(nullable(this));
+    },
+    nonoptional(params) {
+        return nonoptional(this, params);
+    },
+    array() {
+        return array(this);
+    },
+    or(arg) {
+        return union([this, arg]);
+    },
+    and(arg) {
+        return intersection(this, arg);
+    },
+    transform(tx) {
+        return pipe(this, transform(tx));
+    },
+    default(d) {
+        return schemas_default(this, d);
+    },
+    prefault(d) {
+        return prefault(this, d);
+    },
+    catch(params) {
+        return schemas_catch(this, params);
+    },
+    pipe(target) {
+        return pipe(this, target);
+    },
+    readonly() {
+        return readonly(this);
+    },
+    describe(description) {
+        const cl = this.clone();
+        globalRegistry.add(cl, { description });
+        return cl;
+    },
+    meta(...args) {
+        // overloaded: meta() returns the registered metadata, meta(data) returns a clone with `data` registered. The mapped type picks up the second overload, so we accept variadic any-args and return `any` to satisfy both at runtime.
+        if (args.length === 0)
+            return globalRegistry.get(this);
+        const cl = this.clone();
+        globalRegistry.add(cl, args[0]);
+        return cl;
+    },
+    isOptional() {
+        return this.safeParse(undefined).success;
+    },
+    isNullable() {
+        return this.safeParse(null).success;
+    },
+    apply(fn, ...args) {
+        return args.length === 0 ? fn(this) : fn(this, ...args);
+    },
+    // Overrides core's `~standard` to add `jsonSchema`. Must stay a prototype entry: redefining it per instance demotes instances to dictionary mode.
+    get "~standard"() {
+        return hide(this, "~standard", {
+            ...standardProps(this),
+            jsonSchema: {
+                input: createStandardJSONSchemaMethod(this, "input"),
+                output: createStandardJSONSchemaMethod(this, "output"),
+            },
+        });
+    },
+    set "~standard"(value) {
+        own(this, "~standard", value);
+    },
+    parse: function _parse(data, params) {
+        return classic_parse_parse(this, data, params, { callee: _parse });
+    },
+    parseAsync: async function _parseAsync(data, params) {
+        return await classic_parse_parseAsync(this, data, params, { callee: _parseAsync });
+    },
+    safeParse(data, params) {
+        return parse_safeParse(this, data, params);
+    },
+    async safeParseAsync(data, params) {
+        return parse_safeParseAsync(this, data, params);
+    },
+    // `spa` is an alias: same function object as `safeParseAsync`, as before.
+    get spa() {
+        return this?.safeParseAsync;
+    },
+    set spa(value) {
+        own(this, "spa", value);
+    },
+    encode: function _encode(data, params) {
+        return parse_encode(this, data, params, { callee: _encode });
+    },
+    decode: function _decode(data, params) {
+        return parse_decode(this, data, params, { callee: _decode });
+    },
+    encodeAsync: async function _encodeAsync(data, params) {
+        return await parse_encodeAsync(this, data, params, { callee: _encodeAsync });
+    },
+    decodeAsync: async function _decodeAsync(data, params) {
+        return await parse_decodeAsync(this, data, params, { callee: _decodeAsync });
+    },
+    safeEncode(data, params) {
+        return parse_safeEncode(this, data, params);
+    },
+    safeDecode(data, params) {
+        return parse_safeDecode(this, data, params);
+    },
+    async safeEncodeAsync(data, params) {
+        return parse_safeEncodeAsync(this, data, params);
+    },
+    async safeDecodeAsync(data, params) {
+        return parse_safeDecodeAsync(this, data, params);
+    },
+    toJSONSchema(params) {
+        return createToJSONSchemaMethod(this, {})(params);
+    },
+    // Reads through to the registry on every access, so it must not cache.
+    get description() {
+        return globalRegistry.get(this)?.description;
+    },
+    // No setter: `schema._def = x` throws, as it did when `_def` was a non-writable own property.
+    get _def() {
+        return this._zod.def;
+    },
 });
 /** @internal */
 const _ZodString = /*@__PURE__*/ $constructor("_ZodString", (inst, def) => {
@@ -42320,85 +43749,135 @@ const _ZodString = /*@__PURE__*/ $constructor("_ZodString", (inst, def) => {
     inst.format = bag.format ?? null;
     inst.minLength = bag.minimum ?? null;
     inst.maxLength = bag.maximum ?? null;
-    _installLazyMethods(inst, "_ZodString", {
-        regex(...args) {
-            return this.check(_regex(...args));
-        },
-        includes(...args) {
-            return this.check(_includes(...args));
-        },
-        startsWith(...args) {
-            return this.check(_startsWith(...args));
-        },
-        endsWith(...args) {
-            return this.check(_endsWith(...args));
-        },
-        min(...args) {
-            return this.check(_minLength(...args));
-        },
-        max(...args) {
-            return this.check(_maxLength(...args));
-        },
-        length(...args) {
-            return this.check(_length(...args));
-        },
-        nonempty(...args) {
-            return this.check(_minLength(1, ...args));
-        },
-        lowercase(params) {
-            return this.check(_lowercase(params));
-        },
-        uppercase(params) {
-            return this.check(_uppercase(params));
-        },
-        trim() {
-            return this.check(_trim());
-        },
-        normalize(...args) {
-            return this.check(_normalize(...args));
-        },
-        toLowerCase() {
-            return this.check(_toLowerCase());
-        },
-        toUpperCase() {
-            return this.check(_toUpperCase());
-        },
-        slugify() {
-            return this.check(_slugify());
-        },
-    });
+}, {
+    regex(...args) {
+        return this.check(_regex(...args));
+    },
+    includes(...args) {
+        return this.check(_includes(...args));
+    },
+    startsWith(...args) {
+        return this.check(_startsWith(...args));
+    },
+    endsWith(...args) {
+        return this.check(_endsWith(...args));
+    },
+    min(...args) {
+        return this.check(_minLength(...args));
+    },
+    max(...args) {
+        return this.check(_maxLength(...args));
+    },
+    length(...args) {
+        return this.check(_length(...args));
+    },
+    nonempty(...args) {
+        return this.check(_minLength(1, ...args));
+    },
+    lowercase(params) {
+        return this.check(_lowercase(params));
+    },
+    uppercase(params) {
+        return this.check(_uppercase(params));
+    },
+    trim() {
+        return this.check(_trim());
+    },
+    normalize(...args) {
+        return this.check(_normalize(...args));
+    },
+    toLowerCase() {
+        return this.check(_toLowerCase());
+    },
+    toUpperCase() {
+        return this.check(_toUpperCase());
+    },
+    slugify() {
+        return this.check(_slugify());
+    },
 });
 const ZodString = /*@__PURE__*/ $constructor("ZodString", (inst, def) => {
     $ZodString.init(inst, def);
     _ZodString.init(inst, def);
-    inst.email = (params) => inst.check(_email(ZodEmail, params));
-    inst.url = (params) => inst.check(_url(ZodURL, params));
-    inst.jwt = (params) => inst.check(_jwt(ZodJWT, params));
-    inst.emoji = (params) => inst.check(api_emoji(ZodEmoji, params));
-    inst.guid = (params) => inst.check(_guid(ZodGUID, params));
-    inst.uuid = (params) => inst.check(_uuid(ZodUUID, params));
-    inst.uuidv4 = (params) => inst.check(_uuidv4(ZodUUID, params));
-    inst.uuidv6 = (params) => inst.check(_uuidv6(ZodUUID, params));
-    inst.uuidv7 = (params) => inst.check(_uuidv7(ZodUUID, params));
-    inst.nanoid = (params) => inst.check(_nanoid(ZodNanoID, params));
-    inst.guid = (params) => inst.check(_guid(ZodGUID, params));
-    inst.cuid = (params) => inst.check(_cuid(ZodCUID, params));
-    inst.cuid2 = (params) => inst.check(_cuid2(ZodCUID2, params));
-    inst.ulid = (params) => inst.check(_ulid(ZodULID, params));
-    inst.base64 = (params) => inst.check(_base64(ZodBase64, params));
-    inst.base64url = (params) => inst.check(_base64url(ZodBase64URL, params));
-    inst.xid = (params) => inst.check(_xid(ZodXID, params));
-    inst.ksuid = (params) => inst.check(_ksuid(ZodKSUID, params));
-    inst.ipv4 = (params) => inst.check(_ipv4(ZodIPv4, params));
-    inst.ipv6 = (params) => inst.check(_ipv6(ZodIPv6, params));
-    inst.cidrv4 = (params) => inst.check(_cidrv4(ZodCIDRv4, params));
-    inst.cidrv6 = (params) => inst.check(_cidrv6(ZodCIDRv6, params));
-    inst.e164 = (params) => inst.check(_e164(ZodE164, params));
-    // iso
-    inst.datetime = (params) => inst.check(iso_datetime(params));
-    inst.date = (params) => inst.check(iso_date(params));
-    inst.time = (params) => inst.check(iso_time(params));
-    inst.duration = (params) => inst.check(iso_duration(params));
+}, {
+    email(params) {
+        return this.check(_email(ZodEmail, params));
+    },
+    url(params) {
+        return this.check(_url(ZodURL, params));
+    },
+    jwt(params) {
+        return this.check(_jwt(ZodJWT, params));
+    },
+    emoji(params) {
+        return this.check(api_emoji(ZodEmoji, params));
+    },
+    guid(params) {
+        return this.check(_guid(ZodGUID, params));
+    },
+    uuid(params) {
+        return this.check(_uuid(ZodUUID, params));
+    },
+    uuidv4(params) {
+        return this.check(_uuidv4(ZodUUID, params));
+    },
+    uuidv6(params) {
+        return this.check(_uuidv6(ZodUUID, params));
+    },
+    uuidv7(params) {
+        return this.check(_uuidv7(ZodUUID, params));
+    },
+    nanoid(params) {
+        return this.check(_nanoid(ZodNanoID, params));
+    },
+    cuid(params) {
+        return this.check(_cuid(ZodCUID, params));
+    },
+    cuid2(params) {
+        return this.check(_cuid2(ZodCUID2, params));
+    },
+    ulid(params) {
+        return this.check(_ulid(ZodULID, params));
+    },
+    base64(params) {
+        return this.check(_base64(ZodBase64, params));
+    },
+    base64url(params) {
+        return this.check(_base64url(ZodBase64URL, params));
+    },
+    xid(params) {
+        return this.check(_xid(ZodXID, params));
+    },
+    ksuid(params) {
+        return this.check(_ksuid(ZodKSUID, params));
+    },
+    ipv4(params) {
+        return this.check(_ipv4(ZodIPv4, params));
+    },
+    ipv6(params) {
+        return this.check(_ipv6(ZodIPv6, params));
+    },
+    cidrv4(params) {
+        return this.check(_cidrv4(ZodCIDRv4, params));
+    },
+    cidrv6(params) {
+        return this.check(_cidrv6(ZodCIDRv6, params));
+    },
+    e164(params) {
+        return this.check(_e164(ZodE164, params));
+    },
+    datetime(params) {
+        return this.check(_isoDateTime(ZodISODateTime, params));
+    },
+    date(params) {
+        return this.check(_isoDate(ZodISODate, params));
+    },
+    time(params) {
+        return this.check(_isoTime(ZodISOTime, params));
+    },
+    duration(params) {
+        return this.check(_isoDuration(ZodISODuration, params));
+    },
 });
 function schemas_string(params) {
     return _string(ZodString, params);
@@ -42406,6 +43885,22 @@ function schemas_string(params) {
 const ZodStringFormat = /*@__PURE__*/ $constructor("ZodStringFormat", (inst, def) => {
     $ZodStringFormat.init(inst, def);
     _ZodString.init(inst, def);
+});
+const ZodISODateTime = /*@__PURE__*/ $constructor("ZodISODateTime", (inst, def) => {
+    $ZodISODateTime.init(inst, def);
+    ZodStringFormat.init(inst, def);
+});
+const ZodISODate = /*@__PURE__*/ $constructor("ZodISODate", (inst, def) => {
+    $ZodISODate.init(inst, def);
+    ZodStringFormat.init(inst, def);
+});
+const ZodISOTime = /*@__PURE__*/ $constructor("ZodISOTime", (inst, def) => {
+    $ZodISOTime.init(inst, def);
+    ZodStringFormat.init(inst, def);
+});
+const ZodISODuration = /*@__PURE__*/ $constructor("ZodISODuration", (inst, def) => {
+    $ZodISODuration.init(inst, def);
+    ZodStringFormat.init(inst, def);
 });
 const ZodEmail = /*@__PURE__*/ $constructor("ZodEmail", (inst, def) => {
     // ZodStringFormat.init(inst, def);
@@ -42587,6 +44082,13 @@ const ZodE164 = /*@__PURE__*/ $constructor("ZodE164", (inst, def) => {
 function schemas_e164(params) {
     return core._e164(ZodE164, params);
 }
+const ZodCreditCard = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("ZodCreditCard", (inst, def) => {
+    core.$ZodCreditCard.init(inst, def);
+    ZodStringFormat.init(inst, def);
+})));
+function schemas_creditCard(params) {
+    return core._creditCard(ZodCreditCard, params);
+}
 const ZodJWT = /*@__PURE__*/ $constructor("ZodJWT", (inst, def) => {
     // ZodStringFormat.init(inst, def);
     $ZodJWT.init(inst, def);
@@ -42621,53 +44123,6 @@ const ZodNumber = /*@__PURE__*/ $constructor("ZodNumber", (inst, def) => {
     $ZodNumber.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json, params) => numberProcessor(inst, ctx, json, params);
-    _installLazyMethods(inst, "ZodNumber", {
-        gt(value, params) {
-            return this.check(_gt(value, params));
-        },
-        gte(value, params) {
-            return this.check(_gte(value, params));
-        },
-        min(value, params) {
-            return this.check(_gte(value, params));
-        },
-        lt(value, params) {
-            return this.check(_lt(value, params));
-        },
-        lte(value, params) {
-            return this.check(_lte(value, params));
-        },
-        max(value, params) {
-            return this.check(_lte(value, params));
-        },
-        int(params) {
-            return this.check(schemas_int(params));
-        },
-        safe(params) {
-            return this.check(schemas_int(params));
-        },
-        positive(params) {
-            return this.check(_gt(0, params));
-        },
-        nonnegative(params) {
-            return this.check(_gte(0, params));
-        },
-        negative(params) {
-            return this.check(_lt(0, params));
-        },
-        nonpositive(params) {
-            return this.check(_lte(0, params));
-        },
-        multipleOf(value, params) {
-            return this.check(_multipleOf(value, params));
-        },
-        step(value, params) {
-            return this.check(_multipleOf(value, params));
-        },
-        finite() {
-            return this;
-        },
-    });
     const bag = inst._zod.bag;
     inst.minValue =
         Math.max(bag.minimum ?? Number.NEGATIVE_INFINITY, bag.exclusiveMinimum ?? Number.NEGATIVE_INFINITY) ?? null;
@@ -42676,6 +44131,52 @@ const ZodNumber = /*@__PURE__*/ $constructor("ZodNumber", (inst, def) => {
     inst.isInt = (bag.format ?? "").includes("int") || Number.isSafeInteger(bag.multipleOf ?? 0.5);
     inst.isFinite = true;
     inst.format = bag.format ?? null;
+}, {
+    gt(value, params) {
+        return this.check(_gt(value, params));
+    },
+    gte(value, params) {
+        return this.check(_gte(value, params));
+    },
+    min(value, params) {
+        return this.check(_gte(value, params));
+    },
+    lt(value, params) {
+        return this.check(_lt(value, params));
+    },
+    lte(value, params) {
+        return this.check(_lte(value, params));
+    },
+    max(value, params) {
+        return this.check(_lte(value, params));
+    },
+    int(params) {
+        return this.check(schemas_int(params));
+    },
+    safe(params) {
+        return this.check(schemas_int(params));
+    },
+    positive(params) {
+        return this.check(_gt(0, params));
+    },
+    nonnegative(params) {
+        return this.check(_gte(0, params));
+    },
+    negative(params) {
+        return this.check(_lt(0, params));
+    },
+    nonpositive(params) {
+        return this.check(_lte(0, params));
+    },
+    multipleOf(value, params) {
+        return this.check(_multipleOf(value, params));
+    },
+    step(value, params) {
+        return this.check(_multipleOf(value, params));
+    },
+    finite() {
+        return this;
+    },
 });
 function schemas_number(params) {
     return _number(ZodNumber, params);
@@ -42707,28 +44208,49 @@ const ZodBoolean = /*@__PURE__*/ $constructor("ZodBoolean", (inst, def) => {
 function schemas_boolean(params) {
     return _boolean(ZodBoolean, params);
 }
-const ZodBigInt = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("ZodBigInt", (inst, def) => {
-    core.$ZodBigInt.init(inst, def);
+const ZodBigInt = /*@__PURE__*/ $constructor("ZodBigInt", (inst, def) => {
+    $ZodBigInt.init(inst, def);
     ZodType.init(inst, def);
-    inst._zod.processJSONSchema = (ctx, json, params) => processors.bigintProcessor(inst, ctx, json, params);
-    inst.gte = (value, params) => inst.check(checks.gte(value, params));
-    inst.min = (value, params) => inst.check(checks.gte(value, params));
-    inst.gt = (value, params) => inst.check(checks.gt(value, params));
-    inst.gte = (value, params) => inst.check(checks.gte(value, params));
-    inst.min = (value, params) => inst.check(checks.gte(value, params));
-    inst.lt = (value, params) => inst.check(checks.lt(value, params));
-    inst.lte = (value, params) => inst.check(checks.lte(value, params));
-    inst.max = (value, params) => inst.check(checks.lte(value, params));
-    inst.positive = (params) => inst.check(checks.gt(BigInt(0), params));
-    inst.negative = (params) => inst.check(checks.lt(BigInt(0), params));
-    inst.nonpositive = (params) => inst.check(checks.lte(BigInt(0), params));
-    inst.nonnegative = (params) => inst.check(checks.gte(BigInt(0), params));
-    inst.multipleOf = (value, params) => inst.check(checks.multipleOf(value, params));
+    inst._zod.processJSONSchema = (ctx, json, params) => bigintProcessor(inst, ctx, json, params);
     const bag = inst._zod.bag;
     inst.minValue = bag.minimum ?? null;
     inst.maxValue = bag.maximum ?? null;
     inst.format = bag.format ?? null;
-})));
+}, {
+    gte(value, params) {
+        return this.check(_gte(value, params));
+    },
+    min(value, params) {
+        return this.check(_gte(value, params));
+    },
+    gt(value, params) {
+        return this.check(_gt(value, params));
+    },
+    lt(value, params) {
+        return this.check(_lt(value, params));
+    },
+    lte(value, params) {
+        return this.check(_lte(value, params));
+    },
+    max(value, params) {
+        return this.check(_lte(value, params));
+    },
+    positive(params) {
+        return this.check(_gt(BigInt(0), params));
+    },
+    negative(params) {
+        return this.check(_lt(BigInt(0), params));
+    },
+    nonpositive(params) {
+        return this.check(_lte(BigInt(0), params));
+    },
+    nonnegative(params) {
+        return this.check(_gte(BigInt(0), params));
+    },
+    multipleOf(value, params) {
+        return this.check(_multipleOf(value, params));
+    },
+});
 function schemas_bigint(params) {
     return core._bigint(ZodBigInt, params);
 }
@@ -42736,11 +44258,9 @@ const ZodBigIntFormat = /*@__PURE__*/ (/* unused pure expression or super */ nul
     core.$ZodBigIntFormat.init(inst, def);
     ZodBigInt.init(inst, def);
 })));
-// int64
 function int64(params) {
     return core._int64(ZodBigIntFormat, params);
 }
-// uint64
 function uint64(params) {
     return core._uint64(ZodBigIntFormat, params);
 }
@@ -42817,27 +44337,27 @@ function schemas_date(params) {
     return core._date(ZodDate, params);
 }
 const ZodArray = /*@__PURE__*/ $constructor("ZodArray", (inst, def) => {
+    _ensureDefaultMemoizer();
     $ZodArray.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json, params) => arrayProcessor(inst, ctx, json, params);
     inst.element = def.element;
-    _installLazyMethods(inst, "ZodArray", {
-        min(n, params) {
-            return this.check(_minLength(n, params));
-        },
-        nonempty(params) {
-            return this.check(_minLength(1, params));
-        },
-        max(n, params) {
-            return this.check(_maxLength(n, params));
-        },
-        length(n, params) {
-            return this.check(_length(n, params));
-        },
-        unwrap() {
-            return this.element;
-        },
-    });
+}, {
+    min(n, params) {
+        return this.check(_minLength(n, params));
+    },
+    nonempty(params) {
+        return this.check(_minLength(1, params));
+    },
+    max(n, params) {
+        return this.check(_maxLength(n, params));
+    },
+    length(n, params) {
+        return this.check(_length(n, params));
+    },
+    unwrap() {
+        return this.element;
+    },
 });
 function array(element, params) {
     return _array(ZodArray, element, params);
@@ -42848,53 +44368,54 @@ function keyof(schema) {
     return schemas_enum(Object.keys(shape));
 }
 const ZodObject = /*@__PURE__*/ $constructor("ZodObject", (inst, def) => {
+    _ensureDefaultMemoizer();
     $ZodObjectJIT.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json, params) => objectProcessor(inst, ctx, json, params);
-    defineLazy(inst, "shape", () => {
-        return def.shape;
-    });
-    _installLazyMethods(inst, "ZodObject", {
-        keyof() {
-            return schemas_enum(Object.keys(this._zod.def.shape));
-        },
-        catchall(catchall) {
-            return this.clone({ ...this._zod.def, catchall: catchall });
-        },
-        passthrough() {
-            return this.clone({ ...this._zod.def, catchall: unknown() });
-        },
-        loose() {
-            return this.clone({ ...this._zod.def, catchall: unknown() });
-        },
-        strict() {
-            return this.clone({ ...this._zod.def, catchall: never() });
-        },
-        strip() {
-            return this.clone({ ...this._zod.def, catchall: undefined });
-        },
-        extend(incoming) {
-            return extend(this, incoming);
-        },
-        safeExtend(incoming) {
-            return safeExtend(this, incoming);
-        },
-        merge(other) {
-            return merge(this, other);
-        },
-        pick(mask) {
-            return pick(this, mask);
-        },
-        omit(mask) {
-            return omit(this, mask);
-        },
-        partial(...args) {
-            return partial(ZodOptional, this, args[0]);
-        },
-        required(...args) {
-            return required(ZodNonOptional, this, args[0]);
-        },
-    });
+    installLazyProp(inst, "shape", (self) => self._zod.def.shape, false);
+}, {
+    keyof() {
+        return schemas_enum(Object.keys(this._zod.def.shape));
+    },
+    catchall(catchall) {
+        return this.clone({ ...this._zod.def, catchall: catchall });
+    },
+    passthrough() {
+        return this.clone({ ...this._zod.def, catchall: unknown() });
+    },
+    loose() {
+        return this.clone({ ...this._zod.def, catchall: unknown() });
+    },
+    strict() {
+        return this.clone({ ...this._zod.def, catchall: never() });
+    },
+    strip() {
+        return this.clone({ ...this._zod.def, catchall: undefined });
+    },
+    extend(incoming) {
+        return extend(this, incoming);
+    },
+    safeExtend(incoming) {
+        return safeExtend(this, incoming);
+    },
+    merge(other) {
+        return merge(this, other);
+    },
+    pick(mask) {
+        return pick(this, mask);
+    },
+    omit(mask) {
+        return omit(this, mask);
+    },
+    partial(...args) {
+        return partial(ZodOptional, this, args[0]);
+    },
+    exactPartial(...args) {
+        return partial(ZodExactOptional, this, args[0], "exactPartial");
+    },
+    required(...args) {
+        return required(ZodNonOptional, this, args[0]);
+    },
 });
 function object(shape, params) {
     const def = {
@@ -42960,7 +44481,7 @@ function discriminatedUnion(discriminator, options, params) {
     // const [options, params] = args;
     return new ZodDiscriminatedUnion({
         type: "union",
-        options,
+        options: options,
         discriminator,
         ...util.normalizeParams(params),
     });
@@ -42977,15 +44498,29 @@ function intersection(left, right) {
         right: right,
     });
 }
-const ZodTuple = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("ZodTuple", (inst, def) => {
-    core.$ZodTuple.init(inst, def);
+const ZodTuple = /*@__PURE__*/ $constructor("ZodTuple", (inst, def) => {
+    _ensureDefaultMemoizer();
+    $ZodTuple.init(inst, def);
     ZodType.init(inst, def);
-    inst._zod.processJSONSchema = (ctx, json, params) => processors.tupleProcessor(inst, ctx, json, params);
-    inst.rest = (rest) => inst.clone({
-        ...inst._zod.def,
-        rest: rest,
-    });
-})));
+    inst._zod.processJSONSchema = (ctx, json, params) => tupleProcessor(inst, ctx, json, params);
+}, {
+    rest(rest) {
+        return this.clone({
+            ...this._zod.def,
+            rest: rest,
+        });
+    },
+    partial() {
+        const def = this._zod.def;
+        // a refinement was authored against the full arity; partialing would run it on a shorter array
+        if (def.checks?.length)
+            throw new Error(".partial() cannot be used on tuple schemas containing refinements");
+        return this.clone({
+            ...def,
+            items: def.items.map((item) => new ZodOptional({ type: "optional", innerType: item })),
+        });
+    },
+});
 function tuple(items, _paramsOrRest, _params) {
     const hasRest = _paramsOrRest instanceof core.$ZodType;
     const params = hasRest ? _params : _paramsOrRest;
@@ -42998,6 +44533,7 @@ function tuple(items, _paramsOrRest, _params) {
     });
 }
 const ZodRecord = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("ZodRecord", (inst, def) => {
+    _ensureDefaultMemoizer();
     core.$ZodRecord.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json, params) => processors.recordProcessor(inst, ctx, json, params);
@@ -43023,13 +44559,12 @@ function record(keyType, valueType, params) {
 }
 // type alksjf = core.output<core.$ZodRecordKey>;
 function partialRecord(keyType, valueType, params) {
-    const k = core.clone(keyType);
-    k._zod.values = undefined;
     return new ZodRecord({
         type: "record",
-        keyType: k,
+        keyType,
         valueType: valueType,
         ...util.normalizeParams(params),
+        partial: true,
     });
 }
 function looseRecord(keyType, valueType, params) {
@@ -43042,6 +44577,7 @@ function looseRecord(keyType, valueType, params) {
     });
 }
 const ZodMap = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("ZodMap", (inst, def) => {
+    _ensureDefaultMemoizer();
     core.$ZodMap.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json, params) => processors.mapProcessor(inst, ctx, json, params);
@@ -43061,6 +44597,7 @@ function map(keyType, valueType, params) {
     });
 }
 const ZodSet = /*@__PURE__*/ (/* unused pure expression or super */ null && (core.$constructor("ZodSet", (inst, def) => {
+    _ensureDefaultMemoizer();
     core.$ZodSet.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json, params) => processors.setProcessor(inst, ctx, json, params);
@@ -43172,6 +44709,7 @@ function file(params) {
     return core._file(ZodFile, params);
 }
 const ZodTransform = /*@__PURE__*/ $constructor("ZodTransform", (inst, def) => {
+    _ensureDefaultMemoizer();
     $ZodTransform.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json, params) => transformProcessor(inst, ctx, json, params);
@@ -43189,7 +44727,8 @@ const ZodTransform = /*@__PURE__*/ $constructor("ZodTransform", (inst, def) => {
                 if (_issue.fatal)
                     _issue.continue = false;
                 _issue.code ?? (_issue.code = "custom");
-                _issue.input ?? (_issue.input = payload.value);
+                if (!("input" in _issue))
+                    _issue.input = payload.value;
                 _issue.inst ?? (_issue.inst = inst);
                 // _issue.continue ??= true;
                 payload.issues.push(util_issue(_issue));
@@ -43199,12 +44738,10 @@ const ZodTransform = /*@__PURE__*/ $constructor("ZodTransform", (inst, def) => {
         if (output instanceof Promise) {
             return output.then((output) => {
                 payload.value = output;
-                payload.fallback = true;
                 return payload;
             });
         }
         payload.value = output;
-        payload.fallback = true;
         return payload;
     };
 });
@@ -43321,7 +44858,7 @@ function schemas_catch(innerType, catchValue) {
     return new ZodCatch({
         type: "catch",
         innerType: innerType,
-        catchValue: (typeof catchValue === "function" ? catchValue : () => catchValue),
+        catchValue: (typeof catchValue === "function" ? catchValue : constantCatch(catchValue)),
     });
 }
 
@@ -45152,6 +46689,184 @@ async function loadAllSkillMetadata(options = {}) {
 
 /***/ }),
 
+/***/ 4281:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   Gg: () => (/* binding */ CWD_DEFAULTS),
+/* harmony export */   Vy: () => (/* binding */ resolveAllArtifacts)
+/* harmony export */ });
+/* unused harmony export resolveArtifact */
+/* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(6760);
+/* harmony import */ var node_fs_promises__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(1455);
+/**
+ * Artifact Input resolver — #802 Phase 2b
+ *
+ * Resolution order (per artifact-input-contract.md):
+ *   1. CLI arg     – path passed explicitly by the caller
+ *   2. config      – artifacts.<id> in river.config.*
+ *   3. cwd default – well-known filename in the working directory
+ *
+ * Pure module: no singleton state; fs is injectable.
+ * Scope: resolve path + existence check only.
+ * Content reading / skill injection / CLI parsing → Phase 3.
+ */
+
+
+
+
+// CWD default filenames (from artifact-input-contract.md)
+
+/** @type {Readonly<Record<string, string>>} */
+const CWD_DEFAULTS = Object.freeze({
+  'pbi-input': 'pbi-input.md',
+  plan: 'plan.md',
+  todo: 'todo.md',
+  'test-cases': 'test-cases.md',
+  'review-self': 'review-self.md',
+  'review-external': 'review-external.md',
+  diff: 'diff.patch',
+  junit: 'junit.xml',
+  coverage: 'coverage.xml',
+  lint: 'lint.json',
+  typecheck: 'typecheck.txt',
+  'findings-pool': 'findings-pool.json',
+  'tdd-ledger': 'tdd-ledger.json',
+});
+
+/**
+ * @typedef {'cli'|'config'|'cwd'} ArtifactSource
+ * @typedef {object} ArtifactResolution
+ * @property {string}              id
+ * @property {string|null}         path
+ * @property {ArtifactSource|null} source
+ * @property {boolean}             exists
+ * @property {boolean}             optional
+ */
+
+/**
+ * Resolve a single artifact path using the three-tier order.
+ *
+ * Path base: CLI → cwd; config → configDir ?? cwd; cwd-default → cwd.
+ *
+ * @param {object} opts
+ * @param {string} opts.id
+ * @param {string|null} [opts.cliArg]
+ * @param {string|{path:string,optional?:boolean}|null} [opts.configValue]
+ * @param {string} [opts.configDir]
+ * @param {string} [opts.cwd]
+ * @param {Pick<import('node:fs/promises'),'access'>} [opts.fsImpl]
+ * @returns {Promise<ArtifactResolution>}
+ */
+async function resolveArtifact({
+  id,
+  cliArg = null,
+  configValue = null,
+  configDir,
+  cwd = process.cwd(),
+  fsImpl = node_fs_promises__WEBPACK_IMPORTED_MODULE_1__,
+}) {
+  // Tier 1: CLI arg
+  if (cliArg != null && cliArg !== '') {
+    const resolved = node_path__WEBPACK_IMPORTED_MODULE_0__.resolve(cwd, cliArg);
+    const exists = await _fileExists(resolved, fsImpl);
+    return { id, path: resolved, source: 'cli', exists, optional: false };
+  }
+
+  // Tier 2: config value
+  if (configValue != null) {
+    const base = configDir ?? cwd;
+    const { rawPath, optional } = _normalizeConfigValue(configValue);
+    if (rawPath) {
+      const resolved = node_path__WEBPACK_IMPORTED_MODULE_0__.resolve(base, rawPath);
+      const exists = await _fileExists(resolved, fsImpl);
+      return { id, path: resolved, source: 'config', exists, optional: optional ?? false };
+    }
+  }
+
+  // Tier 3: cwd default (only if the file exists)
+  const defaultName = CWD_DEFAULTS[id];
+  if (defaultName) {
+    const resolved = node_path__WEBPACK_IMPORTED_MODULE_0__.resolve(cwd, defaultName);
+    const exists = await _fileExists(resolved, fsImpl);
+    if (exists) {
+      return { id, path: resolved, source: 'cwd', exists: true, optional: true };
+    }
+  }
+
+  // Not found
+  return { id, path: null, source: null, exists: false, optional: true };
+}
+
+/**
+ * Resolve all artifact IDs in parallel.
+ *
+ * The ID set is the union of the contract's known IDs (CWD_DEFAULTS) plus
+ * any IDs explicitly named via cliArgs or configArtifacts. Explicitly
+ * named IDs are never silently dropped — this keeps the resolver
+ * consistent with the Phase 2a schema, which accepts unknown artifact
+ * keys via `.catchall` so the contract can add IDs in a
+ * backward-compatible minor bump. cwd-default lookup still only applies
+ * to known IDs (CWD_DEFAULTS); an unknown ID resolves only if supplied
+ * via CLI/config, otherwise it reports path:null/source:null.
+ *
+ * @param {object} [opts]
+ * @param {Record<string,string>} [opts.cliArgs]
+ * @param {Record<string,string|{path:string,optional?:boolean}>} [opts.configArtifacts]
+ * @param {string} [opts.configDir]
+ * @param {string} [opts.cwd]
+ * @param {Pick<import('node:fs/promises'),'access'>} [opts.fsImpl]
+ * @returns {Promise<Record<string, ArtifactResolution>>}
+ */
+async function resolveAllArtifacts({
+  cliArgs = {},
+  configArtifacts = {},
+  configDir,
+  cwd,
+  fsImpl,
+} = {}) {
+  const ids = new Set([
+    ...Object.keys(CWD_DEFAULTS),
+    ...Object.keys(cliArgs),
+    ...Object.keys(configArtifacts),
+  ]);
+  const entries = await Promise.all(
+    [...ids].map((id) =>
+      resolveArtifact({
+        id,
+        cliArg: cliArgs[id] ?? null,
+        configValue: configArtifacts[id] ?? null,
+        configDir,
+        cwd,
+        fsImpl,
+      }).then((r) => [id, r])
+    )
+  );
+  return Object.fromEntries(entries);
+}
+
+// Internal helpers
+
+function _normalizeConfigValue(value) {
+  if (typeof value === 'string') return { rawPath: value || null, optional: false };
+  if (value && typeof value === 'object') {
+    return { rawPath: value.path || null, optional: value.optional ?? false };
+  }
+  return { rawPath: null, optional: false };
+}
+
+async function _fileExists(filePath, fsImpl) {
+  try {
+    await fsImpl.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+/***/ }),
+
 /***/ 4807:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
@@ -45210,8 +46925,8 @@ var external_node_os_ = __nccwpck_require__(8161);
 var external_node_path_ = __nccwpck_require__(6760);
 // EXTERNAL MODULE: ./node_modules/js-yaml/dist/js-yaml.mjs
 var js_yaml = __nccwpck_require__(3243);
-// EXTERNAL MODULE: ./node_modules/zod/v4/classic/schemas.js + 16 modules
-var schemas = __nccwpck_require__(2314);
+// EXTERNAL MODULE: ./node_modules/zod/v4/classic/schemas.js + 17 modules
+var schemas = __nccwpck_require__(8816);
 ;// CONCATENATED MODULE: ./src/config/schema.mjs
 
 
@@ -45447,6 +47162,7 @@ const artifactPathConfigSchema = schemas/* union */.KC([
 const artifactsConfigSchema = schemas/* object */.Ik({
     'pbi-input': artifactPathConfigSchema.optional(),
     plan: artifactPathConfigSchema.optional(),
+    design: artifactPathConfigSchema.optional(),
     todo: artifactPathConfigSchema.optional(),
     'test-cases': artifactPathConfigSchema.optional(),
     'review-self': artifactPathConfigSchema.optional(),
@@ -46403,6 +48119,930 @@ function extractDiffMeta(diff) {
     hasMigrations: fileTypes.migration.length > 0,
     hasSchemas: fileTypes.schema.length > 0,
   };
+}
+
+
+/***/ }),
+
+/***/ 3055:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   Fs: () => (/* binding */ deriveFlowPin),
+/* harmony export */   Vo: () => (/* binding */ resolveExecutionManifestSpec),
+/* harmony export */   attachExecutionManifest: () => (/* binding */ attachExecutionManifest),
+/* harmony export */   eD: () => (/* binding */ buildExecutionManifest),
+/* harmony export */   zy: () => (/* binding */ verifyExecutionManifest)
+/* harmony export */ });
+/* unused harmony exports EXECUTION_MANIFEST_SCHEMA_VERSION, EXECUTION_MANIFEST_ID_PREFIX, PROVENANCE_STATUS, REPLAY_CLASSES, REPLAY_REQUIREMENTS, REPLAY_PINS, PROVENANCE_BLOCKS, ExecutionManifestError, assertNoRawContext, normalizeSha256, assessReplayability, formatExecutionManifestMarkdown */
+/* harmony import */ var _promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(3077);
+/* harmony import */ var _shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4029);
+/* harmony import */ var _secret_redactor_mjs__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(12);
+// Execution Manifest (#2015, Epic #2011 Phase 4).
+//
+// Pins "what River Review used to judge" for ONE review run into a single
+// content-addressed document: the River Review version, the plugin host, the
+// flow, the agents, the skills, the input artifacts, the policy, the runtime
+// and the effective config. A later reader re-derives the digests with
+// `verifyExecutionManifest` to detect a rewrite, and asks
+// `assessReplayability` whether the manifest is complete enough to replay at
+// all.
+//
+// Scope boundary (fixed by #2015 "Non-goals" and its "やること" list): this
+// module is the MANIFEST CONTRACT and the RESOLVER. It never executes a
+// replay, never invokes a reviewer, an LLM or a provider, and never writes a
+// file. Everything it returns is a plain object built from its arguments.
+//
+// Why this is NOT an extension of `buildExperimentManifest`
+// (src/lib/paired-replay.mjs:614): that manifest pins an EXPERIMENT — two
+// configurations (baseline / candidate), a dataset of already-produced run
+// records, acceptance profiles, trial counts. Its required subject is a pair
+// of run sets, so every block it owns (`baseline`, `candidate`, `dataset`,
+// `acceptance`, `trials`, `verifier`) is meaningless for a single review run,
+// and every block #2015 requires (`plugin`, `flow`, `agents`, `skills`,
+// `policy`, `config`) is absent from it. Generalizing one document to cover
+// both subjects would make roughly a dozen fields conditionally required on a
+// `kind` discriminator, which is a weaker contract than two documents that are
+// each `additionalProperties: false`. What IS shared is the DERIVATION, and
+// that is imported rather than re-typed — see the import block below.
+//
+// Explicit non-goals (#2015): hidden chain-of-thought, raw tool output, raw
+// sensitive context, and byte-for-byte LLM replay. The manifest carries ids,
+// versions and hashes only; `assertNoRawContext` below is the mechanical guard
+// that keeps it that way.
+
+
+
+
+
+/** Schema version of the manifest document. */
+const EXECUTION_MANIFEST_SCHEMA_VERSION = 1;
+
+/**
+ * Prefix of the manifest id. Deliberately distinct from `RR-PC-`
+ * (promotion candidate) and `RR-EXP-` (experiment manifest): three
+ * content-addressed namespaces already exist, and an id whose namespace is
+ * ambiguous cannot be looked up.
+ */
+const EXECUTION_MANIFEST_ID_PREFIX = 'RR-EXM-';
+
+const MANIFEST_ID_HASH_LENGTH = 12;
+
+/**
+ * Resolution status of one provenance block.
+ *
+ * The vocabulary is closed because the whole point of #2015 AC 3 is that a
+ * missing block must not read as a present one. `unavailable` and `missing`
+ * are kept apart on purpose: `unavailable` means this deployment has no such
+ * source at all (there is no flow definition to pin), while `missing` means
+ * the source exists but this run did not record it.
+ */
+const PROVENANCE_STATUS = Object.freeze(['resolved', 'missing', 'unavailable']);
+
+/**
+ * Replay classes #2015 distinguishes.
+ *
+ * `deterministic` covers routing / refs / coverage / hashes / gate derivation
+ * — same inputs must give the same result. `judgment` covers agentic output,
+ * compared semantically (critical-finding recall, taxonomy, severity,
+ * criterion coverage, completion state), never byte-for-byte.
+ */
+const REPLAY_CLASSES = Object.freeze(['deterministic', 'judgment']);
+
+/**
+ * Blocks each replay class requires.
+ *
+ * Deterministic replay reproduces routing and hash derivation, so it needs
+ * whatever decides the route: the flow, the skills, the input artifacts, the
+ * policy and the config. Judgment replay additionally needs the runtime and
+ * the agent roster, because the same flow under a different model is a
+ * different judgment.
+ */
+const REPLAY_REQUIREMENTS = Object.freeze({
+  deterministic: Object.freeze(['flow', 'skills', 'artifacts', 'policy', 'config']),
+  judgment: Object.freeze(['flow', 'skills', 'artifacts', 'policy', 'config', 'agents', 'runtime']),
+});
+
+/**
+ * Identifier fields a required block must actually carry before replay may
+ * treat it as pinned.
+ *
+ * `status: 'resolved'` answers "did this run record the block at all?" — it is
+ * deliberately reachable from a partial recording (a flow with an `id` but no
+ * checksum resolves, because the id IS what was recorded). Replay asks a
+ * second, stricter question: "is what was recorded enough to re-derive the
+ * same route?" Without this map the two questions collapse into one, and a
+ * manifest whose every hash is `null` reports `deterministic: true` — exactly
+ * the "manifest 欠損を replay 可能と誤認しない" failure #2015 forbids.
+ *
+ * Only `flow` and `policy` appear here. The other required blocks already
+ * fold pin-completeness into their own status: `skills` resolves only when
+ * every entry has a `sha256` (`normalizeSkills`), `artifacts` likewise
+ * (`normalizeArtifacts`), and `config` resolves only from a `sha256`
+ * (`normalizeConfig`). `agents` and `runtime` are required by `judgment`
+ * replay alone, which is compared semantically — the roster ids and the
+ * provider/model pair are the comparison keys, so no extra pin applies.
+ *
+ * `policy` demands `sha256` specifically and NOT `riskMapDigest`:
+ * `riskMapDigest` is a 16-hex truncation of the risk map
+ * (src/lib/review-plan.mjs), not a digest of the policy document, so it cannot
+ * detect that the policy text changed between run and replay.
+ */
+const REPLAY_PINS = Object.freeze({
+  flow: Object.freeze(['sha256']),
+  policy: Object.freeze(['sha256']),
+});
+
+/** Provenance blocks the manifest carries, in document order. */
+const PROVENANCE_BLOCKS = Object.freeze([
+  'riverReview',
+  'plugin',
+  'flow',
+  'agents',
+  'skills',
+  'artifacts',
+  'policy',
+  'runtime',
+  'config',
+]);
+
+class ExecutionManifestError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ExecutionManifestError';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Redaction (#2015 AC 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Keys whose VALUE is a free-form string this module refuses to carry.
+ *
+ * Structural rejection comes first because redaction is pattern-based and
+ * therefore incomplete: `redactText` finds tokens that look like secrets, not
+ * a pasted diff or a prompt. The manifest has no field that legitimately holds
+ * either, so the safe rule is that these names never appear at all.
+ */
+const FORBIDDEN_KEYS = Object.freeze([
+  'prompt',
+  'promptPreview',
+  'rawLlmOutput',
+  'reasoning',
+  'thinking',
+  'chainOfThought',
+  'toolOutput',
+  'stdout',
+  'stderr',
+  'diff',
+  'patch',
+  'content',
+  'body',
+  'text',
+  'env',
+  'environment',
+  'secret',
+  'secrets',
+  'token',
+  'accessToken',
+  'apiKey',
+  'authorization',
+  'password',
+  'credentials',
+  'cookie',
+]);
+
+/**
+ * Fold a key to the form the forbidden set is compared against.
+ *
+ * Case alone is not enough: the same field arrives as `apiKey`, `api_key` and
+ * `API-KEY` depending on which layer produced it, and a guard that only lowers
+ * the case lets two of those three through. Separators carry no meaning in a
+ * field NAME, so they are dropped before the comparison.
+ *
+ * @param {string} key
+ * @returns {string}
+ */
+const foldKeyName = (key) => key.toLowerCase().replace(/[-_]/g, '');
+
+const FORBIDDEN_KEY_SET = new Set(FORBIDDEN_KEYS.map(foldKeyName));
+
+/** Containers whose own keys are data labels, not field names. */
+const DATA_KEY_PATHS = new Set(['spec.artifacts']);
+
+/**
+ * Reject any key that would turn the manifest into a context dump.
+ *
+ * This runs on the CALLER-SUPPLIED spec before normalization, so a resolver
+ * that starts handing through a raw field fails loudly here instead of writing
+ * it into a stored artifact. Depth-first with a path so the error names the
+ * offending location rather than the document.
+ *
+ * `dataKeyPaths` names the containers whose OWN keys are data labels rather
+ * than field names. `spec.artifacts` is keyed by artifact name, and `diff` is
+ * one of the names #2015 itself lists — banning it there would reject the
+ * documented manifest. The VALUES under such a container are still checked,
+ * and `normalizeArtifacts` reduces each of them to a sha256 regardless.
+ *
+ * @param {unknown} value
+ * @param {string} [path]
+ * @param {{ dataKeyPaths?: Set<string> }} [options]
+ */
+function assertNoRawContext(value, path = 'spec', { dataKeyPaths = DATA_KEY_PATHS } = {}) {
+  if (value == null || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    value.forEach((item, i) => assertNoRawContext(item, `${path}[${i}]`, { dataKeyPaths }));
+    return;
+  }
+  const keysAreData = dataKeyPaths.has(path);
+  for (const [key, child] of Object.entries(value)) {
+    if (!keysAreData && FORBIDDEN_KEY_SET.has(foldKeyName(key))) {
+      throw new ExecutionManifestError(
+        `${path}.${key} is not allowed in an execution manifest: the manifest records ids, versions and hashes only (#2015 non-goals — no hidden CoT, no raw tool output, no raw sensitive context).`
+      );
+    }
+    assertNoRawContext(child, `${path}.${key}`, { dataKeyPaths });
+  }
+}
+
+/**
+ * Redact every string leaf, counting the hits.
+ *
+ * Defense in depth behind `assertNoRawContext`: the structural check owns the
+ * fields that must not exist, and this owns the values that slipped into a
+ * field that may exist (a model name typed as `gpt-4o?key=sk-...`, a profile
+ * label carrying a token). Redaction happens BEFORE every digest this module
+ * stores — `manifestKey` / `manifestHash` AND `skills.skillSetHash` — so each
+ * one re-derives from the values actually written. Redacting afterwards would
+ * make every manifest fail `verifyExecutionManifest`; computing one digest
+ * ahead of redaction (as `skillSetHash` did until #2032) is the quieter
+ * version of the same bug, because `verifyExecutionManifest` does not cover
+ * `skillSetHash` and the mismatch surfaces only when a reader recomputes it.
+ *
+ * @param {unknown} value
+ * @param {{ hits: Map<string, number> }} acc
+ * @returns {unknown} the same shape with redacted string leaves
+ */
+function redactDeep(value, acc) {
+  if (typeof value === 'string') {
+    const { text, hits } = (0,_secret_redactor_mjs__WEBPACK_IMPORTED_MODULE_2__/* .redactText */ .Rd)(value);
+    for (const hit of hits)
+      acc.hits.set(hit.category, (acc.hits.get(hit.category) ?? 0) + hit.count);
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((item) => redactDeep(item, acc));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value)) out[key] = redactDeep(value[key], acc);
+    return out;
+  }
+  return value;
+}
+
+// ---------------------------------------------------------------------------
+// Block normalization
+// ---------------------------------------------------------------------------
+
+function compareStrings(a, b) {
+  const left = a ?? '';
+  const right = b ?? '';
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+/**
+ * Normalize a sha256 to bare lowercase hex, accepting the `sha256:` prefix
+ * `docs/data/skill-manifest.json` stores its checksums with.
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function normalizeSha256(value) {
+  const raw = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(value);
+  if (!raw) return null;
+  const bare = (raw.startsWith('sha256:') ? raw.slice('sha256:'.length) : raw).toLowerCase();
+  return SHA256_PATTERN.test(bare) ? bare : null;
+}
+
+/**
+ * Wrap a resolved block value with its resolution status (#2015 AC 3).
+ *
+ * `null` never stands alone in this document. A block that is simply absent
+ * and a block that resolved to nothing are indistinguishable once both are
+ * `null`, and that ambiguity is precisely how a run gets misread as
+ * replayable.
+ */
+function block(status, value) {
+  if (!PROVENANCE_STATUS.includes(status)) {
+    throw new ExecutionManifestError(
+      `Unknown provenance status "${status}". Expected one of: ${PROVENANCE_STATUS.join(', ')}.`
+    );
+  }
+  return { status, ...value };
+}
+
+function statusOf(present, { unavailable = false } = {}) {
+  if (present) return 'resolved';
+  return unavailable ? 'unavailable' : 'missing';
+}
+
+function normalizeRiverReview(spec) {
+  const version = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(spec?.riverReview?.version);
+  return block(statusOf(version != null), { version: version ?? null });
+}
+
+function normalizePlugin(spec) {
+  const host = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(spec?.plugin?.host);
+  const pluginVersion = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(spec?.plugin?.pluginVersion);
+  return block(statusOf(host != null && pluginVersion != null), {
+    host: host ?? null,
+    pluginVersion: pluginVersion ?? null,
+  });
+}
+
+function normalizeFlow(spec) {
+  const flow = spec?.flow;
+  const id = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(flow?.id);
+  return block(statusOf(id != null), {
+    id: id ?? null,
+    version: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(flow?.version) ?? null,
+    sha256: normalizeSha256(flow?.sha256),
+  });
+}
+
+function normalizeAgents(spec) {
+  const agents = spec?.agents;
+  if (agents == null) return block('missing', { entries: [] });
+  if (!Array.isArray(agents)) {
+    throw new ExecutionManifestError('agents must be an array or null.');
+  }
+  const entries = agents
+    .map((agent) => ({
+      id: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(agent?.id),
+      version: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(agent?.version) ?? null,
+      sha256: normalizeSha256(agent?.sha256),
+    }))
+    .filter((agent) => agent.id != null)
+    .sort((a, b) => compareStrings(a.id, b.id));
+  // An empty roster is `unavailable`, not `resolved`: "no agents ran" and "we
+  // failed to record which agents ran" would otherwise both serialize as [].
+  return block(statusOf(entries.length > 0, { unavailable: agents.length === 0 }), { entries });
+}
+
+/**
+ * One digest over the whole selected skill set, so a consumer can compare two
+ * runs' skill selection without walking the array.
+ *
+ * Always called on the REDACTED entries (see `buildExecutionManifest`): the
+ * digest has to be re-derivable from the entries the manifest stores, and a
+ * skill id that trips `redactText` is stored redacted.
+ *
+ * @param {Array<object>} entries
+ * @returns {string|null}
+ */
+function computeSkillSetHash(entries) {
+  return entries.length ? (0,_shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_1__/* .sha256Hex */ .fg)((0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .canonicalJson */ .dj)(entries)) : null;
+}
+
+function normalizeSkills(spec) {
+  const skills = spec?.skills;
+  if (skills == null) return block('missing', { entries: [], skillSetHash: null });
+  if (!Array.isArray(skills)) {
+    throw new ExecutionManifestError('skills must be an array or null.');
+  }
+  const entries = skills
+    .map((skill) => ({
+      id: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(skill?.id),
+      version: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(skill?.version) ?? null,
+      sha256: normalizeSha256(skill?.sha256),
+    }))
+    .filter((skill) => skill.id != null)
+    .sort((a, b) => compareStrings(a.id, b.id));
+  // A skill selected but not checksummed is a partial resolution: the id alone
+  // cannot detect that the skill's text changed between run and replay.
+  const complete = entries.length > 0 && entries.every((s) => s.sha256 != null);
+  return block(statusOf(complete, { unavailable: skills.length === 0 }), {
+    entries,
+    // Placeholder only. `buildExecutionManifest` fills this in from the
+    // REDACTED entries; deriving it here would pin the pre-redaction ids.
+    skillSetHash: null,
+  });
+}
+
+function normalizeArtifacts(spec) {
+  const artifacts = spec?.artifacts;
+  if (artifacts == null) return block('missing', { entries: [] });
+  if (typeof artifacts !== 'object' || Array.isArray(artifacts)) {
+    throw new ExecutionManifestError(
+      'artifacts must be an object keyed by artifact name, or null.'
+    );
+  }
+  const entries = Object.keys(artifacts)
+    .sort(compareStrings)
+    .map((name) => ({
+      name: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nfc */ .aX)(name),
+      sha256: normalizeSha256(artifacts[name]?.sha256 ?? artifacts[name]),
+    }));
+  const complete = entries.length > 0 && entries.every((a) => a.sha256 != null);
+  return block(statusOf(complete, { unavailable: entries.length === 0 }), { entries });
+}
+
+function normalizePolicy(spec) {
+  const policy = spec?.policy;
+  const ref = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(policy?.ref);
+  const sha256 = normalizeSha256(policy?.sha256);
+  // `riskMapDigest` is a 16-hex TRUNCATION (src/lib/review-plan.mjs:842), not a
+  // sha256, so it gets its own field instead of being widened into `sha256` —
+  // a consumer comparing digests must not compare two different lengths of the
+  // same hash and read the mismatch as tampering.
+  const riskMapDigest = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(policy?.riskMapDigest)?.toLowerCase() ?? null;
+  return block(statusOf(ref != null && (sha256 != null || riskMapDigest != null)), {
+    ref: ref ?? null,
+    sha256,
+    riskMapDigest,
+  });
+}
+
+function normalizeRuntime(spec) {
+  const runtime = spec?.runtime;
+  const provider = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(runtime?.provider);
+  const model = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(runtime?.model);
+  return block(statusOf(provider != null && model != null), {
+    provider: provider ?? null,
+    model: model ?? null,
+    profile: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(runtime?.profile) ?? null,
+  });
+}
+
+function normalizeConfig(spec) {
+  const sha256 = normalizeSha256(spec?.config?.sha256);
+  return block(statusOf(sha256 != null), { sha256 });
+}
+
+// ---------------------------------------------------------------------------
+// Digests
+// ---------------------------------------------------------------------------
+
+function splitManifest(manifest) {
+  const {
+    manifestId = null,
+    manifestKey = null,
+    manifestHash = null,
+    createdAt = null,
+    ...conditions
+  } = manifest ?? {};
+  return { manifestId, manifestKey, manifestHash, createdAt, conditions };
+}
+
+/**
+ * Compute the manifest digests.
+ *
+ * Same two-level scheme as `computeManifestDigests` in paired-replay.mjs, for
+ * the same reason: `manifestKey` hashes the CONDITIONS only, so two runs under
+ * an identical execution configuration share a key and are directly
+ * comparable, while `manifestHash` additionally covers `createdAt` and the
+ * derived ids and is therefore the tamper check over the whole stored record.
+ */
+function computeManifestDigests({ conditions, createdAt }) {
+  const manifestKey = (0,_shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_1__/* .sha256Hex */ .fg)((0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .canonicalJson */ .dj)(conditions));
+  const manifestId = `${EXECUTION_MANIFEST_ID_PREFIX}${manifestKey.slice(0, MANIFEST_ID_HASH_LENGTH)}`;
+  const manifestHash = (0,_shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_1__/* .sha256Hex */ .fg)((0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .canonicalJson */ .dj)({ conditions, createdAt, manifestKey, manifestId }));
+  return { manifestKey, manifestId, manifestHash };
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the Execution Manifest for one review run.
+ *
+ * @param {object} spec see docs/development/execution-manifest.md
+ * @param {{ now?: Date }} [options]
+ * @returns {object} the manifest document
+ */
+function buildExecutionManifest(spec, { now = new Date() } = {}) {
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
+    throw new ExecutionManifestError('spec must be an object.');
+  }
+  assertNoRawContext(spec);
+
+  // Resolved by `resolveExecutionManifestSpec` (which calls `deriveReviewRunId`
+  // on the run record) rather than here: passing a whole run record into this
+  // function would drag raw finding text through `assertNoRawContext`, and the
+  // manifest has no business holding it.
+  const reviewRunId = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(spec.reviewRunId) ?? null;
+
+  const conditions = {
+    schemaVersion: EXECUTION_MANIFEST_SCHEMA_VERSION,
+    kind: 'execution-manifest',
+    reviewRunId,
+    riverReview: normalizeRiverReview(spec),
+    plugin: normalizePlugin(spec),
+    flow: normalizeFlow(spec),
+    agents: normalizeAgents(spec),
+    skills: normalizeSkills(spec),
+    artifacts: normalizeArtifacts(spec),
+    policy: normalizePolicy(spec),
+    runtime: normalizeRuntime(spec),
+    config: normalizeConfig(spec),
+    // Machine-checkable statement that building a manifest writes nothing.
+    writeEffects: [],
+  };
+
+  const acc = { hits: new Map() };
+  const redacted = redactDeep(conditions, acc);
+  // Every digest is derived from post-redaction values, so a reader holding
+  // only the stored document can recompute each of them. `skillSetHash` is the
+  // one digest `verifyExecutionManifest` does not cover, which is exactly why
+  // it must not be the one derived early.
+  redacted.skills.skillSetHash = computeSkillSetHash(redacted.skills.entries);
+  redacted.redaction = {
+    applied: true,
+    hits: [...acc.hits.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => compareStrings(a.category, b.category)),
+  };
+
+  const createdAt = now.toISOString();
+  const digests = computeManifestDigests({ conditions: redacted, createdAt });
+  return {
+    manifestId: digests.manifestId,
+    manifestKey: digests.manifestKey,
+    manifestHash: digests.manifestHash,
+    createdAt,
+    ...redacted,
+  };
+}
+
+/**
+ * Re-derive a manifest's digests and report whether the stored ones match.
+ *
+ * The immutability check. A manifest is a plain JSON document, so nothing
+ * stops an edit — what the contract guarantees is that the edit is DETECTABLE.
+ *
+ * @param {object} manifest
+ * @returns {{ verified: boolean, mismatches: string[], expected: object, actual: object }}
+ */
+function verifyExecutionManifest(manifest) {
+  const split = splitManifest(manifest);
+  const expected = computeManifestDigests({
+    conditions: split.conditions,
+    createdAt: split.createdAt,
+  });
+  const actual = {
+    manifestKey: split.manifestKey,
+    manifestId: split.manifestId,
+    manifestHash: split.manifestHash,
+  };
+  const mismatches = [];
+  for (const field of ['manifestKey', 'manifestId', 'manifestHash']) {
+    if (actual[field] !== expected[field]) {
+      mismatches.push(
+        `${field}: stored ${actual[field] ?? '(none)'}, recomputed ${expected[field]}`
+      );
+    }
+  }
+  return { verified: mismatches.length === 0, mismatches, expected, actual };
+}
+
+/**
+ * Decide what the manifest actually supports replaying (#2015 AC 3).
+ *
+ * An absent manifest is `not-replayable` with an explicit reason rather than
+ * an empty result: the failure mode this AC names is a missing manifest being
+ * read as a replayable run, so "no manifest" must be a loud answer.
+ *
+ * A required block counts only when it is BOTH `resolved` AND pinned — every
+ * field `REPLAY_PINS` lists for it is non-null. A partially recorded block
+ * (a flow known by id but not by checksum) therefore lands in `missingBlocks`
+ * with a reason that names the null field, instead of silently passing.
+ *
+ * @param {object|null|undefined} manifest
+ * @returns {{ deterministic: boolean, judgment: boolean, missingBlocks: Record<string, string[]>, reasons: string[] }}
+ */
+function assessReplayability(manifest) {
+  if (!manifest || typeof manifest !== 'object' || manifest.kind !== 'execution-manifest') {
+    return {
+      deterministic: false,
+      judgment: false,
+      missingBlocks: {
+        deterministic: [...REPLAY_REQUIREMENTS.deterministic],
+        judgment: [...REPLAY_REQUIREMENTS.judgment],
+      },
+      reasons: ['No execution manifest is attached, so nothing about this run is replayable.'],
+    };
+  }
+  // `resolved` is necessary but not sufficient — see REPLAY_PINS.
+  const unpinnedFields = (name) =>
+    (REPLAY_PINS[name] ?? []).filter((field) => manifest[name]?.[field] == null);
+  const unusable = (names) =>
+    names
+      .filter((name) => manifest[name]?.status !== 'resolved' || unpinnedFields(name).length > 0)
+      .sort(compareStrings);
+  const missingBlocks = {
+    deterministic: unusable(REPLAY_REQUIREMENTS.deterministic),
+    judgment: unusable(REPLAY_REQUIREMENTS.judgment),
+  };
+  const reasons = [];
+  for (const cls of REPLAY_CLASSES) {
+    for (const name of missingBlocks[cls]) {
+      const status = manifest[name]?.status ?? 'missing';
+      if (status !== 'resolved') {
+        reasons.push(`${cls} replay needs ${name}, which is ${status}.`);
+        continue;
+      }
+      const unpinned = unpinnedFields(name);
+      reasons.push(
+        `${cls} replay needs ${name} pinned, but ${unpinned
+          .map((field) => `${name}.${field}`)
+          .join(', ')} is null even though the block is resolved.`
+      );
+    }
+  }
+  return {
+    deterministic: missingBlocks.deterministic.length === 0,
+    judgment: missingBlocks.judgment.length === 0,
+    missingBlocks,
+    reasons: [...new Set(reasons)].sort(compareStrings),
+  };
+}
+
+/**
+ * Attach a manifest to a Review Artifact, additively.
+ *
+ * Never mutates the input. When there IS a manifest to attach, the return
+ * value is a NEW object: the artifact is handed around by other pipeline
+ * stages, and an in-place write here would be invisible to a caller that kept
+ * its own reference.
+ *
+ * When `manifest` is `null` / `undefined` there is nothing to attach and the
+ * INPUT ARTIFACT ITSELF is returned, not a copy — so `attach(a, null) === a`.
+ * Do not rely on the result being a fresh object you may freely mutate;
+ * copy it yourself if you need one. Returning the input unchanged is what
+ * keeps the exact key set older artifacts have, which is what makes this
+ * backward compatible (#2015 AC 4).
+ *
+ * @param {object} artifact
+ * @param {object|null|undefined} manifest
+ * @returns {object}
+ */
+function attachExecutionManifest(artifact, manifest) {
+  if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
+    throw new ExecutionManifestError('artifact must be an object.');
+  }
+  if (manifest == null) return artifact;
+  if (manifest.kind !== 'execution-manifest') {
+    throw new ExecutionManifestError('manifest must be an execution-manifest document.');
+  }
+  return { ...artifact, executionManifest: manifest };
+}
+
+// ---------------------------------------------------------------------------
+// Resolver (#2015 "3. version/hash resolver")
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive the `flow` pin (`id` / `version` / `sha256`) from a PARSED Flow
+ * definition document (schemas/flow.schema.json, #2013).
+ *
+ * Why the CALLER passes the document instead of this module reading it
+ * (#2037): #2016 landed the Flow instance documents together with an
+ * observe-mode guarantee — pinned in tests/flow-definitions.test.mjs, "no
+ * runtime module loads flows/, so no gate or decision changes" — that nothing
+ * under `src/` or `runners/` loads that directory. A resolver that read the
+ * directory itself would break that guarantee, and with it the proof that
+ * adding those documents cannot alter any existing gate, decision or finding.
+ * Injection keeps the resolver pure (no side effects, per this module's scope
+ * boundary) AND leaves the observe guarantee intact, so it is the route taken.
+ * The guarantee is lifted only when the Flow execution engine lands; that is a
+ * separate change which must edit that test explicitly.
+ *
+ * The digest is taken over `canonicalJson(document)`, not over the raw file
+ * bytes, for the same reason every other content hash in this repository is:
+ * key order and whitespace are formatting, not content, so a re-print by
+ * prettier must not invalidate a pin. `canonicalJson` and `sha256Hex` are
+ * imported, never re-implemented (CLAUDE.md "Import the SSoT, never re-derive
+ * it").
+ *
+ * `expectedVersion` is where the entry-name ↔ document version check belongs
+ * at RUN time: a caller that resolved the Flow through an entry name passes
+ * the version that entry pinned, and a document whose own `version` has moved
+ * on is rejected rather than pinned under the wrong version. The corresponding
+ * REPOSITORY-time check (every entry pins a version the Flow document actually
+ * carries) already lives in tests/flow-definitions.test.mjs.
+ *
+ * Only an explicit `null` / `undefined` `expectedVersion` skips that check.
+ * Any other unusable value (a number, an empty or blank string) is a caller
+ * bug and throws, because a stated expectation that is quietly discarded is
+ * worse than no expectation at all.
+ *
+ * `document` is expected to be the result of `JSON.parse` on a Flow document.
+ * `canonicalJson` walks own enumerable keys, so a hand-built object carrying
+ * `Date` / `Map` / `Set` values would not be distinguished by the digest;
+ * parsed JSON has no such values.
+ *
+ * @param {object} document a parsed Flow definition document
+ * @param {object} [options]
+ * @param {string|null} [options.expectedVersion] version the caller resolved
+ * @returns {{ id: string, version: string, sha256: string }}
+ */
+function deriveFlowPin(document, { expectedVersion = null } = {}) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) {
+    throw new ExecutionManifestError('flow document must be an object.');
+  }
+  const id = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(document.id);
+  const version = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(document.version);
+  if (id == null) {
+    throw new ExecutionManifestError('flow document must carry a non-empty id.');
+  }
+  if (version == null) {
+    throw new ExecutionManifestError(`flow document "${id}" must carry a non-empty version.`);
+  }
+  // "Stated no expectation" and "stated a malformed expectation" are different
+  // answers and must not collapse. `nonEmptyString` returns null for a number,
+  // an empty string and a blank string alike, so folding those into the
+  // skip branch would drop the caller's assertion silently — `expectedVersion:
+  // 2` would pin a document of version '3' without complaint. Only an explicit
+  // null / undefined skips the check; anything else must be a usable version.
+  if (expectedVersion != null) {
+    const expected = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(expectedVersion);
+    if (expected == null) {
+      throw new ExecutionManifestError('expectedVersion must be a non-empty string when supplied.');
+    }
+    if (expected !== version) {
+      throw new ExecutionManifestError(
+        `flow document "${id}" is version ${version}, but the caller resolved ${expected}.`
+      );
+    }
+  }
+  return { id, version, sha256: (0,_shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_1__/* .sha256Hex */ .fg)((0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .canonicalJson */ .dj)(document)) };
+}
+
+/**
+ * Map the sources this repository actually has onto an Execution Manifest spec.
+ *
+ * Every argument is injected rather than read from disk, so the resolver stays
+ * pure and testable and this module keeps its "no side effects" property. A
+ * source the caller cannot supply is passed as `null` and lands as a
+ * `missing` / `unavailable` block — never as a fabricated value.
+ *
+ * Measured source coverage in this repository at the time of writing:
+ *   - riverReview.version → package.json `version`
+ *   - plugin.pluginVersion → .claude-plugin/plugin.json `version`
+ *   - skills[].sha256 → docs/data/skill-manifest.json `skills[].checksum`
+ *   - runtime.provider / model → Review Artifact `usage.provider` / `usage.model`
+ *   - policy.riskMapDigest → Review Artifact `gate.inputs.riskMapDigest`
+ *   - agents → `agents/contracts/*.agent.json` (#2014) carry `id` and
+ *     `version`; they carry no checksum, so a caller that wants a `resolved`
+ *     agents block hashes the file bytes itself and passes them in
+ *   - flow → #2016 landed the Flow instance documents, so the source #2015
+ *     recorded as absent now exists (verified 2026-09-04: 8 flow definitions
+ *     plus one entry map, which tests/flow-definitions.test.mjs enumerates).
+ *     This module still does not read them — see `deriveFlowPin` for why — so
+ *     the block resolves as `missing` when the caller supplies neither `flow`
+ *     nor `flowDocument`, and as `resolved` with a non-null `sha256` as soon
+ *     as it supplies `flowDocument`
+ *   - artifacts / policy.sha256 / config.sha256 → no producer records these
+ *     today; they resolve as `missing` until one does
+ *
+ * @param {object} input
+ * @param {object|null} [input.artifact] a Review Artifact
+ * @param {object|null} [input.runRecord] a saved run record
+ * @param {string|null} [input.riverReviewVersion] package.json version
+ * @param {{ host?: string, pluginVersion?: string }|null} [input.plugin]
+ * @param {{ skills?: Array<{id: string, checksum?: string, version?: string}> }|null} [input.skillManifest]
+ * @param {object|null} [input.flow] an already-derived pin ({id, version, sha256})
+ * @param {object|null} [input.flowDocument] a parsed Flow definition document,
+ *   pinned here through `deriveFlowPin`. Mutually exclusive with `flow`.
+ * @param {string|null} [input.expectedFlowVersion] the version the caller resolved
+ *   for `flowDocument`; a document that disagrees is rejected, not pinned. It is
+ *   meaningful only alongside `flowDocument`: supplying it with `flow` (or with
+ *   neither) throws rather than being ignored, for the same reason `flow` and
+ *   `flowDocument` together throw — a discarded expectation reads as an enforced one
+ * @param {Array<object>|null} [input.agents]
+ * @param {Record<string, {sha256: string}>|null} [input.artifacts]
+ * @param {object|null} [input.policy]
+ * @param {string|null} [input.configSha256]
+ * @returns {object} a spec for buildExecutionManifest
+ */
+function resolveExecutionManifestSpec({
+  artifact = null,
+  runRecord = null,
+  riverReviewVersion = null,
+  plugin = null,
+  skillManifest = null,
+  flow = null,
+  flowDocument = null,
+  expectedFlowVersion = null,
+  agents = null,
+  artifacts = null,
+  policy = null,
+  configSha256 = null,
+} = {}) {
+  // Checksums are keyed by skill id so the SELECTED skills (which the artifact
+  // reports by id only) can be joined to the manifest's hashes. A selected
+  // skill absent from the manifest keeps a null sha256 and therefore degrades
+  // the block to `missing` — silently dropping it would leave a shorter list
+  // that still looked complete.
+  // A caller that supplies both forms has two answers for one block; picking
+  // one silently is how a stale pin outlives the document it was taken from.
+  if (flow != null && flowDocument != null) {
+    throw new ExecutionManifestError('Pass either flow or flowDocument, not both.');
+  }
+  // Same class of caller mistake: an expectation nothing can check. Dropping it
+  // silently would let a caller believe a version was enforced when the pin it
+  // supplied says something else entirely.
+  if (expectedFlowVersion != null && flowDocument == null) {
+    throw new ExecutionManifestError('expectedFlowVersion requires flowDocument.');
+  }
+  const flowPin =
+    flowDocument != null
+      ? deriveFlowPin(flowDocument, { expectedVersion: expectedFlowVersion })
+      : flow;
+
+  const checksumById = new Map();
+  for (const entry of skillManifest?.skills ?? []) {
+    const id = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(entry?.id);
+    if (id) checksumById.set(id, entry);
+  }
+
+  const selected = artifact?.plan?.selectedSkills;
+  const resolvedSkills = Array.isArray(selected)
+    ? selected.map((skill) => {
+        const id = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(skill?.id);
+        const known = id ? checksumById.get(id) : null;
+        return {
+          id,
+          version: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(skill?.version) ?? (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(known?.version) ?? null,
+          sha256: normalizeSha256(known?.checksum),
+        };
+      })
+    : null;
+
+  return {
+    reviewRunId:
+      (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__/* .nonEmptyNfcString */ .bS)(artifact?.trace?.run_id) ?? (0,_shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_1__/* .deriveReviewRunId */ .Kh)(runRecord ?? null) ?? null,
+    riverReview: { version: riverReviewVersion },
+    plugin: {
+      host: plugin?.host ?? null,
+      pluginVersion: plugin?.pluginVersion ?? null,
+    },
+    flow: flowPin,
+    agents,
+    skills: resolvedSkills,
+    artifacts,
+    policy: {
+      ref: policy?.ref ?? null,
+      sha256: policy?.sha256 ?? null,
+      riskMapDigest: policy?.riskMapDigest ?? artifact?.gate?.inputs?.riskMapDigest ?? null,
+    },
+    runtime: {
+      provider: artifact?.usage?.provider ?? null,
+      model: artifact?.usage?.model ?? null,
+      profile: artifact?.plan?.reviewMode ?? null,
+    },
+    config: { sha256: configSha256 },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Debug renderer (#2015 "8. debug renderer")
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a manifest as human-readable Markdown for `--debug` output.
+ *
+ * The renderer states the replayability verdict FIRST, because the reason this
+ * document exists is to stop a reader from assuming a run is replayable.
+ *
+ * @param {object|null|undefined} manifest
+ * @returns {string}
+ */
+function formatExecutionManifestMarkdown(manifest) {
+  const replay = assessReplayability(manifest);
+  const lines = ['## Execution Manifest', ''];
+  if (!manifest || manifest.kind !== 'execution-manifest') {
+    lines.push('- Manifest: **absent** — this run is NOT replayable.');
+    return `${lines.join('\n')}\n`;
+  }
+  const verification = verifyExecutionManifest(manifest);
+  lines.push(`- Manifest id: \`${manifest.manifestId}\``);
+  lines.push(`- Manifest key: \`${manifest.manifestKey}\``);
+  lines.push(`- Review run id: \`${manifest.reviewRunId ?? '(none)'}\``);
+  lines.push(`- Integrity: ${verification.verified ? 'verified' : 'MISMATCH'}`);
+  for (const mismatch of verification.mismatches) lines.push(`  - ${mismatch}`);
+  lines.push(
+    `- Deterministic replay: ${replay.deterministic ? 'possible' : 'NOT possible'}; judgment replay: ${replay.judgment ? 'possible' : 'NOT possible'}`
+  );
+  for (const reason of replay.reasons) lines.push(`  - ${reason}`);
+  lines.push('', '| Block | Status |', '| --- | --- |');
+  for (const name of PROVENANCE_BLOCKS) {
+    lines.push(`| ${name} | ${manifest[name]?.status ?? 'missing'} |`);
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 
@@ -47727,13 +50367,385 @@ function formatUnmatchedFeedbackFingerprintWarning({ fingerprint, likelyAlgo }) 
 
 /***/ }),
 
+/***/ 4357:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   FlowLoaderError: () => (/* binding */ FlowLoaderError),
+/* harmony export */   d2: () => (/* binding */ listFlowEntryNames),
+/* harmony export */   resolveFlowEntry: () => (/* binding */ resolveFlowEntry),
+/* harmony export */   sp: () => (/* binding */ requiredInputNames)
+/* harmony export */ });
+/* unused harmony exports FLOWS_DIR_ENV, ENTRY_MAP_FILENAME, FLOW_SCHEMA_FILENAMES, DEFAULT_FLOWS_DIR, SCHEMAS_DIR, resolveFlowsDir, loadFlowRegistry */
+/* harmony import */ var node_fs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(3024);
+/* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(6760);
+/* harmony import */ var node_process__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(1708);
+/* harmony import */ var node_url__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(3136);
+/* harmony import */ var ajv_dist_2020_js__WEBPACK_IMPORTED_MODULE_7__ = __nccwpck_require__(2210);
+/* harmony import */ var ajv_formats__WEBPACK_IMPORTED_MODULE_4__ = __nccwpck_require__(2815);
+/* harmony import */ var _execution_manifest_mjs__WEBPACK_IMPORTED_MODULE_5__ = __nccwpck_require__(3055);
+/* harmony import */ var _promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_6__ = __nccwpck_require__(3077);
+// Flow loader (#2054 PR-3, Epic #2011 Phase 2).
+//
+// The ONLY runtime module that reads `flows/`. #2016 pinned observe mode as
+// "nothing under src/ or runners/ loads the Flow definitions"; this module is
+// the explicit, single exception that tests/flow-definitions.test.mjs now
+// names (`offenders` must equal exactly `['src/lib/flow-loader.mjs']`). Every
+// other module that needs a Flow, an entry or an Intent asks this loader, so
+// the observe-mode scan keeps rejecting a second reader.
+//
+// What this module does:
+//   - resolves where the Flow assets live (`RIVER_FLOWS_DIR`, an explicit
+//     argument, or the repository's `flows/` next to this package);
+//   - reads `entry-map.json`, every `*.flow.json` and every
+//     `intents/*.intent.json`, and validates each against the schema that
+//     already owns it (schemas/flow-entry-map.schema.json, schemas/flow.schema.json,
+//     schemas/review-intent.schema.json) with the same Ajv 2020 setup the
+//     repository's other runtime validators use (src/lib/agent-skill-bridge.mjs);
+//   - resolves one entry name to its Flow pin through `deriveFlowPin`
+//     (src/lib/execution-manifest.mjs), never by hashing on its own.
+//
+// What this module does NOT do (ADR-009 D3, RA-1..RA-4): it holds no
+// judgment. No severity, no gate, no skill selection, no threshold. An entry
+// name goes in; a pin and the evidence the Flow declares as required come
+// out. A missing directory or an invalid document is a loud `FlowLoaderError`,
+// never a silent fall-back to "no Flow" — a runtime that cannot find its
+// Flows must say so.
+//
+// Where the assets come from (#2054 PR-5, #2105 (b)): the explicit argument,
+// then `RIVER_FLOWS_DIR`, then the copy shipped NEXT TO THIS MODULE (the
+// GitHub Action dist bundles `flows/` and the three schemas as sibling
+// directories of the bundle, see scripts/normalize-dist.mjs), then the
+// repository's own `flows/` two levels up (the source / npm layout). The
+// schemas follow the same sibling-first rule. `RIVER_FLOWS_DIR` remains the
+// override for an npm-installed CLI that keeps `flows/` elsewhere.
+
+
+
+
+
+
+
+
+
+
+
+
+/** Environment variable that overrides where the Flow assets are read from. */
+const FLOWS_DIR_ENV = 'RIVER_FLOWS_DIR';
+
+/** File name of the entry map inside the flows directory. */
+const ENTRY_MAP_FILENAME = 'entry-map.json';
+
+const FLOW_SUFFIX = '.flow.json';
+const INTENT_SUFFIX = '.intent.json';
+const INTENTS_SUBDIR = 'intents';
+
+// The directory this module runs from. Deliberately NOT
+// `new URL('.', import.meta.url)`: ncc rewrites that expression into an asset
+// reference (`__nccwpck_require2_(<id>)`) whose path does not exist at runtime
+// in the GitHub Action dist (#1900 / #2111 / #2105). A bare `import.meta.url`
+// is left alone by the bundler and points at the bundle file itself, so in the
+// dist this is `runners/github-action/dist/` and in the source tree `src/lib/`.
+const MODULE_DIR = (0,node_path__WEBPACK_IMPORTED_MODULE_1__.dirname)((0,node_url__WEBPACK_IMPORTED_MODULE_3__.fileURLToPath)(import.meta.url));
+const PACKAGE_ROOT = (0,node_path__WEBPACK_IMPORTED_MODULE_1__.resolve)(MODULE_DIR, '..', '..');
+
+// Names are assembled at runtime so ncc's asset relocator (which statically
+// evaluates `resolve(x, '<literal>')`) never turns the directory into an asset
+// reference — same reason as PACKAGE_JSON_FILE in execution-manifest-producer.mjs.
+const FLOWS_DIRNAME = ['flo', 'ws'].join('');
+const SCHEMAS_DIRNAME = ['sche', 'mas'].join('');
+
+/** The schema file names this loader validates against, in compile order. */
+const FLOW_SCHEMA_FILENAMES = Object.freeze({
+  entryMap: 'flow-entry-map.schema.json',
+  flow: 'flow.schema.json',
+  intent: 'review-intent.schema.json',
+});
+
+/**
+ * Pick the first candidate directory that holds `marker`, else the last one.
+ * The bundled copy (a sibling of this module) wins over the repository's own
+ * directory, so the GitHub Action dist reads what it ships rather than what
+ * happens to sit two levels above `runners/github-action/dist/`.
+ */
+function firstExisting(candidates, marker) {
+  for (const dir of candidates) {
+    if ((0,node_fs__WEBPACK_IMPORTED_MODULE_0__.existsSync)((0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(dir, marker))) return dir;
+  }
+  return candidates[candidates.length - 1];
+}
+
+/**
+ * The `flows/` directory shipped with this package, used when nothing
+ * overrides it: the sibling copy in the Action dist when present, else the
+ * repository's own `flows/`.
+ */
+const DEFAULT_FLOWS_DIR = firstExisting(
+  [(0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(MODULE_DIR, FLOWS_DIRNAME), (0,node_path__WEBPACK_IMPORTED_MODULE_1__.resolve)(PACKAGE_ROOT, FLOWS_DIRNAME)],
+  ENTRY_MAP_FILENAME
+);
+
+/** Same sibling-first rule for the schemas the loader validates against. */
+const SCHEMAS_DIR = firstExisting(
+  [(0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(MODULE_DIR, SCHEMAS_DIRNAME), (0,node_path__WEBPACK_IMPORTED_MODULE_1__.resolve)(PACKAGE_ROOT, SCHEMAS_DIRNAME)],
+  FLOW_SCHEMA_FILENAMES.entryMap
+);
+
+class FlowLoaderError extends Error {
+  constructor(message, options) {
+    super(message, options);
+    this.name = 'FlowLoaderError';
+  }
+}
+
+const compareStrings = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+const isPlainObject = (value) =>
+  value != null && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * Where the Flow assets are read from, in precedence order: the explicit
+ * argument, then `RIVER_FLOWS_DIR`, then the repository's `flows/`.
+ *
+ * @param {object} [options]
+ * @param {string|null} [options.flowsDir]
+ * @param {NodeJS.ProcessEnv} [options.env]
+ * @returns {string} absolute path
+ */
+function resolveFlowsDir({ flowsDir = null, env = node_process__WEBPACK_IMPORTED_MODULE_2__.env } = {}) {
+  const explicit = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_6__/* .nonEmptyNfcString */ .bS)(flowsDir);
+  if (explicit != null) return (0,node_path__WEBPACK_IMPORTED_MODULE_1__.resolve)(explicit);
+  const fromEnv = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_6__/* .nonEmptyNfcString */ .bS)(env?.[FLOWS_DIR_ENV]);
+  if (fromEnv != null) return (0,node_path__WEBPACK_IMPORTED_MODULE_1__.resolve)(fromEnv);
+  return DEFAULT_FLOWS_DIR;
+}
+
+let compiledValidators = null;
+
+/**
+ * Compile the three schemas once per process. Same Ajv 2020 options as the
+ * test-side factory (tests/helpers/schema-validator.mjs): `allErrors` on and
+ * strict mode left at its default, so a typo in a shipped document surfaces.
+ */
+function validators() {
+  if (compiledValidators) return compiledValidators;
+  const ajv = new ajv_dist_2020_js__WEBPACK_IMPORTED_MODULE_7__({ allErrors: true });
+  ajv_formats__WEBPACK_IMPORTED_MODULE_4__(ajv);
+  const compile = (fileName) => {
+    let schema;
+    try {
+      schema = JSON.parse((0,node_fs__WEBPACK_IMPORTED_MODULE_0__.readFileSync)((0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(SCHEMAS_DIR, fileName), 'utf8'));
+    } catch (error) {
+      throw new FlowLoaderError(
+        `cannot read schema ${fileName} from ${SCHEMAS_DIR}: ${error?.message ?? error}`,
+        { cause: error }
+      );
+    }
+    return ajv.compile(schema);
+  };
+  compiledValidators = {
+    entryMap: compile(FLOW_SCHEMA_FILENAMES.entryMap),
+    flow: compile(FLOW_SCHEMA_FILENAMES.flow),
+    intent: compile(FLOW_SCHEMA_FILENAMES.intent),
+  };
+  return compiledValidators;
+}
+
+const formatAjvErrors = (errors) =>
+  (errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ');
+
+function readJsonFile(path, label) {
+  let text;
+  try {
+    text = (0,node_fs__WEBPACK_IMPORTED_MODULE_0__.readFileSync)(path, 'utf8');
+  } catch (error) {
+    throw new FlowLoaderError(`cannot read ${label} at ${path}: ${error?.message ?? error}`, {
+      cause: error,
+    });
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new FlowLoaderError(`${label} at ${path} is not valid JSON: ${error?.message ?? error}`, {
+      cause: error,
+    });
+  }
+}
+
+function validateDocument(validate, document, label, path) {
+  if (!validate(document)) {
+    throw new FlowLoaderError(
+      `${label} at ${path} does not satisfy its schema: ${formatAjvErrors(validate.errors)}`
+    );
+  }
+}
+
+function listFiles(dir, suffix, label) {
+  let names;
+  try {
+    names = (0,node_fs__WEBPACK_IMPORTED_MODULE_0__.readdirSync)(dir);
+  } catch (error) {
+    throw new FlowLoaderError(`cannot list ${label} in ${dir}: ${error?.message ?? error}`, {
+      cause: error,
+    });
+  }
+  return names.filter((name) => name.endsWith(suffix)).sort(compareStrings);
+}
+
+/**
+ * Read and validate every Flow asset.
+ *
+ * @param {object} [options]
+ * @param {string|null} [options.flowsDir] overrides `RIVER_FLOWS_DIR` and the default
+ * @param {NodeJS.ProcessEnv} [options.env]
+ * @returns {{
+ *   flowsDir: string,
+ *   registry: object,
+ *   flowDocuments: object[],
+ *   intents: object[],
+ * }}
+ *   `registry` is the parsed entry map (`entries` + `triggers`), the shape
+ *   `resolveTrigger` (src/lib/trigger-resolver.mjs) takes as `registry`;
+ *   `flowDocuments` is what it takes as `flowDocuments`, sorted by file name.
+ * @throws {FlowLoaderError} when the directory is missing, a document cannot
+ *   be read, or a document fails its schema. Never returns a partial result.
+ */
+function loadFlowRegistry({ flowsDir = null, env = node_process__WEBPACK_IMPORTED_MODULE_2__.env } = {}) {
+  const dir = resolveFlowsDir({ flowsDir, env });
+  let stat;
+  try {
+    stat = (0,node_fs__WEBPACK_IMPORTED_MODULE_0__.statSync)(dir);
+  } catch (error) {
+    throw new FlowLoaderError(
+      `flows directory not found: ${dir}. ` +
+        `The package ships flows/ next to its schemas (the GitHub Action dist bundles both); ` +
+        `${FLOWS_DIR_ENV} may point at a directory that holds ${ENTRY_MAP_FILENAME} ` +
+        `when flows/ is kept elsewhere.`,
+      { cause: error }
+    );
+  }
+  if (!stat.isDirectory()) {
+    throw new FlowLoaderError(`flows path is not a directory: ${dir}`);
+  }
+  const { entryMap, flow, intent } = validators();
+
+  const entryMapPath = (0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(dir, ENTRY_MAP_FILENAME);
+  const registry = readJsonFile(entryMapPath, 'entry map');
+  validateDocument(entryMap, registry, 'entry map', entryMapPath);
+
+  const flowDocuments = listFiles(dir, FLOW_SUFFIX, 'Flow documents').map((name) => {
+    const path = (0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(dir, name);
+    const document = readJsonFile(path, 'Flow document');
+    validateDocument(flow, document, 'Flow document', path);
+    return document;
+  });
+
+  const intentsDir = (0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(dir, INTENTS_SUBDIR);
+  const intents = listFiles(intentsDir, INTENT_SUFFIX, 'Review Intents').map((name) => {
+    const path = (0,node_path__WEBPACK_IMPORTED_MODULE_1__.join)(intentsDir, name);
+    const document = readJsonFile(path, 'Review Intent');
+    validateDocument(intent, document, 'Review Intent', path);
+    return document;
+  });
+
+  return { flowsDir: dir, registry, flowDocuments, intents };
+}
+
+/**
+ * The entry names a caller may pass to `--entry`, sorted.
+ *
+ * @param {Parameters<typeof loadFlowRegistry>[0]} [options]
+ * @returns {string[]}
+ */
+function listFlowEntryNames(options) {
+  const { registry } = loadFlowRegistry(options);
+  return Object.keys(registry.entries).sort(compareStrings);
+}
+
+/**
+ * The input names a Flow document declares as `required: true`, sorted and
+ * de-duplicated. The same reading `resolveTrigger` applies to a selected
+ * entry's Flow; tests/flow-loader.test.mjs cross-checks the two.
+ *
+ * @param {object} document
+ * @returns {string[]}
+ */
+function requiredInputNames(document) {
+  const names = new Set();
+  for (const input of Array.isArray(document?.inputs) ? document.inputs : []) {
+    const name = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_6__/* .nonEmptyNfcString */ .bS)(input?.name);
+    if (input?.required === true && name != null) names.add(name);
+  }
+  return [...names].sort(compareStrings);
+}
+
+/**
+ * Resolve one entry name to its pinned Flow.
+ *
+ * @param {string} entryName a key of the entry map's `entries`
+ * @param {Parameters<typeof loadFlowRegistry>[0]} [options]
+ * @returns {{
+ *   flow: { entry: string, id: string, version: string, sha256: string },
+ *   evidenceRequirements: string[],
+ *   document: object,
+ *   intent: object|null,
+ * }}
+ *   `flow` has the shape of one `flowPins[]` element of `resolveTrigger`;
+ *   `evidenceRequirements` is the Flow's own required inputs (an entry named
+ *   directly has no trigger to add to them).
+ * @throws {FlowLoaderError} for an unknown entry (the message lists the
+ *   accepted names), a Flow the entry points at that is not shipped, or a
+ *   version mismatch between the entry and the document.
+ */
+function resolveFlowEntry(entryName, options) {
+  const { registry, flowDocuments, intents } = loadFlowRegistry(options);
+  const name = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_6__/* .nonEmptyNfcString */ .bS)(entryName);
+  const known = Object.keys(registry.entries).sort(compareStrings);
+  if (name == null || !Object.hasOwn(registry.entries, name)) {
+    throw new FlowLoaderError(`unknown entry "${entryName ?? ''}" (known: ${known.join(', ')}).`);
+  }
+  const entry = registry.entries[name];
+  const flowId = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_6__/* .nonEmptyNfcString */ .bS)(entry?.flow);
+  if (!isPlainObject(entry) || flowId == null) {
+    throw new FlowLoaderError(`entry "${name}" names no flow.`);
+  }
+  const document = flowDocuments.find((candidate) => candidate?.id === flowId) ?? null;
+  if (document == null) {
+    throw new FlowLoaderError(
+      `entry "${name}" resolves to flow "${flowId}", which is not among the shipped Flow documents.`
+    );
+  }
+  let pin;
+  try {
+    pin = (0,_execution_manifest_mjs__WEBPACK_IMPORTED_MODULE_5__/* .deriveFlowPin */ .Fs)(document, { expectedVersion: entry.flowVersion ?? null });
+  } catch (error) {
+    throw new FlowLoaderError(`entry "${name}" cannot be pinned: ${error?.message ?? error}`, {
+      cause: error,
+    });
+  }
+  const purpose = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_6__/* .nonEmptyNfcString */ .bS)(document?.intent?.purpose);
+  const intent =
+    purpose == null ? null : (intents.find((candidate) => candidate?.purpose === purpose) ?? null);
+  return {
+    flow: { entry: name, ...pin },
+    evidenceRequirements: requiredInputNames(document),
+    document,
+    intent,
+  };
+}
+
+
+/***/ }),
+
 /***/ 2773:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   QS: () => (/* binding */ GATE_REASON_CODES),
 /* harmony export */   RF: () => (/* binding */ deriveGateDecision)
 /* harmony export */ });
-/* unused harmony exports GATE_DECISIONS, GATE_REASON_CODES, gateConfigChanged, computeGateInputsHash */
+/* unused harmony exports GATE_DECISIONS, gateConfigChanged, computeGateInputsHash */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /**
  * Gate-decision derivation (Epic #1347 S2 / #1349).
@@ -47809,7 +50821,7 @@ const GATE_DECISIONS = /** @type {const} */ ((/* unused pure expression or super
   'ESCALATE',
 ])));
 
-const GATE_REASON_CODES = /** @type {const} */ ((/* unused pure expression or super */ null && ([
+const GATE_REASON_CODES = /** @type {const} */ ([
   'GATE_CONFIG_CHANGED',
   'HUMAN_APPROVAL_REQUIRED',
   'DECISION_ESCALATED',
@@ -47826,7 +50838,7 @@ const GATE_REASON_CODES = /** @type {const} */ ((/* unused pure expression or su
   'RISK_MAP_OBSERVE',
   'CONVERGED_CLEAN',
   'UNKNOWN_SIGNAL',
-])));
+]);
 
 const KNOWN_RISK_ACTIONS = new Set(['comment_only', 'escalate', 'require_human_review']);
 
@@ -48079,13 +51091,15 @@ function deriveGateDecision({
 /* harmony export */   JA: () => (/* binding */ getHeadSha),
 /* harmony export */   LL: () => (/* binding */ diffWithContext),
 /* harmony export */   NC: () => (/* binding */ ensureGitRepo),
+/* harmony export */   NI: () => (/* binding */ BaseRefError),
+/* harmony export */   OB: () => (/* binding */ normalizeBaseRef),
 /* harmony export */   Rd: () => (/* binding */ detectDefaultBranch),
 /* harmony export */   XS: () => (/* binding */ GitError),
-/* harmony export */   fe: () => (/* binding */ findMergeBase),
+/* harmony export */   Zb: () => (/* binding */ resolveBaseMergeBase),
 /* harmony export */   kG: () => (/* binding */ GitRepoNotFoundError),
 /* harmony export */   mM: () => (/* binding */ isWorkingTreeDirty)
 /* harmony export */ });
-/* unused harmony export collectAddedLineHints */
+/* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, collectAddedLineHints */
 /* harmony import */ var node_child_process__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(1421);
 /* harmony import */ var node_util__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(7975);
 
@@ -48152,14 +51166,258 @@ async function detectDefaultBranch(cwd) {
   return 'HEAD';
 }
 
+/**
+ * Resolve `baseRef` to a commit SHA, or null when git cannot resolve it.
+ *
+ * Uses the SAME candidate order as {@link findMergeBase} (`origin/<ref>` then
+ * `<ref>`), but NOT the same predicate: this asks `rev-parse` whether the ref
+ * names a commit, while findMergeBase asks `merge-base HEAD <ref>` whether the
+ * two share history. The implication holds in one direction only — a ref this
+ * rejects is one findMergeBase cannot use either, but a ref this accepts can
+ * still have no merge base (unrelated history, a shallow clone) and fall back
+ * to HEAD. Callers that must not review an empty range therefore check the
+ * resulting merge base as well (see resolveBaseRepoDiff in
+ * src/cli/commands/review.mjs). Verified 2026-09-04: `--base <orphan branch>`
+ * passes this check and still yields mergeBase === HEAD (#2046 review).
+ *
+ * Because the two predicates can disagree, the candidate ACTUALLY used is part
+ * of the answer, not an implementation detail: see
+ * {@link resolveRefToCommitCandidate} / {@link findMergeBaseCandidate}, which
+ * report it so {@link resolveBaseMergeBase} can keep both sides talking about
+ * the same commit (#2071).
+ *
+ * @param {string} cwd repository path
+ * @param {string} baseRef branch / ref / SHA as typed by the user
+ * @returns {Promise<string|null>} commit SHA, or null when unresolvable
+ */
+async function resolveRefToCommit(cwd, baseRef) {
+  return (await resolveRefToCommitCandidate(cwd, baseRef)).sha;
+}
+
+/**
+ * The candidate order both `--base` resolvers walk: `origin/<ref>` then `<ref>`.
+ *
+ * SSoT for the order so the two resolvers cannot drift apart. Changing the
+ * order is explicitly a non-goal of #2071 — what that issue fixes is the two
+ * resolvers landing on DIFFERENT entries of this same list.
+ *
+ * @param {string} baseRef
+ * @returns {string[]}
+ */
+function baseRefCandidates(baseRef) {
+  return [`origin/${baseRef}`, baseRef];
+}
+
+/**
+ * {@link resolveRefToCommit}, but also reporting WHICH candidate answered.
+ *
+ * @param {string} cwd repository path
+ * @param {string} baseRef branch / ref / SHA as typed by the user
+ * @returns {Promise<{sha: string|null, ref: string|null}>} `ref` is the
+ *   candidate that resolved, or null when none did (then `sha` is null too).
+ */
+async function resolveRefToCommitCandidate(cwd, baseRef) {
+  for (const ref of baseRefCandidates(baseRef)) {
+    const sha = await runGit(['rev-parse', '--quiet', '--verify', `${ref}^{commit}`], {
+      cwd,
+    }).catch(() => null);
+    if (sha) return { sha, ref };
+  }
+  return { sha: null, ref: null };
+}
+
 async function findMergeBase(cwd, baseRef) {
-  const candidates = [`origin/${baseRef}`, baseRef];
-  for (const ref of candidates) {
+  return (await findMergeBaseCandidate(cwd, baseRef)).mergeBase;
+}
+
+/**
+ * {@link findMergeBase}, but also reporting WHICH candidate produced the merge
+ * base.
+ *
+ * `ref` is null when NO candidate had a merge base with HEAD and the result is
+ * the deterministic HEAD fallback — a caller must not read that null as "the
+ * ref the user typed", because no ref answered at all.
+ *
+ * @param {string} cwd repository path
+ * @param {string} baseRef branch / ref / SHA as typed by the user
+ * @returns {Promise<{mergeBase: string, ref: string|null}>}
+ */
+async function findMergeBaseCandidate(cwd, baseRef) {
+  for (const ref of baseRefCandidates(baseRef)) {
     const mergeBase = await runGit(['merge-base', 'HEAD', ref], { cwd }).catch(() => null);
-    if (mergeBase) return mergeBase;
+    if (mergeBase) return { mergeBase, ref };
   }
   // fallback to current HEAD to keep diff calculations deterministic
-  return runGit(['rev-parse', 'HEAD'], { cwd });
+  return { mergeBase: await runGit(['rev-parse', 'HEAD'], { cwd }), ref: null };
+}
+
+/**
+ * Is `ancestorRef` an ancestor of `descendantRef`?
+ *
+ * `merge-base --is-ancestor` communicates the answer through the exit status
+ * (0 = yes, 1 = no) and prints nothing, so the usual "did stdout come back
+ * non-empty" test of {@link runGit} cannot be used — a successful call returns
+ * the empty string. Resolve the promise state instead.
+ *
+ * Fail-soft on purpose: any other git failure (a bad ref, a broken repo)
+ * resolves to `false`. The only caller is a diagnostic message refinement in
+ * {@link resolveBaseMergeBase}, where `false` keeps the pre-existing wording;
+ * a wrong guess must never be more than a less specific warning.
+ *
+ * @param {string} cwd repository path
+ * @param {string} ancestorRef the ref that may be the ancestor
+ * @param {string} descendantRef the ref that may be the descendant
+ * @returns {Promise<boolean>}
+ */
+async function isAncestorRef(cwd, ancestorRef, descendantRef) {
+  return runGit(['merge-base', '--is-ancestor', ancestorRef, descendantRef], { cwd }).then(
+    () => true,
+    () => false
+  );
+}
+
+/**
+ * A `--base` value that cannot be turned into a usable diff range.
+ *
+ * Thrown by {@link resolveBaseMergeBase} so callers can render it as a usage
+ * error rather than a git failure. Deliberately NOT a {@link GitError}: no git
+ * command failed — the value the user typed is the problem, and src/cli.mjs
+ * maps GitError to a "Git command failed" hint that would misdirect.
+ */
+class BaseRefError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'BaseRefError';
+  }
+}
+
+/**
+ * Normalize a raw `--base` value into `null` / `''` / a trimmed ref.
+ *
+ * `null` means "not given" (fall back to the auto-detected default branch),
+ * `''` means "given but blank" (a usage error — `--base "   "` used to reach
+ * findMergeBase as whitespace, resolve to nothing, and fall back to HEAD, i.e.
+ * an empty range presented as "no changes", #2046 review).
+ *
+ * @param {unknown} rawBaseRef
+ * @returns {string|null} trimmed ref, `''` when blank, `null` when absent
+ */
+function normalizeBaseRef(rawBaseRef) {
+  if (typeof rawBaseRef !== 'string') return null;
+  const trimmed = rawBaseRef.trim();
+  return trimmed === '' ? '' : trimmed;
+}
+
+/**
+ * SSoT for how ANY subcommand turns a `--base` value into a merge base.
+ *
+ * Introduced by #2046 / PR #2049 inside `resolveBaseRepoDiff`
+ * (src/cli/commands/review.mjs) and lifted here by #2051 / #2057 so the
+ * `skills` and `run` surfaces share the exact same contract instead of
+ * re-deriving it — `--base` used to mean three different things depending on
+ * the subcommand (`review` validated it, `run` read it without validating,
+ * `skills` ignored it entirely).
+ *
+ * Contract:
+ *   - absent (`null`) → `fallbackRef` is used and NOT validated; it is not
+ *     something the user typed, so its old HEAD fallback stays.
+ *   - blank after trimming → {@link BaseRefError}.
+ *   - unresolvable ref → {@link BaseRefError}. `findMergeBase` falls back to
+ *     HEAD for an unknown ref, so without this a typo reviewed nothing and
+ *     exited 0.
+ *   - resolvable ref that still yields an EMPTY range → `warning` is returned
+ *     (not thrown). The ref itself was valid, so this is not fatal; the caller
+ *     decides where to print it. Two shapes reach here and they get different
+ *     wording (#2067): no shared history (unrelated / shallow), and a base that
+ *     is ahead of HEAD (HEAD is its ancestor, so the merge base IS HEAD).
+ *
+ * @param {string} repoRoot repository path
+ * @param {unknown} rawBaseRef the raw `--base` value as typed (or null/undefined)
+ * @param {string} fallbackRef ref to diff against when `--base` is absent
+ * `baseRefSha` is the commit of the candidate the merge base actually came from
+ * (#2071), which is not always the first candidate `rev-parse` accepts.
+ *
+ * @returns {Promise<{baseRef: string|null, baseRefSha: string|null, mergeBase: string, warning: string|null}>}
+ * @throws {BaseRefError} when an explicitly typed `--base` is blank or unresolvable
+ */
+async function resolveBaseMergeBase(repoRoot, rawBaseRef, fallbackRef) {
+  const baseRef = normalizeBaseRef(rawBaseRef);
+  if (baseRef === '') {
+    throw new BaseRefError('--base requires a branch or ref (got a blank value).');
+  }
+  let baseRefSha = null;
+  let resolvedRef = null;
+  if (baseRef !== null) {
+    ({ sha: baseRefSha, ref: resolvedRef } = await resolveRefToCommitCandidate(repoRoot, baseRef));
+    if (!baseRefSha) {
+      // #2085: enumerate from baseRefCandidates() so the wording cannot drift
+      // from the order the resolvers actually walk.
+      const tried = baseRefCandidates(baseRef)
+        .map((ref) => `"${ref}"`)
+        .join(' and ');
+      throw new BaseRefError(
+        `--base "${baseRef}" is not a ref this repository can resolve ` +
+          `(tried ${tried}). ` +
+          'Reviewing an empty range would look like "no changes".'
+      );
+    }
+  }
+  const { mergeBase, ref: mergeBaseRef } = await findMergeBaseCandidate(
+    repoRoot,
+    baseRef ?? fallbackRef
+  );
+  // #2071: the two resolvers walk the same candidate list with DIFFERENT
+  // predicates (`rev-parse` vs `merge-base`), so they can land on different
+  // entries — `origin/<ref>` resolving but sharing no history while `<ref>`
+  // does. When that happens the merge base above came from `mergeBaseRef`, so
+  // every downstream statement about "the base" must be about THAT commit;
+  // keeping `baseRefSha` from the other candidate is how the empty-range
+  // warning ended up describing a commit the merge base never came from.
+  // Re-resolve with the same `rev-parse` predicate and adopt it — one extra
+  // git call, and only on the rare disagreement.
+  if (baseRef !== null && mergeBaseRef !== null && mergeBaseRef !== resolvedRef) {
+    const mergeBaseRefSha = await runGit(
+      ['rev-parse', '--quiet', '--verify', `${mergeBaseRef}^{commit}`],
+      { cwd: repoRoot }
+    ).catch(() => null);
+    if (mergeBaseRefSha) baseRefSha = mergeBaseRefSha;
+  }
+  // `rev-parse` says the ref exists; `merge-base` says the two share history.
+  // A ref that passes the first and fails the second (unrelated history, a
+  // shallow clone) makes findMergeBase fall back to HEAD, which is an empty
+  // range wearing the same clothes as "no changes" (#2046 review round 3).
+  // Not fatal — the ref itself was valid — but it must not pass unannounced.
+  //
+  // `mergeBase === headSha` alone does NOT mean "no shared history" (#2067).
+  // Two different situations land on HEAD, and only one of them is unrelated
+  // history:
+  //   - unrelated history / shallow clone → `merge-base` FAILS and
+  //     findMergeBase falls back to HEAD.
+  //   - the base is AHEAD of HEAD (HEAD is its ancestor) → `merge-base`
+  //     SUCCEEDS and correctly answers HEAD.
+  // Both also satisfy `baseRefSha !== mergeBase`, so the two are separated by
+  // asking git the ancestry question directly. This costs one extra git call,
+  // but only inside the already-narrow branch that is about to warn — the
+  // no-warning path (every normal `--base`) makes no additional call.
+  let warning = null;
+  if (baseRefSha && baseRefSha !== mergeBase) {
+    const headSha = await getHeadSha(repoRoot);
+    if (headSha && mergeBase === headSha) {
+      // Compare against the already-resolved sha, not `baseRef`: resolveRefToCommit
+      // may have picked `origin/<baseRef>`, and re-resolving here could pick the
+      // other candidate and answer about a different commit. Since #2071 that
+      // sha is also reconciled with the candidate `findMergeBase` actually used,
+      // so this answers about the commit `mergeBase` came from.
+      const baseIsAheadOfHead = await isAncestorRef(repoRoot, headSha, baseRefSha);
+      warning = baseIsAheadOfHead
+        ? `Warning: --base "${baseRef}" is ahead of HEAD (HEAD is an ancestor of it), ` +
+          'so the merge base is HEAD itself and the diff yields an empty range. ' +
+          'Pass a ref HEAD is ahead of to review the change.'
+        : `Warning: --base "${baseRef}" shares no history with HEAD, so no merge base exists. ` +
+          'The diff falls back to HEAD, which yields an empty range.';
+    }
+  }
+  return { baseRef, baseRefSha, mergeBase, warning };
 }
 
 /**
@@ -50172,6 +53430,7 @@ function normalizePlannerMode(mode, { defaultMode = 'off' } = {}) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   J1: () => (/* binding */ proposePromotionCandidate),
 /* harmony export */   _I: () => (/* binding */ readFeedbackJsonl),
+/* harmony export */   aX: () => (/* binding */ nfc),
 /* harmony export */   bS: () => (/* binding */ nonEmptyNfcString),
 /* harmony export */   d: () => (/* binding */ KNOWN_POLICY_VERSIONS),
 /* harmony export */   dj: () => (/* binding */ canonicalJson),
@@ -50182,7 +53441,7 @@ function normalizePlannerMode(mode, { defaultMode = 'off' } = {}) {
 /* harmony export */   xG: () => (/* binding */ normalizeClusterKey),
 /* harmony export */   yI: () => (/* binding */ computeCandidateContentHash)
 /* harmony export */ });
-/* unused harmony exports DEFAULT_EXPIRY_DAYS, DEFAULT_MIN_RECURRENCE, SUGGESTED_ACTION, findRuleCandidates, buildPromotionCandidate, buildPromotionCandidateEntry, buildPromotionCandidates, buildCandidatesArtifact, writeCandidatesArtifact, nfc, buildProposedCandidate */
+/* unused harmony exports DEFAULT_EXPIRY_DAYS, DEFAULT_MIN_RECURRENCE, SUGGESTED_ACTION, findRuleCandidates, buildPromotionCandidate, buildPromotionCandidateEntry, buildPromotionCandidates, buildCandidatesArtifact, writeCandidatesArtifact, buildProposedCandidate */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /* harmony import */ var node_fs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(3024);
 /* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(6760);
@@ -54318,8 +57577,8 @@ var external_node_path_ = __nccwpck_require__(6760);
 var js_yaml = __nccwpck_require__(3243);
 // EXTERNAL MODULE: ./node_modules/minimatch/dist/esm/index.js + 7 modules
 var esm = __nccwpck_require__(9519);
-// EXTERNAL MODULE: ./node_modules/zod/v4/classic/schemas.js + 16 modules
-var schemas = __nccwpck_require__(2314);
+// EXTERNAL MODULE: ./node_modules/zod/v4/classic/schemas.js + 17 modules
+var schemas = __nccwpck_require__(8816);
 ;// CONCATENATED MODULE: ./src/config/risk-map-schema.mjs
 
 
@@ -55513,6 +58772,858 @@ function shouldExcludeForContext(relPath, opts = {}) {
     if ((0,minimatch__WEBPACK_IMPORTED_MODULE_0__/* .minimatch */ .xF)(relPath, g, matchOpts)) return true;
   }
   return false;
+}
+
+
+/***/ }),
+
+/***/ 4029:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   DEFAULT_MIN_RECURRENCE: () => (/* binding */ DEFAULT_MIN_RECURRENCE),
+/* harmony export */   Kh: () => (/* binding */ deriveReviewRunId),
+/* harmony export */   L5: () => (/* binding */ buildRunEvidence),
+/* harmony export */   Mc: () => (/* binding */ computeCandidateId),
+/* harmony export */   buildShadowAggregate: () => (/* binding */ buildShadowAggregate),
+/* harmony export */   fg: () => (/* binding */ sha256Hex),
+/* harmony export */   formatShadowAggregateMarkdown: () => (/* binding */ formatShadowAggregateMarkdown),
+/* harmony export */   lY: () => (/* binding */ EVIDENCE_SOURCES)
+/* harmony export */ });
+/* unused harmony exports SHADOW_AGGREGATE_SCHEMA_VERSION, SHADOW_AGGREGATE_POLICY_VERSION, COLLECTOR_VERSION, P1_TRUST_LEVEL, deriveFeedbackReviewRunId, evidenceTrustLevel, buildClusters */
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
+/* harmony import */ var _finding_factory_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(1535);
+/* harmony import */ var _promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(3077);
+// Shadow aggregate (#1574 P1) — read-only multi-run aggregation.
+//
+// Aggregates completed review runs (`.river/runs/`) and captured feedback
+// (`.river/feedback/*.jsonl`) into a single observation artifact plus at most
+// ONE ReviewImprovementCandidate, WITHOUT mutating any repository surface.
+//
+// Read-only by construction: this module performs no filesystem, network, or
+// process side effects at all — callers pass already-loaded records in and get
+// plain objects back. The `warn` option added in #1823 does not change that: it
+// defaults to a no-op, so the only sink is one the caller supplies. Canary,
+// rollback, and automatic promotion are explicitly out of scope (P3/P4, and the
+// promotion lifecycle itself stays #1568-C's).
+//
+// Design contract compliance (docs/development/1574-p0-design-contract.md):
+//   契約1 evidence provenance  → buildRunEvidence / evidenceTrustLevel
+//   契約2 canonical run id     → deriveReviewRunId / deriveFeedbackReviewRunId
+//   契約4 content-addressed ID → computeCandidateId (date-independent)
+//   契約5 two-stage clustering → buildClusters (stage 1 / stage 2)
+
+
+
+
+
+// Re-exported so the aggregate's own hashing helpers keep one implementation
+// with the candidate id derivation (#1624).
+
+
+const SHADOW_AGGREGATE_SCHEMA_VERSION = 1;
+
+// The candidate id derivation is NOT owned here: it is the one in
+// src/lib/promotion-candidates.mjs (#1624 / 契約4), so that the shadow
+// observation and `river promote propose` converge on the SAME id for the same
+// evidence. That also fixes the policy version to CANDIDATE_POLICY_VERSION —
+// the shadow aggregate does not get a hash namespace of its own.
+const SHADOW_AGGREGATE_POLICY_VERSION = _promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .CANDIDATE_POLICY_VERSION */ .e1;
+
+// Collector identity recorded in every evidence record (契約1).
+const COLLECTOR_VERSION = 'river-shadow-aggregate/1';
+
+/** Evidence sources defined by 契約1. Order is meaningful only for docs. */
+const EVIDENCE_SOURCES = ['local', 'CI', 'protected-branch', 'human'];
+
+/**
+ * The only trust level P1 can emit.
+ *
+ * Every provenance field this module reads comes from `.river/runs/*.json`,
+ * which lives INSIDE the reviewed repository and is writable by the agent
+ * under review (see the trust-boundary note on `buildRunRecord` in
+ * result-store.mjs — referenced by symbol, not by line, because line numbers
+ * here went stale the first time that file grew). A record can
+ * therefore claim `evidence_source: 'CI'` and `trusted_by: 'github-actions'`
+ * with no verification whatsoever, so honouring that claim would let a forged
+ * file mint trusted evidence. P1 closes the promotion path entirely: the
+ * verification mechanism for `trusted_by` (CI attestation / signed record) is
+ * an explicit 契約1 未決事項 and lands in P2.
+ */
+const P1_TRUST_LEVEL = 'untrusted';
+
+/** Recurrence threshold for stage-1 clustering (契約5), same default as #1568-A. */
+const DEFAULT_MIN_RECURRENCE = 2;
+
+/**
+ * Improvement target taxonomy from the #1574 Epic body ("改善対象の分類案").
+ * Deliberately distinct from #1568's `proposedTarget` (fixture/rule/skill/...):
+ * #1574 selects an *investment surface*, #1568 owns the promotion target.
+ */
+const TARGET_SURFACE_BY_FEEDBACK_TYPE = {
+  duplicate: 'routing',
+  out_of_scope: 'context',
+  missed_issue: 'judgment',
+  accepted_risk: 'judgment',
+  false_positive: 'memory',
+  not_actionable: 'reviewer',
+  unclear: 'reviewer',
+};
+
+const OBSERVED_PATTERN_BY_FEEDBACK_TYPE = {
+  duplicate: '同一の指摘が複数 skill から重複して出ている',
+  out_of_scope: '差分スコープ外の指摘が繰り返し出ている',
+  missed_issue: '検出されるべき問題が繰り返し見逃されている',
+  accepted_risk: '同じリスクを繰り返し許容している',
+  false_positive: '同じ誤検出が繰り返し発生している',
+  not_actionable: '指摘が繰り返し実行可能な形になっていない',
+  unclear: '指摘の意味が繰り返し伝わっていない',
+};
+
+// ---------------------------------------------------------------------------
+// Deterministic helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Hex sha256 of a string.
+ *
+ * Exported (#2015) so that content-addressed surfaces added later import this
+ * one implementation instead of spelling `createHash('sha256')` again. Two
+ * byte-identical private copies already existed (here and in
+ * `paired-replay.mjs`); a third would have made the hash a convention rather
+ * than a shared function. `paired-replay.mjs` now imports this one.
+ *
+ * @param {string} input
+ * @returns {string} 64 lowercase hex characters
+ */
+function sha256Hex(input) {
+  return (0,node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash)('sha256').update(input).digest('hex');
+}
+
+function compareStrings(a, b) {
+  const left = a ?? '';
+  const right = b ?? '';
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// 契約2: canonical review_run_id
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the canonical `review_run_id` of a saved run record.
+ *
+ * The field is additive and optional (契約2): an explicit `review_run_id`
+ * wins, otherwise the existing `runId` is used as the canonical value. No
+ * record is rewritten — this is a read-side resolution only.
+ *
+ * @param {object|null|undefined} record
+ * @returns {string|null}
+ */
+function deriveReviewRunId(record) {
+  return (
+    (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(record?.review_run_id) ??
+    (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(record?.reviewRunId) ??
+    (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(record?.runId)
+  );
+}
+
+/**
+ * Resolve the canonical `review_run_id` a feedback entry points at.
+ *
+ * Unlike run records there is no legacy fallback: historical feedback entries
+ * carry no run reference at all, so they simply stay unjoined (and are
+ * reported as such) until the field is propagated.
+ *
+ * @param {object|null|undefined} entry
+ * @returns {string|null}
+ */
+function deriveFeedbackReviewRunId(entry) {
+  return (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.review_run_id) ?? (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.reviewRunId);
+}
+
+// ---------------------------------------------------------------------------
+// 契約1: evidence provenance / trust boundary
+// ---------------------------------------------------------------------------
+
+/**
+ * Trust level of an evidence record — always `untrusted` in P1.
+ *
+ * The argument is accepted (and ignored) so the signature stays stable for P2,
+ * where a verified `trusted_by` may promote a record. Until that verification
+ * exists, no field combination can raise the level: see P1_TRUST_LEVEL.
+ *
+ * @param {object} [_evidence] self-reported provenance (unverified)
+ * @returns {'untrusted'}
+ */
+function evidenceTrustLevel(_evidence) {
+  return P1_TRUST_LEVEL;
+}
+
+/**
+ * Build the 契約1 provenance record for one saved run.
+ *
+ * Every field here is SELF-REPORTED by the reviewed repository: `provenance`
+ * is read from the run record itself, which the agent under review can write.
+ * The record is reproduced as claimed (so a human can inspect it), but it is
+ * never used to raise trust — `provenance_verified` is a constant `false` and
+ * `trust_level` a constant `untrusted` (see P1_TRUST_LEVEL).
+ *
+ * `artifact_sha256` is a SELF-DIGEST: it hashes the canonical JSON of the same
+ * record it is stored on. It detects accidental drift between copies of one
+ * record; it does NOT prove the record is authentic, because whoever can edit
+ * the record can recompute the digest.
+ *
+ * @param {object} record saved run record
+ * @param {{ collectorVersion?: string }} [options]
+ */
+function buildRunEvidence(record, { collectorVersion = COLLECTOR_VERSION } = {}) {
+  const provenance = record?.provenance ?? {};
+  const source = EVIDENCE_SOURCES.includes(provenance.evidenceSource)
+    ? provenance.evidenceSource
+    : 'local';
+  const evidence = {
+    review_run_id: deriveReviewRunId(record),
+    // Claimed source. Recorded for observation only — never a trust input.
+    evidence_source: source,
+    source_commit_sha:
+      (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(provenance.sourceCommitSha) ?? (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(record?.commitSha),
+    artifact_sha256: sha256Hex((0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .canonicalJson */ .dj)(record)),
+    collector_version: collectorVersion,
+    trusted_by: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(provenance.trustedBy),
+    generated_by_candidate: provenance.generatedByCandidate === true,
+    provenance_verified: false,
+  };
+  return { ...evidence, trust_level: evidenceTrustLevel(evidence) };
+}
+
+// ---------------------------------------------------------------------------
+// 契約5: two-stage clustering
+// ---------------------------------------------------------------------------
+
+/**
+ * Index findings of all runs by fingerprint so stage-2 clustering can attach
+ * category / filePath to a feedback entry. Later runs win for the same
+ * fingerprint (same convention as diffRunHistory).
+ *
+ * NOTE: `finding.scope` (the in-diff / pre-existing classification added in
+ * #1648) is deliberately NOT read here. The stage-2 axis below is the file the
+ * finding was reported on, which is why it is called `filePath` — reusing the
+ * name `scope` for it made two unrelated meanings collide. Whether the #1648
+ * scope should become an additional clustering axis is left to a later phase.
+ *
+ * @param {object[]} runRecords
+ * @returns {Map<string, { category: string|null, filePath: string|null, review_run_id: string|null }>}
+ */
+function indexFindingsByFingerprint(runRecords) {
+  const index = new Map();
+  // Two-key sort: records sharing a timestamp (or missing one) must still have
+  // a total order, otherwise "last run wins" depends on directory read order.
+  const ordered = [...runRecords].sort(
+    (a, b) =>
+      compareStrings(a?.timestamp ?? '', b?.timestamp ?? '') ||
+      compareStrings(deriveReviewRunId(a), deriveReviewRunId(b))
+  );
+  for (const record of ordered) {
+    const reviewRunId = deriveReviewRunId(record);
+    for (const finding of record?.findings ?? []) {
+      const fingerprint = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(finding?.fingerprint);
+      if (!fingerprint) continue;
+      index.set(fingerprint, {
+        // `category` is not part of the current finding shape; `ruleId` (set to
+        // the emitting skill id by review-engine / local-runner) is what real
+        // findings carry today, so it is the working fallback.
+        category: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(finding?.category) ?? (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(finding?.ruleId),
+        filePath: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(finding?.file),
+        review_run_id: reviewRunId,
+      });
+    }
+  }
+  return index;
+}
+
+/**
+ * Stage-2 sub-cluster key. `failureMode` is intentionally absent (see below).
+ * The third component is the finding's FILE PATH (see indexFindingsByFingerprint),
+ * not the #1648 `finding.scope` classification.
+ */
+function subClusterKeyOf({ fingerprint, category, filePath }) {
+  return [
+    fingerprint ?? 'no-fingerprint',
+    category ?? 'no-category',
+    filePath ?? 'no-file-path',
+  ].join('::');
+}
+
+/**
+ * Two-stage clustering (契約5).
+ *
+ * - Stage 1 detects recurrence on `(skillId, feedbackType)` — byte-identical
+ *   key format to #1568-A's clusterKey, so both loops group the same way.
+ * - Stage 2 splits a recurring class into cause hypotheses by
+ *   fingerprint / category / filePath.
+ *
+ * `failureMode` is emitted as `null` on purpose: 契約5 defers the failure-mode
+ * vocabulary until it has been *observed* in P1, so inventing one here would
+ * pre-empt the contract.
+ *
+ * Eligibility is decided on DISTINCT occurrences, not on row count: several
+ * feedback rows sharing one fingerprint are one re-litigated finding, not
+ * recurrence (the same defence `reviewPromotionEffectiveness` already applies
+ * in src/lib/promotion.mjs). Sub-clusters without a fingerprint, or without
+ * `minRecurrence` distinct (run, PR) occurrences, stay visible but carry
+ * `experimentEligible: false` and must never feed an experiment or promotion.
+ *
+ * What "distinct" means widened once a producer for `review_run_id` existed
+ * (#1673). The occurrence key is `(review_run_id, pr)`, so with `--run-id`
+ * populated two feedback rows on the SAME PR but different saved runs are two
+ * occurrences, not one re-litigation. That is intended: a finding that comes
+ * back after a revise is exactly the recurrence the Judgment Promotion Loop
+ * is looking for. Before the producer existed such rows collapsed onto the PR
+ * alone, so the same data can flip `experimentEligible` false -> true when
+ * `--run-id` starts being passed. P1/P2 stay observation-only, so nothing is
+ * promoted automatically off the back of that.
+ *
+ * @param {object[]} feedbackEntries
+ * @param {{ minRecurrence?: number, findingIndex?: Map<string, object> }} [options]
+ */
+function buildClusters(
+  feedbackEntries,
+  { minRecurrence = DEFAULT_MIN_RECURRENCE, findingIndex = new Map() } = {}
+) {
+  const stage1 = new Map();
+  for (const entry of feedbackEntries ?? []) {
+    // Key components are used RAW (not trimmed) so the stage-1 clusterKey is
+    // byte-identical to #1568-A's (scripts/feedback-rule-candidates.mjs), which
+    // is the SSoT for this key. Blank values are skipped as unusable.
+    const skillId = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.skillId) ? entry.skillId : null;
+    const feedbackType = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.feedbackType) ? entry.feedbackType : null;
+    if (!skillId || !feedbackType) continue;
+    // `accepted` is a positive signal — never an improvement candidate.
+    if (feedbackType === 'accepted') continue;
+    const clusterKey = `${skillId}::${feedbackType}`;
+    if (!stage1.has(clusterKey)) stage1.set(clusterKey, { skillId, feedbackType, entries: [] });
+    stage1.get(clusterKey).entries.push(entry);
+  }
+
+  const clusters = [];
+  for (const [clusterKey, { skillId, feedbackType, entries }] of stage1) {
+    if (entries.length < minRecurrence) continue;
+    const stage2 = new Map();
+    for (const entry of entries) {
+      const fingerprint = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.findingFingerprint);
+      const finding = fingerprint ? (findingIndex.get(fingerprint) ?? null) : null;
+      const shape = {
+        fingerprint,
+        category: finding?.category ?? null,
+        filePath: finding?.filePath ?? null,
+      };
+      const key = subClusterKeyOf(shape);
+      if (!stage2.has(key)) {
+        stage2.set(key, {
+          subClusterKey: key,
+          ...shape,
+          // 契約5 未決事項: the failure-mode vocabulary is decided AFTER P1
+          // observation, so P1 records the raw signals and leaves this null.
+          failureMode: null,
+          evidence: [],
+        });
+      }
+      stage2.get(key).evidence.push(buildFeedbackRef(entry));
+    }
+    const subClusters = [...stage2.values()]
+      .map((sub) => {
+        const distinctOccurrenceCount = distinctCount(sub.evidence.map(occurrenceKey));
+        return {
+          ...sub,
+          count: sub.evidence.length,
+          // A fingerprint identifies ONE finding, so this is 1 (or 0 when the
+          // sub-cluster has no fingerprint) by construction — surfaced so the
+          // gap against the raw `count` is visible in the artifact.
+          distinctFindingCount: sub.fingerprint == null ? 0 : 1,
+          distinctPrCount: distinctCount(sub.evidence.map((ref) => ref.pr)),
+          distinctRunCount: distinctCount(sub.evidence.map((ref) => ref.review_run_id)),
+          distinctOccurrenceCount,
+          experimentEligible: sub.fingerprint != null && distinctOccurrenceCount >= minRecurrence,
+          evidence: sortFeedbackRefs(sub.evidence),
+        };
+      })
+      .sort((a, b) => b.count - a.count || compareStrings(a.subClusterKey, b.subClusterKey));
+    clusters.push({
+      clusterKey,
+      skillId,
+      feedbackType,
+      // Raw row count. Compare against the distinct counters before treating it
+      // as recurrence evidence.
+      count: entries.length,
+      distinctFindingCount: distinctCount(entries.map((e) => e.findingFingerprint)),
+      distinctPrCount: distinctCount(entries.map((e) => e.pr)),
+      subClusters,
+    });
+  }
+  return clusters.sort((a, b) => b.count - a.count || compareStrings(a.clusterKey, b.clusterKey));
+}
+
+/** Count distinct non-null / non-empty values. */
+function distinctCount(values) {
+  return new Set(values.filter((v) => v != null && v !== '')).size;
+}
+
+/**
+ * Identify the occurrence a feedback row belongs to. Rows that carry neither a
+ * run nor a PR cannot be attributed and return null, so they never count as
+ * independent recurrence evidence.
+ *
+ * Both halves of the key participate, so once `river feedback add --run-id`
+ * populates `review_run_id` (#1673) a row with a run but no PR IS attributable
+ * and does count, and two rows on one PR from two runs are two occurrences.
+ * Intended — see the recurrence note on `buildClusters`. The behaviour here is
+ * unchanged; only the data reaching it is richer.
+ */
+function occurrenceKey(ref) {
+  if (ref.review_run_id == null && ref.pr == null) return null;
+  return `${ref.review_run_id ?? ''}#${ref.pr ?? ''}`;
+}
+
+/**
+ * Project one feedback row into the reference stored on a sub-cluster.
+ *
+ * `skillId` is included so `candidate.sourceFeedbackRefs` is directly usable as
+ * the `--input` of `river promote propose`: that command validates every input
+ * row with `validateFeedbackEntryShape`, which requires a non-empty skillId,
+ * and rejects rows whose `skillId::feedbackType` does not match `--cluster-key`.
+ * Without it the shadow → propose hand-off had no working path at all.
+ * It is not a hash input (normalizeEvidence ignores it), so the candidate id is
+ * unchanged.
+ */
+function buildFeedbackRef(entry) {
+  return {
+    review_run_id: deriveFeedbackReviewRunId(entry),
+    timestamp: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.timestamp),
+    skillId: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.skillId),
+    feedbackType: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.feedbackType),
+    findingFingerprint: (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.findingFingerprint),
+    pr: Number.isInteger(entry?.pr) && entry.pr > 0 ? entry.pr : null,
+  };
+}
+
+function sortFeedbackRefs(refs) {
+  return [...refs].sort(
+    (a, b) =>
+      compareStrings(a.timestamp, b.timestamp) ||
+      compareStrings(a.review_run_id, b.review_run_id) ||
+      compareStrings(a.findingFingerprint, b.findingFingerprint) ||
+      (a.pr ?? 0) - (b.pr ?? 0)
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 契約4: content-addressed candidate ID
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the content-addressed candidate ID for a sub-cluster.
+ *
+ * This is a thin adapter over the #1624 derivation
+ * (`normalizeEvidence` + `computeCandidateContentHash`), NOT a second
+ * implementation: the shadow observation and `river promote propose` must mint
+ * the SAME `RR-PC-<12 hex>` id from the same evidence, otherwise the loop
+ * cannot tell that it is looking at one candidate.
+ *
+ * Consequences of reusing that contract:
+ * - hash inputs are `{ clusterKey, normalized evidence, policyVersion }` only;
+ * - `subClusterKey`, `review_run_id` and the generation date are NOT hashed
+ *   (two sub-clusters of one cluster already differ by their evidence sets);
+ * - evidence is deduplicated and NFC-normalized upstream.
+ *
+ * @param {{ policyVersion?: string, clusterKey: string, evidence: object[] }} input
+ * @returns {{ candidateId: string, contentHash: string, evidenceCount: number }}
+ */
+function computeCandidateId({
+  policyVersion = _promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .CANDIDATE_POLICY_VERSION */ .e1,
+  clusterKey,
+  evidence,
+}) {
+  if (!_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .KNOWN_POLICY_VERSIONS */ .d.includes(String(policyVersion))) {
+    // An arbitrary policy version would let one evidence set mint unlimited
+    // ids — the same guard buildProposedCandidate applies.
+    throw new Error(
+      `Unknown policyVersion "${policyVersion}". Expected one of: ${_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .KNOWN_POLICY_VERSIONS */ .d.join(', ')}.`
+    );
+  }
+  const { evidence: normalized } = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .normalizeEvidence */ .vf)(evidence ?? []);
+  const { candidateId, contentHash } = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .computeCandidateContentHash */ .yI)({
+    clusterKey,
+    evidence: normalized,
+    policyVersion,
+  });
+  return { candidateId, contentHash, evidenceCount: normalized.length };
+}
+
+// ---------------------------------------------------------------------------
+// Candidate + aggregate assembly
+// ---------------------------------------------------------------------------
+
+/**
+ * Select the single sub-cluster P1 turns into a candidate.
+ *
+ * Preference order: experiment-eligible (fingerprinted) sub-clusters first,
+ * then higher evidence count, then lexicographic key for a stable tie-break.
+ */
+function selectSubCluster(clusters) {
+  let best = null;
+  for (const cluster of clusters) {
+    for (const sub of cluster.subClusters) {
+      const candidate = { cluster, sub };
+      if (!best) {
+        best = candidate;
+        continue;
+      }
+      if (sub.experimentEligible !== best.sub.experimentEligible) {
+        if (sub.experimentEligible) best = candidate;
+        continue;
+      }
+      if (sub.count !== best.sub.count) {
+        if (sub.count > best.sub.count) best = candidate;
+        continue;
+      }
+      if (compareStrings(sub.subClusterKey, best.sub.subClusterKey) < 0) best = candidate;
+    }
+  }
+  return best;
+}
+
+/**
+ * Build the shadow ReviewImprovementCandidate for one selected sub-cluster.
+ *
+ * The candidate is an observation only: `mode: 'shadow'`, `status: 'observed'`,
+ * `writeEffects: []`, and a trust block whose `canaryEligible` is hard-wired
+ * to `false` in P1 (契約1: candidate adoption requires trusted evidence
+ * produced outside the candidate's own write scope — that gate lands in P2+).
+ */
+function buildShadowCandidate({ cluster, sub, evidenceByRunId, now, policyVersion }) {
+  const evidence = sub.evidence;
+  const sourceReviewRunIds = [
+    ...new Set(evidence.map((ref) => ref.review_run_id).filter(Boolean)),
+  ].sort(compareStrings);
+  const runEvidence = sourceReviewRunIds
+    .map((id) => evidenceByRunId.get(id) ?? null)
+    .filter(Boolean);
+  const trustedEvidenceCount = runEvidence.filter((e) => e.trust_level === 'trusted').length;
+  const reasons = [];
+  if (!sub.experimentEligible) {
+    reasons.push(
+      sub.fingerprint == null
+        ? 'finding fingerprint がないため自動実験・昇格の対象にしない（契約5）'
+        : `distinct な occurrence が ${sub.distinctOccurrenceCount} 件しかなく反復証拠として不足（契約5）`
+    );
+  }
+  reasons.push(
+    'saved run の provenance は被レビュー側が書き換え可能で未検証のため、すべて untrusted 扱い（契約1）'
+  );
+  reasons.push('P1 は shadow 観測のみで canary へ進まない（実装順 P3 以降）');
+
+  const { candidateId, contentHash, evidenceCount } = computeCandidateId({
+    policyVersion,
+    clusterKey: cluster.clusterKey,
+    evidence,
+  });
+
+  return {
+    schemaVersion: SHADOW_AGGREGATE_SCHEMA_VERSION,
+    candidateId,
+    // Persisted so a reader can re-derive and verify the 12-hex id instead of
+    // trusting it (same rationale as promotion-candidates.mjs).
+    contentHash,
+    uniqueEvidenceCount: evidenceCount,
+    policyVersion,
+    createdAt: now.toISOString(),
+    mode: 'shadow',
+    status: 'observed',
+    clusterKey: cluster.clusterKey,
+    subClusterKey: sub.subClusterKey,
+    skillId: cluster.skillId,
+    feedbackType: cluster.feedbackType,
+    observedPattern:
+      OBSERVED_PATTERN_BY_FEEDBACK_TYPE[cluster.feedbackType] ??
+      '同種の feedback が繰り返し発生している',
+    // 1 candidate = 1 hypothesis. In P1 the hypothesis is not asserted
+    // automatically — a human writes it from the observed cluster.
+    causeHypothesis: null,
+    targetSurface: TARGET_SURFACE_BY_FEEDBACK_TYPE[cluster.feedbackType] ?? null,
+    candidateType: sub.experimentEligible ? 'experiment_candidate' : 'observation_only',
+    failureMode: sub.failureMode,
+    // Raw row counts. `distinct*` below is what recurrence judgements must use.
+    recurrenceCount: cluster.count,
+    subClusterCount: sub.count,
+    distinctFindingCount: sub.distinctFindingCount,
+    distinctPrCount: sub.distinctPrCount,
+    distinctRunCount: sub.distinctRunCount,
+    distinctOccurrenceCount: sub.distinctOccurrenceCount,
+    sourceReviewRunIds,
+    sourceFeedbackRefs: evidence,
+    evidence: runEvidence,
+    trust: {
+      trustedEvidenceCount,
+      untrustedEvidenceCount: runEvidence.length - trustedEvidenceCount,
+      // "Cannot be traced to a saved run" — which is a missing id OR an id
+      // that resolves to no evidence record. Counting only the missing ones
+      // under-reports the moment a producer exists (#1673): a typo'd or
+      // pruned `--run-id` would be silently counted as joined here while
+      // `join.unjoinedFeedbackCount` counts it as unjoined, so the two
+      // numbers in one artifact contradicted each other.
+      unjoinedEvidenceCount: evidence.filter(
+        (ref) => !ref.review_run_id || !evidenceByRunId.has(ref.review_run_id)
+      ).length,
+      canaryEligible: false,
+      reasons,
+    },
+    experimentEligible: sub.experimentEligible,
+    requiresHumanApproval: true,
+    autoActions: ['observe'],
+    // Explicit, machine-checkable statement that P1 mutates nothing.
+    writeEffects: [],
+  };
+}
+
+/**
+ * Build the read-only shadow aggregate over completed runs and feedback.
+ *
+ * Pure function: no I/O, no `Date.now()` (the clock is injected), and stable
+ * ordering everywhere, so the same inputs always produce a byte-identical
+ * artifact regardless of input order.
+ *
+ * @param {{
+ *   runRecords?: object[],
+ *   feedbackEntries?: object[],
+ *   now?: Date,
+ *   minRecurrence?: number,
+ *   month?: string|null,
+ *   policyVersion?: string,
+ *   collectorVersion?: string,
+ *   warn?: (msg: string) => void,
+ * }} [options]
+ *
+ * `warn` is the sink for feedback fingerprints that join to no saved finding
+ * (#1823 残件2). It defaults to a NO-OP, not `console.warn`, so this module
+ * keeps the "no process side effects at all" property stated at the top of the
+ * file — the same contract as `listFeedbackEntries` (src/lib/feedback.mjs).
+ * The CLI wires it to `console.warn`; the same information is also recorded in
+ * `join.unmatchedFindingFingerprints`, so a caller that leaves the sink unwired
+ * still has it in the artifact.
+ */
+function buildShadowAggregate({
+  runRecords = [],
+  feedbackEntries = [],
+  now = new Date(),
+  minRecurrence = DEFAULT_MIN_RECURRENCE,
+  month = null,
+  policyVersion = SHADOW_AGGREGATE_POLICY_VERSION,
+  collectorVersion = COLLECTOR_VERSION,
+  warn = () => {},
+} = {}) {
+  // `--month` scopes BOTH sides of the aggregate. Filtering only the feedback
+  // would silently mix a whole run history into a one-month report.
+  const scopedRuns = month
+    ? runRecords.filter((record) => String(record?.timestamp ?? '').slice(0, 7) === month)
+    : [...runRecords];
+  const scopedFeedback = month
+    ? (feedbackEntries ?? []).filter(
+        (entry) => String(entry?.timestamp ?? '').slice(0, 7) === month
+      )
+    : [...(feedbackEntries ?? [])];
+
+  const runEvidence = scopedRuns
+    .map((record) => buildRunEvidence(record, { collectorVersion }))
+    .sort(
+      (a, b) =>
+        compareStrings(a.review_run_id, b.review_run_id) ||
+        compareStrings(a.artifact_sha256, b.artifact_sha256)
+    );
+  // Two records can claim the same review_run_id (the id is self-reported and
+  // the store is writable). Resolve deterministically — lowest artifact_sha256
+  // wins — instead of letting directory read order decide, and surface the
+  // collision so a human can investigate.
+  const evidenceByRunId = new Map();
+  const duplicateReviewRunIds = new Set();
+  for (const evidence of runEvidence) {
+    if (!evidence.review_run_id) continue;
+    if (evidenceByRunId.has(evidence.review_run_id)) {
+      duplicateReviewRunIds.add(evidence.review_run_id);
+      continue; // first wins; runEvidence is already sorted by (id, sha256)
+    }
+    evidenceByRunId.set(evidence.review_run_id, evidence);
+  }
+  const trustedRunCount = runEvidence.filter((e) => e.trust_level === 'trusted').length;
+
+  const findingIndex = indexFindingsByFingerprint(scopedRuns);
+  const clusters = buildClusters(scopedFeedback, { minRecurrence, findingIndex });
+
+  // #1823 残件2: a `findingFingerprint` that joins to no saved finding is NOT
+  // dropped — it still forms its own stage-2 sub-cluster, just with
+  // `no-category` / `no-file-path`, and (with enough distinct occurrences) can
+  // still mint a candidate under a DIFFERENT candidateId than the same feedback
+  // recorded with the matching value. Nothing in the pre-#1823 output said so.
+  // The most common cause is a v2 hex copied out of `river review --debug`,
+  // which `classifyFingerprintAlgo` can name exactly because the saved records
+  // carry `fingerprintV2` next to `fingerprint`.
+  const scopedFindings = scopedRuns.flatMap((record) => record?.findings ?? []);
+  const unmatched = new Map(); // fingerprint -> 'v2' | null
+  for (const entry of scopedFeedback) {
+    const fingerprint = (0,_promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_2__/* .nonEmptyNfcString */ .bS)(entry?.findingFingerprint);
+    if (!fingerprint || findingIndex.has(fingerprint)) continue;
+    if (unmatched.has(fingerprint)) continue;
+    const algo = (0,_finding_factory_mjs__WEBPACK_IMPORTED_MODULE_1__.classifyFingerprintAlgo)(fingerprint, scopedFindings);
+    unmatched.set(fingerprint, algo === 'v2' ? 'v2' : null);
+  }
+  const unmatchedFindingFingerprints = [...unmatched.keys()].sort(compareStrings);
+  const v2FindingFingerprints = unmatchedFindingFingerprints.filter(
+    (fp) => unmatched.get(fp) === 'v2'
+  );
+  // Sorted first so the sink sees a deterministic order, matching the artifact.
+  for (const fingerprint of unmatchedFindingFingerprints) {
+    warn(
+      (0,_finding_factory_mjs__WEBPACK_IMPORTED_MODULE_1__.formatUnmatchedFeedbackFingerprintWarning)({
+        fingerprint,
+        likelyAlgo: unmatched.get(fingerprint),
+      })
+    );
+  }
+
+  const joinedFeedbackCount = scopedFeedback.filter((entry) => {
+    const id = deriveFeedbackReviewRunId(entry);
+    return id != null && evidenceByRunId.has(id);
+  }).length;
+
+  const selected = selectSubCluster(clusters);
+  const candidate = selected
+    ? buildShadowCandidate({ ...selected, evidenceByRunId, now, policyVersion })
+    : null;
+
+  return {
+    schemaVersion: SHADOW_AGGREGATE_SCHEMA_VERSION,
+    generatedAt: now.toISOString(),
+    mode: 'shadow',
+    readOnly: true,
+    policyVersion,
+    collectorVersion,
+    inputs: {
+      // Counts are POST-`--month` scoping (see scopedRuns / scopedFeedback).
+      runCount: scopedRuns.length,
+      feedbackCount: scopedFeedback.length,
+      minRecurrence,
+      month,
+    },
+    evidence: {
+      runs: runEvidence,
+      trustedRunCount,
+      untrustedRunCount: runEvidence.length - trustedRunCount,
+    },
+    join: {
+      // 契約2 propagation coverage: how much feedback can already be traced
+      // back to a saved run through the canonical review_run_id.
+      joinedFeedbackCount,
+      unjoinedFeedbackCount: scopedFeedback.length - joinedFeedbackCount,
+      runIdsWithEvidence: [...evidenceByRunId.keys()].sort(compareStrings),
+      duplicateReviewRunIds: [...duplicateReviewRunIds].sort(compareStrings),
+      // #1823 残件2. Distinct from `unjoinedFeedbackCount`, which is the
+      // review_run_id join (契約2): a row can join on run id and still name a
+      // fingerprint no finding has.
+      unmatchedFindingFingerprints,
+      v2FindingFingerprints,
+    },
+    clusters,
+    candidate,
+  };
+}
+
+/**
+ * Render the aggregate as Markdown for human review (`--output text`).
+ */
+function formatShadowAggregateMarkdown(aggregate) {
+  const lines = ['## Shadow aggregate (read-only)', ''];
+  lines.push(`| Item | Value |`);
+  lines.push(`|---|---|`);
+  lines.push(`| Generated at | ${aggregate.generatedAt} |`);
+  lines.push(`| Policy version | ${aggregate.policyVersion} |`);
+  lines.push(`| Month scope | ${aggregate.inputs.month ?? '(all)'} |`);
+  lines.push(`| Runs | ${aggregate.inputs.runCount} |`);
+  lines.push(
+    `| Untrusted evidence | ${aggregate.evidence.untrustedRunCount} / ${aggregate.evidence.runs.length}（P1 は全件 untrusted） |`
+  );
+  lines.push(`| Feedback entries | ${aggregate.inputs.feedbackCount} |`);
+  lines.push(
+    `| Feedback joined to a run | ${aggregate.join.joinedFeedbackCount} / ${aggregate.inputs.feedbackCount} |`
+  );
+  lines.push(`| Duplicate review_run_id | ${aggregate.join.duplicateReviewRunIds.length} |`);
+  lines.push(
+    `| Unmatched findingFingerprint | ${aggregate.join.unmatchedFindingFingerprints.length} |`
+  );
+  lines.push(`| Recurring clusters | ${aggregate.clusters.length} |`);
+  lines.push('');
+
+  if (aggregate.join.duplicateReviewRunIds.length) {
+    lines.push(
+      `⚠️ 同一 review_run_id を名乗る run が複数あります: ${aggregate.join.duplicateReviewRunIds
+        .map((id) => `\`${id}\``)
+        .join(', ')}`
+    );
+    lines.push('');
+  }
+
+  // #1823 残件2: an unmatched fingerprint still clusters, so it has to be
+  // called out here — the cluster list below looks perfectly healthy.
+  if (aggregate.join.unmatchedFindingFingerprints.length) {
+    const v2 = new Set(aggregate.join.v2FindingFingerprints);
+    lines.push(
+      '⚠️ どの run の finding にも一致しない findingFingerprint があります（独立した sub-cluster を作ります）:'
+    );
+    for (const fingerprint of aggregate.join.unmatchedFindingFingerprints) {
+      lines.push(
+        `- \`${fingerprint}\`` +
+          (v2.has(fingerprint)
+            ? '（保存済み finding の **v2**（行アンカー）値です。feedback の join は v1 で行うため一致しません）'
+            : '')
+      );
+    }
+    lines.push('');
+  }
+
+  if (aggregate.clusters.length) {
+    lines.push('### Clusters (stage 1 → stage 2)');
+    for (const cluster of aggregate.clusters) {
+      lines.push(
+        `- \`${cluster.clusterKey}\`: ${cluster.count} 件（distinct finding ${cluster.distinctFindingCount} / distinct PR ${cluster.distinctPrCount}）`
+      );
+      for (const sub of cluster.subClusters) {
+        const eligible = sub.experimentEligible ? 'experiment-eligible' : 'observation-only';
+        lines.push(
+          `  - \`${sub.subClusterKey}\`: ${sub.count} 件 / distinct occurrence ${sub.distinctOccurrenceCount} (${eligible})`
+        );
+      }
+    }
+    lines.push('');
+  }
+
+  if (aggregate.candidate) {
+    const c = aggregate.candidate;
+    lines.push('### Candidate (shadow, no side effects)');
+    lines.push(`- id: \`${c.candidateId}\``);
+    lines.push(`- cluster: \`${c.clusterKey}\` → \`${c.subClusterKey}\``);
+    lines.push(`- targetSurface: ${c.targetSurface ?? '(未判定)'}`);
+    lines.push(`- observedPattern: ${c.observedPattern}`);
+    lines.push(`- canaryEligible: ${c.trust.canaryEligible}`);
+    for (const reason of c.trust.reasons) lines.push(`  - ${reason}`);
+    lines.push('');
+  } else {
+    lines.push('No recurring cluster reached the threshold — no candidate generated.');
+    lines.push('');
+  }
+
+  lines.push(
+    'このコマンドは読み取り専用です。Skill / Rule / Riverbed / gate / PR には一切書き込みません。'
+  );
+  return lines.join('\n');
 }
 
 
@@ -56772,9 +60883,20 @@ module.exports = /*#__PURE__*/JSON.parse('{"$schema":"http://json-schema.org/dra
 /******/ 	};
 /******/ })();
 /******/ 
+/******/ /* webpack/runtime/publicPath */
+/******/ (() => {
+/******/ 	var scriptUrl;
+/******/ 	if (typeof import.meta.url === "string") scriptUrl = import.meta.url
+/******/ 	// When supporting browsers where an automatic publicPath is not supported you must specify an output.publicPath manually via configuration
+/******/ 	// or pass an empty string ("") and set the __webpack_public_path__ variable from your code to use your own logic.
+/******/ 	if (!scriptUrl) throw new Error("Automatic publicPath is not supported in this browser");
+/******/ 	scriptUrl = scriptUrl.replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^\/]+$/, "/");
+/******/ 	__nccwpck_require__.p = scriptUrl;
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/import chunk loading */
 /******/ (() => {
-/******/ 	// no baseURI
+/******/ 	__nccwpck_require__.b = new URL("./", import.meta.url);
 /******/ 	
 /******/ 	// object to store loaded and loading chunks
 /******/ 	// undefined = chunk not loaded, null = chunk preloaded/prefetched
@@ -56844,8 +60966,8 @@ var external_node_fs_ = __nccwpck_require__(3024);
 var external_node_os_ = __nccwpck_require__(8161);
 // EXTERNAL MODULE: external "node:path"
 var external_node_path_ = __nccwpck_require__(6760);
-;// CONCATENATED MODULE: external "node:process"
-const external_node_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:process");
+// EXTERNAL MODULE: external "node:process"
+var external_node_process_ = __nccwpck_require__(1708);
 // EXTERNAL MODULE: external "node:url"
 var external_node_url_ = __nccwpck_require__(3136);
 // EXTERNAL MODULE: ./src/lib/git.mjs
@@ -56957,16 +61079,946 @@ async function loadProjectRules(repoRoot, options = {}) {
 var risk_map = __nccwpck_require__(572);
 // EXTERNAL MODULE: ./src/lib/utils.mjs
 var utils = __nccwpck_require__(9746);
-// EXTERNAL MODULE: ./src/lib/planner-utils.mjs
-var planner_utils = __nccwpck_require__(1013);
 // EXTERNAL MODULE: ./src/lib/finding-factory.mjs
 var finding_factory = __nccwpck_require__(1535);
 // EXTERNAL MODULE: ./src/lib/review-plan-generator.mjs
 var review_plan_generator = __nccwpck_require__(8069);
 // EXTERNAL MODULE: ./src/lib/expires-at.mjs
 var expires_at = __nccwpck_require__(5009);
+// EXTERNAL MODULE: ./src/lib/flow-loader.mjs
+var flow_loader = __nccwpck_require__(4357);
+;// CONCATENATED MODULE: ./src/cli/parse/positionals.mjs
+// `parseArgs` の positional 取り込み。src/cli.mjs から純粋に移設したもので、
+// 判定も副作用も変えていない（#2011 AC7 後のリファクタリング Step 1）。
+//
+// ここに置く条件は「`parsed` 以外に依存しないこと」である。`takeTrailingPositional`
+// は `REVIEW_SUBCOMMANDS` / `SKILLS_SUBCOMMANDS` / `EVOLVE_SUBCOMMANDS` の語彙に
+// 依存するため、語彙の置き場所が決まるまで src/cli.mjs に残している。
+
+/**
+ * Whether `parsed.command` still accepts a positional `<path>`.
+ *
+ * The five path-taking surfaces are `run` / `doctor` / `review` /
+ * `skills` (without a subcommand) / `evolve` (except `replay`).
+ *
+ * @param {object} parsed
+ * @returns {boolean}
+ */
+function acceptsPositionalPath(parsed) {
+  switch (parsed.command) {
+    case 'run':
+    case 'doctor':
+    case 'review':
+      return true;
+    case 'skills':
+      // `skills import|export|list|resolve` take options, not a path.
+      return !parsed.skillsSubcommand;
+    case 'evolve':
+      // `replay` takes NO positional (its dataset comes from --spec).
+      return parsed.evolveSubcommand !== 'replay';
+    default:
+      return false;
+  }
+}
+
+/**
+ * Consume `token` as the positional `<path>` and as nothing else.
+ *
+ * This is the reading that applies after the POSIX `--` terminator, where a
+ * token must never be re-read as an option or as a subcommand word even when it
+ * looks like one.
+ *
+ * @param {object} parsed
+ * @param {string} token
+ * @returns {boolean} true when the token was consumed as the target
+ */
+function takePositionalPath(parsed, token) {
+  if (parsed.targetConsumed || !acceptsPositionalPath(parsed)) return false;
+  parsed.target = token;
+  parsed.targetConsumed = true;
+  return true;
+}
+
+;// CONCATENATED MODULE: ./src/cli/parse/terminator.mjs
+// POSIX の `--` ターミネータの読み取り。src/cli.mjs から純粋に移設したもので、
+// 判定も副作用も変えていない（リファクタリング Step 2）。
+//
+// `usageError` は移していない。あれは usage hint を stdout へ出しつつ
+// `parsed.usageError` を立てる副作用で、`parseArgs` の 70 箇所以上から呼ばれる。
+// ここへ引数で渡すと依存注入になるため、本関数は stderr へのメッセージ出力までを
+// 行い、usage error であることを戻り値で返す。呼び出し側が続けて `usageError` を
+// 呼ぶので、出力の順序は移設前と同じである。
+
+
+
+
+
+/**
+ * `--` に続くトークンを全て positional path として読み切る。
+ *
+ * @param {object} parsed
+ * @param {string[]} args `--` の次のトークンから始まる残りの argv（破壊的に shift する）
+ * @returns {{ error: boolean, tookPositional: boolean }}
+ *   `error` が true のとき、呼び出し側は `usageError(parsed)` を呼んで解析を打ち切る。
+ *   `tookPositional` は `--` 経由で positional を取り込んだかどうか。
+ */
+function consumeTerminator(parsed, args) {
+  let error = false;
+  let tookPositional = false;
+  while (args.length) {
+    const positional = args.shift();
+    if (parsed.targetConsumed || !acceptsPositionalPath(parsed)) {
+      console.error(`Error: unexpected argument "${positional}".`);
+      error = true;
+      break;
+    }
+    // The token is a path by construction, so it must BE one. Without this
+    // check `river evolve aggregate -- nosuchdir` exited 0 with an empty
+    // aggregate: `--` bypasses the eager branch's "a non-existent,
+    // non-subcommand token is a mistyped subcommand" rejection, turning a
+    // mistyped path into a silent empty result. #1746 W2 already treated
+    // "exit 0 while silently falling back" as a regression.
+    if (!(0,external_node_fs_.existsSync)(positional)) {
+      console.error(
+        `Error: "${positional}" does not exist ` +
+          '(every token after `--` is read as a path, never as an option or a subcommand).'
+      );
+      error = true;
+      break;
+    }
+    takePositionalPath(parsed, positional);
+    tookPositional = true;
+  }
+  return { error, tookPositional };
+}
+
+;// CONCATENATED MODULE: ./src/cli/parse/vocabulary.mjs
+// `parseArgs` が使うサブコマンド語彙。src/cli.mjs から純粋に移設したもので、
+// 集合の中身も JSDoc も変えていない（リファクタリング Step 3a）。
+//
+// ここに置くのはリテラルな集合だけである。`EAGER_COMMANDS` は `COMMAND_USAGE`
+// から導出しており、移すと使用箇所の表そのものを連れてくることになるため
+// src/cli.mjs に残した。
+
+/**
+ * Eager-branch commands that take a subcommand word and never a positional
+ * path. The arms above the fall-through in the eager branch have already
+ * consumed their subcommand word, so the fall-through (which reads a
+ * positional `<path>`) must skip exactly these.
+ */
+const SUBCOMMAND_ONLY_COMMANDS = new Set(['runs', 'suppression', 'feedback', 'promote']);
+
+/**
+ * `skills` subcommands (`skills import|export|list|resolve` take options, not a
+ * positional path — see `acceptsPositionalPath`).
+ */
+const SKILLS_SUBCOMMANDS = new Set(['import', 'export', 'list', 'resolve']);
+
+/**
+ * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay`, ADR-006
+ * `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
+ * "first non-flag token") keeps `river evolve <path>` working.
+ */
+const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'prompt-ab']);
+
+/**
+ * `promote` subcommands that take an optional positional candidate id.
+ */
+const PROMOTE_ID_SUBCOMMANDS = new Set([
+  'approve',
+  'reject',
+  'template',
+  'review-effectiveness',
+]);
+
+/**
+ * `river review` subcommands (#802 Phase 3), at module scope because BOTH the
+ * eager branch inside `parseArgs` and `takeTrailingPositional` below need it:
+ * `review` had no vocabulary at all, so a subcommand written after the options
+ * was swallowed as the path (#1755).
+ *
+ * `SKILLS_SUBCOMMANDS` / `EVOLVE_SUBCOMMANDS` sit alongside it above. Hoisting
+ * them out of `parseArgs` is a pure relocation: `takeTrailingPositional`
+ * already consulted `REVIEW_SUBCOMMANDS` before the hoist, but for `evolve`
+ * it only approximated the eager branch's decision with `existsSync` (#1759
+ * B1). `takeTrailingPositional` now checks `EVOLVE_SUBCOMMANDS` first, the
+ * same priority the eager branch uses, so `river evolve aggregate --min 2`
+ * and `river evolve --min 2 aggregate` agree even when a directory named
+ * `aggregate` exists in cwd.
+ */
+const REVIEW_SUBCOMMANDS = new Set(['plan', 'exec', 'verify', 'route']);
+
+/**
+ * `runs` subcommands, as dispatched by `runRunsCommand`
+ * (`src/cli/commands/runs.mjs`): `list` / `diff` / `summary` / `digest`, with a
+ * MISSING subcommand behaving as `list` (`:21` — `!parsed.runsSubcommand ||
+ * parsed.runsSubcommand === 'list'`). Mirrors the vocabulary in that handler's
+ * `Unknown runs subcommand: … Use: list | diff | summary | digest` message,
+ * the same "mirror + pin" arrangement `SUPPRESSION_FINGERPRINT_ALGOS` uses
+ * against its schema; `tests/cli-base-option-scope.test.mjs` pins the two
+ * together by running the CLI, so this list cannot drift from the handler.
+ *
+ * Needed at parse time only so `checkCommandScopedOptions` can tell a real
+ * surface from a typo'd subcommand word (see `isNamedSurface`).
+ */
+const RUNS_SUBCOMMANDS = new Set(['list', 'diff', 'summary', 'digest']);
+
+/**
+ * `feedback` / `suppression` accept exactly one subcommand word each, and a
+ * missing one is NOT a surface — both handlers answer
+ * ``only `river feedback add` is supported`` / ``only `river suppression add`
+ * is supported`` (`src/cli/commands/feedback.mjs:61`,
+ * `src/cli/commands/suppression.mjs:20`). Pinned by the same test.
+ */
+const FEEDBACK_SUBCOMMANDS = new Set(['add']);
+const SUPPRESSION_SUBCOMMANDS = new Set(['add']);
+
+;// CONCATENATED MODULE: ./src/cli/parse/eager-command.mjs
+// eager コマンド分岐の本体。src/cli.mjs から純粋に移設したもので、判定も副作用も
+// 変えていない（リファクタリング Step 3 後半）。
+//
+// `EAGER_COMMANDS` によるガードは呼び出し側に残してある。あの集合は
+// `COMMAND_USAGE` から導出しており、移すと使用箇所の表そのものを連れてくる。
+// ガードを残せば本関数の依存はリテラルな語彙集合だけで済む。
+
+
+
+
+
+/**
+ * コマンド語の直後に続く副コマンド語 / positional path を読み取る。
+ *
+ * 呼び出し側は `EAGER_COMMANDS.has(arg)` を確かめてから呼ぶこと。
+ *
+ * @param {object} parsed
+ * @param {string} arg 直前に読んだコマンド語
+ * @param {string[]} args 残りの argv（破壊的に shift する）
+ */
+function consumeEagerCommand(parsed, arg, args) {
+  parsed.command = arg;
+  // Check for skills subcommands (import/export/list)
+  if (arg === 'skills' && args[0] && SKILLS_SUBCOMMANDS.has(args[0])) {
+    parsed.skillsSubcommand = args.shift();
+  } else if (arg === 'evolve') {
+    if (args[0] && EVOLVE_SUBCOMMANDS.has(args[0])) {
+      parsed.evolveSubcommand = args.shift();
+    }
+    // `replay` takes NO positional: its dataset comes from --spec. Letting
+    // the first token become `parsed.target` would make the command accept
+    // and silently ignore it (`river evolve replay ./typo.json --spec x`).
+    if (parsed.evolveSubcommand !== 'replay' && args[0] && !args[0].startsWith('-')) {
+      const token = args.shift();
+      // A mistyped subcommand (`agregate`) must not be swallowed as a path
+      // and reported as an empty, successful aggregate. Anything that is
+      // neither a known subcommand nor an existing path is an error.
+      if (!parsed.evolveSubcommand && !(0,external_node_fs_.existsSync)(token)) {
+        parsed.evolveSubcommand = token; // handler rejects it with exit 1
+      } else {
+        parsed.target = token;
+        parsed.targetConsumed = true;
+      }
+    }
+    // Surplus positionals are a usage error, never silently discarded.
+    while (args[0] && !args[0].startsWith('-')) {
+      parsed.evolveExtraArgs.push(args.shift());
+    }
+  } else if (arg === 'runs' && args[0] && !args[0].startsWith('-')) {
+    parsed.runsSubcommand = args.shift(); // list | diff | summary | digest
+    // `diff` takes two or more positional run IDs, which may be written
+    // before, after, or interleaved with options (e.g. `--output json`).
+    // Collecting them eagerly here (as a fixed shift-two-then-scan) used to
+    // swallow a leading option as a run ID (#1759 B2): `runs diff --output
+    // json r1 r2` shifted "--output" into runsId1 and "json" into runsId2,
+    // then tried to open a run named "--output" and exited 1 with ENOENT.
+    // Collection now happens token-by-token below (near the promote/evolve
+    // dispatches), so options are left for the shared option handlers.
+  } else if (arg === 'suppression' && args[0] && !args[0].startsWith('-')) {
+    parsed.suppressionSubcommand = args.shift(); // add (only one for now)
+  } else if (arg === 'feedback' && args[0] && !args[0].startsWith('-')) {
+    parsed.feedbackSubcommand = args.shift(); // add (only one for now)
+  } else if (arg === 'promote' && args[0] && !args[0].startsWith('-')) {
+    parsed.promoteSubcommand = args.shift(); // propose | list | approve | reject | template | retire | review-effectiveness
+    // approve/reject/template/review-effectiveness take an optional positional candidate id.
+    if (
+      PROMOTE_ID_SUBCOMMANDS.has(parsed.promoteSubcommand) &&
+      args[0] &&
+      !args[0].startsWith('-')
+    ) {
+      parsed.promoteId = args.shift();
+    }
+  } else if (!SUBCOMMAND_ONLY_COMMANDS.has(arg) && args[0] && !args[0].startsWith('-')) {
+    parsed.target = args.shift();
+    parsed.targetConsumed = true;
+  }
+}
+
+// EXTERNAL MODULE: ./src/lib/planner-utils.mjs
+var planner_utils = __nccwpck_require__(1013);
+;// CONCATENATED MODULE: ./src/cli/parse/options.mjs
+// `parseArgs` のオプション連鎖。src/cli.mjs から順序を保ったまま純粋に移設して
+// いる（リファクタリング Step 4）。判定も副作用も変えていない。
+//
+// 連鎖は上から順に評価される。移設は必ず**残りの連鎖の先頭から**行うこと。
+// 途中の分岐だけを持ち出すと評価順が変わる。
+//
+// `usageError` は移していない。usage hint を stdout へ出しつつ
+// `parsed.usageError` を立てる副作用で、`parseArgs` の 70 箇所以上から呼ばれる。
+// 引数で渡すと依存注入になるため、本関数は stderr への出力までを行い、
+// ループを抜けるべきことを `'break'` で返す。呼び出し側が続けて `usageError` を
+// 呼ぶので、出力の順序は移設前と同じである。
+
+
+
+
+
+
+
+
+
+
+
+
+const SEVERITY_VALUES = Object.keys(finding_factory/* SEVERITY_RANK */.f3);
+
+/** Values accepted by `--output`. */
+const OUTPUT_MODES = ['text', 'markdown', 'json', 'yaml', 'html'];
+
+/** Values accepted by `--format` (review plan|exec|verify|route). */
+const REVIEW_FORMATS = ['text', 'markdown', 'json'];
+
+/** Values accepted by `skills list --source`. */
+const SKILLS_LIST_SOURCES = ['rr', 'agent', 'all'];
+
+/**
+ * 1 トークン分のオプションを読み取る。
+ *
+ * @param {object} parsed
+ * @param {string} arg 読み取り済みのトークン
+ * @param {string[]} args 残りの argv（破壊的に shift する）
+ * @returns {'continue'|'break'|null}
+ *   `'continue'` 呼び出し側はループを継続する。
+ *   `'break'` 呼び出し側は `usageError(parsed)` を呼んでループを抜ける。
+ *   `null` 本関数は扱わない。呼び出し側の連鎖へ落とす。
+ */
+function consumeOption(parsed, arg, args) {
+  if (arg === '--plan-only') {
+    parsed.planOnly = true;
+    return 'continue';
+  }
+  if (arg === '--fail-on' || arg === '--warn-on') {
+    const value = args.shift();
+    const sev = value ? value.toLowerCase() : '';
+    if (!SEVERITY_VALUES.includes(sev)) {
+      console.error(
+        `Error: ${arg} must be one of: ${SEVERITY_VALUES.join(', ')} (got "${value ?? ''}").`
+      );
+      return 'break';
+    }
+    if (arg === '--fail-on') parsed.failOn = sev;
+    else parsed.warnOn = sev;
+    return 'continue';
+  }
+  if (arg === '--advisory-only') {
+    parsed.advisoryOnly = true;
+    return 'continue';
+  }
+  if (arg === '--gate') {
+    parsed.gate = true;
+    return 'continue';
+  }
+  if (arg === '--offline' || arg === '--rules-only') {
+    parsed.offline = true;
+    return 'continue';
+  }
+  if (arg === '--plan') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --plan option requires a path.');
+      return 'break';
+    }
+    parsed.planFile = value;
+    return 'continue';
+  }
+  if (arg === '--output-file') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --output-file option requires a path.');
+      return 'break';
+    }
+    parsed.outputFile = value;
+    return 'continue';
+  }
+  if (arg === '--summary-file') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --summary-file option requires a path.');
+      return 'break';
+    }
+    parsed.summaryFile = value;
+    return 'continue';
+  }
+  if (arg === '--quiet') {
+    parsed.quiet = true;
+    return 'continue';
+  }
+  if (arg === '--artifacts-dir') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --artifacts-dir option requires a path.');
+      return 'break';
+    }
+    parsed.artifactsDir = value;
+    return 'continue';
+  }
+  if (arg === '--artifact') {
+    const value = args.shift();
+    const eq = value ? value.indexOf('=') : -1;
+    if (!value || value.startsWith('-') || eq <= 0) {
+      console.error('Error: --artifact requires <id>=<path> (e.g. --artifact plan=./plan.md).');
+      return 'break';
+    }
+    parsed.cliArtifacts[value.slice(0, eq)] = value.slice(eq + 1);
+    return 'continue';
+  }
+  if (arg === '--ensemble') {
+    // #911 Phase 3 Slice B. Sugar for "concatenate every *.md file under
+    // <dir> into a single review-external artifact". The synthesis skill
+    // (`independent-review-synthesis`) consumes the merged
+    // file. We deliberately do NOT pin specific reviewer names (Claude /
+    // Codex / Cursor) in the flag — file names carry that information, so
+    // the CLI stays provider-agnostic.
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error(
+        'Error: --ensemble requires a directory path (e.g. --ensemble ./.river/reviews).'
+      );
+      return 'break';
+    }
+    if (parsed.cliArtifacts['review-external']) {
+      console.warn(
+        'Warning: --ensemble ignored because --artifact review-external=... is already set. Remove the --artifact flag or drop --ensemble.'
+      );
+      return 'continue';
+    }
+    const dir = external_node_path_.resolve(external_node_process_.cwd(), value);
+    let files;
+    try {
+      files = (0,external_node_fs_.readdirSync)(dir)
+        .filter((f) => f.endsWith('.md'))
+        .sort();
+    } catch (err) {
+      console.error(`Error: --ensemble cannot read directory ${value}: ${err.message}`);
+      return 'break';
+    }
+    if (files.length === 0) {
+      console.error(`Error: --ensemble found no *.md files in ${value}.`);
+      return 'break';
+    }
+    const merged = files
+      .map((f) => `\n\n---\nFrom: ${f}\n---\n\n${(0,external_node_fs_.readFileSync)(external_node_path_.join(dir, f), 'utf8')}`)
+      .join('');
+    const tmpPath = external_node_path_.join(external_node_os_.tmpdir(), `river-ensemble-${external_node_process_.pid}-${Date.now()}.md`);
+    (0,external_node_fs_.writeFileSync)(tmpPath, merged);
+    external_node_process_.on('exit', () => {
+      try {
+        (0,external_node_fs_.unlinkSync)(tmpPath);
+      } catch {
+        // ignore cleanup errors — OS will reclaim tmpdir
+      }
+    });
+    parsed.cliArtifacts['review-external'] = tmpPath;
+    return 'continue';
+  }
+  if (arg === '--phase') {
+    if (!args[0] || args[0].startsWith('-')) {
+      console.error('Error: --phase option requires a value.');
+      return 'break';
+    }
+    const value = args.shift();
+    // #1746 follow-up: an invalid phase used to exit 0 and fall back to the
+    // default (`midstream`) downstream in normalizePhase, so the run silently
+    // reviewed a different phase than the one that was typed. PHASES is the
+    // shared vocabulary in src/lib/planner-utils.mjs.
+    //
+    // Case-insensitive, and the lowercased value is what gets stored. That is
+    // `normalizePhase`'s (src/lib/local-runner.mjs) semantics, pinned by
+    // tests/local-runner-internals.test.mjs "normalizes case" — so
+    // `--phase Upstream` really did run as `upstream` and MUST keep working.
+    // `normalizePhase` itself cannot be the validator here: its contract is to
+    // fall back to `midstream` for anything invalid, which is exactly the
+    // silent fallback this guard removes. It also matches the shape the
+    // sibling enum options in this parser already use (--planner / --output /
+    // --format / --fail-on all lowercase before comparing).
+    const phase = value.toLowerCase();
+    if (!planner_utils/* PHASES */.ZG.includes(phase)) {
+      console.error(`Error: --phase must be one of: ${planner_utils/* PHASES */.ZG.join(', ')} (got "${value}").`);
+      return 'break';
+    }
+    parsed.phase = phase;
+    // #1759 C2: marks that --phase already validated and set parsed.phase,
+    // so the post-loop RIVER_PHASE check below must not re-derive it from
+    // the (possibly invalid) env var and must not report a second error.
+    parsed.phaseExplicit = true;
+    return 'continue';
+  }
+  if (arg === '--cases') {
+    const value = args.shift();
+    // #1709 Slice 3 (B3): a trailing `--cases` used to null the field, so
+    // eval silently fell back to the DEFAULT fixtures and printed [PASS].
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --cases option requires a path.');
+      return 'break';
+    }
+    parsed.fixturesCasesPath = value;
+    return 'continue';
+  }
+  if (arg === '--verbose') {
+    parsed.verbose = true;
+    return 'continue';
+  }
+  if (arg === '--planner') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --planner option requires a value.');
+      return 'break';
+    }
+    const mode = value.toLowerCase();
+    if (!planner_utils/* PLANNER_MODES */.Er.includes(mode)) {
+      console.error(
+        `Error: --planner must be one of: ${planner_utils/* PLANNER_MODES */.Er.join(', ')} (got "${value}").`
+      );
+      return 'break';
+    }
+    parsed.plannerMode = mode;
+    return 'continue';
+  }
+  if (arg === '--dry-run') {
+    parsed.dryRun = true;
+    return 'continue';
+  }
+  if (arg === '--debug') {
+    parsed.debug = true;
+    return 'continue';
+  }
+  if (arg === '--explain') {
+    parsed.explain = true;
+    return 'continue';
+  }
+  if (arg === '--estimate') {
+    parsed.estimate = true;
+    return 'continue';
+  }
+  if (arg === '--max-cost') {
+    const value = args.shift();
+    parsed.maxCost = value ? Number.parseFloat(value) : null;
+    if (!Number.isFinite(parsed.maxCost) || parsed.maxCost < 0) {
+      console.error('Error: --max-cost requires a non-negative numeric value.');
+      return 'break';
+    }
+    return 'continue';
+  }
+  if (arg === '--output') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --output option requires a value.');
+      return 'break';
+    }
+    const mode = value.toLowerCase();
+    if (!OUTPUT_MODES.includes(mode)) {
+      console.error(`Error: --output must be one of: ${OUTPUT_MODES.join(', ')} (got "${value}").`);
+      return 'break';
+    }
+    parsed.output = mode;
+    parsed.outputExplicit = true;
+    return 'continue';
+  }
+  if (arg === '--format') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --format option requires a value.');
+      return 'break';
+    }
+    const mode = value.toLowerCase();
+    if (!REVIEW_FORMATS.includes(mode)) {
+      console.error(
+        `Error: --format must be one of: ${REVIEW_FORMATS.join(', ')} (got "${value}").`
+      );
+      return 'break';
+    }
+    parsed.format = mode;
+    parsed.formatExplicit = true;
+    return 'continue';
+  }
+  if (arg === '--context') {
+    const value = args.shift();
+    // #1709 Slice 3: a trailing `--context` used to become parseList(undefined)
+    // = [] in silence (same for --dependency below).
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --context option requires a comma-separated list.');
+      return 'break';
+    }
+    // Deliberately NOT warned here: `--context` is last-wins (this is a plain
+    // assignment, not a merge), so warning per occurrence reports values that
+    // the run never uses — `--context BOGUS --context diff` warned about
+    // BOGUS even though `diff` is what survives. The warning is emitted once
+    // after the loop, against the surviving list (#1958 review, nit 5).
+    parsed.availableContexts = (0,utils/* parseList */.E1)(value);
+    return 'continue';
+  }
+  if (arg === '--dependency') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --dependency option requires a comma-separated list.');
+      return 'break';
+    }
+    parsed.availableDependencies = (0,utils/* parseList */.E1)(value);
+    return 'continue';
+  }
+  if (arg === '--reviewers') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error(
+        'Error: --reviewers option requires a value (e.g. bug-hunter,security-scanner).'
+      );
+      return 'break';
+    }
+    parsed.reviewers = (0,utils/* parseList */.E1)(value);
+    return 'continue';
+  }
+  if (arg === '--baseline') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --baseline option requires a file path.');
+      return 'break';
+    }
+    parsed.baseline = value;
+    return 'continue';
+  }
+  if (arg === '--base') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --base option requires a branch or ref (e.g. --base main).');
+      return 'break';
+    }
+    parsed.base = value;
+    return 'continue';
+  }
+  if (arg === '--entry') {
+    const value = args.shift();
+    if (!value || value.startsWith('-') || value.trim() === '') {
+      console.error(
+        'Error: --entry option requires a review Flow entry name (e.g. --entry review-plan).'
+      );
+      return 'break';
+    }
+    // #2054 PR-3: an unknown entry name is a usage error here, listing the
+    // accepted names, rather than a handler-level exit 3 — the vocabulary is
+    // data (the entry map), so it is read through the single Flow reader.
+    // If the assets cannot be loaded at all the handler reports that with
+    // its own message; parse only validates when it can.
+    let known = null;
+    try {
+      known = (0,flow_loader/* listFlowEntryNames */.d2)();
+    } catch {
+      known = null;
+    }
+    if (known !== null && !known.includes(value)) {
+      console.error(`Error: unknown --entry "${value}". Accepted entries: ${known.join(', ')}.`);
+      return 'break';
+    }
+    parsed.entry = value;
+    return 'continue';
+  }
+  if (arg === '--skill-set') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --skill-set option requires a name (e.g. --skill-set comprehensive).');
+      return 'break';
+    }
+    parsed.skillSet = value;
+    return 'continue';
+  }
+  if (arg === '--depth') {
+    const value = args.shift();
+    const valid = Object.keys(review_plan_generator/* DEPTH_TO_REVIEW_MODE */.To);
+    if (!value || !valid.includes(value)) {
+      console.error(`Error: --depth must be one of: ${valid.join(', ')} (got "${value ?? ''}").`);
+      return 'break';
+    }
+    parsed.depth = value;
+    return 'continue';
+  }
+  if (arg === '--save') {
+    parsed.save = true;
+    return 'continue';
+  }
+  // Skills subcommand options
+  if (arg === '--from') {
+    const value = args.shift();
+    // #1709 Slice 3: a trailing `--from` / `--to` used to null the field in
+    // silence, so `skills import --from` ran against the default instead.
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --from option requires a path.');
+      return 'break';
+    }
+    parsed.fromPath = value;
+    return 'continue';
+  }
+  if (arg === '--to') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --to option requires a path.');
+      return 'break';
+    }
+    parsed.toPath = value;
+    return 'continue';
+  }
+  if (arg === '--strict') {
+    parsed.validationMode = 'strict';
+    return 'continue';
+  }
+  if (arg === '--loose') {
+    parsed.validationMode = 'loose';
+    return 'continue';
+  }
+  if (arg === '--source') {
+    const value = args.shift();
+    if (!value || !SKILLS_LIST_SOURCES.includes(value)) {
+      console.error(
+        `Error: --source must be one of: ${SKILLS_LIST_SOURCES.join(', ')} (got "${value}").`
+      );
+      return 'break';
+    }
+    parsed.listSource = value;
+    return 'continue';
+  }
+  if (arg === '--include-assets') {
+    parsed.includeAssets = true;
+    return 'continue';
+  }
+  return null;
+}
+
+;// CONCATENATED MODULE: ./src/cli/parse/postprocess.mjs
+// `parseArgs` のループ後の検査。src/cli.mjs から純粋に移設したもので、判定も
+// 副作用も変えていない（リファクタリング Step 5）。
+//
+// `usageError` は移していない。他の parse モジュールと同じ扱いで、各関数は
+// stderr への出力までを行い、usage error にすべきことを戻り値の `true` で返す。
+// 呼び出し側が続けて `usageError` を呼ぶので、出力の順序は移設前と同じである。
+
+
+
+
+
+
+/**
+ * `review` が副コマンドを 1 つ取っていることを確かめる。
+ *
+ * @param {object} parsed
+ * @param {boolean} terminatorTookPositional `--` 経由で positional を取り込んだか
+ * @returns {boolean} usage error にすべきとき true
+ */
+function checkReviewSubcommand(parsed, terminatorTookPositional) {
+  // `review` needs one of plan | exec | verify | route. The handler reported
+  // both the missing and the unknown case with exit 3 — the code this project
+  // reserves for the `--gate` ESCALATE decision and for handler-level
+  // configuration errors — so an argument-order typo read as "a human must
+  // look at this" (#1755). Detected here instead, which makes it exit 1 like
+  // every other usage error (#1709 contract).
+  if (
+    parsed.command === 'review' &&
+    !parsed.usageError &&
+    !REVIEW_SUBCOMMANDS.has(parsed.reviewSubcommand)
+  ) {
+    // A path taken from after `--` is NOT a candidate subcommand: the caller
+    // declared it to be a path. Reporting it as one produced the contradiction
+    // `river review -- plan` -> `"plan" is not a river review subcommand
+    // (plan | exec | verify | route)`.
+    const got =
+      parsed.reviewSubcommand ??
+      (parsed.targetConsumed && !terminatorTookPositional ? parsed.target : null);
+    console.error(
+      (got === null
+        ? 'Error: river review requires a subcommand (plan | exec | verify | route).'
+        : `Error: "${got}" is not a river review subcommand (plan | exec | verify | route).`) +
+        ' The subcommand may be written before or after the options —' +
+        ' `river review plan --plan-only` and `river review --plan-only plan` are both accepted.'
+    );
+    return true;
+  }
+  return false;
+}
+
+/**
+ * `--phase` が明示されていないときに `RIVER_PHASE` を反映する。
+ *
+ * @param {object} parsed
+ * @returns {boolean} usage error にすべきとき true
+ */
+function applyPhaseFallback(parsed) {
+  // #1759 C2: RIVER_PHASE used to skip validation entirely and propagate an
+  // invalid value straight through to the printed phase with exit 0, unlike
+  // --phase which already validates against PHASES above. Reuse that same
+  // vocabulary and the same case-insensitive normalization here instead of
+  // writing a second check (CLAUDE.md "Import the SSoT, never re-derive it").
+  //
+  // Only runs when --phase did NOT already set and validate parsed.phase
+  // (parsed.phaseExplicit) and when RIVER_PHASE was actually set to a
+  // non-empty string — unset or empty must keep falling back to the default
+  // ('midstream'), matching the object-literal default above and --phase's
+  // own "not required" contract.
+  if (!parsed.usageError && !parsed.phaseExplicit && external_node_process_.env.RIVER_PHASE) {
+    const envPhase = external_node_process_.env.RIVER_PHASE.toLowerCase();
+    if (!planner_utils/* PHASES */.ZG.includes(envPhase)) {
+      console.error(
+        `Error: RIVER_PHASE must be one of: ${planner_utils/* PHASES */.ZG.join(', ')} (got "${external_node_process_.env.RIVER_PHASE}").`
+      );
+      return true;
+    } else {
+      parsed.phase = envPhase;
+    }
+  }
+  return false;
+}
+
 // EXTERNAL MODULE: ./src/lib/diff-processor.mjs
 var diff_processor = __nccwpck_require__(861);
+// EXTERNAL MODULE: ./src/config/artifact-resolver.mjs
+var artifact_resolver = __nccwpck_require__(4281);
+;// CONCATENATED MODULE: ./src/lib/flow-input-bindings.mjs
+// Flow input bindings (Epic #2011 AC7 P3-2).
+//
+// Flow inputs describe review roles while Artifact Input Contract IDs describe
+// concrete files. This module is the CLI-side SSoT that connects the two;
+// Flow documents intentionally carry no host vocabulary.
+
+
+
+/**
+ * Role-wide default artifact IDs, in selection order.
+ *
+ * `tests` has several valid forms of test evidence, so the first resolved
+ * artifact wins. Keep this table small: a role without a stable Artifact
+ * Input Contract counterpart must not receive a speculative default.
+ *
+ * `requirements` and `tasks` were candidates for `pbi-input` and `todo`, and
+ * are deliberately absent. Both are REQUIRED inputs on some Flows -- `tasks`
+ * on task-completion-review, `requirements` on final-review and
+ * requirements-review -- so a default there would let a file that merely
+ * happens to sit in the working tree declare a required input satisfied.
+ * `todo.md` is a common filename and the Artifact Input Contract defines it
+ * as "実装タスクと進捗", which does not carry the acceptance statement the
+ * Flow asks for. Required inputs must be supplied explicitly with
+ * `--artifact <role>=<path>` (#2011 AC7 P3-2 review).
+ */
+const DEFAULT_FLOW_INPUT_BINDINGS = Object.freeze({
+  tests: Object.freeze(['junit', 'coverage', 'test-cases']),
+});
+
+/**
+ * Entry-specific candidates, checked before role-wide defaults.
+ *
+ * Empty today by design. The separate table prevents a future exceptional
+ * Flow from duplicating the defaults for every entry, and is where a binding
+ * that is only correct for one Flow belongs.
+ */
+const ENTRY_FLOW_INPUT_BINDING_OVERRIDES = Object.freeze({});
+
+function declaredInputNames(document) {
+  return new Set(
+    (Array.isArray(document?.inputs) ? document.inputs : [])
+      .map((input) => input?.name)
+      .filter((name) => typeof name === 'string')
+  );
+}
+
+function resolvedArtifact(resolved, id) {
+  const value = resolved?.[id];
+  return value?.exists === true && typeof value.path === 'string' && value.path ? value : null;
+}
+
+/**
+ * Bind resolved Artifact Input Contract IDs to a Flow's declared input names.
+ *
+ * A directly named artifact (for example `--artifact tasks=other.md`) always
+ * wins over a role default (`todo`). `inputSources` preserves whether each
+ * value came from an explicit CLI argument, another direct resolver source,
+ * or a default binding so later phases can make source-aware stop decisions.
+ *
+ * @param {object} options
+ * @param {string|null} [options.entry] Flow entry name, for exceptional bindings
+ * @param {object} options.document resolved Flow document
+ * @param {Record<string, {exists?: boolean, path?: string, source?: string}>} [options.resolved]
+ * @returns {{inputs: Record<string, string>, inputSources: Record<string, {kind: 'explicit'|'direct'|'default', id: string, source: string|null, path?: string}>, unboundInputNames: string[]}}
+ */
+function resolveFlowInputBindings({ entry = null, document, resolved = {} }) {
+  const names = declaredInputNames(document);
+  const inputs = {};
+  const inputSources = {};
+
+  // Preserve P3-1's same-named resolution and make it take precedence over
+  // role defaults. A CLI-sourced direct ID is the explicit supply contract.
+  for (const name of [...names].sort()) {
+    const resolution = resolved?.[name];
+    if (!resolution || typeof resolution.path !== 'string' || !resolution.path) continue;
+    if (resolution.exists === true) inputs[name] = resolution.path;
+    inputSources[name] = {
+      kind: resolution.source === 'cli' ? 'explicit' : 'direct',
+      id: name,
+      source: resolution.source ?? null,
+      ...(resolution.exists === true ? {} : { path: resolution.path }),
+    };
+  }
+
+  const entryOverrides =
+    entry && ENTRY_FLOW_INPUT_BINDING_OVERRIDES[entry]
+      ? ENTRY_FLOW_INPUT_BINDING_OVERRIDES[entry]
+      : {};
+  for (const name of [...names].sort()) {
+    // Guard on `inputSources`, not `inputs`: an explicit `--artifact` pointing
+    // at a file that does not exist records a source but supplies no path, and
+    // guarding on `inputs` let a default silently override it. That both broke
+    // the documented "explicit always wins" order and erased the
+    // bound-artifact-missing reason P3-3 reports (#2011 AC7 P3 range review).
+    if (name in inputSources) continue;
+    const candidates = entryOverrides[name] ?? DEFAULT_FLOW_INPUT_BINDINGS[name] ?? [];
+    for (const id of candidates) {
+      const artifact = resolvedArtifact(resolved, id);
+      if (!artifact) continue;
+      inputs[name] = artifact.path;
+      inputSources[name] = { kind: 'default', id, source: artifact.source ?? null };
+      break;
+    }
+    if (name in inputSources) continue;
+
+    // An explicit/configured candidate that does not exist still tells the
+    // user exactly which intended file is absent. Only fall back to a CWD
+    // default after all existing candidates have had their chance to bind.
+    for (const id of candidates) {
+      const resolution = resolved?.[id];
+      if (typeof resolution?.path !== 'string' || !resolution.path) continue;
+      inputSources[name] = {
+        kind: 'default',
+        id,
+        source: resolution.source ?? null,
+        path: resolution.path,
+      };
+      break;
+    }
+    if (name in inputSources) continue;
+
+    const id = candidates.find((candidate) => artifact_resolver/* CWD_DEFAULTS */.Gg[candidate]);
+    if (id) inputSources[name] = { kind: 'default', id, source: null, path: artifact_resolver/* CWD_DEFAULTS */.Gg[id] };
+  }
+
+  return {
+    inputs,
+    inputSources,
+    unboundInputNames: [...names].filter((name) => !(name in inputSources)).sort(),
+  };
+}
+
 ;// CONCATENATED MODULE: ./src/cli/commands/review.mjs
 // `river review` subcommand handler.
 //
@@ -56979,6 +62031,84 @@ var diff_processor = __nccwpck_require__(861);
 
 
 
+
+
+/**
+ * Resolve the git diff for `--base` (or the auto-detected default branch).
+ *
+ * SSoT for how every `review` subcommand turns `--base` into a diff: the
+ * route path (`runReviewRoute`) and the plan/exec path both call this, so the
+ * two cannot drift into different ranges for the same `--base` (#2046).
+ *
+ * An explicitly typed `--base` that git cannot resolve is a usage error, not a
+ * silent empty range: `findMergeBase` falls back to HEAD for an unknown ref, so
+ * without this check `--base no-such-ref` reviewed nothing and exited 0
+ * (#2046 review, major 2). The auto-detected default branch keeps the old
+ * fallback — it is not something the user typed.
+ *
+ * @param {Record<string, unknown>} parsed - parseArgs() result.
+ * @returns {Promise<{targetPath: string, repoRoot: string, defaultBranch: string,
+ *   mergeBase: string, repoDiff: object}>}
+ */
+function resolveBaseRef(parsed) {
+  // Delegates to the shared normalizer in src/lib/git.mjs — the `skills` and
+  // `run` surfaces trim `--base` through the same function (#2051 / #2057), so
+  // "blank means usage error" cannot drift between them.
+  return (0,git/* normalizeBaseRef */.OB)(parsed?.base);
+}
+
+async function resolveBaseRepoDiff(parsed) {
+  const targetPath = external_node_path_.resolve(parsed.target);
+  const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
+  const defaultBranch = await (0,git/* detectDefaultBranch */.Rd)(repoRoot);
+  // #2051 / #2057: the validation this used to inline now lives in
+  // resolveBaseMergeBase (src/lib/git.mjs) so `skills` and `run` share it
+  // verbatim. Behavior here is unchanged — same messages, same exit path.
+  const { baseRef, mergeBase, warning } = await (0,git/* resolveBaseMergeBase */.Zb)(
+    repoRoot,
+    parsed?.base,
+    defaultBranch
+  );
+  if (warning) console.warn(warning);
+  const repoDiff = await (0,diff_processor/* collectRepoDiff */.KD)(repoRoot, mergeBase);
+  return { targetPath, repoRoot, defaultBranch, mergeBase, baseRef, repoDiff };
+}
+
+/**
+ * Flow inputs the plan execution proves were supplied, keyed by Flow input
+ * name, for `executeFlow`'s required-input check and `when` clauses (Epic
+ * #2011 AC7 P3-1). Two sources:
+ *
+ *   - `context.changedFiles` exists only when the review diff resolved
+ *     (review-plan.mjs sets `context` under `diffResolved`), so it stands for
+ *     the Flow input `diff`.
+ *   - `resolved` is the resolver result returned by `runReviewPlan`. The
+ *     CLI-side binding SSoT maps compatible contract IDs to Flow roles while
+ *     preserving direct CLI input precedence.
+ *
+ * @param {Record<string, unknown>} artifact
+ * @param {Record<string, unknown>|undefined} resolved - Resolver result from
+ *   the plan execution; unavailable on replay.
+ * @param {object} document - the resolved Flow document (`inputs[]` names).
+ * @returns {{inputs: Record<string, unknown>, inputSources: Record<string, unknown>, unboundInputNames: string[]}}
+ */
+function resolvedFlowInputs(artifact, entry, document, resolved) {
+  const { inputs, inputSources, unboundInputNames } = resolveFlowInputBindings({
+    entry,
+    document,
+    resolved,
+  });
+  const declaresDiff =
+    Array.isArray(document?.inputs) && document.inputs.some((input) => input?.name === 'diff');
+  if (declaresDiff && !('diff' in inputs) && Array.isArray(artifact?.context?.changedFiles)) {
+    inputs.diff = artifact.context.changedFiles;
+  }
+  if ('diff' in inputs) {
+    const index = unboundInputNames.indexOf('diff');
+    if (index !== -1) unboundInputNames.splice(index, 1);
+  }
+  return { inputs, inputSources, unboundInputNames };
+}
 
 /**
  * Handle the `review` command (plan | exec | verify | route).
@@ -57033,7 +62163,7 @@ async function runReviewCommand(parsed) {
   }
   try {
     const { runReviewPlan, runReviewExecReplay, ReviewPlanError, resolveReviewOutputFormat } =
-      await __nccwpck_require__.e(/* import() */ 916).then(__nccwpck_require__.bind(__nccwpck_require__, 6916));
+      await __nccwpck_require__.e(/* import() */ 209).then(__nccwpck_require__.bind(__nccwpck_require__, 9209));
     let reviewFormat;
     try {
       reviewFormat = resolveReviewOutputFormat(parsed);
@@ -57061,7 +62191,37 @@ async function runReviewCommand(parsed) {
         throw err;
       }
     }
+    // #2046: `--base <ref>` used to be parsed and then read by nobody on this
+    // path, so `review plan --base <ref>` silently reported `no-changes` while
+    // `review route --base <ref>` saw the very diff it was pointed at. Resolve
+    // it through the SAME helper the route path uses, and hand the resulting
+    // diff (plus the range context) to the plan/replay layer. Only when
+    // `--base` is actually given: without it the artifact-resolution path is
+    // untouched, so existing callers keep their behavior.
+    //
+    // Precedence against the `diff` artifact is decided in review-plan.mjs,
+    // where the artifact's resolution tier (cli / config / cwd-default) is
+    // known — an explicitly specified artifact wins, per
+    // pages/reference/artifact-input-contract.md.
+    let diffOverride;
+    if (resolveBaseRef(parsed) !== null) {
+      const { repoRoot, defaultBranch, mergeBase, repoDiff } = await resolveBaseRepoDiff(parsed);
+      diffOverride = {
+        diffText: repoDiff.rawDiffText,
+        // schemas/review-artifact.schema.json `context` (additionalProperties:
+        // false). Only the four range fields are filled: the token estimates
+        // there describe the OPTIMIZED diff text, which is not the text handed
+        // to the planner below, so claiming them would be wrong.
+        context: {
+          repoRoot,
+          defaultBranch,
+          mergeBase,
+          changedFiles: repoDiff.changedFiles,
+        },
+      };
+    }
     let artifact;
+    let resolved;
     try {
       if (isExecPlanReplay) {
         artifact = await runReviewExecReplay({
@@ -57074,6 +62234,7 @@ async function runReviewCommand(parsed) {
           cwd: external_node_path_.resolve(parsed.target),
           cliArtifacts: parsed.cliArtifacts,
           artifactsDir: parsed.artifactsDir,
+          diffOverride,
         });
       } else {
         artifact = await runReviewPlan({
@@ -57094,7 +62255,9 @@ async function runReviewCommand(parsed) {
           // into selection without env vars.
           availableContexts: parsed.availableContexts ?? undefined,
           availableDependencies: parsed.availableDependencies ?? undefined,
+          diffOverride,
         });
+        resolved = artifact.resolved;
       }
     } catch (err) {
       if (err instanceof ReviewPlanError) {
@@ -57102,6 +62265,80 @@ async function runReviewCommand(parsed) {
         return 3;
       }
       throw err;
+    }
+    // #2054 PR-3 (Beta): `review plan --entry <name>` pins the artifact to a
+    // review Flow entry. Only the pin and the Flow's declared required inputs
+    // are attached, both additive; nothing above (skill selection, decision,
+    // gate) reads them, so the artifact without `--entry` is byte-identical to
+    // the one produced before this flag existed (tests/cli-review-plan-entry
+    // pins that). Reading `flows/` goes through the single Flow loader; an
+    // unreadable flows directory is a loud exit 1, never a silent "no Flow".
+    let resolvedFlow = null;
+    if (parsed.entry !== null && parsed.entry !== undefined) {
+      const { FlowLoaderError, resolveFlowEntry } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 4357));
+      try {
+        resolvedFlow = resolveFlowEntry(parsed.entry);
+        artifact.flow = resolvedFlow.flow;
+        artifact.evidenceRequirements = resolvedFlow.evidenceRequirements;
+      } catch (err) {
+        if (err instanceof FlowLoaderError) {
+          console.error(`Error: ${err.message}`);
+          return 1;
+        }
+        throw err;
+      }
+    }
+    // Epic #2011 AC7 P2 (Beta, record only): on `review exec --entry <name>`
+    // run the pinned Flow document through the single Flow runner and append
+    // the per-step outcomes as `steps`, additively, right after the pin.
+    // `capabilities` is empty in this slice, so every step lands on
+    // `not-implemented` / `skipped` / `stopped`, and a Flow whose required
+    // inputs the artifact cannot vouch for (see `resolvedFlowInputs`) records
+    // every step as `stopped`. Nothing here reads the runner's `stopped` / `stopReason`
+    // back into `gate` / `decision` (RA-1) — both were finalized above and
+    // stay byte-identical to the run without `--entry`. `review plan --entry`
+    // and `exec --dry-run` / `exec --plan` keep the pin only: they run no
+    // review, so there is nothing for a step to record.
+    if (resolvedFlow !== null && isExecExecute) {
+      const { executeFlow } = await __nccwpck_require__.e(/* import() */ 550).then(__nccwpck_require__.bind(__nccwpck_require__, 5550));
+      const flowInputs = resolvedFlowInputs(
+        artifact,
+        parsed.entry,
+        resolvedFlow.document,
+        resolved
+      );
+      const result = await executeFlow({
+        document: resolvedFlow.document,
+        capabilities: {},
+        ...flowInputs,
+        // Record only: `observe` continues past a missing capability as
+        // `not-implemented` and lists every step even when a required input
+        // is missing. `judgment` is reserved for P4 and not passed here.
+        mode: 'observe',
+      });
+      artifact.steps = result.steps;
+    }
+    // #2054 PR-4 (Epic #2011 AC6): pin what this run used as an Execution
+    // Manifest, additively, as the LAST top-level key. Built after every
+    // judgment above (skill selection, decision, gate, Flow pin) so none of
+    // them can read it; `attachExecutionManifest` copies the artifact rather
+    // than mutating it. The `flow` block is `resolved` only when `--entry`
+    // resolved a Flow document on this very run — the parsed document is handed
+    // to the resolver so the manifest never reads `flows/` itself (#2037).
+    // Fail-soft: a manifest that cannot be built is a loud warning and an
+    // artifact without the key, never a lost review.
+    try {
+      const { produceExecutionManifest } =
+        await __nccwpck_require__.e(/* import() */ 866).then(__nccwpck_require__.bind(__nccwpck_require__, 9866));
+      const { attachExecutionManifest } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 3055));
+      const manifest = await produceExecutionManifest({
+        artifact,
+        flowDocument: resolvedFlow?.document ?? null,
+        expectedFlowVersion: resolvedFlow?.flow?.version ?? null,
+      });
+      artifact = attachExecutionManifest(artifact, manifest);
+    } catch (err) {
+      console.error(`Warning: execution manifest not attached: ${err.message}`);
     }
     const outputFilePath = parsed.outputFile ? external_node_path_.resolve(parsed.outputFile) : null;
     const summaryFilePath = parsed.summaryFile ? external_node_path_.resolve(parsed.summaryFile) : null;
@@ -57124,7 +62361,7 @@ async function runReviewCommand(parsed) {
     } else {
       // The artifact (JSON or Markdown) is the requested output, not a
       // progress log: --quiet does not suppress it.
-      external_node_process_namespaceObject.stdout.write(serialized + '\n');
+      external_node_process_.stdout.write(serialized + '\n');
     }
     if (summaryFilePath) {
       const { formatReviewPlanSummaryMarkdown } = await __nccwpck_require__.e(/* import() */ 466).then(__nccwpck_require__.bind(__nccwpck_require__, 7466));
@@ -57166,7 +62403,7 @@ async function runReviewCommand(parsed) {
 async function runReviewVerify(parsed) {
   try {
     const { ReviewPlanError, resolveReviewOutputFormat } =
-      await __nccwpck_require__.e(/* import() */ 916).then(__nccwpck_require__.bind(__nccwpck_require__, 6916));
+      await __nccwpck_require__.e(/* import() */ 209).then(__nccwpck_require__.bind(__nccwpck_require__, 9209));
     try {
       resolveReviewOutputFormat(parsed);
     } catch (err) {
@@ -57201,11 +62438,12 @@ async function runReviewRoute(parsed) {
     const { routeReviewMode, formatRouterResultMarkdown } =
       await __nccwpck_require__.e(/* import() */ 709).then(__nccwpck_require__.bind(__nccwpck_require__, 1709));
     const { loadRiskMap } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 572));
-    const routeTargetPath = external_node_path_.resolve(parsed.target);
-    const repoRoot = await (0,git/* ensureGitRepo */.NC)(routeTargetPath);
-    const defaultBranch = await (0,git/* detectDefaultBranch */.Rd)(repoRoot);
-    const mergeBase = await (0,git/* findMergeBase */.fe)(repoRoot, parsed.base ?? defaultBranch);
-    const repoDiff = await (0,diff_processor/* collectRepoDiff */.KD)(repoRoot, mergeBase);
+    const {
+      targetPath: routeTargetPath,
+      repoRoot,
+      repoDiff,
+      baseRef,
+    } = await resolveBaseRepoDiff(parsed);
     const riskMap = await loadRiskMap(repoRoot).catch((err) => {
       console.warn(`Warning: could not load risk-map.yaml: ${err?.message ?? err}`);
       return null;
@@ -57215,6 +62453,10 @@ async function runReviewRoute(parsed) {
       diffText: repoDiff.rawDiffText,
       riskMap,
       targetPath: routeTargetPath,
+      // #2046: the suggested next command must review the range this routing
+      // decision was made against, otherwise following it re-resolves a
+      // different range (the issue's "なぜ問題か").
+      baseRef,
     });
     const outputFormat = parsed.formatExplicit
       ? parsed.format
@@ -57247,8 +62489,8 @@ var esm = __nccwpck_require__(9519);
 var loader = __nccwpck_require__(3833);
 // EXTERNAL MODULE: ./runners/core/skill-cache.mjs
 var skill_cache = __nccwpck_require__(7328);
-// EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/index.mjs + 101 modules
-var sdk = __nccwpck_require__(9240);
+// EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/index.mjs + 102 modules
+var sdk = __nccwpck_require__(9080);
 ;// CONCATENATED MODULE: ./node_modules/@google/generative-ai/dist/index.mjs
 /**
  * Contains the list of OpenAPI data types
@@ -74136,7 +79378,27 @@ async function runSkillsCommand(parsed, targetPath) {
 
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
   const defaultBranch = await (0,git/* detectDefaultBranch */.Rd)(repoRoot);
-  const mergeBase = await (0,git/* findMergeBase */.fe)(repoRoot, defaultBranch);
+  // #2051: `--base` was parsed and accepted here but read by nobody — the diff
+  // was always taken against the auto-detected default branch, so pointing
+  // `skills` at another ref silently reviewed the wrong range. Resolve it
+  // through the SAME helper `review` uses (src/lib/git.mjs resolveBaseMergeBase,
+  // lifted out of resolveBaseRepoDiff in #2049) so the flag cannot mean two
+  // things on two surfaces. A blank / unresolvable ref is a usage error,
+  // rendered as `Error: ...` + exit 1 exactly like the `review` surface.
+  let mergeBase;
+  try {
+    const resolved = await (0,git/* resolveBaseMergeBase */.Zb)(repoRoot, parsed.base, defaultBranch);
+    mergeBase = resolved.mergeBase;
+    // Same stream as `review` (console.warn -> stderr): stdout may be a
+    // machine-consumed JSON/markdown artifact here.
+    if (resolved.warning) console.warn(resolved.warning);
+  } catch (err) {
+    if (err instanceof git/* BaseRefError */.NI) {
+      console.error(`Error: ${err.message}`);
+      return 1;
+    }
+    throw err;
+  }
   const repoDiff = await (0,diff_processor/* collectRepoDiff */.KD)(repoRoot, mergeBase);
 
   const dispatcher = new SkillDispatcher(repoRoot, { log: logProgress });
@@ -74215,7 +79477,7 @@ var loop_signal = __nccwpck_require__(4702);
  */
 async function runRunsCommand(parsed, targetPath) {
   const { resolveStoreDir, listRunRecords, loadRunRecord, computeDashboard, formatDashboard } =
-    await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+    await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
   const storeDir = resolveStoreDir(targetPath);
 
   if (!parsed.runsSubcommand || parsed.runsSubcommand === 'list') {
@@ -74332,7 +79594,7 @@ async function runRunsCommand(parsed, targetPath) {
   }
 
   if (parsed.runsSubcommand === 'digest') {
-    const { loadAllRunRecords } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+    const { loadAllRunRecords } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
     const fullRuns = await loadAllRunRecords(storeDir);
     if (!fullRuns.length) {
       console.log('No stored runs found in ' + storeDir);
@@ -74408,7 +79670,7 @@ async function runEvalCommand(parsed) {
 async function warnWhenFingerprintMatchesNoFinding(fingerprint, repoRoot) {
   if (!fingerprint) return;
   try {
-    const { resolveStoreDir, loadAllRunRecords } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+    const { resolveStoreDir, loadAllRunRecords } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
     const { classifyFingerprintAlgo, formatUnmatchedFeedbackFingerprintWarning } =
       await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 1535));
     const runRecords = await loadAllRunRecords(resolveStoreDir(repoRoot));
@@ -76341,8 +81603,26 @@ async function collectLocalContext({
   const riskMap = await (0,risk_map.loadRiskMap)(repoRoot);
   // When --base is provided, compare against the explicit ref instead of the
   // auto-detected default branch. Falls back to detection when unset.
-  const defaultBranch = baseRef ?? (await (0,git/* detectDefaultBranch */.Rd)(repoRoot));
-  const mergeBase = await (0,git/* findMergeBase */.fe)(repoRoot, defaultBranch);
+  //
+  // #2057: the value used to be handed straight to findMergeBase, which falls
+  // back to `rev-parse HEAD` for a ref it cannot resolve — so `--base <typo>`
+  // exited 0 having reviewed HEAD..working-tree instead of failing, and the
+  // same flag meant something different here than on the `review` surface.
+  // resolveBaseMergeBase (src/lib/git.mjs) is the shared contract lifted out of
+  // review.mjs's resolveBaseRepoDiff in #2049: it trims, rejects a blank or
+  // unresolvable ref with BaseRefError, and reports (does not throw on) a ref
+  // that shares no history with HEAD. `detectDefaultBranch` stays lazy — it is
+  // only consulted when `--base` is absent, exactly as before.
+  const normalizedBaseRef = (0,git/* normalizeBaseRef */.OB)(baseRef);
+  const detectedDefaultBranch =
+    normalizedBaseRef === null ? await (0,git/* detectDefaultBranch */.Rd)(repoRoot) : null;
+  const { mergeBase, warning: baseRefWarning } = await (0,git/* resolveBaseMergeBase */.Zb)(
+    repoRoot,
+    baseRef,
+    detectedDefaultBranch
+  );
+  if (baseRefWarning) console.warn(baseRefWarning);
+  const defaultBranch = normalizedBaseRef ?? detectedDefaultBranch;
   // #1715 (#1574 producer Slice 2): the HEAD the review was taken against, plus
   // whether the working tree had changes HEAD does not carry.
   //
@@ -78487,11 +83767,11 @@ async function persistRunArtifacts(result, parsed, targetPath) {
   // M1 (#1372 review): RIVER_AUTO_SAVE=false opts out of the CI auto-save
   // (documented in the contract doc; the write target is .river/runs/).
   const isGithubActions =
-    external_node_process_namespaceObject.env.GITHUB_ACTIONS === 'true' && external_node_process_namespaceObject.env.RIVER_AUTO_SAVE !== 'false';
+    external_node_process_.env.GITHUB_ACTIONS === 'true' && external_node_process_.env.RIVER_AUTO_SAVE !== 'false';
   if ((parsed.save || isGithubActions) && result.status === 'ok') {
     try {
       const { buildRunProvenance, buildRunRecord, saveRunRecord, resolveStoreDir } =
-        await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+        await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
       const { decision: runDecision, gate: runGate } = deriveRunGate(result);
       const record = buildRunRecord(result, {
         phase: parsed.phase,
@@ -78507,8 +83787,36 @@ async function persistRunArtifacts(result, parsed, targetPath) {
           dirty: result.dirty,
         }),
       });
+      // #2054 PR-4 (Epic #2011 AC6): pin what this run used — river-review
+      // version, selected skill checksums, gate policy digest — as an
+      // Execution Manifest on the persisted record. Additive: `attach` returns a
+      // new object with one extra top-level key, and every other key keeps the
+      // value and order it had (tests/cli-run-execution-manifest pins that
+      // against a manifest-less record). The manifest carries no judgment:
+      // gate / decision above are computed before it exists and never read it.
+      // `river run` accepts no `--entry`, so `flow` stays `missing` here.
+      //
+      // Its own try: a producer failure must cost the MANIFEST, never the
+      // record (#2111 review major 2 — nested inside the save's try it lost the
+      // whole record). `attach(record, null)` returns the record itself, so the
+      // fallback is exactly the pre-#2054 write.
+      let manifest = null;
+      try {
+        const { produceExecutionManifest, runRecordArtifactView } =
+          await __nccwpck_require__.e(/* import() */ 866).then(__nccwpck_require__.bind(__nccwpck_require__, 9866));
+        manifest = await produceExecutionManifest({
+          artifact: runRecordArtifactView(result, record),
+          runRecord: record,
+        });
+      } catch (err) {
+        console.error(`Warning: execution manifest not attached: ${err.message}`);
+      }
+      const { attachExecutionManifest } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 3055));
+      const recordWithManifest = attachExecutionManifest(record, manifest);
       // Use targetPath (not result.repoRoot) so --save and runs list resolve the same storeDir
-      const savedPath = await saveRunRecord(record, { storeDir: resolveStoreDir(targetPath) });
+      const savedPath = await saveRunRecord(recordWithManifest, {
+        storeDir: resolveStoreDir(targetPath),
+      });
       console.error(`Run saved: ${record.runId} → ${savedPath}`);
     } catch (err) {
       console.error(`Warning: --save failed: ${err.message}`);
@@ -78518,17 +83826,17 @@ async function persistRunArtifacts(result, parsed, targetPath) {
   // Forced display point (Epic #1347 S3): under GitHub Actions, append the
   // runs digest to the job summary. Fail-soft — the review result must
   // never break on digest generation.
-  if (isGithubActions && external_node_process_namespaceObject.env.GITHUB_STEP_SUMMARY && result.status === 'ok') {
+  if (isGithubActions && external_node_process_.env.GITHUB_STEP_SUMMARY && result.status === 'ok') {
     try {
       // C1 (#1372 review): the digest needs FULL records — the light
       // listRunRecords metadata has no gate/findings and silently produced
       // an empty digest here.
-      const { loadAllRunRecords, resolveStoreDir } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+      const { loadAllRunRecords, resolveStoreDir } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
       const { buildRunsDigest, formatDigestMarkdown } = await __nccwpck_require__.e(/* import() */ 518).then(__nccwpck_require__.bind(__nccwpck_require__, 9518));
       const records = await loadAllRunRecords(resolveStoreDir(targetPath));
       const digest = buildRunsDigest(records, { now: () => new Date() });
       const fs = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 1455, 19));
-      await fs.appendFile(external_node_process_namespaceObject.env.GITHUB_STEP_SUMMARY, '\n' + formatDigestMarkdown(digest));
+      await fs.appendFile(external_node_process_.env.GITHUB_STEP_SUMMARY, '\n' + formatDigestMarkdown(digest));
     } catch (err) {
       console.error(`Warning: job summary digest failed: ${err.message}`);
     }
@@ -78574,7 +83882,7 @@ async function runRunCommand(parsed, targetPath) {
   });
 
   const estimator = new cost_estimator(
-    external_node_process_namespaceObject.env.OPENAI_MODEL || external_node_process_namespaceObject.env.RIVER_OPENAI_MODEL || undefined
+    external_node_process_.env.OPENAI_MODEL || external_node_process_.env.RIVER_OPENAI_MODEL || undefined
   );
   const estimatedCost =
     context.status === 'ok'
@@ -79578,7 +84886,7 @@ var promotion_candidates = __nccwpck_require__(3077);
 
 /** Resolve `now` from RIVER_NOW (external injection) or fall back to real time. */
 function resolveNow() {
-  const raw = external_node_process_namespaceObject.env.RIVER_NOW;
+  const raw = external_node_process_.env.RIVER_NOW;
   if (!raw) return new Date();
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) {
@@ -79590,7 +84898,7 @@ function resolveNow() {
 /** Resolve the Riverbed index path: explicit --index, else the repo's .river/memory. */
 async function resolveIndexPath(parsed, targetPath) {
   if (parsed.promoteIndex) {
-    return external_node_path_.resolve(external_node_process_namespaceObject.cwd(), parsed.promoteIndex);
+    return external_node_path_.resolve(external_node_process_.cwd(), parsed.promoteIndex);
   }
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
   return external_node_path_.resolve(repoRoot, '.river', 'memory', 'index.json');
@@ -79679,7 +84987,7 @@ async function runPromoteCommand(parsed, targetPath) {
     }
     let result;
     try {
-      const entries = await (0,promotion_candidates/* readFeedbackJsonl */._I)(external_node_path_.resolve(external_node_process_namespaceObject.cwd(), parsed.promoteInput));
+      const entries = await (0,promotion_candidates/* readFeedbackJsonl */._I)(external_node_path_.resolve(external_node_process_.cwd(), parsed.promoteInput));
       result = (0,promotion_candidates/* proposePromotionCandidate */.J1)({
         entries,
         clusterKey: parsed.promoteClusterKey,
@@ -79768,9 +85076,9 @@ async function runPromoteCommand(parsed, targetPath) {
     const decision = sub === 'approve' ? 'approved' : 'rejected'; // vocab-literal-ignore
     const approver =
       parsed.promoteApprover ||
-      external_node_process_namespaceObject.env.RIVER_APPROVER ||
-      external_node_process_namespaceObject.env.USER ||
-      external_node_process_namespaceObject.env.USERNAME || // Windows
+      external_node_process_.env.RIVER_APPROVER ||
+      external_node_process_.env.USER ||
+      external_node_process_.env.USERNAME || // Windows
       'unknown';
     let result;
     try {
@@ -79848,7 +85156,7 @@ async function runPromoteCommand(parsed, targetPath) {
 
   if (sub === 'review-effectiveness') {
     const feedbackRoot = parsed.promoteFeedbackRoot
-      ? external_node_path_.resolve(external_node_process_namespaceObject.cwd(), parsed.promoteFeedbackRoot)
+      ? external_node_path_.resolve(external_node_process_.cwd(), parsed.promoteFeedbackRoot)
       : await (0,git/* ensureGitRepo */.NC)(targetPath);
     const feedbackEntries = await (0,feedback.listFeedbackEntries)({
       repoRoot: feedbackRoot,
@@ -80116,10 +85424,10 @@ async function runPromptCompare(parsed, targetPath, output) {
     return 1;
   }
 
-  const { resolveStoreDir, loadAllRunRecords } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+  const { resolveStoreDir, loadAllRunRecords } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
   const { buildPromptComparison, formatPromptComparisonMarkdown, PromptComparisonError } =
-    await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(80), __nccwpck_require__.e(90)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
-  const { PairedReplayError } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(80)]).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
+    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(90)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
+  const { PairedReplayError } = await __nccwpck_require__.e(/* import() */ 80).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
 
   const runRecords = await loadAllRunRecords(resolveStoreDir(targetPath));
 
@@ -80169,10 +85477,10 @@ async function runPromptAb(parsed, targetPath, output) {
     return 1;
   }
 
-  const { resolveStoreDir, loadAllRunRecords } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+  const { resolveStoreDir, loadAllRunRecords } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
   const { buildPromptAbComparison, formatPromptAbMarkdown, PromptComparisonError } =
-    await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(80), __nccwpck_require__.e(90)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
-  const { PairedReplayError } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(80)]).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
+    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(90)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
+  const { PairedReplayError } = await __nccwpck_require__.e(/* import() */ 80).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
 
   const runRecords = await loadAllRunRecords(resolveStoreDir(targetPath));
 
@@ -80218,10 +85526,10 @@ async function runAggregate(parsed, targetPath, output) {
 
   warnWhenTargetPathMissing(targetPath, parsed.target ?? targetPath);
 
-  const { resolveStoreDir, loadAllRunRecords } = await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(260)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
+  const { resolveStoreDir, loadAllRunRecords } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
   const { listFeedbackEntries } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 7638));
   const { buildShadowAggregate, formatShadowAggregateMarkdown, DEFAULT_MIN_RECURRENCE } =
-    await __nccwpck_require__.e(/* import() */ 29).then(__nccwpck_require__.bind(__nccwpck_require__, 4029));
+    await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 4029));
 
   const storeDir = resolveStoreDir(targetPath);
   const runRecords = await loadAllRunRecords(storeDir);
@@ -80268,7 +85576,7 @@ async function runReplay(parsed, output) {
 
   const { readFile } = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 1455, 19));
   const { buildPairedReplay, formatPairedReplayMarkdown, PairedReplayError } =
-    await Promise.all(/* import() */[__nccwpck_require__.e(29), __nccwpck_require__.e(80)]).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
+    await __nccwpck_require__.e(/* import() */ 80).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
 
   let spec;
   try {
@@ -80375,6 +85683,13 @@ async function runReplay(parsed, output) {
 
 
 
+
+
+
+
+
+
+
 function printHelp() {
   console.log(`Usage: river <command> <path> [options]
 
@@ -80387,9 +85702,12 @@ Commands:
   skills resolve        Show which skills apply to the given --path files
   doctor <path>         Check setup and print hints for common issues
   review plan           Resolve upstream artifacts and emit a Review Artifact
-                        (Phase 3 slice: --plan-only only)
+                        (Phase 3 slice: --plan-only only; --base <ref> diffs
+                         against that ref instead of the diff artifact;
+                         --entry <name> pins a review Flow entry, Beta)
   review exec           Run the review and emit a Review Artifact with findings
-                        (--dry-run: plan only; --plan <file>: replay an existing plan)
+                        (--dry-run: plan only; --plan <file>: replay an existing plan;
+                         --entry <name> pins a review Flow entry and records steps, Beta)
   review route          Recommend a review mode (light|standard|team|human-required)
                         for the current diff (--format json|markdown; --base <ref>)
   eval                  Run review fixtures evaluation (must_include checks)
@@ -80478,6 +85796,12 @@ Options:
                     Use "auto" to select roles automatically based on diff content and risk signals.
   --baseline <path> Path to a previous review JSON (findings array) for regression comparison
   --base <ref>      Branch or ref to diff against (e.g. main). Default: auto-detected default branch
+                    Accepted only by: run, skills (no subcommand), review plan|exec|route.
+                    Other surfaces reject it (#2065) — they never read a diff.
+  --entry <name>    (review plan|exec, Beta) Review Flow entry to pin the artifact to
+                    (review-plan|review-task|review-final|... from the entry map).
+                    Adds flow and evidenceRequirements to the artifact; review exec also
+                    records the Flow's per-step outcomes as steps. No other output changes.
   --skill-set <name> Restrict review to a named skill set from skills/registry.yaml
                     (e.g. basic, typescript, comprehensive). Default: all applicable skills
   --depth <name>    Force review depth: quick|standard|thorough. Default: auto-detected from diff size
@@ -80562,32 +85886,6 @@ const EAGER_COMMANDS = new Set(
 );
 
 /**
- * Eager-branch commands that take a subcommand word and never a positional
- * path. The arms above the fall-through in the eager branch have already
- * consumed their subcommand word, so the fall-through (which reads a
- * positional `<path>`) must skip exactly these.
- */
-const SUBCOMMAND_ONLY_COMMANDS = new Set(['runs', 'suppression', 'feedback', 'promote']);
-
-/**
- * `skills` subcommands (`skills import|export|list|resolve` take options, not a
- * positional path — see `acceptsPositionalPath`).
- */
-const SKILLS_SUBCOMMANDS = new Set(['import', 'export', 'list', 'resolve']);
-
-/**
- * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay`, ADR-006
- * `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
- * "first non-flag token") keeps `river evolve <path>` working.
- */
-const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'prompt-ab']);
-
-/**
- * `promote` subcommands that take an optional positional candidate id.
- */
-const PROMOTE_ID_SUBCOMMANDS = new Set(['approve', 'reject', 'template', 'review-effectiveness']);
-
-/**
  * Global options the shared parser handles for `evolve`. Anything else starting
  * with `-` is rejected rather than silently ignored.
  */
@@ -80611,16 +85909,7 @@ const PROMOTE_SHARED_OPTIONS = new Set(['--output', '--dry-run', '-h', '--help',
  * `schemas/suppression-context.schema.json`, which validates the `context`
  * `suppression add` ends up writing.
  */
-const SEVERITY_VALUES = Object.keys(finding_factory/* SEVERITY_RANK */.f3);
-
-/** Values accepted by `--output`. */
-const OUTPUT_MODES = ['text', 'markdown', 'json', 'yaml', 'html'];
-
-/** Values accepted by `--format` (review plan|exec|verify|route). */
-const REVIEW_FORMATS = ['text', 'markdown', 'json'];
-
-/** Values accepted by `skills list --source`. */
-const SKILLS_LIST_SOURCES = ['rr', 'agent', 'all'];
+const cli_SEVERITY_VALUES = Object.keys(finding_factory/* SEVERITY_RANK */.f3);
 
 /**
  * Fingerprint algorithms accepted by `suppression add --fingerprint-algo`
@@ -80633,64 +85922,223 @@ const SKILLS_LIST_SOURCES = ['rr', 'agent', 'all'];
 const SUPPRESSION_FINGERPRINT_ALGOS = ['v1', 'v2'];
 
 /**
- * `river review` subcommands (#802 Phase 3), at module scope because BOTH the
- * eager branch inside `parseArgs` and `takeTrailingPositional` below need it:
- * `review` had no vocabulary at all, so a subcommand written after the options
- * was swallowed as the path (#1755).
+ * Which subcommand words name a real surface, per command (#2065 review).
  *
- * `SKILLS_SUBCOMMANDS` / `EVOLVE_SUBCOMMANDS` sit alongside it above. Hoisting
- * them out of `parseArgs` is a pure relocation: `takeTrailingPositional`
- * already consulted `REVIEW_SUBCOMMANDS` before the hoist, but for `evolve`
- * it only approximated the eager branch's decision with `existsSync` (#1759
- * B1). `takeTrailingPositional` now checks `EVOLVE_SUBCOMMANDS` first, the
- * same priority the eager branch uses, so `river evolve aggregate --min 2`
- * and `river evolve --min 2 aggregate` agree even when a directory named
- * `aggregate` exists in cwd.
+ * `bare` says whether the command WITHOUT a subcommand is itself a surface:
+ * `river runs` runs as `runs list`, `river skills <path>` is the diff-reviewing
+ * form, and `river evolve <path>` takes a path — but `river feedback` and
+ * `river suppression` are not surfaces, and `river review` without a
+ * subcommand is already rejected earlier in this function.
+ *
+ * `promote` is deliberately ABSENT. Its vocabulary lives only in its handler,
+ * and the parser has no constant for it — but it also never reaches the
+ * command-scoped check, because `parsePromoteOption` consumes `--base` as an
+ * unknown option before `parsed.base` is ever set (measured: `promote list
+ * --base main` exits 1 with ``unknown option for promote: --base`` both before
+ * and after #2065). A command missing from this map is treated as "not a
+ * surface the parser can name", so the check skips it rather than invent one.
+ *
+ * @type {Map<string, {bare: boolean, known: Set<string> | null}>}
  */
-const REVIEW_SUBCOMMANDS = new Set(['plan', 'exec', 'verify', 'route']);
+const SURFACE_SUBCOMMANDS = new Map([
+  ['run', { bare: true, known: null }],
+  ['doctor', { bare: true, known: null }],
+  ['eval', { bare: true, known: null }],
+  ['skills', { bare: true, known: SKILLS_SUBCOMMANDS }],
+  ['runs', { bare: true, known: RUNS_SUBCOMMANDS }],
+  ['review', { bare: false, known: REVIEW_SUBCOMMANDS }],
+  ['feedback', { bare: false, known: FEEDBACK_SUBCOMMANDS }],
+  ['suppression', { bare: false, known: SUPPRESSION_SUBCOMMANDS }],
+  ['evolve', { bare: true, known: EVOLVE_SUBCOMMANDS }],
+]);
 
 /**
- * Whether `parsed.command` still accepts a positional `<path>`.
+ * The surfaces that actually READ `parsed.base` (#2065).
  *
- * The five path-taking surfaces are `run` / `doctor` / `review` /
- * `skills` (without a subcommand) / `evolve` (except `replay`).
+ * Derived by reading every consumer of the value — `src/cli/commands/run.mjs`
+ * (`baseRef: parsed.base`), `src/cli/commands/skills.mjs` (only the
+ * subcommand-less `skills <path>` branch reaches `resolveBaseMergeBase`; the
+ * `import` / `export` / `list` / `resolve` branches return before it), and
+ * `src/cli/commands/review.mjs` (`resolveBaseRepoDiff`, reached from `plan`,
+ * `exec` and `route`; `verify` returns from `runReviewVerify` without ever
+ * touching it, and its own option contract in
+ * `pages/reference/cli-review-verify-spec.md` lists `--artifact` / `--plan` /
+ * `--target` rather than `--base`).
+ *
+ * `tests/cli-base-option-scope.test.mjs` pins this set against the files that
+ * mention `parsed.base` / `resolveBaseMergeBase`, so adding a consumer without
+ * widening the set (or the reverse) fails there rather than silently.
+ *
+ * @type {Set<string>}
+ */
+const BASE_CONSUMING_SURFACES = new Set([
+  'run',
+  'skills',
+  'review plan',
+  'review exec',
+  'review route',
+]);
+
+/**
+ * The surfaces that READ `parsed.entry` (#2054 PR-3, Beta).
+ *
+ * `--entry <name>` names a review Flow entry (a key of the entry map's
+ * `entries`, read through `src/lib/flow-loader.mjs`) and is consumed by
+ * `src/cli/commands/review.mjs` on the `plan` and `exec` paths, where it
+ * attaches the resolved Flow pin to the emitted artifact; on `review exec`
+ * (Epic #2011 AC7 P2) it additionally runs the pinned Flow through
+ * `src/lib/flow-runner.mjs` and records the per-step outcomes as `steps`.
+ * `exec --dry-run` / `exec --plan` share the `review exec` surface word, so
+ * the parse layer lets the token through for them too; the handler attaches
+ * the pin there and runs no steps. Same INVARIANT as `--base` above: every
+ * other surface accepted the token and never read it (before #2054 PR-3 it was
+ * an unknown option on all of them), so dropping it restores the previous
+ * behavior exactly.
+ *
+ * @type {Set<string>}
+ */
+const ENTRY_CONSUMING_SURFACES = new Set(['review plan', 'review exec']);
+
+/**
+ * Command-scoped option allowlist (#2065).
+ *
+ * `KNOWN_OPTION_TOKENS` and the per-option `if` chain inside `parseArgs` are
+ * FLAT: every option they know is accepted by every command. That is why
+ * `doctor --base <ref>`, `runs list --base <ref>` and `eval --base <ref>`
+ * exited 0 while consuming nothing — the same "accepted, therefore effective"
+ * misreading that #2046 / #2051 / #2057 closed on the surfaces that do read the
+ * value. Rather than rebuild the parser around per-command option tables, this
+ * table names the few options whose meaning is surface-specific and the parse
+ * loop stays untouched; the check runs once after the loop (see
+ * `checkCommandScopedOptions`), which is also the only point where the
+ * subcommand word is known regardless of where the caller wrote it
+ * (`river review --base X plan` and `river review plan --base X` are both
+ * accepted orders since #1755).
+ *
+ * `promote` and `evolve` already reject out-of-scope options this way through
+ * `PROMOTE_SHARED_OPTIONS` / `EVOLVE_SHARED_OPTIONS`, so `promote list --base
+ * main` and `evolve aggregate --base main` exited 1 before this change too —
+ * this table extends the same contract to the surfaces those two sets do not
+ * cover.
+ *
+ * INVARIANT: every entry here names an option that the out-of-scope surfaces
+ * ACCEPTED AND NEVER READ. That is the whole reason the table exists, and it is
+ * what makes one shared recovery sentence correct for all of them (#2076):
+ * removing the option cannot change what those surfaces do, because they never
+ * looked at its value. An option whose presence has a side effect on a surface
+ * that does not "read" it does not belong in this table — it needs its own
+ * message, not this one.
+ *
+ * @type {Array<{token: string, given: (parsed: object) => boolean,
+ *   surfaces: Set<string>, why: string}>}
+ */
+const COMMAND_SCOPED_OPTIONS = [
+  {
+    token: '--base',
+    // `--base` requires a value, so a non-null field means it was passed.
+    given: (parsed) => parsed.base !== null,
+    surfaces: BASE_CONSUMING_SURFACES,
+    why: 'that surface does not review a diff',
+  },
+  {
+    token: '--entry',
+    given: (parsed) => parsed.entry !== null,
+    surfaces: ENTRY_CONSUMING_SURFACES,
+    why: 'that surface does not resolve a review Flow entry',
+  },
+];
+
+/**
+ * The surface a parse result names: the command word plus its subcommand when
+ * it has one (`review plan`, `skills list`, `runs digest`). Only one of these
+ * fields can be set at a time — each is written by the eager branch of the
+ * command it belongs to.
+ *
+ * @param {object} parsed
+ * @returns {string}
+ */
+function currentSubcommand(parsed) {
+  return (
+    parsed.reviewSubcommand ??
+    parsed.skillsSubcommand ??
+    parsed.runsSubcommand ??
+    parsed.evolveSubcommand ??
+    parsed.promoteSubcommand ??
+    parsed.suppressionSubcommand ??
+    parsed.feedbackSubcommand ??
+    null
+  );
+}
+
+function currentSurface(parsed) {
+  const subcommand = currentSubcommand(parsed);
+  return subcommand ? `${parsed.command} ${subcommand}` : `${parsed.command}`;
+}
+
+/**
+ * Whether `currentSurface(parsed)` names a surface that actually exists
+ * (#2065 review, minor 1).
+ *
+ * The subcommand word is taken verbatim by the eager branch for `runs` /
+ * `feedback` / `suppression` / `promote` — it is the HANDLER that validates it.
+ * Without this gate, `river runs nosuch --base main` reported
+ * ``--base is not supported by `river runs nosuch` `` and swallowed the far
+ * more useful ``Unknown runs subcommand: nosuch. Use: list | diff | summary |
+ * digest``, naming a surface that does not exist. Both exit 1, so the canary
+ * cannot see the difference — hence the explicit gate.
+ *
+ * When the surface cannot be named, this returns false and the command-scoped
+ * check stands down, leaving the handler to report the real problem. `--base`
+ * is not consumed on any of those paths either way.
  *
  * @param {object} parsed
  * @returns {boolean}
  */
-function acceptsPositionalPath(parsed) {
-  switch (parsed.command) {
-    case 'run':
-    case 'doctor':
-    case 'review':
-      return true;
-    case 'skills':
-      // `skills import|export|list|resolve` take options, not a path.
-      return !parsed.skillsSubcommand;
-    case 'evolve':
-      // `replay` takes NO positional (its dataset comes from --spec).
-      return parsed.evolveSubcommand !== 'replay';
-    default:
-      return false;
-  }
+function isNamedSurface(parsed) {
+  const entry = SURFACE_SUBCOMMANDS.get(parsed.command);
+  if (!entry) return false;
+  const subcommand = currentSubcommand(parsed);
+  if (subcommand === null) return entry.bare;
+  return entry.known !== null && entry.known.has(subcommand);
 }
 
 /**
- * Consume `token` as the positional `<path>` and as nothing else.
+ * Reject an option the current surface accepts but never reads (#2065).
  *
- * This is the reading that applies after the POSIX `--` terminator, where a
- * token must never be re-read as an option or as a subcommand word even when it
- * looks like one.
+ * Runs post-loop, and only for a real command: `parsed.command` is `null` for
+ * a bare `river --base main` (which prints help and exits 0) and `'help'`
+ * whenever `-h` / `--help` appeared anywhere in argv — including AFTER the
+ * option, as in `river run . --base main --help`. Rejecting either would turn
+ * `--help` into a usage error, so both are left alone; neither can be misread
+ * as "a review ran against that ref" because neither runs a review.
  *
  * @param {object} parsed
- * @param {string} token
- * @returns {boolean} true when the token was consumed as the target
+ * @returns {void}
  */
-function takePositionalPath(parsed, token) {
-  if (parsed.targetConsumed || !acceptsPositionalPath(parsed)) return false;
-  parsed.target = token;
-  parsed.targetConsumed = true;
-  return true;
+function checkCommandScopedOptions(parsed) {
+  if (parsed.usageError) return;
+  if (!COMMAND_NAMES.includes(parsed.command)) return;
+  // A typo'd subcommand word is the handler's to report, not this check's.
+  if (!isNamedSurface(parsed)) return;
+  const surface = currentSurface(parsed);
+  for (const rule of COMMAND_SCOPED_OPTIONS) {
+    if (!rule.given(parsed)) continue;
+    if (rule.surfaces.has(surface)) continue;
+    // Sentence order: why it was rejected -> where the option IS read -> how to
+    // recover (#2076). The recovery sentence closes the Error line rather than
+    // taking a line of its own, so that the `Usage:` / ``Run `river --help` ``
+    // pair `usageError` prints below stays the last thing on stderr.
+    console.error(
+      `Error: ${rule.token} is not supported by \`river ${surface}\` — ${rule.why}, ` +
+        `so the value would be accepted and never used. ` +
+        `Surfaces that read ${rule.token}: ${[...rule.surfaces]
+          .map((name) => `river ${name}`)
+          .join(', ')}. ` +
+        `Drop ${rule.token} to get the previous behavior.`
+    );
+    usageError(parsed);
+    return;
+  }
 }
 
 /**
@@ -80719,6 +86167,27 @@ function takeTrailingPositional(parsed, token) {
   // written after the path (`river review . plan`) resolves as well.
   if (parsed.command === 'review' && !parsed.reviewSubcommand && REVIEW_SUBCOMMANDS.has(token)) {
     parsed.reviewSubcommand = token;
+    return true;
+  }
+  // #2081: `river skills --base main import` swallowed `import` as the target
+  // path, so the `--base` allowlist check (#2065) never saw the subcommand and
+  // the review ran against `import/` when that directory existed. Vocabulary
+  // match only — the eager branch above (`args[0]` right after `skills`) also
+  // matches by vocabulary alone and `river skills bogus` is pinned as "read as
+  // a path" (#1709 未決 7), so an `!existsSync` heuristic here would make the
+  // two word orders disagree again. A directory literally named `import` is
+  // still reachable as `river skills ./import`. `!parsed.targetConsumed`
+  // mirrors the `evolve` branch: once a path has been taken
+  // (`river skills --dry-run . import`), the trailing word is a surplus
+  // positional, exactly as the leading form `skills import .` reports it —
+  // otherwise the path would be swallowed silently and the subcommand run.
+  if (
+    parsed.command === 'skills' &&
+    !parsed.targetConsumed &&
+    !parsed.skillsSubcommand &&
+    SKILLS_SUBCOMMANDS.has(token)
+  ) {
+    parsed.skillsSubcommand = token;
     return true;
   }
   // Mirror the eager branch's priority: a token that matches known
@@ -80820,6 +86289,7 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--reviewers',
   '--baseline',
   '--base',
+  '--entry',
   '--skill-set',
   '--depth',
   '--save',
@@ -81437,9 +86907,9 @@ function parseSuppressionOption(arg, args, parsed) {
     // mean the same thing. The schema enum is lowercase, so the stored
     // value must be too.
     const severity = value.toLowerCase();
-    if (!SEVERITY_VALUES.includes(severity)) {
+    if (!cli_SEVERITY_VALUES.includes(severity)) {
       console.error(
-        `Error: --severity must be one of: ${SEVERITY_VALUES.join(', ')} (got "${value}").`
+        `Error: --severity must be one of: ${cli_SEVERITY_VALUES.join(', ')} (got "${value}").`
       );
       usageError(parsed);
       return 'break';
@@ -81525,13 +86995,13 @@ function parseArgs(argv) {
     targetConsumed: false,
     fixturesCasesPath: null,
     verbose: false,
-    phase: external_node_process_namespaceObject.env.RIVER_PHASE || 'midstream',
+    phase: external_node_process_.env.RIVER_PHASE || 'midstream',
     // #1759 C2: set to true only by the --phase branch below, once its value
     // has passed the PHASES check. Lets the post-loop RIVER_PHASE validation
     // tell "an explicit, already-validated --phase" apart from "still the
     // raw (possibly invalid) env-or-default value".
     phaseExplicit: false,
-    plannerMode: external_node_process_namespaceObject.env.RIVER_PLANNER_MODE || 'off',
+    plannerMode: external_node_process_.env.RIVER_PLANNER_MODE || 'off',
     dryRun: false,
     debug: false,
     estimate: false,
@@ -81545,6 +87015,7 @@ function parseArgs(argv) {
     reviewers: null,
     baseline: null,
     base: null,
+    entry: null,
     skillSet: null,
     depth: null,
     save: false,
@@ -81634,92 +87105,16 @@ function parseArgs(argv) {
     // command-specific blocks, so that all five path-taking surfaces behave the
     // same (`evolve` would otherwise report it as its own unknown option).
     if (arg === '--') {
-      let terminatorError = false;
-      while (args.length) {
-        const positional = args.shift();
-        if (parsed.targetConsumed || !acceptsPositionalPath(parsed)) {
-          console.error(`Error: unexpected argument "${positional}".`);
-          usageError(parsed);
-          terminatorError = true;
-          break;
-        }
-        // The token is a path by construction, so it must BE one. Without this
-        // check `river evolve aggregate -- nosuchdir` exited 0 with an empty
-        // aggregate: `--` bypasses the eager branch's "a non-existent,
-        // non-subcommand token is a mistyped subcommand" rejection, turning a
-        // mistyped path into a silent empty result. #1746 W2 already treated
-        // "exit 0 while silently falling back" as a regression.
-        if (!(0,external_node_fs_.existsSync)(positional)) {
-          console.error(
-            `Error: "${positional}" does not exist ` +
-              '(every token after `--` is read as a path, never as an option or a subcommand).'
-          );
-          usageError(parsed);
-          terminatorError = true;
-          break;
-        }
-        takePositionalPath(parsed, positional);
-        terminatorTookPositional = true;
+      const { error, tookPositional } = consumeTerminator(parsed, args);
+      if (tookPositional) terminatorTookPositional = true;
+      if (error) {
+        usageError(parsed);
+        break;
       }
-      if (terminatorError) break;
       continue;
     }
     if (!parsed.command && EAGER_COMMANDS.has(arg)) {
-      parsed.command = arg;
-      // Check for skills subcommands (import/export/list)
-      if (arg === 'skills' && args[0] && SKILLS_SUBCOMMANDS.has(args[0])) {
-        parsed.skillsSubcommand = args.shift();
-      } else if (arg === 'evolve') {
-        if (args[0] && EVOLVE_SUBCOMMANDS.has(args[0])) {
-          parsed.evolveSubcommand = args.shift();
-        }
-        // `replay` takes NO positional: its dataset comes from --spec. Letting
-        // the first token become `parsed.target` would make the command accept
-        // and silently ignore it (`river evolve replay ./typo.json --spec x`).
-        if (parsed.evolveSubcommand !== 'replay' && args[0] && !args[0].startsWith('-')) {
-          const token = args.shift();
-          // A mistyped subcommand (`agregate`) must not be swallowed as a path
-          // and reported as an empty, successful aggregate. Anything that is
-          // neither a known subcommand nor an existing path is an error.
-          if (!parsed.evolveSubcommand && !(0,external_node_fs_.existsSync)(token)) {
-            parsed.evolveSubcommand = token; // handler rejects it with exit 1
-          } else {
-            parsed.target = token;
-            parsed.targetConsumed = true;
-          }
-        }
-        // Surplus positionals are a usage error, never silently discarded.
-        while (args[0] && !args[0].startsWith('-')) {
-          parsed.evolveExtraArgs.push(args.shift());
-        }
-      } else if (arg === 'runs' && args[0] && !args[0].startsWith('-')) {
-        parsed.runsSubcommand = args.shift(); // list | diff | summary | digest
-        // `diff` takes two or more positional run IDs, which may be written
-        // before, after, or interleaved with options (e.g. `--output json`).
-        // Collecting them eagerly here (as a fixed shift-two-then-scan) used to
-        // swallow a leading option as a run ID (#1759 B2): `runs diff --output
-        // json r1 r2` shifted "--output" into runsId1 and "json" into runsId2,
-        // then tried to open a run named "--output" and exited 1 with ENOENT.
-        // Collection now happens token-by-token below (near the promote/evolve
-        // dispatches), so options are left for the shared option handlers.
-      } else if (arg === 'suppression' && args[0] && !args[0].startsWith('-')) {
-        parsed.suppressionSubcommand = args.shift(); // add (only one for now)
-      } else if (arg === 'feedback' && args[0] && !args[0].startsWith('-')) {
-        parsed.feedbackSubcommand = args.shift(); // add (only one for now)
-      } else if (arg === 'promote' && args[0] && !args[0].startsWith('-')) {
-        parsed.promoteSubcommand = args.shift(); // propose | list | approve | reject | template | retire | review-effectiveness
-        // approve/reject/template/review-effectiveness take an optional positional candidate id.
-        if (
-          PROMOTE_ID_SUBCOMMANDS.has(parsed.promoteSubcommand) &&
-          args[0] &&
-          !args[0].startsWith('-')
-        ) {
-          parsed.promoteId = args.shift();
-        }
-      } else if (!SUBCOMMAND_ONLY_COMMANDS.has(arg) && args[0] && !args[0].startsWith('-')) {
-        parsed.target = args.shift();
-        parsed.targetConsumed = true;
-      }
+      consumeEagerCommand(parsed, arg, args);
       continue;
     }
     if (parsed.command === 'suppression') {
@@ -81783,407 +87178,11 @@ function parseArgs(argv) {
       parsed.command = arg;
       break;
     }
-    if (arg === '--plan-only') {
-      parsed.planOnly = true;
-      continue;
-    }
-    if (arg === '--fail-on' || arg === '--warn-on') {
-      const value = args.shift();
-      const sev = value ? value.toLowerCase() : '';
-      if (!SEVERITY_VALUES.includes(sev)) {
-        console.error(
-          `Error: ${arg} must be one of: ${SEVERITY_VALUES.join(', ')} (got "${value ?? ''}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      if (arg === '--fail-on') parsed.failOn = sev;
-      else parsed.warnOn = sev;
-      continue;
-    }
-    if (arg === '--advisory-only') {
-      parsed.advisoryOnly = true;
-      continue;
-    }
-    if (arg === '--gate') {
-      parsed.gate = true;
-      continue;
-    }
-    if (arg === '--offline' || arg === '--rules-only') {
-      parsed.offline = true;
-      continue;
-    }
-    if (arg === '--plan') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --plan option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.planFile = value;
-      continue;
-    }
-    if (arg === '--output-file') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --output-file option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.outputFile = value;
-      continue;
-    }
-    if (arg === '--summary-file') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --summary-file option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.summaryFile = value;
-      continue;
-    }
-    if (arg === '--quiet') {
-      parsed.quiet = true;
-      continue;
-    }
-    if (arg === '--artifacts-dir') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --artifacts-dir option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.artifactsDir = value;
-      continue;
-    }
-    if (arg === '--artifact') {
-      const value = args.shift();
-      const eq = value ? value.indexOf('=') : -1;
-      if (!value || value.startsWith('-') || eq <= 0) {
-        console.error('Error: --artifact requires <id>=<path> (e.g. --artifact plan=./plan.md).');
-        usageError(parsed);
-        break;
-      }
-      parsed.cliArtifacts[value.slice(0, eq)] = value.slice(eq + 1);
-      continue;
-    }
-    if (arg === '--ensemble') {
-      // #911 Phase 3 Slice B. Sugar for "concatenate every *.md file under
-      // <dir> into a single review-external artifact". The synthesis skill
-      // (`independent-review-synthesis`) consumes the merged
-      // file. We deliberately do NOT pin specific reviewer names (Claude /
-      // Codex / Cursor) in the flag — file names carry that information, so
-      // the CLI stays provider-agnostic.
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error(
-          'Error: --ensemble requires a directory path (e.g. --ensemble ./.river/reviews).'
-        );
-        usageError(parsed);
-        break;
-      }
-      if (parsed.cliArtifacts['review-external']) {
-        console.warn(
-          'Warning: --ensemble ignored because --artifact review-external=... is already set. Remove the --artifact flag or drop --ensemble.'
-        );
-        continue;
-      }
-      const dir = external_node_path_.resolve(external_node_process_namespaceObject.cwd(), value);
-      let files;
-      try {
-        files = (0,external_node_fs_.readdirSync)(dir)
-          .filter((f) => f.endsWith('.md'))
-          .sort();
-      } catch (err) {
-        console.error(`Error: --ensemble cannot read directory ${value}: ${err.message}`);
-        usageError(parsed);
-        break;
-      }
-      if (files.length === 0) {
-        console.error(`Error: --ensemble found no *.md files in ${value}.`);
-        usageError(parsed);
-        break;
-      }
-      const merged = files
-        .map((f) => `\n\n---\nFrom: ${f}\n---\n\n${(0,external_node_fs_.readFileSync)(external_node_path_.join(dir, f), 'utf8')}`)
-        .join('');
-      const tmpPath = external_node_path_.join(external_node_os_.tmpdir(), `river-ensemble-${external_node_process_namespaceObject.pid}-${Date.now()}.md`);
-      (0,external_node_fs_.writeFileSync)(tmpPath, merged);
-      external_node_process_namespaceObject.on('exit', () => {
-        try {
-          (0,external_node_fs_.unlinkSync)(tmpPath);
-        } catch {
-          // ignore cleanup errors — OS will reclaim tmpdir
-        }
-      });
-      parsed.cliArtifacts['review-external'] = tmpPath;
-      continue;
-    }
-    if (arg === '--phase') {
-      if (!args[0] || args[0].startsWith('-')) {
-        console.error('Error: --phase option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const value = args.shift();
-      // #1746 follow-up: an invalid phase used to exit 0 and fall back to the
-      // default (`midstream`) downstream in normalizePhase, so the run silently
-      // reviewed a different phase than the one that was typed. PHASES is the
-      // shared vocabulary in src/lib/planner-utils.mjs.
-      //
-      // Case-insensitive, and the lowercased value is what gets stored. That is
-      // `normalizePhase`'s (src/lib/local-runner.mjs) semantics, pinned by
-      // tests/local-runner-internals.test.mjs "normalizes case" — so
-      // `--phase Upstream` really did run as `upstream` and MUST keep working.
-      // `normalizePhase` itself cannot be the validator here: its contract is to
-      // fall back to `midstream` for anything invalid, which is exactly the
-      // silent fallback this guard removes. It also matches the shape the
-      // sibling enum options in this parser already use (--planner / --output /
-      // --format / --fail-on all lowercase before comparing).
-      const phase = value.toLowerCase();
-      if (!planner_utils/* PHASES */.ZG.includes(phase)) {
-        console.error(`Error: --phase must be one of: ${planner_utils/* PHASES */.ZG.join(', ')} (got "${value}").`);
-        usageError(parsed);
-        break;
-      }
-      parsed.phase = phase;
-      // #1759 C2: marks that --phase already validated and set parsed.phase,
-      // so the post-loop RIVER_PHASE check below must not re-derive it from
-      // the (possibly invalid) env var and must not report a second error.
-      parsed.phaseExplicit = true;
-      continue;
-    }
-    if (arg === '--cases') {
-      const value = args.shift();
-      // #1709 Slice 3 (B3): a trailing `--cases` used to null the field, so
-      // eval silently fell back to the DEFAULT fixtures and printed [PASS].
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --cases option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.fixturesCasesPath = value;
-      continue;
-    }
-    if (arg === '--verbose') {
-      parsed.verbose = true;
-      continue;
-    }
-    if (arg === '--planner') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --planner option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const mode = value.toLowerCase();
-      if (!planner_utils/* PLANNER_MODES */.Er.includes(mode)) {
-        console.error(
-          `Error: --planner must be one of: ${planner_utils/* PLANNER_MODES */.Er.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.plannerMode = mode;
-      continue;
-    }
-    if (arg === '--dry-run') {
-      parsed.dryRun = true;
-      continue;
-    }
-    if (arg === '--debug') {
-      parsed.debug = true;
-      continue;
-    }
-    if (arg === '--explain') {
-      parsed.explain = true;
-      continue;
-    }
-    if (arg === '--estimate') {
-      parsed.estimate = true;
-      continue;
-    }
-    if (arg === '--max-cost') {
-      const value = args.shift();
-      parsed.maxCost = value ? Number.parseFloat(value) : null;
-      if (!Number.isFinite(parsed.maxCost) || parsed.maxCost < 0) {
-        console.error('Error: --max-cost requires a non-negative numeric value.');
-        usageError(parsed);
-        break;
-      }
-      continue;
-    }
-    if (arg === '--output') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --output option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const mode = value.toLowerCase();
-      if (!OUTPUT_MODES.includes(mode)) {
-        console.error(
-          `Error: --output must be one of: ${OUTPUT_MODES.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.output = mode;
-      parsed.outputExplicit = true;
-      continue;
-    }
-    if (arg === '--format') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --format option requires a value.');
-        usageError(parsed);
-        break;
-      }
-      const mode = value.toLowerCase();
-      if (!REVIEW_FORMATS.includes(mode)) {
-        console.error(
-          `Error: --format must be one of: ${REVIEW_FORMATS.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.format = mode;
-      parsed.formatExplicit = true;
-      continue;
-    }
-    if (arg === '--context') {
-      const value = args.shift();
-      // #1709 Slice 3: a trailing `--context` used to become parseList(undefined)
-      // = [] in silence (same for --dependency below).
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --context option requires a comma-separated list.');
-        usageError(parsed);
-        break;
-      }
-      // Deliberately NOT warned here: `--context` is last-wins (this is a plain
-      // assignment, not a merge), so warning per occurrence reports values that
-      // the run never uses — `--context BOGUS --context diff` warned about
-      // BOGUS even though `diff` is what survives. The warning is emitted once
-      // after the loop, against the surviving list (#1958 review, nit 5).
-      parsed.availableContexts = (0,utils/* parseList */.E1)(value);
-      continue;
-    }
-    if (arg === '--dependency') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --dependency option requires a comma-separated list.');
-        usageError(parsed);
-        break;
-      }
-      parsed.availableDependencies = (0,utils/* parseList */.E1)(value);
-      continue;
-    }
-    if (arg === '--reviewers') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error(
-          'Error: --reviewers option requires a value (e.g. bug-hunter,security-scanner).'
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.reviewers = (0,utils/* parseList */.E1)(value);
-      continue;
-    }
-    if (arg === '--baseline') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --baseline option requires a file path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.baseline = value;
-      continue;
-    }
-    if (arg === '--base') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --base option requires a branch or ref (e.g. --base main).');
-        usageError(parsed);
-        break;
-      }
-      parsed.base = value;
-      continue;
-    }
-    if (arg === '--skill-set') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error(
-          'Error: --skill-set option requires a name (e.g. --skill-set comprehensive).'
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.skillSet = value;
-      continue;
-    }
-    if (arg === '--depth') {
-      const value = args.shift();
-      const valid = Object.keys(review_plan_generator/* DEPTH_TO_REVIEW_MODE */.To);
-      if (!value || !valid.includes(value)) {
-        console.error(`Error: --depth must be one of: ${valid.join(', ')} (got "${value ?? ''}").`);
-        usageError(parsed);
-        break;
-      }
-      parsed.depth = value;
-      continue;
-    }
-    if (arg === '--save') {
-      parsed.save = true;
-      continue;
-    }
-    // Skills subcommand options
-    if (arg === '--from') {
-      const value = args.shift();
-      // #1709 Slice 3: a trailing `--from` / `--to` used to null the field in
-      // silence, so `skills import --from` ran against the default instead.
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --from option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.fromPath = value;
-      continue;
-    }
-    if (arg === '--to') {
-      const value = args.shift();
-      if (!value || value.startsWith('-')) {
-        console.error('Error: --to option requires a path.');
-        usageError(parsed);
-        break;
-      }
-      parsed.toPath = value;
-      continue;
-    }
-    if (arg === '--strict') {
-      parsed.validationMode = 'strict';
-      continue;
-    }
-    if (arg === '--loose') {
-      parsed.validationMode = 'loose';
-      continue;
-    }
-    if (arg === '--source') {
-      const value = args.shift();
-      if (!value || !SKILLS_LIST_SOURCES.includes(value)) {
-        console.error(
-          `Error: --source must be one of: ${SKILLS_LIST_SOURCES.join(', ')} (got "${value}").`
-        );
-        usageError(parsed);
-        break;
-      }
-      parsed.listSource = value;
-      continue;
-    }
-    if (arg === '--include-assets') {
-      parsed.includeAssets = true;
-      continue;
+    const optionResult = consumeOption(parsed, arg, args);
+    if (optionResult === 'continue') continue;
+    if (optionResult === 'break') {
+      usageError(parsed);
+      break;
     }
     if (arg === '-h' || arg === '--help') {
       parsed.command = 'help';
@@ -82221,61 +87220,25 @@ function parseArgs(argv) {
     warnUnknownInputContexts(parsed.availableContexts);
   }
 
-  // `review` needs one of plan | exec | verify | route. The handler reported
-  // both the missing and the unknown case with exit 3 — the code this project
-  // reserves for the `--gate` ESCALATE decision and for handler-level
-  // configuration errors — so an argument-order typo read as "a human must
-  // look at this" (#1755). Detected here instead, which makes it exit 1 like
-  // every other usage error (#1709 contract).
-  if (
-    parsed.command === 'review' &&
-    !parsed.usageError &&
-    !REVIEW_SUBCOMMANDS.has(parsed.reviewSubcommand)
-  ) {
-    // A path taken from after `--` is NOT a candidate subcommand: the caller
-    // declared it to be a path. Reporting it as one produced the contradiction
-    // `river review -- plan` -> `"plan" is not a river review subcommand
-    // (plan | exec | verify | route)`.
-    const got =
-      parsed.reviewSubcommand ??
-      (parsed.targetConsumed && !terminatorTookPositional ? parsed.target : null);
-    console.error(
-      (got === null
-        ? 'Error: river review requires a subcommand (plan | exec | verify | route).'
-        : `Error: "${got}" is not a river review subcommand (plan | exec | verify | route).`) +
-        ' The subcommand may be written before or after the options —' +
-        ' `river review plan --plan-only` and `river review --plan-only plan` are both accepted.'
-    );
+  if (checkReviewSubcommand(parsed, terminatorTookPositional)) {
     usageError(parsed);
   }
 
-  // #1759 C2: RIVER_PHASE used to skip validation entirely and propagate an
-  // invalid value straight through to the printed phase with exit 0, unlike
-  // --phase which already validates against PHASES above. Reuse that same
-  // vocabulary and the same case-insensitive normalization here instead of
-  // writing a second check (CLAUDE.md "Import the SSoT, never re-derive it").
-  //
-  // Only runs when --phase did NOT already set and validate parsed.phase
-  // (parsed.phaseExplicit) and when RIVER_PHASE was actually set to a
-  // non-empty string — unset or empty must keep falling back to the default
-  // ('midstream'), matching the object-literal default above and --phase's
-  // own "not required" contract.
-  if (!parsed.usageError && !parsed.phaseExplicit && external_node_process_namespaceObject.env.RIVER_PHASE) {
-    const envPhase = external_node_process_namespaceObject.env.RIVER_PHASE.toLowerCase();
-    if (!planner_utils/* PHASES */.ZG.includes(envPhase)) {
-      console.error(
-        `Error: RIVER_PHASE must be one of: ${planner_utils/* PHASES */.ZG.join(', ')} (got "${external_node_process_namespaceObject.env.RIVER_PHASE}").`
-      );
-      usageError(parsed);
-    } else {
-      parsed.phase = envPhase;
-    }
+  // #2065: an option the resolved surface accepts but never reads. Placed
+  // after the `review` subcommand check on purpose — that check is what turns
+  // a missing / unknown subcommand into a usage error, and this one must not
+  // report `river review null` on top of it (checkCommandScopedOptions returns
+  // early when parsed.usageError is already set).
+  checkCommandScopedOptions(parsed);
+
+  if (applyPhaseFallback(parsed)) {
+    usageError(parsed);
   }
 
   return parsed;
 }
 
-async function main(argv = external_node_process_namespaceObject.argv.slice(2)) {
+async function main(argv = external_node_process_.argv.slice(2)) {
   const parsed = parseArgs(argv);
   // #1709 Slice 2: parseArgs already reported the usage error to stderr
   // (Error line + usage hint). Exit 1 without printing the full help to
@@ -82308,7 +87271,7 @@ async function main(argv = external_node_process_namespaceObject.argv.slice(2)) 
   // runs on deterministic heuristics only (ADR-002 / #1071). isLlmEnabled()
   // honors RIVER_OFFLINE across all call sites (dispatcher / runner / engine).
   if (parsed.offline) {
-    external_node_process_namespaceObject.env.RIVER_OFFLINE = '1';
+    external_node_process_.env.RIVER_OFFLINE = '1';
   }
   if (!COMMAND_NAMES.includes(parsed.command)) {
     // Reachable since #1709 Slice 2: parseArgs records an unknown leading
@@ -82436,9 +87399,9 @@ async function main(argv = external_node_process_namespaceObject.argv.slice(2)) 
  * シナリオを壊さない）。
  */
 function isDirectInvocation() {
-  if (!external_node_process_namespaceObject.argv[1]) return false;
+  if (!external_node_process_.argv[1]) return false;
   try {
-    const real = (0,external_node_fs_.realpathSync)(external_node_process_namespaceObject.argv[1]);
+    const real = (0,external_node_fs_.realpathSync)(external_node_process_.argv[1]);
     return (0,external_node_url_.fileURLToPath)(import.meta.url) === real || import.meta.url === (0,external_node_url_.pathToFileURL)(real).href;
   } catch {
     return false;
@@ -82448,7 +87411,7 @@ function isDirectInvocation() {
 if (isDirectInvocation()) {
   main().then((code) => {
     if (typeof code === 'number' && code !== 0) {
-      external_node_process_namespaceObject.exitCode = code;
+      external_node_process_.exitCode = code;
     }
   });
 }

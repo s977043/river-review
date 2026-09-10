@@ -22,8 +22,16 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { FLOW_SCHEMA_FILENAMES } from '../src/lib/flow-loader.mjs';
+
 const scriptPath = fileURLToPath(new URL('../scripts/normalize-dist.mjs', import.meta.url));
 const CANONICAL = 'river-review';
+// Hand-written: the three schemas the Flow loader compiles (#2054 PR-5).
+const FLOW_SCHEMA_FILES = [
+  'flow-entry-map.schema.json',
+  'flow.schema.json',
+  'review-intent.schema.json',
+];
 
 // ncc が実際に吐いた asset 参照行（ディレクトリ名のみ合成）と、置換してはいけない
 // 正当な文脈の行を混ぜた入力。最後の 1 行はビルドディレクトリ名そのものを
@@ -60,7 +68,7 @@ const bundleExpected = (dirName) =>
  * 組み立てる。スクリプト自身が `basename(repoRoot)` を見るので、テスト側は
  * ディレクトリ名を変えるだけでビルド場所の違いを再現できる。
  */
-function makeFakeRepo(t, dirName, { extraAssetDir = null } = {}) {
+function makeFakeRepo(t, dirName, { extraAssetDir = null, withFlowAssets = true } = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'normalize-dist-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
   const root = path.join(tmp, dirName);
@@ -69,6 +77,20 @@ function makeFakeRepo(t, dirName, { extraAssetDir = null } = {}) {
   fs.mkdirSync(dist, { recursive: true });
   fs.copyFileSync(scriptPath, path.join(root, 'scripts/normalize-dist.mjs'));
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: CANONICAL }), 'utf8');
+  // Flow assets (#2054 PR-5): what the dist must ship, plus one non-asset file
+  // in each directory that must NOT be copied.
+  if (withFlowAssets) {
+    fs.mkdirSync(path.join(root, 'flows/intents'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'flows/entry-map.json'), '{"entries":{}}\n', 'utf8');
+    fs.writeFileSync(path.join(root, 'flows/x.flow.json'), '{"id":"x"}\n', 'utf8');
+    fs.writeFileSync(path.join(root, 'flows/intents/y.intent.json'), '{"purpose":"y"}\n', 'utf8');
+    fs.writeFileSync(path.join(root, 'flows/README.md'), '# not an asset\n', 'utf8');
+    fs.mkdirSync(path.join(root, 'schemas'), { recursive: true });
+    for (const name of FLOW_SCHEMA_FILES) {
+      fs.writeFileSync(path.join(root, 'schemas', name), `{"$id":"${name}"}\n`, 'utf8');
+    }
+    fs.writeFileSync(path.join(root, 'schemas/output.schema.json'), '{"$id":"out"}\n', 'utf8');
+  }
   fs.writeFileSync(path.join(dist, '260.index.mjs'), bundleInput(dirName), 'utf8');
   fs.writeFileSync(path.join(dist, 'crlf.cjs'), 'a\r\nb\r\n', 'utf8');
   fs.mkdirSync(path.join(dist, dirName, 'schemas'), { recursive: true });
@@ -139,4 +161,53 @@ test('CRLF の LF 正規化は作業ディレクトリ名によらず行われ�
     run(root);
     assert.equal(fs.readFileSync(path.join(dist, 'crlf.cjs'), 'utf8'), 'a\nb\n');
   }
+});
+
+test('flows/ の Flow asset と loader が使う schema 3 本だけを dist に同梱する (#2054 PR-5)', (t) => {
+  const { root, dist } = makeFakeRepo(t, CANONICAL);
+  const stdout = run(root);
+
+  assert.ok(stdout.includes('Copied flows/ and 3 schema(s) into dist/'));
+  const list = (dir) =>
+    fs
+      .readdirSync(path.join(dist, dir), { recursive: true })
+      .map((f) => String(f))
+      .sort();
+  assert.deepEqual(list('flows'), [
+    'entry-map.json',
+    'intents',
+    'intents/y.intent.json',
+    'x.flow.json',
+  ]);
+  assert.deepEqual(list('schemas'), FLOW_SCHEMA_FILES);
+  // Contents are copied verbatim.
+  assert.equal(
+    fs.readFileSync(path.join(dist, 'flows/entry-map.json'), 'utf8'),
+    '{"entries":{}}\n'
+  );
+  // Re-running replaces rather than accumulates (a renamed asset does not linger).
+  fs.writeFileSync(path.join(dist, 'flows/stale.flow.json'), '{}\n', 'utf8');
+  run(root);
+  assert.deepEqual(list('flows'), [
+    'entry-map.json',
+    'intents',
+    'intents/y.intent.json',
+    'x.flow.json',
+  ]);
+});
+
+test('flows/ が無い checkout では黙って同梱を省かず失敗する (#2054 PR-5)', (t) => {
+  const { root } = makeFakeRepo(t, CANONICAL, { withFlowAssets: false });
+  assert.throws(() => run(root), /flows\/ not found at .*the dist cannot ship --entry without it/);
+});
+
+test('同梱する schema の一覧は flow-loader の FLOW_SCHEMA_FILENAMES と一致する (#2054 PR-5)', () => {
+  // The script cannot import the loader (it must run without node_modules), so
+  // the list is duplicated there; this pins the duplicate to the SSoT.
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const block = /const FLOW_SCHEMA_FILES = \[([^\]]+)\];/.exec(source);
+  assert.ok(block, 'FLOW_SCHEMA_FILES not found in normalize-dist.mjs');
+  const inScript = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+  assert.deepEqual(inScript, Object.values(FLOW_SCHEMA_FILENAMES).sort());
+  assert.deepEqual(inScript, [...FLOW_SCHEMA_FILES].sort());
 });

@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/cross-runtime-conformance.schema.json",
+  "title": "Cross-Runtime Conformance Case",
+  "description": "One paired cross-runtime observation (#2020, Epic #2011 Phase 9). A case pins ONE Flow execution condition set and records what each host runtime (Claude Code / Codex Plugin) actually produced for it, so the invariant \"Runtime Adapter MUST NOT redefine Review Judgment\" can be evaluated mechanically. The record is read-only evidence: it carries no promotion decision, and `expected.promotionGate` states only what the comparator must compute, never what a human must approve. Byte-for-byte prose equality is deliberately NOT representable here — the agentic layer records structured judgment fields (taxonomy, severity band, target anchor, escalation state) and never the finding message, so an equality check on this record can never degenerate into an output-text diff.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "caseId",
+    "caseClass",
+    "description",
+    "expectation",
+    "pinned",
+    "observations",
+    "expected"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "caseId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Stable identity of the case. Two runtimes are paired by this id, never by array position."
+    },
+    "caseClass": {
+      "type": "string",
+      "description": "Dataset class from #2020 \"Dataset\". The kit must cover every value.",
+      "enum": [
+        "clean-positive",
+        "should-detect",
+        "should-not-detect",
+        "missing-artifact",
+        "requirement-contradiction",
+        "replan-semantic-drift",
+        "task-false-complete",
+        "final-false-convergence",
+        "security-human-handoff"
+      ]
+    },
+    "description": { "type": "string", "minLength": 1 },
+    "expectation": {
+      "type": "string",
+      "enum": ["conformant", "non-conformant"],
+      "description": "Positive fixture (`conformant`) vs negative fixture (`non-conformant`). A negative fixture exists to prove the comparator still fails when the invariant is broken; a kit of positives alone cannot distinguish a working comparator from one that always returns pass."
+    },
+    "pinned": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "flow", "flowVersion", "policySha256", "artifactSetSha256"],
+      "description": "The experiment CONDITIONS held identical across runtimes. Everything here must be equal for both observations; a case whose inputs differ is a dataset defect, not a runtime divergence.",
+      "properties": {
+        "entry": {
+          "type": "string",
+          "description": "Entry name as typed by a person; resolves through flows/entry-map.json."
+        },
+        "flow": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "flowVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "The `version` of the pinned Flow document, in the same semver form `schemas/flow-entry-map.schema.json` pins. An unconstrained string here would let a case pin `latest` and still validate, which is not a pinned condition."
+        },
+        "policySha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "artifactSetSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Digest of the fixture artifact set under review. Equal digest = same input."
+        },
+        "skillRegistryCommit": { "type": ["string", "null"] },
+        "model": {
+          "type": ["string", "null"],
+          "description": "Model identity, when the pair was collected under one model. `null` means the pair was collected under each host's own default model — which is exactly the condition under which an agentic difference may legitimately be classified `model-variation`."
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/observation" },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": ["runtime"],
+            "properties": { "runtime": { "const": "claude" } }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": ["runtime"],
+            "properties": { "runtime": { "const": "codex" } }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "description": "Exactly one observation per runtime. `minItems`/`maxItems` alone would admit two observations of the SAME runtime, which is not a pair at all, so each runtime is additionally pinned to exactly one entry by `contains` + `minContains`/`maxContains`. What JSON Schema cannot express here is that this runtime list stays a mirror of `agents/contracts/adapter-map.json`: a cross-document constraint is enforced by `tests/cross-runtime-conformance.test.mjs` rather than by this document."
+    },
+    "declaredDivergences": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/declaredDivergence" },
+      "description": "Reasons the case author claims for the differences it contains. A declaration is a CLAIM, not a verdict: the comparator re-derives each divergence from the observations and accepts the claimed class only when the evidence supports it, otherwise reclassifies it as `unexplained`."
+    },
+    "expected": { "$ref": "#/$defs/expected" }
+  },
+  "$defs": {
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "adapter", "deterministic", "agentic"],
+      "properties": {
+        "runtime": { "type": "string", "enum": ["claude", "codex"] },
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mechanisms", "surfaces", "capabilities"],
+          "description": "How this host bound the Agents. Mirrors agents/contracts/adapter-map.json; it is the evidence a divergence claim of `adapter-mechanism` / `adapter-capability` is checked against. A runtime binds FIVE logical Agents and may bind them by different mechanisms — in adapter-map.json `claude` uses `native-subagent` for review-orchestrator / specialist-reviewer and `skill` for the other three — so a single-valued `mechanism` could not record the real binding. Both fields are therefore SETS over the run's Agents. That each set stays within what adapter-map.json records for the runtime is a cross-document constraint enforced by `tests/cross-runtime-conformance.test.mjs`.",
+          "properties": {
+            "mechanisms": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["native-subagent", "skill"] },
+              "description": "The distinct mechanisms this host used to bind the Agents in this run. Compared as a set, so recording order is not a divergence."
+            },
+            "surfaces": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "The distinct surface paths those bindings resolved to."
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["read-artifact", "read-source", "search-source", "run-command"]
+              },
+              "uniqueItems": true
+            },
+            "fallbacks": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["not-needed", "skill-only", "escalate"] },
+              "description": "The distinct fallback policies those bindings declared. A set for the same reason `mechanisms` is: adapter-map.json records one fallback per Agent, and a runtime mixes them (claude declares `escalate` for consistency-judge and `not-needed` for the rest)."
+            }
+          }
+        },
+        "deterministic": { "$ref": "#/$defs/deterministicLayer" },
+        "agentic": { "$ref": "#/$defs/agenticLayer" }
+      }
+    },
+    "deterministicLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "routing",
+        "selectedSkills",
+        "referenceCoverage",
+        "manifest",
+        "deterministicChecks",
+        "gate"
+      ],
+      "description": "The layer #2020 requires to match 100%. Every field here is derived by repository code from pinned inputs, so a runtime-dependent value in this layer IS the adapter redefining judgment — there is no tolerance band.",
+      "properties": {
+        "routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["entry", "resolvedFlow", "resolvedFlowVersion"],
+          "properties": {
+            "entry": { "type": "string", "minLength": 1 },
+            "resolvedFlow": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "resolvedFlowVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" }
+          }
+        },
+        "selectedSkills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "version"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" }
+            }
+          }
+        },
+        "referenceCoverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "referenced"],
+          "description": "Which declared references the run actually consulted. Compared as sets, so recording order is not a divergence.",
+          "properties": {
+            "required": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "referenced": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+          }
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["replayClass", "blocks"],
+          "description": "Execution-manifest provenance as recorded by this runtime. `blocks` uses the PROVENANCE_STATUS vocabulary from src/lib/execution-manifest.mjs; completeness is evaluated against REPLAY_REQUIREMENTS for the declared replayClass rather than against a list restated here.",
+          "properties": {
+            "replayClass": { "type": "string", "enum": ["deterministic", "judgment"] },
+            "blocks": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "string",
+                "enum": ["resolved", "missing", "unavailable"]
+              }
+            },
+            "pins": {
+              "type": "object",
+              "description": "Per-block pin fields actually recorded (e.g. `flow: [\"sha256\"]`). A block may be `resolved` yet still lack the pin replay needs, which REPLAY_PINS is the SSoT for.",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "type": "string" },
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "deterministicChecks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "status"],
+            "properties": {
+              "id": { "type": "string" },
+              "status": { "type": "string", "enum": ["pass", "fail", "skipped", "unrunnable"] }
+            }
+          }
+        },
+        "gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decision", "reasonCode", "inputsHash"],
+          "properties": {
+            "decision": {
+              "type": "string",
+              "enum": ["GO", "GO_WITH_OBSERVATION", "NO_GO", "ESCALATE"]
+            },
+            "reasonCode": { "type": "string" },
+            "inputsHash": { "type": "string", "pattern": "^[0-9a-f]{16,64}$" }
+          }
+        }
+      }
+    },
+    "agenticLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "findings",
+        "criterionCoverage",
+        "completionState",
+        "unsupportedDoneClaim",
+        "humanEscalation"
+      ],
+      "description": "Model-produced judgment, recorded as STRUCTURE only. There is deliberately no message/prose field: #2020 Non-goals exclude identical wording, so recording the text would invite an equality check the contract forbids.",
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["semanticKey", "taxonomy", "severity", "target"],
+            "properties": {
+              "semanticKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Identity of WHAT was found, independent of how it was worded. Two runtimes agree when they emit the same semanticKey; they are compared on nothing else."
+              },
+              "taxonomy": { "type": "string", "minLength": 1 },
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "major", "minor", "info"]
+              },
+              "target": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "anchor": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "criterionCoverage": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Ids of the review criteria this run actually addressed."
+        },
+        "completionState": {
+          "type": "string",
+          "enum": ["complete", "incomplete", "contradicted", "undetermined"]
+        },
+        "unsupportedDoneClaim": { "type": "boolean" },
+        "humanEscalation": {
+          "type": "boolean",
+          "description": "Whether the run handed authority to a human. Equality here is what \"Human authority unchanged\" is measured by: a runtime that escalates where the other does not has moved the authority boundary."
+        }
+      }
+    },
+    "declaredDivergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "layer", "reasonClass", "evidence"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dotted path of the diverging field, e.g. `agentic.findings` or `deterministic.gate.decision`."
+        },
+        "layer": { "type": "string", "enum": ["deterministic", "agentic"] },
+        "reasonClass": {
+          "type": "string",
+          "description": "Closed vocabulary. `adapter-mechanism` and `adapter-capability` are ADAPTER variation and are accepted only where adapter-map.json evidences the difference. `model-variation` is MODEL variation and is accepted on the agentic layer only — a deterministic field that moves with the model is by definition not deterministic, so such a claim is reclassified `unexplained`. `dataset-defect` marks an input that was not actually pinned. `unexplained` is the residual the promotion gate requires to be zero.",
+          "enum": [
+            "adapter-mechanism",
+            "adapter-capability",
+            "model-variation",
+            "dataset-defect",
+            "unexplained"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the claim can be checked (a file path, an adapter-map key). Prose alone is not evidence; the comparator re-derives the class from the observations regardless of what this says."
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministicConformance",
+        "manifestCompleteness",
+        "criticalRegressionCount",
+        "unexplainedDivergenceCount",
+        "humanAuthorityUnchanged",
+        "promotionGate"
+      ],
+      "description": "What the comparator must compute for this case. These are assertions about the comparator, not authorizations: `promotionGate: \"pass\"` means every measured condition held, and never that promotion may proceed — that decision stays with a human (#2020 \"Human authority unchanged\").",
+      "properties": {
+        "deterministicConformance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "manifestCompleteness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "criticalRegressionCount": { "type": "integer", "minimum": 0 },
+        "unexplainedDivergenceCount": { "type": "integer", "minimum": 0 },
+        "humanAuthorityUnchanged": { "type": "boolean" },
+        "promotionGate": { "type": "string", "enum": ["pass", "fail"] },
+        "failedGates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "deterministic-conformance",
+              "manifest-completeness",
+              "critical-regression",
+              "unexplained-divergence",
+              "human-authority"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

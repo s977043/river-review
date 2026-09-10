@@ -68,6 +68,44 @@ view alone cannot diagnose this. `mergeStateStatus` was `BLOCKED`.
 `scripts/wait-pr-ready.sh <N>` performs both reads for one or more PRs and
 prints a `stalled_runs` column, so it can stand in for this step.
 
+## One command for Steps 1 to 3: `scripts/pr-unstall.sh`
+
+`scripts/pr-unstall.sh <N>` runs Steps 1 to 3 below as one decision. It is a
+mechanisation of this runbook, not a replacement: the reads, the routing rule,
+and the escape are the ones written out in those steps, and the script quotes
+this file when it stops. Read the steps once so that the script's output makes
+sense; run the script so that the six-times-a-session judgement is not retyped.
+
+```bash
+scripts/pr-unstall.sh <N>             # dry-run: judge, print the next command
+scripts/pr-unstall.sh --execute <N>   # run the escape (update-branch or kick)
+```
+
+What it does, in the order of this runbook:
+
+| Runbook step | Script behaviour                                                                                                                                                                                                                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Step 1       | Reads the head from `repos/:owner/:repo/pulls/<N>` (full 40-char SHA) and its `actions/runs?head_sha=`. One or more `action_required` runs with nothing still `queued` / `in_progress` is `stalled`; a head whose runs are still moving is not; zero runs is `no-runs`, never a verdict.                                         |
+| Step 2       | A `release-please--*` head takes the kick route; any other head takes `PUT .../pulls/<N>/update-branch`, which pushes a merge commit as your own account.                                                                                                                                                                        |
+| Step 3       | `--execute` runs the account guard (`gh api user`, `gh auth switch -u s977043`), then `scripts/release-please-kick.sh <branch>` or the `update-branch` call.                                                                                                                                                                     |
+| 422          | Prints the manual procedure and exits 1. A merge conflict gets the local `git merge origin/main` steps (regenerate `runners/github-action/dist/**` with `npm run build:action` when that is the only conflict); `no new commits` gets the kick command. Neither is run: both touch a working tree or need a human on the branch. |
+
+Exit codes: `0` not stalled, already merged, or the escape ran; `1` stalled but
+not resolvable from here (the procedure was printed); `2` a GitHub read failed,
+so no verdict; `64` usage. Exit 2 exists so a failed read is never reported as
+"not stalled".
+
+Measured on 2026-09-05 against open PR #2038 (head `e1cb880e`, 12 runs, one of
+them `Blocked Label Guard` / `failure`): the script printed
+`#2038 is not stalled: no action_required run of e1cb880e6c27b8ec61127af899cccfb7fef7cf9a, or a run is still moving.` and exited 0.
+Against merged PR #2086 it printed `#2086 is already merged; nothing to
+unstall.` and exited 0 without reading the runs. The `--execute` paths were
+exercised only against a stubbed `gh` (`tests/scripts-pr-unstall.test.mjs`);
+no stalled head existed on the repository at the time of writing.
+
+`scripts/merge-chain.sh` calls this script when `update-branch` returns a
+merge-conflict 422 during a batch merge; see `docs/runbook/merge-chain.md`.
+
 ## Step 2: diagnose BEHIND vs pure BLOCKED
 
 A PR can be behind `main` and BLOCKED at the same time, and which one it is
@@ -292,4 +330,7 @@ stays the procedure SSoT for the BEHIND decision, which kick route to use, and
 Fix the command when the two disagree.
 
 `scripts/wait-pr-ready.sh` waits for one or more PRs to settle and surfaces the
-stalled `action_required` runs that send you here.
+stalled `action_required` runs that send you here. `scripts/pr-unstall.sh`
+judges one PR and runs the escape (section above); `scripts/merge-chain.sh`
+(`docs/runbook/merge-chain.md`) drives a strict-mode batch merge on top of
+both.

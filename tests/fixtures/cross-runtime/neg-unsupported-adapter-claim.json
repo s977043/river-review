@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "caseId": "neg-unsupported-adapter-claim",
+  "caseClass": "clean-positive",
+  "description": "Negative fixture: a deterministic check differs and the case blames an adapter capability gap, but both runtimes declare the same capabilities here. The claim has no evidence, so it is reclassified unexplained.",
+  "expectation": "non-conformant",
+  "pinned": {
+    "entry": "review-plan",
+    "flow": "plan-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "90486c641e7050abc0a139fd1647dfbe2d140fe3c8a7912b9326723d07c10311",
+    "artifactSetSha256": "c40c0e9b0b9851f532b2139df874bc55bc60ab24db9e726625d24752b8677c4d",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": ["skills/agent-skills/river-review/SKILL.md"],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["not-needed"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "plan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "reference-resolvable",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "b384ef2236587109"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-plan",
+          "resolvedFlow": "plan-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "plangate-plan-integrity",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "reference-resolvable",
+            "status": "fail"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "b384ef2236587109"
+        }
+      },
+      "agentic": {
+        "findings": [],
+        "criterionCoverage": ["plan-readiness"],
+        "completionState": "complete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [
+    {
+      "field": "deterministic.deterministicChecks",
+      "layer": "deterministic",
+      "reasonClass": "adapter-capability",
+      "evidence": "claimed capability gap between the two runtimes."
+    }
+  ],
+  "expected": {
+    "deterministicConformance": 0.9166666666666666,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 1,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "fail",
+    "failedGates": ["deterministic-conformance", "unexplained-divergence"]
+  }
+}

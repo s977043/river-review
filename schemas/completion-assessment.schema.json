@@ -1,0 +1,550 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/completion-assessment.schema.json",
+  "title": "River Review Completion Assessment",
+  "description": "Evidence-based DONE proof for one review run (#2019, Epic #2011 Phase 8). `claimed complete != proven complete`: this document records whether the evidence supports a completion claim, NOT whether the loop may advance. Completion and Gate are separate contracts (Epic #2011 invariant I6): the gate vocabulary (GATE_DECISIONS / GATE_REASON_CODES in `src/lib/gate-decision.mjs`) answers \"should the host proceed\", this document answers \"is the goal / requirement / acceptance-criterion evidence in place\". The two vocabularies are disjoint by construction and `tests/completion-assessment.test.mjs` imports the gate ledger and pins the disjointness, so neither side can absorb the other. This document carries NO merge, release or approval field: a completion state MUST NOT be wired to merge authority, and business-value judgment is returned to a human via `HUMAN_JUDGMENT_REQUIRED`. `mode` is `observe` only, so an assessment cannot alter an existing decision, gate or finding. Vocabulary is closed: every enum is closed and every object sets `additionalProperties: false`, so an unknown state fails validation instead of degrading silently — the same fail-safe direction recorded in `src/lib/gate-decision.mjs`.",
+  "type": "object",
+  "required": ["schemaVersion", "scope", "mode", "state", "reasonCodes", "evidence"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "description": "Version of THIS document shape (artifact schemaVersion, not an asset version).",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "scope": {
+      "$ref": "#/$defs/completionScope"
+    },
+    "mode": {
+      "description": "Only `observe` exists in #2019. An assessment is recorded alongside the existing outputs and MUST NOT change an existing decision, gate or finding. Adding an enforcing mode is therefore a schema change (a reviewable event), not a field flip.",
+      "type": "string",
+      "enum": ["observe"]
+    },
+    "state": {
+      "$ref": "#/$defs/completionState"
+    },
+    "reasonCodes": {
+      "description": "Why the state is what it is. Disjoint from GATE_REASON_CODES by construction; `tests/completion-assessment.test.mjs` pins that against the imported gate ledger.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/completionReasonCode"
+      }
+    },
+    "verification": {
+      "description": "Verification = did the change satisfy the REQUIREMENTS that were defined. Distinct from `validation`, which asks whether the original GOAL was achieved. Splitting the two is a #2019 requirement: a run can satisfy every stated requirement and still fail the goal.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirements", "acceptanceCriteria"],
+      "properties": {
+        "requirements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "satisfied", "violated", "unverified"],
+          "properties": {
+            "total": {
+              "$ref": "#/$defs/count"
+            },
+            "satisfied": {
+              "$ref": "#/$defs/count"
+            },
+            "violated": {
+              "$ref": "#/$defs/count"
+            },
+            "unverified": {
+              "$ref": "#/$defs/count"
+            }
+          }
+        },
+        "acceptanceCriteria": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "verified", "unverified"],
+          "properties": {
+            "total": {
+              "$ref": "#/$defs/count"
+            },
+            "verified": {
+              "$ref": "#/$defs/count"
+            },
+            "unverified": {
+              "$ref": "#/$defs/count"
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "description": "Validation = can the ORIGINAL GOAL be called achieved. Meaningful only at `final` scope: a single task has no goal of its own to validate, which is why `scope: task` forbids this property outright rather than allowing an empty one. When the answer needs a business or value judgment, `state` is `REQUIRES_HUMAN_JUDGMENT` and the document's own `state` becomes `HUMAN_JUDGMENT_REQUIRED` — River Review does not make that call.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "rationale"],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/validationState"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "goalRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        }
+      }
+    },
+    "tasks": {
+      "description": "Task records as SUPPORTING evidence. At `final` scope, task exhaustion is explicitly NOT the completion criterion (`TASK_EXHAUSTION_IS_NOT_CONVERGENCE`), which is why 8-of-8 complete tasks cannot on their own produce COMPLETE.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "complete", "unsupportedClaims"],
+      "properties": {
+        "total": {
+          "$ref": "#/$defs/count"
+        },
+        "complete": {
+          "description": "Tasks CLAIMED complete (e.g. a checked todo box). A claim is not a proof: see `unsupportedClaims`.",
+          "$ref": "#/$defs/count"
+        },
+        "unsupportedClaims": {
+          "description": "How many of the claims in `complete` are unsupported. MUST equal `unsupportedClaims.length`; `tests/completion-assessment.test.mjs` pins the equality because JSON Schema cannot compare a count against an array length.",
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "unsupportedClaims": {
+      "description": "An unsupported completion claim: something declared DONE whose declaration is the only evidence for it. `claimSource` records what the declaration was; `missingEvidence` records what would have had to be present. A claim whose only `claimSource` is `todo-checkbox` can never support COMPLETE, which is the mechanical form of \"Task DONE must not depend on a todo checkbox alone\".",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "claimSource", "missingEvidence"],
+        "properties": {
+          "ref": {
+            "$ref": "#/$defs/artifactRef"
+          },
+          "claimSource": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": ["todo-checkbox", "task-status-field", "agent-self-report", "commit-message"]
+            }
+          },
+          "missingEvidence": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/evidenceKind"
+            }
+          }
+        }
+      }
+    },
+    "unresolvedRefs": {
+      "description": "Requirement / acceptance-criterion identifiers that could not be resolved to evidence. A non-empty list forbids COMPLETE.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifactRef"
+      }
+    },
+    "evidence": {
+      "description": "What evidence was available for this assessment, one entry per kind. Absence is recorded rather than skipped: a `missing` entry is itself part of the answer and forces the state away from COMPLETE. JSON Schema draft 2020-12 は「あるプロパティでの一意性」を表現できないため、kind の一意性は tests/completion-assessment.test.mjs が強制する。",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "state"],
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/evidenceKind"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["present", "partial", "missing", "unreadable"]
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "humanJudgment": {
+      "description": "The human boundary. Required when `state` is `HUMAN_JUDGMENT_REQUIRED`, and never a permission to proceed: it names the question River Review refuses to answer.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary", "question"],
+      "properties": {
+        "boundary": {
+          "type": "string",
+          "enum": ["business-value", "product-scope", "risk-acceptance", "policy-exception"]
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "blockedBy": {
+      "description": "Why the assessment could not be carried out. Required and non-empty when `state` is `BLOCKED`.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "title": "task scope: no goal validation, task evidence required",
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "task"
+          }
+        },
+        "required": ["scope"]
+      },
+      "then": {
+        "required": ["tasks"],
+        "properties": {
+          "validation": false
+        }
+      }
+    },
+    {
+      "title": "final scope: the goal is the subject, so validation and requirements are required",
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "final"
+          }
+        },
+        "required": ["scope"]
+      },
+      "then": {
+        "required": ["validation", "verification"]
+      }
+    },
+    {
+      "title": "COMPLETE requires zero unverified, zero violated, zero unsupported claims and zero unresolved refs",
+      "if": {
+        "properties": {
+          "state": {
+            "const": "COMPLETE"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["verification"],
+        "properties": {
+          "verification": {
+            "properties": {
+              "requirements": {
+                "properties": {
+                  "violated": {
+                    "const": 0
+                  },
+                  "unverified": {
+                    "const": 0
+                  }
+                }
+              },
+              "acceptanceCriteria": {
+                "properties": {
+                  "unverified": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          },
+          "tasks": {
+            "properties": {
+              "unsupportedClaims": {
+                "const": 0
+              }
+            }
+          },
+          "unsupportedClaims": {
+            "maxItems": 0
+          },
+          "unresolvedRefs": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "title": "COMPLETE at final scope additionally requires the goal to be validated as met",
+      "if": {
+        "properties": {
+          "state": {
+            "const": "COMPLETE"
+          },
+          "scope": {
+            "const": "final"
+          }
+        },
+        "required": ["state", "scope"]
+      },
+      "then": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "state": {
+                "const": "GOAL_MET"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "missing or unreadable evidence forbids COMPLETE",
+      "if": {
+        "properties": {
+          "evidence": {
+            "contains": {
+              "properties": {
+                "state": {
+                  "enum": ["missing", "unreadable"]
+                }
+              }
+            }
+          }
+        },
+        "required": ["evidence"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "not": {
+              "const": "COMPLETE"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "COMPLETE requires diff and test evidence to be present, never a claim alone",
+      "if": {
+        "properties": {
+          "state": {
+            "const": "COMPLETE"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "allOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "kind": {
+                      "const": "diff"
+                    },
+                    "state": {
+                      "const": "present"
+                    }
+                  },
+                  "required": ["kind", "state"]
+                }
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "kind": {
+                      "const": "tests"
+                    },
+                    "state": {
+                      "const": "present"
+                    }
+                  },
+                  "required": ["kind", "state"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "HUMAN_JUDGMENT_REQUIRED must name the boundary it hands back",
+      "if": {
+        "properties": {
+          "state": {
+            "const": "HUMAN_JUDGMENT_REQUIRED"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["humanJudgment"]
+      }
+    },
+    {
+      "title": "a goal needing human judgment cannot be recorded as anything else",
+      "if": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "state": {
+                "const": "REQUIRES_HUMAN_JUDGMENT"
+              }
+            },
+            "required": ["state"]
+          }
+        },
+        "required": ["validation"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "HUMAN_JUDGMENT_REQUIRED"
+          }
+        },
+        "required": ["humanJudgment"]
+      }
+    },
+    {
+      "title": "BLOCKED must say what blocked it",
+      "if": {
+        "properties": {
+          "state": {
+            "const": "BLOCKED"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["blockedBy"]
+      }
+    },
+    {
+      "title": "an unsupported claim must be reflected in the state",
+      "if": {
+        "properties": {
+          "unsupportedClaims": {
+            "minItems": 1
+          }
+        },
+        "required": ["unsupportedClaims"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "not": {
+              "const": "COMPLETE"
+            }
+          },
+          "reasonCodes": {
+            "contains": {
+              "const": "UNSUPPORTED_COMPLETION_CLAIM"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence": {
+            "type": "array",
+            "contains": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "const": "missing"
+                }
+              },
+              "required": ["state"]
+            }
+          }
+        },
+        "required": ["evidence"]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "enum": ["UNVERIFIED", "BLOCKED", "HUMAN_JUDGMENT_REQUIRED"]
+          }
+        },
+        "description": "#2019 AC: evidence 欠損は UNVERIFIED へ倒す。`INCOMPLETE` は「調べた結果 満たしていない」であり、`missing` は「調べられなかった」なので別物。両者を同じ状態で表すと、未検証を検証済みの否定として読ませてしまう。BLOCKED と HUMAN_JUDGMENT_REQUIRED は「そもそも判定に到達していない」点で UNVERIFIED と同じ側にあるため許す。"
+      }
+    }
+  ],
+  "$defs": {
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "artifactRef": {
+      "description": "Identifier of a requirement, acceptance criterion or task as it is written in the source artifact (e.g. `REQ-7`, `AC-12`, `TASK-3`).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "completionScope": {
+      "description": "Which question this assessment answers. `task` = \"is there evidence to declare THIS task DONE\" (Flow `task-completion-review`, intent `task-completion`). `final` = \"were the goal and the requirements met\", where finishing every task is explicitly not the criterion (Flow `final-review`, intent `final-convergence`). The two are separate semantics, not two thresholds of one scale: only `final` validates a goal, and only `task` requires task records.",
+      "type": "string",
+      "enum": ["task", "final"]
+    },
+    "completionState": {
+      "description": "The DONE state. Deliberately disjoint from GATE_DECISIONS (`GO` / `GO_WITH_OBSERVATION` / `NO_GO` / `ESCALATE`): a completion state is a statement about evidence, never an instruction to a host. `UNVERIFIED` is the fail-safe landing spot for absent evidence — an unproven claim is never COMPLETE and never silently INCOMPLETE either, because \"we could not check\" and \"we checked and it is not done\" are different answers.",
+      "type": "string",
+      "enum": ["COMPLETE", "INCOMPLETE", "UNVERIFIED", "BLOCKED", "HUMAN_JUDGMENT_REQUIRED"]
+    },
+    "validationState": {
+      "description": "Goal-level answer, used only at `final` scope.",
+      "type": "string",
+      "enum": ["GOAL_MET", "GOAL_NOT_MET", "NOT_ASSESSED", "REQUIRES_HUMAN_JUDGMENT"]
+    },
+    "completionReasonCode": {
+      "description": "Closed vocabulary explaining a completion state. Disjoint from GATE_REASON_CODES; the disjointness is pinned in `tests/completion-assessment.test.mjs` against the imported ledger rather than restated here.",
+      "type": "string",
+      "enum": [
+        "ALL_REQUIREMENTS_SATISFIED",
+        "REQUIREMENT_UNSATISFIED",
+        "REQUIREMENT_EVIDENCE_MISSING",
+        "ACCEPTANCE_CRITERION_UNVERIFIED",
+        "UNSUPPORTED_COMPLETION_CLAIM",
+        "UNRESOLVED_REFERENCE",
+        "TASK_EXHAUSTION_IS_NOT_CONVERGENCE",
+        "GOAL_VALIDATION_PENDING",
+        "BUSINESS_VALUE_JUDGMENT_REQUIRED",
+        "EVIDENCE_SOURCE_UNAVAILABLE",
+        "UPSTREAM_DEPENDENCY_BLOCKED"
+      ]
+    },
+    "evidenceKind": {
+      "description": "Kinds of evidence a completion judgment can rest on. `tasks` is listed so its ABSENCE can be recorded, not so a task record can stand in for proof.",
+      "type": "string",
+      "enum": [
+        "requirements",
+        "acceptanceCriteria",
+        "tasks",
+        "diff",
+        "tests",
+        "findings",
+        "verified-findings",
+        "baseline"
+      ]
+    }
+  }
+}

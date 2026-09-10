@@ -17,10 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: HOL Plugin Scanner
-        uses: hashgraph-online/ai-plugin-scanner-action@11cbacde361ef96e800316edbaadb332415798e7 # v1
+        uses: hashgraph-online/ai-plugin-scanner-action@6bf4e9d7b49a9f245f5ac6046366d167c5145d40 # v1
         with:
           plugin_dir: '.'
           mode: scan
+          # v1.2.591 で trust_repository_policy（既定 false）が入り、false のままだと
+          # .plugin-scanner.toml の ignore_paths / baseline が読まれない
+          # （hol-guard v3.0.65 src/codex_plugin_scanner/_scanner_commands.py:67-76。
+          # 明示的な config 入力も同じ分岐で無視される）。旧版は常に読んでいたため、
+          # 挙動を据え置くために true を明示する。
+          trust_repository_policy: true
           min_score: 80
           fail_on_severity: high
           format: sarif

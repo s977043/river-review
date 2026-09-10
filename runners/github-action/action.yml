@@ -77,6 +77,21 @@ inputs:
       the PR-head checkout being reviewed (that would break the trust boundary).
     required: false
     default: ''
+  entry:
+    description: >-
+      (Beta, #2054 PR-5) Review Flow entry name to pin the emitted Review
+      Artifact to (a key of flows/entry-map.json `entries`, e.g. review-plan,
+      review-task, review-final). When set, the step runs
+      `review plan --plan-only --entry <entry>` instead of `run` and emits the
+      Review Artifact (JSON, or Markdown when output_format=markdown); the
+      artifact carries `flow` and `evidenceRequirements`. The name is passed
+      through verbatim — the Action holds no judgment about it (ADR-009 D3).
+      Leave empty (default) to keep the `run` command path exactly as before.
+      When set, gate / dry_run / estimate / max_cost / comment / inline_comments
+      do not apply (plan-only runs no review, so there is nothing to gate or
+      to post).
+    required: false
+    default: ''
 outputs:
   json_path:
     description: 'Path to the JSON output file (only when output_format=json).'
@@ -98,6 +113,9 @@ runs:
         # hardening pattern against script injection (#1401 (d) review).
         INPUT_DETERMINISTIC_EXEC: ${{ inputs.deterministic_exec }}
         INPUT_TRUSTED_TREE: ${{ inputs.trusted_tree }}
+        # Same env passthrough for the Beta Flow entry name (#2054 PR-5): the
+        # value never reaches the shell script as an expanded expression.
+        INPUT_ENTRY: ${{ inputs.entry }}
       run: |
         set -euo pipefail
         export RIVER_REPO_ROOT="$(cd "${RIVER_REPO_ROOT}" && pwd)"
@@ -143,22 +161,51 @@ runs:
           output_fmt="json"
         fi
 
-        cmd=(node "${GITHUB_ACTION_PATH}/dist/index.mjs" run "${repo_path}" --phase "${{ inputs.phase }}" --planner "${{ inputs.planner }}" --output "${output_fmt}")
-        if [ "${{ inputs.dry_run }}" = "true" ]; then
+        if [ -n "${INPUT_ENTRY}" ]; then
+          # #2054 PR-5 (Beta): an entry name selects the `review plan` path.
+          # Only the entry name is forwarded; `review plan` accepts json /
+          # markdown, so the other formats fall back to json for this path.
+          plan_fmt="json"
+          if [ "${output_fmt}" = "markdown" ]; then
+            plan_fmt="markdown"
+          fi
+          cmd=(node "${GITHUB_ACTION_PATH}/dist/index.mjs" review plan "${repo_path}" --plan-only --entry "${INPUT_ENTRY}" --phase "${{ inputs.phase }}" --output "${plan_fmt}")
+          output_fmt="${plan_fmt}"
+          # #2119: say so when a `run`-path input was set alongside `entry`,
+          # instead of dropping it silently (same shape as the
+          # deterministic_exec warning above; a notice, since nothing is wrong).
+          ignored=""
+          [ "${{ inputs.gate }}" = "true" ] && ignored="${ignored} gate"
+          [ "${{ inputs.dry_run }}" = "true" ] && ignored="${ignored} dry_run"
+          [ "${{ inputs.estimate }}" = "true" ] && ignored="${ignored} estimate"
+          [ -n "${{ inputs.max_cost }}" ] && ignored="${ignored} max_cost"
+          [ "${{ inputs.comment }}" = "true" ] && ignored="${ignored} comment"
+          [ "${{ inputs.inline_comments }}" = "true" ] && ignored="${ignored} inline_comments"
+          if [ -n "${ignored}" ]; then
+            echo "::notice::entry is set (${INPUT_ENTRY}); these inputs do not apply on the plan-only path and are ignored:${ignored}"
+          fi
+        else
+          cmd=(node "${GITHUB_ACTION_PATH}/dist/index.mjs" run "${repo_path}" --phase "${{ inputs.phase }}" --planner "${{ inputs.planner }}" --output "${output_fmt}")
+        fi
+        # dry_run / estimate / max_cost describe the `run` path only: `review
+        # plan --plan-only` calls no model, so they are not forwarded there.
+        if [ -z "${INPUT_ENTRY}" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
           cmd+=("--dry-run")
         fi
         if [ "${{ inputs.debug }}" = "true" ]; then
           cmd+=("--debug")
         fi
-        if [ "${{ inputs.estimate }}" = "true" ]; then
+        if [ -z "${INPUT_ENTRY}" ] && [ "${{ inputs.estimate }}" = "true" ]; then
           cmd+=("--estimate")
         fi
-        if [ -n "${{ inputs.max_cost }}" ]; then
+        if [ -z "${INPUT_ENTRY}" ] && [ -n "${{ inputs.max_cost }}" ]; then
           cmd+=("--max-cost" "${{ inputs.max_cost }}")
         fi
         # Epic #1347 S4: opt-in gate enforcement. --gate makes NO_GO/ESCALATE a
-        # non-zero exit; default (gate=false) stays advisory.
-        if [ "${{ inputs.gate }}" = "true" ]; then
+        # non-zero exit; default (gate=false) stays advisory. Not forwarded on
+        # the entry path: `review plan --plan-only` runs no review, so its gate
+        # is always NOT_EXECUTED and --gate would fail the job unconditionally.
+        if [ -z "${INPUT_ENTRY}" ] && [ "${{ inputs.gate }}" = "true" ]; then
           cmd+=("--gate")
         fi
         echo "Running: ${cmd[*]}"
@@ -187,8 +234,11 @@ runs:
           exit "${rc}"
         fi
 
+    # Both comment steps are skipped when `entry` is set (#2054 PR-5): the
+    # plan-only artifact is a Review Artifact, not review findings, and belongs
+    # in the job log / an uploaded artifact rather than a PR comment.
     - name: Post PR comment
-      if: ${{ github.event_name == 'pull_request' && inputs.comment == 'true' && inputs.estimate != 'true' && inputs.output_format != 'json' && inputs.inline_comments != 'true' }}
+      if: ${{ github.event_name == 'pull_request' && inputs.entry == '' && inputs.comment == 'true' && inputs.estimate != 'true' && inputs.output_format != 'json' && inputs.inline_comments != 'true' }}
       uses: actions/github-script@v8
       env:
         RIVER_REVIEWER_COMMENT_PATH: ${{ steps.river.outputs.comment_path }}
@@ -198,7 +248,7 @@ runs:
           await postComment({ github, context, core });
 
     - name: Post inline review comments
-      if: ${{ github.event_name == 'pull_request' && inputs.comment == 'true' && inputs.inline_comments == 'true' && inputs.estimate != 'true' }}
+      if: ${{ github.event_name == 'pull_request' && inputs.entry == '' && inputs.comment == 'true' && inputs.inline_comments == 'true' && inputs.estimate != 'true' }}
       uses: actions/github-script@v8
       env:
         RIVER_REVIEWER_JSON_PATH: ${{ steps.river.outputs.json_path }}

@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "caseId": "neg-adapter-redefines-gate",
+  "caseClass": "should-detect",
+  "description": "Negative fixture: the two runtimes derive different gates from identical inputs, and the case author blames the adapter mechanism. Gate derivation is host-independent repository code, so the claim must be rejected and the divergence reported unexplained.",
+  "expectation": "non-conformant",
+  "pinned": {
+    "entry": "review-technical",
+    "flow": "technical-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "808f8b04bf8e8fff96b57c4c4e74875e54e0c50afc11179e2e04ac67d7890b7c",
+    "artifactSetSha256": "d8e25ecbd1be03d7dad1e73a7d78d65d6dd3f2908c621a92b781ec68055042fa",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "external-dependencies",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "50d89d8bedb63b80"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "unpinned-transitive-dep",
+            "taxonomy": "evidence-gap",
+            "severity": "critical",
+            "target": {
+              "path": "package.json",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["dependency-risk"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "external-dependencies",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "GO",
+          "reasonCode": "NO_BLOCKING_FINDING",
+          "inputsHash": "50d89d8bedb63b80"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "unpinned-transitive-dep",
+            "taxonomy": "evidence-gap",
+            "severity": "critical",
+            "target": {
+              "path": "package.json",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["dependency-risk"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [
+    {
+      "field": "deterministic.gate.decision",
+      "layer": "deterministic",
+      "reasonClass": "adapter-mechanism",
+      "evidence": "agents/contracts/adapter-map.json: claude binds native-subagent, codex binds skill."
+    },
+    {
+      "field": "deterministic.gate.reasonCode",
+      "layer": "deterministic",
+      "reasonClass": "adapter-mechanism",
+      "evidence": "agents/contracts/adapter-map.json: claude binds native-subagent, codex binds skill."
+    }
+  ],
+  "expected": {
+    "deterministicConformance": 0.8333333333333334,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 2,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "fail",
+    "failedGates": ["deterministic-conformance", "unexplained-divergence"]
+  }
+}

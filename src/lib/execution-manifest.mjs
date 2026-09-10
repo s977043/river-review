@@ -678,6 +678,83 @@ export function attachExecutionManifest(artifact, manifest) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Derive the `flow` pin (`id` / `version` / `sha256`) from a PARSED Flow
+ * definition document (schemas/flow.schema.json, #2013).
+ *
+ * Why the CALLER passes the document instead of this module reading it
+ * (#2037): #2016 landed the Flow instance documents together with an
+ * observe-mode guarantee — pinned in tests/flow-definitions.test.mjs, "no
+ * runtime module loads flows/, so no gate or decision changes" — that nothing
+ * under `src/` or `runners/` loads that directory. A resolver that read the
+ * directory itself would break that guarantee, and with it the proof that
+ * adding those documents cannot alter any existing gate, decision or finding.
+ * Injection keeps the resolver pure (no side effects, per this module's scope
+ * boundary) AND leaves the observe guarantee intact, so it is the route taken.
+ * The guarantee is lifted only when the Flow execution engine lands; that is a
+ * separate change which must edit that test explicitly.
+ *
+ * The digest is taken over `canonicalJson(document)`, not over the raw file
+ * bytes, for the same reason every other content hash in this repository is:
+ * key order and whitespace are formatting, not content, so a re-print by
+ * prettier must not invalidate a pin. `canonicalJson` and `sha256Hex` are
+ * imported, never re-implemented (CLAUDE.md "Import the SSoT, never re-derive
+ * it").
+ *
+ * `expectedVersion` is where the entry-name ↔ document version check belongs
+ * at RUN time: a caller that resolved the Flow through an entry name passes
+ * the version that entry pinned, and a document whose own `version` has moved
+ * on is rejected rather than pinned under the wrong version. The corresponding
+ * REPOSITORY-time check (every entry pins a version the Flow document actually
+ * carries) already lives in tests/flow-definitions.test.mjs.
+ *
+ * Only an explicit `null` / `undefined` `expectedVersion` skips that check.
+ * Any other unusable value (a number, an empty or blank string) is a caller
+ * bug and throws, because a stated expectation that is quietly discarded is
+ * worse than no expectation at all.
+ *
+ * `document` is expected to be the result of `JSON.parse` on a Flow document.
+ * `canonicalJson` walks own enumerable keys, so a hand-built object carrying
+ * `Date` / `Map` / `Set` values would not be distinguished by the digest;
+ * parsed JSON has no such values.
+ *
+ * @param {object} document a parsed Flow definition document
+ * @param {object} [options]
+ * @param {string|null} [options.expectedVersion] version the caller resolved
+ * @returns {{ id: string, version: string, sha256: string }}
+ */
+export function deriveFlowPin(document, { expectedVersion = null } = {}) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) {
+    throw new ExecutionManifestError('flow document must be an object.');
+  }
+  const id = nonEmptyString(document.id);
+  const version = nonEmptyString(document.version);
+  if (id == null) {
+    throw new ExecutionManifestError('flow document must carry a non-empty id.');
+  }
+  if (version == null) {
+    throw new ExecutionManifestError(`flow document "${id}" must carry a non-empty version.`);
+  }
+  // "Stated no expectation" and "stated a malformed expectation" are different
+  // answers and must not collapse. `nonEmptyString` returns null for a number,
+  // an empty string and a blank string alike, so folding those into the
+  // skip branch would drop the caller's assertion silently — `expectedVersion:
+  // 2` would pin a document of version '3' without complaint. Only an explicit
+  // null / undefined skips the check; anything else must be a usable version.
+  if (expectedVersion != null) {
+    const expected = nonEmptyString(expectedVersion);
+    if (expected == null) {
+      throw new ExecutionManifestError('expectedVersion must be a non-empty string when supplied.');
+    }
+    if (expected !== version) {
+      throw new ExecutionManifestError(
+        `flow document "${id}" is version ${version}, but the caller resolved ${expected}.`
+      );
+    }
+  }
+  return { id, version, sha256: sha256Hex(canonicalJson(document)) };
+}
+
+/**
  * Map the sources this repository actually has onto an Execution Manifest spec.
  *
  * Every argument is injected rather than read from disk, so the resolver stays
@@ -694,9 +771,13 @@ export function attachExecutionManifest(artifact, manifest) {
  *   - agents → `agents/contracts/*.agent.json` (#2014) carry `id` and
  *     `version`; they carry no checksum, so a caller that wants a `resolved`
  *     agents block hashes the file bytes itself and passes them in
- *   - flow → #2013 landed `schemas/flow.schema.json` but NO flow instance
- *     document exists in this repository (verified: no `flows/` directory and
- *     no `*.flow.json` file), so the block resolves as `missing`
+ *   - flow → #2016 landed the Flow instance documents, so the source #2015
+ *     recorded as absent now exists (verified 2026-09-04: 8 flow definitions
+ *     plus one entry map, which tests/flow-definitions.test.mjs enumerates).
+ *     This module still does not read them — see `deriveFlowPin` for why — so
+ *     the block resolves as `missing` when the caller supplies neither `flow`
+ *     nor `flowDocument`, and as `resolved` with a non-null `sha256` as soon
+ *     as it supplies `flowDocument`
  *   - artifacts / policy.sha256 / config.sha256 → no producer records these
  *     today; they resolve as `missing` until one does
  *
@@ -706,7 +787,14 @@ export function attachExecutionManifest(artifact, manifest) {
  * @param {string|null} [input.riverReviewVersion] package.json version
  * @param {{ host?: string, pluginVersion?: string }|null} [input.plugin]
  * @param {{ skills?: Array<{id: string, checksum?: string, version?: string}> }|null} [input.skillManifest]
- * @param {object|null} [input.flow]
+ * @param {object|null} [input.flow] an already-derived pin ({id, version, sha256})
+ * @param {object|null} [input.flowDocument] a parsed Flow definition document,
+ *   pinned here through `deriveFlowPin`. Mutually exclusive with `flow`.
+ * @param {string|null} [input.expectedFlowVersion] the version the caller resolved
+ *   for `flowDocument`; a document that disagrees is rejected, not pinned. It is
+ *   meaningful only alongside `flowDocument`: supplying it with `flow` (or with
+ *   neither) throws rather than being ignored, for the same reason `flow` and
+ *   `flowDocument` together throw — a discarded expectation reads as an enforced one
  * @param {Array<object>|null} [input.agents]
  * @param {Record<string, {sha256: string}>|null} [input.artifacts]
  * @param {object|null} [input.policy]
@@ -720,6 +808,8 @@ export function resolveExecutionManifestSpec({
   plugin = null,
   skillManifest = null,
   flow = null,
+  flowDocument = null,
+  expectedFlowVersion = null,
   agents = null,
   artifacts = null,
   policy = null,
@@ -730,6 +820,22 @@ export function resolveExecutionManifestSpec({
   // skill absent from the manifest keeps a null sha256 and therefore degrades
   // the block to `missing` — silently dropping it would leave a shorter list
   // that still looked complete.
+  // A caller that supplies both forms has two answers for one block; picking
+  // one silently is how a stale pin outlives the document it was taken from.
+  if (flow != null && flowDocument != null) {
+    throw new ExecutionManifestError('Pass either flow or flowDocument, not both.');
+  }
+  // Same class of caller mistake: an expectation nothing can check. Dropping it
+  // silently would let a caller believe a version was enforced when the pin it
+  // supplied says something else entirely.
+  if (expectedFlowVersion != null && flowDocument == null) {
+    throw new ExecutionManifestError('expectedFlowVersion requires flowDocument.');
+  }
+  const flowPin =
+    flowDocument != null
+      ? deriveFlowPin(flowDocument, { expectedVersion: expectedFlowVersion })
+      : flow;
+
   const checksumById = new Map();
   for (const entry of skillManifest?.skills ?? []) {
     const id = nonEmptyString(entry?.id);
@@ -757,7 +863,7 @@ export function resolveExecutionManifestSpec({
       host: plugin?.host ?? null,
       pluginVersion: plugin?.pluginVersion ?? null,
     },
-    flow,
+    flow: flowPin,
     agents,
     skills: resolvedSkills,
     artifacts,

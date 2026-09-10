@@ -8,7 +8,7 @@ export const modules = {
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   runSkillsSubcommand: () => (/* binding */ runSkillsSubcommand)
 /* harmony export */ });
-/* unused harmony exports sanitizeSkillId, AgentSkillBridgeError, discoverAgentSkillPaths, parseAgentSkill, generateAgentSkillId, convertAgentSkillToRR, importAgentSkills, serializeToSkillMd, exportSkillToAgentFormat, exportAllSkills, listAllSkills */
+/* unused harmony exports sanitizeSkillId, discoverAgentSkillPaths, parseAgentSkill, generateAgentSkillId, convertAgentSkillToRR, importAgentSkills, serializeToSkillMd, exportSkillToAgentFormat, listAllSkills */
 /* harmony import */ var node_fs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3024);
 /* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6760);
 /* harmony import */ var node_url__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3136);
@@ -238,8 +238,8 @@ function convertAgentSkillToRR(parsed, existingIds = new Set(), projectRoot) {
 // ---------------------------------------------------------------------------
 
 async function loadLooseSchema() {
-  const schemaPath = node_path__WEBPACK_IMPORTED_MODULE_1__.join(repoRoot, 'schemas', 'agent-skill-loose.schema.json');
-  return (0,_runners_core_skill_loader_mjs__WEBPACK_IMPORTED_MODULE_6__/* .loadSchema */ .e$)(schemaPath);
+  const schemaPath = __webpack_require__.ab + "agent-skill-loose.schema.json";
+  return (0,_runners_core_skill_loader_mjs__WEBPACK_IMPORTED_MODULE_6__/* .loadSchema */ .e$)(__webpack_require__.ab + "agent-skill-loose.schema.json");
 }
 
 function createLooseValidator(schema) {

@@ -250,3 +250,37 @@ test('packageBaseOf: パッケージ名の抽出と対象外（相対 / builtin�
   assert.equal(packageBaseOf('./local.mjs'), null);
   assert.equal(packageBaseOf('node:fs'), null);
 });
+
+// -----------------------------------------------------------------------------
+// heredoc-size（#2144）
+// -----------------------------------------------------------------------------
+// homebrew の bash 5.3.15 は本体が 512 バイトを超える heredoc で決定論的に
+// deadlock する。#1951 が 3 本を printf へ書き換えたがガードを残さず、16 日後に
+// 追加された scripts/pr-unstall.sh で再発した。境界（510 は通り 520 は止まる）は
+// #2144 のコメントに実測を残してある。
+const heredoc = (bytes) => `#!/usr/bin/env bash\ncat >&2 <<PROBE\n${'x'.repeat(bytes)}\nPROBE\n`;
+
+test('heredoc-size: 512 バイトを超える heredoc を検出する（exit 1）', () => {
+  const dir = fixture({ 'scripts/probe.sh': heredoc(600) });
+  assert.equal(runIn(dir), 1);
+});
+
+test('heredoc-size canary: 帯の下 / コメント内の <<EOF / 終端なしは誤検出しない（exit 0）', () => {
+  const dir = fixture({
+    'scripts/small.sh': heredoc(400),
+    // 手当ての経緯を書いたコメントには `cat >&2 <<EOF` という**説明のための
+    // 文字列**が残る。素朴に正規表現を当てるとこれを実物として数えてしまう
+    // （2026-09-09 に自作の計測スクリプトで実際に踏んだ）。
+    // コメント除外を外すと、この行の `<<EOF` から下の 600 バイトが heredoc の
+    // 本体として数えられ、閾値を超えて検出される。**本文の量が閾値を超えて
+    // いないと、この canary は除外の有無を弁別できない。**
+    'scripts/commented.sh':
+      '#!/usr/bin/env bash\n' +
+      '# 以下は #1950 まで `cat >&2 <<EOF` の heredoc だった。printf へ書き換え済み\n' +
+      `printf '%s\\n' '${'y'.repeat(600)}'\n` +
+      'EOF\n',
+    // 終端タグが無い行は heredoc ではない（`echo a << b` のような誤解析を防ぐ）。
+    'scripts/unterminated.sh': "#!/usr/bin/env bash\necho 'a <<NOPE b'\n",
+  });
+  assert.equal(runIn(dir), 0);
+});

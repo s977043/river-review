@@ -1,0 +1,72 @@
+{
+  "id": "technical-review",
+  "version": "0.1.0",
+  "description": "Technical viability review (#2017, Epic #2011 Phase 6). Answers whether the declared technical premises — runtime, API, library, performance, security, compatibility — hold, and never whether a technology is preferable. Viability is judged on evidence: what can be established mechanically is established by deterministic-check before any model judgment runs, every candidate verdict passes verify-findings, and a premise whose evidence lies outside the supplied artifacts leaves the run through human-escalation as an open question instead of reaching derive-gate as a verdict.",
+  "intent": { "purpose": "technical-viability" },
+  "inputs": [
+    {
+      "name": "design",
+      "required": true,
+      "description": "The design carrying the technical premises under review."
+    },
+    {
+      "name": "diff",
+      "description": "Code that already exercises the premises. Optional: absence skips the premise-versus-code cross-check."
+    },
+    {
+      "name": "tests",
+      "description": "Test evidence for performance and compatibility premises. Optional: absence degrades those judgments to declared-only and records the degradation."
+    },
+    {
+      "name": "requirements",
+      "description": "Requirements the premises must support. Optional: absence skips the premise-versus-requirement cross-check."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    { "use": "resolve-artifacts", "description": "Missing `design` stops here (required input)." },
+    {
+      "use": "deterministic-check",
+      "description": "Mechanical evidence first: whether a declared dependency exists in the repository, whether a version range resolves, whether a referenced interface is present. Degrades when the check cannot run, so a missing mechanical answer never becomes a model-asserted one.",
+      "onUnsatisfied": "degrade"
+    },
+    {
+      "use": "select-skills",
+      "description": "Existing upstream-phase selection; no Flow-local list."
+    },
+    { "use": "select-agents" },
+    {
+      "use": "cross-artifact-review",
+      "description": "Declared premises against the design that declares them. Degrades to a premise-only judgment when the supporting test evidence is absent.",
+      "onUnsatisfied": "degrade"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Declared premises against the requirements they must support.",
+      "when": { "input": "requirements", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Declared premises against the code that already exercises them.",
+      "when": { "input": "diff", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    { "reviewer": "dependency-reviewer", "parallel": true },
+    { "reviewer": "security-scanner", "parallel": true },
+    { "reviewer": "ci-cd-reviewer", "parallel": true },
+    {
+      "use": "verify-findings",
+      "description": "Evidence requirement: a viability verdict that cites nothing in the supplied artifacts does not survive this step."
+    },
+    {
+      "use": "human-escalation",
+      "description": "A premise whose evidence lies outside the supplied artifacts is handed to a person as an open question rather than decided. Degrades to recording the open question when no escalation channel is available.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED", "UNDETERMINED"]
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "task",
+  "mode": "observe",
+  "state": "COMPLETE",
+  "reasonCodes": ["UNSUPPORTED_COMPLETION_CLAIM"],
+  "verification": {
+    "requirements": { "total": 2, "satisfied": 2, "violated": 0, "unverified": 0 },
+    "acceptanceCriteria": { "total": 2, "verified": 2, "unverified": 0 }
+  },
+  "tasks": { "total": 1, "complete": 1, "unsupportedClaims": 1 },
+  "unsupportedClaims": [
+    {
+      "ref": "TASK-3",
+      "claimSource": ["todo-checkbox"],
+      "missingEvidence": ["diff", "tests"]
+    }
+  ],
+  "unresolvedRefs": [],
+  "evidence": [
+    { "kind": "tasks", "state": "present" },
+    { "kind": "diff", "state": "present" },
+    { "kind": "tests", "state": "present" }
+  ]
+}

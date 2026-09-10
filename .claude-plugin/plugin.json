@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "river-review",
   "displayName": "River Review",
-  "version": "1.92.0",
+  "version": "1.109.0",
   "description": "Turn review into an organizational judgment asset. Review Judgment as Code for AI-assisted development, delivered as a capability pack for Claude Code: your team's review criteria as versioned, repo-owned skills (a Skill Registry), driven by a review agent that runs perspective-based reviewer roles (code, security, performance, architecture, testing, adversarial) and verifies findings against the diff so humans keep the high-risk judgment.",
   "author": {
     "name": "river-review maintainers",

@@ -10,21 +10,33 @@ function raiseMode(current, candidate) {
   return MODE_PRIORITY[candidate] > MODE_PRIORITY[current] ? candidate : current;
 }
 
-function buildNextCommand(mode, targetPath = '.') {
-  const p = targetPath.includes(' ')
-    ? `"${targetPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
-    : targetPath;
+function quoteArg(value) {
+  return value.includes(' ') ? `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : value;
+}
+
+/**
+ * @param {string} mode
+ * @param {string} [targetPath]
+ * @param {string|null} [baseRef] the `--base` this routing decision was made
+ *   against. Carried into the suggested command because the whole point of
+ *   #2046 is that following this suggestion must review the SAME range the
+ *   router just judged; without it, `river review plan <path>` re-resolves the
+ *   range from the auto-detected default branch and can answer `no-changes`.
+ */
+function buildNextCommand(mode, targetPath = '.', baseRef = null) {
+  const p = quoteArg(targetPath);
+  const base = baseRef ? ` --base ${quoteArg(baseRef)}` : '';
   switch (mode) {
     case 'light':
-      return `river review plan ${p} --depth quick`;
+      return `river review plan ${p}${base} --depth quick`;
     case 'standard':
-      return `river review plan ${p}`;
+      return `river review plan ${p}${base}`;
     case 'team':
-      return `river review plan ${p} --depth thorough --reviewers auto`;
+      return `river review plan ${p}${base} --depth thorough --reviewers auto`;
     case 'human-required':
       return '# No AI review recommended. Assign human reviewer.';
     default:
-      return `river review plan ${p}`;
+      return `river review plan ${p}${base}`;
   }
 }
 
@@ -32,10 +44,16 @@ function buildNextCommand(mode, targetPath = '.') {
  * Route a PR to the appropriate review mode based on diff risk.
  * No LLM calls are made — all decisions are heuristic.
  *
- * @param {{ changedFiles: string[], diffText?: string, riskMap?: object | null, targetPath?: string }} input
+ * @param {{ changedFiles: string[], diffText?: string, riskMap?: object | null, targetPath?: string, baseRef?: string | null }} input
  * @returns {{ selectedMode: ReviewRouterMode, confidence: 'high' | 'medium', reasons: string[], matchedTriggers: string[], recommendedReviewers: string, riskAction: string, nextCommand: string }}
  */
-export function routeReviewMode({ changedFiles = [], diffText, riskMap, targetPath = '.' }) {
+export function routeReviewMode({
+  changedFiles = [],
+  diffText,
+  riskMap,
+  targetPath = '.',
+  baseRef = null,
+}) {
   const fileTypes = classifyChangedFiles(changedFiles);
   const riskAssessment = riskMap ? evaluateRisk(riskMap, changedFiles) : null;
   const aggregateAction = riskAssessment?.aggregateAction ?? 'comment_only';
@@ -140,7 +158,7 @@ export function routeReviewMode({ changedFiles = [], diffText, riskMap, targetPa
     matchedTriggers,
     recommendedReviewers,
     riskAction: aggregateAction,
-    nextCommand: buildNextCommand(mode, targetPath),
+    nextCommand: buildNextCommand(mode, targetPath, baseRef),
   };
 }
 

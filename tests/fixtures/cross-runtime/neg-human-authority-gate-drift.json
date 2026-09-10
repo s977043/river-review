@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "caseId": "neg-human-authority-gate-drift",
+  "caseClass": "security-human-handoff",
+  "description": "Negative fixture: both runtimes record humanEscalation false, so the agentic half of Human authority agrees, yet only Claude's deterministic gate decides ESCALATE. Human authority is measured by BOTH halves; a fixture that moved only the agentic flag would leave the gate half of the condition untested.",
+  "expectation": "non-conformant",
+  "pinned": {
+    "entry": "review-technical",
+    "flow": "technical-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "65fb7f5f22836567c379ec3e4dcd8b937c20c35b2a13f0756f8b57c34e4b58e9",
+    "artifactSetSha256": "45e00aa04f7d07bc7f5e01acdb9f55cd3f5f7e4681a7951aa69a4099d1ba9b69",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": null
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "trust-boundaries-authz",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "ESCALATE",
+          "reasonCode": "HUMAN_HANDOFF_REQUIRED",
+          "inputsHash": "c1b93f0a7e5d4482"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "secret-in-plaintext-config",
+            "taxonomy": "trust-boundary",
+            "severity": "critical",
+            "target": {
+              "path": "config/app.yaml",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["trust-boundary"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-technical",
+          "resolvedFlow": "technical-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "trust-boundaries-authz",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "c1b93f0a7e5d4482"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "secret-in-plaintext-config",
+            "taxonomy": "trust-boundary",
+            "severity": "critical",
+            "target": {
+              "path": "config/app.yaml",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["trust-boundary"],
+        "completionState": "incomplete",
+        "unsupportedDoneClaim": false,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "expected": {
+    "deterministicConformance": 0.8333333333333334,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 2,
+    "humanAuthorityUnchanged": false,
+    "promotionGate": "fail",
+    "failedGates": ["deterministic-conformance", "unexplained-divergence", "human-authority"]
+  },
+  "declaredDivergences": [
+    {
+      "field": "deterministic.gate.decision",
+      "layer": "deterministic",
+      "reasonClass": "adapter-capability",
+      "evidence": "agents/contracts/adapter-map.json: codex declares no run-command capability."
+    },
+    {
+      "field": "deterministic.gate.reasonCode",
+      "layer": "deterministic",
+      "reasonClass": "adapter-capability",
+      "evidence": "agents/contracts/adapter-map.json: codex declares no run-command capability."
+    }
+  ]
+}

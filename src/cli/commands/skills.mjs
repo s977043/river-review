@@ -4,7 +4,12 @@
 // refactor (split main() into per-subcommand handlers). Behavior, messages,
 // and exit codes are unchanged; only the enclosing function and the relative
 // import depth differ from the original inline block.
-import { ensureGitRepo, detectDefaultBranch, findMergeBase } from '../../lib/git.mjs';
+import {
+  BaseRefError,
+  ensureGitRepo,
+  detectDefaultBranch,
+  resolveBaseMergeBase,
+} from '../../lib/git.mjs';
 import { collectRepoDiff, renderDiffText } from '../../lib/diff-processor.mjs';
 import { SkillDispatcher } from '../../core/skill-dispatcher.mjs';
 
@@ -104,7 +109,27 @@ export async function runSkillsCommand(parsed, targetPath) {
 
   const repoRoot = await ensureGitRepo(targetPath);
   const defaultBranch = await detectDefaultBranch(repoRoot);
-  const mergeBase = await findMergeBase(repoRoot, defaultBranch);
+  // #2051: `--base` was parsed and accepted here but read by nobody — the diff
+  // was always taken against the auto-detected default branch, so pointing
+  // `skills` at another ref silently reviewed the wrong range. Resolve it
+  // through the SAME helper `review` uses (src/lib/git.mjs resolveBaseMergeBase,
+  // lifted out of resolveBaseRepoDiff in #2049) so the flag cannot mean two
+  // things on two surfaces. A blank / unresolvable ref is a usage error,
+  // rendered as `Error: ...` + exit 1 exactly like the `review` surface.
+  let mergeBase;
+  try {
+    const resolved = await resolveBaseMergeBase(repoRoot, parsed.base, defaultBranch);
+    mergeBase = resolved.mergeBase;
+    // Same stream as `review` (console.warn -> stderr): stdout may be a
+    // machine-consumed JSON/markdown artifact here.
+    if (resolved.warning) console.warn(resolved.warning);
+  } catch (err) {
+    if (err instanceof BaseRefError) {
+      console.error(`Error: ${err.message}`);
+      return 1;
+    }
+    throw err;
+  }
   const repoDiff = await collectRepoDiff(repoRoot, mergeBase);
 
   const dispatcher = new SkillDispatcher(repoRoot, { log: logProgress });

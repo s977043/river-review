@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "task",
+  "mode": "observe",
+  "state": "GO",
+  "reasonCodes": ["CONVERGED_CLEAN"],
+  "tasks": { "total": 1, "complete": 1, "unsupportedClaims": 0 },
+  "evidence": [{ "kind": "diff", "state": "present" }]
+}

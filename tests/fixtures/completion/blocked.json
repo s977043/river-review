@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "0.1.0",
+  "scope": "task",
+  "mode": "observe",
+  "state": "BLOCKED",
+  "reasonCodes": ["UPSTREAM_DEPENDENCY_BLOCKED"],
+  "tasks": { "total": 1, "complete": 0, "unsupportedClaims": 0 },
+  "evidence": [{ "kind": "tasks", "state": "unreadable" }],
+  "blockedBy": ["The task artifact could not be parsed."]
+}

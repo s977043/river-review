@@ -1,0 +1,18 @@
+{
+  "id": "research-review",
+  "version": "0.1.0",
+  "description": "Negative fixture for the #2017 evidence discipline. Schema-valid on purpose: every primitive, output and stop condition is drawn from the closed vocabulary, so schemas/flow.schema.json accepts it. What it drops is verify-findings and human-escalation, which lets a claim that a source is stale or missing reach derive-gate as a verdict — the exact failure the acceptance criterion forbids. A pass in tests/flow-definitions.test.mjs would mean nothing enforces it any more.",
+  "intent": { "purpose": "research-adequacy" },
+  "inputs": [
+    { "name": "artifacts", "required": true, "description": "The research write-up under review." }
+  ],
+  "steps": [
+    { "use": "resolve-artifacts" },
+    { "use": "select-skills" },
+    { "use": "parallel-review" },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED"]
+}

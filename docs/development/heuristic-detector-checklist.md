@@ -17,6 +17,7 @@
 - [ ] **matcher 内で 2 段構えにする**（既存 `matchesDangerousEval` を参照）。① 先頭がコメントの行は早期 return（`trimmed.startsWith('//')` 等）。② 残りは `stripTrailingLineComment(trimmed).trim()` で行末コメントを除去してから判定する。①のみだと行末コメント FP が再発する（gemini が毎 PR 指摘した class）。
 - [ ] **行末コメント除去は quote-aware な共有ヘルパー `stripTrailingLineComment(code)` を使う**。素朴な `code.replace(/\/\/.*$/, '')` は **禁止**—文字列リテラル内の `//`（例 `"http://x"; eval(y)`）でコメント開始を誤判定し、後続の本物（`eval`）を取りこぼす（false negative）。
 - [ ] パターンのキーワードが「コメント内に登場しただけ」で発火しないことを negative テストで確認する。
+- [ ] **位置を報告するときは単位を明示する**。`readFileSync(path, 'utf8')` が返す文字列の index は UTF-16 コード単位で、byte offset とは一致しない。byte offset が必要なら `readFileSync(path)` の Buffer で測る。#2068 の委託指示で utf8 index（16436）を byte と報告し、ワーカー側の実測（16480）と食い違った。
 
 ## 2. メソッド呼び出しと関数呼び出しの衝突
 
@@ -30,6 +31,7 @@
   - focused test: `describe` / `context` / `it` / `test` / `suite` / `bench` の `.only`
   - merge conflict: `<<<<<<<` / `>>>>>>>` に加え diff3/zdiff3 の base marker `|||||||`（`=======` は Markdown h1 下線と衝突するため**使わない**）
   - DOM 注入: `document.write` だけでなく `document.writeln`
+- [ ] **日本語語彙を含む正規表現で `\b` を使わない。** `\b` は単語構成文字（`[A-Za-z0-9_]`）の境界としてしか成立せず、CJK 文字との境界を作らない。`/\b(?:findings?|指摘)\b/` では `指摘` の枝が死にコードになり、日本語の実文で発火しない。2026-09-04 に `scripts/validate-plugin-manifest.mjs` の証跡要件規則で実際に起きた。fixture が英語 `finding` だけだったため、テストもこの枝に触れていなかった。ASCII 側の語境界が必要なら `(?<![A-Za-z0-9_])` / `(?![A-Za-z0-9_])` を明示し、CJK 側には境界を付けない。**日本語の入力を positive fixture へ必ず 1 行入れる。**
 - [ ] 「設定値で危険になる」ものは条件を限定する。例: 環境変数 `NODE_TLS_REJECT_UNAUTHORIZED` は **`=0` に代入された場合のみ**（read や `=1` は除外）。オブジェクトリテラルの `rejectUnauthorized: false` は別 sink として扱う。
 
 ## 4. スコープと上限
@@ -60,6 +62,7 @@
 - [ ] `tests/heuristic-review.test.mjs` に **検出される** ケースを追加する。
 - [ ] **検出されない** ケースを追加する: コメント内の言及 / 行末コメント / 安全な異形（例: `execFile(cmd, [args])` / `setTimeout(() => ...)` / `@ts-expect-error`）/ 条件を満たさない設定（`=1`）。
 - [ ] **不変条件を守るテストは、宣言の対象ではなく実権限の所在を検査する**。「X が Y を変更してはならない」をソース文字列の走査で検査すると、X が持つ間接的な権限（別モジュールへの委譲・動的キー・文字列連結）を素通りする。守りたいのが結果なら結果を測る。対象を全列挙し、同一入力を本番経路へ通して出力が一致することを assert する。ファイル列挙は再帰で行い、列挙結果そのものをパスで pin する（件数ではなくパスで pin すると、走査漏れと新規追加を区別できる）。実例は `tests/prompt-compiler-invariants.test.mjs`。当初は profile のソース文字列だけを非再帰に走査しており、判断側の語を 1 つも含まない profile から `rendererId` 経由で severity を書き換える形が通った（#1867 の `6df05ab7` で振る舞い検査へ移した）。§6 の drift guard canary も、期待値を `SKILL.md` から導出して本番と同じ `minimatch` へ通す点で同じ型にあたる。
+- [ ] **リポジトリの実体（違反件数・ファイル数）を期待値に pin しない。** 「現在このリポジトリには違反が N 件ある」をassert するテストは、検出器が正しく働いて違反が解消された瞬間に落ちる。**修正が正しいほど壊れる**構造にあたる。2026-09-04 に RA-1 の観測モード検査が「違反がちょうど 1 件」を pin しており、承認済みの 1 行を適用して 0 件にした時点で必須チェック `Unit tests (22.x)` が落ちた。検査したいのが段階遷移や経路の振る舞いなら、**注入 fixture と純関数へ pin し直す**（当該例では `ra1Sink()` を切り出して off / observe / active の 3 経路を直接固定した）。実体を走査する検査そのものの回帰を見たい場合は、件数ではなく「実体に対して例外を投げずに完走すること」を assert する。
 - [ ] `npm test -- tests/heuristic-review.test.mjs` で確認後、`npm test` で全体を確認する。
 
 ## 8. dist 再ビルド（必須）

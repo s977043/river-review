@@ -137,7 +137,7 @@ guards:
     verifiedBy: []
     addedAt: '2026-04-11'
     reviewAfter: '2026-11-10'
-    notes: .claude/hooks/no-force-push.sh は force push を止めるが、switch 前の WIP commit は対象外。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降に観測された switch 系の事故（worktree が握るブランチへの switch 失敗）は「Worktree-held branches refuse switch」が受け持っている。本ガード自体の再発は特定できなかった。
+    notes: .claude/hooks/no-force-push.sh は force push を止めるが、switch 前の WIP commit は対象外。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降に観測された switch 系の事故（worktree が握るブランチへの switch 失敗）は「Worktree-held branches refuse switch」が受け持っている。本ガード自体の再発は特定できなかった。 2026-09-04 に並行セッション保有 worktree への退避 commit を 1 件観測し、ListAgents による事前確認を本文へ追記した。
 
   - id: verify-git-output-before-chaining
     title: Verify git output before chaining
@@ -145,7 +145,7 @@ guards:
     verifiedBy: []
     addedAt: '2026-04-11'
     reviewAfter: '2026-11-10'
-    notes: 出力を読んだかどうかは判定できない。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降の観測は、本ガードを拡張した「Worktree-held branches refuse switch」として既に独立している。出力を読んだかどうかは判定できず、決定論スライスが見つかっていない。
+    notes: 出力を読んだかどうかは判定できない。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降の観測は、本ガードを拡張した「Worktree-held branches refuse switch」として既に独立している。出力を読んだかどうかは判定できず、決定論スライスが見つかっていない。 2026-09-04 に stale な local ref に対する照合事故を 1 件観測し、origin との一致確認を本文へ追記した。
 
   - id: verify-gh-active-account
     title: Verify gh active account before write ops

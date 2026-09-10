@@ -1,0 +1,47 @@
+{
+  "id": "replan-review",
+  "version": "0.1.0",
+  "description": "Replan integrity review (#2016). Answers whether a plan change is justified and leaves the upstream contract intact. The previous plan is a required input: without it this is a plan review, not a replan review.",
+  "intent": { "purpose": "replan-integrity" },
+  "inputs": [
+    { "name": "plan", "required": true, "description": "The revised plan." },
+    {
+      "name": "baseline",
+      "required": true,
+      "description": "The plan this one replaces. Required, so its absence stops the Flow."
+    },
+    {
+      "name": "requirements",
+      "description": "Upstream requirements the revision must not break. Optional: absence degrades the cross-artifact step."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    {
+      "use": "resolve-artifacts",
+      "description": "Missing `plan` or `baseline` stops here (both required inputs)."
+    },
+    {
+      "use": "compare-baseline",
+      "description": "The plan-to-plan delta is the subject of this Flow, so a failure here stops rather than degrades."
+    },
+    {
+      "use": "detect-semantic-drift",
+      "description": "Whether the revision changed what the plan means, not only how it is worded.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "select-skills" },
+    { "use": "select-agents" },
+    {
+      "use": "cross-artifact-review",
+      "description": "Revised plan against upstream requirements. Without requirements it degrades to a delta-only review and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    { "reviewer": "security-scanner" },
+    { "use": "verify-findings" },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "baseline-diff", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED", "OSCILLATION_DETECTED"]
+}

@@ -1,0 +1,59 @@
+{
+  "id": "final-review",
+  "version": "0.1.0",
+  "description": "Final convergence review (#2016). Answers whether the goal and requirements are met, not whether every task is closed. Requirements are therefore a required input and tasks are only supporting evidence.",
+  "intent": { "purpose": "final-convergence" },
+  "inputs": [
+    {
+      "name": "requirements",
+      "required": true,
+      "description": "The goal under judgment. Required: without it this Flow would degenerate into a task-completion review."
+    },
+    { "name": "diff", "required": true, "description": "The cumulative change under review." },
+    {
+      "name": "tasks",
+      "description": "Task records. Optional: absence degrades the coverage cross-check."
+    },
+    {
+      "name": "tests",
+      "description": "Test evidence. Optional: absence degrades the completion judgment."
+    },
+    {
+      "name": "baseline",
+      "description": "Previous run record. Optional: absence skips the regression comparison."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    {
+      "use": "resolve-artifacts",
+      "description": "Missing `requirements` or `diff` stops here (both required inputs)."
+    },
+    { "use": "deterministic-check" },
+    { "use": "select-skills", "description": "Existing downstream-phase selection." },
+    { "use": "select-agents" },
+    { "reviewer": "bug-hunter", "parallel": true },
+    { "reviewer": "security-scanner", "parallel": true },
+    { "reviewer": "test-gap", "parallel": true },
+    {
+      "use": "cross-artifact-review",
+      "description": "Requirements against the cumulative diff and the task records. Without task records it degrades to a requirements-versus-diff check.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "verify-findings" },
+    {
+      "use": "compare-baseline",
+      "when": { "input": "baseline", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "evaluate-completion",
+      "description": "Without test evidence this runs in a reduced form and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "coverage", "completion", "gate", "baseline-diff", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED", "UNDETERMINED"]
+}

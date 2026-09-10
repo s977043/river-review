@@ -23,8 +23,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-node-deps
+      # shellcheck is preinstalled on ubuntu-latest; print the version so a
+      # runner-image bump that changes the rule set is visible in the log.
+      - name: Show shellcheck version
+        run: shellcheck --version
       - name: Run linters
         run: npm run lint
+      - name: Lint shell scripts (shellcheck)
+        run: npm run lint:sh
 
   test:
     name: Unit tests
@@ -64,6 +70,35 @@ jobs:
           directory: coverage
           flags: unittests
           fail_ci_if_error: false
+
+  # Separate job, not a matrix leg on `test`: the required status check is named
+  # "Unit tests (22.x)", and adding an `os` axis would rename it, leaving every PR
+  # blocked on a context that never reports (CLAUDE.md "CI matrix leg <-> branch-
+  # protection required-check sync"). This job carries its own name and is NOT in
+  # branch protection, so a macOS-only flake cannot block merges while we learn how
+  # stable it is.
+  #
+  # Why macOS at all: two defects reached main that Linux CI could not see. #2135
+  # (a Stop hook exiting 141 on SIGPIPE, where the pipe buffer size decides whether
+  # it fires) and #2144 (a 30s timeout in the pr-unstall test, still unexplained).
+  # Both were found by running the suite by hand on a maintainer's machine.
+  test-macos:
+    name: Unit tests (macOS)
+    runs-on: macos-latest
+    needs: lint
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-deps
+        with:
+          node-version: 22.x
+      - name: Run unit tests (single-process isolation, #1415)
+        run: npm test
 
   skill-validation:
     name: Skill schema validation

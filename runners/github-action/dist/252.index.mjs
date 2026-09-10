@@ -18,8 +18,8 @@ __webpack_require__.d(__webpack_exports__, {
 var promises_ = __webpack_require__(1455);
 // EXTERNAL MODULE: external "node:path"
 var external_node_path_ = __webpack_require__(6760);
-// EXTERNAL MODULE: ../../../node_modules/yaml/dist/index.js
-var dist = __webpack_require__(1917);
+// EXTERNAL MODULE: ../../../node_modules/js-yaml/dist/js-yaml.mjs
+var js_yaml = __webpack_require__(1813);
 ;// CONCATENATED MODULE: ./src/lib/deterministic-command-allowlist.mjs
 /**
  * Deterministic command allowlist — validation layer only (#1401 §10.1).
@@ -173,7 +173,7 @@ function normalizeFlag(arg) {
 function parseAllowlist(yamlText) {
   let doc;
   try {
-    doc = dist.parse(String(yamlText ?? ''));
+    doc = js_yaml/* load */.Hh(String(yamlText ?? ''));
   } catch (err) {
     return { error: `invalid YAML: ${err?.message ?? String(err)}` };
   }

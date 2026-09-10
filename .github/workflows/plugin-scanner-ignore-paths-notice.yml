@@ -1,0 +1,68 @@
+name: Plugin Scanner Ignore Paths Notice
+
+on:
+  pull_request:
+    paths:
+      - '.plugin-scanner.toml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  report-ignore-paths:
+    name: Report plugin scanner ignore paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        continue-on-error: true
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Generate ignore-path report
+        id: report
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPORT_PATH: ${{ runner.temp }}/plugin-scanner-ignore-paths.md
+        run: |
+          set +e
+          git show "${BASE_SHA}:.plugin-scanner.toml" > "$RUNNER_TEMP/before.toml"
+          git show "${HEAD_SHA}:.plugin-scanner.toml" > "$RUNNER_TEMP/after.toml"
+          node scripts/report-plugin-scanner-ignore-paths.mjs --before "$RUNNER_TEMP/before.toml" --after "$RUNNER_TEMP/after.toml" > "$REPORT_PATH"
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            printf '### Plugin scanner の除外対象変更\n\nレポート生成に失敗しました（exit %s）。ログを確認してください。\n' "$status" > "$REPORT_PATH"
+          fi
+          cat "$REPORT_PATH" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+      - name: Post or update PR comment
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          REPORT_PATH: ${{ runner.temp }}/plugin-scanner-ignore-paths.md
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('node:fs');
+            const marker = '<!-- plugin-scanner-ignore-paths-notice -->';
+            const report = fs.readFileSync(process.env.REPORT_PATH, 'utf8');
+            const body = `${marker}\n${report}`;
+            try {
+              const { owner, repo } = context.repo;
+              const issue_number = context.payload.pull_request.number;
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number, per_page: 100,
+              });
+              const existing = comments.find((comment) => comment.body?.includes(marker));
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number, body });
+              }
+            } catch (error) {
+              core.warning(`PR コメントを投稿できませんでした: ${error.message}`);
+            }

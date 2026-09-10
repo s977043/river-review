@@ -21,6 +21,7 @@ River Review が認識する入力アーティファクトは以下の通りで�
 | ----------------- | -------------------- | ------------ | -------------- | --------------------------------------------------- | ------------------------------------------------- |
 | `pbi-input`       | `pbi-input.md`       | Markdown     | 任意（推奨）   | フリーフォーム                                      | PBI（Product Backlog Item）の入力仕様・背景       |
 | `plan`            | `plan.md`            | Markdown     | 任意（推奨）   | フリーフォーム                                      | 実装計画・設計判断の記録                          |
+| `design`          | —（既定なし）        | Markdown     | 任意（推奨）   | フリーフォーム                                      | 設計文書（アーキテクチャ・技術的前提）            |
 | `todo`            | `todo.md`            | Markdown     | 任意           | フリーフォーム（チェックリスト）                    | 実装タスクと進捗                                  |
 | `test-cases`      | `test-cases.md`      | Markdown     | 任意           | フリーフォーム（箇条書き／表）                      | テストケース設計                                  |
 | `review-self`     | `review-self.md`     | Markdown     | 任意           | フリーフォーム                                      | 実装者によるセルフレビュー                        |
@@ -41,6 +42,7 @@ River Review が認識する入力アーティファクトは以下の通りで�
   - `任意`: 欠損してもレビューは継続。該当観点のレビューはスキップまたはデグレードする。
   - `任意（推奨）`: 欠損は許容されるが、レビュー品質が有意に低下する。
 - **形式**: ファイル内容のエンコーディングおよび構文。複数形式に対応するものはカンマ区切りで併記する。
+- **ファイル名例**: 後述「指定方法（入力チャネル）」の 3 番目、カレントディレクトリ検出で探索する既定ファイル名。`—（既定なし）` の artifact は既定探索の対象外であり、CLI 引数または設定ファイルによる明示供給だけで解決する。
 
 ## アーティファクト別の契約詳細
 
@@ -103,6 +105,20 @@ River Review が認識する入力アーティファクトは以下の通りで�
   }
 }
 ```
+
+### `design`
+
+設計文書を供給するアーティファクトです。Flow が宣言する `design` 入力は、同名の本 artifact ID として解決されます。
+
+- **供給方法**: `--artifact design=<path>` または設定ファイルの `artifacts.design` で必ず明示供給する。カレントディレクトリ検出の既定ファイル名は持たない。
+- **既定ファイル名を持たない理由**: `design` は `design-review` / `technical-review` の必須入力であり、必須入力へ既定束縛を置くと、作業ツリーに置かれているだけのファイルが供給済みだと宣言してしまうため（[Runner CLI Reference](./runner-cli-reference.md#entry-acceptance-scope)）。
+- **形式**: UTF-8 Markdown。アーキテクチャ・設計判断・技術的前提を記述する。
+- **サイズ目安**: 1 ファイルあたり 100KB 以下を推奨する。
+- **必須入力とする Flow**: `design-review` / `technical-review`
+- **任意入力とする Flow**: `plan-review` / `requirements-review` / `research-review`
+- **欠損時（必須入力の Flow）**: 当該入力を未束縛として報告する。
+- **欠損時（任意入力の Flow）**: 該当する観点をスキップする。
+- **`stage` 語彙との区別**: 前掲の `stage` 語彙にある `design` は `reviewSignals.stage` が取る値であり、artifact ID と同じ語彙空間に属さない。名前が同じでも、両者に対応関係はない。
 
 ### `review-self` / `review-external`
 
@@ -188,8 +204,9 @@ River Review が認識する入力アーティファクトは以下の通りで�
 
 ### `diff`
 
-- **形式**: unified diff（`git diff` 互換）。バイナリ差分は無視される。
+- **形式**: unified diff（`git diff` 互換）。artifact として供給された差分では、バイナリ差分は無視される（`review plan|exec --base <ref>` で git から取得した場合は `git diff --name-only` を用いるため、binary と 100% rename も変更ファイル集合に含まれる）。
 - **必須性**: レビュー対象差分は **必ずいずれかの手段で供給される必要がある**。artifact として指定が無い場合 River Review は `git diff <mergeBase>..HEAD` を内部で実行し、その結果を差分として扱う。
+- **`--base` との優先順位**（#2046）: 明示指定した artifact（tier 1 CLI 引数 / tier 2 設定ファイル）は `review plan|exec --base <ref>` に優先する。ただし優先されるのは**そのパスにファイルが実在する場合**であり、実在しなければ `--base` の範囲が使われる（その旨を stderr で告知する）。tier 3 のディレクトリ自動検出（`diff.patch`）よりは `--base` が優先する。いずれの場合も、採用しなかった側を stderr の警告で告知する。
 - **結果が空の場合**: 供給された差分（指定または fallback 実行結果）が空であれば、`status` を `no-changes` とし、レビュー skill は実行されない。
 
 ### `junit`

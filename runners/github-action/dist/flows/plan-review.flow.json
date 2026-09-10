@@ -1,0 +1,44 @@
+{
+  "id": "plan-review",
+  "version": "0.1.0",
+  "description": "Plan readiness review (#2016). Answers whether execution can safely start from this plan. Declares no compare-baseline step because a first plan has nothing to regress against; that choice is recorded in flows/intents/plan-readiness.intent.json.",
+  "intent": { "purpose": "plan-readiness" },
+  "inputs": [
+    { "name": "plan", "required": true, "description": "The plan under review." },
+    {
+      "name": "requirements",
+      "description": "Upstream requirements the plan must satisfy. Optional: absence degrades the cross-artifact step rather than stopping the Flow."
+    },
+    {
+      "name": "design",
+      "description": "Design document the plan derives from. Optional: absence skips the design cross-check."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    { "use": "resolve-artifacts", "description": "Missing `plan` stops here (required input)." },
+    {
+      "use": "select-skills",
+      "description": "Existing upstream-phase selection; no Flow-local skill list."
+    },
+    { "use": "select-agents" },
+    {
+      "use": "cross-artifact-review",
+      "description": "Plan against requirements. Runs unconditionally; without requirements it degrades to a plan-internal review and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Plan against design.",
+      "when": { "input": "design", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    { "reviewer": "security-scanner", "parallel": true },
+    { "reviewer": "test-gap", "parallel": true },
+    { "use": "verify-findings" },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED"]
+}

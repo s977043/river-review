@@ -15,7 +15,7 @@ __webpack_require__.d(__webpack_exports__, {
   runReviewPlan: () => (/* binding */ runReviewPlan)
 });
 
-// UNUSED EXPORTS: computeReplayDrift
+// UNUSED EXPORTS: computeReplayDrift, resolveChangedFiles, resolveDiffSource
 
 // EXTERNAL MODULE: external "node:path"
 var external_node_path_ = __webpack_require__(6760);
@@ -1006,6 +1006,8 @@ var deterministic_gate = __webpack_require__(5837);
 var deterministic_exec_gate = __webpack_require__(2785);
 // EXTERNAL MODULE: ./src/lib/finding-factory.mjs
 var finding_factory = __webpack_require__(1535);
+// EXTERNAL MODULE: ./src/lib/execution-manifest.mjs
+var execution_manifest = __webpack_require__(3055);
 // EXTERNAL MODULE: external "node:crypto"
 var external_node_crypto_ = __webpack_require__(7598);
 ;// CONCATENATED MODULE: ./src/lib/review-plan.mjs
@@ -1035,6 +1037,7 @@ var external_node_crypto_ = __webpack_require__(7598);
  * Pure-ish module: config loader, resolver, buildExecutionPlan and the
  * diff reader are injectable for tests.
  */
+
 
 
 
@@ -1158,6 +1161,88 @@ function finalizeArtifact(
 const VALID_PLANNER_MODES = new Set(planner_utils/* PLANNER_MODES */.Er);
 const MODEL_HINTS = new Set(['cheap', 'balanced', 'high-accuracy']);
 
+/**
+ * Decide which of two possible diff sources supplies the review diff, and say
+ * on stderr when the two disagree (#2046 review, major 1).
+ *
+ * `pages/reference/artifact-input-contract.md` § `diff` declares that River
+ * Review runs git itself only when the diff is NOT supplied as an artifact, so
+ * an artifact the caller actually specified — `--artifact diff=<path>` (tier
+ * `cli`) or `artifacts.diff` in the config (tier `config`) — wins over
+ * `--base`. The cwd-default `diff.patch` (tier `cwd`) is auto-detected rather
+ * than specified, so a typed `--base` wins over it; #2046 exists precisely
+ * because a stale file in the working directory must not decide the range.
+ *
+ * Either way the loser is announced. Silently discarding the caller's input is
+ * the failure mode #2046 was filed about; replacing it with a different silent
+ * discard would not be a fix.
+ *
+ * @param {{diffText: string, context?: object}|undefined} diffOverride
+ * @param {{exists?: boolean, path?: string|null, source?: string|null}|undefined} diffRes
+ * @param {{warn?: (msg: string) => void}} [opts] injectable for tests
+ * @returns {{useOverride: boolean}}
+ */
+function resolveDiffSource(diffOverride, diffRes, { warn = console.warn } = {}) {
+  const hasOverride = diffOverride != null && typeof diffOverride.diffText === 'string';
+  if (!hasOverride) return { useOverride: false };
+
+  const artifactPresent = Boolean(diffRes?.exists && diffRes.path);
+  const artifactSpecified = diffRes?.source === 'cli' || diffRes?.source === 'config';
+  const artifactExplicit = artifactPresent && artifactSpecified;
+
+  // A specified-but-missing artifact loses to `--base` on the `exists` check
+  // alone, which reads as "the artifact took precedence" to nobody: the caller
+  // named a file and got a git range instead. Say so before falling through.
+  if (artifactSpecified && !artifactPresent) {
+    warn(
+      `Warning: the \`diff\` artifact specified via ` +
+        `${diffRes.source === 'cli' ? '--artifact diff=' : 'river.config'} (${diffRes.path}) ` +
+        'does not exist; using the --base range instead.'
+    );
+  }
+
+  if (artifactExplicit) {
+    warn(
+      `Warning: --base is ignored for the review diff. The \`diff\` artifact specified via ` +
+        `${diffRes.source === 'cli' ? '--artifact diff=' : 'river.config'} (${diffRes.path}) ` +
+        'takes precedence (pages/reference/artifact-input-contract.md § diff).'
+    );
+    return { useOverride: false };
+  }
+  if (artifactPresent) {
+    warn(
+      `Warning: --base takes precedence over the auto-detected diff artifact ${diffRes.path}; ` +
+        'that file is not used. Pass --artifact diff=<path> to use it instead.'
+    );
+  }
+  return { useOverride: true };
+}
+
+/**
+ * The changed-file set for a diff that {@link resolveDiffSource} selected.
+ *
+ * When the diff came from `--base`, git already answered this question
+ * (`git diff --name-only`, via collectRepoDiff) and that answer is the SSoT:
+ * `parseUnifiedDiff` only sees entries carrying `---`/`+++` headers, so
+ * deriving the set from the diff text drops binary changes and pure renames
+ * (#2046 review). A rename-only range parsed to zero files and produced an
+ * `ok` review of nothing. Artifact-supplied diffs have no git answer, so there
+ * the parsed set stays the only available one.
+ *
+ * @param {{context?: {changedFiles?: string[]}}|undefined} diffOverride
+ * @param {boolean} useOverride
+ * @param {{files?: Array<{path?: string}>}} parsedDiff
+ * @returns {string[]}
+ */
+function resolveChangedFiles(diffOverride, useOverride, parsedDiff) {
+  if (useOverride && Array.isArray(diffOverride?.context?.changedFiles)) {
+    return [...diffOverride.context.changedFiles];
+  }
+  // Exclude /dev/null (the deletion/creation sentinel) so deleted or created
+  // files are not reported as a literal path.
+  return (parsedDiff?.files ?? []).map((f) => f?.path).filter((p) => p && p !== '/dev/null');
+}
+
 /** Raised for argument/config errors that map to CLI exit code 3. */
 class ReviewPlanError extends Error {
   constructor(message) {
@@ -1229,6 +1314,12 @@ async function runReviewExecReplay({
   cwd = process.cwd(),
   cliArtifacts = {},
   artifactsDir,
+  // #2046: diff resolved by the caller from `--base` (see
+  // src/cli/commands/review.mjs resolveBaseRepoDiff): `{ diffText, context }`.
+  // Precedence against the `diff` artifact is decided by resolveDiffSource;
+  // when this source wins, an empty `diffText` means "the base range is empty"
+  // and must NOT fall back to a stale on-disk diff artifact.
+  diffOverride,
   loadConfigImpl = loader/* loadConfig */.Z9,
   resolveAllArtifactsImpl = resolveAllArtifacts,
   generateReviewImpl = review_engine/* generateReview */.G1,
@@ -1317,6 +1408,31 @@ async function runReviewExecReplay({
 
   const phase = phaseFromArtifact ?? 'midstream';
 
+  // #2054 PR-4: when the source artifact carries an Execution Manifest, check
+  // its integrity before replaying against it. A mismatch is a WARNING and a
+  // debug note only — the replay still runs and gate / decision / findings
+  // are untouched (ADR-009 RA-1: the manifest records, it never judges). The
+  // point is that a tampered or hand-edited source plan is detectable, not
+  // that it is refused; refusal would be a gate this module has no mandate for.
+  // A source without a manifest is not checked and not warned about: artifacts
+  // that predate the manifest are valid as they are (AC 4).
+  let sourceManifestVerification = null;
+  if (looksLikeFullArtifact && parsed.executionManifest != null) {
+    try {
+      const { verified, mismatches } = (0,execution_manifest/* verifyExecutionManifest */.zy)(parsed.executionManifest);
+      sourceManifestVerification = { verified, mismatches };
+    } catch (err) {
+      sourceManifestVerification = { verified: false, mismatches: [`invalid: ${err.message}`] };
+    }
+    if (!sourceManifestVerification.verified) {
+      console.warn(
+        `Warning: the execution manifest in --plan "${planFile}" does not verify ` +
+          `(${sourceManifestVerification.mismatches.join(', ')}); ` +
+          'the source plan may have been edited since it was produced. Replay continues.'
+      );
+    }
+  }
+
   // #878 A2-3-impl: read the carry-over snapshot the planner wrote (A2-3-runners
   // #933). Contract: replay does NOT re-derive these — it trusts the values
   // captured at plan-creation time, avoiding context-snapshot drift.
@@ -1341,6 +1457,11 @@ async function runReviewExecReplay({
 
   let executionTrace = null;
   let replayDrift = null;
+  let replayChangedFiles = [];
+  let useOverrideForContext = false;
+  // Whether a diff was actually resolved on this run. `[]` must mean "we looked
+  // and the range was empty", never "we never looked" (#2046 review round 3).
+  let replayDiffResolved = false;
   // Captured from config (when loaded for execution) so finalizeArtifact can
   // surface usage.provider / usage.model when an LLM actually runs.
   let modelConfigForUsage = null;
@@ -1365,23 +1486,25 @@ async function runReviewExecReplay({
       cwd: detectionRoot,
     });
     const diffRes = resolved?.diff;
-    if (diffRes?.exists && diffRes.path) {
+    const { useOverride } = resolveDiffSource(diffOverride, diffRes);
+    useOverrideForContext = useOverride;
+    if (useOverride ? diffOverride.diffText.length > 0 : diffRes?.exists && diffRes.path) {
       let diffText;
-      try {
-        diffText = await readFileImpl(diffRes.path);
-      } catch (err) {
-        throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+      if (useOverride) {
+        diffText = diffOverride.diffText;
+      } else {
+        try {
+          diffText = await readFileImpl(diffRes.path);
+        } catch (err) {
+          throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+        }
       }
       const parsedDiff = (0,diff_processor/* parseUnifiedDiff */.rj)(diffText);
+      replayDiffResolved = true;
+      replayChangedFiles = resolveChangedFiles(diffOverride, useOverride, parsedDiff);
       // #936: report (non-blocking) membership drift between the replay-time
       // diff and the source plan's snapshot. Null when the snapshot predates A2-3.
-      replayDrift = computeReplayDrift(
-        // Exclude /dev/null (deletion/creation sentinel) so deleted/created
-        // files are not reported as literal drift paths, matching the
-        // changed-files extraction used elsewhere.
-        (parsedDiff.files ?? []).map((f) => f?.path).filter((p) => p && p !== '/dev/null'),
-        sourceSnapshot
-      );
+      replayDrift = computeReplayDrift(replayChangedFiles, sourceSnapshot);
       let review;
       try {
         review = await generateReviewImpl({
@@ -1420,6 +1543,28 @@ async function runReviewExecReplay({
         replaySnapshotUsed: sourceSnapshot != null,
       };
     }
+  } else if (diffOverride != null) {
+    // `review exec --plan <file> --dry-run` (and a source plan with no selected
+    // skills) never reaches the diff-resolution block above, so `--base` is not
+    // consumed here at all. Announcing it is the same rule the precedence
+    // decision follows: an input the caller typed is never dropped in silence
+    // (#2046 review round 3, major 1).
+    console.warn(
+      'Warning: --base has no effect on this run: `review exec --plan <file>` echoes the ' +
+        'source plan without resolving a diff (--dry-run, or the source plan selected no skills).'
+    );
+  }
+
+  // #2046 review: the replay path accepts `--base` too, so it reports the
+  // reviewed range in the same place the plan path does. Emitted ONLY when a
+  // diff was actually resolved — an artifact that declares `changedFiles: []`
+  // for a run that never looked at any diff is worse than one that stays
+  // silent, because a consumer cannot tell the two apart.
+  if (replayDiffResolved) {
+    artifact.context = {
+      ...(useOverrideForContext && diffOverride.context ? diffOverride.context : {}),
+      changedFiles: replayChangedFiles,
+    };
   }
 
   if (debug || executionTrace) {
@@ -1429,6 +1574,7 @@ async function runReviewExecReplay({
       sourcePhase: phaseFromArtifact,
       sourceTimestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp : null,
       ...(replayDrift ? { drift: replayDrift } : {}),
+      ...(sourceManifestVerification ? { sourceManifest: sourceManifestVerification } : {}),
     };
     if (executionTrace) artifact.debug.execution = executionTrace;
   }
@@ -1589,7 +1735,8 @@ function toSelectedView(skill) {
  *   documented "no LLM call is ever made here" contract. The adjudicator is
  *   escalation-only: it can never overturn a HIGH-confidence regex verdict
  *   (see adjudicateHumanApproval).
- * @returns {Promise<object>} Review Artifact (schema version "1")
+ * @returns {Promise<object>} Review Artifact (schema version "1") with a
+ *   non-enumerable `resolved` resolver result for in-process callers.
  */
 async function runReviewPlan({
   cwd = process.cwd(),
@@ -1603,6 +1750,12 @@ async function runReviewPlan({
   skillIds = null,
   availableContexts,
   availableDependencies,
+  // #2046: diff resolved by the caller from `--base` (see
+  // src/cli/commands/review.mjs resolveBaseRepoDiff): `{ diffText, context }`.
+  // Precedence against the `diff` artifact is decided by resolveDiffSource;
+  // when this source wins, an empty `diffText` means "the base range is empty"
+  // and must NOT fall back to a stale on-disk diff artifact.
+  diffOverride,
   humanApprovalAdjudicator,
   now = () => new Date().toISOString(),
   loadConfigImpl = loader/* loadConfig */.Z9,
@@ -1684,21 +1837,30 @@ async function runReviewPlan({
   };
 
   const diffRes = resolved?.diff;
+  const { useOverride } = resolveDiffSource(diffOverride, diffRes);
   let executionTrace = null;
-  if (diffRes?.exists && diffRes.path) {
+  // Same rule as the replay path: `changedFiles: []` may only be written when a
+  // diff source was actually consulted. `--base` counts as consulted even when
+  // the range came back empty — that empty answer is git's, and knowing which
+  // range produced it is the point of #2046.
+  let diffResolved = useOverride;
+  if (useOverride ? diffOverride.diffText.length > 0 : diffRes?.exists && diffRes.path) {
+    diffResolved = true;
     let diffText;
-    try {
-      diffText = await readFileImpl(diffRes.path);
-    } catch (err) {
-      throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+    if (useOverride) {
+      diffText = diffOverride.diffText;
+    } else {
+      try {
+        diffText = await readFileImpl(diffRes.path);
+      } catch (err) {
+        throw new ReviewPlanError(`Failed to read diff artifact: ${err.message}`);
+      }
     }
     // Parse the diff once and reuse the result. The same parser used to
     // power deriveChangedFiles (planning input) also exposes the per-file
     // structure generateReview needs (execution input).
     const parsedDiff = (0,diff_processor/* parseUnifiedDiff */.rj)(diffText);
-    const changedFiles = (parsedDiff.files ?? [])
-      .map((f) => f.path)
-      .filter((p) => p && p !== '/dev/null');
+    const changedFiles = resolveChangedFiles(diffOverride, useOverride, parsedDiff);
     gateChangedFiles = changedFiles;
 
     // Declare which artifact contexts are actually available so the plan
@@ -1811,9 +1973,25 @@ async function runReviewPlan({
       };
     }
   } else {
-    // No diff artifact resolved and no git fallback in this slice:
-    // per cli-review-plan-spec.md this is a no-op review, not an error.
+    // No diff resolved — neither a diff artifact nor (since #2046) a non-empty
+    // `--base` range: per cli-review-plan-spec.md this is a no-op review, not
+    // an error.
     artifact.status = 'no-changes';
+  }
+
+  // #2046 review (major 3): `context` is the schema's existing home for the
+  // reviewed range (schemas/review-artifact.schema.json `context`, documented
+  // in pages/reference/review-artifact.md) — not a new debug field.
+  // `changedFiles` means "the file paths included in the review diff", so it is
+  // filled whichever source supplied that diff. The range fields (repoRoot /
+  // defaultBranch / mergeBase) exist only when git resolved the range from
+  // `--base`, the empty-range case included: knowing WHICH range came back
+  // empty is the whole point of #2046.
+  if (diffResolved) {
+    artifact.context = {
+      ...(useOverride && diffOverride.context ? diffOverride.context : {}),
+      changedFiles: gateChangedFiles,
+    };
   }
 
   if (debug || executionDeferred || executionTrace) {
@@ -1876,6 +2054,14 @@ async function runReviewPlan({
     },
   });
 
+  // Keep resolver state available to the CLI's Flow hand-off without adding it
+  // to the Review Artifact or making diagnostic output depend on `--debug`.
+  // Non-enumerability preserves the JSON artifact contract for all existing
+  // callers, including the no-`--entry` byte-identity guarantee.
+  Object.defineProperty(artifact, 'resolved', {
+    value: resolved,
+    enumerable: false,
+  });
   return artifact;
 }
 

@@ -10,7 +10,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +25,7 @@ import {
   assessReplayability,
   attachExecutionManifest,
   buildExecutionManifest,
+  deriveFlowPin,
   formatExecutionManifestMarkdown,
   normalizeSha256,
   resolveExecutionManifestSpec,
@@ -34,7 +35,12 @@ import { buildRunEvidence, deriveReviewRunId, sha256Hex } from '../src/lib/shado
 import { canonicalJson } from '../src/lib/promotion-candidates.mjs';
 import { buildRunRecord } from '../src/lib/result-store.mjs';
 import { redactText } from '../src/lib/secret-redactor.mjs';
-import { compileSchemaFile, compileReviewArtifactValidator } from './helpers/schema-validator.mjs';
+import {
+  compileSchemaFile,
+  compileFlowValidator,
+  compileReviewArtifactValidator,
+} from './helpers/schema-validator.mjs';
+import { referencesFlowsDirectory } from './helpers/flows-reference-scan.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..');
@@ -448,8 +454,10 @@ describe('resolveExecutionManifestSpec — sources this repository actually has'
   });
 
   it('produces missing blocks — never fabricated values — for sources that do not exist yet', () => {
-    // #2013 / #2014 landed flow and agent SCHEMAS; no instance documents exist,
-    // so an honest resolver leaves these unresolved.
+    // The Flow (#2016) and agent (#2014) instance documents now exist, but the
+    // resolver reads no file: a caller that supplies neither the document nor
+    // a derived pin gets `missing`, never a fabricated value. The supplied
+    // route is pinned in "flow pin derivation (#2037)" below.
     const spec = resolveExecutionManifestSpec({ artifact: { trace: { run_id: 'r' } } });
     const manifest = buildExecutionManifest(spec, { now: FIXED_NOW });
     assert.equal(manifest.flow.status, 'missing');
@@ -540,5 +548,208 @@ describe('formatExecutionManifestMarkdown — debug renderer', () => {
   it('surfaces a tampered manifest as a mismatch', () => {
     const tampered = { ...COMPLETE, createdAt: '2020-01-01T00:00:00.000Z' };
     assert.match(formatExecutionManifestMarkdown(tampered), /Integrity: MISMATCH/);
+  });
+});
+
+describe('flow pin derivation (#2037)', () => {
+  // Route chosen: the CALLER passes the parsed Flow document, the resolver
+  // hashes it. The rejected alternative — `resolveExecutionManifestSpec`
+  // reading the flow directory itself — would break the #2016 observe-mode
+  // guarantee pinned in tests/flow-definitions.test.mjs ("no runtime module
+  // loads flows/, so no gate or decision changes"), which is what proves that
+  // landing the Flow documents cannot move an existing gate. This test file is
+  // free to read that directory; only `src/` and `runners/` are scanned.
+  const FLOW_DOC = readJson(resolve(FIXTURES, 'flow-document.json'));
+  const UNVERSIONED = readJson(resolve(FIXTURES, 'flow-document-unversioned.json'));
+  const FLOWS_DIR = resolve(REPO_ROOT, 'flows');
+  const ENTRY_MAP = readJson(join(FLOWS_DIR, 'entry-map.json'));
+
+  // Golden, not self-consistent: the digest is written out here, so a change
+  // to WHAT is hashed (file bytes instead of canonicalJson, a different
+  // helper, an added field) fails even though the module stays internally
+  // coherent.
+  const GOLDEN_SHA256 = 'c334b807d6bab496c785bd6c21a9f7662ce08a6d3dc616996efdc76ff504ea57';
+
+  it('pins a real Flow document by id, version and canonical-JSON digest', () => {
+    const validateFlow = compileFlowValidator();
+    assert.ok(validateFlow(FLOW_DOC), JSON.stringify(validateFlow.errors));
+    assert.deepEqual(deriveFlowPin(FLOW_DOC), {
+      id: 'fixture-review',
+      version: '0.1.0',
+      sha256: GOLDEN_SHA256,
+    });
+    // Cross-check against the SSoT derivation itself (CLAUDE.md "Import the
+    // SSoT, never re-derive it"): a private sha256 or a private serializer in
+    // execution-manifest.mjs would diverge from these two imports.
+    assert.equal(deriveFlowPin(FLOW_DOC).sha256, sha256Hex(canonicalJson(FLOW_DOC)));
+    assert.notEqual(deriveFlowPin(FLOW_DOC).sha256, sha256Hex(JSON.stringify(FLOW_DOC)));
+  });
+
+  it('is insensitive to key order and whitespace, so re-formatting keeps the pin', () => {
+    const reordered = JSON.parse(
+      JSON.stringify(Object.fromEntries(Object.entries(FLOW_DOC).reverse()), null, 4)
+    );
+    assert.notDeepEqual(Object.keys(reordered), Object.keys(FLOW_DOC));
+    assert.equal(deriveFlowPin(reordered).sha256, GOLDEN_SHA256);
+  });
+
+  it('pins every Flow document this repository ships, agreeing with the entry map', () => {
+    const files = readdirSync(FLOWS_DIR).filter((name) => name.endsWith('.flow.json'));
+    assert.ok(files.length > 0, 'no flow definitions found');
+    const byId = new Map();
+    for (const file of files) {
+      const pin = deriveFlowPin(readJson(join(FLOWS_DIR, file)));
+      assert.match(pin.sha256, /^[0-9a-f]{64}$/);
+      // Checked BEFORE the insert: `Map.set` overwrites on a repeated key, so
+      // a duplicate id would shrink `byId` and every later count would compare
+      // against the already-deduplicated total — the test would keep passing
+      // while silently covering fewer documents than it claims.
+      assert.ok(
+        !byId.has(pin.id),
+        `${file}: flow id "${pin.id}" is already used by another document`
+      );
+      byId.set(pin.id, pin);
+    }
+    // Every document this repository ships is now represented, one per id.
+    assert.equal(byId.size, files.length);
+    // Two documents must not collide onto one digest, or a pin cannot say
+    // which Flow ran.
+    assert.equal(new Set([...byId.values()].map((p) => p.sha256)).size, files.length);
+    for (const [entryName, entry] of Object.entries(ENTRY_MAP.entries)) {
+      const pin = byId.get(entry.flow);
+      assert.ok(pin, `${entryName}: no document for flow ${entry.flow}`);
+      // The run-time half of the flowVersion check: what the entry pinned is
+      // what `deriveFlowPin` accepts as `expectedVersion`.
+      assert.deepEqual(
+        deriveFlowPin(readJson(join(FLOWS_DIR, `${entry.flow}.flow.json`)), {
+          expectedVersion: entry.flowVersion,
+        }),
+        pin
+      );
+    }
+  });
+
+  it('refuses a document it cannot pin instead of pinning a null', () => {
+    const validateFlow = compileFlowValidator();
+    // The negative fixture is invalid against the Flow schema too — the two
+    // rejections are independent, and neither may be the only one.
+    assert.equal(validateFlow(UNVERSIONED), false);
+    assert.throws(() => deriveFlowPin(UNVERSIONED), ExecutionManifestError);
+    assert.throws(() => deriveFlowPin({ version: '1' }), ExecutionManifestError);
+    assert.throws(() => deriveFlowPin(null), ExecutionManifestError);
+    assert.throws(() => deriveFlowPin([FLOW_DOC]), ExecutionManifestError);
+    assert.throws(() => deriveFlowPin({ id: ' ', version: '1' }), ExecutionManifestError);
+  });
+
+  it('rejects a document whose version disagrees with the one the caller resolved', () => {
+    assert.equal(deriveFlowPin(FLOW_DOC, { expectedVersion: '0.1.0' }).version, '0.1.0');
+    assert.throws(
+      () => deriveFlowPin(FLOW_DOC, { expectedVersion: '0.2.0' }),
+      /is version 0\.1\.0, but the caller resolved 0\.2\.0/
+    );
+    // An absent expectation is not an assertion that any version will do — it
+    // is the caller declining to state one.
+    assert.equal(deriveFlowPin(FLOW_DOC, { expectedVersion: null }).sha256, GOLDEN_SHA256);
+    assert.equal(deriveFlowPin(FLOW_DOC, { expectedVersion: undefined }).sha256, GOLDEN_SHA256);
+  });
+
+  it('refuses an expectation it cannot compare instead of dropping it', () => {
+    // The fail-open shape this guards: `nonEmptyString` answers null for a
+    // number, an empty string and a blank string alike, so folding those into
+    // the "no expectation" branch made `expectedVersion: 2` pin a document of
+    // any version without complaint. Each of these states an expectation, so
+    // each must be rejected rather than discarded.
+    for (const bad of [2, '', '   ', true, {}, ['0.1.0']]) {
+      assert.throws(
+        () => deriveFlowPin(FLOW_DOC, { expectedVersion: bad }),
+        /expectedVersion must be a non-empty string/,
+        `expectedVersion: ${JSON.stringify(bad)} was accepted`
+      );
+    }
+    // The equivalent asymmetry one level up: an expectation with nothing to
+    // check it against (a pre-derived pin, or no flow input at all).
+    assert.throws(
+      () =>
+        resolveExecutionManifestSpec({
+          flow: { id: 'p', version: '1', sha256: 'a'.repeat(64) },
+          expectedFlowVersion: '9',
+        }),
+      /expectedFlowVersion requires flowDocument/
+    );
+    assert.throws(
+      () => resolveExecutionManifestSpec({ expectedFlowVersion: '9' }),
+      /expectedFlowVersion requires flowDocument/
+    );
+  });
+
+  it('refuses a spec that carries both a derived pin and a document', () => {
+    assert.throws(
+      () =>
+        resolveExecutionManifestSpec({
+          flow: { id: 'x', version: '1', sha256: 'a'.repeat(64) },
+          flowDocument: FLOW_DOC,
+        }),
+      /either flow or flowDocument/
+    );
+  });
+
+  it('reaches deterministic replay once the caller supplies the Flow document (AC 3)', () => {
+    const artifact = {
+      trace: { run_id: '2026-09-04T00-00-00-000Z-abc123' },
+      plan: { selectedSkills: [{ id: 'known', version: '1' }], reviewMode: 'deep' },
+      usage: { provider: 'anthropic', model: 'claude-sonnet-4' },
+      gate: { inputs: { riskMapDigest: '0123456789abcdef' } },
+    };
+    const common = {
+      artifact,
+      riverReviewVersion: '1.93.0',
+      plugin: { host: 'claude-code', pluginVersion: '1.93.0' },
+      skillManifest: { skills: [{ id: 'known', checksum: `sha256:${'a'.repeat(64)}` }] },
+      artifacts: { plan: { sha256: 'b'.repeat(64) } },
+      policy: { ref: 'pages/reference/review-policy.md', sha256: 'c'.repeat(64) },
+      configSha256: 'd'.repeat(64),
+    };
+
+    // Negative: the same run WITHOUT the document is exactly what #2037
+    // reports — every run stuck at deterministic: false.
+    const withoutFlow = buildExecutionManifest(resolveExecutionManifestSpec(common), {
+      now: FIXED_NOW,
+    });
+    assert.equal(withoutFlow.flow.status, 'missing');
+    assert.equal(withoutFlow.flow.sha256, null);
+    assert.equal(assessReplayability(withoutFlow).deterministic, false);
+
+    // Positive: one added argument, and the run is deterministically
+    // replayable. The document is the real one this repository ships, so the
+    // route is exercised end to end rather than on a hand-made object.
+    const realFlow = readJson(join(FLOWS_DIR, 'plan-review.flow.json'));
+    const withFlow = buildExecutionManifest(
+      resolveExecutionManifestSpec({
+        ...common,
+        flowDocument: realFlow,
+        expectedFlowVersion: ENTRY_MAP.entries['review-plan'].flowVersion,
+      }),
+      { now: FIXED_NOW }
+    );
+    assert.equal(withFlow.flow.status, 'resolved');
+    assert.equal(withFlow.flow.id, 'plan-review');
+    assert.equal(withFlow.flow.version, realFlow.version);
+    assert.match(withFlow.flow.sha256, /^[0-9a-f]{64}$/);
+    const replay = assessReplayability(withFlow);
+    assert.equal(replay.deterministic, true);
+    assert.deepEqual(replay.missingBlocks.deterministic, []);
+    // Judgment replay is a strictly larger requirement and this run records no
+    // agent roster, so it stays false — the flow pin fixes deterministic
+    // replay only, which is what #2037 is about.
+    assert.equal(replay.judgment, false);
+    assert.deepEqual(replay.missingBlocks.judgment, ['agents']);
+    assert.equal(verifyExecutionManifest(withFlow).verified, true);
+  });
+
+  it('keeps the #2016 observe-mode guarantee: the resolver never loads the directory', () => {
+    // Measured with the same scanner #2016 pins, not with a fresh regexp: the
+    // chosen route is only valid while this stays false.
+    const source = readFileSync(resolve(REPO_ROOT, 'src', 'lib', 'execution-manifest.mjs'), 'utf8');
+    assert.equal(referencesFlowsDirectory(source), false);
   });
 });

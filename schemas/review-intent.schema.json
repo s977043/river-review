@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/review-intent.schema.json",
+  "title": "River Review Review Intent",
+  "description": "Why a review runs, declared once per purpose (#2016, Epic #2011). This document is ADDITIVE: `schemas/flow.schema.json` (#2013) keeps its closed `intent` object with a single `purpose` key, and a Review Intent is joined to a Flow by that purpose string rather than by embedding new keys into the Flow document. Nothing here selects a skill or decides a severity: per ADR-009 D3 those stay in `skills/**`, `docs/review/**`, `pages/reference/**` and `src/lib/**`. What a Review Intent adds over a bare purpose label is the declared shape of the judgment: which stage of work it belongs to, which artifacts are under judgment, what it compares against, and which evidence must exist before the judgment is meaningful. The evidence list is where the #2016 acceptance criterion \"missing artifact は degrade/stop が明示される\" is written down; `tests/flow-definitions.test.mjs` pins each entry against the matching Flow's `inputs[]` so the two documents cannot drift. Vocabulary is closed and every object sets `additionalProperties: false`, so an unknown artifact kind or an unknown missing-artifact outcome fails validation instead of being silently ignored, matching the fail-safe direction of `src/lib/gate-decision.mjs`.",
+  "type": "object",
+  "required": [
+    "purpose",
+    "version",
+    "question",
+    "stage",
+    "phase",
+    "subject",
+    "baseline",
+    "evidence"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "purpose": {
+      "description": "Join key to a Flow: the value a Flow document carries in `intent.purpose` (`schemas/flow.schema.json`). Unique across `flows/intents/`.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "version": {
+      "description": "Semantic version of this Review Intent as a versioned asset, following the `packs:`/`skills:` convention (`schemas/pack.schema.json`). This is an asset version, not an artifact `schemaVersion`. The same `purpose` + `version` MUST mean the same question, subject and evidence requirements on every runtime.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "question": {
+      "description": "The single question this review answers, in prose. It is a statement of scope, not a criterion: the criteria for answering it live in the skills the existing selection path picks.",
+      "type": "string",
+      "minLength": 1
+    },
+    "description": { "type": "string", "minLength": 1 },
+    "stage": {
+      "description": "Where in the work this review sits, named after the `review-<stage>` entry it answers for (`flows/entry-map.json`): the four core reviews of #2016 plus the four before-implementation reviews of #2017. `stage` and `phase` are different axes and are not interchangeable: `stage` is the moment in the work whose question is being asked, while `phase` is the skill-selection vocabulary below — all four #2017 stages sit in `phase: upstream`, so a single phase value carries four distinct stages and collapsing the two would erase that distinction. Still a closed set: adding a ninth stage is a schema change rather than a new spelling in a data file, and extending it is additive, so every Intent valid against the previous enum stays valid.",
+      "enum": [
+        "research",
+        "requirements",
+        "design",
+        "technical",
+        "plan",
+        "replan",
+        "task-completion",
+        "final"
+      ]
+    },
+    "phase": {
+      "description": "Skill-selection phase, reusing the existing skill vocabulary verbatim (`phase` in `schemas/skill.schema.json`, consumed by `selectSkills` in `runners/core/review-runner.mjs`). Declaring it here is how a Review Intent reaches existing skills WITHOUT a second routing mechanism: no Flow, Agent or Intent document names a skill id, so skill selection stays where ADR-009 D3 puts it.",
+      "enum": ["upstream", "midstream", "downstream"]
+    },
+    "subject": {
+      "description": "Artifact kinds under judgment. Declarative scope only.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/artifactKind" }
+    },
+    "baseline": {
+      "description": "What this review compares the subject against. `none` means the judgment is absolute rather than differential; it is spelled out instead of being left implicit so a Flow without a `compare-baseline` step is a declared choice.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["none", "previous-plan", "previous-run-record"] },
+        "required": {
+          "description": "When true, the baseline is not optional and its absence is a stop. Absent means false. MUST be false (or absent) when `kind` is `none`.",
+          "type": "boolean"
+        },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "none" } }, "required": ["kind"] },
+          "then": { "properties": { "required": { "const": false } } }
+        }
+      ]
+    },
+    "evidence": {
+      "description": "Artifacts that must (or may) exist for the question to be answerable, and what a runtime does when one is missing. This is the machine-readable half of the #2016 acceptance criterion on missing artifacts. `uniqueItems` only rejects fully identical entries: two entries naming the SAME `artifact` with different `requirement` / `onMissing` would pass here, which would leave a single artifact carrying contradictory outcomes (`stop` and `skip` at once). JSON Schema draft 2020-12 cannot express uniqueness by one property, so that constraint is enforced by `tests/flow-definitions.test.mjs` rather than by this document.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/evidenceRequirement" }
+    }
+  },
+  "$defs": {
+    "artifactKind": {
+      "description": "Artifact kinds. Deliberately a subset of the `inputKind` enum in `schemas/agent-contract.schema.json` (#2014) rather than a parallel ledger; `tests/flow-definitions.test.mjs` asserts the subset relation so a new kind cannot be minted here alone. `artifacts` is the generic host-supplied bundle that `flows/research-review.flow.json` (#2017) takes as its subject: no dedicated research kind is minted, in line with that Flow's own note.",
+      "enum": [
+        "artifacts",
+        "requirements",
+        "design",
+        "plan",
+        "tasks",
+        "tests",
+        "diff",
+        "findings",
+        "baseline"
+      ]
+    },
+    "evidenceRequirement": {
+      "type": "object",
+      "required": ["artifact", "requirement", "onMissing"],
+      "additionalProperties": false,
+      "properties": {
+        "artifact": { "$ref": "#/$defs/artifactKind" },
+        "requirement": { "enum": ["required", "optional"] },
+        "onMissing": {
+          "description": "What happens when the artifact is absent, using the same three outcomes as a Flow step's `onUnsatisfied` (`schemas/flow.schema.json`): `stop` halts and derives a gate carrying a stop condition, `degrade` runs a reduced form and records the degradation, `skip` does not run the dependent step and records a reason. There is no fourth outcome that continues silently.",
+          "enum": ["stop", "degrade", "skip"]
+        },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "description": "A required artifact cannot degrade or skip: if it is required, its absence stops the Flow. This makes the safe side unwritable-around rather than a convention.",
+          "if": {
+            "properties": { "requirement": { "const": "required" } },
+            "required": ["requirement"]
+          },
+          "then": { "properties": { "onMissing": { "const": "stop" } } }
+        }
+      ]
+    }
+  }
+}

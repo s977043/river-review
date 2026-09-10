@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "kind": "cross-artifact-consistency",
+  "edges": [
+    {
+      "edge": "requirement->test",
+      "status": "missing",
+      "judgment": "deterministic",
+      "inputsPresent": false,
+      "findingCode": "TRACE_MISSING_COVERAGE",
+      "evidence": ["requirements が渡っていないのに欠落として報告している"]
+    }
+  ],
+  "semanticDrift": null,
+  "degradations": [],
+  "findings": []
+}

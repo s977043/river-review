@@ -1,0 +1,60 @@
+{
+  "id": "design-review",
+  "version": "0.1.0",
+  "description": "Design soundness review (#2017, Epic #2011 Phase 6). Answers whether implementation may proceed from this design. Per the Non-goals of #2017 this Flow adds no all-in-one upstream judgment: it bundles the architecture-side judgments the repository already ships by ordering existing primitives, and the bundle is expressed as steps rather than as a list of names, because a Flow document may not name what it selects (ADR-009 D3).",
+  "intent": { "purpose": "design-soundness" },
+  "inputs": [
+    { "name": "design", "required": true, "description": "The design under review." },
+    {
+      "name": "requirements",
+      "description": "Requirements the design must satisfy. Optional: absence degrades the design-versus-requirement cross-check rather than stopping the Flow."
+    },
+    {
+      "name": "plan",
+      "description": "Plan derived from the design. Optional: absence skips the plan cross-check."
+    },
+    {
+      "name": "diff",
+      "description": "Change under review, when the design arrives together with code. Optional: absence skips the design-versus-code cross-check."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    { "use": "resolve-artifacts", "description": "Missing `design` stops here (required input)." },
+    {
+      "use": "select-skills",
+      "description": "Existing upstream-phase selection; no Flow-local list."
+    },
+    { "use": "select-agents" },
+    {
+      "use": "cross-artifact-review",
+      "description": "Design against requirements. Runs unconditionally; without requirements it degrades to a design-internal review and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Design against the plan derived from it.",
+      "when": { "input": "plan", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Design against the code that claims to implement it.",
+      "when": { "input": "diff", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "parallel-review",
+      "description": "Boundary, traceability, risk-register and validation-plan judgments on the design itself, drawn from the existing upstream set through the selection path.",
+      "parallel": true,
+      "onUnsatisfied": "degrade"
+    },
+    { "reviewer": "security-scanner", "parallel": true },
+    { "reviewer": "dependency-reviewer", "parallel": true },
+    { "use": "verify-findings" },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED"]
+}

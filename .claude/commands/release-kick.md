@@ -133,6 +133,16 @@ gh pr merge $ARGUMENTS --squash --delete-branch
 - tag が merge commit と一致することを確認する。`repos/:owner/:repo/git/ref/tags/<tag>` が単発 404 を返す場合は `git ls-remote --tags origin` でも照合する
 - `gh release view <tag>` で release が published になっていることを確認する
 
+### Step 9. Migration note の追記（公開契約を変えた PR がある release のみ）
+
+release-please は CHANGELOG に commit subject しか載せないため、利用者が CI を直すのに必要な移行情報（外すべき flag、書き換えるべき呼び出し形、参照先）は Release body に手で足す。
+
+1. `gh release view <tag> --json body --jq .body` で本文を取り、CHANGELOG の該当節に載った PR のうち **`pages/reference/stable-interfaces.md` の免責節を追加・拡張した PR、または `--base` の受理縮小のように exit code や受理範囲を変えた PR** を特定する。無ければ本 Step は不要
+2. 元本文をローカルへ退避してから（`gh release view <tag> --json body --jq .body > <scratchpad>/release-<tag>-body.bak.md`）、v1.99.3 / v1.100.0 と同型の `> **Migration note (#issue / #PR)** — …` ブロックを末尾に追記する。内容は「何が変わったか / 従来の結果を得る書き方 / reference へのリンク」の 3 点
+3. `gh release edit <tag> --notes "$(cat <退避ファイル>)<追記>"` で更新し、`gh release view <tag> --json body --jq .body | grep -c 'Migration note'` が 1 以上であることを確認する
+
+2026-09-05 の v1.99.2 / v1.99.3 / v1.100.0 は 3 リリース連続で範囲レビュー（`/range-review`）が「移行情報が Release body に無い」を major として出し、都度後付けした。本 Step はその手順を release 時点へ前倒しするものである。
+
 ## 禁止事項
 
 - `git push --force`

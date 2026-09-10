@@ -173,8 +173,36 @@ async function persistRunArtifacts(result, parsed, targetPath) {
           dirty: result.dirty,
         }),
       });
+      // #2054 PR-4 (Epic #2011 AC6): pin what this run used — river-review
+      // version, selected skill checksums, gate policy digest — as an
+      // Execution Manifest on the persisted record. Additive: `attach` returns a
+      // new object with one extra top-level key, and every other key keeps the
+      // value and order it had (tests/cli-run-execution-manifest pins that
+      // against a manifest-less record). The manifest carries no judgment:
+      // gate / decision above are computed before it exists and never read it.
+      // `river run` accepts no `--entry`, so `flow` stays `missing` here.
+      //
+      // Its own try: a producer failure must cost the MANIFEST, never the
+      // record (#2111 review major 2 — nested inside the save's try it lost the
+      // whole record). `attach(record, null)` returns the record itself, so the
+      // fallback is exactly the pre-#2054 write.
+      let manifest = null;
+      try {
+        const { produceExecutionManifest, runRecordArtifactView } =
+          await import('../../lib/execution-manifest-producer.mjs');
+        manifest = await produceExecutionManifest({
+          artifact: runRecordArtifactView(result, record),
+          runRecord: record,
+        });
+      } catch (err) {
+        console.error(`Warning: execution manifest not attached: ${err.message}`);
+      }
+      const { attachExecutionManifest } = await import('../../lib/execution-manifest.mjs');
+      const recordWithManifest = attachExecutionManifest(record, manifest);
       // Use targetPath (not result.repoRoot) so --save and runs list resolve the same storeDir
-      const savedPath = await saveRunRecord(record, { storeDir: resolveStoreDir(targetPath) });
+      const savedPath = await saveRunRecord(recordWithManifest, {
+        storeDir: resolveStoreDir(targetPath),
+      });
       console.error(`Run saved: ${record.runId} → ${savedPath}`);
     } catch (err) {
       console.error(`Warning: --save failed: ${err.message}`);

@@ -1,0 +1,26 @@
+{
+  "total_count": 3,
+  "workflow_runs": [
+    {
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "action_required",
+      "event": "pull_request",
+      "actor": { "login": "github-actions[bot]" }
+    },
+    {
+      "name": "Lint",
+      "status": "completed",
+      "conclusion": "action_required",
+      "event": "pull_request",
+      "actor": { "login": "github-actions[bot]" }
+    },
+    {
+      "name": "Blocked Label Guard",
+      "status": "completed",
+      "conclusion": "action_required",
+      "event": "pull_request",
+      "actor": { "login": "github-actions[bot]" }
+    }
+  ]
+}

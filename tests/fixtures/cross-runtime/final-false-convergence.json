@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "caseId": "final-false-convergence",
+  "caseClass": "final-false-convergence",
+  "description": "Every task is closed but the goal is not met. Both runtimes must refuse to read closed tasks as convergence.",
+  "expectation": "conformant",
+  "pinned": {
+    "entry": "review-final",
+    "flow": "final-review",
+    "flowVersion": "0.1.0",
+    "policySha256": "93422f00013b807f66b31bacf7e4410d5742b3fbbb655afd1138b09067d5d41a",
+    "artifactSetSha256": "74a0956bbda0bf5292fc300f217812f48be79de83e6772e8c4b79c6538c82656",
+    "skillRegistryCommit": "aabe805eb08cec4553dabed9b409e2febf7f2655",
+    "model": "fixture-replay"
+  },
+  "observations": [
+    {
+      "runtime": "claude",
+      "adapter": {
+        "mechanisms": ["native-subagent", "skill"],
+        "surfaces": [
+          "agents/river-review.md",
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source", "search-source", "run-command"],
+        "fallbacks": ["not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-final",
+          "resolvedFlow": "final-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "unknown-coverage-review",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "ddf5a156f856b38c"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "goal-unmet-though-tasks-closed",
+            "taxonomy": "false-convergence",
+            "severity": "critical",
+            "target": {
+              "path": "docs/goal.md",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["goal-attainment", "requirement-traceability"],
+        "completionState": "contradicted",
+        "unsupportedDoneClaim": true,
+        "humanEscalation": false
+      }
+    },
+    {
+      "runtime": "codex",
+      "adapter": {
+        "mechanisms": ["skill"],
+        "surfaces": [
+          "skills/agent-skills/river-review/SKILL.md",
+          "skills/agent-skills/river-review-code/SKILL.md",
+          "skills/agent-skills/unknown-coverage-review/SKILL.md"
+        ],
+        "capabilities": ["read-artifact", "read-source"],
+        "fallbacks": ["skill-only", "not-needed", "escalate"]
+      },
+      "deterministic": {
+        "routing": {
+          "entry": "review-final",
+          "resolvedFlow": "final-review",
+          "resolvedFlowVersion": "0.1.0"
+        },
+        "selectedSkills": [
+          {
+            "id": "unknown-coverage-review",
+            "version": "1.0.0"
+          }
+        ],
+        "referenceCoverage": {
+          "required": ["docs/review/viewpoints.md"],
+          "referenced": ["docs/review/viewpoints.md"]
+        },
+        "manifest": {
+          "replayClass": "judgment",
+          "blocks": {
+            "riverReview": "resolved",
+            "plugin": "resolved",
+            "flow": "resolved",
+            "agents": "resolved",
+            "skills": "resolved",
+            "artifacts": "resolved",
+            "policy": "resolved",
+            "runtime": "resolved",
+            "config": "resolved"
+          },
+          "pins": {
+            "flow": ["sha256"],
+            "policy": ["sha256"]
+          }
+        },
+        "deterministicChecks": [
+          {
+            "id": "artifact-presence",
+            "status": "pass"
+          }
+        ],
+        "gate": {
+          "decision": "NO_GO",
+          "reasonCode": "CRITICAL_FINDING",
+          "inputsHash": "ddf5a156f856b38c"
+        }
+      },
+      "agentic": {
+        "findings": [
+          {
+            "semanticKey": "goal-unmet-though-tasks-closed",
+            "taxonomy": "false-convergence",
+            "severity": "critical",
+            "target": {
+              "path": "docs/goal.md",
+              "anchor": null
+            }
+          }
+        ],
+        "criterionCoverage": ["goal-attainment", "requirement-traceability"],
+        "completionState": "contradicted",
+        "unsupportedDoneClaim": true,
+        "humanEscalation": false
+      }
+    }
+  ],
+  "declaredDivergences": [],
+  "expected": {
+    "deterministicConformance": 1,
+    "manifestCompleteness": 1,
+    "criticalRegressionCount": 0,
+    "unexplainedDivergenceCount": 0,
+    "humanAuthorityUnchanged": true,
+    "promotionGate": "pass",
+    "failedGates": []
+  }
+}

@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/cross-artifact-consistency.schema.json",
+  "title": "River Review Cross-Artifact Consistency Report",
+  "description": "Output contract of the `cross-artifact-review` and `detect-semantic-drift` Flow steps (#2018, Epic #2011 Phase 7). Records whether the v1 traceability edges between Requirement / Design / Plan / Task / Diff / Test / Acceptance Criterion / Finding hold for ONE review run, and whether a re-plan changed what the plan means. This is a report, not a graph store: edges are evaluated per run from the refs the upstream artifacts already carry, no node index is persisted, and River Review does not own the upstream ID namespace (same rule as findings[].criterionRefs / artifactRefs in schemas/review-artifact.schema.json). Consequently no Graph DB and no new routing mechanism are introduced. Judgment placement (which entries a deterministic check may emit and which require an agent) follows docs/review/rationale-traceability.md section 7 and is NOT redefined here.",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "edges", "semanticDrift", "degradations", "findings"],
+  "additionalProperties": false,
+  "$defs": {
+    "edgeKind": {
+      "type": "string",
+      "description": "One of the nine v1 traceability edges (#2018). Two of them are already produced end to end and MUST NOT be re-implemented: `finding->criterion` and `finding->artifact` are carried by findings[].criterionRefs / findings[].artifactRefs (#1682, #1666, #1545 Phase 2) through parseFindingMessage (src/lib/finding-factory.mjs) -> schemas/review-artifact.schema.json -> src/cli/render.mjs. The remaining seven have no producer yet; a report MAY omit them, but MUST NOT claim a status for an edge it did not evaluate.",
+      "enum": [
+        "requirement->task",
+        "requirement->test",
+        "design->task",
+        "plan->task",
+        "task->diff",
+        "task->test",
+        "acceptance-criterion->test",
+        "finding->criterion",
+        "finding->artifact"
+      ]
+    },
+    "edgeStatus": {
+      "type": "string",
+      "description": "Resolution of one edge, using the three-state vocabulary of docs/review/rationale-traceability.md section 4 plus `satisfied`. `satisfied`: every source node reached a target. `missing`: the artifacts were present and a link that the contract requires is absent — reportable. `unknown`: an artifact this edge needs never reached the review, so nothing can be concluded — NOT reportable as missing (that misreading is the most severe false positive of this lens). `not_required`: the edge does not apply to this run.",
+      "enum": ["satisfied", "missing", "unknown", "not_required"]
+    },
+    "judgment": {
+      "type": "string",
+      "description": "Which side of the deterministic / agentic split produced this entry. The split itself is defined in docs/review/rationale-traceability.md section 7 (which in turn follows .claude/rules/review-core.md, responsibility boundary #1070); this field only records the outcome. Deterministic entries are decidable from refs and artifact presence alone (reference existence, missing coverage, orphan node, unknown ID, stale explicit ref). Agentic entries need meaning (semantic contradiction, terminology drift, requirement/design mismatch, design/implementation mismatch, plan revision meaning change).",
+      "enum": ["deterministic", "agentic"]
+    },
+    "findingCode": {
+      "type": "string",
+      "description": "finding-id in the SAME namespace as the 13 codes of docs/review/rationale-traceability.md section 2 — this lens extends that table rather than opening a parallel taxonomy. Four of the #2018 candidates map onto codes that already exist and get no new code: `contradiction` -> RATIONALE_CONTRADICTED, `stale-artifact` (semantic) -> WHY_NOT_STALE, `unjustified-implementation` -> WHY_MISSING, `design-deviation` -> WHY_DIFF_MISMATCH. The six TRACE_* / SEMANTIC_DRIFT codes are new because no existing code expresses connectivity between artifacts. Like the existing table, these are internal classifiers: they are not emitted as a machine-readable finding column.",
+      "enum": [
+        "TRACE_MISSING_COVERAGE",
+        "TRACE_ORPHAN",
+        "TRACE_UNKNOWN_ID",
+        "TRACE_STALE_REF",
+        "TRACE_UNSUPPORTED_CLAIM",
+        "SEMANTIC_DRIFT",
+        "RATIONALE_CONTRADICTED",
+        "WHY_NOT_STALE",
+        "WHY_MISSING",
+        "WHY_DIFF_MISMATCH"
+      ]
+    },
+    "driftAxis": {
+      "type": "string",
+      "description": "The eight meaning axes a re-plan is compared on (#2018). They sit ABOVE the file-level drift of #936, which stays in semanticDrift.fileMembership.",
+      "enum": [
+        "goal",
+        "requirement",
+        "scope",
+        "architecture",
+        "technical-approach",
+        "risk",
+        "test-strategy",
+        "done-condition"
+      ]
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "cross-artifact-consistency"
+    },
+    "edges": {
+      "type": "array",
+      "description": "One entry per traceability edge actually evaluated in this run. An edge the run did not evaluate is absent — it is never reported as satisfied by default.",
+      "items": {
+        "type": "object",
+        "required": ["edge", "status", "judgment", "inputsPresent"],
+        "additionalProperties": false,
+        "properties": {
+          "edge": {
+            "$ref": "#/$defs/edgeKind"
+          },
+          "status": {
+            "$ref": "#/$defs/edgeStatus"
+          },
+          "judgment": {
+            "$ref": "#/$defs/judgment"
+          },
+          "inputsPresent": {
+            "type": "boolean",
+            "description": "Whether every artifact this edge needs reached the review. False is the false-positive guard: an edge whose inputs are absent MUST report `unknown`, enforced below by if/then rather than left to reviewer discipline."
+          },
+          "unresolvedRefs": {
+            "type": "array",
+            "description": "Refs quoted verbatim from the upstream artifact that resolved to no node. Copied, never minted: River Review does not own this ID namespace.",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "orphans": {
+            "type": "array",
+            "description": "Nodes on the target side that no source node reaches (orphan task / orphan test).",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "findingCode": {
+            "$ref": "#/$defs/findingCode"
+          },
+          "evidence": {
+            "type": "array",
+            "description": "Reproducible pointers for the entry (file:line, artifact id, search term).",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "inputsPresent": {
+                  "const": false
+                }
+              },
+              "required": ["inputsPresent"]
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "unknown"
+                }
+              },
+              "not": {
+                "required": ["findingCode"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": ["satisfied", "unknown", "not_required"]
+                }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "not": {
+                "required": ["findingCode"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "missing"
+                }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "required": ["findingCode"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "unknown"
+                }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "properties": {
+                "inputsPresent": {
+                  "const": false
+                }
+              },
+              "description": "`unknown` means the artifacts this edge needs never reached the review, so it is only reachable with `inputsPresent: false`. Without this direction a report could claim it had the inputs and still refuse to evaluate the edge, which is exactly the false 'we looked and found nothing' this contract exists to prevent."
+            }
+          }
+        ]
+      }
+    },
+    "semanticDrift": {
+      "type": ["object", "null"],
+      "description": "Re-plan drift. Null when this run is not a re-plan (no baseline plan), which is distinct from a re-plan that found no drift.",
+      "required": ["fileMembership", "axes"],
+      "additionalProperties": false,
+      "properties": {
+        "fileMembership": {
+          "type": ["object", "null"],
+          "description": "The file-level drift of #936, COPIED VERBATIM from computeReplayDrift (src/lib/review-plan.mjs) — that function is the SSoT and MUST NOT be re-derived here. Null carries its own meaning, unchanged from the source: the plan predates the A2-3 snapshot, so membership drift is undecidable. Content-level `filesModified` is absent by design because the plan does not snapshot diff bytes.",
+          "required": ["filesAdded", "filesRemoved", "summary"],
+          "additionalProperties": false,
+          "properties": {
+            "filesAdded": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "filesRemoved": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "summary": {
+              "type": "string"
+            }
+          }
+        },
+        "axes": {
+          "type": "array",
+          "description": "One entry per meaning axis actually compared. An axis the run could not compare is either absent or recorded as `unknown`; it is never recorded as `unchanged`.",
+          "items": {
+            "type": "object",
+            "required": ["axis", "status", "judgment", "baselinePresent"],
+            "additionalProperties": false,
+            "properties": {
+              "axis": {
+                "$ref": "#/$defs/driftAxis"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["changed", "unchanged", "unknown", "not_required"]
+              },
+              "judgment": {
+                "$ref": "#/$defs/judgment"
+              },
+              "baselinePresent": {
+                "type": "boolean",
+                "description": "Whether the baseline plan carried this axis. False forces `unknown` below: a re-plan that merely added a section is not a meaning change."
+              },
+              "findingCode": {
+                "$ref": "#/$defs/findingCode"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "baselinePresent": {
+                      "const": false
+                    }
+                  },
+                  "required": ["baselinePresent"]
+                },
+                "then": {
+                  "properties": {
+                    "status": {
+                      "const": "unknown"
+                    }
+                  },
+                  "not": {
+                    "required": ["findingCode"]
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "changed"
+                    }
+                  },
+                  "required": ["status"]
+                },
+                "then": {
+                  "required": ["findingCode", "summary"],
+                  "properties": {
+                    "judgment": {
+                      "const": "agentic"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "degradations": {
+      "type": "array",
+      "description": "Why a step produced less than a full answer. Populated from the Flow's own onMissing / onUnsatisfied vocabulary (schemas/flow.schema.json) so a degraded run is never read as a clean one. Empty array means nothing degraded.",
+      "items": {
+        "type": "object",
+        "required": ["step", "missingInput", "effect", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "step": {
+            "type": "string",
+            "enum": ["cross-artifact-review", "detect-semantic-drift"]
+          },
+          "missingInput": {
+            "type": "string",
+            "minLength": 1
+          },
+          "effect": {
+            "type": "string",
+            "enum": ["stop", "degrade", "skip"]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Findings this lens contributes, in the existing finding vocabulary. No new severity vocabulary and no new finding field: severity stays the internal blocker / warning / nit of .claude/rules/review-core.md, and `code` is the internal classifier of $defs/findingCode, not a new machine-readable output column.",
+      "items": {
+        "type": "object",
+        "required": ["code", "judgment", "severity", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/$defs/findingCode"
+          },
+          "judgment": {
+            "$ref": "#/$defs/judgment"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["blocker", "warning", "nit"]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "edge": {
+            "$ref": "#/$defs/edgeKind"
+          },
+          "axis": {
+            "$ref": "#/$defs/driftAxis"
+          },
+          "criterionRefs": {
+            "type": "array",
+            "description": "Same field and same rule as findings[].criterionRefs in schemas/review-artifact.schema.json: copied verbatim from the upstream artifact, never minted or validated here.",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "artifactRefs": {
+            "type": "array",
+            "description": "Same field and same rule as findings[].artifactRefs in schemas/review-artifact.schema.json.",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
