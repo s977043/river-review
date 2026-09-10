@@ -58548,11 +58548,15 @@ const PATTERNS = [
   // internal host is still readable after its basic-auth pair is removed.
   //
   // Runs AFTER databaseUrl so `postgres://u:p@h/db` is still redacted whole.
-  // Both userinfo halves exclude `:` and `/`, which is what keeps a plain
-  // `https://host.example.com:8443/path` (port, no `@`) from matching.
+  // The user half excludes `:` and `/`; the password half excludes `/` but
+  // ALLOWS `:` because RFC 3986 permits it inside the password
+  // (`alice:hun:ter2@host`). The password half is optional so token-style
+  // userinfo (`https://token@host/p`) is covered too. A plain
+  // `https://host.example.com:8443/path` still cannot match: there is no `@`
+  // before the first `/`.
   {
     id: 'urlUserInfo',
-    regex: /\b([A-Za-z][A-Za-z0-9+.-]*):\/\/([^\s:/?#@'"`<>]+):([^\s:/?#@'"`<>]+)@/g,
+    regex: /\b([A-Za-z][A-Za-z0-9+.-]*):\/\/([^\s:/?#@'"`<>]+)(?::([^\s/?#@'"`<>]+))?@/g,
     redact: (_m, scheme) => `${scheme}://${REPLACEMENT('urlUserInfo')}@`,
   },
 ];
@@ -58582,11 +58586,20 @@ const ASSIGNMENT_PATTERNS = [
   // sees that a credential was present. `isCredentialLiteral` is what keeps
   // type annotations (`password: string`) and references
   // (`password = req.body.password`) out — see its own comment.
+  //
+  // The optional matched quote pair around the key covers JSON
+  // (`{"password": "hunter2"}`), the trailing `\b` stops `PWD` from being
+  // read as a password key mid-word, and `&` is excluded from the unquoted
+  // value class so a query string only loses the one parameter.
   {
     id: 'passwordAssignment',
-    regex: /\b(password|passwd|pwd)(\s*[:=]\s*)("[^"\n]{4,}"|'[^'\n]{4,}'|[^\s'"`,;)\]}]{4,})/gi,
-    redact: (_m, name, sep, value) =>
-      isCredentialLiteral(value) ? `${name}${sep}${REPLACEMENT('passwordAssignment')}` : null,
+    regex:
+      /(["']?)\b(password|passwd|pwd)\b\1(\s*[:=]\s*)("[^"\n]{4,}"|'[^'\n]{4,}'|[^\s'"`,;)\]}&]{4,})/gi,
+    redact: (_m, quote, name, sep, value) => {
+      if (NON_SECRET_PWD_NAMES.has(name)) return null;
+      if (!isCredentialLiteral(value)) return null;
+      return `${quote}${name}${quote}${sep}${REPLACEMENT('passwordAssignment')}`;
+    },
   },
 ];
 
@@ -58604,14 +58617,44 @@ const NON_CREDENTIAL_VALUE_RE =
 // `req.body.password`, `process.env.PASSWORD`, `user.password` — a dotted
 // identifier path is a reference to the value, never the value itself.
 const REFERENCE_EXPRESSION_RE = /^[A-Za-z_$][\w$]*(?:\.[\w$]+)+$/;
+// A bare identifier written the way source code names things — camelCase
+// (`hashedPassword`) or snake_case (`user_password`), letters only. A literal
+// credential is not spelled like a symbol, so this shape is a reference to
+// one. Deliberately NOT `^[A-Za-z_$][\w$]*$`: that also covers `hunter2`,
+// which is the canonical leaked-password form and must stay redacted. Digits
+// disqualify the identifier reading for the same reason — `MyS3cret` after a
+// `password=` key is a credential, not a symbol. Residual gap: an unquoted,
+// digit-free camelCase password (`password=MyPassword`) is not redacted;
+// quoted, SCREAMING_CASE (`envAssignment`) and high-entropy forms still are.
+const IDENTIFIER_SHAPED_RE =
+  /^(?:[A-Za-z][a-z]*(?:[A-Z][a-z]*)+|[A-Za-z_$][A-Za-z_$]*[_$][A-Za-z_$]*)$/;
+// Names that match the `pwd` alternative but never hold a password: `PWD` and
+// `OLDPWD` are the shell's working directory and appear in every env dump and
+// CI log. Case-sensitive — lowercase `pwd = '...'` is still a password key.
+const NON_SECRET_PWD_NAMES = new Set(['PWD', 'OLDPWD']);
 
 function isCredentialLiteral(raw) {
+  const quoted = /^(["']).*\1$/s.test(raw);
   const value = raw.replace(/^["']/, '').replace(/["']$/, '').trim();
   if (value.length < 4) return false;
   if (NON_CREDENTIAL_VALUE_RE.test(value)) return false;
   // `<your-password>`, `${DB_PASSWORD}`, `{{ password }}`, `*****`
   if (/^[<{$*]/.test(value)) return false;
   if (REFERENCE_EXPRESSION_RE.test(value)) return false;
+  // Prose, not a value: `password: 8文字以上を推奨します`. A credential that
+  // reaches a config file or a URL is ASCII.
+  // eslint-disable-next-line no-control-regex
+  if (/[^\x00-\x7f]/.test(value)) return false;
+  // The remaining shapes are only ambiguous when the value is unquoted. A
+  // quoted value is a literal by construction, so `"password": "hashedX"`
+  // stays redacted while `password: hashedX` in a diff does not.
+  if (!quoted) {
+    // `getPassword(` — the value class stops before `)`, so a call site is
+    // recognised by the opening paren alone. Redacting it would also leave
+    // the stray `)` behind and break the syntax the reviewer is reading.
+    if (value.includes('(')) return false;
+    if (IDENTIFIER_SHAPED_RE.test(value)) return false;
+  }
   return true;
 }
 

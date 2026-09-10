@@ -290,6 +290,96 @@ test('#2033 redactText does not redact password type annotations, references, or
   }
 });
 
+test('#2033 redactText leaves ordinary source code and prose around a password key alone', () => {
+  // B-1: `redactText` also runs on the text sent to the LLM (repo-context,
+  // review-engine, llm-adjudicator), so a false positive here deletes exactly
+  // the auth diff a reviewer needs. Behaviour test on purpose: asserting the
+  // pattern against itself would stay green under any mutation of it.
+  const negatives = [
+    '+  const password = getPassword()',
+    '-  const password = readPassword(input)',
+    '   password: hashedPassword,',
+    'password: user_password',
+    'password: 8文字以上を推奨します',
+  ];
+  for (const sample of negatives) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText leaves the PWD / OLDPWD shell variables alone', () => {
+  // B-2: `pwd` needs a trailing word boundary, and even then `PWD=` is the
+  // working directory that every shell and CI log prints. Redacting it would
+  // feed a permanent false signal to consumers that read `hits`.
+  for (const sample of ['PWD=/Users/dev/src/river-review', 'OLDPWD=/tmp/build-42']) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+  // ...while a lowercase `pwd` key is still a password key.
+  const { text } = redactText('pwd = hunter2', { highEntropy: false });
+  assert.equal(text, 'pwd = <REDACTED:passwordAssignment>');
+});
+
+test('#2033 redactText redacts JSON-shaped password keys', () => {
+  // B-3: the quoted-key form is the most common config-dump shape.
+  for (const sample of ['{"password": "hunter2"}', "{'passwd': 'hunter2'}"]) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.match(text, /<REDACTED:passwordAssignment>/, 'missed: ' + sample);
+    assert.equal(text.includes('hunter2'), false, 'leaked: ' + sample);
+    assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  }
+});
+
+test('#2033 redactText does not redact short values after a password key', () => {
+  // Discriminates the minimum-value-length rule. If `{4,}` / `value.length < 4`
+  // are loosened, these three-character values start getting redacted and this
+  // test fails — the previous suite was silent about the loosening direction.
+  for (const sample of ['pwd: abc', 'password = xyz', 'passwd: 123']) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText redacts URL userinfo for non-http schemes', () => {
+  // Discriminates the scheme class. Narrowing it to `https?` leaves these
+  // untouched and fails here; the previous suite only used https samples.
+  for (const sample of [
+    'ftp://alice:hunter2@files.internal.net/dump.sql',
+    'sftp://deploy:s3cretpass@build.internal.net/artifacts',
+  ]) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.match(text, /<REDACTED:urlUserInfo>/, 'missed: ' + sample);
+    assert.equal(hits.find((h) => h.category === 'urlUserInfo')?.count, 1);
+  }
+});
+
+test('#2033 redactText redacts colon-bearing and token-only URL userinfo', () => {
+  // B-4: RFC 3986 allows `:` inside the password half, and a bare
+  // `token@host` userinfo carries a credential with no password half at all.
+  const colon = redactText('https://alice:hun:ter2@internal.corp.net/p', { highEntropy: false });
+  assert.equal(colon.text, 'https://<REDACTED:urlUserInfo>@internal.corp.net/p');
+  assert.equal(colon.text.includes('hun:ter2'), false);
+
+  const token = redactText('https://s3cr3ttoken@internal.corp.net/p', { highEntropy: false });
+  assert.equal(token.text, 'https://<REDACTED:urlUserInfo>@internal.corp.net/p');
+
+  // The scp-style git remote has no `scheme://`, so it still must not match.
+  const remote = redactText('git@github.com:owner/repo.git', { highEntropy: false });
+  assert.equal(remote.text, 'git@github.com:owner/repo.git');
+  assert.equal(remote.hits.length, 0);
+});
+
+test('#2033 redactText masks only the password parameter of a query string', () => {
+  // B-6 (partial): `&` bounds the unquoted value so the neighbouring
+  // parameters stay readable.
+  const { text } = redactText('?user=bob&password=hunter2&debug=1', { highEntropy: false });
+  assert.equal(text, '?user=bob&password=<REDACTED:passwordAssignment>&debug=1');
+});
+
 test('#2033 REDACTION_PATTERN_IDS enumerates every category redactText can emit', () => {
   // Guards the "applied is not exhaustive" contract: a consumer recording the
   // pattern set must not drift from what redactText actually runs.
