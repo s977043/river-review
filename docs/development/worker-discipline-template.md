@@ -397,6 +397,7 @@ PR 番号 / head SHA / ローカル検証の exit code / 変更ファイル一�
 
 - ADR の編集を「『現在の検証手段』列のみ」に限定した結果、同じファイルの Context 節にある同種の行番号ずれが直せなかった。ワーカーが「スコープ外」と報告したため気づけたが、報告がなければ事実誤りが残った
 - `schemas/review-intent.schema.json` の編集を禁じた結果、`stage` の enum が閉じていて upstream flow に Intent を付けられなくなり、後から制約を解いた
+- `src/` を変更するタスクで `runners/github-action/dist/**` を境界外に置いた（2026-09-10、PR #2199）。ワーカーの push 前に `Auto Rebuild Action Dist` bot が旧 `src/` 由来の dist を同じブランチへ押し込んだ。その stale な生成物は境界外なので直せない。**`src/` を触るタスクでは dist を必ず境界の内側に入れる。** 放置すると `Action dist freshness` が落ち、bot が再 push して同じ状態に戻る。取り込みは force / rebase ではなく `git merge origin/<自分のブランチ>` で行う。再生成は Node 22 の `npm run build:action`
 
 境界を書くときは、**そのタスクの受入条件を満たすうえで触る必要のあるファイルが境界の内側にあるか**を確認する。判断がつかない範囲は「触るな」ではなく「触る前に報告せよ」にする。ワーカー側は、境界がタスクの完了を妨げると判断したなら、黙って越えるのでも諦めるのでもなく、**何がなぜ塞がれているかを報告**すること。
 
