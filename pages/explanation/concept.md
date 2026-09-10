@@ -81,7 +81,7 @@ River Review は PR の差分だけを見るツールではありません。実
 
 上流では要件・設計・ADR・計画を確認して後続工程のリスクを減らし、中流ではコードと PR をレビューして設計意図・計画・差分の整合を保ち、下流ではテスト・QA・完了レポート・リリース準備を確認します。
 
-上の 9 種は **コンセプト上のレビュー対象** です。実装済みの入力契約は [Artifact Input Contract](../reference/artifact-input-contract.md) が定義する 13 入力（`plan` / `diff` / `junit` / `test-cases` など）であり、9 種のすべてが専用の入力タイプを持つわけではありません。Skill の充足度もフェーズによって濃淡があります。とくに Security Report と Operations Artifact は、対象領域としては定義済みですが、対応する入力契約と Skill は拡充中です。CLI としてどこまで実装済みかは [レビュー対象と使いどころ](./review-scope.md) を参照してください。
+上の 9 種は **コンセプト上のレビュー対象** です。実装済みの入力契約は [Artifact Input Contract](../reference/artifact-input-contract.md) が定義する 14 入力（`plan` / `diff` / `junit` / `test-cases` など）であり、9 種のすべてが専用の入力タイプを持つわけではありません。Skill の充足度もフェーズによって濃淡があります。とくに Security Report と Operations Artifact は、対象領域としては定義済みですが、対応する入力契約と Skill は拡充中です。CLI としてどこまで実装済みかは [レビュー対象と使いどころ](./review-scope.md) を参照してください。
 
 ## 判断材料を増やし、責任は肩代わりしない
 

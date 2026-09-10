@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test, { describe } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve as resolvePath } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+import { resolveAllArtifacts } from '../src/config/artifact-resolver.mjs';
 import {
   DEFAULT_FLOW_INPUT_BINDINGS,
   ENTRY_FLOW_INPUT_BINDING_OVERRIDES,
@@ -165,6 +169,83 @@ describe('Flow input bindings', () => {
         tasks: { kind: 'explicit', id: 'tasks', source: 'cli', path: '/repo/missing-tasks.md' },
       },
       unboundInputNames: [],
+    });
+  });
+  // #2011 AC7 P3-4. Cross-checks the real production path rather than this
+  // module alone: the Flow document on disk, the artifact resolver, and the
+  // same-named binding must line up.
+  //
+  // `design` is bound by the same-named rule (flow-input-bindings.mjs:73-83),
+  // so it must NOT appear in DEFAULT_FLOW_INPUT_BINDINGS -- a role default
+  // there would be redundant. It must also have NO cwd default, because it is
+  // REQUIRED on design-review / technical-review and
+  // runner-cli-reference.md § "--entry の受理範囲" declares that required
+  // inputs carry no default binding. Both halves are pinned below: explicit
+  // supply binds, and a design.md sitting in cwd does not.
+  describe('design (#2011 AC7 P3-4)', () => {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const designFlow = JSON.parse(
+      readFileSync(resolvePath(__dirname, '../flows/design-review.flow.json'), 'utf8')
+    );
+
+    const fsWith = (existing) => ({
+      access(candidate) {
+        return existing.includes(candidate)
+          ? Promise.resolve()
+          : Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      },
+    });
+
+    test('design-review declares design as REQUIRED and no role default exists', () => {
+      assert.equal(
+        designFlow.inputs.find((input) => input.name === 'design')?.required,
+        true,
+        'design-review must keep design REQUIRED for these tests to mean anything'
+      );
+      assert.equal(DEFAULT_FLOW_INPUT_BINDINGS.design, undefined);
+    });
+
+    test('an explicitly supplied design binds to the Flow input', async () => {
+      const resolved = await resolveAllArtifacts({
+        cwd: '/repo',
+        cliArgs: { design: 'docs/design.md' },
+        fsImpl: fsWith(['/repo/docs/design.md']),
+      });
+      assert.equal(resolved.design.path, '/repo/docs/design.md');
+      assert.equal(resolved.design.source, 'cli');
+
+      const result = resolveFlowInputBindings({
+        entry: 'design-review',
+        document: designFlow,
+        resolved,
+      });
+      assert.equal(result.inputs.design, '/repo/docs/design.md');
+      assert.deepEqual(result.inputSources.design, {
+        kind: 'explicit',
+        id: 'design',
+        source: 'cli',
+      });
+      assert.ok(!result.unboundInputNames.includes('design'));
+    });
+
+    // The mutation this pins: restoring `design: 'design.md'` to CWD_DEFAULTS
+    // would bind the REQUIRED input from a file nobody named, and this test is
+    // the only thing that would notice.
+    test('a design.md sitting in cwd does not bind the required design input', async () => {
+      const resolved = await resolveAllArtifacts({
+        cwd: '/repo',
+        fsImpl: fsWith(['/repo/design.md']),
+      });
+      assert.equal(resolved.design, undefined, 'design must not be a cwd-probed artifact ID');
+
+      const result = resolveFlowInputBindings({
+        entry: 'design-review',
+        document: designFlow,
+        resolved,
+      });
+      assert.equal(result.inputs.design, undefined);
+      assert.equal(result.inputSources.design, undefined);
+      assert.ok(result.unboundInputNames.includes('design'));
     });
   });
 });
