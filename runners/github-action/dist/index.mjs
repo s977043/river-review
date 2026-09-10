@@ -58405,7 +58405,7 @@ const VERDICT_THRESHOLDS = {
 /* harmony export */   Rd: () => (/* binding */ redactText),
 /* harmony export */   g: () => (/* binding */ shouldExcludeForContext)
 /* harmony export */ });
-/* unused harmony exports DEFAULT_DENY_GLOBS, REDACTION_PATTERN_IDS, shannonEntropy */
+/* unused harmony exports DEFAULT_DENY_GLOBS, REDACTION_PATTERN_IDS, shannonEntropy, extractCaptureGroups */
 /* harmony import */ var minimatch__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9519);
 // Secret redaction for repo-wide review context (#692 PR-A).
 //
@@ -58715,6 +58715,30 @@ function isAllowlisted(snippet) {
 }
 
 /**
+ * The capture groups of a `String.prototype.replace` callback, taken from the
+ * arguments that follow `match`.
+ *
+ * `replace` calls back with `(match, ...captures, offset, string)` — and, when
+ * the pattern contains ANY named capture group `(?<name>...)`, with a trailing
+ * `groups` object as well. Dropping a fixed two-element tail therefore starts
+ * handing `offset` to a pattern's `redact` callback as if it were a capture
+ * the moment a named group is added to any pattern here (#2038 review). The
+ * tail length is decided by the shape of the last argument instead: `string`
+ * when there are no named groups, an object when there are.
+ *
+ * Exported so the contract can be exercised against both argument shapes; it
+ * is a `replace` adapter, not part of the redaction API.
+ *
+ * @param {Array<unknown>} rest the callback arguments after `match`
+ * @returns {Array<unknown>} the capture groups only
+ */
+function extractCaptureGroups(rest) {
+  const last = rest[rest.length - 1];
+  const tailLength = last !== null && typeof last === 'object' ? 3 : 2;
+  return rest.slice(0, -tailLength);
+}
+
+/**
  * Redact secrets in a text string.
  *
  * @param {string} text
@@ -58745,8 +58769,7 @@ function redactText(text, opts = {}) {
     out = out.replace(regex, (m, ...groups) => {
       if (skipMatch(m)) return m;
       if (redact) {
-        // Capture groups arrive before offset/string; drop those two tails.
-        const replaced = redact(m, ...groups.slice(0, -2));
+        const replaced = redact(m, ...extractCaptureGroups(groups));
         if (replaced == null) return m;
         bump(id);
         return replaced;

@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   DEFAULT_DENY_GLOBS,
   REDACTION_PATTERN_IDS,
+  extractCaptureGroups,
   redactText,
   shannonEntropy,
   shouldExcludeForContext,
@@ -403,17 +404,64 @@ test('#2033 redactText masks only the password parameter of a query string', () 
   assert.equal(text, '?user=bob&password=<REDACTED:passwordAssignment>&debug=1');
 });
 
+// One input per redaction category, chosen so `redactText` emits that
+// category. The expected id set is derived from the `hits` these produce, NOT
+// restated as a literal list: a list would be self-consistent with the
+// constant and could not detect drift (#2038 review).
+const EMISSION_CORPUS = [
+  'token = ghp_' + TOKEN_BODY_40,
+  'OPENAI_KEY: sk-' + TOKEN_BODY_40,
+  'ANTHROPIC_KEY: sk-ant-' + TOKEN_BODY_40,
+  'google: AIza' + TOKEN_BODY_40.slice(0, 35),
+  'creds: AKIATESTFIXTURE12345',
+  '-----BEGIN RSA PRIVATE KEY-----\nMIIB' + TOKEN_BODY_40 + '\n-----END RSA PRIVATE KEY-----',
+  'Authorization: Bearer ' + TOKEN_BODY_40,
+  'DSN = postgres://u:p@db.corp.net:5432/app',
+  'hook: https://hooks.slack.com/SERVICES/T000/B000/ABC123',
+  'ref: https://alice:s3cr3t@internal.corp.net/p',
+  'aws_secret_access_key = "' + TOKEN_BODY_40 + '"',
+  'client_secret = "' + TOKEN_BODY_40 + '"',
+  'password=hunter2',
+  'API_TOKEN=' + TOKEN_BODY_40,
+];
+
 test('#2033 REDACTION_PATTERN_IDS enumerates every category redactText can emit', () => {
   // Guards the "applied is not exhaustive" contract: a consumer recording the
-  // pattern set must not drift from what redactText actually runs.
-  for (const id of ['urlUserInfo', 'passwordAssignment', 'awsAccessKey', 'awsSecretKey']) {
-    assert.ok(REDACTION_PATTERN_IDS.includes(id), 'missing pattern id: ' + id);
+  // pattern set must not drift from what redactText actually runs. Both
+  // directions are checked — an id registered but never emitted, and a pass
+  // that emits an id nobody registered, each fail this assertion.
+  const emitted = new Set();
+  for (const sample of EMISSION_CORPUS) {
+    for (const hit of redactText(sample, { highEntropy: false }).hits) emitted.add(hit.category);
   }
-  assert.ok(REDACTION_PATTERN_IDS.includes('envAssignment'));
-  assert.ok(REDACTION_PATTERN_IDS.includes('highEntropy'));
+  // The entropy fallback is the one pass that needs the option left on.
+  for (const hit of redactText('header: kZpL3xQ8mNvW5tJfRy2HcBd9eAuQs7Tg').hits) {
+    emitted.add(hit.category);
+  }
+  assert.deepEqual([...emitted].sort(), [...REDACTION_PATTERN_IDS].sort());
   // Frozen and duplicate-free.
   assert.equal(REDACTION_PATTERN_IDS.length, new Set(REDACTION_PATTERN_IDS).size);
   assert.throws(() => REDACTION_PATTERN_IDS.push('x'), /read[- ]only|object is not extensible/i);
+});
+
+test('#2038 replace-callback captures exclude offset/string and the named-group object', () => {
+  // `redactText` hands a pattern's `redact` the capture groups only. A fixed
+  // two-element tail drop is correct ONLY while no pattern uses a named
+  // capture group: one `(?<name>...)` anywhere in the pattern makes `replace`
+  // append a `groups` object, and `offset` then arrives as a capture.
+  const capturesOf = (re, input) => {
+    let seen = null;
+    input.replace(re, (m, ...rest) => {
+      seen = extractCaptureGroups(rest);
+      return m;
+    });
+    return seen;
+  };
+  assert.deepEqual(capturesOf(/([a-z]+)=(\d+)/, 'a=1'), ['a', '1']);
+  assert.deepEqual(capturesOf(/(?<key>[a-z]+)=(\d+)/, 'a=1'), ['a', '1']);
+  assert.deepEqual(capturesOf(/(?<key>[a-z]+)=(?<value>\d+)/, 'a=1'), ['a', '1']);
+  // An optional group that did not participate stays in place as undefined.
+  assert.deepEqual(capturesOf(/(?<key>[a-z]+)(:)?=(\d+)/, 'a=1'), ['a', undefined, '1']);
 });
 
 // --- false positives / allowlist ---
