@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   DEFAULT_DENY_GLOBS,
+  REDACTION_PATTERN_IDS,
+  extractCaptureGroups,
   redactText,
   shannonEntropy,
   shouldExcludeForContext,
@@ -171,6 +173,295 @@ test('redactText catches short and unprefixed secret-named variables', () => {
   // At least one envAssignment hit, plus one databaseUrl.
   assert.ok((hits.find((h) => h.category === 'envAssignment')?.count ?? 0) >= 3);
   assert.ok(hits.some((h) => h.category === 'databaseUrl'));
+});
+
+// --- #2033: URL userinfo, AWS keys, password assignments ---
+//
+// Each of the three shapes below gets a positive fixture (it IS redacted) and
+// a negative one (a look-alike that must survive untouched). `highEntropy` is
+// disabled in these so a pass proves the NAMED pattern fired rather than the
+// entropy fallback catching the same span by accident.
+
+test('#2033 redactText redacts URL userinfo (scheme://user:pass@host)', () => {
+  const sample = 'policyRef: https://alice:hunter2@internal.corp.net/policy.md';
+  const { text, hits } = redactText(sample, { highEntropy: false });
+  assert.match(text, /<REDACTED:urlUserInfo>/);
+  assert.equal(hits.find((h) => h.category === 'urlUserInfo')?.count, 1);
+  // The credentials are gone but the host stays reviewable.
+  assert.equal(text.includes('hunter2'), false);
+  assert.equal(text.includes('alice'), false);
+  assert.equal(text.includes('internal.corp.net/policy.md'), true);
+});
+
+test('#2033 redactText redacts URL userinfo even when the host says "example"', () => {
+  // The exact string from the issue report. `example` is an ALLOWLIST_TOKENS
+  // entry, but it sits in the HOST, outside the matched credential span, so it
+  // must not suppress the redaction.
+  const { text, hits } = redactText('https://alice:hunter2@internal.example.com/policy.md', {
+    highEntropy: false,
+  });
+  assert.match(text, /<REDACTED:urlUserInfo>/);
+  assert.ok(hits.some((h) => h.category === 'urlUserInfo'));
+});
+
+test('#2033 redactText leaves port-bearing and credential-free URLs alone', () => {
+  const negatives = [
+    'see https://host.corp.net:8443/path/to/doc',
+    'https://hub.corp.net/anthropics/river',
+    'localhost:3000/@vite/client',
+  ];
+  for (const sample of negatives) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText redacts AWS access key ids without relying on entropy', () => {
+  // The issue reported `AKIAIOSFODNN7EXAMPLE` passing through. That is the
+  // allowlist (`example`) doing its job on a documentation literal, not a hole
+  // in the pattern: a non-documentation key of the same shape IS redacted, and
+  // with highEntropy off so the awsAccessKey pattern is what proves it.
+  for (const key of ['AKIAQ7WZ3TVMNPLKJHGF', 'ASIAZXCVBNMLKJHGFDSA']) {
+    const { text, hits } = redactText('creds: ' + key, { highEntropy: false });
+    assert.equal(text, 'creds: <REDACTED:awsAccessKey>');
+    assert.equal(hits.find((h) => h.category === 'awsAccessKey')?.count, 1);
+  }
+});
+
+test('#2033 redactText redacts AWS secret access keys by assignment without entropy', () => {
+  // Assembled at runtime so no 40-char AWS-secret-shaped literal is committed.
+  const value = ('wJalrXUtnFEMIK' + '7MDENGbPxRfiCY' + 'zGKlmnPqRsAB').slice(0, 40);
+  assert.equal(value.length, 40);
+  const { text, hits } = redactText('AWS_SECRET_ACCESS_KEY=' + value, { highEntropy: false });
+  assert.match(text, /<REDACTED:awsSecretKey>/);
+  assert.ok(hits.some((h) => h.category === 'awsSecretKey'));
+  assert.equal(text.includes(value), false);
+});
+
+test('#2033 redactText leaves AWS-shaped identifiers that are not keys alone', () => {
+  const negatives = [
+    // Wrong prefix / wrong length — must not be swept up.
+    'arn:aws:iam::123456789012:role/ReadOnly',
+    'bucket: AKIA123',
+    'region = us-east-1',
+  ];
+  for (const sample of negatives) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText redacts password / passwd / pwd assignments', () => {
+  const cases = [
+    ['password=hunter2', 'password='],
+    ['passwd: "hunter2xyz"', 'passwd: '],
+    ["pwd = 's0meThing'", 'pwd = '],
+  ];
+  for (const [sample, keptPrefix] of cases) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(
+      text,
+      keptPrefix + '<REDACTED:passwordAssignment>',
+      'not redacted as expected: ' + sample
+    );
+    assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  }
+});
+
+test('#2033 redactText does not redact password type annotations, references, or placeholders', () => {
+  // The canary set for passwordAssignment. Each line is ordinary source or
+  // documentation that a naive `password\s*[:=]\s*\S+` rule would mangle.
+  const negatives = [
+    '  password: string;',
+    'password?: string',
+    'const p = req.body.password',
+    'password = process.env.DB_PASSWORD',
+    'password=<your-password>',
+    'password: ${DB_PASSWORD}',
+    'password=example-value',
+    'pwd: null',
+    'passwd = undefined',
+  ];
+  for (const sample of negatives) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText leaves ordinary source code and prose around a password key alone', () => {
+  // B-1: `redactText` also runs on the text sent to the LLM (repo-context,
+  // review-engine, llm-adjudicator), so a false positive here deletes exactly
+  // the auth diff a reviewer needs. Behaviour test on purpose: asserting the
+  // pattern against itself would stay green under any mutation of it.
+  const negatives = [
+    '+  const password = getPassword()',
+    '-  const password = readPassword(input)',
+    '   password: hashedPassword,',
+    'password: user_password',
+    'password: 8文字以上を推奨します',
+  ];
+  for (const sample of negatives) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText leaves the PWD / OLDPWD shell variables alone', () => {
+  // B-2: `pwd` needs a trailing word boundary, and even then `PWD=` is the
+  // working directory that every shell and CI log prints. Redacting it would
+  // feed a permanent false signal to consumers that read `hits`.
+  for (const sample of ['PWD=/Users/dev/src/river-review', 'OLDPWD=/tmp/build-42']) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+  // ...while a lowercase `pwd` key is still a password key.
+  const { text } = redactText('pwd = hunter2', { highEntropy: false });
+  assert.equal(text, 'pwd = <REDACTED:passwordAssignment>');
+});
+
+test('#2033 redactText redacts JSON-shaped password keys', () => {
+  // B-3: the quoted-key form is the most common config-dump shape.
+  for (const sample of ['{"password": "hunter2"}', "{'passwd': 'hunter2'}"]) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.match(text, /<REDACTED:passwordAssignment>/, 'missed: ' + sample);
+    assert.equal(text.includes('hunter2'), false, 'leaked: ' + sample);
+    assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  }
+});
+
+test('#2033 redactText redacts quoted non-ASCII password values', () => {
+  // The non-ASCII exclusion exists to protect Japanese prose after a password
+  // key (B-1). It must apply ONLY to unquoted values: a quoted value is a
+  // literal by construction, so a quoted non-ASCII secret is a secret and was
+  // reaching the LLM unredacted. Behaviour test on purpose — asserting the
+  // regex against itself would stay green under any mutation of it.
+  for (const [sample, secret] of [
+    ['{"password": "パスワード123"}', 'パスワード123'],
+    ["passwd = '密碼強度テスト'", '密碼強度テスト'],
+  ]) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.match(text, /<REDACTED:passwordAssignment>/, 'missed: ' + sample);
+    assert.equal(text.includes(secret), false, 'leaked: ' + sample);
+    assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  }
+  // ...while the unquoted prose the exclusion was written for stays intact.
+  for (const sample of ['password: 8文字以上を推奨します', 'pwd: 未設定です']) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText does not redact short values after a password key', () => {
+  // Discriminates the minimum-value-length rule. If `{4,}` / `value.length < 4`
+  // are loosened, these three-character values start getting redacted and this
+  // test fails — the previous suite was silent about the loosening direction.
+  for (const sample of ['pwd: abc', 'password = xyz', 'passwd: 123']) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
+test('#2033 redactText redacts URL userinfo for non-http schemes', () => {
+  // Discriminates the scheme class. Narrowing it to `https?` leaves these
+  // untouched and fails here; the previous suite only used https samples.
+  for (const sample of [
+    'ftp://alice:hunter2@files.internal.net/dump.sql',
+    'sftp://deploy:s3cretpass@build.internal.net/artifacts',
+  ]) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.match(text, /<REDACTED:urlUserInfo>/, 'missed: ' + sample);
+    assert.equal(hits.find((h) => h.category === 'urlUserInfo')?.count, 1);
+  }
+});
+
+test('#2033 redactText redacts colon-bearing and token-only URL userinfo', () => {
+  // B-4: RFC 3986 allows `:` inside the password half, and a bare
+  // `token@host` userinfo carries a credential with no password half at all.
+  const colon = redactText('https://alice:hun:ter2@internal.corp.net/p', { highEntropy: false });
+  assert.equal(colon.text, 'https://<REDACTED:urlUserInfo>@internal.corp.net/p');
+  assert.equal(colon.text.includes('hun:ter2'), false);
+
+  const token = redactText('https://s3cr3ttoken@internal.corp.net/p', { highEntropy: false });
+  assert.equal(token.text, 'https://<REDACTED:urlUserInfo>@internal.corp.net/p');
+
+  // The scp-style git remote has no `scheme://`, so it still must not match.
+  const remote = redactText('git@github.com:owner/repo.git', { highEntropy: false });
+  assert.equal(remote.text, 'git@github.com:owner/repo.git');
+  assert.equal(remote.hits.length, 0);
+});
+
+test('#2033 redactText masks only the password parameter of a query string', () => {
+  // B-6 (partial): `&` bounds the unquoted value so the neighbouring
+  // parameters stay readable.
+  const { text } = redactText('?user=bob&password=hunter2&debug=1', { highEntropy: false });
+  assert.equal(text, '?user=bob&password=<REDACTED:passwordAssignment>&debug=1');
+});
+
+// One input per redaction category, chosen so `redactText` emits that
+// category. The expected id set is derived from the `hits` these produce, NOT
+// restated as a literal list: a list would be self-consistent with the
+// constant and could not detect drift (#2038 review).
+const EMISSION_CORPUS = [
+  'token = ghp_' + TOKEN_BODY_40,
+  'OPENAI_KEY: sk-' + TOKEN_BODY_40,
+  'ANTHROPIC_KEY: sk-ant-' + TOKEN_BODY_40,
+  'google: AIza' + TOKEN_BODY_40.slice(0, 35),
+  'creds: AKIATESTFIXTURE12345',
+  '-----BEGIN RSA PRIVATE KEY-----\nMIIB' + TOKEN_BODY_40 + '\n-----END RSA PRIVATE KEY-----',
+  'Authorization: Bearer ' + TOKEN_BODY_40,
+  'DSN = postgres://u:p@db.corp.net:5432/app',
+  'hook: https://hooks.slack.com/SERVICES/T000/B000/ABC123',
+  'ref: https://alice:s3cr3t@internal.corp.net/p',
+  'aws_secret_access_key = "' + TOKEN_BODY_40 + '"',
+  'client_secret = "' + TOKEN_BODY_40 + '"',
+  'password=hunter2',
+  'API_TOKEN=' + TOKEN_BODY_40,
+];
+
+test('#2033 REDACTION_PATTERN_IDS enumerates every category redactText can emit', () => {
+  // Guards the "applied is not exhaustive" contract: a consumer recording the
+  // pattern set must not drift from what redactText actually runs. Both
+  // directions are checked — an id registered but never emitted, and a pass
+  // that emits an id nobody registered, each fail this assertion.
+  const emitted = new Set();
+  for (const sample of EMISSION_CORPUS) {
+    for (const hit of redactText(sample, { highEntropy: false }).hits) emitted.add(hit.category);
+  }
+  // The entropy fallback is the one pass that needs the option left on.
+  for (const hit of redactText('header: kZpL3xQ8mNvW5tJfRy2HcBd9eAuQs7Tg').hits) {
+    emitted.add(hit.category);
+  }
+  assert.deepEqual([...emitted].sort(), [...REDACTION_PATTERN_IDS].sort());
+  // Frozen and duplicate-free.
+  assert.equal(REDACTION_PATTERN_IDS.length, new Set(REDACTION_PATTERN_IDS).size);
+  assert.throws(() => REDACTION_PATTERN_IDS.push('x'), /read[- ]only|object is not extensible/i);
+});
+
+test('#2038 replace-callback captures exclude offset/string and the named-group object', () => {
+  // `redactText` hands a pattern's `redact` the capture groups only. A fixed
+  // two-element tail drop is correct ONLY while no pattern uses a named
+  // capture group: one `(?<name>...)` anywhere in the pattern makes `replace`
+  // append a `groups` object, and `offset` then arrives as a capture.
+  const capturesOf = (re, input) => {
+    let seen = null;
+    input.replace(re, (m, ...rest) => {
+      seen = extractCaptureGroups(rest);
+      return m;
+    });
+    return seen;
+  };
+  assert.deepEqual(capturesOf(/([a-z]+)=(\d+)/, 'a=1'), ['a', '1']);
+  assert.deepEqual(capturesOf(/(?<key>[a-z]+)=(\d+)/, 'a=1'), ['a', '1']);
+  assert.deepEqual(capturesOf(/(?<key>[a-z]+)=(?<value>\d+)/, 'a=1'), ['a', '1']);
+  // An optional group that did not participate stays in place as undefined.
+  assert.deepEqual(capturesOf(/(?<key>[a-z]+)(:)?=(\d+)/, 'a=1'), ['a', undefined, '1']);
 });
 
 // --- false positives / allowlist ---
