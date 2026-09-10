@@ -333,6 +333,29 @@ test('#2033 redactText redacts JSON-shaped password keys', () => {
   }
 });
 
+test('#2033 redactText redacts quoted non-ASCII password values', () => {
+  // The non-ASCII exclusion exists to protect Japanese prose after a password
+  // key (B-1). It must apply ONLY to unquoted values: a quoted value is a
+  // literal by construction, so a quoted non-ASCII secret is a secret and was
+  // reaching the LLM unredacted. Behaviour test on purpose — asserting the
+  // regex against itself would stay green under any mutation of it.
+  for (const [sample, secret] of [
+    ['{"password": "パスワード123"}', 'パスワード123'],
+    ["passwd = '密碼強度テスト'", '密碼強度テスト'],
+  ]) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.match(text, /<REDACTED:passwordAssignment>/, 'missed: ' + sample);
+    assert.equal(text.includes(secret), false, 'leaked: ' + sample);
+    assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  }
+  // ...while the unquoted prose the exclusion was written for stays intact.
+  for (const sample of ['password: 8文字以上を推奨します', 'pwd: 未設定です']) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, sample, 'false positive on: ' + sample);
+    assert.equal(hits.length, 0, 'false positive on: ' + sample);
+  }
+});
+
 test('#2033 redactText does not redact short values after a password key', () => {
   // Discriminates the minimum-value-length rule. If `{4,}` / `value.length < 4`
   // are loosened, these three-character values start getting redacted and this

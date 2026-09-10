@@ -232,14 +232,14 @@ function isCredentialLiteral(raw) {
   // `<your-password>`, `${DB_PASSWORD}`, `{{ password }}`, `*****`
   if (/^[<{$*]/.test(value)) return false;
   if (REFERENCE_EXPRESSION_RE.test(value)) return false;
-  // Prose, not a value: `password: 8文字以上を推奨します`. A credential that
-  // reaches a config file or a URL is ASCII.
-  // eslint-disable-next-line no-control-regex
-  if (/[^\x00-\x7f]/.test(value)) return false;
   // The remaining shapes are only ambiguous when the value is unquoted. A
   // quoted value is a literal by construction, so `"password": "hashedX"`
   // stays redacted while `password: hashedX` in a diff does not.
   if (!quoted) {
+    // Prose, not a value: `password: 8文字以上を推奨します`. A credential that
+    // reaches a config file or a URL is ASCII.
+    // eslint-disable-next-line no-control-regex
+    if (/[^\x00-\x7f]/.test(value)) return false;
     // `getPassword(` — the value class stops before `)`, so a call site is
     // recognised by the opening paren alone. Redacting it would also leave
     // the stray `)` behind and break the syntax the reviewer is reading.
