@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.109.1](https://github.com/s977043/river-review/compare/v1.109.0...v1.109.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **security:** [#2033](https://github.com/s977043/river-review/issues/2033) redact URL userinfo and password assignments ([#2038](https://github.com/s977043/river-review/issues/2038)) ([7360df8](https://github.com/s977043/river-review/commit/7360df842813a891c89af968c19a82805069e7e4))
+
 ## [1.109.0](https://github.com/s977043/river-review/compare/v1.108.0...v1.109.0) (2026-09-09)
 
 
