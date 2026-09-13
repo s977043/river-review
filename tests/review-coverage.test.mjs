@@ -128,4 +128,23 @@ describe('review coverage schema', () => {
     coverage.completedUnits = -1;
     assert.equal(validateCoverage(coverage), false);
   });
+
+  it('rejects an empty subject list', () => {
+    const coverage = validCoverage();
+    coverage.units[0].subjects = [];
+    assert.equal(validateCoverage(coverage), false);
+  });
+
+  it('rejects a completed unit carrying an error reason', () => {
+    const coverage = validCoverage();
+    coverage.units[0].reasonCode = 'reviewer_error';
+    assert.equal(validateCoverage(coverage), false);
+  });
+
+  it('rejects a timed-out unit without the timeout reason', () => {
+    const coverage = validCoverage();
+    coverage.units[0].status = 'timed_out';
+    coverage.units[0].reasonCode = 'reviewer_error';
+    assert.equal(validateCoverage(coverage), false);
+  });
 });
