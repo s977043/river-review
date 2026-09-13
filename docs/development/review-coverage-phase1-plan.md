@@ -16,7 +16,7 @@ PR #2214 established the Experimental Review Coverage Contract. Phase 1 wires th
 - Map `Promise.allSettled` outcomes to `completed | failed | timed_out`.
 - Derive `required` from `autoSelection.required` in auto mode; explicit reviewer selections remain required.
 - Return `reviewCoverage` from reviewer orchestration.
-- Add runtime regression tests for complete, partial timeout, partial failure, not executed, and optional auto-selected reviewer failure.
+- Add runtime regression tests for complete and partial timeout/failure cases. Also cover not-executed and optional auto-selected reviewer failure.
 
 This slice does not expose a new public CLI field yet.
 
