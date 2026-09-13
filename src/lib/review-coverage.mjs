@@ -63,7 +63,11 @@ export function deriveReviewCoverage(units = []) {
   } else if (requiredUnits === 0) {
     // Defensive path for future policies that may make every unit optional.
     status =
-      completedUnits === expectedUnits ? 'complete' : completedUnits > 0 ? 'partial' : 'not_executed';
+      completedUnits === expectedUnits
+        ? 'complete'
+        : completedUnits > 0
+          ? 'partial'
+          : 'not_executed';
   } else if (completedRequiredUnits === requiredUnits) {
     status = 'complete';
   } else if (completedRequiredUnits === 0) {
