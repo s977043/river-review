@@ -16,7 +16,7 @@ The implementation must derive Review Units from the existing reviewer orchestra
 
 APPROVE.
 
-Coverage is observation only. `decision`, `deriveRunGate()`, `deriveGateDecision()`, auto-approve behavior, and Human Review policy are explicitly out of scope for this phase.
+Coverage is observation only. `decision` and Gate derivation stay unchanged. Auto-approve behavior and Human Review policy are also explicitly out of scope for this phase.
 
 ## Backward compatibility
 
@@ -34,19 +34,19 @@ Runtime-produced coverage must validate against `schemas/review-coverage.schema.
 
 APPROVE.
 
-Tests must execute the real orchestration path with injected reviewer implementations and cover complete, timeout, failure, not-executed, and auto-mode optional failure cases.
+Tests must execute the real orchestration path with injected reviewer implementations. They cover complete and timeout/failure paths. They also cover not-executed and auto-mode optional failure cases.
 
 ## Operations and observability
 
 APPROVE.
 
-A staged rollout is preferred: generate correct telemetry first, then expose it through JSON and saved run records in a separately reviewed slice. This reduces the chance of publishing a wrong contract and then supporting it indefinitely.
+Use a staged rollout. Generate correct telemetry first. Then expose it through JSON and saved run records in a separately reviewed slice. This avoids publishing a wrong contract and supporting it indefinitely.
 
 ## Security and trust boundary
 
 APPROVE.
 
-The change adds deterministic aggregation only. It introduces no shell, network, file-write, or provider capability and does not raise the authority of the resulting observation.
+The change adds deterministic aggregation only. It introduces no shell or network capability. It adds no file-write or provider capability and does not raise the authority of the resulting observation.
 
 ## Blocking findings
 
