@@ -101,10 +101,7 @@ describe('reviewCoverage runtime wiring', () => {
     );
 
     assert.equal(result.reviewCoverage.status, 'partial');
-    assert.equal(
-      result.reviewCoverage.units.filter((unit) => unit.status === 'failed').length,
-      1
-    );
+    assert.equal(result.reviewCoverage.units.filter((unit) => unit.status === 'failed').length, 1);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
 
