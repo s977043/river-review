@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
-import { deriveReviewCoverage } from '../src/lib/review-coverage.mjs';
+import {
+  REVIEW_COVERAGE_STATUSES,
+  REVIEW_UNIT_STATUSES,
+  deriveReviewCoverage,
+} from '../src/lib/review-coverage.mjs';
 
 function unit(id, status = 'completed', required = true, extra = {}) {
   return {
@@ -82,5 +87,16 @@ describe('deriveReviewCoverage', () => {
     assert.equal(result.status, 'not_executed');
     assert.equal(result.expectedUnits, 0);
     assert.equal(result.requiredUnits, 0);
+  });
+});
+
+describe('review coverage schema vocabulary', () => {
+  it('stays aligned with the runtime status vocabularies', () => {
+    const schema = JSON.parse(
+      readFileSync(new URL('../schemas/review-coverage.schema.json', import.meta.url), 'utf8')
+    );
+
+    assert.deepEqual(schema.properties.status.enum, [...REVIEW_COVERAGE_STATUSES]);
+    assert.deepEqual(schema.$defs.reviewUnit.properties.status.enum, [...REVIEW_UNIT_STATUSES]);
   });
 });
