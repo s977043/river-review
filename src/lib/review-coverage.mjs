@@ -13,11 +13,15 @@ function isCompleted(unit) {
   return unit?.status === 'completed';
 }
 
-function isRequired(unit) {
+function normalizeRequired(unit) {
   // Fail-safe default: an execution unit is required unless policy explicitly
-  // marks it optional. This prevents missing metadata from making coverage look
-  // stronger than it is.
-  return unit?.required !== false;
+  // marks it optional. Materialize the default in the returned unit as well so
+  // the derived coverage object conforms to review-coverage.schema.json.
+  return { ...unit, required: unit?.required !== false };
+}
+
+function isRequired(unit) {
+  return unit?.required === true;
 }
 
 /**
@@ -40,7 +44,9 @@ function isRequired(unit) {
  * }}
  */
 export function deriveReviewCoverage(units = []) {
-  const normalizedUnits = Array.isArray(units) ? units.filter(Boolean) : [];
+  const normalizedUnits = Array.isArray(units)
+    ? units.filter(Boolean).map((unit) => normalizeRequired(unit))
+    : [];
   const expectedUnits = normalizedUnits.length;
   const completedUnits = normalizedUnits.filter(isCompleted).length;
   const required = normalizedUnits.filter(isRequired);
