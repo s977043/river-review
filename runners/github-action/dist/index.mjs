@@ -80784,7 +80784,18 @@ function mergeFindings(findings) {
       evidence: [...evidenceSet],
       agreement: mergedAgreement,
       consensusLevel: computeConsensusLevel(mergedAgreement),
+      // Only materialise `scope` when at least one member carried it. A cluster
+      // where nobody classified the scope stays without the field — schema
+      // readers already treat an absent scope as `in-diff`
+      // (schemas/output.schema.json, issues[].scope), so adding it there would
+      // change the payload without changing its meaning.
       ...(members.some((m) => m?.scope !== undefined) ? { scope: mergeScope(members) } : {}),
+      // #1823 残件1: only materialised when the cluster spans MORE THAN ONE
+      // line. A single distinct line is already carried by `lineStart`, so the
+      // field would repeat it without adding a sweep target — same emission
+      // rule as `scope` above. Single-member clusters therefore never gain the
+      // field on the passthrough branch either; a representative that inherited
+      // one from an earlier pass keeps it through the `...canonical` spread.
       ...(mergedLineStarts.length > 1 ? { mergedLineStarts } : {}),
     };
   });
@@ -80816,6 +80827,7 @@ function editDistance(a, b) {
   const n = b.length;
   if (m === 0) return n;
   if (n === 0) return m;
+  // Only compute if strings are similar enough to be worth comparing
   if (Math.abs(m - n) > 15) return 99;
   const dp = Array.from({ length: m + 1 }, (_, i) => [i]);
   for (let j = 1; j <= n; j++) dp[0][j] = j;
@@ -80832,7 +80844,9 @@ function editDistance(a, b) {
 
 function reviewUnitSubjects(chunkDiff) {
   const fileObjects = chunkDiff?.filesForReview ?? chunkDiff?.files ?? [];
-  const filePaths = fileObjects.map((file) => file?.path).filter((value) => typeof value === 'string');
+  const filePaths = fileObjects
+    .map((file) => file?.path)
+    .filter((value) => typeof value === 'string');
   const changedFiles = Array.isArray(chunkDiff?.changedFiles)
     ? chunkDiff.changedFiles.filter((value) => typeof value === 'string')
     : [];
@@ -80861,6 +80875,12 @@ async function runReviewerOrchestration({
   reviewers,
   prBody,
   signals,
+  // #1689: observability knobs. `quiet` comes from the CLI `--quiet` flag;
+  // `timeoutMs` / `progress` are explicit overrides above env and config.
+  // `env` is injectable so a stray RIVER_REVIEWER_TIMEOUT in the developer's
+  // shell cannot change test outcomes. `progressSink` and `generateReviewImpl`
+  // are injection points for tests (same `*Impl` convention as
+  // llm-pipeline.mjs / deterministic-command-orchestrator.mjs).
   quiet = false,
   timeoutMs,
   progress,
@@ -80880,6 +80900,7 @@ async function runReviewerOrchestration({
     );
   }
 
+  // Attempt diff splitting for large PRs
   const diffChunks = splitDiffIntoChunks(diff);
   const chunked = diffChunks !== null;
   const diffsToProcess = chunked ? diffChunks : [diff];
@@ -80899,17 +80920,25 @@ async function runReviewerOrchestration({
     prBody,
   };
 
+  // #1689: resolve observability settings once per run.
+  // stderr ONLY — never process.stdout, which carries the review artifact.
   const emit =
     typeof progressSink === 'function'
       ? (line) => progressSink(line)
       : (line) => console.error(line);
+  // An invalid-timeout warning must surface even under --quiet: silently
+  // ignoring a misconfigured limit is exactly the failure #1689's review found.
   const effectiveTimeoutMs = resolveReviewerTimeoutMs({ timeoutMs, config, env, warn: emit });
   const progressEnabled = resolveReviewerProgressEnabled({ quiet, progress, config });
   const logProgress = progressEnabled ? emit : () => {};
 
+  // One descriptor per unit of work (role × chunk). Keeping the descriptors
+  // alongside the promises lets the per-role summary index into `settled`
+  // directly instead of recomputing the role-per-task mapping.
   const taskDescriptors = roles.flatMap((roleName) =>
     diffsToProcess.map((chunkDiff, chunkIdx) => ({ roleName, chunkDiff, chunkIdx }))
   );
+  /** Per-task outcome, filled in by the progress handlers before allSettled resolves. */
   const taskOutcomes = taskDescriptors.map(() => ({ durationMs: null, timedOut: false }));
 
   const chunkSuffix = (chunkIdx) =>
@@ -80917,6 +80946,7 @@ async function runReviewerOrchestration({
 
   const orchestrationStartedAt = nowMs();
 
+  // Fan out: each role × each diff chunk runs in parallel
   const tasks = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const role = REVIEWER_ROLES[roleName];
     const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
@@ -80959,6 +80989,7 @@ async function runReviewerOrchestration({
     );
   });
 
+  // Run each role in parallel; partial failure is tolerated
   const settled = await Promise.allSettled(tasks);
   const orchestrationDurationMs = Math.round(nowMs() - orchestrationStartedAt);
 
@@ -80988,6 +81019,7 @@ async function runReviewerOrchestration({
   });
   const reviewCoverage = deriveReviewCoverage(reviewUnits);
 
+  // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
   const rawFindings = succeeded.flatMap((r) =>
     (r.findings ?? []).map((f) => ({
@@ -81002,6 +81034,7 @@ async function runReviewerOrchestration({
   const allComments = succeeded.flatMap((r) => r.comments ?? []);
   const classified = (0,finding_factory/* classifyFindings */.ZY)(allFindings, { reviewMode: reviewMode ?? 'medium' });
 
+  // Summarise per-role results (aggregate across chunks)
   const reviewerResults = roles.map((name) => {
     const roleIndices = taskDescriptors
       .map((d, i) => (d.roleName === name ? i : -1))
@@ -81018,7 +81051,11 @@ async function runReviewerOrchestration({
       status: roleSucceeded.length > 0 ? 'fulfilled' : 'rejected',
       findingsCount: roleSucceeded.reduce((sum, r) => sum + (r.value?.findings?.length ?? 0), 0),
       chunksRun: chunked ? diffsToProcess.length : null,
+      // #1545 P1: why this role was auto-selected (only present in auto mode).
       selectionReasons: autoSelection ? (autoSelection.reasons[name] ?? []) : null,
+      // #1689: true when at least one unit of work for this role hit the
+      // per-role timeout. With chunking the role can still be 'fulfilled' —
+      // the surviving chunks' findings are kept (fail-soft).
       timedOut: roleOutcomes.some((o) => o.timedOut),
       durationMs: roleDurations.length ? Math.max(...roleDurations) : null,
       error:
@@ -81026,6 +81063,11 @@ async function runReviewerOrchestration({
     };
   });
 
+  // #1689 W4: counted in ROLES (not role×chunk tasks) so this agrees with the
+  // "N/M roles succeeded" figure. A role whose surviving chunks produced
+  // findings stays `fulfilled` yet still appears here, so the timed-out roles
+  // are listed by name rather than folded into the failure count — "0 failed
+  // (1 timed out)" read as a contradiction.
   const timedOutRoles = reviewerResults.filter((r) => r.timedOut).map((r) => r.role);
   const failedRoleCount = reviewerResults.filter((r) => r.status === 'rejected').length;
   const succeededRoleCount = reviewerResults.length - failedRoleCount;
@@ -81048,6 +81090,8 @@ async function runReviewerOrchestration({
     reviewCoverage,
     invalidRoles: invalid,
     autoSelectedRoles: reviewers?.length === 1 && reviewers[0] === 'auto' ? roles : null,
+    // #1545 P1: explainable auto-selection — reasons per role, the always-on
+    // required set, and the roles skipped this run. null when not in auto mode.
     autoSelection,
     teamLeadReport,
     chunked,
@@ -81059,6 +81103,11 @@ async function runReviewerOrchestration({
       succeededReviewers: succeeded.length,
       failedReviewers: failed.length,
       deduplicatedCount: rawFindings.length - allFindings.length,
+      // #1689: the timeout is also recorded in the machine-readable result, not
+      // only on stderr, so a CI consumer can tell "no findings" apart from
+      // "the role never returned". `timeoutMs` is null when disabled (default).
+      // Reachable from the CLI as `reviewDebug` in the run record and as the
+      // top-level `timedOutRoles` field of the JSON output (src/cli/render.mjs).
       timeoutMs: effectiveTimeoutMs,
       timedOutRoles,
       durationMs: orchestrationDurationMs,
