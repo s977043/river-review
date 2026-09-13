@@ -2,7 +2,7 @@
 
 ## Verdict
 
-**APPROVED — proceed with Slice A implementation.**
+**APPROVED—proceed with Slice A implementation.**
 
 This review evaluates the approved execution plan before runtime wiring.
 
