@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/review-coverage.schema.json",
+  "title": "River Review Execution Coverage",
+  "description": "Observe-only contract describing whether planned review execution units completed. Finding count does not determine coverage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "status",
+    "expectedUnits",
+    "completedUnits",
+    "requiredUnits",
+    "completedRequiredUnits",
+    "incompleteRequiredUnitIds",
+    "units"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1" },
+    "status": {
+      "type": "string",
+      "enum": ["complete", "partial", "not_executed"]
+    },
+    "expectedUnits": { "type": "integer", "minimum": 0 },
+    "completedUnits": { "type": "integer", "minimum": 0 },
+    "requiredUnits": { "type": "integer", "minimum": 0 },
+    "completedRequiredUnits": { "type": "integer", "minimum": 0 },
+    "incompleteRequiredUnitIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "units": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reviewUnit" }
+    }
+  },
+  "$defs": {
+    "reviewUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "subjects",
+        "reviewerRole",
+        "required",
+        "status",
+        "reasonCode",
+        "findingsCount"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["diff-chunk"] },
+        "subjects": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "reviewerRole": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "failed", "timed_out"]
+        },
+        "reasonCode": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "enum": ["reviewer_timeout", "reviewer_error"] }
+          ]
+        },
+        "findingsCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
