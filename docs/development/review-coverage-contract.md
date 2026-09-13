@@ -4,7 +4,7 @@
 
 Contract foundation inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
 
-This document defines **review execution coverage** for River Review. The first implementation slice adds the schema and pure derivation logic only; runtime emission and Gate integration are separate follow-up changes.
+**Stability: Experimental.** This contract is not part of the Stable Contract yet. The first implementation slice adds the schema and pure derivation logic only; runtime emission and Gate integration are separate follow-up changes. Before runtime output becomes a supported external surface, `pages/reference/stable-interfaces.md` must be updated with the Review Coverage contract and its stability level.
 
 ## Why
 
@@ -51,6 +51,12 @@ reasonCode: null | reviewer_timeout | reviewer_error
 findingsCount: 0
 ```
 
+The schema enforces the status/reason relationship:
+
+- `completed` → `reasonCode: null`
+- `failed` → `reasonCode: reviewer_error`
+- `timed_out` → `reasonCode: reviewer_timeout`
+
 ### Stable ID
 
 - Non-chunked review: `reviewer:<role>/chunk:1`
@@ -88,12 +94,15 @@ Status derivation:
 
 A unit that completes with `findingsCount: 0` is still completed. Finding count never determines coverage.
 
+The current v1 reviewer selection always produces at least one required role when reviewer orchestration runs. The `requiredUnits === 0` branch in `deriveReviewCoverage()` is defensive for a future policy where all units might be optional; in that case coverage falls back to whether all, some, or none of the planned optional units completed.
+
 ## Rollout boundary
 
 ### Foundation slice (this PR)
 
 - Add the versioned Review Coverage schema.
 - Add pure `deriveReviewCoverage()` logic and regression tests.
+- Compile the schema in Ajv strict mode and validate representative positive/negative cases.
 - Do not change runtime output, `decision`, or Gate behavior.
 
 ### Observe-only runtime slice (next PR)
@@ -102,6 +111,7 @@ A unit that completes with `findingsCount: 0` is still completed. Finding count 
 - Emit coverage as additive machine-readable metadata.
 - Keep existing `decision` and `gate` derivation unchanged.
 - Keep `run-gate.mjs`'s existing all-reviewers-failed fail-safe.
+- Register Review Coverage in `pages/reference/stable-interfaces.md` before treating the runtime field as a supported external surface.
 
 ### Gate integration (later, opt-in)
 
