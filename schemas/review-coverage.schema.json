@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://river-review.the3396.com/schemas/review-coverage.schema.json",
   "title": "River Review Execution Coverage",
-  "description": "Observe-only contract describing whether planned review execution units completed. Finding count does not determine coverage.",
+  "description": "Contract describing whether planned review execution units completed. Finding count does not determine coverage; runtime emission is wired separately.",
   "type": "object",
   "additionalProperties": false,
   "required": [
