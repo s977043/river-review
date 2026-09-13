@@ -7,6 +7,10 @@ import {
   REVIEW_UNIT_STATUSES,
   deriveReviewCoverage,
 } from '../src/lib/review-coverage.mjs';
+import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
+
+const validateCoverage = compileReviewCoverageValidator();
+const validationErrors = () => JSON.stringify(validateCoverage.errors, null, 2);
 
 function unit(id, status = 'completed', required = true, extra = {}) {
   return {
@@ -31,6 +35,7 @@ describe('deriveReviewCoverage', () => {
     assert.equal(result.completedUnits, 2);
     assert.equal(result.completedRequiredUnits, 2);
     assert.deepEqual(result.incompleteRequiredUnitIds, []);
+    assert.equal(validateCoverage(result), true, validationErrors());
   });
 
   it('reports partial when one required unit completed and another timed out', () => {
@@ -42,6 +47,7 @@ describe('deriveReviewCoverage', () => {
     assert.equal(result.status, 'partial');
     assert.equal(result.completedRequiredUnits, 1);
     assert.deepEqual(result.incompleteRequiredUnitIds, ['b']);
+    assert.equal(validateCoverage(result), true, validationErrors());
   });
 
   it('reports not_executed when no required unit completed', () => {
@@ -53,6 +59,7 @@ describe('deriveReviewCoverage', () => {
     assert.equal(result.status, 'not_executed');
     assert.equal(result.completedUnits, 0);
     assert.equal(result.completedRequiredUnits, 0);
+    assert.equal(validateCoverage(result), true, validationErrors());
   });
 
   it('does not weaken required coverage when optional work fails', () => {
@@ -62,6 +69,7 @@ describe('deriveReviewCoverage', () => {
     assert.equal(result.requiredUnits, 1);
     assert.equal(result.completedRequiredUnits, 1);
     assert.equal(result.completedUnits, 1);
+    assert.equal(validateCoverage(result), true, validationErrors());
   });
 
   it('treats missing required metadata as required (fail-safe)', () => {
@@ -87,10 +95,13 @@ describe('deriveReviewCoverage', () => {
     assert.equal(result.status, 'not_executed');
     assert.equal(result.expectedUnits, 0);
     assert.equal(result.requiredUnits, 0);
+    assert.equal(validateCoverage(result), true, validationErrors());
   });
 });
 
-describe('review coverage schema vocabulary', () => {
+describe('review coverage schema', () => {
+  const validCoverage = () => deriveReviewCoverage([unit('a')]);
+
   it('stays aligned with the runtime status vocabularies', () => {
     const schema = JSON.parse(
       readFileSync(new URL('../schemas/review-coverage.schema.json', import.meta.url), 'utf8')
@@ -98,5 +109,23 @@ describe('review coverage schema vocabulary', () => {
 
     assert.deepEqual(schema.properties.status.enum, [...REVIEW_COVERAGE_STATUSES]);
     assert.deepEqual(schema.$defs.reviewUnit.properties.status.enum, [...REVIEW_UNIT_STATUSES]);
+  });
+
+  it('rejects an unknown unit status', () => {
+    const coverage = validCoverage();
+    coverage.units[0].status = 'cancelled';
+    assert.equal(validateCoverage(coverage), false);
+  });
+
+  it('rejects an unknown top-level field', () => {
+    const coverage = validCoverage();
+    coverage.runtime = 'claude-code';
+    assert.equal(validateCoverage(coverage), false);
+  });
+
+  it('rejects negative coverage counters', () => {
+    const coverage = validCoverage();
+    coverage.completedUnits = -1;
+    assert.equal(validateCoverage(coverage), false);
   });
 });
