@@ -8,7 +8,7 @@ PR #2214 established the Experimental Review Coverage Contract. Phase 1 wires th
 
 ## Delivery slices
 
-### Slice A — Orchestrator coverage generation
+### Slice A—Orchestrator coverage generation
 
 - Use the existing `role × diff chunk` task descriptors as the Review Unit SSoT.
 - Derive stable unit IDs as `reviewer:<role>/chunk:<1-based index>`.
@@ -20,7 +20,7 @@ PR #2214 established the Experimental Review Coverage Contract. Phase 1 wires th
 
 This slice does not expose a new public CLI field yet.
 
-### Slice B — Observe-only surface propagation
+### Slice B—Observe-only surface propagation
 
 After Slice A is green and reviewed:
 
@@ -30,7 +30,7 @@ After Slice A is green and reviewed:
 - register the runtime field in Stable Interfaces with its Experimental/Beta status;
 - keep Gate and decision derivation unchanged.
 
-### Slice C — Visibility and dogfood
+### Slice C—Visibility and dogfood
 
 After the stored data is proven reliable:
 
