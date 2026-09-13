@@ -77,7 +77,7 @@ This is deliberately conservative. A future policy can introduce optional review
 
 ```yaml
 coverage:
-  schemaVersion: "1"
+  schemaVersion: '1'
   status: complete | partial | not_executed
   expectedUnits: 6
   completedUnits: 5
