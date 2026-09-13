@@ -72,7 +72,7 @@ describe('deriveReviewCoverage', () => {
     assert.equal(validateCoverage(result), true, validationErrors());
   });
 
-  it('treats missing required metadata as required (fail-safe)', () => {
+  it('treats missing required metadata as required and materializes the default', () => {
     const result = deriveReviewCoverage([
       {
         id: 'unknown-policy',
@@ -87,6 +87,8 @@ describe('deriveReviewCoverage', () => {
 
     assert.equal(result.requiredUnits, 1);
     assert.equal(result.status, 'not_executed');
+    assert.equal(result.units[0].required, true);
+    assert.equal(validateCoverage(result), true, validationErrors());
   });
 
   it('reports not_executed for an empty execution plan', () => {
