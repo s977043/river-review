@@ -42,15 +42,15 @@ Gate integration remains a later opt-in phase.
 
 ## Multi-perspective review
 
-| Perspective | Decision | Reason |
-| --- | --- | --- |
-| Architecture | APPROVE | Reuses the actual task descriptors instead of creating a second execution plan. |
-| Safety / Gate | APPROVE | Observe-only; no Gate or verdict input changes. |
-| Backward compatibility | APPROVE | Slice A only adds a return field on the reviewer-orchestration path. |
-| Schema / Contract | APPROVE WITH GUARDS | Runtime output must validate against the existing schema; derived values remain the SSoT for counters. |
-| Testing / Regression | APPROVE | Pins real allSettled timeout/failure paths, not only pure helper behavior. |
-| Operations / Observability | APPROVE | Staged exposure lets data quality be verified before promoting the field to a supported surface. |
-| Security / Trust boundary | APPROVE | No new network/tool capability and no trust elevation. |
+| Perspective                | Decision            | Reason                                                                                                 |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Architecture               | APPROVE             | Reuses the actual task descriptors instead of creating a second execution plan.                        |
+| Safety / Gate              | APPROVE             | Observe-only; no Gate or verdict input changes.                                                        |
+| Backward compatibility     | APPROVE             | Slice A only adds a return field on the reviewer-orchestration path.                                   |
+| Schema / Contract          | APPROVE WITH GUARDS | Runtime output must validate against the existing schema; derived values remain the SSoT for counters. |
+| Testing / Regression       | APPROVE             | Pins real allSettled timeout/failure paths, not only pure helper behavior.                             |
+| Operations / Observability | APPROVE             | Staged exposure lets data quality be verified before promoting the field to a supported surface.       |
+| Security / Trust boundary  | APPROVE             | No new network/tool capability and no trust elevation.                                                 |
 
 ## Approval conditions
 
