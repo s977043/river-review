@@ -2,9 +2,9 @@
 
 ## Status
 
-Design + observe-only implementation contract inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
+Contract foundation inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
 
-This document defines **review execution coverage** for River Review. It does not change gate behavior by itself.
+This document defines **review execution coverage** for River Review. The first implementation slice adds the schema and pure derivation logic only; runtime emission and Gate integration are separate follow-up changes.
 
 ## Why
 
@@ -88,21 +88,30 @@ Status derivation:
 
 A unit that completes with `findingsCount: 0` is still completed. Finding count never determines coverage.
 
-## Gate boundary
+## Rollout boundary
 
-Phase 1 is **observe-only**.
+### Foundation slice (this PR)
 
-- Existing `decision` and `gate` derivation are unchanged.
-- Coverage is emitted as machine-readable metadata.
-- `run-gate.mjs` keeps its existing all-reviewers-failed fail-safe.
+- Add the versioned Review Coverage schema.
+- Add pure `deriveReviewCoverage()` logic and regression tests.
+- Do not change runtime output, `decision`, or Gate behavior.
+
+### Observe-only runtime slice (next PR)
+
+- Build Review Units from the existing `role × chunk` task descriptors and outcomes.
+- Emit coverage as additive machine-readable metadata.
+- Keep existing `decision` and `gate` derivation unchanged.
+- Keep `run-gate.mjs`'s existing all-reviewers-failed fail-safe.
+
+### Gate integration (later, opt-in)
 
 Gate integration must be a separate change after fixtures and dogfooding demonstrate the policy we want for incomplete required vs optional coverage.
 
 ## Backward compatibility
 
-Coverage is additive and optional. Consumers that do not know the field can ignore it.
+The contract is designed to be additive and optional. Runtime consumers remain unchanged until the observe-only wiring lands.
 
-The v1 Review Artifact schema remains valid for artifacts that predate this field.
+When runtime emission is added, artifacts that predate coverage must remain valid and consumers that do not know the field must be able to ignore it.
 
 ## Future generalization
 
