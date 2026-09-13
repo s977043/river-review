@@ -4,7 +4,7 @@
 
 Contract foundation inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
 
-**Stability: Experimental.** This contract is not part of the Stable Contract yet. The first implementation slice adds the schema and pure derivation logic only; runtime emission and Gate integration are separate follow-up changes. Before runtime output becomes a supported external surface, `pages/reference/stable-interfaces.md` must be updated with the Review Coverage contract and its stability level.
+**Stability: Experimental.** This contract is not part of the Stable Contract yet. The first implementation slice adds only the schema and pure derivation logic. Runtime emission and Gate integration are separate follow-up changes. Before runtime output becomes a supported external surface, update `pages/reference/stable-interfaces.md`. Add Review Coverage and its stability level there.
 
 ## Why
 
@@ -15,7 +15,7 @@ A review run may produce no findings because:
 1. all intended review work completed and found nothing, or
 2. some intended review work failed, timed out, was skipped, or was otherwise not executed.
 
-The current reviewer orchestrator executes `reviewer role × diff chunk` units. Before #2212, per-role aggregation marked a role `fulfilled` when at least one of its chunks succeeded, while the gate only treated the run as not executed when every role failed. That makes partial execution observable in debug data but not a first-class contract.
+The current reviewer orchestrator executes `reviewer role × diff chunk` units. Before #2212, per-role aggregation marked a role `fulfilled` when at least one of its chunks succeeded. The gate treated a run as not executed only when every role failed. Partial execution was therefore visible in debug data, but not represented as a first-class contract.
 
 ## Scope
 
@@ -94,7 +94,7 @@ Status derivation:
 
 A unit that completes with `findingsCount: 0` is still completed. Finding count never determines coverage.
 
-The current v1 reviewer selection always produces at least one required role when reviewer orchestration runs. The `requiredUnits === 0` branch in `deriveReviewCoverage()` is defensive for a future policy where all units might be optional; in that case coverage falls back to whether all, some, or none of the planned optional units completed.
+The current v1 reviewer selection always produces at least one required role when reviewer orchestration runs. `deriveReviewCoverage()` still includes a defensive `requiredUnits === 0` branch for a future all-optional policy. In that case, coverage falls back to whether all, some, or none of the planned optional units completed.
 
 ## Rollout boundary
 
