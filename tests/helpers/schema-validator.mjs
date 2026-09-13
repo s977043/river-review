@@ -53,6 +53,11 @@ export function compileReviewArtifactValidator() {
   return compileSchemaFile('review-artifact.schema.json');
 }
 
+/** Compiled validator for schemas/review-coverage.schema.json (strict on). */
+export function compileReviewCoverageValidator() {
+  return compileSchemaFile('review-coverage.schema.json', { ajvOptions: { allErrors: true } });
+}
+
 /** Compiled validator for schemas/suppression-context.schema.json (strict on). */
 export function compileSuppressionContextValidator() {
   return compileSchemaFile('suppression-context.schema.json', { ajvOptions: { allErrors: true } });
