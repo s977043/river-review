@@ -23,10 +23,10 @@ This contract covers **execution coverage** only.
 
 It is intentionally separate from:
 
-- **Skill routing coverage** — `selectedSkills` / `skippedSkills` and their reasons.
-- **Context coverage** — repository context supplied / skipped by `repo-context.mjs`.
-- **Finding quality** — whether a finding is correct, blocking, or advisory.
-- **Reviewer independence** — who reviewed and what context they shared.
+- **Skill routing coverage**—`selectedSkills` / `skippedSkills` and their reasons.
+- **Context coverage**—repository context supplied / skipped by `repo-context.mjs`.
+- **Finding quality**—whether a finding is correct, blocking, or advisory.
+- **Reviewer independence**—who reviewed and what context they shared.
 
 ## Review Unit v1
 
