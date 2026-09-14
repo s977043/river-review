@@ -129,7 +129,7 @@ The file ledger is derived from the same `buildLlmDiffView()` / `optimizeDiff()`
 
 Chunked orchestration historically populated `filesForReview` with raw chunk files. `buildLlmDiffView()` treats `filesForReview` as the prompt source. That could reintroduce files that the normal optimizer had already excluded. Examples include Markdown, lockfiles, generated `dist/` files, and non-reviewable hunks.
 
-Slice C makes `buildLlmDiffView()` re-apply the optimizer when `filesForReview` is present. The operation is intentionally idempotent for already-optimized repository diffs and keeps chunked and non-chunked LLM scope aligned.
+Slice C preserves the existing contract that an independently supplied `filesForReview` is already optimized and must pass through unchanged. The internal chunk shape aliases the same raw array into both `files` and `filesForReview`; only that shape is re-optimized. This keeps chunked and non-chunked LLM scope aligned without changing existing callers.
 
 ## Rollout boundary
 
