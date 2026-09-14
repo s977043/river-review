@@ -19,7 +19,8 @@ Review Coverage already records `reviewer role × diff chunk` execution units an
 Two existing boundaries can remove files before reviewer execution:
 
 1. configured exclusions: `config.exclude.files` in `local-runner.mjs`;
-2. LLM diff optimization: files absent from `filesForReview` (for example documentation, lock files, generated `dist/` output, or changes whose hunks are removed by the optimizer).
+2. LLM diff optimization: files absent from `filesForReview`.
+   Examples include documentation, lock files, generated `dist/` output, or changes whose hunks are removed by the optimizer.
 
 The ledger must describe this scope without pretending that excluded files were executed Review Units.
 
