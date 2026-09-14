@@ -105,13 +105,13 @@ Explicitly state that Review Coverage does not influence Gate or decision in Pha
 
 ## Multi-perspective review
 
-- **Architecture—APPROVE:** one-way propagation from the runtime producer; no second coverage computation.
-- **Contract / SSoT—APPROVE WITH GUARD:** `review-coverage.schema.json` remains the shape SSoT, while each validator resolves that schema locally rather than duplicating it.
-- **Reliability—APPROVE:** absence is never rewritten as complete; partial/not-executed remain observable states.
-- **Backward compatibility—APPROVE:** new fields are additive and optional. Duplicate-role normalization resolves previously undefined redundant input. Offline schema resolution preserves existing local validation behavior.
-- **Security / trust—APPROVE:** metadata propagation adds no capability or authority and does not make saved records tamper-evident.
+- **Architecture—APPROVE:** one-way propagation from the runtime producer. Coverage is not recomputed.
+- **Contract / SSoT—APPROVE WITH GUARD:** `review-coverage.schema.json` remains the shape SSoT. Each validator resolves that schema locally without duplicating it.
+- **Reliability—APPROVE:** absence is never rewritten as complete. Partial and not-executed remain observable states.
+- **Backward compatibility—APPROVE:** new fields are additive and optional. Duplicate-role normalization resolves previously undefined redundant input. Offline schema resolution preserves local validation behavior.
+- **Security / trust—APPROVE:** metadata propagation adds no capability or authority. Saved records do not become tamper-evident.
 - **Operations—APPROVE:** JSON and saved runs enable dogfood metrics before Gate policy changes.
-- **Testing—APPROVE:** tests cover identity uniqueness, propagation, schema validation, legacy absence, and Gate non-interference; CI must also prove packaged schema availability.
+- **Testing—APPROVE:** tests cover identity uniqueness and propagation. They also cover schema validation, legacy absence, and Gate non-interference. CI must prove packaged schema availability.
 
 ## Approval conditions
 
