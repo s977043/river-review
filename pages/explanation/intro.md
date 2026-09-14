@@ -5,6 +5,8 @@ title: River Review へようこそ
 
 River Review (RR) は、**チームのレビュー判断を skill として明示化・バージョン管理し、SDLC の各ゲートで実行する OSS フレームワーク**です。
 
+中核思想は **Review Judgment as Code** です。現在の River Review は、チームの判断基準を所有・実行・改善する **Review Judgment Platform / team-owned audit layer** として位置付けています。
+
 このページは、はじめての方向けの短い導入です。課題認識・コアモデル・責任境界・目指さないものを含むコンセプトの全体像は [コンセプト](./concept.md) にまとめています。
 
 River Review は、PR の差分だけを見るツールではありません。AI 支援開発で発生する **要件・設計・計画・差分・レポート** をレビュー対象として扱い、作業に入る前から完了後まで、チームの判断基準を一貫して適用します。
@@ -32,6 +34,14 @@ River Review は、PR の差分だけを見るツールではありません。A
 - **Skills define judgment** — skill は「どんなレビュー判断を行うか」を YAML frontmatter + Markdown で記述する。`schemas/skill.schema.json` で検証され、requirements / design / plan / diff / tests / report / security / a11y / migration / dependency などの基準を載せる。
 - **Gates execute judgment** — SDLC の各ゲートで、対象アーティファクトに応じた skill を実行する。PR 完成後だけでなく、要件整理・設計・実装計画・検証・完了報告のいずれでも動かせる。
 - **Riverbed remembers judgment** — レビュー結果や決定は operating memory として残り、suppression や過去判断の再利用を通じて将来のレビューを一貫させる（[Riverbed Memory](./riverbed-memory.md)）。
+
+## Review Coverage
+
+River Review は、**「findings が 0 件だった」と「必要なレビューが完了した」を別の概念として扱います**。
+
+Experimental な Review Coverage Contract は、review unit ごとの完了状態を machine-readable に記録します。`completed` / `failed` / `timed_out` などを保持し、レビュー実行の完遂性を `complete` / `partial` / `not_executed` として観測できます。
+
+現段階では observe-only です。Review Coverage 自体は Gate / decision を変更せず、レビュー実行の完全性を確認するための観測情報として扱います。
 
 このドキュメントでは以下をカバーします。
 
