@@ -24,6 +24,12 @@ Two existing boundaries can remove files before reviewer execution:
 
 The ledger must describe this scope without pretending that excluded files were executed Review Units.
 
+## Compatibility with #2230
+
+Current `main` preserves the optimized `filesForReview` scope across reviewer chunking via #2230. Slice C observes that scope and does not reimplement chunking or diff optimization.
+
+Final verification must run on a branch current with #2230. This pins selection telemetry to the same LLM-facing scope used by reviewer execution.
+
 ## Contract
 
 Add an optional `fileScope` property to `reviewCoverage`:
@@ -92,9 +98,11 @@ Execution completion remains represented by Review Units. `fileScope` only recor
 
 Required before completion:
 
+- branch current with `main`, including #2230;
 - focused tests for scope derivation and Review Coverage schema;
 - existing Review Coverage runtime/surface tests;
 - repository CI required checks;
+- generated GitHub Action dist fresh;
 - unresolved blocking review threads = 0.
 
 ## Mandatory multi-perspective final review
