@@ -80079,7 +80079,99 @@ function synthesizeTeamLeadReport({ findings = [], reviewerResults = [] }) {
   };
 }
 
+;// CONCATENATED MODULE: ./src/lib/review-coverage.mjs
+/**
+ * Review execution coverage contract (#2212).
+ *
+ * Coverage answers whether the review work that was expected to run actually
+ * completed. It is deliberately independent from finding count, skill routing,
+ * context supply, and gate policy.
+ */
+
+const REVIEW_UNIT_STATUSES = Object.freeze(['completed', 'failed', 'timed_out']);
+const REVIEW_COVERAGE_STATUSES = Object.freeze(['complete', 'partial', 'not_executed']);
+
+function isCompleted(unit) {
+  return unit?.status === 'completed';
+}
+
+function normalizeRequired(unit) {
+  // Fail-safe default: an execution unit is required unless policy explicitly
+  // marks it optional. Materialize the default in the returned unit as well so
+  // the derived coverage object conforms to review-coverage.schema.json.
+  return { ...unit, required: unit?.required !== false };
+}
+
+function isRequired(unit) {
+  return unit?.required === true;
+}
+
+/**
+ * Derive machine-readable review execution coverage from already-planned units.
+ *
+ * This function is intentionally pure and has no gate side effects. Runtime
+ * wiring in reviewer-orchestrator is a separate step so observe-only telemetry
+ * can land before any policy change.
+ *
+ * @param {Array<object>} units planned/executed review units
+ * @returns {{
+ *   schemaVersion: '1',
+ *   status: 'complete'|'partial'|'not_executed',
+ *   expectedUnits: number,
+ *   completedUnits: number,
+ *   requiredUnits: number,
+ *   completedRequiredUnits: number,
+ *   incompleteRequiredUnitIds: string[],
+ *   units: Array<object>
+ * }}
+ */
+function deriveReviewCoverage(units = []) {
+  const normalizedUnits = Array.isArray(units)
+    ? units.filter(Boolean).map((unit) => normalizeRequired(unit))
+    : [];
+  const expectedUnits = normalizedUnits.length;
+  const completedUnits = normalizedUnits.filter(isCompleted).length;
+  const required = normalizedUnits.filter(isRequired);
+  const requiredUnits = required.length;
+  const completedRequiredUnits = required.filter(isCompleted).length;
+  const incompleteRequiredUnitIds = required
+    .filter((unit) => !isCompleted(unit))
+    .map((unit) => unit.id)
+    .filter((id) => typeof id === 'string' && id.length > 0);
+
+  let status;
+  if (expectedUnits === 0) {
+    status = 'not_executed';
+  } else if (requiredUnits === 0) {
+    // Defensive path for future policies that may make every unit optional.
+    status =
+      completedUnits === expectedUnits
+        ? 'complete'
+        : completedUnits > 0
+          ? 'partial'
+          : 'not_executed';
+  } else if (completedRequiredUnits === requiredUnits) {
+    status = 'complete';
+  } else if (completedRequiredUnits === 0) {
+    status = 'not_executed';
+  } else {
+    status = 'partial';
+  }
+
+  return {
+    schemaVersion: '1',
+    status,
+    expectedUnits,
+    completedUnits,
+    requiredUnits,
+    completedRequiredUnits,
+    incompleteRequiredUnitIds,
+    units: normalizedUnits,
+  };
+}
+
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
+
 
 
 
@@ -80750,6 +80842,22 @@ function editDistance(a, b) {
   return dp[m][n];
 }
 
+function reviewUnitSubjects(chunkDiff) {
+  const fileObjects = chunkDiff?.filesForReview ?? chunkDiff?.files ?? [];
+  const filePaths = fileObjects
+    .map((file) => file?.path)
+    .filter((value) => typeof value === 'string');
+  const changedFiles = Array.isArray(chunkDiff?.changedFiles)
+    ? chunkDiff.changedFiles.filter((value) => typeof value === 'string')
+    : [];
+  const subjects = [...new Set(filePaths.length > 0 ? filePaths : changedFiles)];
+  // Orchestration normally only runs when there are reviewable files. Keep the
+  // contract schema-valid if a malformed/custom diff reaches this layer while
+  // making the missing subject explicit instead of pretending the unit covered
+  // a real path.
+  return subjects.length > 0 ? subjects : ['<unknown-diff>'];
+}
+
 async function runReviewerOrchestration({
   diff,
   plan,
@@ -80888,6 +80996,29 @@ async function runReviewerOrchestration({
   const succeeded = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
   const failed = settled.filter((r) => r.status === 'rejected');
 
+  const requiredRoles = new Set(autoSelection ? (autoSelection.required ?? []) : roles);
+  const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
+    const task = settled[taskIdx];
+    const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
+    const status = task?.status === 'fulfilled' ? 'completed' : timedOut ? 'timed_out' : 'failed';
+    return {
+      id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
+      kind: 'diff-chunk',
+      subjects: reviewUnitSubjects(chunkDiff),
+      reviewerRole: roleName,
+      required: requiredRoles.has(roleName),
+      status,
+      reasonCode:
+        status === 'completed'
+          ? null
+          : status === 'timed_out'
+            ? 'reviewer_timeout'
+            : 'reviewer_error',
+      findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
+    };
+  });
+  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
   const rawFindings = succeeded.flatMap((r) =>
@@ -80956,6 +81087,7 @@ async function runReviewerOrchestration({
     findings: allFindings,
     classified,
     reviewerResults,
+    reviewCoverage,
     invalidRoles: invalid,
     autoSelectedRoles: reviewers?.length === 1 && reviewers[0] === 'auto' ? roles : null,
     // #1545 P1: explainable auto-selection — reasons per role, the always-on
