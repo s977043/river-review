@@ -24,6 +24,63 @@ function isRequired(unit) {
   return unit?.required === true;
 }
 
+function uniqueStrings(values) {
+  return [
+    ...new Set(
+      (Array.isArray(values) ? values : []).filter(
+        (value) => typeof value === 'string' && value.length > 0
+      )
+    ),
+  ];
+}
+
+/**
+ * Add the deterministic file-scope ledger to an already-derived coverage object.
+ *
+ * `selected` comes from the LLM-facing diff scope. `covered` is stricter: a
+ * selected file is covered only when at least one effective execution unit
+ * names it and every effective unit that names it completed. Required units are
+ * authoritative when present; the all-optional defensive path falls back to all
+ * units, mirroring deriveReviewCoverage(). Optional reviewer failures therefore
+ * do not make a file uncovered when required coverage completed.
+ *
+ * The helper is pure and does not alter coverage.status or Gate behavior.
+ *
+ * @param {object} coverage result of deriveReviewCoverage()
+ * @param {{selected?: string[], excluded?: Array<{path?: string, reasonCode?: string}>}} fileScope
+ * @returns {object}
+ */
+export function attachReviewFileCoverage(coverage, fileScope = {}) {
+  const units = Array.isArray(coverage?.units) ? coverage.units : [];
+  const requiredUnits = units.filter(isRequired);
+  const effectiveUnits = requiredUnits.length > 0 ? requiredUnits : units;
+  const selected = uniqueStrings(fileScope?.selected);
+  const covered = selected.filter((path) => {
+    const unitsForPath = effectiveUnits.filter(
+      (unit) => Array.isArray(unit?.subjects) && unit.subjects.includes(path)
+    );
+    return unitsForPath.length > 0 && unitsForPath.every(isCompleted);
+  });
+  const excluded = [];
+  const seenExcluded = new Set();
+  for (const entry of Array.isArray(fileScope?.excluded) ? fileScope.excluded : []) {
+    const path = typeof entry?.path === 'string' ? entry.path : '';
+    const reasonCode = typeof entry?.reasonCode === 'string' ? entry.reasonCode : '';
+    if (!path || !reasonCode || seenExcluded.has(path)) continue;
+    seenExcluded.add(path);
+    excluded.push({ path, reasonCode });
+  }
+
+  return {
+    ...coverage,
+    files: {
+      selected,
+      covered,
+      excluded,
+    },
+  };
+}
+
 /**
  * Derive machine-readable review execution coverage from already-planned units.
  *
