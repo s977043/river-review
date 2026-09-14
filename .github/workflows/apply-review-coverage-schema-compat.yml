@@ -1,0 +1,56 @@
+name: Apply Review Coverage Schema Compatibility Fix
+
+on:
+  push:
+    branches:
+      - feat/review-coverage-surface-2212
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply compatibility fix
+        run: node scripts/apply-review-coverage-schema-compat-fix.mjs
+
+      - name: Normalize changed files
+        run: |
+          npx prettier --write \
+            schemas/output.schema.json \
+            src/cli/render.mjs \
+            tests/review-coverage-surface.test.mjs \
+            docs/development/review-coverage-phase1-slice-b-plan.md
+          node scripts/fix-dashes.mjs
+          git diff --check
+
+      - name: Run focused tests
+        run: node --test tests/review-coverage-surface.test.mjs tests/review-coverage.test.mjs
+
+      - name: Commit compatibility fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            schemas/output.schema.json \
+            src/cli/render.mjs \
+            tests/review-coverage-surface.test.mjs \
+            docs/development/review-coverage-phase1-slice-b-plan.md
+          git commit -m "fix(review): keep output schema self-contained" || exit 0
+          git push origin HEAD:feat/review-coverage-surface-2212
