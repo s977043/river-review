@@ -67,9 +67,10 @@ describe('Review Coverage file scope', () => {
     ]);
   });
 
-  it('re-applies the optimizer when filesForReview contains raw chunk files', () => {
+  it('re-applies the optimizer only for the raw chunk alias shape', () => {
     const rawChunk = [file('src/app.js'), file('docs/guide.md')];
     const view = buildLlmDiffView({
+      files: rawChunk,
       filesForReview: rawChunk,
       diffText: renderDiffText(rawChunk),
     });
