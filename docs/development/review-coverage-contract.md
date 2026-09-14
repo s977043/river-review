@@ -125,7 +125,7 @@ Closed reason vocabulary:
 - `configured_exclusion`: the path matched `config.exclude.files`;
 - `diff_optimization`: the path did not match a configured exclusion but was absent from the LLM-facing `filesForReview` set.
 
-`selected` and `excluded` are deterministic, disjoint, and preserve first-seen changed-file order. Together they reconstruct the changed-file scope available at that boundary.
+`selected` and `excluded` are deterministic and disjoint. They preserve first-seen changed-file order. Together they reconstruct the changed-file scope available at that boundary.
 
 ### Why there is no `coveredFiles` field
 
