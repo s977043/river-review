@@ -4,7 +4,7 @@
 
 Contract foundation inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
 
-**Stability: Experimental.** This contract is not part of the Stable Contract yet. The first implementation slice adds only the schema and pure derivation logic. Runtime emission and Gate integration are separate follow-up changes. Before runtime output becomes a supported external surface, update `pages/reference/stable-interfaces.md`. Add Review Coverage and its stability level there.
+**Stability: Experimental.** Review Coverage is emitted on machine-readable reviewer-orchestration surfaces, but it is not a Stable Contract and has no Gate authority in Phase 1. `pages/reference/stable-interfaces.md` records the JSON/saved-run surface as Experimental.
 
 ## Why
 
@@ -19,7 +19,7 @@ The current reviewer orchestrator executes `reviewer role × diff chunk` units. 
 
 ## Scope
 
-This contract covers **execution coverage** only.
+This contract covers **execution coverage** plus the deterministic **file-selection scope** that precedes reviewer execution.
 
 It is intentionally separate from:
 
@@ -27,6 +27,8 @@ It is intentionally separate from:
 - **Context coverage**—repository context supplied / skipped by `repo-context.mjs`.
 - **Finding quality**—whether a finding is correct, blocking, or advisory.
 - **Reviewer independence**—who reviewed and what context they shared.
+
+File selection does not prove execution. Execution completion is still derived only from Review Units.
 
 ## Review Unit v1
 
@@ -76,13 +78,14 @@ This is deliberately conservative. A future policy can introduce optional review
 ## Coverage status
 
 ```yaml
-coverage:
+reviewCoverage:
   schemaVersion: '1'
   status: complete | partial | not_executed
   expectedUnits: 6
   completedUnits: 5
   requiredUnits: 4
   completedRequiredUnits: 3
+  incompleteRequiredUnitIds: []
   units: []
 ```
 
@@ -96,32 +99,79 @@ A unit that completes with `findingsCount: 0` is still completed. Finding count 
 
 The current v1 reviewer selection always produces at least one required role when reviewer orchestration runs. `deriveReviewCoverage()` still includes a defensive `requiredUnits === 0` branch for a future all-optional policy. In that case, coverage falls back to whether all, some, or none of the planned optional units completed.
 
+## File scope ledger
+
+Phase 1 / Slice C adds an optional `fileScope` ledger to the same Review Coverage object:
+
+```yaml
+fileScope:
+  selected:
+    - src/app.mjs
+  excluded:
+    - path: docs/notes.md
+      reasonCode: diff_optimization
+    - path: fixtures/generated.json
+      reasonCode: configured_exclusion
+```
+
+The ledger is derived at the local selection boundary where River Review still has both the raw repository change set and the exact diff passed to reviewer execution.
+
+Closed reason vocabulary:
+
+- `configured_exclusion`: the path matched `config.exclude.files`;
+- `diff_optimization`: the path did not match a configured exclusion but was absent from the LLM-facing `filesForReview` set.
+
+`selected` and `excluded` are deterministic, disjoint, and preserve first-seen changed-file order. Together they reconstruct the changed-file scope available at that boundary.
+
+### Why there is no `coveredFiles` field
+
+File-level execution completion is not equivalent to file selection. A file can appear in multiple Review Units because different reviewer roles inspect the same chunk. A `covered: true/false` value would therefore require policy about required vs optional reviewers and partial failures.
+
+That policy belongs to later Gate integration. Phase 1 keeps file selection as observation and Review Unit outcomes as the execution SSoT.
+
+### All-excluded / non-orchestrated runs
+
+`fileScope` is attached to an existing Review Coverage observation. If reviewer orchestration does not run, River Review does not synthesize Review Coverage solely to carry file selection metadata. In particular, legacy single-reviewer and early no-review paths keep their existing surface semantics. Generalizing scope telemetry to those paths is a separate change rather than an implicit expansion of this contract.
+
 ## Rollout boundary
 
-### Foundation slice (this PR)
+### Foundation — shipped
 
-- Add the versioned Review Coverage schema.
-- Add pure `deriveReviewCoverage()` logic and regression tests.
-- Compile the schema in Ajv strict mode and validate representative positive/negative cases.
-- Do not change runtime output, `decision`, or Gate behavior.
+- versioned Review Coverage schema;
+- pure `deriveReviewCoverage()` logic and regression tests;
+- no Gate behavior change.
 
-### Observe-only runtime slice (next PR)
+### Phase 1 / Slice A — shipped
 
-- Build Review Units from the existing `role × chunk` task descriptors and outcomes.
-- Emit coverage as additive machine-readable metadata.
-- Keep existing `decision` and `gate` derivation unchanged.
-- Keep `run-gate.mjs`'s existing all-reviewers-failed fail-safe.
-- Register Review Coverage in `pages/reference/stable-interfaces.md` before treating the runtime field as a supported external surface.
+- build Review Units from existing `role × chunk` task descriptors and outcomes;
+- derive complete / partial / not_executed at runtime;
+- keep Gate/decision unchanged.
 
-### Gate integration (later, opt-in)
+### Phase 1 / Slice B — shipped
+
+- propagate the existing object to JSON output and saved runs;
+- validate against the Review Coverage schema without duplicating its shape;
+- register the runtime surface as Experimental.
+
+### Phase 1 / Slice C — file selection scope
+
+- attach deterministic selected/excluded file scope to existing Review Coverage;
+- distinguish configured exclusions from LLM diff optimization;
+- do not derive file-level completion or change Gate policy.
+
+### Gate integration — later, opt-in
 
 Gate integration must be a separate change after fixtures and dogfooding demonstrate the policy we want for incomplete required vs optional coverage.
 
 ## Backward compatibility
 
-The contract is designed to be additive and optional. Runtime consumers remain unchanged until the observe-only wiring lands.
+The contract remains additive:
 
-When runtime emission is added, artifacts that predate coverage must remain valid and consumers that do not know the field must be able to ignore it.
+- `reviewCoverage` itself remains optional on output surfaces;
+- `fileScope` is optional inside Review Coverage;
+- artifacts produced before Slice C remain valid;
+- callers supplying an older programmatic context without file-scope metadata keep the pre-Slice-C Review Coverage object;
+- consumers that do not know the new field can ignore it while the surface is Experimental.
 
 ## Future generalization
 
