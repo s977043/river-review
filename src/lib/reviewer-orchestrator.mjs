@@ -7,6 +7,7 @@ import {
 } from './finding-factory.mjs';
 import { renderDiffText } from './diff-processor.mjs';
 import { synthesizeTeamLeadReport } from './team-lead-synthesizer.mjs';
+import { deriveReviewCoverage } from './review-coverage.mjs';
 
 export const REVIEWER_ROLES = {
   'bug-hunter': {
@@ -673,6 +674,22 @@ function editDistance(a, b) {
   return dp[m][n];
 }
 
+function reviewUnitSubjects(chunkDiff) {
+  const fileObjects = chunkDiff?.filesForReview ?? chunkDiff?.files ?? [];
+  const filePaths = fileObjects
+    .map((file) => file?.path)
+    .filter((value) => typeof value === 'string');
+  const changedFiles = Array.isArray(chunkDiff?.changedFiles)
+    ? chunkDiff.changedFiles.filter((value) => typeof value === 'string')
+    : [];
+  const subjects = [...new Set(filePaths.length > 0 ? filePaths : changedFiles)];
+  // Orchestration normally only runs when there are reviewable files. Keep the
+  // contract schema-valid if a malformed/custom diff reaches this layer while
+  // making the missing subject explicit instead of pretending the unit covered
+  // a real path.
+  return subjects.length > 0 ? subjects : ['<unknown-diff>'];
+}
+
 export async function runReviewerOrchestration({
   diff,
   plan,
@@ -811,6 +828,29 @@ export async function runReviewerOrchestration({
   const succeeded = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
   const failed = settled.filter((r) => r.status === 'rejected');
 
+  const requiredRoles = new Set(autoSelection ? (autoSelection.required ?? []) : roles);
+  const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
+    const task = settled[taskIdx];
+    const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
+    const status = task?.status === 'fulfilled' ? 'completed' : timedOut ? 'timed_out' : 'failed';
+    return {
+      id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
+      kind: 'diff-chunk',
+      subjects: reviewUnitSubjects(chunkDiff),
+      reviewerRole: roleName,
+      required: requiredRoles.has(roleName),
+      status,
+      reasonCode:
+        status === 'completed'
+          ? null
+          : status === 'timed_out'
+            ? 'reviewer_timeout'
+            : 'reviewer_error',
+      findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
+    };
+  });
+  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
   const rawFindings = succeeded.flatMap((r) =>
@@ -879,6 +919,7 @@ export async function runReviewerOrchestration({
     findings: allFindings,
     classified,
     reviewerResults,
+    reviewCoverage,
     invalidRoles: invalid,
     autoSelectedRoles: reviewers?.length === 1 && reviewers[0] === 'auto' ? roles : null,
     // #1545 P1: explainable auto-selection — reasons per role, the always-on
