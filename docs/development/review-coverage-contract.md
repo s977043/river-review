@@ -127,7 +127,7 @@ The file ledger is derived from the same `buildLlmDiffView()` / `optimizeDiff()`
 
 ## Chunked review consistency
 
-Chunked orchestration historically populated `filesForReview` with raw chunk files. Since `buildLlmDiffView()` treats `filesForReview` as the prompt source, that could reintroduce Markdown, lockfiles, generated `dist/` files, or non-reviewable hunks after the normal optimizer had excluded them.
+Chunked orchestration historically populated `filesForReview` with raw chunk files. `buildLlmDiffView()` treats `filesForReview` as the prompt source. That could reintroduce files that the normal optimizer had already excluded, including Markdown, lockfiles, generated `dist/` files, and non-reviewable hunks.
 
 Slice C makes `buildLlmDiffView()` re-apply the optimizer when `filesForReview` is present. The operation is intentionally idempotent for already-optimized repository diffs and keeps chunked and non-chunked LLM scope aligned.
 
