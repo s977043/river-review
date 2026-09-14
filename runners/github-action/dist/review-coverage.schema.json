@@ -33,6 +33,23 @@
     "units": {
       "type": "array",
       "items": { "$ref": "#/$defs/reviewUnit" }
+    },
+    "fileScope": {
+      "description": "Observe-only file selection ledger. Execution completion remains represented by Review Units; this field only records which changed files entered reviewer execution scope and which were excluded before it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "excluded"],
+      "properties": {
+        "selected": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "excluded": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fileExclusion" }
+        }
+      }
     }
   },
   "$defs": {
@@ -95,6 +112,18 @@
           "then": { "properties": { "reasonCode": { "const": "reviewer_timeout" } } }
         }
       ]
+    },
+    "fileExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reasonCode"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "reasonCode": {
+          "type": "string",
+          "enum": ["configured_exclusion", "diff_optimization"]
+        }
+      }
     }
   }
 }
