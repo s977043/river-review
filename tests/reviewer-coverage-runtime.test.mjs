@@ -50,6 +50,10 @@ function chunkedDiff() {
   ]);
 }
 
+function coveredSubjects(reviewCoverage) {
+  return [...new Set(reviewCoverage.units.flatMap((unit) => unit.subjects))].sort();
+}
+
 describe('reviewCoverage runtime wiring', () => {
   it('reports complete for a successful non-chunked required review', async () => {
     const result = await runReviewerOrchestration(baseArgs());
@@ -59,6 +63,28 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(result.reviewCoverage.completedRequiredUnits, 1);
     assert.equal(result.reviewCoverage.units[0].id, 'reviewer:bug-hunter/chunk:1');
     assert.deepEqual(result.reviewCoverage.units[0].subjects, ['src/a.js']);
+    assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
+  });
+
+  it('reports complete when every chunk of a required review completes', async () => {
+    const diff = chunkedDiff();
+    const result = await runReviewerOrchestration(baseArgs({ diff }));
+
+    assert.equal(result.reviewCoverage.status, 'complete');
+    assert.equal(result.reviewCoverage.expectedUnits, 2);
+    assert.equal(result.reviewCoverage.completedUnits, 2);
+    assert.equal(result.reviewCoverage.completedRequiredUnits, 2);
+    assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, []);
+    assert.deepEqual(coveredSubjects(result.reviewCoverage), [...diff.changedFiles].sort());
+    assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
+  });
+
+  it('keeps non-chunked subject accounting reconstructible from Review Units', async () => {
+    const diff = diffFor(['src/a.js', 'src/b.js', 'test/a.test.js']);
+    const result = await runReviewerOrchestration(baseArgs({ diff }));
+
+    assert.equal(result.reviewCoverage.expectedUnits, 1);
+    assert.deepEqual(coveredSubjects(result.reviewCoverage), [...diff.changedFiles].sort());
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
 
@@ -141,6 +167,32 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(result.reviewCoverage.expectedUnits, 2);
     assert.equal(result.reviewCoverage.requiredUnits, 1);
     assert.equal(result.reviewCoverage.completedRequiredUnits, 1);
+    assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
+  });
+
+  it('keeps a failed required reviewer incomplete even when optional work succeeds', async () => {
+    const result = await runReviewerOrchestration(
+      baseArgs({
+        reviewers: ['auto'],
+        fileTypes: { infra: ['infra/main.tf'] },
+        generateReviewImpl: async ({ projectRules }) => {
+          if (projectRules.includes('Bug Hunter reviewer')) {
+            throw new Error('required bug review failed');
+          }
+          return okReview();
+        },
+      })
+    );
+
+    assert.deepEqual(result.autoSelection.required, ['bug-hunter']);
+    assert.equal(result.reviewCoverage.status, 'not_executed');
+    assert.equal(result.reviewCoverage.expectedUnits, 2);
+    assert.equal(result.reviewCoverage.completedUnits, 1);
+    assert.equal(result.reviewCoverage.requiredUnits, 1);
+    assert.equal(result.reviewCoverage.completedRequiredUnits, 0);
+    assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, [
+      'reviewer:bug-hunter/chunk:1',
+    ]);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
 });
