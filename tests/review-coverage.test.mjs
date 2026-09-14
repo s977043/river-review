@@ -72,6 +72,24 @@ describe('deriveReviewCoverage', () => {
     assert.equal(validateCoverage(result), true, validationErrors());
   });
 
+  it('keeps review execution coverage independent from context coverage metadata', () => {
+    const units = [unit('required-a')];
+    const baseline = deriveReviewCoverage(units);
+    const contextSupplied = {
+      supplied: [{ path: 'src/required-a.js' }],
+      skipped: [],
+    };
+    const contextBudgetSkipped = {
+      supplied: [],
+      skipped: [{ path: 'src/required-a.js', reason: 'budget-exhausted' }],
+    };
+
+    assert.deepEqual(deriveReviewCoverage(units, contextSupplied), baseline);
+    assert.deepEqual(deriveReviewCoverage(units, contextBudgetSkipped), baseline);
+    assert.equal(baseline.status, 'complete');
+    assert.equal(validateCoverage(baseline), true, validationErrors());
+  });
+
   it('treats missing required metadata as required and materializes the default', () => {
     const result = deriveReviewCoverage([
       {
