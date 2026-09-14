@@ -195,6 +195,23 @@ test('buildLlmDiffView reuses the precomputed optimized view (collectRepoDiff sh
   assert.equal(view.diffText, 'PRECOMPUTED_OPTIMIZED');
 });
 
+test('buildLlmDiffView re-optimizes the raw chunk alias shape', () => {
+  const parsed = parseUnifiedDiff(twoFileArtifactDiff);
+  const rawChunk = parsed.files;
+  const view = buildLlmDiffView({
+    files: rawChunk,
+    filesForReview: rawChunk,
+    diffText: twoFileArtifactDiff,
+  });
+
+  assert.deepEqual(
+    view.files.map((f) => f.path),
+    ['src/app.ts']
+  );
+  assert.equal(view.diffText.includes('dist/index.mjs'), false);
+  assert.match(view.diffText, /src\/app\.ts/);
+});
+
 test('buildLlmDiffView filters dist on the fly when filesForReview is absent (plan/exec path)', () => {
   const parsed = parseUnifiedDiff(twoFileArtifactDiff);
   const view = buildLlmDiffView({ diffText: twoFileArtifactDiff, files: parsed.files });
