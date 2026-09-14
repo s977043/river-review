@@ -30,12 +30,46 @@
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true
     },
+    "files": {
+      "description": "Optional observe-only ledger of the LLM-facing changed-file scope. Legacy coverage objects may omit this field.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "covered", "excluded"],
+      "properties": {
+        "selected": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "covered": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "excluded": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/excludedFile" }
+        }
+      }
+    },
     "units": {
       "type": "array",
       "items": { "$ref": "#/$defs/reviewUnit" }
     }
   },
   "$defs": {
+    "excludedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reasonCode"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "reasonCode": {
+          "type": "string",
+          "enum": ["markdown", "lockfile", "generated_artifact", "non_reviewable_hunks"]
+        }
+      }
+    },
     "reviewUnit": {
       "type": "object",
       "additionalProperties": false,
