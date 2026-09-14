@@ -19,6 +19,13 @@ const MAX_HUNK_LINES = 200;
 const MAX_HUNK_HEAD = 120;
 const MAX_HUNK_TAIL = 40;
 
+export const LLM_DIFF_EXCLUSION_REASONS = Object.freeze([
+  'markdown',
+  'lockfile',
+  'generated_artifact',
+  'non_reviewable_hunks',
+]);
+
 function extension(path) {
   const idx = path.lastIndexOf('.');
   return idx >= 0 ? path.slice(idx).toLowerCase() : '';
@@ -29,12 +36,26 @@ function baseName(path) {
   return parts[parts.length - 1];
 }
 
-function isExcludedFile(path) {
+/**
+ * Return the deterministic path-policy reason a file is omitted from the
+ * LLM-facing diff, or null when the path itself is reviewable. Hunk-level
+ * filtering is represented separately as `non_reviewable_hunks` by
+ * buildLlmReviewScope().
+ *
+ * @param {string} path
+ * @returns {'markdown'|'lockfile'|'generated_artifact'|null}
+ */
+export function getLlmDiffExclusionReason(path) {
+  if (!path || typeof path !== 'string') return null;
   const ext = extension(path);
-  if (EXCLUDED_EXTENSIONS.has(ext)) return true;
-  if (EXCLUDED_FILES.has(baseName(path))) return true;
-  if (EXCLUDED_DIR_RE.test(path)) return true;
-  return false;
+  if (EXCLUDED_EXTENSIONS.has(ext)) return 'markdown';
+  if (EXCLUDED_FILES.has(baseName(path))) return 'lockfile';
+  if (EXCLUDED_DIR_RE.test(path)) return 'generated_artifact';
+  return null;
+}
+
+function isExcludedFile(path) {
+  return getLlmDiffExclusionReason(path) !== null;
 }
 
 /**
@@ -152,7 +173,8 @@ export function optimizeDiff(diff) {
  *
  * Two entry shapes converge here:
  *  - collectRepoDiff already ran optimizeDiff and exposes `filesForReview` +
- *    optimized `diffText` — reused as-is.
+ *    optimized `diffText` — re-optimizing is intentionally idempotent and also
+ *    protects chunked reviewer orchestration from reintroducing raw files.
  *  - the artifact-driven plan/exec path (review-plan.mjs) parses a diff
  *    artifact and bypasses optimizeDiff — filtered on the fly. The diff text is
  *    re-rendered only when a file was actually excluded, so the common
@@ -163,10 +185,11 @@ export function optimizeDiff(diff) {
  */
 export function buildLlmDiffView(diff) {
   if (Array.isArray(diff?.filesForReview)) {
-    return {
+    const optimized = optimizeDiff({
       files: diff.filesForReview,
       diffText: diff.diffText ?? renderDiffText(diff.filesForReview),
-    };
+    });
+    return { files: optimized.files, diffText: optimized.diffText };
   }
   const rawFiles = Array.isArray(diff?.files) ? diff.files : [];
   const files = rawFiles.filter((file) => !isExcludedFile(file?.path ?? ''));
@@ -175,6 +198,42 @@ export function buildLlmDiffView(diff) {
       ? (diff?.diffText ?? renderDiffText(files))
       : renderDiffText(files);
   return { files, diffText };
+}
+
+/**
+ * Build a deterministic ledger of the files selected for the LLM-facing diff
+ * and the files intentionally excluded from it. This is review-scope telemetry,
+ * not ContextCoverage: it says which changed files were eligible for the diff
+ * presented to the reviewer, not which extra repository context was supplied.
+ *
+ * @param {{changedFiles?: string[], files?: Array, filesForReview?: Array, diffText?: string}} diff
+ * @returns {{selected: string[], excluded: Array<{path: string, reasonCode: string}>}}
+ */
+export function buildLlmReviewScope(diff) {
+  const llmView = buildLlmDiffView(diff ?? {});
+  const selected = [
+    ...new Set(
+      (llmView.files ?? [])
+        .map((file) => file?.path)
+        .filter((path) => typeof path === 'string' && path.length > 0)
+    ),
+  ];
+  const rawFilePaths = (Array.isArray(diff?.files) ? diff.files : [])
+    .map((file) => file?.path)
+    .filter((path) => typeof path === 'string' && path.length > 0);
+  const changedFiles = Array.isArray(diff?.changedFiles)
+    ? diff.changedFiles.filter((path) => typeof path === 'string' && path.length > 0)
+    : [];
+  const allChanged = [...new Set([...changedFiles, ...rawFilePaths])];
+  const selectedSet = new Set(selected);
+  const excluded = allChanged
+    .filter((path) => !selectedSet.has(path))
+    .map((path) => ({
+      path,
+      reasonCode: getLlmDiffExclusionReason(path) ?? 'non_reviewable_hunks',
+    }));
+
+  return { selected, excluded };
 }
 
 export function renderDiffText(files) {
