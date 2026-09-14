@@ -234,8 +234,12 @@ export function resolveReviewerRoles(reviewers, { fileTypes, riskAssessment, sig
     return { valid: autoSelection.roles, invalid: [], autoSelection };
   }
   const names = reviewers ?? DEFAULT_REVIEWERS;
-  const valid = names.filter((n) => REVIEWER_ROLES[n]);
-  const invalid = names.filter((n) => !REVIEWER_ROLES[n]);
+  // A reviewer role is an identity, not an execution multiplicity. Normalize
+  // explicit duplicate names here so role aggregation and Review Unit IDs stay
+  // one-to-one while preserving the caller's first-seen order.
+  const uniqueNames = [...new Set(names)];
+  const valid = uniqueNames.filter((n) => REVIEWER_ROLES[n]);
+  const invalid = uniqueNames.filter((n) => !REVIEWER_ROLES[n]);
   return { valid, invalid };
 }
 
