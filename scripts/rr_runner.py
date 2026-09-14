@@ -14,10 +14,11 @@ if importlib.util.find_spec("jsonschema") is None:  # pragma: no cover - 依存�
   print("jsonschema が必要です。`pip install jsonschema` を実行してください。", file=sys.stderr)
   sys.exit(1)
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, RefResolver
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_SCHEMA_PATH = ROOT / "schemas" / "output.schema.json"
+REVIEW_COVERAGE_SCHEMA_PATH = ROOT / "schemas" / "review-coverage.schema.json"
 DEFAULT_ARTIFACT_PATH = ROOT / "artifacts" / "river-review-output.json"
 VALID_PHASES = {"upstream", "midstream", "downstream"}
 
@@ -40,9 +41,21 @@ class NullRiverbedMemory(RiverbedMemory):
 
 
 def load_schema_validator(path: Path) -> Draft202012Validator:
-  """JSON Schema を読み込み、バリデータを返す。"""
+  """JSON Schema をローカル参照込みで読み込み、バリデータを返す。"""
   schema = json.loads(path.read_text(encoding="utf-8"))
-  return Draft202012Validator(schema)
+  schema_store: dict[str, dict] = {}
+
+  # output.schema.json は Review Coverage の詳細契約を $id 参照する。
+  # Runner は offline でも動作する必要があるため、対応する schema を
+  # ローカル store に明示登録して remote fetch を発生させない。
+  if REVIEW_COVERAGE_SCHEMA_PATH.exists():
+    review_coverage_schema = json.loads(REVIEW_COVERAGE_SCHEMA_PATH.read_text(encoding="utf-8"))
+    schema_id = review_coverage_schema.get("$id")
+    if schema_id:
+      schema_store[str(schema_id)] = review_coverage_schema
+
+  resolver = RefResolver.from_schema(schema, store=schema_store)
+  return Draft202012Validator(schema, resolver=resolver)
 
 
 def normalize_issue(raw_issue: dict, default_phase: str | None = None) -> dict:
