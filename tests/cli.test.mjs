@@ -437,7 +437,15 @@ describe('river run - JSON output schema conformance', () => {
     const Ajv2020 = req('ajv/dist/2020');
     const schemaPath = fileURLToPath(new URL('../schemas/output.schema.json', import.meta.url));
     const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
+    // output.schema references review-coverage.schema.json by $id rather than
+    // inlining the Review Coverage contract, so the referenced schema has to be
+    // registered before compiling or Ajv throws "can't resolve reference".
+    const reviewCoverageSchemaPath = fileURLToPath(
+      new URL('../schemas/review-coverage.schema.json', import.meta.url)
+    );
+    const reviewCoverageSchema = JSON.parse(readFileSync(reviewCoverageSchemaPath, 'utf8'));
     const ajv = new Ajv2020({ strict: false });
+    ajv.addSchema(reviewCoverageSchema);
     const validate = ajv.compile(schema);
     const valid = validate(parsed);
     assert.ok(
