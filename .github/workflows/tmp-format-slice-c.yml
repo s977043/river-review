@@ -27,18 +27,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Format Slice C files
-        run: >-
-          npx --no-install prettier --write
-          docs/development/review-coverage-phase1-slice-c-plan.md
-          src/lib/local-runner.mjs
-          tests/review-file-scope.test.mjs
+      - name: Normalize and format Slice C files
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/fix-dashes.mjs \
+            docs/development/review-coverage-contract.md \
+            docs/development/review-coverage-phase1-slice-c-plan.md
+          npx --no-install prettier --write \
+            docs/development/review-coverage-contract.md \
+            docs/development/review-coverage-phase1-slice-c-plan.md \
+            src/lib/local-runner.mjs \
+            tests/review-file-scope.test.mjs
 
       - name: Commit formatting when needed
         shell: bash
         run: |
           set -euo pipefail
           git add \
+            docs/development/review-coverage-contract.md \
             docs/development/review-coverage-phase1-slice-c-plan.md \
             src/lib/local-runner.mjs \
             tests/review-file-scope.test.mjs
@@ -48,5 +55,5 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "style: format Review Coverage Slice C" -m "Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>"
+          git commit -m "style: normalize Review Coverage Slice C" -m "Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>"
           git push origin HEAD:feat/review-coverage-file-scope-2212
