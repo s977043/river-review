@@ -54,6 +54,8 @@ The Review Coverage shape remains owned by `schemas/review-coverage.schema.json`
 
 Runtime validation must register that schema with Ajv before compiling `output.schema.json`, then reference it by `$id`. Do not copy Review Coverage fields into `output.schema.json`.
 
+Consumers that validate `output.schema.json` outside the Node runtime must be able to resolve the same `$id` without network access. The bundled Python runner therefore registers the local `review-coverage.schema.json` in its schema resolver store.
+
 Old JSON payloads without `reviewCoverage` remain valid.
 
 ## Slice B-3 — saved run
@@ -95,22 +97,21 @@ Explicitly state that Review Coverage does not influence Gate or decision in Pha
 5. JSON output emits `reviewCoverage` only when present;
 6. JSON output with coverage validates using the Review Coverage schema as the SSoT;
 7. JSON output without coverage remains schema-valid;
-8. saved run persists the same coverage object;
-9. saved run without coverage preserves the legacy key shape;
-10. partial coverage does not change `decision` or Gate;
-11. Linux and macOS unit suites, Integration CLI, schema validation, and Action dist freshness are green.
+8. bundled non-Node consumers resolve the Review Coverage schema locally without network access;
+9. saved run persists the same coverage object;
+10. saved run without coverage preserves the legacy key shape;
+11. partial coverage does not change `decision` or Gate;
+12. Linux and macOS unit suites, Integration CLI, schema validation, and Action dist freshness are green.
 
 ## Multi-perspective review
 
-| Perspective | Verdict | Reason |
-| --- | --- | --- |
-| Architecture | APPROVE | One-way propagation from the runtime producer; no second coverage computation. |
-| Contract / SSoT | APPROVE WITH GUARD | `review-coverage.schema.json` remains the shape SSoT and is referenced by the output validator. |
-| Reliability | APPROVE | Absence is never rewritten as complete; partial/not-executed remain observable states. |
-| Backward compatibility | APPROVE | New fields are additive and optional. Duplicate-role normalization resolves previously undefined redundant input. |
-| Security / trust | APPROVE | Metadata propagation adds no capability or authority and does not make saved records tamper-evident. |
-| Operations | APPROVE | JSON and saved runs enable dogfood metrics before Gate policy changes. |
-| Testing | APPROVE | Tests cover identity uniqueness, propagation, schema validation, legacy absence, and Gate non-interference. |
+- **Architecture — APPROVE:** one-way propagation from the runtime producer; no second coverage computation.
+- **Contract / SSoT — APPROVE WITH GUARD:** `review-coverage.schema.json` remains the shape SSoT, while each validator resolves that schema locally rather than duplicating it.
+- **Reliability — APPROVE:** absence is never rewritten as complete; partial/not-executed remain observable states.
+- **Backward compatibility — APPROVE:** new fields are additive and optional. Duplicate-role normalization resolves previously undefined redundant input. Offline schema resolution preserves existing local validation behavior.
+- **Security / trust — APPROVE:** metadata propagation adds no capability or authority and does not make saved records tamper-evident.
+- **Operations — APPROVE:** JSON and saved runs enable dogfood metrics before Gate policy changes.
+- **Testing — APPROVE:** tests cover identity uniqueness, propagation, schema validation, legacy absence, and Gate non-interference; CI must also prove packaged schema availability.
 
 ## Approval conditions
 
@@ -119,6 +120,7 @@ Slice B can merge only when:
 - required CI is green;
 - unresolved blocking review threads are zero;
 - output validation does not duplicate the Review Coverage schema;
+- machine-readable consumers can resolve Review Coverage without network access;
 - legacy artifacts without coverage remain valid;
 - duplicate explicit reviewer roles cannot create duplicate Review Unit IDs;
 - Gate and decision behavior are unchanged.
