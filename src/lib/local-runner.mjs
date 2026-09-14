@@ -698,6 +698,9 @@ export async function runLocalReview({
     suppressedFindings,
     classified: review.classified,
     reviewerResults: review.reviewerResults ?? null,
+    // #2212 Phase 1: observe-only execution coverage. Preserve the producer's
+    // object verbatim; a single-reviewer run has no coverage contract to invent.
+    reviewCoverage: review.reviewCoverage ?? null,
     teamLeadReport: review.teamLeadReport ?? null,
     tokenEstimate: context.diff.tokenEstimate,
     rawTokenEstimate: context.diff.rawTokenEstimate,
