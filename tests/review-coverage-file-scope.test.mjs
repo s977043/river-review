@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -136,10 +137,10 @@ describe('Review Coverage file scope', () => {
     assert.equal(validateCoverage(invalid), false);
   });
 
-  it('keeps code and schema exclusion vocabularies aligned', async () => {
-    const schema = (await import('../schemas/review-coverage.schema.json', {
-      with: { type: 'json' },
-    })).default;
+  it('keeps code and schema exclusion vocabularies aligned', () => {
+    const schema = JSON.parse(
+      readFileSync(new URL('../schemas/review-coverage.schema.json', import.meta.url), 'utf8')
+    );
     assert.deepEqual(schema.$defs.excludedFile.properties.reasonCode.enum, LLM_DIFF_EXCLUSION_REASONS);
   });
 
