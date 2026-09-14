@@ -133,31 +133,31 @@ Slice C makes `buildLlmDiffView()` re-apply the optimizer when `filesForReview` 
 
 ## Rollout boundary
 
-### Foundation — merged
+### Foundation—merged
 
 - Versioned Review Coverage schema.
 - Pure `deriveReviewCoverage()` logic and regression tests.
 - Schema validation in Ajv strict mode.
 
-### Phase 1 / Slice A — merged
+### Phase 1 / Slice A—merged
 
 - Build Review Units from the existing `role × chunk` task descriptors and outcomes.
 - Derive runtime `complete | partial | not_executed` without changing Gate behavior.
 
-### Phase 1 / Slice B — merged
+### Phase 1 / Slice B—merged
 
 - Propagate coverage to JSON output and saved runs.
 - Keep the field optional and backward compatible.
 - Register Review Coverage as Experimental in `pages/reference/stable-interfaces.md`.
 
-### Phase 1 / Slice C — file scope telemetry
+### Phase 1 / Slice C—file scope telemetry
 
 - Record selected / covered / excluded file scope with deterministic reasons.
 - Keep the ledger additive and observe-only.
 - Keep Context Coverage separate.
 - Keep existing Gate / decision behavior unchanged.
 
-### Dogfood and Gate integration — later
+### Dogfood and Gate integration—later
 
 Before Gate integration, dogfood Review Coverage using River Review's own runs and measure at least:
 
