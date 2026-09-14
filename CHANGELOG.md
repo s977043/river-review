@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.110.0](https://github.com/s977043/river-review/compare/v1.109.1...v1.110.0) (2026-09-14)
+
+
+### Features
+
+* add Review Coverage Contract foundation ([#2212](https://github.com/s977043/river-review/issues/2212)) ([5001f19](https://github.com/s977043/river-review/commit/5001f19424fcd3930e9e166620784b604b0e7660))
+* **review:** derive per-unit Review Coverage in orchestrator ([#2212](https://github.com/s977043/river-review/issues/2212)) ([433763a](https://github.com/s977043/river-review/commit/433763ae22734d7f8c97909320439b8129d188b3))
+* **review:** expose Review Coverage in JSON and saved runs ([#2212](https://github.com/s977043/river-review/issues/2212)) ([#2217](https://github.com/s977043/river-review/issues/2217)) ([e31eb68](https://github.com/s977043/river-review/commit/e31eb6806169832453ddba15280a442c953f735e))
+
 ## [1.109.1](https://github.com/s977043/river-review/compare/v1.109.0...v1.109.1) (2026-09-10)
 
 
