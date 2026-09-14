@@ -2,9 +2,9 @@
 
 ## Status
 
-Contract foundation inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
+Contract inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
 
-**Stability: Experimental.** This contract is not part of the Stable Contract yet. The first implementation slice adds only the schema and pure derivation logic. Runtime emission and Gate integration are separate follow-up changes. Before runtime output becomes a supported external surface, update `pages/reference/stable-interfaces.md`. Add Review Coverage and its stability level there.
+**Stability: Experimental.** The contract foundation, per-unit runtime derivation, JSON output, and saved-run persistence are implemented. Review Coverage remains observe-only: it does not change `decision`, Gate, auto-approve, or Human Review policy.
 
 ## Why
 
@@ -19,7 +19,7 @@ The current reviewer orchestrator executes `reviewer role × diff chunk` units. 
 
 ## Scope
 
-This contract covers **execution coverage** only.
+This contract covers **execution coverage** and an observe-only ledger of the **LLM-facing changed-file scope**.
 
 It is intentionally separate from:
 
@@ -27,6 +27,8 @@ It is intentionally separate from:
 - **Context coverage**—repository context supplied / skipped by `repo-context.mjs`.
 - **Finding quality**—whether a finding is correct, blocking, or advisory.
 - **Reviewer independence**—who reviewed and what context they shared.
+
+The file ledger does not claim that excluded files were ignored by every deterministic heuristic. It records which changed files were selected for the LLM-facing diff and which were intentionally excluded by the existing diff optimizer.
 
 ## Review Unit v1
 
@@ -83,6 +85,16 @@ coverage:
   completedUnits: 5
   requiredUnits: 4
   completedRequiredUnits: 3
+  incompleteRequiredUnitIds:
+    - reviewer:security-scanner/chunk:2
+  files:
+    selected:
+      - src/auth/session.ts
+    covered:
+      - src/auth/session.ts
+    excluded:
+      - path: docs/guide.md
+        reasonCode: markdown
   units: []
 ```
 
@@ -96,32 +108,72 @@ A unit that completes with `findingsCount: 0` is still completed. Finding count 
 
 The current v1 reviewer selection always produces at least one required role when reviewer orchestration runs. `deriveReviewCoverage()` still includes a defensive `requiredUnits === 0` branch for a future all-optional policy. In that case, coverage falls back to whether all, some, or none of the planned optional units completed.
 
+## File scope ledger
+
+`files` is optional and additive so saved runs produced before Slice C remain schema-valid.
+
+- `selected`: changed file paths present in the LLM-facing diff after the existing diff optimizer runs.
+- `covered`: selected paths for which every effective Review Unit that names the path completed. Required units are authoritative when they exist; optional reviewer failures do not weaken required file coverage.
+- `excluded`: changed file paths omitted from the LLM-facing diff together with a deterministic reason code.
+
+Current exclusion reasons are:
+
+- `markdown`—Markdown paths excluded by the existing LLM diff policy.
+- `lockfile`—supported lockfiles excluded by the existing LLM diff policy.
+- `generated_artifact`—paths under a `dist/` segment.
+- `non_reviewable_hunks`—the path is otherwise reviewable, but no hunk remains after whitespace/comment-only filtering or the diff has no reviewable hunk.
+
+The file ledger is derived from the same `buildLlmDiffView()` / `optimizeDiff()` policy used to construct reviewer prompts. It must not reimplement an independent selection policy.
+
+## Chunked review consistency
+
+Chunked orchestration historically populated `filesForReview` with raw chunk files. Since `buildLlmDiffView()` treats `filesForReview` as the prompt source, that could reintroduce Markdown, lockfiles, generated `dist/` files, or non-reviewable hunks after the normal optimizer had excluded them.
+
+Slice C makes `buildLlmDiffView()` re-apply the optimizer when `filesForReview` is present. The operation is intentionally idempotent for already-optimized repository diffs and keeps chunked and non-chunked LLM scope aligned.
+
 ## Rollout boundary
 
-### Foundation slice (this PR)
+### Foundation — merged
 
-- Add the versioned Review Coverage schema.
-- Add pure `deriveReviewCoverage()` logic and regression tests.
-- Compile the schema in Ajv strict mode and validate representative positive/negative cases.
-- Do not change runtime output, `decision`, or Gate behavior.
+- Versioned Review Coverage schema.
+- Pure `deriveReviewCoverage()` logic and regression tests.
+- Schema validation in Ajv strict mode.
 
-### Observe-only runtime slice (next PR)
+### Phase 1 / Slice A — merged
 
 - Build Review Units from the existing `role × chunk` task descriptors and outcomes.
-- Emit coverage as additive machine-readable metadata.
-- Keep existing `decision` and `gate` derivation unchanged.
-- Keep `run-gate.mjs`'s existing all-reviewers-failed fail-safe.
-- Register Review Coverage in `pages/reference/stable-interfaces.md` before treating the runtime field as a supported external surface.
+- Derive runtime `complete | partial | not_executed` without changing Gate behavior.
 
-### Gate integration (later, opt-in)
+### Phase 1 / Slice B — merged
 
-Gate integration must be a separate change after fixtures and dogfooding demonstrate the policy we want for incomplete required vs optional coverage.
+- Propagate coverage to JSON output and saved runs.
+- Keep the field optional and backward compatible.
+- Register Review Coverage as Experimental in `pages/reference/stable-interfaces.md`.
+
+### Phase 1 / Slice C — file scope telemetry
+
+- Record selected / covered / excluded file scope with deterministic reasons.
+- Keep the ledger additive and observe-only.
+- Keep Context Coverage separate.
+- Keep existing Gate / decision behavior unchanged.
+
+### Dogfood and Gate integration — later
+
+Before Gate integration, dogfood Review Coverage using River Review's own runs and measure at least:
+
+- required unit completion rate;
+- partial review rate;
+- required timeout/failure rate;
+- `0 findings + partial` frequency;
+- unexplained selected-but-uncovered files.
+
+Gate integration must be a separate, opt-in change after those observations establish the desired policy for incomplete required vs optional coverage.
 
 ## Backward compatibility
 
-The contract is designed to be additive and optional. Runtime consumers remain unchanged until the observe-only wiring lands.
+Review Coverage and the `files` ledger are additive. Artifacts and saved runs that predate either field remain valid.
 
-When runtime emission is added, artifacts that predate coverage must remain valid and consumers that do not know the field must be able to ignore it.
+Consumers must not interpret an absent `reviewCoverage` or absent `reviewCoverage.files` as proof of complete coverage.
 
 ## Future generalization
 
@@ -134,4 +186,4 @@ If usage proves valuable, later versions may define semantic Review Units for up
 - plan → task / milestone
 - security → trust boundary
 
-That is explicitly out of scope for the first implementation.
+That is explicitly out of scope for the current implementation.
