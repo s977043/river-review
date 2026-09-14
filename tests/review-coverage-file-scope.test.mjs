@@ -138,7 +138,10 @@ describe('Review Coverage file scope', () => {
     const schema = JSON.parse(
       readFileSync(new URL('../schemas/review-coverage.schema.json', import.meta.url), 'utf8')
     );
-    assert.deepEqual(schema.$defs.excludedFile.properties.reasonCode.enum, LLM_DIFF_EXCLUSION_REASONS);
+    assert.deepEqual(
+      schema.$defs.excludedFile.properties.reasonCode.enum,
+      LLM_DIFF_EXCLUSION_REASONS
+    );
   });
 
   it('wires file scope into runtime Review Coverage', async () => {
