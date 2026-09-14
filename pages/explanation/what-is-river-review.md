@@ -5,6 +5,8 @@ title: River Review とは
 
 River Review は、**チーム固有のレビュー判断を、要件・設計・計画・差分・レポートにまたがって実行できる OSS フレームワーク**です。
 
+中核思想は **Review Judgment as Code** です。現在のプロダクトは **Review Judgment Platform / team-owned audit layer** として、チームの判断基準を所有・実行・観測・改善できる形にします。
+
 このページは、機能・利用方法・実行モデルの概要を扱います。課題認識・コアモデル・責任境界を含むコンセプトの全体像は [コンセプト](./concept.md) にまとめています。
 
 一般的な AI レビューツールは、PR diff を主な入力として扱います。River Review はそれだけではありません。AI エージェントが実装に入る前の要件・設計・計画もレビュー対象に含め、実装後の差分・テスト・完了レポートまで一貫して確認します。
@@ -34,6 +36,7 @@ River Review は、**コードだけでなく、開発の流れそのものを�
 - テスト/リリース前の回帰やカバレッジ漏れを抑える
 - レビュー判断をチーム所有の Skill として再利用可能にする
 - AI エージェントの作業結果を、チームの基準で監査できるようにする
+- findings の有無とレビュー実行の完遂性を分離し、false clean を避ける
 
 ## 位置付け
 
@@ -61,6 +64,16 @@ River Review はスキルを束ねるだけでなく、それを動かす**レ�
 - **観点別レビュアーの並列実行とマージ（review team）** — `src/lib/reviewer-orchestrator.mjs` が観点別レビュアーロールを並列に走らせ、各 finding を connected-components でマージする。ロールは bug-hunter / security-scanner / test-gap / dependency-reviewer / frontend-reviewer / ci-cd-reviewer の 6 種類。`--reviewers auto` なら差分内容に応じてロールが選ばれる。
 
 ここでいう「マルチエージェント」は、1 つの orchestrator が観点別レビュアーのロールを並列に動かして結果をマージする仕組みです。完全に自律した独立エージェント群ではなく、あくまで**観点別レビュアーの並列実行とマージ**を指します。
+
+## Review Coverage
+
+River Review は、**「findings が 0 件だった」と「必要なレビューが完了した」を別の概念として扱います**。
+
+Experimental な Review Coverage Contract は、review unit ごとの実行結果を machine-readable に残します。現在の最小単位は reviewer role × diff chunk です。unit は `completed` / `failed` / `timed_out` などの状態を持ちます。
+
+集約結果は `complete` / `partial` / `not_executed` として表現します。これにより、一部の reviewer や chunk が失敗した状態を「レビュー完了」と誤認しにくくします。
+
+現段階では observe-only です。Review Coverage は JSON artifact / saved run に保存されますが、既存の Gate / decision の挙動は変更しません。Gate 連携は、観測と回帰テストを経て別段階で扱います。
 
 ## 反復ループと判定素材の critic
 

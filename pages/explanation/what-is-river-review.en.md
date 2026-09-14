@@ -5,6 +5,8 @@ title: What is River Review
 
 River Review is an **OSS framework that runs a team's own review judgment across requirements, design, plan, diff, and report**.
 
+Its core idea is **Review Judgment as Code**. The current product is a **Review Judgment Platform / team-owned audit layer** for owning, executing, observing, and improving team review judgment.
+
 This page covers features, usage, and the execution model. The overall concept — the problems, the core model, and the responsibility boundary — is collected in [Concept](./concept.en.md).
 
 A typical AI review tool treats the PR diff as its main input. River Review does not stop there: it also reviews the requirements, design, and plan that come before an AI agent starts implementing, and stays consistent through the diff, tests, and completion report afterwards.
@@ -29,9 +31,12 @@ River Review is a framework for reviewing **the flow of development itself, not 
 
 ## Purpose
 
-- Detect drift and risks early in the design phase.
-- Standardize review perspectives without stalling implementation reviews.
-- Reduce regression and coverage gaps before test/release.
+- Reduce ambiguity in requirements, design, and plans before implementation.
+- Detect drift between plans and implementation during and after execution.
+- Reduce regression and coverage gaps before test or release.
+- Make review judgment reusable as team-owned Skills.
+- Audit AI-agent output against team-owned criteria.
+- Separate findings from review-execution completeness so a partial review is not mistaken for a clean review.
 
 ## Positioning
 
@@ -59,6 +64,16 @@ River Review does more than bundle skills — it ships a **dedicated review agen
 - **Parallel perspective reviewers with merge (review team)** — `src/lib/reviewer-orchestrator.mjs` runs perspective-based reviewer roles (bug-hunter / security-scanner / test-gap / dependency-reviewer / frontend-reviewer / ci-cd-reviewer) in parallel, then clusters and merges their findings via connected-components. With `--reviewers auto`, the roles relevant to the diff are selected automatically.
 
 Here, "multi-agent" means a single orchestrator running perspective-based reviewer roles in parallel and merging the results. It is not a set of fully autonomous, independent agents — it is specifically **parallel execution and merge of perspective reviewers**.
+
+## Review Coverage
+
+River Review treats **"zero findings" and "the required review work completed" as separate facts**.
+
+The experimental Review Coverage Contract records the result of each review unit in machine-readable form. The current minimum unit is reviewer role × diff chunk, and units preserve states such as `completed`, `failed`, and `timed_out`.
+
+Aggregate coverage is exposed as `complete`, `partial`, or `not_executed`. This prevents a successful subset of reviewer work from silently implying that the entire review completed.
+
+At this stage Review Coverage is observe-only. It is persisted in JSON artifacts and saved runs, but it does not change existing Gate or decision behavior. Gate integration is a later step after observation and regression validation.
 
 ## Iteration loop and decision material critic
 
