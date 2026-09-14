@@ -25,14 +25,13 @@ replaceOnce(
 replaceOnce(
   'src/cli/render.mjs',
   `  return outputSchemaValidator;\n}\n\n/**\n * Validate a formatted artifact against output.schema.json at runtime and`,
-  `  return outputSchemaValidator;\n}\n\nlet reviewCoverageSchemaValidator;\n\n/**\n * Compile the dedicated Review Coverage contract separately from output.schema.\n * Keeping the schemas separate preserves output.schema.json as a self-contained\n * artifact for existing consumers while review-coverage.schema.json remains the\n * single detailed shape SSoT.\n */\nexport function getReviewCoverageSchemaValidator() {\n  if (reviewCoverageSchemaValidator !== undefined) return reviewCoverageSchemaValidator;\n  try {\n    const schemaPath = new URL('../../schemas/review-coverage.schema.json', import.meta.url);\n    const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));\n    const ajv = new Ajv2020({ allErrors: true, strict: false });\n    addFormats(ajv);\n    reviewCoverageSchemaValidator = ajv.compile(schema);\n  } catch (err) {\n    console.error(\n      \`Warning: could not load review-coverage.schema.json for validation: {err.message}\`\n    );\n    reviewCoverageSchemaValidator = null;\n  }\n  return reviewCoverageSchemaValidator;\n}\n\n/**\n * Validate a formatted artifact against output.schema.json at runtime and`
-    .replace('\\u001b{err.message}', '${err.message}')
+  `  return outputSchemaValidator;\n}\n\nlet reviewCoverageSchemaValidator;\n\n/**\n * Compile the dedicated Review Coverage contract separately from output.schema.\n * Keeping the schemas separate preserves output.schema.json as a self-contained\n * artifact for existing consumers while review-coverage.schema.json remains the\n * single detailed shape SSoT.\n */\nexport function getReviewCoverageSchemaValidator() {\n  if (reviewCoverageSchemaValidator !== undefined) return reviewCoverageSchemaValidator;\n  try {\n    const schemaPath = new URL('../../schemas/review-coverage.schema.json', import.meta.url);\n    const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));\n    const ajv = new Ajv2020({ allErrors: true, strict: false });\n    addFormats(ajv);\n    reviewCoverageSchemaValidator = ajv.compile(schema);\n  } catch (err) {\n    console.error(\n      \`Warning: could not load review-coverage.schema.json for validation: \${err.message}\`\n    );\n    reviewCoverageSchemaValidator = null;\n  }\n  return reviewCoverageSchemaValidator;\n}\n\n/**\n * Validate a formatted artifact against output.schema.json at runtime and`
 );
 
 replaceOnce(
   'src/cli/render.mjs',
-  `  if (!validate(artifact)) {\n    console.error(\n      \`Warning: JSON output does not conform to schemas/output.schema.json:\\n{JSON.stringify(\n        validate.errors,\n        null,\n        2\n      )}\`\n    );\n  }\n}`.replace('\\u001b{JSON.stringify', '${JSON.stringify'),
-  `  if (!validate(artifact)) {\n    console.error(\n      \`Warning: JSON output does not conform to schemas/output.schema.json:\\n{JSON.stringify(\n        validate.errors,\n        null,\n        2\n      )}\`\n    );\n  }\n  if (artifact?.reviewCoverage) {\n    const validateCoverage = getReviewCoverageSchemaValidator();\n    if (validateCoverage && !validateCoverage(artifact.reviewCoverage)) {\n      console.error(\n        \`Warning: reviewCoverage does not conform to schemas/review-coverage.schema.json:\\n{JSON.stringify(\n          validateCoverage.errors,\n          null,\n          2\n        )}\`\n      );\n    }\n  }\n}`.replaceAll('\\u001b{JSON.stringify', '${JSON.stringify')
+  `  if (!validate(artifact)) {\n    console.error(\n      \`Warning: JSON output does not conform to schemas/output.schema.json:\\n\${JSON.stringify(\n        validate.errors,\n        null,\n        2\n      )}\`\n    );\n  }\n}`,
+  `  if (!validate(artifact)) {\n    console.error(\n      \`Warning: JSON output does not conform to schemas/output.schema.json:\\n\${JSON.stringify(\n        validate.errors,\n        null,\n        2\n      )}\`\n    );\n  }\n  if (artifact?.reviewCoverage) {\n    const validateCoverage = getReviewCoverageSchemaValidator();\n    if (validateCoverage && !validateCoverage(artifact.reviewCoverage)) {\n      console.error(\n        \`Warning: reviewCoverage does not conform to schemas/review-coverage.schema.json:\\n\${JSON.stringify(\n          validateCoverage.errors,\n          null,\n          2\n        )}\`\n      );\n    }\n  }\n}`
 );
 
 replaceOnce(
@@ -49,14 +48,14 @@ replaceOnce(
 
 replaceOnce(
   'docs/development/review-coverage-phase1-slice-b-plan.md',
-  `The Review Coverage shape remains owned by \u0060schemas/review-coverage.schema.json\u0060.\n\nRuntime validation must register that schema with Ajv before compiling \u0060output.schema.json\u0060, then reference it by \u0060$id\u0060. Do not copy Review Coverage fields into \u0060output.schema.json\u0060.\n\nOld JSON payloads without \u0060reviewCoverage\u0060 remain valid.`,
-  `The Review Coverage shape remains owned by \u0060schemas/review-coverage.schema.json\u0060.\n\n\u0060output.schema.json\u0060 stays self-contained for existing consumers and declares \u0060reviewCoverage\u0060 only as an optional object. Runtime validation separately validates that object against the dedicated Review Coverage schema. Do not copy Review Coverage fields into \u0060output.schema.json\u0060 and do not introduce a remote-reference requirement for consumers that compile only the output schema.\n\nOld JSON payloads without \u0060reviewCoverage\u0060 remain valid.`
+  `The Review Coverage shape remains owned by \`schemas/review-coverage.schema.json\`.\n\nRuntime validation must register that schema with Ajv before compiling \`output.schema.json\`, then reference it by \`$id\`. Do not copy Review Coverage fields into \`output.schema.json\`.\n\nOld JSON payloads without \`reviewCoverage\` remain valid.`,
+  `The Review Coverage shape remains owned by \`schemas/review-coverage.schema.json\`.\n\n\`output.schema.json\` stays self-contained for existing consumers and declares \`reviewCoverage\` only as an optional object. Runtime validation separately validates that object against the dedicated Review Coverage schema. Do not copy Review Coverage fields into \`output.schema.json\` and do not introduce a remote-reference requirement for consumers that compile only the output schema.\n\nOld JSON payloads without \`reviewCoverage\` remain valid.`
 );
 
 replaceOnce(
   'docs/development/review-coverage-phase1-slice-b-plan.md',
-  `| Contract / SSoT | APPROVE WITH GUARD | \u0060review-coverage.schema.json\u0060 remains the shape SSoT and is referenced by the output validator. |`,
-  `| Contract / SSoT | APPROVE WITH GUARD | \u0060review-coverage.schema.json\u0060 remains the detailed shape SSoT; output schema stays self-contained and runtime validates coverage separately. |`
+  `| Contract / SSoT | APPROVE WITH GUARD | \`review-coverage.schema.json\` remains the shape SSoT and is referenced by the output validator. |`,
+  `| Contract / SSoT | APPROVE WITH GUARD | \`review-coverage.schema.json\` remains the detailed shape SSoT; output schema stays self-contained and runtime validates coverage separately. |`
 );
 
 replaceOnce(
