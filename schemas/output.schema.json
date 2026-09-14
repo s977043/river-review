@@ -34,6 +34,10 @@
         "minLength": 1
       }
     },
+    "reviewCoverage": {
+      "description": "Observe-only Review Coverage for reviewer orchestration (#2212 Phase 1). Additive/optional. Its absence is not equivalent to complete coverage, and this field MUST NOT change decision or gate behavior in Phase 1.",
+      "$ref": "https://river-review.the3396.com/schemas/review-coverage.schema.json"
+    },
     "teamLeadReport": {
       "description": "Tech Lead synthesis of a multi-role run (#1700). Emitted only when the run went through reviewer orchestration (`--reviewers`), so its absence means a single-reviewer run. Produced by synthesizeTeamLeadReport (src/lib/team-lead-synthesizer.mjs) with no LLM call — every field is a deterministic aggregation of the same findings already listed in `issues`. Additive/optional and display-only: it MUST NOT override severity, `decision`, or `gate`.",
       "$ref": "#/$defs/teamLeadReport"
