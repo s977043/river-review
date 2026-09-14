@@ -48642,13 +48642,14 @@ function computeStrictBlock({ findings, selected } = {}) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   KD: () => (/* binding */ collectRepoDiff),
 /* harmony export */   So: () => (/* binding */ extractDiffMeta),
+/* harmony export */   at: () => (/* binding */ buildLlmReviewScope),
 /* harmony export */   pQ: () => (/* binding */ renderDiffText),
 /* harmony export */   rj: () => (/* binding */ parseUnifiedDiff),
 /* harmony export */   vS: () => (/* binding */ isGeneratedArtifactPath),
 /* harmony export */   wT: () => (/* binding */ buildLlmDiffView),
 /* harmony export */   ye: () => (/* binding */ countChangedLinesFromText)
 /* harmony export */ });
-/* unused harmony exports optimizeDiff, deriveChangedFiles */
+/* unused harmony exports LLM_DIFF_EXCLUSION_REASONS, getLlmDiffExclusionReason, optimizeDiff, deriveChangedFiles */
 /* harmony import */ var _git_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(8613);
 /* harmony import */ var _file_classifier_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4673);
 
@@ -48672,6 +48673,13 @@ const MAX_HUNK_LINES = 200;
 const MAX_HUNK_HEAD = 120;
 const MAX_HUNK_TAIL = 40;
 
+const LLM_DIFF_EXCLUSION_REASONS = Object.freeze([
+  'markdown',
+  'lockfile',
+  'generated_artifact',
+  'non_reviewable_hunks',
+]);
+
 function extension(path) {
   const idx = path.lastIndexOf('.');
   return idx >= 0 ? path.slice(idx).toLowerCase() : '';
@@ -48682,12 +48690,26 @@ function baseName(path) {
   return parts[parts.length - 1];
 }
 
-function isExcludedFile(path) {
+/**
+ * Return the deterministic path-policy reason a file is omitted from the
+ * LLM-facing diff, or null when the path itself is reviewable. Hunk-level
+ * filtering is represented separately as `non_reviewable_hunks` by
+ * buildLlmReviewScope().
+ *
+ * @param {string} path
+ * @returns {'markdown'|'lockfile'|'generated_artifact'|null}
+ */
+function getLlmDiffExclusionReason(path) {
+  if (!path || typeof path !== 'string') return null;
   const ext = extension(path);
-  if (EXCLUDED_EXTENSIONS.has(ext)) return true;
-  if (EXCLUDED_FILES.has(baseName(path))) return true;
-  if (EXCLUDED_DIR_RE.test(path)) return true;
-  return false;
+  if (EXCLUDED_EXTENSIONS.has(ext)) return 'markdown';
+  if (EXCLUDED_FILES.has(baseName(path))) return 'lockfile';
+  if (EXCLUDED_DIR_RE.test(path)) return 'generated_artifact';
+  return null;
+}
+
+function isExcludedFile(path) {
+  return getLlmDiffExclusionReason(path) !== null;
 }
 
 /**
@@ -48805,7 +48827,8 @@ function optimizeDiff(diff) {
  *
  * Two entry shapes converge here:
  *  - collectRepoDiff already ran optimizeDiff and exposes `filesForReview` +
- *    optimized `diffText` — reused as-is.
+ *    optimized `diffText` — re-optimizing is intentionally idempotent and also
+ *    protects chunked reviewer orchestration from reintroducing raw files.
  *  - the artifact-driven plan/exec path (review-plan.mjs) parses a diff
  *    artifact and bypasses optimizeDiff — filtered on the fly. The diff text is
  *    re-rendered only when a file was actually excluded, so the common
@@ -48816,10 +48839,11 @@ function optimizeDiff(diff) {
  */
 function buildLlmDiffView(diff) {
   if (Array.isArray(diff?.filesForReview)) {
-    return {
+    const optimized = optimizeDiff({
       files: diff.filesForReview,
       diffText: diff.diffText ?? renderDiffText(diff.filesForReview),
-    };
+    });
+    return { files: optimized.files, diffText: optimized.diffText };
   }
   const rawFiles = Array.isArray(diff?.files) ? diff.files : [];
   const files = rawFiles.filter((file) => !isExcludedFile(file?.path ?? ''));
@@ -48828,6 +48852,42 @@ function buildLlmDiffView(diff) {
       ? (diff?.diffText ?? renderDiffText(files))
       : renderDiffText(files);
   return { files, diffText };
+}
+
+/**
+ * Build a deterministic ledger of the files selected for the LLM-facing diff
+ * and the files intentionally excluded from it. This is review-scope telemetry,
+ * not ContextCoverage: it says which changed files were eligible for the diff
+ * presented to the reviewer, not which extra repository context was supplied.
+ *
+ * @param {{changedFiles?: string[], files?: Array, filesForReview?: Array, diffText?: string}} diff
+ * @returns {{selected: string[], excluded: Array<{path: string, reasonCode: string}>}}
+ */
+function buildLlmReviewScope(diff) {
+  const llmView = buildLlmDiffView(diff ?? {});
+  const selected = [
+    ...new Set(
+      (llmView.files ?? [])
+        .map((file) => file?.path)
+        .filter((path) => typeof path === 'string' && path.length > 0)
+    ),
+  ];
+  const rawFilePaths = (Array.isArray(diff?.files) ? diff.files : [])
+    .map((file) => file?.path)
+    .filter((path) => typeof path === 'string' && path.length > 0);
+  const changedFiles = Array.isArray(diff?.changedFiles)
+    ? diff.changedFiles.filter((path) => typeof path === 'string' && path.length > 0)
+    : [];
+  const allChanged = [...new Set([...changedFiles, ...rawFilePaths])];
+  const selectedSet = new Set(selected);
+  const excluded = allChanged
+    .filter((path) => !selectedSet.has(path))
+    .map((path) => ({
+      path,
+      reasonCode: getLlmDiffExclusionReason(path) ?? 'non_reviewable_hunks',
+    }));
+
+  return { selected, excluded };
 }
 
 function renderDiffText(files) {
@@ -81016,6 +81076,63 @@ function isRequired(unit) {
   return unit?.required === true;
 }
 
+function uniqueStrings(values) {
+  return [
+    ...new Set(
+      (Array.isArray(values) ? values : []).filter(
+        (value) => typeof value === 'string' && value.length > 0
+      )
+    ),
+  ];
+}
+
+/**
+ * Add the deterministic file-scope ledger to an already-derived coverage object.
+ *
+ * `selected` comes from the LLM-facing diff scope. `covered` is stricter: a
+ * selected file is covered only when at least one effective execution unit
+ * names it and every effective unit that names it completed. Required units are
+ * authoritative when present; the all-optional defensive path falls back to all
+ * units, mirroring deriveReviewCoverage(). Optional reviewer failures therefore
+ * do not make a file uncovered when required coverage completed.
+ *
+ * The helper is pure and does not alter coverage.status or Gate behavior.
+ *
+ * @param {object} coverage result of deriveReviewCoverage()
+ * @param {{selected?: string[], excluded?: Array<{path?: string, reasonCode?: string}>}} fileScope
+ * @returns {object}
+ */
+function attachReviewFileCoverage(coverage, fileScope = {}) {
+  const units = Array.isArray(coverage?.units) ? coverage.units : [];
+  const requiredUnits = units.filter(isRequired);
+  const effectiveUnits = requiredUnits.length > 0 ? requiredUnits : units;
+  const selected = uniqueStrings(fileScope?.selected);
+  const covered = selected.filter((path) => {
+    const unitsForPath = effectiveUnits.filter(
+      (unit) => Array.isArray(unit?.subjects) && unit.subjects.includes(path)
+    );
+    return unitsForPath.length > 0 && unitsForPath.every(isCompleted);
+  });
+  const excluded = [];
+  const seenExcluded = new Set();
+  for (const entry of Array.isArray(fileScope?.excluded) ? fileScope.excluded : []) {
+    const path = typeof entry?.path === 'string' ? entry.path : '';
+    const reasonCode = typeof entry?.reasonCode === 'string' ? entry.reasonCode : '';
+    if (!path || !reasonCode || seenExcluded.has(path)) continue;
+    seenExcluded.add(path);
+    excluded.push({ path, reasonCode });
+  }
+
+  return {
+    ...coverage,
+    files: {
+      selected,
+      covered,
+      excluded,
+    },
+  };
+}
+
 /**
  * Derive machine-readable review execution coverage from already-planned units.
  *
@@ -81931,7 +82048,10 @@ async function runReviewerOrchestration({
       findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
-  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+  const reviewCoverage = attachReviewFileCoverage(
+    deriveReviewCoverage(reviewUnits),
+    (0,diff_processor/* buildLlmReviewScope */.at)(diff)
+  );
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
