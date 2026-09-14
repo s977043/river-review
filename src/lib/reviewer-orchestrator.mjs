@@ -5,9 +5,9 @@ import {
   normalizeSeverity,
   SEVERITY_RANK,
 } from './finding-factory.mjs';
-import { renderDiffText } from './diff-processor.mjs';
+import { buildLlmReviewScope, renderDiffText } from './diff-processor.mjs';
 import { synthesizeTeamLeadReport } from './team-lead-synthesizer.mjs';
-import { deriveReviewCoverage } from './review-coverage.mjs';
+import { attachReviewFileCoverage, deriveReviewCoverage } from './review-coverage.mjs';
 
 export const REVIEWER_ROLES = {
   'bug-hunter': {
@@ -853,7 +853,10 @@ export async function runReviewerOrchestration({
       findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
-  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+  const reviewCoverage = attachReviewFileCoverage(
+    deriveReviewCoverage(reviewUnits),
+    buildLlmReviewScope(diff)
+  );
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
