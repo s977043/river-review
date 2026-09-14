@@ -9,10 +9,7 @@ import {
   optimizeDiff,
   renderDiffText,
 } from '../src/lib/diff-processor.mjs';
-import {
-  attachReviewFileCoverage,
-  deriveReviewCoverage,
-} from '../src/lib/review-coverage.mjs';
+import { attachReviewFileCoverage, deriveReviewCoverage } from '../src/lib/review-coverage.mjs';
 import { runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
 import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
 
@@ -45,7 +42,7 @@ function unit({
 }
 
 describe('Review Coverage file scope', () => {
-  it('records selected and deterministic excluded file reasons from the existing LLM diff policy', () => {
+  it('records deterministic selected and excluded file reasons', () => {
     const rawFiles = [
       file('src/app.js'),
       file('docs/guide.md'),
@@ -144,7 +141,7 @@ describe('Review Coverage file scope', () => {
     assert.deepEqual(schema.$defs.excludedFile.properties.reasonCode.enum, LLM_DIFF_EXCLUSION_REASONS);
   });
 
-  it('wires the scope ledger into runtime Review Coverage without changing Gate policy', async () => {
+  it('wires file scope into runtime Review Coverage', async () => {
     const rawFiles = [file('src/app.js'), file('docs/guide.md')];
     const optimized = optimizeDiff({ files: rawFiles, diffText: renderDiffText(rawFiles) });
     const result = await runReviewerOrchestration({
@@ -164,6 +161,10 @@ describe('Review Coverage file scope', () => {
       covered: ['src/app.js'],
       excluded: [{ path: 'docs/guide.md', reasonCode: 'markdown' }],
     });
-    assert.equal(validateCoverage(result.reviewCoverage), true, JSON.stringify(validateCoverage.errors));
+    assert.equal(
+      validateCoverage(result.reviewCoverage),
+      true,
+      JSON.stringify(validateCoverage.errors)
+    );
   });
 });
