@@ -80912,8 +80912,12 @@ function resolveReviewerRoles(reviewers, { fileTypes, riskAssessment, signals } 
     return { valid: autoSelection.roles, invalid: [], autoSelection };
   }
   const names = reviewers ?? DEFAULT_REVIEWERS;
-  const valid = names.filter((n) => REVIEWER_ROLES[n]);
-  const invalid = names.filter((n) => !REVIEWER_ROLES[n]);
+  // A reviewer role is an identity, not an execution multiplicity. Normalize
+  // explicit duplicate names here so role aggregation and Review Unit IDs stay
+  // one-to-one while preserving the caller's first-seen order.
+  const uniqueNames = [...new Set(names)];
+  const valid = uniqueNames.filter((n) => REVIEWER_ROLES[n]);
+  const invalid = uniqueNames.filter((n) => !REVIEWER_ROLES[n]);
   return { valid, invalid };
 }
 
@@ -82845,6 +82849,9 @@ async function runLocalReview({
     suppressedFindings,
     classified: review.classified,
     reviewerResults: review.reviewerResults ?? null,
+    // #2212 Phase 1: observe-only execution coverage. Preserve the producer's
+    // object verbatim; a single-reviewer run has no coverage contract to invent.
+    reviewCoverage: review.reviewCoverage ?? null,
     teamLeadReport: review.teamLeadReport ?? null,
     tokenEstimate: context.diff.tokenEstimate,
     rawTokenEstimate: context.diff.rawTokenEstimate,
@@ -83989,9 +83996,14 @@ function getOutputSchemaValidator() {
     // throws `TypeError [ERR_INVALID_URL]: Invalid URL` because that string is
     // not a valid file: URL, while readFileSync accepts the plain path as-is.
     const schemaPath = __nccwpck_require__.ab + "output.schema.json";
+    const reviewCoverageSchemaPath = __nccwpck_require__.ab + "review-coverage.schema.json";
     const schema = JSON.parse((0,external_node_fs_.readFileSync)(schemaPath, 'utf8'));
+    const reviewCoverageSchema = JSON.parse((0,external_node_fs_.readFileSync)(reviewCoverageSchemaPath, 'utf8'));
     const ajv = new _2020({ allErrors: true, strict: false });
     dist(ajv);
+    // Keep review-coverage.schema.json as the single shape SSoT. output.schema
+    // references it by $id instead of copying the Review Coverage contract.
+    ajv.addSchema(reviewCoverageSchema);
     outputSchemaValidator = ajv.compile(schema);
   } catch (err) {
     console.error(`Warning: could not load output.schema.json for validation: ${err.message}`);
@@ -84108,6 +84120,7 @@ function formatJsonOutput(result, phase) {
     ...(decision !== undefined ? { decision } : {}),
     ...(gate ? { gate } : {}),
     ...(timedOutRoles.length > 0 ? { timedOutRoles } : {}),
+    ...(result.reviewCoverage ? { reviewCoverage: result.reviewCoverage } : {}),
     ...(result.teamLeadReport ? { teamLeadReport: result.teamLeadReport } : {}),
   };
   validateOutputArtifact(artifact);

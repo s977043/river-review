@@ -209,6 +209,9 @@ function buildRunRecord(result, { phase, runId, gate, decision, provenance } = {
     // digest can aggregate them (see trust-boundary note above).
     ...(decision !== undefined ? { decision } : {}),
     ...(gate ? { gate } : {}),
+    // #2212 Phase 1: persist the exact runtime observation. Do not recompute
+    // coverage in the store; absence remains distinguishable from complete.
+    ...(result.reviewCoverage ? { reviewCoverage: result.reviewCoverage } : {}),
     // #1600: persist the calibration debug telemetry (verifierStats,
     // verifierAllRejected, findingFormat.recommendedGaps, etc.) so it
     // survives past process memory and can be inspected from the CI
