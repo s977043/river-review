@@ -63,10 +63,11 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
 
     const scope = deriveReviewFileScope(rawDiff, filteredDiff, []);
     assert.deepEqual(scope.selected, ['b.js', 'a.js']);
-    assert.deepEqual(scope.excluded, [
-      { path: 'docs/readme.md', reasonCode: 'diff_optimization' },
-    ]);
-    assert.equal(scope.selected.some((path) => scope.excluded.some((entry) => entry.path === path)), false);
+    assert.deepEqual(scope.excluded, [{ path: 'docs/readme.md', reasonCode: 'diff_optimization' }]);
+    assert.equal(
+      scope.selected.some((path) => scope.excluded.some((entry) => entry.path === path)),
+      false
+    );
   });
 
   it('accepts fileScope in the Review Coverage schema and rejects unknown reasons', () => {

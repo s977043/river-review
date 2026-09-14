@@ -1,4 +1,4 @@
-# Review Coverage Phase 1 / Slice C — File Scope Ledger
+# Review Coverage Phase 1 / Slice C—File Scope Ledger
 
 Issue: #2212
 

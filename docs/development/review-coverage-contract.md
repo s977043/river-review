@@ -143,31 +143,31 @@ Generalizing scope telemetry to those paths is a separate change. It is not an i
 
 ## Rollout boundary
 
-### Foundation — shipped
+### Foundation—shipped
 
 - versioned Review Coverage schema;
 - pure `deriveReviewCoverage()` logic and regression tests;
 - no Gate behavior change.
 
-### Phase 1 / Slice A — shipped
+### Phase 1 / Slice A—shipped
 
 - build Review Units from existing `role × chunk` task descriptors and outcomes;
 - derive complete / partial / not_executed at runtime;
 - keep Gate/decision unchanged.
 
-### Phase 1 / Slice B — shipped
+### Phase 1 / Slice B—shipped
 
 - propagate the existing object to JSON output and saved runs;
 - validate against the Review Coverage schema without duplicating its shape;
 - register the runtime surface as Experimental.
 
-### Phase 1 / Slice C — file selection scope
+### Phase 1 / Slice C—file selection scope
 
 - attach deterministic selected/excluded file scope to existing Review Coverage;
 - distinguish configured exclusions from LLM diff optimization;
 - do not derive file-level completion or change Gate policy.
 
-### Gate integration — later, opt-in
+### Gate integration—later, opt-in
 
 Gate integration must be a separate change after fixtures and dogfooding demonstrate the policy we want for incomplete required vs optional coverage.
 

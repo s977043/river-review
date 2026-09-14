@@ -96,9 +96,7 @@ export function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns 
     .filter((filePath) => !selectedSet.has(filePath))
     .map((filePath) => ({
       path: filePath,
-      reasonCode: shouldExclude(filePath, patterns)
-        ? 'configured_exclusion'
-        : 'diff_optimization',
+      reasonCode: shouldExclude(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
     }));
 
   return { selected, excluded };
