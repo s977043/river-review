@@ -195,4 +195,50 @@ describe('reviewCoverage runtime wiring', () => {
     ]);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
+
+  it('forwards the caller repoContext unchanged to an orchestrated reviewer', async () => {
+    const repoContext = {
+      supplied: [{ path: 'src/context.js' }],
+      skipped: [],
+    };
+    const seen = [];
+    const result = await runReviewerOrchestration(
+      baseArgs({
+        repoContext,
+        generateReviewImpl: async (args) => {
+          seen.push(args.repoContext);
+          return okReview();
+        },
+      })
+    );
+
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0], repoContext);
+    assert.equal(result.reviewCoverage.status, 'complete');
+    assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
+  });
+
+  it('forwards the same repoContext to every chunk without weakening execution coverage', async () => {
+    const repoContext = {
+      supplied: [],
+      skipped: [{ path: 'src/context.js', reason: 'budget-exhausted' }],
+    };
+    const seen = [];
+    const result = await runReviewerOrchestration(
+      baseArgs({
+        diff: chunkedDiff(),
+        repoContext,
+        generateReviewImpl: async (args) => {
+          seen.push(args.repoContext);
+          return okReview();
+        },
+      })
+    );
+
+    assert.equal(seen.length, 2);
+    assert.ok(seen.every((value) => value === repoContext));
+    assert.equal(result.reviewCoverage.status, 'complete');
+    assert.equal(result.reviewCoverage.completedRequiredUnits, 2);
+    assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
+  });
 });
