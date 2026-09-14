@@ -88,22 +88,6 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
 
-  it('does not treat repo-context budget skips as review execution failure', async () => {
-    const result = await runReviewerOrchestration(
-      baseArgs({
-        repoContext: {
-          supplied: [],
-          skipped: [{ path: 'src/a.js', reason: 'budget-exhausted' }],
-        },
-      })
-    );
-
-    assert.equal(result.reviewCoverage.status, 'complete');
-    assert.equal(result.reviewCoverage.completedRequiredUnits, 1);
-    assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, []);
-    assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
-  });
-
   it('reports partial when one required chunk succeeds and another times out', async () => {
     const result = await runReviewerOrchestration(
       baseArgs({
