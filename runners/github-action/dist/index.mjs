@@ -48803,9 +48803,12 @@ function optimizeDiff(diff) {
  * for prompt construction; heuristic detection, scoring, and fixture eval keep
  * reading the raw `diff.files`, so this changes no other pipeline input.
  *
- * Two entry shapes converge here:
+ * Entry shapes converge here:
  *  - collectRepoDiff already ran optimizeDiff and exposes `filesForReview` +
- *    optimized `diffText` — reused as-is.
+ *    optimized `diffText`; this existing contract is passed through unchanged.
+ *  - reviewer chunking aliases the raw chunk array into BOTH `files` and
+ *    `filesForReview`. That internal shape is re-optimized so chunking cannot
+ *    reintroduce Markdown, lockfiles, dist artifacts, or non-reviewable hunks.
  *  - the artifact-driven plan/exec path (review-plan.mjs) parses a diff
  *    artifact and bypasses optimizeDiff — filtered on the fly. The diff text is
  *    re-rendered only when a file was actually excluded, so the common
@@ -48816,6 +48819,14 @@ function optimizeDiff(diff) {
  */
 function buildLlmDiffView(diff) {
   if (Array.isArray(diff?.filesForReview)) {
+    const isRawChunkAlias = Array.isArray(diff?.files) && diff.filesForReview === diff.files;
+    if (isRawChunkAlias) {
+      const optimized = optimizeDiff({
+        files: diff.filesForReview,
+        diffText: diff.diffText ?? renderDiffText(diff.filesForReview),
+      });
+      return { files: optimized.files, diffText: optimized.diffText };
+    }
     return {
       files: diff.filesForReview,
       diffText: diff.diffText ?? renderDiffText(diff.filesForReview),
