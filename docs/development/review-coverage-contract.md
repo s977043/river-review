@@ -4,7 +4,7 @@
 
 Contract foundation inspired by Alibaba OpenCodeReview's deterministic dispatch / delegation model.
 
-**Stability: Experimental.** Review Coverage is emitted on machine-readable reviewer-orchestration surfaces, but it is not a Stable Contract and has no Gate authority in Phase 1. `pages/reference/stable-interfaces.md` records the JSON/saved-run surface as Experimental.
+**Stability: Experimental.** Review Coverage is emitted on machine-readable reviewer-orchestration surfaces. It is not a Stable Contract and has no Gate authority in Phase 1. The JSON/saved-run surface is recorded as Experimental in `pages/reference/stable-interfaces.md`.
 
 ## Why
 
@@ -131,7 +131,7 @@ That policy belongs to later Gate integration. Phase 1 keeps file selection as o
 
 ### All-excluded / non-orchestrated runs
 
-`fileScope` is attached to an existing Review Coverage observation. If reviewer orchestration does not run, River Review does not synthesize Review Coverage solely to carry file selection metadata. In particular, legacy single-reviewer and early no-review paths keep their existing surface semantics. Generalizing scope telemetry to those paths is a separate change rather than an implicit expansion of this contract.
+`fileScope` is attached to an existing Review Coverage observation. If reviewer orchestration does not run, River Review does not synthesize Review Coverage solely to carry file selection metadata. Legacy single-reviewer and early no-review paths therefore keep their existing surface semantics. Generalizing scope telemetry to those paths is a separate change. It is not an implicit expansion of this contract.
 
 ## Rollout boundary
 
