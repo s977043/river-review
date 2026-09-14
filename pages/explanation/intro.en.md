@@ -5,6 +5,8 @@ title: Welcome to River Review
 
 River Review (RR) is an OSS framework that **turns your team's review judgment into versioned, repo-owned skills and runs them across SDLC gates**. It operates over artifacts such as plan, diff, test-cases, JUnit, and prior review outputs, acting as the **team-owned audit layer** for AI-assisted development.
 
+Its core idea is **Review Judgment as Code**. The current product is positioned as a **Review Judgment Platform / team-owned audit layer** for owning, executing, observing, and improving team review judgment.
+
 This page is a short introduction for first-time readers. The full concept — the problems, the core model, the responsibility boundary, and the non-goals — is collected in [Concept](./concept.en.md).
 
 The foundation stays the same: it turns your team's tacit knowledge into versioned, repo-owned **Skills (the Skill Registry)** that you reuse as a shared asset. River Review delivers that foundation along three core axes:
@@ -32,6 +34,14 @@ River Review therefore serves both **pre-execution review** and **post-execution
 - **Skills define judgment** — A skill describes how a review decision should be made (security, accessibility, migration safety, dependency policy, plan conformance, ...). Skills are written as YAML frontmatter + Markdown and validated against `schemas/skill.schema.json`.
 - **Gates execute judgment** — `river review plan` / `exec` / `verify` run those skills at the right point in the delivery flow — not only after the PR is already complete.
 - **Riverbed remembers judgment** — Review outcomes and decisions persist as operating memory, with suppression and prior-decision recall keeping future reviews consistent ([Riverbed Memory](./riverbed-memory.en.md)).
+
+## Review Coverage
+
+River Review treats **"zero findings" and "the required review work completed" as separate facts**.
+
+The experimental Review Coverage Contract records review-unit execution in machine-readable form. It preserves states such as `completed`, `failed`, and `timed_out`, then exposes aggregate coverage as `complete`, `partial`, or `not_executed`.
+
+At this stage it is observe-only. Review Coverage does not change Gate or decision behavior; it is recorded as evidence about whether the review execution itself completed.
 
 This documentation covers:
 
