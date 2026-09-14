@@ -118,7 +118,7 @@ fileScope:
       reasonCode: configured_exclusion
 ```
 
-The ledger is derived at the local selection boundary where River Review still has both the raw repository change set and the exact diff passed to reviewer execution.
+The ledger is derived at the local selection boundary. At that point River Review has the raw repository change set and the exact diff passed to reviewer execution.
 
 Closed reason vocabulary:
 
