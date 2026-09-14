@@ -2,7 +2,7 @@
 
 ## Status
 
-**APPROVED after multi-perspective review.**
+**APPROVED after multi-perspective review. Verification plan updated for CI billing outage.**
 
 Slice A (PR #2216) made `reviewCoverage` a deterministic runtime observation inside reviewer orchestration. Slice B propagates that same object to machine-readable output and saved runs without changing Gate, decision, auto-approve, or Human Review policy.
 
@@ -101,7 +101,9 @@ Explicitly state that Review Coverage does not influence Gate or decision in Pha
 9. saved run persists the same coverage object;
 10. saved run without coverage preserves the legacy key shape;
 11. partial coverage does not change `decision` or Gate;
-12. Linux and macOS unit suites, Integration CLI, schema validation, and Action dist freshness are green.
+12. normally, Linux and macOS unit suites, Integration CLI, schema validation, and Action dist freshness are green;
+13. when GitHub Actions cannot execute because of billing/account limits, treat that as infrastructure unavailable rather than product-test failure only after confirming the failure is billing/account related;
+14. under that CI exception, require local or independently reproduced evidence for the changed contracts: Node 22 syntax/behavior checks where dependency-free, Python offline schema resolution, source/dist schema identity, legacy absence behavior, Gate/decision non-interference by diff inspection, and multi-perspective review with zero blocking findings.
 
 ## Multi-perspective review
 
@@ -111,16 +113,18 @@ Explicitly state that Review Coverage does not influence Gate or decision in Pha
 - **Backward compatibility—APPROVE:** new fields are additive and optional. Duplicate-role normalization resolves previously undefined redundant input. Offline schema resolution preserves local validation behavior.
 - **Security / trust—APPROVE:** metadata propagation adds no capability or authority. Saved records do not become tamper-evident.
 - **Operations—APPROVE:** JSON and saved runs enable dogfood metrics before Gate policy changes.
-- **Testing—APPROVE:** tests cover identity uniqueness and propagation. They also cover schema validation, legacy absence, and Gate non-interference. CI must prove packaged schema availability.
+- **Testing—APPROVE WITH CI FALLBACK:** normal CI remains preferred. If Actions is blocked by billing/account state, merge requires focused local evidence for every changed contract plus an independent multi-perspective diff review; a genuine test failure is never waived as a billing exception.
 
 ## Approval conditions
 
 Slice B can merge only when:
 
-- required CI is green;
+- required CI is green, **or** the only unavailable required checks are confirmed as GitHub Actions billing/account execution failures and the CI-fallback evidence in this plan has passed;
 - unresolved blocking review threads are zero;
 - output validation does not duplicate the Review Coverage schema;
 - machine-readable consumers can resolve Review Coverage without network access;
+- source and packaged Review Coverage schemas are identical;
 - legacy artifacts without coverage remain valid;
 - duplicate explicit reviewer roles cannot create duplicate Review Unit IDs;
-- Gate and decision behavior are unchanged.
+- Gate and decision behavior are unchanged;
+- multi-perspective review has zero blocking findings.
