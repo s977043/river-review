@@ -920,9 +920,17 @@ export function getOutputSchemaValidator() {
     // throws `TypeError [ERR_INVALID_URL]: Invalid URL` because that string is
     // not a valid file: URL, while readFileSync accepts the plain path as-is.
     const schemaPath = new URL('../../schemas/output.schema.json', import.meta.url);
+    const reviewCoverageSchemaPath = new URL(
+      '../../schemas/review-coverage.schema.json',
+      import.meta.url
+    );
     const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
+    const reviewCoverageSchema = JSON.parse(readFileSync(reviewCoverageSchemaPath, 'utf8'));
     const ajv = new Ajv2020({ allErrors: true, strict: false });
     addFormats(ajv);
+    // Keep review-coverage.schema.json as the single shape SSoT. output.schema
+    // references it by $id instead of copying the Review Coverage contract.
+    ajv.addSchema(reviewCoverageSchema);
     outputSchemaValidator = ajv.compile(schema);
   } catch (err) {
     console.error(`Warning: could not load output.schema.json for validation: ${err.message}`);
@@ -1039,6 +1047,7 @@ export function formatJsonOutput(result, phase) {
     ...(decision !== undefined ? { decision } : {}),
     ...(gate ? { gate } : {}),
     ...(timedOutRoles.length > 0 ? { timedOutRoles } : {}),
+    ...(result.reviewCoverage ? { reviewCoverage: result.reviewCoverage } : {}),
     ...(result.teamLeadReport ? { teamLeadReport: result.teamLeadReport } : {}),
   };
   validateOutputArtifact(artifact);
