@@ -21,7 +21,7 @@ reviewer-orchestrator
 
 No layer recomputes coverage.
 
-## Slice B-0 — reviewer identity guard
+## Slice B-0—reviewer identity guard
 
 Before external emission, normalize explicit reviewer role lists to stable unique roles while preserving first-seen order.
 
@@ -36,7 +36,7 @@ Why:
 
 Tests must pin order-preserving de-duplication and preserve invalid-role reporting.
 
-## Slice B-1 — local result propagation
+## Slice B-1—local result propagation
 
 `runLocalReview` passes through `review.reviewCoverage` additively.
 
@@ -46,7 +46,7 @@ Rules:
 - single-reviewer path: do not invent coverage;
 - absence must stay distinguishable from `complete`.
 
-## Slice B-2 — JSON artifact
+## Slice B-2—JSON artifact
 
 Add optional top-level `reviewCoverage` to `schemas/output.schema.json` and `formatJsonOutput()`.
 
@@ -58,7 +58,7 @@ Consumers that validate `output.schema.json` outside the Node runtime must be ab
 
 Old JSON payloads without `reviewCoverage` remain valid.
 
-## Slice B-3 — saved run
+## Slice B-3—saved run
 
 `buildRunRecord()` conditionally persists the same `result.reviewCoverage` object.
 
@@ -69,7 +69,7 @@ Rules:
 - coverage is observation metadata, not an attestation;
 - existing result-store trust-boundary semantics remain unchanged.
 
-## Slice B-4 — interface declaration
+## Slice B-4—interface declaration
 
 Register these surfaces as **Experimental** in `pages/reference/stable-interfaces.md`:
 
@@ -105,13 +105,13 @@ Explicitly state that Review Coverage does not influence Gate or decision in Pha
 
 ## Multi-perspective review
 
-- **Architecture — APPROVE:** one-way propagation from the runtime producer; no second coverage computation.
-- **Contract / SSoT — APPROVE WITH GUARD:** `review-coverage.schema.json` remains the shape SSoT, while each validator resolves that schema locally rather than duplicating it.
-- **Reliability — APPROVE:** absence is never rewritten as complete; partial/not-executed remain observable states.
-- **Backward compatibility — APPROVE:** new fields are additive and optional. Duplicate-role normalization resolves previously undefined redundant input. Offline schema resolution preserves existing local validation behavior.
-- **Security / trust — APPROVE:** metadata propagation adds no capability or authority and does not make saved records tamper-evident.
-- **Operations — APPROVE:** JSON and saved runs enable dogfood metrics before Gate policy changes.
-- **Testing — APPROVE:** tests cover identity uniqueness, propagation, schema validation, legacy absence, and Gate non-interference; CI must also prove packaged schema availability.
+- **Architecture—APPROVE:** one-way propagation from the runtime producer; no second coverage computation.
+- **Contract / SSoT—APPROVE WITH GUARD:** `review-coverage.schema.json` remains the shape SSoT, while each validator resolves that schema locally rather than duplicating it.
+- **Reliability—APPROVE:** absence is never rewritten as complete; partial/not-executed remain observable states.
+- **Backward compatibility—APPROVE:** new fields are additive and optional. Duplicate-role normalization resolves previously undefined redundant input. Offline schema resolution preserves existing local validation behavior.
+- **Security / trust—APPROVE:** metadata propagation adds no capability or authority and does not make saved records tamper-evident.
+- **Operations—APPROVE:** JSON and saved runs enable dogfood metrics before Gate policy changes.
+- **Testing—APPROVE:** tests cover identity uniqueness, propagation, schema validation, legacy absence, and Gate non-interference; CI must also prove packaged schema availability.
 
 ## Approval conditions
 
