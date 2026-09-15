@@ -129,4 +129,53 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
     assert.deepEqual(result.reviewCoverage?.fileScope, context.reviewFileScope);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
+  it('falls back to filtered filesForReview when rawDiff carries no changedFiles', () => {
+    const emptyChanged = deriveReviewFileScope(
+      { changedFiles: [] },
+      { filesForReview: [file('x.js'), file('y.js')] },
+      []
+    );
+    assert.deepEqual(emptyChanged.selected, ['x.js', 'y.js']);
+    assert.deepEqual(emptyChanged.excluded, []);
+
+    const missingChanged = deriveReviewFileScope({}, { filesForReview: [file('x.js')] }, []);
+    assert.deepEqual(missingChanged.selected, ['x.js']);
+    assert.deepEqual(missingChanged.excluded, []);
+  });
+
+  it('keeps caller-provided selected paths absent from changedFiles after raw order', () => {
+    const scope = deriveReviewFileScope(
+      { changedFiles: ['a.js'] },
+      { filesForReview: [file('a.js'), file('synthetic.js')] },
+      []
+    );
+    assert.deepEqual(scope.selected, ['a.js', 'synthetic.js']);
+    assert.deepEqual(scope.excluded, []);
+  });
+
+  it('propagates the file scope ledger on the no-changes path when every change is excluded', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-review-file-scope-no-changes-',
+      initialFiles: {
+        '.river-review.json': JSON.stringify({ exclude: { files: ['generated/**'] } }, null, 2),
+        'generated/data.json': '{"value":1}\n',
+        'generated/other.json': '{"value":1}\n',
+      },
+      changedFiles: {
+        'generated/data.json': '{"value":2}\n',
+        'generated/other.json': '{"value":2}\n',
+      },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const context = await planLocalReview({ cwd: dir, dryRun: true });
+    assert.equal(context.status, 'no-changes');
+    assert.ok(context.reviewFileScope, 'no-changes context must carry reviewFileScope');
+    assert.deepEqual(context.reviewFileScope.selected, []);
+    assert.deepEqual(context.reviewFileScope.excluded, [
+      { path: 'generated/data.json', reasonCode: 'configured_exclusion' },
+      { path: 'generated/other.json', reasonCode: 'configured_exclusion' },
+    ]);
+  });
 });
