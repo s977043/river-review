@@ -48867,31 +48867,6 @@ function renderDiffText(files) {
 // diff — parse unified diff and collect repo diff from git
 // ---------------------------------------------------------------------------
 
-function stripPrefix(path) {
-  if (!path) return path;
-  if (path.startsWith('a/')) return path.slice(2);
-  if (path.startsWith('b/')) return path.slice(2);
-  return path;
-}
-
-/**
- * Turn a `---`/`+++` header token into a real repository path.
- *
- * The unquote MUST run before the prefix strip: git wraps the whole token,
- * prefix included, so the quoted form is `"b/s/\346\227\245.mjs"` and the
- * `b/` is INSIDE the quotes. Stripping first therefore never fires and the
- * literal quoted string leaks downstream as a path (#2234).
- *
- * `unquoteGitPath` is imported from `./git.mjs` rather than reimplemented so
- * the diff-header route and the `git diff --name-only` route cannot drift.
- *
- * @param {string} token
- * @returns {string}
- */
-function normalizeDiffHeaderPath(token) {
-  return stripPrefix((0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .unquoteGitPath */ .Lh)(token));
-}
-
 /**
  * Parse a unified diff into a structured representation.
  * Returns files with hunks and added line hints so downstream consumers
@@ -48912,11 +48887,11 @@ function parseUnifiedDiff(diffText) {
       continue;
     }
     if (line.startsWith('--- ')) {
-      pendingOldPath = normalizeDiffHeaderPath(line.slice(4).trim());
+      pendingOldPath = (0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .parseDiffHeaderPath */ .J0)(line.slice(4));
       continue;
     }
     if (line.startsWith('+++ ')) {
-      const newPathRaw = normalizeDiffHeaderPath(line.slice(4).trim());
+      const newPathRaw = (0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .parseDiffHeaderPath */ .J0)(line.slice(4));
       const isDeletion = newPathRaw === '/dev/null';
       const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
       const newPath = isDeletion ? '/dev/null' : newPathRaw;
@@ -52027,9 +52002,9 @@ function deriveGateDecision({
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   AC: () => (/* binding */ listChangedFiles),
+/* harmony export */   J0: () => (/* binding */ parseDiffHeaderPath),
 /* harmony export */   JA: () => (/* binding */ getHeadSha),
 /* harmony export */   LL: () => (/* binding */ diffWithContext),
-/* harmony export */   Lh: () => (/* binding */ unquoteGitPath),
 /* harmony export */   NC: () => (/* binding */ ensureGitRepo),
 /* harmony export */   NI: () => (/* binding */ BaseRefError),
 /* harmony export */   OB: () => (/* binding */ normalizeBaseRef),
@@ -52039,7 +52014,7 @@ function deriveGateDecision({
 /* harmony export */   kG: () => (/* binding */ GitRepoNotFoundError),
 /* harmony export */   mM: () => (/* binding */ isWorkingTreeDirty)
 /* harmony export */ });
-/* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, collectAddedLineHints */
+/* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, unquoteGitPath, normalizeGitPathToken, collectAddedLineHints */
 /* harmony import */ var node_child_process__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(1421);
 /* harmony import */ var node_util__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(7975);
 
@@ -52061,15 +52036,27 @@ class GitRepoNotFoundError extends GitError {
   }
 }
 
-async function runGit(args, { cwd }) {
+async function runGitRaw(args, { cwd }) {
   try {
     // Use a large maxBuffer (200MB) to handle large diffs (e.g., pnpm-lock.yaml changes)
     const { stdout } = await exec('git', args, { cwd, maxBuffer: 200 * 1024 * 1024 });
-    return stdout.trim();
+    return stdout;
   } catch (error) {
     const detail = error.stderr?.toString().trim() || error.message;
     throw new GitError(detail);
   }
+}
+
+/**
+ * Run git and trim the output.
+ *
+ * Convenient for single-token answers (`rev-parse`, `symbolic-ref`), but the
+ * trim is destructive for output whose first or last line is a PATH: it eats a
+ * leading space off the first `--name-only` line and a trailing space off the
+ * last one (#2241). Callers that read paths use {@link runGitRaw}.
+ */
+async function runGit(args, { cwd }) {
+  return (await runGitRaw(args, { cwd })).trim();
 }
 
 async function ensureGitRepo(cwd) {
@@ -52490,13 +52477,62 @@ function unquoteGitPath(path) {
   return Buffer.from(bytes).toString('utf8');
 }
 
+/**
+ * Strip only the delimiters git itself added around a printed path token, then
+ * decode it with {@link unquoteGitPath}.
+ *
+ * This is the single extraction point shared by all three routes that read a
+ * path out of git output (#2241): `git diff --name-only` lines
+ * (`listChangedFiles`), unified-diff `---`/`+++` headers (`parseUnifiedDiff`
+ * in `./diff-processor.mjs`), and the `+++` scan in `collectAddedLineHints`.
+ * Writing a private `.trim()` per route is what broke them apart: a blanket
+ * trim also eats leading and trailing whitespace that is PART of the path, and
+ * each route ate a different amount, so one file arrived under two spellings
+ * and was counted twice in `fileScope` while `config.exclude.files` matched
+ * neither.
+ *
+ * Only two things are genuinely delimiters:
+ * - a trailing `\r`, from a CRLF-terminated stream;
+ * - a TAB and everything after it. git appends a TAB separator to a diff
+ *   header ONLY when the path contains whitespace (`+++ b/ leadspace\t`, while
+ *   `+++ b/normal.mjs` has none), which is exactly why the header route could
+ *   still see the leading space. A literal TAB inside a path never reaches
+ *   here unescaped, because git quotes such a path and emits `\t`.
+ *
+ * Everything else — leading spaces, trailing spaces, inner spaces — is path.
+ *
+ * @param {string} token raw token as git printed it
+ * @returns {string} the real path
+ */
+function normalizeGitPathToken(token) {
+  if (typeof token !== 'string') return token;
+  const withoutDelimiters = token.replace(/\t[\s\S]*$/, '').replace(/\r$/, '');
+  return unquoteGitPath(withoutDelimiters);
+}
+
+/**
+ * Turn a unified-diff `---`/`+++` header token into a real repository path.
+ *
+ * The unquote MUST run before the `a/`/`b/` prefix strip: git wraps the whole
+ * token, prefix included, so the quoted form is `"b/s/\346\227\245.mjs"` with
+ * the `b/` INSIDE the quotes, and stripping first never fires (#2234).
+ *
+ * @param {string} token raw header token (the part after `--- ` / `+++ `)
+ * @returns {string} the real path, prefix removed
+ */
+function parseDiffHeaderPath(token) {
+  const path = normalizeGitPathToken(token);
+  if (!path) return path;
+  if (path.startsWith('a/') || path.startsWith('b/')) return path.slice(2);
+  return path;
+}
+
 async function listChangedFiles(cwd, baseRef) {
-  const stdout = await runGit(['diff', '--name-only', baseRef], { cwd });
+  const stdout = await runGitRaw(['diff', '--name-only', baseRef], { cwd });
   return stdout
     .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => unquoteGitPath(line));
+    .map((line) => normalizeGitPathToken(line))
+    .filter(Boolean);
 }
 
 async function diffWithContext(cwd, baseRef, { unified = 3 } = {}) {
@@ -52508,9 +52544,14 @@ function collectAddedLineHints(diffText) {
   let currentFile = null;
 
   for (const line of diffText.split('\n')) {
-    if (line.startsWith('+++ b/')) {
+    if (line.startsWith('+++ ')) {
+      // Share the header parser with `parseUnifiedDiff` (#2241). A literal
+      // `startsWith('+++ b/')` test missed every quoted path, whose header
+      // reads `+++ "b/\346\227\245.mjs"`, so those files silently dropped out
+      // of the hint map entirely.
+      const path = parseDiffHeaderPath(line.slice(4));
       // We record the first hunk per file; this keeps output stable for the placeholder comments.
-      currentFile = line.replace('+++ b/', '').trim();
+      currentFile = path === '/dev/null' ? null : path;
       continue;
     }
     if (!line.startsWith('@@')) continue;
