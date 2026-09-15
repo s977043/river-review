@@ -6,29 +6,29 @@ Issue: #2212
 
 Add a deterministic, observe-only file-scope ledger to Review Coverage so an operator can distinguish:
 
-- files selected for reviewer execution;
-- files intentionally excluded before reviewer execution;
-- why an excluded file did not enter the reviewer execution scope.
+- files selected into the LLM-facing `filesForReview` view;
+- files excluded from that LLM-facing selection scope;
+- why a changed file is absent from that scope.
 
 This slice does **not** change Gate, decision, auto-approve, or Human Review policy.
 
 ## Current boundary
 
-Review Coverage already records `reviewer role × diff chunk` execution units and their outcomes. The remaining Phase 1 gap is that a consumer cannot reconstruct which changed files never entered those units.
+Review Coverage already records `reviewer role × diff chunk` execution units and their outcomes. The remaining Phase 1 gap is that a consumer cannot reconstruct the LLM-facing file-selection scope alongside those execution observations.
 
-Two existing boundaries can remove files before reviewer execution:
+Two existing boundaries affect that selection:
 
-1. configured exclusions: `config.exclude.files` in `local-runner.mjs`;
-2. LLM diff optimization: files absent from `filesForReview`.
+1. configured exclusions: `config.exclude.files` in `local-runner.mjs` removes matching paths from the local review diff before review processing;
+2. LLM diff optimization: files absent from `filesForReview` are omitted from generated review prompts while remaining available to deterministic review logic through raw `diff.files`.
    Examples include documentation, lock files, generated `dist/` output, or changes whose hunks are removed by the optimizer.
 
-The ledger must describe this scope without pretending that excluded files were executed Review Units.
+The ledger must describe this selection scope without pretending that it is file-level execution coverage or that optimizer-excluded files are invisible to all review processing.
 
 ## Compatibility with #2230
 
 Current `main` preserves the optimized `filesForReview` scope across reviewer chunking via #2230. Slice C observes that scope and does not reimplement chunking or diff optimization.
 
-Final verification must run on a branch current with #2230. This pins selection telemetry to the same LLM-facing scope used by reviewer execution.
+Final verification must run on a branch current with #2230. This pins selection telemetry to the same LLM-facing scope used when review prompts are constructed.
 
 ## Contract
 
@@ -47,21 +47,21 @@ fileScope:
 
 Closed reason vocabulary for this slice:
 
-- `configured_exclusion`: matched `config.exclude.files`;
-- `diff_optimization`: remained after config filtering but was not present in the LLM-facing `filesForReview` set.
+- `configured_exclusion`: matched `config.exclude.files` and was removed from the local review diff before review processing;
+- `diff_optimization`: remained after config filtering but was not present in the LLM-facing `filesForReview` set. Deterministic review logic may still inspect it through raw `diff.files`.
 
-`selected + excluded` reconstructs the changed-file scope seen before those two filtering boundaries. Order follows the original changed-file order and duplicate paths are removed in first-seen order.
+`selected + excluded` reconstructs the raw changed-file set relative to these two filtering boundaries. Order follows the original changed-file order and duplicate paths are removed in first-seen order.
 
 ## Why no `coveredFiles` field yet
 
-A file can appear in multiple Review Units because execution is `reviewer role × diff chunk`. A simple file-level `covered` boolean would need policy about required vs optional reviewers and partial failures. That is Gate-adjacent semantics and is intentionally deferred.
+A file can appear in multiple Review Units because execution is `reviewer role × diff chunk`, and deterministic review logic can inspect raw files that the LLM-facing optimizer omitted. A simple file-level `covered` boolean would therefore need policy about required vs optional reviewers, deterministic processing, and partial failures. That is Gate-adjacent semantics and is intentionally deferred.
 
-Execution completion remains represented by Review Units. `fileScope` only records selection scope.
+Execution completion remains represented by Review Units. `fileScope` only records LLM-facing selection scope.
 
 ## Implementation
 
 1. `local-runner.mjs`
-   - derive file scope at the boundary where raw repo diff, optimized diff, and configured exclusions are all available;
+   - derive file scope at the boundary where raw repo diff, optimized LLM-facing diff, and configured exclusions are all available;
    - keep the derivation pure and deterministic;
    - carry the ledger in the planned context;
    - when reviewer orchestration produced Review Coverage, attach the ledger without recomputing counters/status/units;
@@ -73,7 +73,7 @@ Execution completion remains represented by Review Units. `fileScope` only recor
    - use closed reason codes and `additionalProperties: false`.
 
 3. Documentation
-   - update the Review Coverage contract to distinguish execution units from file selection scope;
+   - update the Review Coverage contract to distinguish Review Unit execution coverage from LLM-facing file selection scope;
    - keep the surface Experimental.
 
 4. Tests
