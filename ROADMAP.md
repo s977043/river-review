@@ -66,11 +66,11 @@ AI が人間の可読量を超えるコードを生成できる時代におい�
 
 ## Phase 4: Riverbed Memory & Intelligence
 
-- [ ] Riverbed Memory の設計（ADR/WontFix/過去指摘の永続化と再利用）
-- [ ] セマンティック/コンテキストルーティング（PR タイトル/差分/依存関係を考慮）
-- [ ] 抑止・再提示の仕組み（抑制した指摘の再浮上条件を定義）
-- [ ] Review Philosophy Skill を追加し、「Review the System, Not Every Line」を River Review の判断原則として形式知化
-- [ ] Riverbed Memory にレビュー思想、検証ハーネス、エスカレーション判断の履歴を蓄積し、継続的改善へ接続
+- [x] Riverbed Memory の設計（ADR/WontFix/過去指摘の永続化と再利用） — v1 実装済み（#474）。`src/lib/riverbed-memory.mjs` / `schemas/riverbed-entry.schema.json` / `.github/workflows/riverbed-persist.yml`。v2（外部データストア連携）は将来計画
+- [ ] セマンティック/コンテキストルーティング（PR タイトル/差分/依存関係を考慮） — **部分実装**。差分ベースの mode 選択は `src/lib/review-mode-router.mjs`（#1323、Slice 1+2）で実装済みだが、入力は `changedFiles` / `diffText` / `riskMap` に限られ、**PR タイトルと依存関係は考慮していない**。「セマンティック」に相当する LLM による diff 内容分析は同設計書で明示的に非ゴール
+- [x] 抑止・再提示の仕組み（抑制した指摘の再浮上条件を定義） — 実装済み（#687）。`src/lib/suppression.mjs` / `src/lib/suppression-apply.mjs`。`river suppression add` で抑止し、`--expires` を付けるとその日時以降に抑制が外れて再浮上する
+- [ ] Review Philosophy Skill を追加し、「Review the System, Not Every Line」を River Review の判断原則として形式知化 — 未着手。`skills/` 配下に該当 skill は無く、この文言は本ファイルにのみ存在する
+- [ ] Riverbed Memory にレビュー思想、検証ハーネス、エスカレーション判断の履歴を蓄積し、継続的改善へ接続 — 上記「Review Philosophy Skill」が未着手のため、蓄積対象の一部が存在しない
 - Exit Criteria: コンテキストに応じたスキル選択が行われ、不要実行が削減される。さらに、過去の判断とレビュー思想を再利用して、AI 開発フロー全体の信頼性を高められる。
 
 ## GitHub Projects 推奨フィールド
