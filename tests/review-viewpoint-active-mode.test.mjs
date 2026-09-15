@@ -7,8 +7,8 @@ import { defaultConfig } from '../src/config/default.mjs';
 import { reviewConfigSchema } from '../src/config/schema.mjs';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { generateReview } from '../src/lib/review-engine.mjs';
-import { REVIEW_REQUEST_IR_VERSION, buildReviewRequest } from '../src/prompt/review-request.mjs';
 import { compileReviewPrompt } from '../src/prompt/compiler.mjs';
+import { REVIEW_REQUEST_IR_VERSION, buildReviewRequest } from '../src/prompt/review-request.mjs';
 import { buildReviewObligationsSection } from '../src/prompt/sections.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -137,7 +137,12 @@ test('Prompt Compiler renderers consume the same Review Obligation context', () 
     subject: { phase: 'midstream', changedFiles: [] },
     judgment: { skillIds: ['api-compatibility'], severity: 'normal', plan: { selected: [] } },
     context: { diff: '', reviewObligations: [sampleObligation] },
-    constraints: { maxFindings: 5, focusHint: 'focus' },
+    constraints: {
+      maxFindings: 5,
+      focusHint: 'focus',
+      walkthrough: true,
+      agentHandoff: true,
+    },
     outputContract: { language: 'ja' },
     execution: { provider: 'openai', model: 'gpt-4o-mini' },
   });
@@ -163,4 +168,11 @@ test('Prompt Compiler renderers consume the same Review Obligation context', () 
     ).length,
     1
   );
+
+  const walkthroughIndex = generic.prompt.indexOf('### File Walkthrough');
+  const handoffIndex = generic.prompt.indexOf('### Agent Handoff');
+  const obligationIndex = generic.prompt.indexOf('### Review Obligations');
+  assert.ok(walkthroughIndex >= 0);
+  assert.ok(walkthroughIndex < handoffIndex);
+  assert.ok(handoffIndex < obligationIndex);
 });
