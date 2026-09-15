@@ -133,9 +133,7 @@ describe('observeReviewViewpoints', () => {
       unmappedSignalCount: 1,
       activatedViewpointCount: 0,
       obligationCount: 0,
-      unmappedSignals: [
-        { kind: 'unmapped-detector-kind', file: 'src/api/user.ts', line: 1 },
-      ],
+      unmappedSignals: [{ kind: 'unmapped-detector-kind', file: 'src/api/user.ts', line: 1 }],
     });
   });
 
