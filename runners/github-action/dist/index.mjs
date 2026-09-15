@@ -48875,6 +48875,24 @@ function stripPrefix(path) {
 }
 
 /**
+ * Turn a `---`/`+++` header token into a real repository path.
+ *
+ * The unquote MUST run before the prefix strip: git wraps the whole token,
+ * prefix included, so the quoted form is `"b/s/\346\227\245.mjs"` and the
+ * `b/` is INSIDE the quotes. Stripping first therefore never fires and the
+ * literal quoted string leaks downstream as a path (#2234).
+ *
+ * `unquoteGitPath` is imported from `./git.mjs` rather than reimplemented so
+ * the diff-header route and the `git diff --name-only` route cannot drift.
+ *
+ * @param {string} token
+ * @returns {string}
+ */
+function normalizeDiffHeaderPath(token) {
+  return stripPrefix((0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .unquoteGitPath */ .Lh)(token));
+}
+
+/**
  * Parse a unified diff into a structured representation.
  * Returns files with hunks and added line hints so downstream consumers
  * can locate where to attach review comments.
@@ -48894,11 +48912,11 @@ function parseUnifiedDiff(diffText) {
       continue;
     }
     if (line.startsWith('--- ')) {
-      pendingOldPath = stripPrefix(line.slice(4).trim());
+      pendingOldPath = normalizeDiffHeaderPath(line.slice(4).trim());
       continue;
     }
     if (line.startsWith('+++ ')) {
-      const newPathRaw = stripPrefix(line.slice(4).trim());
+      const newPathRaw = normalizeDiffHeaderPath(line.slice(4).trim());
       const isDeletion = newPathRaw === '/dev/null';
       const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
       const newPath = isDeletion ? '/dev/null' : newPathRaw;
@@ -52011,6 +52029,7 @@ function deriveGateDecision({
 /* harmony export */   AC: () => (/* binding */ listChangedFiles),
 /* harmony export */   JA: () => (/* binding */ getHeadSha),
 /* harmony export */   LL: () => (/* binding */ diffWithContext),
+/* harmony export */   Lh: () => (/* binding */ unquoteGitPath),
 /* harmony export */   NC: () => (/* binding */ ensureGitRepo),
 /* harmony export */   NI: () => (/* binding */ BaseRefError),
 /* harmony export */   OB: () => (/* binding */ normalizeBaseRef),
@@ -52392,12 +52411,92 @@ async function isWorkingTreeDirty(cwd) {
   return status.length > 0;
 }
 
+const C_ESCAPES = new Map([
+  ['a', 0x07],
+  ['b', 0x08],
+  ['f', 0x0c],
+  ['n', 0x0a],
+  ['r', 0x0d],
+  ['t', 0x09],
+  ['v', 0x0b],
+  ['\\', 0x5c],
+  ['"', 0x22],
+]);
+
+/**
+ * Decode a path exactly as git printed it, whether or not git quoted it.
+ *
+ * git quotes a pathname when it contains a byte it considers unusual: any
+ * non-ASCII byte while `core.quotePath` is at its default (true), and — even
+ * with `core.quotePath=false` — a double quote, a backslash, or a control
+ * character. The quoted form is a C string: it is wrapped in `"`, non-ASCII
+ * bytes appear as three-digit octal escapes (`\346\227\245`), and a small set
+ * of characters use single-letter escapes. Because the octal escapes are UTF-8
+ * BYTES, they must be reassembled as a byte sequence and decoded as UTF-8 —
+ * decoding them one code unit at a time produces mojibake.
+ *
+ * This is the single normalization point for git-printed paths (#2234). Both
+ * `git diff --name-only` output and unified-diff `---`/`+++` headers pass
+ * through it, so the two routes agree on one spelling for the same file. They
+ * did not before: `--name-only` emits `"s/\346\227\245.mjs"` (quotes outside,
+ * no prefix) while the diff header emits `"b/s/\346\227\245.mjs"` (quotes
+ * OUTSIDE the `b/` prefix, so a naive prefix strip does not fire). The two
+ * spellings made one file appear in both `fileScope.selected` and
+ * `fileScope.excluded`, and made `config.exclude.files` minimatch patterns
+ * silently miss non-ASCII paths.
+ *
+ * Unquoted input is returned unchanged, so ASCII paths are untouched.
+ *
+ * @param {string} path raw path token as git printed it
+ * @returns {string} the real path
+ */
+function unquoteGitPath(path) {
+  if (typeof path !== 'string') return path;
+  if (path.length < 2 || !path.startsWith('"') || !path.endsWith('"')) return path;
+
+  const body = path.slice(1, -1);
+  const bytes = [];
+  for (let i = 0; i < body.length; i += 1) {
+    const ch = body[i];
+    if (ch !== '\\') {
+      // Non-escaped characters inside a git-quoted path are plain ASCII, but
+      // encode defensively so a hand-written quoted path still round-trips.
+      for (const byte of Buffer.from(ch, 'utf8')) bytes.push(byte);
+      continue;
+    }
+    const next = body[i + 1];
+    if (next === undefined) {
+      bytes.push(0x5c);
+      continue;
+    }
+    if (next >= '0' && next <= '7') {
+      const octal = body.slice(i + 1, i + 4);
+      if (/^[0-7]{3}$/.test(octal)) {
+        bytes.push(Number.parseInt(octal, 8));
+        i += 3;
+        continue;
+      }
+    }
+    const mapped = C_ESCAPES.get(next);
+    if (mapped !== undefined) {
+      bytes.push(mapped);
+      i += 1;
+      continue;
+    }
+    // Unknown escape: keep the escaped character itself, as git never emits it.
+    for (const byte of Buffer.from(next, 'utf8')) bytes.push(byte);
+    i += 1;
+  }
+  return Buffer.from(bytes).toString('utf8');
+}
+
 async function listChangedFiles(cwd, baseRef) {
   const stdout = await runGit(['diff', '--name-only', baseRef], { cwd });
   return stdout
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((line) => unquoteGitPath(line));
 }
 
 async function diffWithContext(cwd, baseRef, { unified = 3 } = {}) {

@@ -1,4 +1,4 @@
-import { diffWithContext, listChangedFiles } from './git.mjs';
+import { diffWithContext, listChangedFiles, unquoteGitPath } from './git.mjs';
 import { classifyChangedFiles } from './file-classifier.mjs';
 
 // ---------------------------------------------------------------------------
@@ -222,6 +222,24 @@ function stripPrefix(path) {
 }
 
 /**
+ * Turn a `---`/`+++` header token into a real repository path.
+ *
+ * The unquote MUST run before the prefix strip: git wraps the whole token,
+ * prefix included, so the quoted form is `"b/s/\346\227\245.mjs"` and the
+ * `b/` is INSIDE the quotes. Stripping first therefore never fires and the
+ * literal quoted string leaks downstream as a path (#2234).
+ *
+ * `unquoteGitPath` is imported from `./git.mjs` rather than reimplemented so
+ * the diff-header route and the `git diff --name-only` route cannot drift.
+ *
+ * @param {string} token
+ * @returns {string}
+ */
+function normalizeDiffHeaderPath(token) {
+  return stripPrefix(unquoteGitPath(token));
+}
+
+/**
  * Parse a unified diff into a structured representation.
  * Returns files with hunks and added line hints so downstream consumers
  * can locate where to attach review comments.
@@ -241,11 +259,11 @@ export function parseUnifiedDiff(diffText) {
       continue;
     }
     if (line.startsWith('--- ')) {
-      pendingOldPath = stripPrefix(line.slice(4).trim());
+      pendingOldPath = normalizeDiffHeaderPath(line.slice(4).trim());
       continue;
     }
     if (line.startsWith('+++ ')) {
-      const newPathRaw = stripPrefix(line.slice(4).trim());
+      const newPathRaw = normalizeDiffHeaderPath(line.slice(4).trim());
       const isDeletion = newPathRaw === '/dev/null';
       const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
       const newPath = isDeletion ? '/dev/null' : newPathRaw;
