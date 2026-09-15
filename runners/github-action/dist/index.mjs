@@ -52542,9 +52542,23 @@ async function diffWithContext(cwd, baseRef, { unified = 3 } = {}) {
 function collectAddedLineHints(diffText) {
   const hints = new Map();
   let currentFile = null;
+  // A `+++ ` line is a header only OUTSIDE a hunk body. Inside one,
+  // `+++ phantom.md` is just the added line `++ phantom.md` wearing a `+`, and
+  // reading it as a header hands `currentFile` to a path that does not exist —
+  // the next `@@` then registers a ghost entry for it. (A deleted `-- x`
+  // followed by an added `++ y` forges the whole `--- `/`+++ ` PAIR, so
+  // checking adjacency instead of hunk state would not be enough.) git emits
+  // every real header before that file's first `@@` and resets at each
+  // `diff --git`, so this keeps all real headers, quoted ones included.
+  let inHunk = false;
 
   for (const line of diffText.split('\n')) {
-    if (line.startsWith('+++ ')) {
+    if (line.startsWith('diff --git')) {
+      inHunk = false;
+      currentFile = null;
+      continue;
+    }
+    if (!inHunk && line.startsWith('+++ ')) {
       // Share the header parser with `parseUnifiedDiff` (#2241). A literal
       // `startsWith('+++ b/')` test missed every quoted path, whose header
       // reads `+++ "b/\346\227\245.mjs"`, so those files silently dropped out
@@ -52556,7 +52570,9 @@ function collectAddedLineHints(diffText) {
     }
     if (!line.startsWith('@@')) continue;
     const match = /@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
-    if (match && currentFile && !hints.has(currentFile)) {
+    if (!match) continue;
+    inHunk = true;
+    if (currentFile && !hints.has(currentFile)) {
       const startLine = Number.parseInt(match[1], 10);
       hints.set(currentFile, startLine);
     }

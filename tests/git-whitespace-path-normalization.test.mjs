@@ -139,6 +139,72 @@ describe('plain ASCII paths are unaffected (#2241 regression guard)', () => {
     assert.deepEqual([...collectAddedLineHints(diffText).keys()], ['src/app.js']);
   });
 
+  it('does not mistake an added `++ ` line for a `+++` header', async (t) => {
+    // Loosening the header test from `'+++ b/'` to `'+++ '` (#2241) made a hunk
+    // body line beat the header check: adding the line `++ phantom.md` to a
+    // file produces the diff line `+++ phantom.md`, which stole `currentFile`
+    // and made the NEXT hunk register a ghost entry for a path that does not
+    // exist. It needs a second hunk to show, so the fixture makes one.
+    const original = Array.from({ length: 80 }, (_, i) => `line ${i + 1}`).join('\n') + '\n';
+    const edited = original.split('\n');
+    edited.splice(2, 0, '++ phantom.md');
+    edited[70] = 'line 71 CHANGED';
+
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-whitespace-phantom-',
+      initialFiles: { 'notes.md': original },
+      changedFiles: { 'notes.md': edited.join('\n') },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const diffText = await diffWithContext(dir, 'HEAD');
+    // Guard the fixture itself: without both the `+++ `-looking body line and a
+    // following hunk the test would pass vacuously.
+    assert.ok(
+      diffText.includes('\n+++ phantom.md'),
+      'fixture must contain a `+++`-looking body line'
+    );
+    assert.ok(
+      diffText.split('\n').filter((l) => l.startsWith('@@')).length >= 2,
+      'fixture needs 2 hunks'
+    );
+
+    const hints = collectAddedLineHints(diffText);
+    assert.deepEqual([...hints.keys()], ['notes.md']);
+    assert.equal(existsSync(join(dir, 'phantom.md')), false);
+  });
+
+  it('does not mistake a forged `--- ` / `+++ ` PAIR inside a hunk for a header', async (t) => {
+    // Replacing the line `-- old.md` with `++ new.md` makes the diff body read
+    // `--- old.md` then `+++ new.md` — a byte-perfect forgery of a header pair.
+    // A fix that only checked "is the previous line `--- `?" would accept it;
+    // tracking hunk state is what rejects it.
+    const original =
+      Array.from({ length: 40 }, (_, i) => (i === 2 ? '-- old.md' : `line ${i + 1}`)).join('\n') +
+      '\n';
+    const edited = original.split('\n');
+    edited[2] = '++ new.md';
+    edited[30] = 'line 31 CHANGED';
+
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-whitespace-forged-pair-',
+      initialFiles: { 'notes.md': original },
+      changedFiles: { 'notes.md': edited.join('\n') },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const diffText = await diffWithContext(dir, 'HEAD');
+    assert.ok(diffText.includes('\n--- old.md\n+++ new.md'), 'fixture must forge a header pair');
+    assert.ok(
+      diffText.split('\n').filter((l) => l.startsWith('@@')).length >= 2,
+      'fixture needs 2 hunks'
+    );
+
+    assert.deepEqual([...collectAddedLineHints(diffText).keys()], ['notes.md']);
+  });
+
   it('still ignores the new side of a deletion (+++ /dev/null)', () => {
     const diffText = [
       'diff --git a/gone.js b/gone.js',
