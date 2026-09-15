@@ -42,8 +42,8 @@
     {
       "id": "api-compatibility",
       "path": "skills/midstream/api-compatibility",
-      "checksum": "sha256:09471ed05c568480e0d1b0c9f92772e10ef4580b7d418485163649a2eb223a6f",
-      "files": 5
+      "checksum": "sha256:0d26f8e56d297d126df54dcfbf449f23180b9fc6035b8d928faa700381485230",
+      "files": 6
     },
     {
       "id": "api-design",
