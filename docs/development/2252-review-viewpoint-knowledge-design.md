@@ -146,6 +146,8 @@ Foundation 後の runtime 接続は小さい Slice に分割します。
 
 Phase 6 でも Viewpoint は Finding を断定しません。prompt へ追加するのは `question` / `requiredEvidence` / evidence hints / false-positive guards だけで、signal の一致自体を違反の証拠として扱いません。
 
+`observe` は prompt だけでなく既存レビューの成功・失敗特性も変えないことを不変条件とします。signal producer、heuristic signal collection、Catalog 解決でエラーが起きた場合は `debug.execution.reviewViewpoints.errors` にコードだけを記録して fail-soft に継続します。`active` は Viewpoint Knowledge をレビュー入力として明示的に利用するモードなので、同じエラーは fail-closed とします。
+
 ### Runtime trust boundary
 
 runtime は対象 repository から Viewpoint path を受け取りません。Skill discovery と同じ package-root SSoT から selected built-in Skill の実体を確認し、その Skill 配下の `references/viewpoints.yaml` だけを読み込みます。GitHub Action の bundle では host が固定する `RIVER_REPO_ROOT` を Skill loader と共用します。
