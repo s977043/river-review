@@ -34,7 +34,8 @@ describe('observeReviewViewpoints', () => {
     assert.deepEqual(observation.applicableViewpoints, []);
     assert.deepEqual(observation.obligations, []);
     assert.deepEqual(observation.comparison, {
-      detectorSignalCount: 0,
+      detectorResultCount: 0,
+      normalizedSignalCount: 0,
       mappedSignalCount: 0,
       unmappedSignalCount: 0,
       activatedViewpointCount: 0,
@@ -58,7 +59,8 @@ describe('observeReviewViewpoints', () => {
       ['api-compatibility/backward-compatibility', 'api-compatibility/api-test-coverage']
     );
     assert.deepEqual(observation.comparison, {
-      detectorSignalCount: 1,
+      detectorResultCount: 1,
+      normalizedSignalCount: 1,
       mappedSignalCount: 1,
       unmappedSignalCount: 0,
       activatedViewpointCount: 2,
@@ -103,6 +105,9 @@ describe('observeReviewViewpoints', () => {
       { kind: 'dto-field-removed', file: 'src/api/user.ts', line: 42 },
       { kind: 'dto-field-removed', file: 'src/api/order.ts', line: 9 },
     ]);
+    assert.equal(observation.comparison.detectorResultCount, 3);
+    assert.equal(observation.comparison.normalizedSignalCount, 2);
+    assert.equal(observation.comparison.mappedSignalCount, 2);
 
     const backwardCompatibility = observation.obligations.find(
       (obligation) => obligation.viewpointId === 'backward-compatibility'
@@ -122,7 +127,8 @@ describe('observeReviewViewpoints', () => {
     assert.deepEqual(observation.applicableViewpoints, []);
     assert.deepEqual(observation.obligations, []);
     assert.deepEqual(observation.comparison, {
-      detectorSignalCount: 1,
+      detectorResultCount: 1,
+      normalizedSignalCount: 1,
       mappedSignalCount: 0,
       unmappedSignalCount: 1,
       activatedViewpointCount: 0,
