@@ -11,10 +11,8 @@ function parse(diffText) {
   return { files: parseUnifiedDiff(diffText).files };
 }
 
-test(
-  'collectHeuristicDetections preserves registry order and is uncapped while comments stay capped at 8',
-  () => {
-    const diffText = `diff --git a/src/security.ts b/src/security.ts
+test('collectHeuristicDetections preserves registry order and is uncapped while comments stay capped at 8', () => {
+  const diffText = `diff --git a/src/security.ts b/src/security.ts
 --- a/src/security.ts
 +++ b/src/security.ts
 @@ -1,1 +1,10 @@
@@ -29,31 +27,30 @@ test(
 +const second = { rejectUnauthorized: false };
 +const third = { rejectUnauthorized: false };
 `;
-    const diff = parse(diffText);
-    const plan = { selected: [{ metadata: { id: 'security-basic' } }] };
+  const diff = parse(diffText);
+  const plan = { selected: [{ metadata: { id: 'security-basic' } }] };
 
-    const detections = collectHeuristicDetections({ diff, plan });
-    const comments = buildHeuristicComments({ diff, plan });
+  const detections = collectHeuristicDetections({ diff, plan });
+  const comments = buildHeuristicComments({ diff, plan });
 
-    assert.equal(detections.length, 9);
-    assert.deepEqual(
-      detections.map((detection) => detection.kind),
-      [
-        'hardcoded-secret',
-        'hardcoded-secret',
-        'hardcoded-secret',
-        'dangerous-eval',
-        'dangerous-eval',
-        'dangerous-eval',
-        'insecure-tls',
-        'insecure-tls',
-        'insecure-tls',
-      ]
-    );
-    assert.equal(comments.length, 8);
-    assert.deepEqual(comments, detections.slice(0, 8));
-  }
-);
+  assert.equal(detections.length, 9);
+  assert.deepEqual(
+    detections.map((detection) => detection.kind),
+    [
+      'hardcoded-secret',
+      'hardcoded-secret',
+      'hardcoded-secret',
+      'dangerous-eval',
+      'dangerous-eval',
+      'dangerous-eval',
+      'insecure-tls',
+      'insecure-tls',
+      'insecure-tls',
+    ]
+  );
+  assert.equal(comments.length, 8);
+  assert.deepEqual(comments, detections.slice(0, 8));
+});
 
 test('collectHeuristicDetections keeps detector output separate from finding presentation', () => {
   const diffText = `diff --git a/src/handler.ts b/src/handler.ts
@@ -79,32 +76,26 @@ test('collectHeuristicDetections keeps detector output separate from finding pre
   assert.equal('confidence' in detection, false);
 });
 
-test(
-  'collectHeuristicDetections preserves skipIfSkill semantics without duplicate coverage findings',
-  () => {
-    const diffText = `diff --git a/src/service.ts b/src/service.ts
+test('collectHeuristicDetections preserves skipIfSkill semantics without duplicate coverage findings', () => {
+  const diffText = `diff --git a/src/service.ts b/src/service.ts
 --- a/src/service.ts
 +++ b/src/service.ts
 @@ -1,1 +1,2 @@
  export const baseline = true;
 +if (featureEnabled) return runFeature();
 `;
-    const diff = parse(diffText);
-    const plan = {
-      selected: [
-        { metadata: { id: 'test-existence' } },
-        { metadata: { id: 'coverage-gap' } },
-      ],
-    };
+  const diff = parse(diffText);
+  const plan = {
+    selected: [{ metadata: { id: 'test-existence' } }, { metadata: { id: 'coverage-gap' } }],
+  };
 
-    const missingTests = collectHeuristicDetections({ diff, plan }).filter(
-      (detection) => detection.kind === 'missing-tests'
-    );
+  const missingTests = collectHeuristicDetections({ diff, plan }).filter(
+    (detection) => detection.kind === 'missing-tests'
+  );
 
-    assert.equal(missingTests.length, 1);
-    assert.equal(missingTests[0].skillId, 'test-existence');
-  }
-);
+  assert.equal(missingTests.length, 1);
+  assert.equal(missingTests[0].skillId, 'test-existence');
+});
 
 test('collectHeuristicDetections uses coverage-gap when test-existence is not selected', () => {
   const diffText = `diff --git a/src/service.ts b/src/service.ts
