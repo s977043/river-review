@@ -81,21 +81,26 @@ export function findDuplicateViewpointIds(viewpoints = []) {
 }
 
 /**
- * Load and validate the data-only viewpoints owned by a Skill.
+ * Load and validate the data-only viewpoints owned by a selected Skill.
  *
  * This loader intentionally does not perform Skill routing, evaluator selection,
  * policy decisions, gate derivation, or arbitrary command/expression execution.
+ * The owning Skill id is required so a caller cannot silently attach knowledge
+ * from one Skill to another.
  *
  * @param {string} viewpointsPath
- * @param {object} [options]
- * @param {string} [options.expectedSkillId] Optional owning Skill id assertion.
- * @param {import('ajv').ValidateFunction} [options.validator] Test/custom validator override.
+ * @param {object} options
+ * @param {string} options.expectedSkillId Owning Skill id selected by the existing router.
  * @returns {Promise<object>}
  */
-export async function loadReviewViewpoints(
-  viewpointsPath,
-  { expectedSkillId, validator } = {}
-) {
+export async function loadReviewViewpoints(viewpointsPath, { expectedSkillId } = {}) {
+  if (typeof expectedSkillId !== 'string' || expectedSkillId.trim() === '') {
+    throw new ReviewViewpointsError('expectedSkillId is required to load review viewpoints', {
+      expectedSkillId,
+      viewpointsPath,
+    });
+  }
+
   let raw;
   try {
     raw = await fs.readFile(viewpointsPath, 'utf8');
@@ -116,7 +121,7 @@ export async function loadReviewViewpoints(
     });
   }
 
-  const validate = validator ?? (await getDefaultValidator());
+  const validate = await getDefaultValidator();
   if (!validate(document)) {
     throw new ReviewViewpointsError(
       `Invalid review viewpoints at ${viewpointsPath}: ${formatValidationErrors(validate.errors)}`,
@@ -132,7 +137,7 @@ export async function loadReviewViewpoints(
     );
   }
 
-  if (expectedSkillId !== undefined && document.skillId !== expectedSkillId) {
+  if (document.skillId !== expectedSkillId) {
     throw new ReviewViewpointsError(
       `Review viewpoints skillId mismatch at ${viewpointsPath}: expected ${expectedSkillId}, got ${document.skillId}`,
       { actualSkillId: document.skillId, expectedSkillId, viewpointsPath }
