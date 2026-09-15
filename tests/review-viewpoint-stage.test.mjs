@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -87,10 +88,17 @@ test('active mode exposes only matched review obligations', async () => {
 });
 
 test('repository-owned skill paths cannot load viewpoint knowledge', async () => {
+  const outsideSkillPath = path.join(
+    os.tmpdir(),
+    'target-repository',
+    'skills',
+    'api-compatibility',
+    'SKILL.md'
+  );
   const result = await runReviewViewpointStage({
     reviewConfig: { viewpoints: { mode: 'active' } },
     diff: apiContractDiff(),
-    plan: planWithSkillPath('/tmp/target-repository/skills/api-compatibility/SKILL.md'),
+    plan: planWithSkillPath(outsideSkillPath),
   });
 
   assert.deepEqual(result.activeObligations, []);
