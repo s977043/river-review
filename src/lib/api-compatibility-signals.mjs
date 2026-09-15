@@ -1,5 +1,4 @@
-const CONTRACT_PATH_RE =
-  /(?:^|\/)(?:api|apis|dto|dtos|schema|schemas|contract|contracts|types?)(?:\/|\.|-|_)/i;
+const CONTRACT_PATH_RE = /(?:^|\/)(?:api|apis|dto|dtos|contract|contracts)(?:\/|\.|-|_)/i;
 const TYPESCRIPT_PATH_RE = /\.(?:ts|tsx)$/i;
 const TEST_PATH_RE =
   /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
@@ -34,18 +33,18 @@ function parseProperty(text) {
   };
 }
 
-function hasContractContext(file) {
-  if (CONTRACT_PATH_RE.test(String(file?.path ?? ''))) return true;
-  return (file?.hunks ?? []).some((hunk) =>
-    (hunk?.lines ?? []).some((rawLine) => CONTRACT_DECLARATION_RE.test(String(rawLine).slice(1)))
+function hunkHasContractDeclaration(hunk) {
+  return (hunk?.lines ?? []).some((rawLine) =>
+    CONTRACT_DECLARATION_RE.test(String(rawLine).slice(1))
   );
 }
 
-function collectChangedProperties(file) {
+function collectChangedProperties(file, { declarationScoped = false } = {}) {
   const removed = new Map();
   const added = new Map();
 
   for (const hunk of file?.hunks ?? []) {
+    if (declarationScoped && !hunkHasContractDeclaration(hunk)) continue;
     let newLine = Number.isInteger(hunk?.newStart) ? hunk.newStart : 1;
 
     for (const rawLine of hunk?.lines ?? []) {
@@ -90,10 +89,11 @@ function first(entries) {
  * violation decision, or gate behavior is attached here.
  *
  * The v1 detector is deliberately conservative. It handles TypeScript property
- * changes only when the file path or a contract-named declaration indicates an
- * API/DTO/schema/contract/type boundary. New files and test/fixture files are
- * excluded because they cannot establish a breaking change to an existing
- * production contract.
+ * changes only when an API/DTO/contract path or a contract-named declaration
+ * identifies the boundary. Declaration-based fallback is hunk-scoped so an
+ * unrelated internal type in the same file does not inherit contract status.
+ * New files and test/fixture files are excluded because they cannot establish a
+ * breaking change to an existing production contract.
  *
  * @param {{diff?: {files?: Array<object>}}} options
  * @returns {Array<{kind: string, file: string, line?: number}>}
@@ -106,9 +106,14 @@ export function detectApiCompatibilitySignals({ diff } = {}) {
     if (!filePath || filePath === '/dev/null') continue;
     if (!TYPESCRIPT_PATH_RE.test(filePath) || TEST_PATH_RE.test(filePath)) continue;
     if (!file.oldPath || file.oldPath === '/dev/null') continue;
-    if (!hasContractContext(file)) continue;
 
-    const { removed, added } = collectChangedProperties(file);
+    const pathBased = CONTRACT_PATH_RE.test(filePath);
+    const declarationBased = (file.hunks ?? []).some(hunkHasContractDeclaration);
+    if (!pathBased && !declarationBased) continue;
+
+    const { removed, added } = collectChangedProperties(file, {
+      declarationScoped: !pathBased,
+    });
     const names = new Set([...removed.keys(), ...added.keys()]);
 
     for (const name of names) {
