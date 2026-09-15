@@ -15,6 +15,7 @@ const apiCompatibilityViewpointsPath = path.join(
   'skills',
   'midstream',
   'api-compatibility',
+  'references',
   'viewpoints.yaml'
 );
 
