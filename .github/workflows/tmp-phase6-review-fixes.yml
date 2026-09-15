@@ -1,4 +1,4 @@
-name: Temporary Phase 6 Review Fixes
+name: Temporary Phase 6 Review Fixes v2
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
       - name: Apply review fixes
         run: python scripts/tmp-phase6-review-fixes.py
       - name: Format
-        run: npx prettier --write src/lib/review-viewpoint-stage.mjs pages/reference/config-schema.md pages/reference/config-schema.en.md docs/development/2252-review-viewpoint-knowledge-design.md tests/review-viewpoint-active-mode.test.mjs
+        run: npx prettier --write src/lib/review-viewpoint-stage.mjs pages/reference/config-schema.md pages/reference/config-schema.en.md docs/development/2252-review-viewpoint-knowledge-design.md tests/review-viewpoint-active-mode.test.mjs tests/review-viewpoint-stage.test.mjs
       - name: Verify
         run: |
           node --test tests/review-viewpoint-stage.test.mjs tests/review-viewpoint-active-mode.test.mjs tests/prompt-review-request.test.mjs tests/prompt-compiler.test.mjs tests/prompt-compiler-observe.test.mjs tests/prompt-sections.test.mjs
@@ -39,6 +39,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/review-viewpoint-stage.mjs pages/reference/config-schema.md pages/reference/config-schema.en.md docs/development/2252-review-viewpoint-knowledge-design.md tests/review-viewpoint-active-mode.test.mjs
+          git add src/lib/review-viewpoint-stage.mjs pages/reference/config-schema.md pages/reference/config-schema.en.md docs/development/2252-review-viewpoint-knowledge-design.md tests/review-viewpoint-active-mode.test.mjs tests/review-viewpoint-stage.test.mjs
           git commit -m "docs(viewpoints): document runtime modes and trust boundary"
           git push origin HEAD:feat/2252-review-viewpoints-active-mode
