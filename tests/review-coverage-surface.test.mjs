@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { formatJsonOutput, getOutputSchemaValidator } from '../src/cli/render.mjs';
+import { planLocalReview, runLocalReview } from '../src/lib/local-runner.mjs';
 import { buildRunRecord } from '../src/lib/result-store.mjs';
 import { deriveReviewCoverage } from '../src/lib/review-coverage.mjs';
 import { resolveReviewerRoles } from '../src/lib/reviewer-orchestrator.mjs';
+import { createTempGitRepo, runGit } from './helpers/temp-repo.mjs';
 
 function unit(overrides = {}) {
   return {
@@ -46,9 +47,51 @@ describe('Review Coverage surface propagation', () => {
     assert.deepEqual(resolved.invalid, ['unknown-role']);
   });
 
-  it('wires the orchestration observation through runLocalReview without synthesizing it', () => {
-    const source = readFileSync(new URL('../src/lib/local-runner.mjs', import.meta.url), 'utf8');
-    assert.match(source, /reviewCoverage:\s*review\.reviewCoverage \?\? null/);
+  it('wires the orchestration observation through runLocalReview without synthesizing it', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-review-coverage-passthrough-',
+      initialFiles: { 'src/app.js': 'export const value = 1;\n' },
+      changedFiles: { 'src/app.js': 'export const value = 2;\n' },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const context = await planLocalReview({ cwd: dir, dryRun: true });
+    assert.equal(context.status, 'ok');
+
+    // Orchestrated run without the Slice C ledger: local-runner must surface the
+    // orchestration observation as-is and invent no fileScope of its own.
+    const withoutScope = await runLocalReview({
+      cwd: dir,
+      context: { ...context, reviewFileScope: null },
+      dryRun: true,
+      reviewers: ['bug-hunter'],
+      quiet: true,
+    });
+    assert.ok(withoutScope.reviewCoverage, 'orchestrated run must surface Review Coverage');
+    assert.equal(Object.hasOwn(withoutScope.reviewCoverage, 'fileScope'), false);
+
+    // Same context plus the ledger: enrichment only — every other field of the
+    // observation is identical, so nothing is recomputed in local-runner.
+    const withScope = await runLocalReview({
+      cwd: dir,
+      context,
+      dryRun: true,
+      reviewers: ['bug-hunter'],
+      quiet: true,
+    });
+    const { fileScope, ...enriched } = withScope.reviewCoverage;
+    assert.deepEqual(fileScope, context.reviewFileScope);
+    assert.deepEqual(enriched, withoutScope.reviewCoverage);
+
+    // No orchestration, no observation: local-runner does not synthesize one.
+    const unorchestrated = await runLocalReview({
+      cwd: dir,
+      context,
+      dryRun: true,
+      quiet: true,
+    });
+    assert.equal(unorchestrated.reviewCoverage, null);
   });
 
   it('emits schema-valid JSON Review Coverage only when present', () => {
