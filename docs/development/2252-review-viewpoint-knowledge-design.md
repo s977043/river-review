@@ -10,7 +10,7 @@ River Review では、既知のレビュー知識を Skill 配下の構造化デ
 参照した発想は、テスト観点を再利用可能なカタログへ分離する事例です。
 本設計では、その発想を River Review の既存アーキテクチャへ適合させます。
 
-- <https://zenn.dev/aldagram_tech/articles/316c4d944fd9d5>
+- <https://zenn.dev/aldagram_tech/articles/316c4d944fd9d5e>
 - Issue #2252
 
 ## 目的
@@ -151,6 +151,8 @@ Phase 6 でも Viewpoint は Finding を断定しません。prompt へ追加す
 ### Runtime trust boundary
 
 runtime は対象 repository から Viewpoint path を受け取りません。Skill discovery と同じ package-root SSoT から selected built-in Skill の実体を確認し、その Skill 配下の `references/viewpoints.yaml` だけを読み込みます。GitHub Action の bundle では host が固定する `RIVER_REPO_ROOT` を Skill loader と共用します。
+
+selected Skill の `SKILL.md` だけでなく、最終的に読み込む `references/viewpoints.yaml` 自体も `realpath` で canonicalize し、どちらも配布済み `skills/` root 内にあることを確認します。これにより、trusted tree 内の `references/` や catalog file が symlink で root 外を指す場合も読み込みません。`observe` はその事実を観測エラーとして記録し、`active` は fail-closed とします。
 
 Repository custom catalog / organization catalog は v1 の対象外です。
 
