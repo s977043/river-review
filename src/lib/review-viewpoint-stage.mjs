@@ -54,11 +54,7 @@ async function resolveTrustedBuiltInSkillPath(skillPath) {
 }
 
 async function resolveTrustedViewpointsPath({ realRoot, realSkillPath }) {
-  const candidate = path.join(
-    path.dirname(realSkillPath),
-    'references',
-    'viewpoints.yaml'
-  );
+  const candidate = path.join(path.dirname(realSkillPath), 'references', 'viewpoints.yaml');
 
   let realViewpointsPath;
   try {
