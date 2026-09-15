@@ -88,6 +88,9 @@ Evidence: changed contract / affected consumers
 Repository custom catalog と organization catalog は扱いません。
 レビュー対象側が自分の確認義務を無効化できる経路を増やさないためです。
 
+後続の runtime 接続では、対象 repository から任意の Viewpoint path を受け取りません。
+既存 router が選択した配布済み Skill のディレクトリから `viewpoints.yaml` を導出します。
+
 ### Public Stable API として固定しない
 
 `schemas/review-viewpoints.schema.json` は experimental contract です。
@@ -135,7 +138,7 @@ Repository custom catalog と organization catalog は扱いません。
 
 1. 既存 detector result を内部 signal へ正規化します。
 2. signal と Viewpoint を照合します。
-3. Review Obligation を生成します。
+3. Review Obligation を生成し、同一 Viewpoint が複数 signal に一致しても Viewpoint id 単位で 1 件に dedupe します。
 4. finding、gate、LLM context へ影響させず結果だけを記録します。
 5. 既存挙動との parity と activation precision / recall を測ります。
 
