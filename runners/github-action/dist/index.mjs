@@ -57406,9 +57406,9 @@ function renderContextBlock(ir) {
     buildADRContextSection(c.relatedADRs),
     (0,repo_context/* buildRepoContextSection */.lQ)(c.repoContext),
     buildPrDescriptionSection(c.prDescription),
-    buildReviewObligationsSection(c.reviewObligations, ir.outputContract.language),
     buildWalkthroughSection(ir.constraints.walkthrough),
     buildHandoffSection(ir.constraints.agentHandoff),
+    buildReviewObligationsSection(c.reviewObligations, ir.outputContract.language),
   ].join('');
 }
 
@@ -58452,9 +58452,12 @@ function compactSkillObservation(observation) {
  *
  * Modes:
  * - off: return immediately without detector or filesystem work.
- * - observe: calculate activation and return debug-safe observation only.
+ * - observe: calculate activation and return debug-safe observation only. Any
+ *   signal/catalog failure is recorded without changing the existing review's
+ *   success/failure behavior.
  * - active: return the same observation plus obligations that callers may add
- *   to the LLM prompt.
+ *   to the LLM prompt. Signal/catalog failures fail closed because active mode
+ *   explicitly opts into this knowledge as part of the review input.
  *
  * v1 deliberately refuses repository-owned/custom Skill paths. A selected Skill
  * must resolve under the same distributed `skills/` root used by Skill discovery
@@ -58475,18 +58478,42 @@ async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
   if (mode === 'off') return null;
 
   const selected = plan?.selected ?? [];
-  const heuristicSignals = groupHeuristicSignalsBySkill((0,heuristic_review/* collectHeuristicDetections */.bg)({ diff, plan }));
   const observations = [];
   const obligations = [];
   const skipped = [];
   const errors = [];
+
+  let heuristicSignals = new Map();
+  try {
+    heuristicSignals = groupHeuristicSignalsBySkill((0,heuristic_review/* collectHeuristicDetections */.bg)({ diff, plan }));
+  } catch (error) {
+    if (mode === 'active') {
+      throw new ReviewViewpointStageError('Failed to collect heuristic review signals', {
+        cause: error,
+      });
+    }
+    errors.push({ code: 'heuristic-signal-collection-failed' });
+  }
 
   for (const skill of selected) {
     const skillId = getSkillId(skill);
     if (!skillId) continue;
 
     const producer = NEUTRAL_SIGNAL_PRODUCERS.get(skillId);
-    const producerSignals = producer ? producer({ diff, plan }) : [];
+    let producerSignals = [];
+    if (producer) {
+      try {
+        producerSignals = producer({ diff, plan });
+      } catch (error) {
+        if (mode === 'active') {
+          throw new ReviewViewpointStageError(`Failed to produce review signals for ${skillId}`, {
+            cause: error,
+            skillId,
+          });
+        }
+        errors.push({ skillId, code: 'signal-producer-failed' });
+      }
+    }
     const existingSignals = heuristicSignals.get(skillId) ?? [];
     const signals = [...existingSignals, ...producerSignals];
 
