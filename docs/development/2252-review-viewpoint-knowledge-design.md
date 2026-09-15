@@ -136,11 +136,11 @@ Repository custom catalog と organization catalog は扱いません。
 
 次は observe-mode を実装します。
 
-1. 既存 detector result を内部 signal へ正規化します。
-2. signal と Viewpoint を照合します。
-3. Review Obligation を生成し、同一 Viewpoint が複数 signal に一致しても Viewpoint id 単位で 1 件に dedupe します。
-4. finding、gate、LLM context へ影響させず結果だけを記録します。
-5. 既存挙動との parity と activation precision / recall を測ります。
+1. 既存 detector result の内部 signal への正規化
+2. signal と Viewpoint の照合
+3. Review Obligation の生成、および複数 signal 一致時の Viewpoint id 単位での dedupe
+4. finding、gate、LLM context へ影響させない結果記録
+5. 既存挙動との parity、および activation precision / recall の計測
 
 observe-mode で有効性を確認した後に active-mode を検討します。
 
