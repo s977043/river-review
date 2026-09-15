@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
+import { runReviewViewpointStage } from '../src/lib/review-viewpoint-stage.mjs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, '..');
+const apiCompatibilitySkillPath = path.join(
+  repoRoot,
+  'skills',
+  'midstream',
+  'api-compatibility',
+  'SKILL.md'
+);
+
+function apiContractDiff() {
+  const diffText = `diff --git a/src/api/user.ts b/src/api/user.ts
+--- a/src/api/user.ts
++++ b/src/api/user.ts
+@@ -1,5 +1,4 @@
+ interface UserResponse {
+   id: string;
+-  legacyName: string;
+   name: string;
+ }
+`;
+  return { ...parseUnifiedDiff(diffText), diffText };
+}
+
+function planWithSkillPath(skillPath = apiCompatibilitySkillPath) {
+  return {
+    selected: [
+      {
+        metadata: { id: 'api-compatibility' },
+        path: skillPath,
+      },
+    ],
+  };
+}
+
+test('off mode is a complete no-op', async () => {
+  const result = await runReviewViewpointStage({
+    reviewConfig: { viewpoints: { mode: 'off' } },
+    diff: apiContractDiff(),
+    plan: planWithSkillPath('/outside/repository/api-compatibility/SKILL.md'),
+  });
+
+  assert.equal(result, null);
+});
+
+test('observe mode records obligations without activating prompt obligations', async () => {
+  const result = await runReviewViewpointStage({
+    reviewConfig: { viewpoints: { mode: 'observe' } },
+    diff: apiContractDiff(),
+    plan: planWithSkillPath(),
+  });
+
+  assert.equal(result.mode, 'observe');
+  assert.deepEqual(result.activeObligations, []);
+  assert.equal(result.observation.catalogSkillCount, 1);
+  assert.equal(result.observation.signalCount, 1);
+  assert.equal(result.observation.activatedViewpointCount, 2);
+  assert.equal(result.observation.obligationCount, 2);
+  assert.equal(result.observation.activeObligationCount, 0);
+  assert.deepEqual(result.observation.skills[0].obligationIds, [
+    'api-compatibility/backward-compatibility',
+    'api-compatibility/api-test-coverage',
+  ]);
+});
+
+test('active mode exposes only matched review obligations', async () => {
+  const result = await runReviewViewpointStage({
+    reviewConfig: { viewpoints: { mode: 'active' } },
+    diff: apiContractDiff(),
+    plan: planWithSkillPath(),
+  });
+
+  assert.equal(result.mode, 'active');
+  assert.deepEqual(
+    result.activeObligations.map((obligation) => obligation.id),
+    [
+      'api-compatibility/backward-compatibility',
+      'api-compatibility/api-test-coverage',
+    ]
+  );
+  assert.equal(result.observation.activeObligationCount, 2);
+});
+
+test('repository-owned skill paths cannot load viewpoint knowledge', async () => {
+  const result = await runReviewViewpointStage({
+    reviewConfig: { viewpoints: { mode: 'active' } },
+    diff: apiContractDiff(),
+    plan: planWithSkillPath('/tmp/target-repository/skills/api-compatibility/SKILL.md'),
+  });
+
+  assert.deepEqual(result.activeObligations, []);
+  assert.deepEqual(result.observation.skipped, [
+    { skillId: 'api-compatibility', reason: 'outside-built-in-skills' },
+  ]);
+  assert.equal(result.observation.catalogSkillCount, 0);
+});
