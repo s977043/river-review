@@ -48880,17 +48880,21 @@ function parseUnifiedDiff(diffText) {
   let currentHunk = null;
   let newLineNumber = 0;
   let pendingOldPath = null;
+  // Header lines are only headers outside a hunk body — see
+  // `isDiffFileHeaderLine` in git.mjs for why adjacency is not enough (#2249).
+  let inHunk = false;
 
   for (const line of diffText.split('\n')) {
     if (line.startsWith('diff --git')) {
       currentHunk = null;
+      inHunk = false;
       continue;
     }
-    if (line.startsWith('--- ')) {
+    if ((0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .isDiffFileHeaderLine */ .ru)(line, '--- ', inHunk)) {
       pendingOldPath = (0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .parseDiffHeaderPath */ .J0)(line.slice(4));
       continue;
     }
-    if (line.startsWith('+++ ')) {
+    if ((0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .isDiffFileHeaderLine */ .ru)(line, '+++ ', inHunk)) {
       const newPathRaw = (0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .parseDiffHeaderPath */ .J0)(line.slice(4));
       const isDeletion = newPathRaw === '/dev/null';
       const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
@@ -48923,6 +48927,7 @@ function parseUnifiedDiff(diffText) {
       };
       currentFile.hunks.push(currentHunk);
       newLineNumber = newStart;
+      inHunk = true;
       continue;
     }
     if (!currentHunk) continue;
@@ -52012,7 +52017,8 @@ function deriveGateDecision({
 /* harmony export */   XS: () => (/* binding */ GitError),
 /* harmony export */   Zb: () => (/* binding */ resolveBaseMergeBase),
 /* harmony export */   kG: () => (/* binding */ GitRepoNotFoundError),
-/* harmony export */   mM: () => (/* binding */ isWorkingTreeDirty)
+/* harmony export */   mM: () => (/* binding */ isWorkingTreeDirty),
+/* harmony export */   ru: () => (/* binding */ isDiffFileHeaderLine)
 /* harmony export */ });
 /* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, unquoteGitPath, normalizeGitPathToken, collectAddedLineHints */
 /* harmony import */ var node_child_process__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(1421);
@@ -52539,6 +52545,28 @@ async function diffWithContext(cwd, baseRef, { unified = 3 } = {}) {
   return runGit(['diff', `--unified=${unified}`, '--no-color', baseRef], { cwd });
 }
 
+/**
+ * A `--- ` / `+++ ` line is a FILE HEADER only OUTSIDE a hunk body. Inside one,
+ * `+++ phantom.md` is just the added line `++ phantom.md` wearing a `+`, and
+ * reading it as a header registers a path that does not exist (#2249). Checking
+ * adjacency instead of hunk state is not enough: replacing `-- old.md` with
+ * `++ new.md` inside a hunk forges the whole `--- `/`+++ ` PAIR. git emits every
+ * real header before that file's first `@@` and starts each file with
+ * `diff --git`, so this keeps all real headers, quoted ones included.
+ *
+ * Shared by `collectAddedLineHints` here and `parseUnifiedDiff`
+ * (`diff-processor.mjs`) so the rule has one definition; each caller still owns
+ * its own hunk-state variable because their loops reset it at different points.
+ *
+ * @param {string} line
+ * @param {'+++ '|'--- '} prefix
+ * @param {boolean} inHunk
+ * @returns {boolean}
+ */
+function isDiffFileHeaderLine(line, prefix, inHunk) {
+  return !inHunk && line.startsWith(prefix);
+}
+
 function collectAddedLineHints(diffText) {
   const hints = new Map();
   let currentFile = null;
@@ -52558,7 +52586,7 @@ function collectAddedLineHints(diffText) {
       currentFile = null;
       continue;
     }
-    if (!inHunk && line.startsWith('+++ ')) {
+    if (isDiffFileHeaderLine(line, '+++ ', inHunk)) {
       // Share the header parser with `parseUnifiedDiff` (#2241). A literal
       // `startsWith('+++ b/')` test missed every quoted path, whose header
       // reads `+++ "b/\346\227\245.mjs"`, so those files silently dropped out

@@ -520,6 +520,28 @@ export async function diffWithContext(cwd, baseRef, { unified = 3 } = {}) {
   return runGit(['diff', `--unified=${unified}`, '--no-color', baseRef], { cwd });
 }
 
+/**
+ * A `--- ` / `+++ ` line is a FILE HEADER only OUTSIDE a hunk body. Inside one,
+ * `+++ phantom.md` is just the added line `++ phantom.md` wearing a `+`, and
+ * reading it as a header registers a path that does not exist (#2249). Checking
+ * adjacency instead of hunk state is not enough: replacing `-- old.md` with
+ * `++ new.md` inside a hunk forges the whole `--- `/`+++ ` PAIR. git emits every
+ * real header before that file's first `@@` and starts each file with
+ * `diff --git`, so this keeps all real headers, quoted ones included.
+ *
+ * Shared by `collectAddedLineHints` here and `parseUnifiedDiff`
+ * (`diff-processor.mjs`) so the rule has one definition; each caller still owns
+ * its own hunk-state variable because their loops reset it at different points.
+ *
+ * @param {string} line
+ * @param {'+++ '|'--- '} prefix
+ * @param {boolean} inHunk
+ * @returns {boolean}
+ */
+export function isDiffFileHeaderLine(line, prefix, inHunk) {
+  return !inHunk && line.startsWith(prefix);
+}
+
 export function collectAddedLineHints(diffText) {
   const hints = new Map();
   let currentFile = null;
@@ -539,7 +561,7 @@ export function collectAddedLineHints(diffText) {
       currentFile = null;
       continue;
     }
-    if (!inHunk && line.startsWith('+++ ')) {
+    if (isDiffFileHeaderLine(line, '+++ ', inHunk)) {
       // Share the header parser with `parseUnifiedDiff` (#2241). A literal
       // `startsWith('+++ b/')` test missed every quoted path, whose header
       // reads `+++ "b/\346\227\245.mjs"`, so those files silently dropped out

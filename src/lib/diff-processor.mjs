@@ -1,4 +1,9 @@
-import { diffWithContext, listChangedFiles, parseDiffHeaderPath } from './git.mjs';
+import {
+  diffWithContext,
+  isDiffFileHeaderLine,
+  listChangedFiles,
+  parseDiffHeaderPath,
+} from './git.mjs';
 import { classifyChangedFiles } from './file-classifier.mjs';
 
 // ---------------------------------------------------------------------------
@@ -227,17 +232,21 @@ export function parseUnifiedDiff(diffText) {
   let currentHunk = null;
   let newLineNumber = 0;
   let pendingOldPath = null;
+  // Header lines are only headers outside a hunk body — see
+  // `isDiffFileHeaderLine` in git.mjs for why adjacency is not enough (#2249).
+  let inHunk = false;
 
   for (const line of diffText.split('\n')) {
     if (line.startsWith('diff --git')) {
       currentHunk = null;
+      inHunk = false;
       continue;
     }
-    if (line.startsWith('--- ')) {
+    if (isDiffFileHeaderLine(line, '--- ', inHunk)) {
       pendingOldPath = parseDiffHeaderPath(line.slice(4));
       continue;
     }
-    if (line.startsWith('+++ ')) {
+    if (isDiffFileHeaderLine(line, '+++ ', inHunk)) {
       const newPathRaw = parseDiffHeaderPath(line.slice(4));
       const isDeletion = newPathRaw === '/dev/null';
       const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
@@ -270,6 +279,7 @@ export function parseUnifiedDiff(diffText) {
       };
       currentFile.hunks.push(currentHunk);
       newLineNumber = newStart;
+      inHunk = true;
       continue;
     }
     if (!currentHunk) continue;
