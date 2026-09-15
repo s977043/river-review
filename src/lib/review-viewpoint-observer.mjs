@@ -100,7 +100,7 @@ function buildReviewObligations(document, applicableViewpoints) {
   });
 }
 
-function buildObserveComparison(signals, applicableViewpoints, obligations) {
+function buildObserveComparison(detectorResultCount, signals, applicableViewpoints, obligations) {
   const mappedSignalKeys = new Set();
   for (const viewpoint of applicableViewpoints) {
     for (const signal of viewpoint.matchedSignals) {
@@ -114,7 +114,8 @@ function buildObserveComparison(signals, applicableViewpoints, obligations) {
   );
 
   return {
-    detectorSignalCount: signals.length,
+    detectorResultCount,
+    normalizedSignalCount: signals.length,
     mappedSignalCount: mappedSignalKeys.size,
     unmappedSignalCount: unmappedSignals.length,
     activatedViewpointCount: applicableViewpoints.length,
@@ -133,9 +134,10 @@ function buildObserveComparison(signals, applicableViewpoints, obligations) {
  * signal producers demonstrate a real shared abstraction is needed.
  *
  * `comparison` is the serializable old/new observation record: existing
- * detector signals versus newly activated viewpoints/obligations. Persistence
- * is intentionally left to the runtime adapter so this module does not acquire
- * run-artifact or orchestration responsibilities.
+ * detector results versus newly normalized signals and activated
+ * viewpoints/obligations. Persistence is intentionally left to the runtime
+ * adapter so this module does not acquire run-artifact or orchestration
+ * responsibilities.
  *
  * @param {object} document validated Review Viewpoint document
  * @param {Array<{kind: string, file?: string, line?: number}>} detections existing detector results for the owning Skill
@@ -146,7 +148,12 @@ export function observeReviewViewpoints(document, detections = []) {
   const signals = normalizeDetectorSignals(detections);
   const applicableViewpoints = matchViewpoints(document, signals);
   const obligations = buildReviewObligations(document, applicableViewpoints);
-  const comparison = buildObserveComparison(signals, applicableViewpoints, obligations);
+  const comparison = buildObserveComparison(
+    detections.length,
+    signals,
+    applicableViewpoints,
+    obligations
+  );
 
   return {
     mode: 'observe',
