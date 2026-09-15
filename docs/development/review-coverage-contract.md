@@ -129,22 +129,51 @@ Closed reason vocabulary:
 
 That reconstruction holds for runs over a real repository. A programmatic caller can supply paths that the raw changed-file set does not contain. Those paths stay in `selected`, which then covers more than the raw set.
 
-### `selected` is not a superset of Review Unit subjects
+### `excluded` and Review Unit subjects are disjoint
 
 `fileScope` and `units[].subjects` come from different points in the pipeline.
-A path excluded with `diff_optimization` can still appear in a subject list.
+They still agree on which paths the reviewer saw.
+A path recorded in `excluded` never appears in a subject list.
+That holds for both reason codes.
 
-This shows up once a diff crosses the chunking thresholds.
+The guarantee used to hold only below the chunking thresholds.
 `splitDiffIntoChunks` partitions the raw `diff.files`.
 It then aliases each chunk's `filesForReview` to that same array.
-The subjects of a chunked run therefore list the pre-optimization files.
-Small diffs do not chunk, so they do not show the difference.
-The prompt the reviewer receives is re-optimized.
-The discrepancy is an over-reported subject list, not a review gap.
-Paths excluded with `configured_exclusion` never reach a chunk.
+A chunked run therefore reported pre-optimization files as subjects (#2233).
+Subjects are now derived through `buildLlmDiffView()`.
+That function is the single source of truth for the LLM-facing view.
+It re-optimizes the raw chunk alias (#2230).
+A subject list therefore names exactly the files whose hunks reached a reviewer.
+The `<unknown-diff>` sentinel below is the one declared exception to that.
 
-Do not read `selected` and `subjects` as one hierarchy. Aligning them is a change
-to the orchestrator, tracked separately, and a prerequisite for Gate integration.
+`selected` remains the wider of the two sets.
+It is a superset of the union of Review Unit subjects for a repository run.
+A selected path can still lose every hunk to per-chunk optimization.
+Do not read the two as one hierarchy in the other direction.
+A subject is not a claim that the file was reviewed completely.
+It only states that the file was part of the reviewed view.
+
+### The `<unknown-diff>` subject sentinel
+
+`subjects` is schema-constrained to at least one entry.
+A Review Unit whose LLM view is empty therefore carries the literal `<unknown-diff>`.
+It is the one subject value that names no file.
+
+A chunk reaches that state when the optimizer drops every one of its files.
+`splitDiffIntoChunks` groups by top-level directory.
+Six Markdown files under `docs/` can become one whole chunk.
+That chunk has no reviewable hunk left, so its LLM view is empty.
+The condition is reachable on ordinary pull requests, not only on malformed input.
+
+The sentinel is deliberately not a path.
+It never matches an entry in `fileScope.excluded`, so the disjointness above still holds.
+It also never claims that an excluded file was reviewed.
+Reading it as a real path is a consumer bug.
+
+Such a unit still reports `status: "completed"` and `findingsCount: 0`.
+That is accurate for Phase 1: the reviewer role did run and returned nothing.
+Suppressing the unit, or giving it a distinct status, changes execution semantics.
+That change belongs to Gate integration and is tracked separately.
 
 ### Why there is no `coveredFiles` field
 
