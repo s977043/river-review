@@ -4,7 +4,7 @@ const TYPESCRIPT_PATH_RE = /\.(?:ts|tsx)$/i;
 const TEST_PATH_RE =
   /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
 const CONTRACT_DECLARATION_RE =
-  /\binterface\s+[A-Za-z_$][\w$]*\s*(?:extends\s+[^\{]+)?\{|\btype\s+[A-Za-z_$][\w$]*\s*=\s*\{|\bz\.object\s*\(\s*\{/;
+  /\binterface\s+[A-Za-z_$][\w$]*(?:Dto|DTO|Request|Response|Api|API|Contract|Schema)[\w$]*\s*(?:extends\s+[^\{]+)?\{|\btype\s+[A-Za-z_$][\w$]*(?:Dto|DTO|Request|Response|Api|API|Contract|Schema)[\w$]*\s*=\s*\{|\bconst\s+[A-Za-z_$][\w$]*(?:Dto|DTO|Request|Response|Api|API|Contract|Schema)[\w$]*\s*=\s*z\.object\s*\(/;
 const PROPERTY_RE =
   /^\s*(?:readonly\s+)?(?<name>[A-Za-z_$][\w$]*)(?<optional>\?)?\s*:\s*(?<type>.+?)\s*[;,]?\s*$/;
 
@@ -90,9 +90,10 @@ function first(entries) {
  * violation decision, or gate behavior is attached here.
  *
  * The v1 detector is deliberately conservative. It handles TypeScript property
- * changes only when the file path or diff context indicates an API/DTO/schema/
- * contract/type boundary. New files and test/fixture files are excluded because
- * they cannot establish a breaking change to an existing production contract.
+ * changes only when the file path or a contract-named declaration indicates an
+ * API/DTO/schema/contract/type boundary. New files and test/fixture files are
+ * excluded because they cannot establish a breaking change to an existing
+ * production contract.
  *
  * @param {{diff?: {files?: Array<object>}}} options
  * @returns {Array<{kind: string, file: string, line?: number}>}
