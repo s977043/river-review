@@ -5,7 +5,7 @@ import {
   normalizeSeverity,
   SEVERITY_RANK,
 } from './finding-factory.mjs';
-import { renderDiffText } from './diff-processor.mjs';
+import { buildLlmDiffView, renderDiffText } from './diff-processor.mjs';
 import { synthesizeTeamLeadReport } from './team-lead-synthesizer.mjs';
 import { deriveReviewCoverage } from './review-coverage.mjs';
 
@@ -678,14 +678,28 @@ function editDistance(a, b) {
   return dp[m][n];
 }
 
+// Subjects MUST describe what the reviewer actually saw, which is the LLM diff
+// view — not the raw chunk array (#2233). `splitDiffIntoChunks` aliases the raw
+// files into BOTH `files` and `filesForReview`, so reading those directly made a
+// chunked run report lockfiles / dist artifacts as covered subjects while the
+// same `reviewCoverage.fileScope.excluded` listed them as `diff_optimization`.
+// `buildLlmDiffView` is the single source of truth for that view (it re-optimizes
+// the raw chunk alias, #2230), so routing through it keeps the ledger's
+// `excluded` and `units[].subjects` sets disjoint by construction.
 function reviewUnitSubjects(chunkDiff) {
-  const fileObjects = chunkDiff?.filesForReview ?? chunkDiff?.files ?? [];
-  const filePaths = fileObjects
+  const hadInputFiles =
+    (Array.isArray(chunkDiff?.filesForReview) && chunkDiff.filesForReview.length > 0) ||
+    (Array.isArray(chunkDiff?.files) && chunkDiff.files.length > 0);
+  const filePaths = (buildLlmDiffView(chunkDiff).files ?? [])
     .map((file) => file?.path)
     .filter((value) => typeof value === 'string');
-  const changedFiles = Array.isArray(chunkDiff?.changedFiles)
-    ? chunkDiff.changedFiles.filter((value) => typeof value === 'string')
-    : [];
+  // Only fall back to `changedFiles` when the chunk carried no file objects at
+  // all. When every file of a chunk was dropped by the optimizer, falling back
+  // would re-introduce exactly the excluded paths this function must not claim.
+  const changedFiles =
+    hadInputFiles || !Array.isArray(chunkDiff?.changedFiles)
+      ? []
+      : chunkDiff.changedFiles.filter((value) => typeof value === 'string');
   const subjects = [...new Set(filePaths.length > 0 ? filePaths : changedFiles)];
   // Orchestration normally only runs when there are reviewable files. Keep the
   // contract schema-valid if a malformed/custom diff reaches this layer while
