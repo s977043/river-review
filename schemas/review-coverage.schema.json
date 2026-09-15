@@ -35,7 +35,7 @@
       "items": { "$ref": "#/$defs/reviewUnit" }
     },
     "fileScope": {
-      "description": "Observe-only file selection ledger. Execution completion remains represented by Review Units; this field only records which changed files entered reviewer execution scope and which were excluded before it.",
+      "description": "Observe-only LLM-facing file-selection ledger. Execution completion remains represented by Review Units. selected records paths present in filesForReview; excluded records raw changed paths removed by configured exclusion or LLM diff optimization. A diff_optimization exclusion may still be inspected by deterministic review logic through raw diff.files.",
       "type": "object",
       "additionalProperties": false,
       "required": ["selected", "excluded"],
