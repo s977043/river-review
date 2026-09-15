@@ -44,23 +44,38 @@ async function resolveTrustedBuiltInSkillPath(skillPath) {
   if (!isPathInside(path.resolve(builtInSkillsRoot), resolved)) return null;
 
   // Lexical containment alone is insufficient if a trusted-tree path is a
-  // symlink. Canonicalize both sides before deriving references/viewpoints.yaml
-  // so a symlink cannot escape the distributed skills root.
+  // symlink. Canonicalize both sides before deriving references/viewpoints.yaml.
   const [realRoot, realSkillPath] = await Promise.all([
     fs.realpath(builtInSkillsRoot),
     fs.realpath(resolved),
   ]);
-  return isPathInside(realRoot, realSkillPath) ? realSkillPath : null;
+  if (!isPathInside(realRoot, realSkillPath)) return null;
+  return { realRoot, realSkillPath };
 }
 
-async function fileExists(filePath) {
+async function resolveTrustedViewpointsPath({ realRoot, realSkillPath }) {
+  const candidate = path.join(
+    path.dirname(realSkillPath),
+    'references',
+    'viewpoints.yaml'
+  );
+
+  let realViewpointsPath;
   try {
-    await fs.access(filePath);
-    return true;
+    realViewpointsPath = await fs.realpath(candidate);
   } catch (error) {
-    if (error?.code === 'ENOENT') return false;
+    if (error?.code === 'ENOENT') return { status: 'missing' };
     throw error;
   }
+
+  // Re-check the final catalog path after resolving references/ and the file
+  // itself. Without this second realpath check, a symlink located inside a
+  // trusted Skill directory could still point outside the distributed skills
+  // root even though SKILL.md itself was trusted.
+  if (!isPathInside(realRoot, realViewpointsPath)) {
+    return { status: 'outside' };
+  }
+  return { status: 'ok', path: realViewpointsPath };
 }
 
 function groupHeuristicSignalsBySkill(detections) {
@@ -109,9 +124,9 @@ function compactSkillObservation(observation) {
  *   explicitly opts into this knowledge as part of the review input.
  *
  * v1 deliberately refuses repository-owned/custom Skill paths. A selected Skill
- * must resolve under the same distributed `skills/` root used by Skill discovery
- * before `<skill>/references/viewpoints.yaml` is considered. This preserves the
- * trust boundary defined by #2252 while the schema remains experimental.
+ * and its final `references/viewpoints.yaml` target must both canonicalize under
+ * the same distributed `skills/` root used by Skill discovery. This prevents a
+ * symlink inside the trusted tree from escaping the built-in-only boundary.
  *
  * @param {object} params
  * @param {object} params.reviewConfig merged review configuration
@@ -172,9 +187,9 @@ export async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
       continue;
     }
 
-    let trustedSkillPath;
+    let trustedSkill;
     try {
-      trustedSkillPath = await resolveTrustedBuiltInSkillPath(skillPath);
+      trustedSkill = await resolveTrustedBuiltInSkillPath(skillPath);
     } catch (error) {
       if (mode === 'active') {
         throw new ReviewViewpointStageError(
@@ -188,19 +203,14 @@ export async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
       errors.push({ skillId, code: 'skill-path-resolution-failed' });
       continue;
     }
-    if (!trustedSkillPath) {
+    if (!trustedSkill) {
       if (signals.length > 0) skipped.push({ skillId, reason: 'outside-built-in-skills' });
       continue;
     }
 
-    const viewpointsPath = path.join(
-      path.dirname(trustedSkillPath),
-      'references',
-      'viewpoints.yaml'
-    );
-    let exists;
+    let catalogResolution;
     try {
-      exists = await fileExists(viewpointsPath);
+      catalogResolution = await resolveTrustedViewpointsPath(trustedSkill);
     } catch (error) {
       if (mode === 'active') {
         throw new ReviewViewpointStageError(
@@ -214,8 +224,20 @@ export async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
       errors.push({ skillId, code: 'catalog-inspection-failed' });
       continue;
     }
-    if (!exists) continue;
 
+    if (catalogResolution.status === 'missing') continue;
+    if (catalogResolution.status === 'outside') {
+      if (mode === 'active') {
+        throw new ReviewViewpointStageError(
+          `Built-in viewpoints path escapes skills root for ${skillId}`,
+          { skillId }
+        );
+      }
+      errors.push({ skillId, code: 'catalog-path-outside-built-in-skills' });
+      continue;
+    }
+
+    const viewpointsPath = catalogResolution.path;
     try {
       const document = await loadReviewViewpoints(viewpointsPath, { expectedSkillId: skillId });
       const observation = observeReviewViewpoints(document, signals);
