@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -146,3 +147,53 @@ test('repository-owned skill paths cannot load viewpoint knowledge', async () =>
   ]);
   assert.equal(result.observation.catalogSkillCount, 0);
 });
+
+test(
+  'catalog symlinks cannot escape the built-in skills root',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const fixturesRoot = path.join(
+      repoRoot,
+      'skills',
+      'midstream',
+      'api-compatibility',
+      'fixtures'
+    );
+    const skillDir = await fs.mkdtemp(path.join(fixturesRoot, 'viewpoint-stage-'));
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'river-review-viewpoints-outside-'));
+    t.after(async () => {
+      await fs.rm(skillDir, { recursive: true, force: true });
+      await fs.rm(outsideDir, { recursive: true, force: true });
+    });
+
+    const skillPath = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(skillPath, '# test skill\n', 'utf8');
+    await fs.writeFile(
+      path.join(outsideDir, 'viewpoints.yaml'),
+      'version: 1\nskillId: api-compatibility\nviewpoints: []\n',
+      'utf8'
+    );
+    await fs.symlink(outsideDir, path.join(skillDir, 'references'), 'dir');
+
+    const observe = await runReviewViewpointStage({
+      reviewConfig: { viewpoints: { mode: 'observe' } },
+      diff: apiContractDiff(),
+      plan: planWithSkillPath(skillPath),
+    });
+    assert.deepEqual(observe.activeObligations, []);
+    assert.deepEqual(observe.observation.errors, [
+      { skillId: 'api-compatibility', code: 'catalog-path-outside-built-in-skills' },
+    ]);
+
+    await assert.rejects(
+      runReviewViewpointStage({
+        reviewConfig: { viewpoints: { mode: 'active' } },
+        diff: apiContractDiff(),
+        plan: planWithSkillPath(skillPath),
+      }),
+      (error) =>
+        error instanceof ReviewViewpointStageError &&
+        /viewpoints path escapes skills root/.test(error.message)
+    );
+  }
+);
