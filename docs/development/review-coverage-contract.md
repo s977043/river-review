@@ -181,6 +181,14 @@ The contract remains additive:
 - callers supplying an older programmatic context without file-scope metadata keep the pre-Slice-C Review Coverage object;
 - consumers that do not know the new field can ignore it while the surface is Experimental.
 
+Forward compatibility is deliberately weaker. While the surface is Experimental, optional
+fields may be added without advancing `schemaVersion`, and the schema sets
+`additionalProperties: false`. A consumer that pins or vendors an older copy of
+`schemas/review-coverage.schema.json` therefore rejects a newer artifact.
+The copy shipped under `runners/github-action/dist/` has the same property.
+`schemaVersion` alone does not signal the difference.
+Validate against the schema shipped with the release you consume artifacts from.
+
 ## Future generalization
 
 Do not generalize v1 beyond the currently executable unit.
