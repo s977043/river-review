@@ -52591,7 +52591,7 @@ function collectAddedLineHints(diffText) {
 /* harmony export */   y2: () => (/* binding */ HEURISTIC_SKILL_IDS),
 /* harmony export */   zq: () => (/* binding */ buildHeuristicComments)
 /* harmony export */ });
-/* unused harmony export SKILL_HEURISTIC_MAP */
+/* unused harmony exports SKILL_HEURISTIC_MAP, collectHeuristicDetections */
 /* harmony import */ var _diff_processor_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(861);
 /**
  * ヒューリスティック検出器レジストリ（単一の真実 / SSoT）
@@ -54188,24 +54188,43 @@ function findTemporaryWithoutExit({ diff }) {
 }
 
 /**
- * Generate deterministic review comments from heuristics.
- * These comments are used as a fallback when LLM is not available.
+ * Execute the heuristic detectors selected by the existing Skill plan.
+ *
+ * This is the detector adapter boundary for Review Viewpoints. It deliberately
+ * returns uncapped detector signals in HEURISTIC_REGISTRY order so downstream
+ * observe-mode consumers do not lose activation evidence behind the existing
+ * eight-comment presentation limit. Routing remains owned by the selected
+ * Skill plan and HEURISTIC_REGISTRY remains the detector SSoT.
+ *
  * @param {{diff: {files?: Array}, plan: {selected?: Array}}} options
+ * @returns {Array<{file?: string, line?: number, kind: string, skillId: string}>}
  */
-function buildHeuristicComments({ diff, plan }) {
-  const comments = [];
+function collectHeuristicDetections({ diff, plan }) {
+  const detections = [];
 
   for (const { skillId, detect, skipIfSkill } of HEURISTIC_REGISTRY) {
     if (!hasSkill(plan, skillId)) continue;
     // skipIfSkill: 上位スキルが選択されている場合は重複実行を避ける
     // （test-existence が選択されていれば coverage-gap の同一検出器は実行しない）。
     if (skipIfSkill && hasSkill(plan, skipIfSkill)) continue;
-    for (const c of detect({ diff })) {
-      comments.push({ ...c, skillId });
+    for (const detection of detect({ diff })) {
+      detections.push({ ...detection, skillId });
     }
   }
 
-  return comments.slice(0, 8);
+  return detections;
+}
+
+/**
+ * Generate deterministic review comments from heuristics.
+ * These comments are used as a fallback when LLM is not available.
+ * The existing eight-comment presentation cap intentionally stays here rather
+ * than in collectHeuristicDetections so observe-mode activation can inspect all
+ * detector evidence without changing user-visible heuristic output.
+ * @param {{diff: {files?: Array}, plan: {selected?: Array}}} options
+ */
+function buildHeuristicComments({ diff, plan }) {
+  return collectHeuristicDetections({ diff, plan }).slice(0, 8);
 }
 
 
