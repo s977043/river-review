@@ -10,7 +10,7 @@ River Review では、既知のレビュー知識を Skill 配下の構造化デ
 参照した発想は、テスト観点を再利用可能なカタログへ分離する事例です。
 本設計では、その発想を River Review の既存アーキテクチャへ適合させます。
 
-- <https://zenn.dev/aldagram_tech/articles/316c4d944fd9d5e>
+- <https://zenn.dev/aldagram_tech/articles/316c4d944fd9d5>
 - Issue #2252
 
 ## 目的
