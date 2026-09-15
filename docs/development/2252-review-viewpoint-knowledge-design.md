@@ -65,6 +65,9 @@ Question: 既存 consumer との互換性が維持されているか。
 Evidence: changed contract / affected consumers
 ```
 
+同じ懸念を別 Viewpoint に分割しすぎません。
+たとえば versioning と migration path は backward compatibility の証拠として扱い、重複 Obligation を避けます。
+
 ### data-only に限定する
 
 `viewpoints.yaml` から任意コードを実行できるようにしません。
@@ -122,7 +125,6 @@ Repository custom catalog と organization catalog は扱いません。
 - backward compatibility
 - API contract test coverage
 - optional field consumer handling
-- breaking change migration evidence
 
 この Slice では、`activatesOn` の signal vocabulary は実行へ接続しません。
 後続の observe-mode で既存 detector result から内部正規化して接続します。
