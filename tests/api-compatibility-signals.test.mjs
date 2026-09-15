@@ -75,6 +75,38 @@ test('detects an added optional field for consumer-handling review', () => {
   ]);
 });
 
+test('detects a contract-named declaration outside a conventional contract path', () => {
+  const signals = detect(`diff --git a/src/service/user.ts b/src/service/user.ts
+--- a/src/service/user.ts
++++ b/src/service/user.ts
+@@ -1,4 +1,4 @@
+ interface UserResponse {
+-  id: string;
++  id: number;
+   name: string;
+ }
+`);
+
+  assert.deepEqual(signals, [
+    { kind: 'dto-field-type-changed', file: 'src/service/user.ts', line: 2 },
+  ]);
+});
+
+test('does not treat an internal interface as an API contract signal', () => {
+  const signals = detect(`diff --git a/src/service/user.ts b/src/service/user.ts
+--- a/src/service/user.ts
++++ b/src/service/user.ts
+@@ -1,4 +1,4 @@
+ interface CacheState {
+-  retries: string;
++  retries: number;
+   ready: boolean;
+ }
+`);
+
+  assert.deepEqual(signals, []);
+});
+
 test('does not treat a moved or reformatted property as a contract change', () => {
   const signals = detect(`diff --git a/src/dto/user.ts b/src/dto/user.ts
 --- a/src/dto/user.ts
