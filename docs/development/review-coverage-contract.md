@@ -118,7 +118,7 @@ fileScope:
       reasonCode: configured_exclusion
 ```
 
-The ledger is derived at the local selection boundary where River Review has both the raw repository change set and the post-configuration LLM-facing `filesForReview` view.
+The ledger is derived at the local selection boundary. That is the point where River Review holds both the raw repository change set and the post-configuration LLM-facing `filesForReview` view.
 
 Closed reason vocabulary:
 
@@ -146,7 +146,7 @@ to the orchestrator, tracked separately, and a prerequisite for Gate integration
 
 ### Why there is no `coveredFiles` field
 
-File-level execution completion is not equivalent to LLM-facing file selection. A file can appear in multiple Review Units because different reviewer roles inspect the same chunk, and deterministic review logic may inspect raw files that the LLM-facing optimizer omitted. A `covered: true/false` value would therefore require policy about required vs optional reviewers, deterministic processing, and partial failures.
+File-level execution completion is not equivalent to LLM-facing file selection. A file can appear in multiple Review Units because different reviewer roles inspect the same chunk. Deterministic review logic may also inspect raw files that the LLM-facing optimizer omitted. A `covered: true/false` value would therefore require policy about required vs optional reviewers, deterministic processing, and partial failures.
 
 That policy belongs to later Gate integration. Phase 1 keeps file selection as observation and Review Unit outcomes as the execution SSoT.
 

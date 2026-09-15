@@ -19,10 +19,10 @@ Review Coverage already records `reviewer role × diff chunk` execution units an
 Two existing boundaries affect that selection:
 
 1. configured exclusions: `config.exclude.files` in `local-runner.mjs` removes matching paths from the local review diff before review processing;
-2. LLM diff optimization: files absent from `filesForReview` are omitted from generated review prompts while remaining available to deterministic review logic through raw `diff.files`.
+2. LLM diff optimization: files absent from `filesForReview` are omitted from generated review prompts. They remain available to deterministic review logic through raw `diff.files`.
    Examples include documentation, lock files, generated `dist/` output, or changes whose hunks are removed by the optimizer.
 
-The ledger must describe this selection scope without pretending that it is file-level execution coverage or that optimizer-excluded files are invisible to all review processing.
+The ledger must describe this selection scope as selection, not as file-level execution coverage. It must also not imply that optimizer-excluded files are invisible to all review processing.
 
 ## Compatibility with #2230
 
@@ -54,7 +54,7 @@ Closed reason vocabulary for this slice:
 
 ## Why no `coveredFiles` field yet
 
-A file can appear in multiple Review Units because execution is `reviewer role × diff chunk`, and deterministic review logic can inspect raw files that the LLM-facing optimizer omitted. A simple file-level `covered` boolean would therefore need policy about required vs optional reviewers, deterministic processing, and partial failures. That is Gate-adjacent semantics and is intentionally deferred.
+A file can appear in multiple Review Units because execution is `reviewer role × diff chunk`. Deterministic review logic can also inspect raw files that the LLM-facing optimizer omitted. A simple file-level `covered` boolean would therefore need policy about required vs optional reviewers, deterministic processing, and partial failures. That is Gate-adjacent semantics and is intentionally deferred.
 
 Execution completion remains represented by Review Units. `fileScope` only records LLM-facing selection scope.
 
