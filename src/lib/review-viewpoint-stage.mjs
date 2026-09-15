@@ -1,16 +1,16 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import { defaultPaths } from '../../runners/core/skill-loader.mjs';
 import { detectApiCompatibilitySignals } from './api-compatibility-signals.mjs';
 import { collectHeuristicDetections } from './heuristic-review.mjs';
 import { observeReviewViewpoints } from './review-viewpoint-observer.mjs';
 import { loadReviewViewpoints } from './review-viewpoints.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '..', '..');
-const builtInSkillsRoot = path.join(repoRoot, 'skills');
+// Skill discovery already resolves the River Review package root, including the
+// GitHub Action/ncc RIVER_REPO_ROOT override. Reuse that SSoT instead of
+// re-deriving it from this module's __dirname, which changes after bundling.
+const builtInSkillsRoot = defaultPaths.skillsDir;
 const REVIEW_VIEWPOINT_MODES = new Set(['off', 'observe', 'active']);
 
 const NEUTRAL_SIGNAL_PRODUCERS = new Map([
@@ -29,15 +29,28 @@ function getSkillId(skill) {
   return skill?.metadata?.id ?? skill?.id ?? null;
 }
 
-function isInsideBuiltInSkillsRoot(skillPath) {
-  const resolved = path.resolve(skillPath);
-  const relative = path.relative(builtInSkillsRoot, resolved);
+function isPathInside(root, candidate) {
+  const relative = path.relative(root, candidate);
   return (
     relative !== '' &&
     relative !== '..' &&
     !relative.startsWith(`..${path.sep}`) &&
     !path.isAbsolute(relative)
   );
+}
+
+async function resolveTrustedBuiltInSkillPath(skillPath) {
+  const resolved = path.resolve(skillPath);
+  if (!isPathInside(path.resolve(builtInSkillsRoot), resolved)) return null;
+
+  // Lexical containment alone is insufficient if a trusted-tree path is a
+  // symlink. Canonicalize both sides before deriving references/viewpoints.yaml
+  // so a symlink cannot escape the distributed skills root.
+  const [realRoot, realSkillPath] = await Promise.all([
+    fs.realpath(builtInSkillsRoot),
+    fs.realpath(resolved),
+  ]);
+  return isPathInside(realRoot, realSkillPath) ? realSkillPath : null;
 }
 
 async function fileExists(filePath) {
@@ -93,9 +106,9 @@ function compactSkillObservation(observation) {
  *   to the LLM prompt.
  *
  * v1 deliberately refuses repository-owned/custom Skill paths. A selected Skill
- * must resolve under River Review's distributed `skills/` directory before
- * `<skill>/references/viewpoints.yaml` is considered. This preserves the trust
- * boundary defined by #2252 while the schema remains experimental.
+ * must resolve under the same distributed `skills/` root used by Skill discovery
+ * before `<skill>/references/viewpoints.yaml` is considered. This preserves the
+ * trust boundary defined by #2252 while the schema remains experimental.
  *
  * @param {object} params
  * @param {object} params.reviewConfig merged review configuration
@@ -131,13 +144,27 @@ export async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
       if (signals.length > 0) skipped.push({ skillId, reason: 'missing-skill-path' });
       continue;
     }
-    if (!isInsideBuiltInSkillsRoot(skillPath)) {
+
+    let trustedSkillPath;
+    try {
+      trustedSkillPath = await resolveTrustedBuiltInSkillPath(skillPath);
+    } catch (error) {
+      if (mode === 'active') {
+        throw new ReviewViewpointStageError(`Failed to resolve built-in Skill path for ${skillId}`, {
+          cause: error,
+          skillId,
+        });
+      }
+      errors.push({ skillId, code: 'skill-path-resolution-failed' });
+      continue;
+    }
+    if (!trustedSkillPath) {
       if (signals.length > 0) skipped.push({ skillId, reason: 'outside-built-in-skills' });
       continue;
     }
 
     const viewpointsPath = path.join(
-      path.dirname(path.resolve(skillPath)),
+      path.dirname(trustedSkillPath),
       'references',
       'viewpoints.yaml'
     );
