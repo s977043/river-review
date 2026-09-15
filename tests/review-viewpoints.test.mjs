@@ -92,7 +92,7 @@ describe('review-viewpoints schema', () => {
 });
 
 describe('review-viewpoints loader', () => {
-  test('loads the api-compatibility knowledge without changing runtime behavior', async () => {
+  test('loads the built-in api-compatibility knowledge', async () => {
     const document = await loadReviewViewpoints(apiCompatibilityViewpointsPath, {
       expectedSkillId: 'api-compatibility',
     });
@@ -101,13 +101,32 @@ describe('review-viewpoints loader', () => {
     assert.equal(document.skillId, 'api-compatibility');
     assert.deepEqual(
       document.viewpoints.map((viewpoint) => viewpoint.id),
-      [
-        'backward-compatibility',
-        'api-test-coverage',
-        'optional-field-consumer-handling',
-        'breaking-change-migration-evidence',
-      ]
+      ['backward-compatibility', 'api-test-coverage', 'optional-field-consumer-handling']
     );
+  });
+
+  test('rejects invalid YAML before schema validation', async () => {
+    await withTempViewpoints('version: [\n', async (filePath) => {
+      await assert.rejects(
+        () => loadReviewViewpoints(filePath),
+        (error) =>
+          error instanceof ReviewViewpointsError &&
+          error.message.includes('Failed to parse review viewpoints YAML')
+      );
+    });
+  });
+
+  test('rejects schema-invalid policy or executable fields', async () => {
+    const yaml = `version: 1\nskillId: example-skill\nonUnknown: escalate\nviewpoints:\n  - id: example\n    title: Example\n    activatesOn: [signal-one]\n    question: Example question\n    requiredEvidence: [evidence-one]\n`;
+
+    await withTempViewpoints(yaml, async (filePath) => {
+      await assert.rejects(
+        () => loadReviewViewpoints(filePath),
+        (error) =>
+          error instanceof ReviewViewpointsError &&
+          error.message.includes('Invalid review viewpoints')
+      );
+    });
   });
 
   test('rejects duplicate viewpoint ids even when the JSON schema shape is valid', async () => {
