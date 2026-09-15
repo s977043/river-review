@@ -14,7 +14,7 @@
 //   オブジェクトを返す。tests/prompt-compiler-invariants.test.mjs が pin する。
 
 /** IR のバージョン。形を変えたら上げる。 */
-export const REVIEW_REQUEST_IR_VERSION = '1';
+export const REVIEW_REQUEST_IR_VERSION = '2';
 
 /** 凍結対象のネスト。浅い freeze では profile 側の書き換えを防げない。 */
 function deepFreeze(value) {
@@ -65,6 +65,7 @@ export function buildReviewRequest({
       riskAssessment: context?.riskAssessment ?? null,
       repoContext: context?.repoContext ?? null,
       prDescription: context?.prDescription ?? null,
+      reviewObligations: context?.reviewObligations ?? [],
     },
     constraints: {
       maxFindings: constraints?.maxFindings ?? null,

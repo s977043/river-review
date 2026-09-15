@@ -104,6 +104,47 @@ export function buildPrDescriptionSection(prBody) {
   return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。\n\n---\n${body}\n---\n`;
 }
 
+function reviewObligationOneLine(value) {
+  return String(value ?? '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+}
+
+function reviewObligationList(values) {
+  return (values ?? []).map(reviewObligationOneLine).filter(Boolean).join(', ');
+}
+
+/**
+ * Render matched Review Obligations as questions that require evidence, never
+ * as pre-asserted Findings. Activation details stay out of the prompt: they are
+ * runtime provenance, not evidence that a violation exists.
+ */
+export function buildReviewObligationsSection(obligations = [], language = 'ja') {
+  if (!obligations?.length) return '';
+
+  const instruction =
+    language === 'en'
+      ? 'The following items are review obligations, not findings. Verify the required evidence in the diff and context. Emit a finding only when evidence supports a real issue; never invent missing evidence, and respect false-positive guards.'
+      : '以下は「確認すべき観点」であり、問題の存在を示す Finding ではありません。差分と文脈から Required evidence を確認し、実際の問題を裏付ける証拠がある場合だけ Finding を出してください。証拠を推測・捏造せず、False-positive guards に該当する場合は指摘しないでください。';
+  const lines = [];
+
+  for (const obligation of obligations) {
+    lines.push(
+      `- [${reviewObligationOneLine(obligation.id)}] ${reviewObligationOneLine(obligation.title)}`
+    );
+    lines.push(`  - Question: ${reviewObligationOneLine(obligation.question)}`);
+    lines.push(
+      `  - Required evidence: ${reviewObligationList(obligation.requiredEvidence) || '(none)'}`
+    );
+    const hints = reviewObligationList(obligation.evidenceHints);
+    if (hints) lines.push(`  - Evidence hints: ${hints}`);
+    const guards = reviewObligationList(obligation.falsePositiveGuards);
+    if (guards) lines.push(`  - False-positive guards: ${guards}`);
+  }
+
+  return `\n### Review Obligations\n\n${instruction}\n\n${lines.join('\n')}\n`;
+}
+
 // Opt-in (review.walkthrough). Asks the model to prepend a per-file walkthrough
 // to its output so reviewers see what changed, the risk, and a reading order.
 export function buildWalkthroughSection(enabled) {
