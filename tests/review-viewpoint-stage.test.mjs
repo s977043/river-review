@@ -5,7 +5,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
-import { runReviewViewpointStage } from '../src/lib/review-viewpoint-stage.mjs';
+import {
+  ReviewViewpointStageError,
+  runReviewViewpointStage,
+} from '../src/lib/review-viewpoint-stage.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -42,10 +45,20 @@ function planWithSkillPath(skillPath = apiCompatibilitySkillPath) {
   };
 }
 
+function explodingDiff() {
+  const diff = {};
+  Object.defineProperty(diff, 'files', {
+    get() {
+      throw new Error('detector boom');
+    },
+  });
+  return diff;
+}
+
 test('off mode is a complete no-op', async () => {
   const result = await runReviewViewpointStage({
     reviewConfig: { viewpoints: { mode: 'off' } },
-    diff: apiContractDiff(),
+    diff: explodingDiff(),
     plan: planWithSkillPath('/outside/repository/api-compatibility/SKILL.md'),
   });
 
@@ -70,6 +83,32 @@ test('observe mode records obligations without activating prompt obligations', a
     'api-compatibility/backward-compatibility',
     'api-compatibility/api-test-coverage',
   ]);
+});
+
+test('observe mode records signal failures without changing review success semantics', async () => {
+  const result = await runReviewViewpointStage({
+    reviewConfig: { viewpoints: { mode: 'observe' } },
+    diff: explodingDiff(),
+    plan: planWithSkillPath(),
+  });
+
+  assert.equal(result.mode, 'observe');
+  assert.deepEqual(result.activeObligations, []);
+  assert.deepEqual(result.observation.errors, [
+    { code: 'heuristic-signal-collection-failed' },
+    { skillId: 'api-compatibility', code: 'signal-producer-failed' },
+  ]);
+});
+
+test('active mode fails closed when signal collection cannot be trusted', async () => {
+  await assert.rejects(
+    runReviewViewpointStage({
+      reviewConfig: { viewpoints: { mode: 'active' } },
+      diff: explodingDiff(),
+      plan: planWithSkillPath(),
+    }),
+    (error) => error instanceof ReviewViewpointStageError
+  );
 });
 
 test('active mode exposes only matched review obligations', async () => {
