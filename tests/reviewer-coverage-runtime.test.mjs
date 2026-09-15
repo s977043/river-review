@@ -7,8 +7,13 @@ import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
 const validateCoverage = compileReviewCoverageValidator();
 const validationErrors = () => JSON.stringify(validateCoverage.errors, null, 2);
 
+// Files carry a real hunk: `reviewUnitSubjects` derives subjects from the LLM
+// diff view (#2233), and a file with no surviving hunk is not part of that view.
 function file(path) {
-  return { path, hunks: [] };
+  return {
+    path,
+    hunks: [{ header: '@@ -1,1 +1,2 @@', lines: [' const a = 1;', `+const touched = '${path}';`] }],
+  };
 }
 
 function diffFor(paths) {
