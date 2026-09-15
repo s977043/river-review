@@ -105,10 +105,19 @@ describe('review-viewpoints loader', () => {
     );
   });
 
+  test('requires the selected Skill id before reading knowledge', async () => {
+    await assert.rejects(
+      () => loadReviewViewpoints(apiCompatibilityViewpointsPath),
+      (error) =>
+        error instanceof ReviewViewpointsError &&
+        error.message.includes('expectedSkillId is required')
+    );
+  });
+
   test('rejects invalid YAML before schema validation', async () => {
     await withTempViewpoints('version: [\n', async (filePath) => {
       await assert.rejects(
-        () => loadReviewViewpoints(filePath),
+        () => loadReviewViewpoints(filePath, { expectedSkillId: 'example-skill' }),
         (error) =>
           error instanceof ReviewViewpointsError &&
           error.message.includes('Failed to parse review viewpoints YAML')
@@ -121,7 +130,7 @@ describe('review-viewpoints loader', () => {
 
     await withTempViewpoints(yaml, async (filePath) => {
       await assert.rejects(
-        () => loadReviewViewpoints(filePath),
+        () => loadReviewViewpoints(filePath, { expectedSkillId: 'example-skill' }),
         (error) =>
           error instanceof ReviewViewpointsError &&
           error.message.includes('Invalid review viewpoints')
@@ -134,7 +143,7 @@ describe('review-viewpoints loader', () => {
 
     await withTempViewpoints(yaml, async (filePath) => {
       await assert.rejects(
-        () => loadReviewViewpoints(filePath),
+        () => loadReviewViewpoints(filePath, { expectedSkillId: 'example-skill' }),
         (error) =>
           error instanceof ReviewViewpointsError &&
           error.message.includes('Duplicate review viewpoint id(s)') &&
@@ -143,7 +152,7 @@ describe('review-viewpoints loader', () => {
     });
   });
 
-  test('can assert that the document belongs to the selected Skill', async () => {
+  test('rejects knowledge owned by a different Skill', async () => {
     await assert.rejects(
       () =>
         loadReviewViewpoints(apiCompatibilityViewpointsPath, {
