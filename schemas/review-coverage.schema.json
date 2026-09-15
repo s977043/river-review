@@ -47,7 +47,8 @@
         },
         "excluded": {
           "type": "array",
-          "items": { "$ref": "#/$defs/fileExclusion" }
+          "items": { "$ref": "#/$defs/fileExclusion" },
+          "uniqueItems": true
         }
       }
     }

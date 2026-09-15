@@ -127,6 +127,8 @@ Closed reason vocabulary:
 
 `selected` and `excluded` are deterministic and disjoint. They preserve first-seen changed-file order. Together they reconstruct the raw changed-file set relative to these two selection boundaries; they do not assert file-level execution completion.
 
+That reconstruction holds for runs over a real repository. A programmatic caller can supply paths that the raw changed-file set does not contain. Those paths stay in `selected`, which then covers more than the raw set.
+
 ### `selected` is not a superset of Review Unit subjects
 
 `fileScope` and `units[].subjects` come from different points in the pipeline.
