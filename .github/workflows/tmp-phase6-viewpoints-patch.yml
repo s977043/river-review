@@ -1,0 +1,224 @@
+name: Temporary Phase 6 Viewpoint Patch
+
+on:
+  push:
+    branches:
+      - feat/2252-review-viewpoints-active-mode
+    paths:
+      - .github/workflows/tmp-phase6-viewpoints-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2252-review-viewpoints-active-mode
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply reviewed patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, got {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'src/config/default.mjs',
+              "    promptCompiler: { mode: 'off' },\n",
+              "    promptCompiler: { mode: 'off' },\n    // #2252: Review Viewpoint Catalog is opt-in. observe records activation\n    // without changing prompts; active injects matched Review Obligations.\n    viewpoints: { mode: 'off' },\n",
+          )
+
+          replace_once(
+              'src/config/schema.mjs',
+              "export const promptCompilerConfigSchema = z.object({\n  mode: z.enum(['off', 'observe', 'active']).optional(),\n});\n\nexport const reviewConfigSchema = z.object({\n  promptCompiler: promptCompilerConfigSchema.optional(),\n",
+              "export const promptCompilerConfigSchema = z.object({\n  mode: z.enum(['off', 'observe', 'active']).optional(),\n});\n\n// #2252: Review Viewpoint runtime mode. Separate from Prompt Compiler because\n// knowledge activation and model-specific prompt rendering are independent.\nexport const reviewViewpointsConfigSchema = z.object({\n  mode: z.enum(['off', 'observe', 'active']).optional(),\n});\n\nexport const reviewConfigSchema = z.object({\n  promptCompiler: promptCompilerConfigSchema.optional(),\n  viewpoints: reviewViewpointsConfigSchema.optional(),\n",
+          )
+
+          sections_anchor = "// Opt-in (review.walkthrough). Asks the model to prepend a per-file walkthrough\n"
+          sections_insert = r'''function reviewObligationOneLine(value) {
+            return String(value ?? '')
+              .replace(/[\r\n]+/g, ' ')
+              .trim();
+          }
+
+          function reviewObligationList(values) {
+            return (values ?? []).map(reviewObligationOneLine).filter(Boolean).join(', ');
+          }
+
+          /**
+           * Render matched Review Obligations as questions that require evidence, never
+           * as pre-asserted Findings. Activation details stay out of the prompt: they are
+           * runtime provenance, not evidence that a violation exists.
+           */
+          export function buildReviewObligationsSection(obligations = [], language = 'ja') {
+            if (!obligations?.length) return '';
+
+            const instruction =
+              language === 'en'
+                ? 'The following items are review obligations, not findings. Verify the required evidence in the diff and context. Emit a finding only when evidence supports a real issue; never invent missing evidence, and respect false-positive guards.'
+                : '以下は「確認すべき観点」であり、問題の存在を示す Finding ではありません。差分と文脈から Required evidence を確認し、実際の問題を裏付ける証拠がある場合だけ Finding を出してください。証拠を推測・捏造せず、False-positive guards に該当する場合は指摘しないでください。';
+            const lines = [];
+
+            for (const obligation of obligations) {
+              lines.push(
+                `- [${reviewObligationOneLine(obligation.id)}] ${reviewObligationOneLine(obligation.title)}`
+              );
+              lines.push(`  - Question: ${reviewObligationOneLine(obligation.question)}`);
+              lines.push(
+                `  - Required evidence: ${reviewObligationList(obligation.requiredEvidence) || '(none)'}`
+              );
+              const hints = reviewObligationList(obligation.evidenceHints);
+              if (hints) lines.push(`  - Evidence hints: ${hints}`);
+              const guards = reviewObligationList(obligation.falsePositiveGuards);
+              if (guards) lines.push(`  - False-positive guards: ${guards}`);
+            }
+
+            return `\n### Review Obligations\n\n${instruction}\n\n${lines.join('\n')}\n`;
+          }
+
+          '''
+          replace_once('src/prompt/sections.mjs', sections_anchor, sections_insert + sections_anchor)
+
+          replace_once(
+              'src/prompt/review-request.mjs',
+              "export const REVIEW_REQUEST_IR_VERSION = '1';",
+              "export const REVIEW_REQUEST_IR_VERSION = '2';",
+          )
+          replace_once(
+              'src/prompt/review-request.mjs',
+              "      prDescription: context?.prDescription ?? null,\n",
+              "      prDescription: context?.prDescription ?? null,\n      reviewObligations: context?.reviewObligations ?? [],\n",
+          )
+
+          replace_once(
+              'src/prompt/renderers/shared.mjs',
+              "  buildPrDescriptionSection,\n  buildProjectRulesSection,\n",
+              "  buildPrDescriptionSection,\n  buildProjectRulesSection,\n  buildReviewObligationsSection,\n",
+          )
+          replace_once(
+              'src/prompt/renderers/shared.mjs',
+              "    buildPrDescriptionSection(c.prDescription),\n    buildWalkthroughSection(ir.constraints.walkthrough),\n",
+              "    buildPrDescriptionSection(c.prDescription),\n    buildReviewObligationsSection(c.reviewObligations, ir.outputContract.language),\n    buildWalkthroughSection(ir.constraints.walkthrough),\n",
+          )
+
+          replace_once(
+              'src/prompt/compiler-stage.mjs',
+              "  prBody,\n  language,\n",
+              "  prBody,\n  reviewObligations,\n  language,\n",
+          )
+          replace_once(
+              'src/prompt/compiler-stage.mjs',
+              "      prDescription: prBody,\n    },\n",
+              "      prDescription: prBody,\n      reviewObligations,\n    },\n",
+          )
+
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "  buildPrDescriptionSection,\n  buildProjectRulesSection,\n",
+              "  buildPrDescriptionSection,\n  buildProjectRulesSection,\n  buildReviewObligationsSection,\n",
+          )
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "import { runPromptCompilerStage } from '../prompt/compiler-stage.mjs';\n",
+              "import { runPromptCompilerStage } from '../prompt/compiler-stage.mjs';\nimport { runReviewViewpointStage } from './review-viewpoint-stage.mjs';\n",
+          )
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "  prBody,\n  maxChars = MAX_PROMPT_CHARS,\n",
+              "  prBody,\n  reviewObligations,\n  maxChars = MAX_PROMPT_CHARS,\n",
+          )
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildFindingContractSection(\n",
+              "${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(\n",
+          )
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "  const llmDiff = buildLlmDiffView(diff);\n  const promptInfo = buildPrompt({\n",
+              "  const llmDiff = buildLlmDiffView(diff);\n  const viewpointStage = await runReviewViewpointStage({\n    reviewConfig: effectiveConfig.review,\n    diff,\n    plan,\n  });\n  const reviewObligations = viewpointStage?.activeObligations ?? [];\n  const promptInfo = buildPrompt({\n",
+          )
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "    prBody,\n    maxChars: maxPromptChars,\n",
+              "    prBody,\n    reviewObligations,\n    maxChars: maxPromptChars,\n",
+          )
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "  };\n\n  // --- ADR-006 / #1859 + #1861: Prompt Compiler（配線はこの 1 箇所だけ）---\n",
+              "  };\n\n  if (viewpointStage) {\n    debug.execution = {\n      ...(debug.execution ?? {}),\n      reviewViewpoints: viewpointStage.observation,\n    };\n  }\n\n  // --- ADR-006 / #1859 + #1861: Prompt Compiler（配線はこの 1 箇所だけ）---\n",
+          )
+          replace_once(
+              'src/lib/review-engine.mjs',
+              "    prBody,\n    language,\n    openAIConfig,\n",
+              "    prBody,\n    reviewObligations,\n    language,\n    openAIConfig,\n",
+          )
+          PY
+
+      - name: Format changed files
+        run: >-
+          npx prettier --write
+          src/config/default.mjs
+          src/config/schema.mjs
+          src/lib/review-engine.mjs
+          src/lib/review-viewpoint-stage.mjs
+          src/prompt/compiler-stage.mjs
+          src/prompt/renderers/shared.mjs
+          src/prompt/review-request.mjs
+          src/prompt/sections.mjs
+          tests/review-viewpoint-stage.test.mjs
+          tests/review-viewpoint-active-mode.test.mjs
+
+      - name: Run focused tests
+        run: >-
+          node --test
+          tests/review-viewpoint-stage.test.mjs
+          tests/review-viewpoint-active-mode.test.mjs
+          tests/prompt-review-request.test.mjs
+          tests/prompt-compiler.test.mjs
+          tests/prompt-compiler-observe.test.mjs
+          tests/prompt-sections.test.mjs
+
+      - name: Verify patch scope and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' \
+            src/config/default.mjs \
+            src/config/schema.mjs \
+            src/lib/review-engine.mjs \
+            src/lib/review-viewpoint-stage.mjs \
+            src/prompt/compiler-stage.mjs \
+            src/prompt/renderers/shared.mjs \
+            src/prompt/review-request.mjs \
+            src/prompt/sections.mjs \
+            tests/review-viewpoint-active-mode.test.mjs \
+            tests/review-viewpoint-stage.test.mjs | sort)"
+          test "$changed" = "$expected"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $changed
+          git commit -m "feat(viewpoints): wire observe and active runtime modes"
+          git push origin HEAD:feat/2252-review-viewpoints-active-mode
