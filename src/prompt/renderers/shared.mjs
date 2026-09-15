@@ -16,6 +16,7 @@ import {
   buildHandoffSection,
   buildPrDescriptionSection,
   buildProjectRulesSection,
+  buildReviewObligationsSection,
   buildRiskAssessmentSection,
   buildSkillSummary,
   buildSystemMessage,
@@ -49,6 +50,7 @@ export function renderContextBlock(ir) {
     buildADRContextSection(c.relatedADRs),
     buildRepoContextSection(c.repoContext),
     buildPrDescriptionSection(c.prDescription),
+    buildReviewObligationsSection(c.reviewObligations, ir.outputContract.language),
     buildWalkthroughSection(ir.constraints.walkthrough),
     buildHandoffSection(ir.constraints.agentHandoff),
   ].join('');

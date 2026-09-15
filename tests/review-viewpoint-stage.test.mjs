@@ -81,10 +81,7 @@ test('active mode exposes only matched review obligations', async () => {
   assert.equal(result.mode, 'active');
   assert.deepEqual(
     result.activeObligations.map((obligation) => obligation.id),
-    [
-      'api-compatibility/backward-compatibility',
-      'api-compatibility/api-test-coverage',
-    ]
+    ['api-compatibility/backward-compatibility', 'api-compatibility/api-test-coverage']
   );
   assert.equal(result.observation.activeObligationCount, 2);
 });

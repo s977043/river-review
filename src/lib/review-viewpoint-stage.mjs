@@ -111,9 +111,7 @@ export async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
   if (mode === 'off') return null;
 
   const selected = plan?.selected ?? [];
-  const heuristicSignals = groupHeuristicSignalsBySkill(
-    collectHeuristicDetections({ diff, plan })
-  );
+  const heuristicSignals = groupHeuristicSignalsBySkill(collectHeuristicDetections({ diff, plan }));
   const observations = [];
   const obligations = [];
   const skipped = [];
@@ -138,16 +136,23 @@ export async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
       continue;
     }
 
-    const viewpointsPath = path.join(path.dirname(path.resolve(skillPath)), 'references', 'viewpoints.yaml');
+    const viewpointsPath = path.join(
+      path.dirname(path.resolve(skillPath)),
+      'references',
+      'viewpoints.yaml'
+    );
     let exists;
     try {
       exists = await fileExists(viewpointsPath);
     } catch (error) {
       if (mode === 'active') {
-        throw new ReviewViewpointStageError(`Failed to inspect built-in viewpoints for ${skillId}`, {
-          cause: error,
-          skillId,
-        });
+        throw new ReviewViewpointStageError(
+          `Failed to inspect built-in viewpoints for ${skillId}`,
+          {
+            cause: error,
+            skillId,
+          }
+        );
       }
       errors.push({ skillId, code: 'catalog-inspection-failed' });
       continue;

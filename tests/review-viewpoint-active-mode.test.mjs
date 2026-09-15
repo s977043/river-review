@@ -80,8 +80,14 @@ function baseGenerateArgs(config) {
 
 test('review.viewpoints mode defaults to off and rejects shadow', () => {
   assert.equal(defaultConfig.review.viewpoints.mode, 'off');
-  assert.equal(reviewConfigSchema.parse({ viewpoints: { mode: 'observe' } }).viewpoints.mode, 'observe');
-  assert.equal(reviewConfigSchema.parse({ viewpoints: { mode: 'active' } }).viewpoints.mode, 'active');
+  assert.equal(
+    reviewConfigSchema.parse({ viewpoints: { mode: 'observe' } }).viewpoints.mode,
+    'observe'
+  );
+  assert.equal(
+    reviewConfigSchema.parse({ viewpoints: { mode: 'active' } }).viewpoints.mode,
+    'active'
+  );
   assert.throws(() => reviewConfigSchema.parse({ viewpoints: { mode: 'shadow' } }));
 });
 
@@ -98,9 +104,7 @@ test('review obligation section states that obligations are not findings', () =>
 });
 
 test('observe mode preserves the exact legacy prompt while recording activation', async () => {
-  const off = await generateReview(
-    baseGenerateArgs({ review: { viewpoints: { mode: 'off' } } })
-  );
+  const off = await generateReview(baseGenerateArgs({ review: { viewpoints: { mode: 'off' } } }));
   const observe = await generateReview(
     baseGenerateArgs({ review: { viewpoints: { mode: 'observe' } } })
   );
@@ -140,13 +144,19 @@ test('Prompt Compiler renderers consume the same Review Obligation context', () 
   assert.match(`${generic.systemMessage}\n${generic.prompt}`, /### Review Obligations/);
   assert.match(`${openai.systemMessage}\n${openai.prompt}`, /### Review Obligations/);
   assert.equal(
-    (`${generic.systemMessage}\n${generic.prompt}`.match(/api-compatibility\/backward-compatibility/g) ?? [])
-      .length,
+    (
+      `${generic.systemMessage}\n${generic.prompt}`.match(
+        /api-compatibility\/backward-compatibility/g
+      ) ?? []
+    ).length,
     1
   );
   assert.equal(
-    (`${openai.systemMessage}\n${openai.prompt}`.match(/api-compatibility\/backward-compatibility/g) ?? [])
-      .length,
+    (
+      `${openai.systemMessage}\n${openai.prompt}`.match(
+        /api-compatibility\/backward-compatibility/g
+      ) ?? []
+    ).length,
     1
   );
 });

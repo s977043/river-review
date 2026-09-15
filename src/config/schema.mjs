@@ -51,8 +51,15 @@ export const promptCompilerConfigSchema = z.object({
   mode: z.enum(['off', 'observe', 'active']).optional(),
 });
 
+// #2252: Review Viewpoint runtime mode. Separate from Prompt Compiler because
+// knowledge activation and model-specific prompt rendering are independent.
+export const reviewViewpointsConfigSchema = z.object({
+  mode: z.enum(['off', 'observe', 'active']).optional(),
+});
+
 export const reviewConfigSchema = z.object({
   promptCompiler: promptCompilerConfigSchema.optional(),
+  viewpoints: reviewViewpointsConfigSchema.optional(),
   language: z.enum(['ja', 'en']).optional(),
   severity: z.enum(['strict', 'normal', 'relaxed']).optional(),
   additionalInstructions: z.array(z.string().min(1)).optional(),
