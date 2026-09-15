@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.111.0](https://github.com/s977043/river-review/compare/v1.110.0...v1.111.0) (2026-09-15)
+
+
+### Features
+
+* **review:** add Review Coverage file scope ledger ([#2212](https://github.com/s977043/river-review/issues/2212)) ([#2220](https://github.com/s977043/river-review/issues/2220)) ([0cb26ee](https://github.com/s977043/river-review/commit/0cb26ee289f07f99a0c1bf71e13738a6f73bc0b6))
+
+
+### Bug Fixes
+
+* **review:** preserve optimized LLM scope across reviewer chunking ([#2230](https://github.com/s977043/river-review/issues/2230)) ([758fb88](https://github.com/s977043/river-review/commit/758fb887019579e3fdda6a240cc8d164f0670e57))
+* **review:** preserve repoContext through reviewer orchestration ([#2228](https://github.com/s977043/river-review/issues/2228)) ([34f5ff2](https://github.com/s977043/river-review/commit/34f5ff23b021baa5081aabc3e7333492cca23447))
+
 ## [1.110.0](https://github.com/s977043/river-review/compare/v1.109.1...v1.110.0) (2026-09-14)
 
 
