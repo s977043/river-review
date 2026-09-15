@@ -89,7 +89,7 @@ Repository custom catalog と organization catalog は扱いません。
 レビュー対象側が自分の確認義務を無効化できる経路を増やさないためです。
 
 後続の runtime 接続では、対象 repository から任意の Viewpoint path を受け取りません。
-既存 router が選択した配布済み Skill のディレクトリから `viewpoints.yaml` を導出します。
+既存 router が選択した配布済み Skill のディレクトリから `references/viewpoints.yaml` を導出します。
 
 ### Public Stable API として固定しない
 
@@ -106,7 +106,7 @@ Repository custom catalog と organization catalog は扱いません。
 - data-only loader
 - duplicate viewpoint id の検出
 - owning Skill id の整合チェック
-- `api-compatibility` の `viewpoints.yaml`
+- `api-compatibility/references/viewpoints.yaml`
 - schema と loader の契約テスト
 
 非対象:
@@ -151,6 +151,6 @@ Foundation Slice の完了条件は次の通りです。
 - Schema が未知 field と executable field を拒否する。
 - Loader が不正 YAML、schema violation、duplicate id を失敗として扱う。
 - Loader が `skillId` の所有関係を検証できる。
-- `api-compatibility/viewpoints.yaml` が schema を満たす。
+- `api-compatibility/references/viewpoints.yaml` が schema を満たす。
 - 既存 runtime の呼び出し経路へ Viewpoint loader を接続しない。
 - `npm run lint` と `npm test` が通る。
