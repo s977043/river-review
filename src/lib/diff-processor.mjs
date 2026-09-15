@@ -1,6 +1,6 @@
 import {
+  createDiffHunkTracker,
   diffWithContext,
-  isDiffFileHeaderLine,
   listChangedFiles,
   parseDiffHeaderPath,
 } from './git.mjs';
@@ -232,21 +232,23 @@ export function parseUnifiedDiff(diffText) {
   let currentHunk = null;
   let newLineNumber = 0;
   let pendingOldPath = null;
-  // Header lines are only headers outside a hunk body — see
-  // `isDiffFileHeaderLine` in git.mjs for why adjacency is not enough (#2249).
-  let inHunk = false;
+  // Header lines are only headers outside a hunk body, and that body ends by
+  // line budget rather than by a marker — see `createDiffHunkTracker` in
+  // git.mjs, shared with `collectAddedLineHints` (#2249).
+  const hunk = createDiffHunkTracker();
 
   for (const line of diffText.split('\n')) {
     if (line.startsWith('diff --git')) {
       currentHunk = null;
-      inHunk = false;
+      hunk.resetFile();
       continue;
     }
-    if (isDiffFileHeaderLine(line, '--- ', inHunk)) {
+    hunk.closeIfNotBodyLine(line);
+    if (hunk.isHeader(line, '--- ')) {
       pendingOldPath = parseDiffHeaderPath(line.slice(4));
       continue;
     }
-    if (isDiffFileHeaderLine(line, '+++ ', inHunk)) {
+    if (hunk.isHeader(line, '+++ ')) {
       const newPathRaw = parseDiffHeaderPath(line.slice(4));
       const isDeletion = newPathRaw === '/dev/null';
       const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
@@ -261,13 +263,10 @@ export function parseUnifiedDiff(diffText) {
       continue;
     }
     if (!currentFile) continue;
-    if (line.startsWith('@@')) {
-      const match = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
-      if (!match) continue;
-      const oldStart = Number.parseInt(match[1], 10);
-      const oldLines = match[2] ? Number.parseInt(match[2], 10) : 1;
-      const newStart = Number.parseInt(match[3], 10);
-      const newLines = match[4] ? Number.parseInt(match[4], 10) : 1;
+    if (!hunk.inHunk && line.startsWith('@@')) {
+      const parsed = hunk.beginHunk(line);
+      if (!parsed) continue;
+      const { oldStart, oldLines, newStart, newLines } = parsed;
       currentHunk = {
         header: line,
         oldStart,
@@ -279,10 +278,10 @@ export function parseUnifiedDiff(diffText) {
       };
       currentFile.hunks.push(currentHunk);
       newLineNumber = newStart;
-      inHunk = true;
       continue;
     }
     if (!currentHunk) continue;
+    hunk.consumeBodyLine(line);
     currentHunk.lines.push(line);
     if (line.startsWith('+') && !line.startsWith('+++')) {
       currentFile.addedLines.push(newLineNumber);

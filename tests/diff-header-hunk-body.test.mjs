@@ -11,6 +11,12 @@
 //   - a SECOND hunk is required. The ghost header only becomes a `files[]`
 //     entry once a following `@@` attaches a hunk to it, so a single-hunk diff
 //     silently passes.
+//   - the body has to END by LINE BUDGET. Resetting only on `diff --git` is a
+//     git-only terminator, so a non-git unified diff (`diff -u -r`, a patch
+//     file) stayed inside the first hunk forever and every later file's header
+//     was read as body — every file but the first silently dropped. That
+//     regression was introduced by the first cut of this fix and is covered
+//     below; `review plan|exec --artifact diff=<path>` can reach it.
 //   - adjacency ("the previous line was `--- `") is NOT a sufficient guard:
 //     replacing `-- old.md` with `++ new.md` inside a hunk makes git emit
 //     `--- old.md` / `+++ new.md`, a forged header PAIR.
@@ -31,6 +37,7 @@ import { describe, it } from 'node:test';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { diffWithContext } from '../src/lib/git.mjs';
 import { createTempGitRepo, writeFileRelative, runGit } from './helpers/temp-repo.mjs';
+import { collectAddedLineHints } from '../src/lib/git.mjs';
 
 const LONG_BODY = Array.from({ length: 80 }, (_, i) => `line${i + 1}`);
 
@@ -125,5 +132,150 @@ describe('parseUnifiedDiff: header lines inside a hunk body (#2249)', () => {
 
     const paths = parseUnifiedDiff(diff).files.map((f) => f.path);
     assert.deepEqual([...paths].sort(), [SPACED, QUOTED].sort());
+  });
+});
+
+describe('parseUnifiedDiff: non-git unified diff (#2249 follow-up)', () => {
+  // `diff -u -r` emits `diff -u -r a/f.txt b/f.txt` instead of `diff --git`, so
+  // a parser that only leaves a hunk on `diff --git` never leaves it at all.
+  // Generated with the real `diff` binary: the header shape (the TAB + mtime
+  // suffix, the absence of `index` lines) is the tool's, not ours to invent.
+  async function nonGitDiff(t) {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { execFileSync } = await import('node:child_process');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { rm } = await import('node:fs/promises');
+
+    const root = mkdtempSync(join(tmpdir(), 'rr-nongit-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    for (const side of ['a', 'b']) {
+      mkdirSync(join(root, side));
+      for (const name of ['f1.txt', 'f2.txt']) {
+        writeFileSync(join(root, side, name), `one\n${side === 'a' ? 'two' : 'TWO'}\nthree\n`);
+      }
+    }
+    try {
+      execFileSync('diff', ['-u', '-r', 'a', 'b'], { cwd: root, encoding: 'utf8' });
+    } catch (err) {
+      return err.stdout;
+    }
+    throw new Error('fixture broken: `diff -u -r` reported no differences');
+  }
+
+  it('keeps every file when the diff has no `diff --git` lines', async (t) => {
+    const diff = await nonGitDiff(t);
+    assert.ok(!diff.includes('diff --git'), 'fixture broken: expected a non-git diff');
+    assert.equal(
+      diff.split('\n').filter((l) => l.startsWith('+++ ')).length,
+      2,
+      'fixture broken: expected two file headers'
+    );
+
+    assert.deepEqual(
+      parseUnifiedDiff(diff).files.map((f) => f.path),
+      ['f1.txt', 'f2.txt']
+    );
+  });
+
+  // A patch file built by concatenating per-file `diff -u` output has NO
+  // unprefixed line between the files at all — the next thing after hunk 1's
+  // body is `--- a/f2.txt`, which wears a `-` and so reads as a deletion line.
+  // Only the hunk's line budget can end the body here.
+  async function concatenatedPatch(t) {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { execFileSync } = await import('node:child_process');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { rm } = await import('node:fs/promises');
+
+    const root = mkdtempSync(join(tmpdir(), 'rr-patchcat-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    for (const side of ['a', 'b']) {
+      mkdirSync(join(root, side));
+      for (const name of ['f1.txt', 'f2.txt']) {
+        writeFileSync(join(root, side, name), `one\n${side === 'a' ? 'two' : 'TWO'}\nthree\n`);
+      }
+    }
+    const parts = ['f1.txt', 'f2.txt'].map((name) => {
+      try {
+        execFileSync('diff', ['-u', `a/${name}`, `b/${name}`], { cwd: root, encoding: 'utf8' });
+      } catch (err) {
+        return err.stdout;
+      }
+      throw new Error('fixture broken: `diff -u` reported no differences');
+    });
+    return parts.join('');
+  }
+
+  it('keeps every file in a concatenated patch with no separator lines', async (t) => {
+    const patch = await concatenatedPatch(t);
+    const lines = patch.split('\n');
+    const secondHeader = lines.findIndex((l, i) => i > 0 && l.startsWith('--- '));
+    assert.ok(secondHeader > 0, 'fixture broken: expected a second file header');
+    // Everything between the first hunk header and the second file header must
+    // be body-prefixed, so nothing but the budget can end that hunk.
+    const firstHunk = lines.findIndex((l) => l.startsWith('@@'));
+    const between = lines.slice(firstHunk + 1, secondHeader);
+    assert.ok(between.length > 0, 'fixture broken: empty first hunk');
+    assert.deepEqual(
+      between.filter((l) => l !== '' && !' +-\\'.includes(l[0])),
+      [],
+      'fixture broken: an unprefixed line would end the hunk without the budget'
+    );
+
+    assert.deepEqual(
+      parseUnifiedDiff(patch).files.map((f) => f.path),
+      ['f1.txt', 'f2.txt']
+    );
+    assert.deepEqual([...collectAddedLineHints(patch).keys()], ['f1.txt', 'f2.txt']);
+  });
+
+  it('collectAddedLineHints agrees with parseUnifiedDiff on the same diff', async (t) => {
+    // The two path routes must not disagree (#2241): a hunk-state terminator
+    // fixed on only one of them puts them back out of sync.
+    const diff = await nonGitDiff(t);
+    assert.deepEqual([...collectAddedLineHints(diff).keys()], ['f1.txt', 'f2.txt']);
+  });
+});
+
+describe('parseUnifiedDiff: a hunk whose declared counts do not match its body', () => {
+  // Hand-written and tool-rewritten patches (our own fixtures included) carry
+  // `@@` counts that disagree with the lines that follow. A line-budget
+  // terminator alone would still be inside hunk 1 when hunk 2's `@@` arrives
+  // and would swallow it, collapsing two hunks into one. An unprefixed line
+  // cannot be body, which is what ends the hunk here.
+  const DIFF = [
+    'diff --git a/src/lib/format.mjs b/src/lib/format.mjs',
+    '--- a/src/lib/format.mjs',
+    '+++ b/src/lib/format.mjs',
+    '@@ -10,3 +10,6 @@ export function formatA(x) {', // says 3/6, body carries 2/5
+    ' export function formatA(x) {',
+    '+  x = trim(x);',
+    ' }',
+    '@@ -40,3 +43,6 @@ export function formatB(y) {',
+    ' export function formatB(y) {',
+    '+  y = pad(y);',
+    ' }',
+    '',
+  ].join('\n');
+
+  it('still starts the next hunk', () => {
+    const files = parseUnifiedDiff(DIFF).files;
+    assert.deepEqual(
+      files.map((f) => f.path),
+      ['src/lib/format.mjs']
+    );
+    assert.deepEqual(
+      files[0].hunks.map((h) => h.oldStart),
+      [10, 40],
+      'both hunks must survive a header whose counts overstate the body'
+    );
+  });
+
+  it('collectAddedLineHints reads the same first hunk', () => {
+    assert.deepEqual(Object.fromEntries(collectAddedLineHints(DIFF)), {
+      'src/lib/format.mjs': 10,
+    });
   });
 });
