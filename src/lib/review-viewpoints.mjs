@@ -9,8 +9,7 @@ import * as yaml from 'js-yaml';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
-
-export const defaultReviewViewpointsSchemaPath = path.join(
+const defaultReviewViewpointsSchemaPath = path.join(
   repoRoot,
   'schemas',
   'review-viewpoints.schema.json'
@@ -32,9 +31,7 @@ function formatValidationErrors(errors = []) {
     .join('; ');
 }
 
-export async function loadReviewViewpointsSchema(
-  schemaPath = defaultReviewViewpointsSchemaPath
-) {
+async function loadReviewViewpointsSchema(schemaPath = defaultReviewViewpointsSchemaPath) {
   let raw;
   try {
     raw = await fs.readFile(schemaPath, 'utf8');
@@ -55,7 +52,7 @@ export async function loadReviewViewpointsSchema(
   }
 }
 
-export function createReviewViewpointsValidator(schema) {
+function createReviewViewpointsValidator(schema) {
   const ajv = new Ajv2020({ allErrors: true, strict: true });
   addFormats(ajv);
   return ajv.compile(schema);
@@ -66,7 +63,7 @@ async function getDefaultValidator() {
   return defaultValidatorPromise;
 }
 
-export function findDuplicateViewpointIds(viewpoints = []) {
+function findDuplicateViewpointIds(viewpoints = []) {
   const seen = new Set();
   const duplicates = new Set();
 
