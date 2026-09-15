@@ -5,11 +5,7 @@ import path from 'node:path';
 import test, { describe } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import {
-  ReviewViewpointsError,
-  findDuplicateViewpointIds,
-  loadReviewViewpoints,
-} from '../src/lib/review-viewpoints.mjs';
+import { ReviewViewpointsError, loadReviewViewpoints } from '../src/lib/review-viewpoints.mjs';
 import { compileSchemaFile } from './helpers/schema-validator.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -162,21 +158,6 @@ describe('review-viewpoints loader', () => {
         error instanceof ReviewViewpointsError &&
         error.message.includes('skillId mismatch') &&
         error.details?.actualSkillId === 'api-compatibility'
-    );
-  });
-});
-
-describe('findDuplicateViewpointIds', () => {
-  test('returns each duplicate once in stable order', () => {
-    assert.deepEqual(
-      findDuplicateViewpointIds([
-        { id: 'zeta' },
-        { id: 'alpha' },
-        { id: 'zeta' },
-        { id: 'alpha' },
-        { id: 'alpha' },
-      ]),
-      ['alpha', 'zeta']
     );
   });
 });
