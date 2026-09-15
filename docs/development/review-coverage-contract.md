@@ -23,7 +23,7 @@ The current reviewer orchestrator executes `reviewer role × diff chunk` units. 
 
 ## Scope
 
-This contract covers **execution coverage** plus the deterministic **file-selection scope** that precedes reviewer execution.
+This contract covers **execution coverage** plus an adjacent, observe-only **LLM-facing file-selection scope**.
 
 It is intentionally separate from:
 
@@ -32,7 +32,7 @@ It is intentionally separate from:
 - **Finding quality**—whether a finding is correct, blocking, or advisory.
 - **Reviewer independence**—who reviewed and what context they shared.
 
-File selection does not prove execution. Execution completion is still derived only from Review Units.
+`fileScope` is not reviewer-execution coverage. It records which changed files are represented in the LLM-facing `filesForReview` view after configured exclusions and diff optimization. A file omitted by diff optimization can still be inspected by deterministic review logic through raw `diff.files`. Execution completion is derived only from Review Units.
 
 ## Review Unit v1
 
@@ -118,18 +118,18 @@ fileScope:
       reasonCode: configured_exclusion
 ```
 
-The ledger is derived at the local selection boundary. At that point River Review has the raw repository change set and the exact diff passed to reviewer execution.
+The ledger is derived at the local selection boundary where River Review has both the raw repository change set and the post-configuration LLM-facing `filesForReview` view.
 
 Closed reason vocabulary:
 
-- `configured_exclusion`: the path matched `config.exclude.files`;
-- `diff_optimization`: the path did not match a configured exclusion but was absent from the LLM-facing `filesForReview` set.
+- `configured_exclusion`: the path matched `config.exclude.files` and was removed from the local review diff before review processing;
+- `diff_optimization`: the path did not match a configured exclusion but was absent from the LLM-facing `filesForReview` set. It can still be inspected by deterministic review logic through raw `diff.files`.
 
-`selected` and `excluded` are deterministic and disjoint. They preserve first-seen changed-file order. Together they reconstruct the changed-file scope available at that boundary.
+`selected` and `excluded` are deterministic and disjoint. They preserve first-seen changed-file order. Together they reconstruct the raw changed-file set relative to these two selection boundaries; they do not assert file-level execution completion.
 
 ### Why there is no `coveredFiles` field
 
-File-level execution completion is not equivalent to file selection. A file can appear in multiple Review Units because different reviewer roles inspect the same chunk. A `covered: true/false` value would therefore require policy about required vs optional reviewers and partial failures.
+File-level execution completion is not equivalent to LLM-facing file selection. A file can appear in multiple Review Units because different reviewer roles inspect the same chunk, and deterministic review logic may inspect raw files that the LLM-facing optimizer omitted. A `covered: true/false` value would therefore require policy about required vs optional reviewers, deterministic processing, and partial failures.
 
 That policy belongs to later Gate integration. Phase 1 keeps file selection as observation and Review Unit outcomes as the execution SSoT.
 
@@ -161,9 +161,9 @@ Generalizing scope telemetry to those paths is a separate change. It is not an i
 - validate against the Review Coverage schema without duplicating its shape;
 - register the runtime surface as Experimental.
 
-### Phase 1 / Slice C—file selection scope
+### Phase 1 / Slice C—LLM-facing file selection scope
 
-- attach deterministic selected/excluded file scope to existing Review Coverage;
+- attach deterministic selected/excluded LLM-facing file-selection scope to existing Review Coverage;
 - distinguish configured exclusions from LLM diff optimization;
 - do not derive file-level completion or change Gate policy.
 
