@@ -127,6 +127,23 @@ Closed reason vocabulary:
 
 `selected` and `excluded` are deterministic and disjoint. They preserve first-seen changed-file order. Together they reconstruct the raw changed-file set relative to these two selection boundaries; they do not assert file-level execution completion.
 
+### `selected` is not a superset of Review Unit subjects
+
+`fileScope` and `units[].subjects` come from different points in the pipeline.
+A path excluded with `diff_optimization` can still appear in a subject list.
+
+This shows up once a diff crosses the chunking thresholds.
+`splitDiffIntoChunks` partitions the raw `diff.files`.
+It then aliases each chunk's `filesForReview` to that same array.
+The subjects of a chunked run therefore list the pre-optimization files.
+Small diffs do not chunk, so they do not show the difference.
+The prompt the reviewer receives is re-optimized.
+The discrepancy is an over-reported subject list, not a review gap.
+Paths excluded with `configured_exclusion` never reach a chunk.
+
+Do not read `selected` and `subjects` as one hierarchy. Aligning them is a change
+to the orchestrator, tracked separately, and a prerequisite for Gate integration.
+
 ### Why there is no `coveredFiles` field
 
 File-level execution completion is not equivalent to LLM-facing file selection. A file can appear in multiple Review Units because different reviewer roles inspect the same chunk, and deterministic review logic may inspect raw files that the LLM-facing optimizer omitted. A `covered: true/false` value would therefore require policy about required vs optional reviewers, deterministic processing, and partial failures.
