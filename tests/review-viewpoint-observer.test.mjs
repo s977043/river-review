@@ -28,10 +28,19 @@ describe('observeReviewViewpoints', () => {
     const document = await loadApiCompatibilityViewpoints();
     const observation = observeReviewViewpoints(document, []);
 
+    assert.equal(observation.mode, 'observe');
     assert.equal(observation.skillId, 'api-compatibility');
     assert.deepEqual(observation.signals, []);
     assert.deepEqual(observation.applicableViewpoints, []);
     assert.deepEqual(observation.obligations, []);
+    assert.deepEqual(observation.comparison, {
+      detectorSignalCount: 0,
+      mappedSignalCount: 0,
+      unmappedSignalCount: 0,
+      activatedViewpointCount: 0,
+      obligationCount: 0,
+      unmappedSignals: [],
+    });
   });
 
   test('activates every viewpoint that declares a matching detector kind', async () => {
@@ -48,6 +57,14 @@ describe('observeReviewViewpoints', () => {
       observation.obligations.map((obligation) => obligation.id),
       ['api-compatibility/backward-compatibility', 'api-compatibility/api-test-coverage']
     );
+    assert.deepEqual(observation.comparison, {
+      detectorSignalCount: 1,
+      mappedSignalCount: 1,
+      unmappedSignalCount: 0,
+      activatedViewpointCount: 2,
+      obligationCount: 2,
+      unmappedSignals: [],
+    });
   });
 
   test('deduplicates one viewpoint when multiple detector kinds activate it', async () => {
@@ -93,7 +110,7 @@ describe('observeReviewViewpoints', () => {
     assert.equal(backwardCompatibility.activation.matchedSignals.length, 2);
   });
 
-  test('keeps unmatched detector kinds observable without creating obligations', async () => {
+  test('keeps unmatched detector kinds observable and records them in comparison', async () => {
     const document = await loadApiCompatibilityViewpoints();
     const observation = observeReviewViewpoints(document, [
       { kind: 'unmapped-detector-kind', file: 'src/api/user.ts', line: 1 },
@@ -104,6 +121,16 @@ describe('observeReviewViewpoints', () => {
     ]);
     assert.deepEqual(observation.applicableViewpoints, []);
     assert.deepEqual(observation.obligations, []);
+    assert.deepEqual(observation.comparison, {
+      detectorSignalCount: 1,
+      mappedSignalCount: 0,
+      unmappedSignalCount: 1,
+      activatedViewpointCount: 0,
+      obligationCount: 0,
+      unmappedSignals: [
+        { kind: 'unmapped-detector-kind', file: 'src/api/user.ts', line: 1 },
+      ],
+    });
   });
 
   test('creates obligations as questions and evidence requirements, not findings or policy', async () => {
