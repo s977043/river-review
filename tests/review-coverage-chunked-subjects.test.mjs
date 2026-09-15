@@ -122,3 +122,33 @@ test('unchunked run: subjects still cover every reviewable file (#2233)', async 
   assert.deepEqual(intersection, []);
   assert.deepEqual([...subjects].sort(), ['src/a.mjs', 'src/b.mjs']);
 });
+
+// A chunk can consist entirely of optimizer-dropped files: `splitDiffIntoChunks`
+// groups by top-level directory, so six Markdown files under `docs/` become one
+// whole chunk whose LLM view is empty. That chunk is where the `changedFiles`
+// fallback must stay OFF — `changedFiles` is inherited from the whole diff by
+// the `...diff` spread, so an unconditional fallback re-introduces every
+// excluded path (the #2233 bug) for that unit.
+const ALL_DROPPED_CHUNK_PATHS = [
+  ...Array.from({ length: 6 }, (_, i) => `docs/${String.fromCharCode(97 + i)}.md`),
+  ...Array.from({ length: 6 }, (_, i) => `src/x${i}.mjs`),
+];
+
+test('chunk whose files are all optimizer-dropped claims no subject (#2233)', async () => {
+  const { units, excluded, subjects, intersection } = await runCoverage(ALL_DROPPED_CHUNK_PATHS);
+
+  assert.equal(units.length, 2, `expected a 2-chunk run, got ${units.length}`);
+  assert.deepEqual(
+    [...excluded].sort(),
+    ALL_DROPPED_CHUNK_PATHS.filter((path) => path.endsWith('.md')).sort()
+  );
+
+  // Checked first: an unconditional `changedFiles` fallback shows up here as the
+  // excluded Markdown paths reappearing, which is the failure this test pins.
+  assert.deepEqual(intersection, [], `subjects claim excluded path(s): ${intersection.join(', ')}`);
+
+  const emptyUnit = units.find((unit) => !unit.subjects.some((s) => s.startsWith('src/')));
+  assert.ok(emptyUnit, 'expected one chunk with no reviewable subject');
+  assert.deepEqual(emptyUnit.subjects, ['<unknown-diff>']);
+  assert.ok(subjects.has('src/x0.mjs'));
+});
