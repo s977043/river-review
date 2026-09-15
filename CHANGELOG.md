@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.111.1](https://github.com/s977043/river-review/compare/v1.111.0...v1.111.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **git:** normalize git-quoted paths in both path routes ([#2234](https://github.com/s977043/river-review/issues/2234)) ([#2240](https://github.com/s977043/river-review/issues/2240)) ([a2d5caf](https://github.com/s977043/river-review/commit/a2d5cafc0bafb659058443f9e4c4a0c1762ba252))
+
 ## [1.111.0](https://github.com/s977043/river-review/compare/v1.110.0...v1.111.0) (2026-09-15)
 
 
