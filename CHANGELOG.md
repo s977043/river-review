@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.111.2](https://github.com/s977043/river-review/compare/v1.111.1...v1.111.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* **review:** derive Review Unit subjects from the LLM diff view ([#2233](https://github.com/s977043/river-review/issues/2233)) ([#2245](https://github.com/s977043/river-review/issues/2245)) ([f12ebcd](https://github.com/s977043/river-review/commit/f12ebcd8651144aed4eb1863eef2ea11766b400a))
+
 ## [1.111.1](https://github.com/s977043/river-review/compare/v1.111.0...v1.111.1) (2026-09-15)
 
 
