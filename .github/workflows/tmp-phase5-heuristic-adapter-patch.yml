@@ -1,0 +1,46 @@
+name: Temporary Phase 5 Heuristic Adapter Patch
+
+on:
+  push:
+    branches:
+      - feat/2252-heuristic-adapter
+    paths:
+      - .github/workflows/tmp-phase5-heuristic-adapter-patch.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-phase5-heuristic-adapter-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2252-heuristic-adapter
+
+      - name: Apply exact-match patch
+        run: node scripts/tmp-phase5-heuristic-adapter-patch.mjs
+
+      - name: Verify patch scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          test "$changed" = "src/lib/heuristic-review.mjs"
+
+      - name: Commit patched source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/heuristic-review.mjs
+          git commit -m "refactor(heuristics): add uncapped detector adapter" -m "Co-Authored-By: ChatGPT <noreply@openai.com>"
+          git push origin HEAD:feat/2252-heuristic-adapter
