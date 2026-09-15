@@ -21,9 +21,7 @@ test('detects a DTO field type change as a neutral signal', () => {
  }
 `);
 
-  assert.deepEqual(signals, [
-    { kind: 'dto-field-type-changed', file: 'src/dto/user.ts', line: 2 },
-  ]);
+  assert.deepEqual(signals, [{ kind: 'dto-field-type-changed', file: 'src/dto/user.ts', line: 2 }]);
 });
 
 test('detects optional to required without misclassifying it as a type change', () => {

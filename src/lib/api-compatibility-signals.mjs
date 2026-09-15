@@ -1,8 +1,12 @@
-const CONTRACT_PATH_RE = /(?:^|\/)(?:api|apis|dto|dtos|schema|schemas|contract|contracts|types?)(?:\/|\.|-|_)/i;
+const CONTRACT_PATH_RE =
+  /(?:^|\/)(?:api|apis|dto|dtos|schema|schemas|contract|contracts|types?)(?:\/|\.|-|_)/i;
 const TYPESCRIPT_PATH_RE = /\.(?:ts|tsx)$/i;
-const TEST_PATH_RE = /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
-const CONTRACT_DECLARATION_RE = /\binterface\s+[A-Za-z_$][\w$]*\s*(?:extends\s+[^\{]+)?\{|\btype\s+[A-Za-z_$][\w$]*\s*=\s*\{|\bz\.object\s*\(\s*\{/;
-const PROPERTY_RE = /^\s*(?:readonly\s+)?(?<name>[A-Za-z_$][\w$]*)(?<optional>\?)?\s*:\s*(?<type>.+?)\s*[;,]?\s*$/;
+const TEST_PATH_RE =
+  /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
+const CONTRACT_DECLARATION_RE =
+  /\binterface\s+[A-Za-z_$][\w$]*\s*(?:extends\s+[^\{]+)?\{|\btype\s+[A-Za-z_$][\w$]*\s*=\s*\{|\bz\.object\s*\(\s*\{/;
+const PROPERTY_RE =
+  /^\s*(?:readonly\s+)?(?<name>[A-Za-z_$][\w$]*)(?<optional>\?)?\s*:\s*(?<type>.+?)\s*[;,]?\s*$/;
 
 function normalizeType(type) {
   return String(type)
