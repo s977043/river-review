@@ -41,7 +41,7 @@ CLI の項目はコマンド名とオプション名、およびその意味を�
 | Review Coverage (`schemas/review-coverage.schema.json` / JSON・saved run `reviewCoverage`) | Experimental | #2212 Phase 1 の観測用 contract。Gate / `decision` には影響せず、JSON output と `.river/runs/*.json` への field は additive・optional。Slice C で追加した `fileScope` も optional                                                                    |
 | Node API (`runners/node-api/`)                                                             | Experimental | `private: true`、npm 未公開                                                                                                                                                                                                                          |
 | Agent Skills bridge                                                                        | Experimental | v0.9.0 で追加、成熟途上                                                                                                                                                                                                                              |
-| Riverbed Memory                                                                            | Experimental | 設計フェーズ — 安定化は未定。利用前に最新の Issue を確認してください                                                                                                                                                                                 |
+| Riverbed Memory                                                                            | Experimental | v1 は実装済み（#474）。ラベルは Experimental のままで、予告なく変更・削除される可能性がある。v2（外部データストア連携）は将来計画。詳細は [Riverbed Memory](../explanation/riverbed-memory.md) を参照                                                |
 
 ## CLI（`river`）リファレンス（最小）
 
