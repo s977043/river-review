@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.111.3](https://github.com/s977043/river-review/compare/v1.111.2...v1.111.3) (2026-09-15)
+
+
+### Bug Fixes
+
+* **git:** share one path extractor across the three git-path routes ([#2248](https://github.com/s977043/river-review/issues/2248)) ([fead372](https://github.com/s977043/river-review/commit/fead372a010d1b763cb820f26b9f3f82db6babb3))
+
 ## [1.111.2](https://github.com/s977043/river-review/compare/v1.111.1...v1.111.2) (2026-09-15)
 
 
