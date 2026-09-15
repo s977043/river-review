@@ -33,6 +33,24 @@
     "units": {
       "type": "array",
       "items": { "$ref": "#/$defs/reviewUnit" }
+    },
+    "fileScope": {
+      "description": "Observe-only LLM-facing file-selection ledger. Execution completion remains represented by Review Units. selected records paths present in filesForReview; excluded records raw changed paths removed by configured exclusion or LLM diff optimization. A diff_optimization exclusion may still be inspected by deterministic review logic through raw diff.files.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "excluded"],
+      "properties": {
+        "selected": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "excluded": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fileExclusion" },
+          "uniqueItems": true
+        }
+      }
     }
   },
   "$defs": {
@@ -95,6 +113,18 @@
           "then": { "properties": { "reasonCode": { "const": "reviewer_timeout" } } }
         }
       ]
+    },
+    "fileExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reasonCode"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "reasonCode": {
+          "type": "string",
+          "enum": ["configured_exclusion", "diff_optimization"]
+        }
+      }
     }
   }
 }

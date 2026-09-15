@@ -82622,6 +82622,57 @@ function local_runner_shouldExclude(filePath, patterns = []) {
   return patterns.some((pattern) => (0,esm/* minimatch */.xF)(filePath, pattern, { dot: true }));
 }
 
+function uniquePaths(paths = []) {
+  const seen = new Set();
+  const result = [];
+  for (const filePath of Array.isArray(paths) ? paths : []) {
+    if (typeof filePath !== 'string' || !filePath || seen.has(filePath)) continue;
+    seen.add(filePath);
+    result.push(filePath);
+  }
+  return result;
+}
+
+/**
+ * Build the observe-only file-selection ledger for Review Coverage (#2212 Slice C).
+ *
+ * `rawDiff` is the repository diff before `config.exclude.files`; `filteredDiff`
+ * is the exact diff handed to planning/reviewer execution after configured
+ * exclusions. `filesForReview` already reflects the LLM diff optimizer, so the
+ * difference lets us record why a changed path did not become a Review Unit
+ * subject without changing optimizer behavior or inventing file-level execution
+ * semantics.
+ */
+function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns = []) {
+  const rawChanged = uniquePaths(rawDiff?.changedFiles ?? []);
+  const selectedCandidates = uniquePaths(
+    (filteredDiff?.filesForReview ?? filteredDiff?.files ?? [])
+      .map((file) => file?.path)
+      .filter(Boolean)
+  );
+  const selectedSet = new Set(selectedCandidates);
+  const rawSet = new Set(rawChanged);
+  const selected = rawChanged.length
+    ? rawChanged.filter((filePath) => selectedSet.has(filePath))
+    : selectedCandidates;
+
+  // A selected path not present in changedFiles can occur only on synthetic
+  // programmatic input. Keep it rather than silently losing caller-provided
+  // scope while preserving raw changed-file order for normal repository runs.
+  for (const filePath of selectedCandidates) {
+    if (!rawSet.has(filePath) && !selected.includes(filePath)) selected.push(filePath);
+  }
+
+  const excluded = rawChanged
+    .filter((filePath) => !selectedSet.has(filePath))
+    .map((filePath) => ({
+      path: filePath,
+      reasonCode: local_runner_shouldExclude(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
+    }));
+
+  return { selected, excluded };
+}
+
 function applyFileExclusions(diff, patterns = []) {
   if (!patterns.length) return diff;
 
@@ -82765,7 +82816,9 @@ async function collectLocalContext({
   const commitSha = await (0,git/* getHeadSha */.JA)(repoRoot);
   const dirty = await (0,git/* isWorkingTreeDirty */.mM)(repoRoot);
   const rawDiff = await (0,diff_processor/* collectRepoDiff */.KD)(repoRoot, mergeBase, { contextLines });
-  const diff = applyFileExclusions(rawDiff, config.exclude?.files ?? []);
+  const exclusionPatterns = config.exclude?.files ?? [];
+  const diff = applyFileExclusions(rawDiff, exclusionPatterns);
+  const reviewFileScope = deriveReviewFileScope(rawDiff, diff, exclusionPatterns);
   const reviewFiles = diff.filesForReview?.map((file) => file.path) ?? diff.changedFiles;
   // #1606: declare `fullFile` as an available input context when the runner can
   // honestly supply the current change set's full source text. The content is
@@ -82802,6 +82855,7 @@ async function collectLocalContext({
     dirty,
     diff,
     reviewFiles,
+    reviewFileScope,
     availableContexts: contexts,
     availableDependencies: dependencies,
     fullFileSupply,
@@ -82845,6 +82899,7 @@ async function planLocalReview({
     dirty,
     diff,
     reviewFiles,
+    reviewFileScope,
     availableContexts: contexts,
     availableDependencies: dependencies,
     fullFileSupply,
@@ -82910,6 +82965,7 @@ async function planLocalReview({
       dirty,
       projectRules,
       diff,
+      reviewFileScope,
       availableContexts: contexts,
       availableDependencies: dependencies,
       config,
@@ -82972,6 +83028,7 @@ async function planLocalReview({
     changedFiles: reviewFiles,
     plan: augmentedPlan,
     diff,
+    reviewFileScope,
     projectRules,
     availableContexts: contexts,
     availableDependencies: dependencies,
@@ -83190,6 +83247,15 @@ async function runLocalReview({
     ? await runReviewerOrchestration({ ...reviewArgs, reviewers, quiet })
     : await (0,review_engine/* generateReview */.G1)(reviewArgs);
 
+  // Slice C enriches an existing orchestration observation with the selection
+  // ledger from the boundary that actually filtered the diff. Counters/status/
+  // units are never recomputed here, and callers that provide an older context
+  // without the ledger keep the exact pre-Slice-C Review Coverage object.
+  const reviewCoverage =
+    review.reviewCoverage && context.reviewFileScope
+      ? { ...review.reviewCoverage, fileScope: context.reviewFileScope }
+      : (review.reviewCoverage ?? null);
+
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
@@ -83262,9 +83328,9 @@ async function runLocalReview({
     suppressedFindings,
     classified: review.classified,
     reviewerResults: review.reviewerResults ?? null,
-    // #2212 Phase 1: observe-only execution coverage. Preserve the producer's
-    // object verbatim; a single-reviewer run has no coverage contract to invent.
-    reviewCoverage: review.reviewCoverage ?? null,
+    // #2212 Phase 1: observe-only execution coverage. Slice C adds the
+    // deterministic file-selection ledger but still has no Gate authority.
+    reviewCoverage,
     teamLeadReport: review.teamLeadReport ?? null,
     tokenEstimate: context.diff.tokenEstimate,
     rawTokenEstimate: context.diff.rawTokenEstimate,
