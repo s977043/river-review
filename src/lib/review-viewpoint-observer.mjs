@@ -100,6 +100,29 @@ function buildReviewObligations(document, applicableViewpoints) {
   });
 }
 
+function buildObserveComparison(signals, applicableViewpoints, obligations) {
+  const mappedSignalKeys = new Set();
+  for (const viewpoint of applicableViewpoints) {
+    for (const signal of viewpoint.matchedSignals) {
+      mappedSignalKeys.add(`${signal.kind}\u0000${signal.file ?? ''}\u0000${signal.line ?? ''}`);
+    }
+  }
+
+  const unmappedSignals = signals.filter(
+    (signal) =>
+      !mappedSignalKeys.has(`${signal.kind}\u0000${signal.file ?? ''}\u0000${signal.line ?? ''}`)
+  );
+
+  return {
+    detectorSignalCount: signals.length,
+    mappedSignalCount: mappedSignalKeys.size,
+    unmappedSignalCount: unmappedSignals.length,
+    activatedViewpointCount: applicableViewpoints.length,
+    obligationCount: obligations.length,
+    unmappedSignals: unmappedSignals.map((signal) => ({ ...signal })),
+  };
+}
+
 /**
  * Calculate observe-mode Review Viewpoint activation from existing heuristic
  * detector results without changing findings, gates, policy, or LLM context.
@@ -109,20 +132,28 @@ function buildReviewObligations(document, applicableViewpoints) {
  * ReviewSignal schema; normalization is private to this module until multiple
  * signal producers demonstrate a real shared abstraction is needed.
  *
+ * `comparison` is the serializable old/new observation record: existing
+ * detector signals versus newly activated viewpoints/obligations. Persistence
+ * is intentionally left to the runtime adapter so this module does not acquire
+ * run-artifact or orchestration responsibilities.
+ *
  * @param {object} document validated Review Viewpoint document
- * @param {Array<{kind: string, file?: string, line?: number}>} detections existing detector results
- * @returns {{skillId: string, signals: object[], applicableViewpoints: object[], obligations: object[]}}
+ * @param {Array<{kind: string, file?: string, line?: number}>} detections existing detector results for the owning Skill
+ * @returns {{mode: 'observe', skillId: string, signals: object[], applicableViewpoints: object[], obligations: object[], comparison: object}}
  */
 export function observeReviewViewpoints(document, detections = []) {
   assertViewpointDocument(document);
   const signals = normalizeDetectorSignals(detections);
   const applicableViewpoints = matchViewpoints(document, signals);
   const obligations = buildReviewObligations(document, applicableViewpoints);
+  const comparison = buildObserveComparison(signals, applicableViewpoints, obligations);
 
   return {
+    mode: 'observe',
     skillId: document.skillId,
     signals,
     applicableViewpoints,
     obligations,
+    comparison,
   };
 }
