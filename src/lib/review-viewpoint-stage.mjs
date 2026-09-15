@@ -150,10 +150,13 @@ export async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
       trustedSkillPath = await resolveTrustedBuiltInSkillPath(skillPath);
     } catch (error) {
       if (mode === 'active') {
-        throw new ReviewViewpointStageError(`Failed to resolve built-in Skill path for ${skillId}`, {
-          cause: error,
-          skillId,
-        });
+        throw new ReviewViewpointStageError(
+          `Failed to resolve built-in Skill path for ${skillId}`,
+          {
+            cause: error,
+            skillId,
+          }
+        );
       }
       errors.push({ skillId, code: 'skill-path-resolution-failed' });
       continue;

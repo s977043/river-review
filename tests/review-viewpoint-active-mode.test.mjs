@@ -7,7 +7,7 @@ import { defaultConfig } from '../src/config/default.mjs';
 import { reviewConfigSchema } from '../src/config/schema.mjs';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { generateReview } from '../src/lib/review-engine.mjs';
-import { buildReviewRequest } from '../src/prompt/review-request.mjs';
+import { REVIEW_REQUEST_IR_VERSION, buildReviewRequest } from '../src/prompt/review-request.mjs';
 import { compileReviewPrompt } from '../src/prompt/compiler.mjs';
 import { buildReviewObligationsSection } from '../src/prompt/sections.mjs';
 
@@ -77,6 +77,10 @@ function baseGenerateArgs(config) {
     config,
   };
 }
+
+test('Review Request IR version is bumped for Review Obligation context', () => {
+  assert.equal(REVIEW_REQUEST_IR_VERSION, '2');
+});
 
 test('review.viewpoints mode defaults to off and rejects shadow', () => {
   assert.equal(defaultConfig.review.viewpoints.mode, 'off');
