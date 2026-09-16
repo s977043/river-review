@@ -263,7 +263,7 @@ See [`pages/guides/repo-wide-review.md`](pages/guides/repo-wide-review.md) and [
 - Inside the repo, run `npm run river -- run . --dry-run` to print skill selection and placeholder review comments for the current diff without sending anything externally (local mode is currently planning/preview only)
 - Add `--debug` to show merge base, changed files, token estimate, and a diff preview
 - Specify phase via `--phase upstream|midstream|downstream`; defaults to `RIVER_PHASE` env or `midstream`
-- Control contexts/dependencies (optional): set `RIVER_AVAILABLE_CONTEXTS=diff,tests` or `RIVER_AVAILABLE_DEPENDENCIES=code_search,test_runner` to skip skills whose requirements are unmet (with reasons) during selection (dependency checks are skipped when unset).
+- Control contexts/dependencies (optional): set `RIVER_AVAILABLE_CONTEXTS=diff,tests` or `RIVER_AVAILABLE_DEPENDENCIES=code_search,test_runner` to skip skills that require unavailable inputs; if unset, dependency checks are bypassed for backward compatibility.
 - Override via CLI flags: `--context diff,fullFile` and `--dependency code_search,test_runner` override the env vars (comma-separated).
 - Enable stub dependencies: set `RIVER_DEPENDENCY_STUBS=1` to treat known dependencies (`code_search`, `test_runner`, `coverage_report`, `adr_lookup`, `repo_metadata`, `tracing`) and any extension dependency starting with `custom:` (`custom:*`) as available so planning doesn’t skip them while provider implementations are being readied.
 
@@ -398,7 +398,7 @@ Operating assumptions:
 
 ### Local review run (river run .)
 
-> **Note**: River Review is [not published to npm](#getting-started) (project policy), so the `river` CLI is run inside the repo via `npm run river -- ...`. Plugin-based review is CLI-independent ([Installing the plugin](#installing-the-river-review-plugin)).
+> **Note**: River Review is [not published to npm](#getting-started) (project policy), so the `river` CLI is run inside the repo via `npm run river -- ...`. Plugin-based review is CLI-independent ([Installing the river-review plugin](#installing-the-river-review-plugin)).
 
 1. Inside the repo, run `npm run river -- run . --dry-run` to review the current diff locally (no posting to GitHub).
 2. Add `--debug` to print the merge base, target file list, prompt preview, token estimate, and diff excerpts to stdout.
