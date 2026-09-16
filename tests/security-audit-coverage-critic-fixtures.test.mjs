@@ -8,13 +8,7 @@ import { validateSecurityAuditCoverageSemantics } from '../src/lib/security-audi
 import { compileSecurityAuditCoverageValidator } from './helpers/schema-validator.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const FIXTURE_DIR = resolve(
-  ROOT,
-  'skills',
-  'agent-skills',
-  'unknown-coverage-review',
-  'fixtures'
-);
+const FIXTURE_DIR = resolve(ROOT, 'skills', 'agent-skills', 'unknown-coverage-review', 'fixtures');
 const REGISTRY_PATH = resolve(
   ROOT,
   'skills',
@@ -82,9 +76,15 @@ test('legitimate exclusion and suspicious exclusion are separate false-positive 
   const legitimate = readFixture('06-security-audit-legitimate-out-of-scope.md');
   const suspicious = readFixture('07-security-audit-hidden-exclusion-defer.md');
 
-  assert.match(legitimate, /Do not report a coverage gap merely because the unit is `out_of_scope`/u);
+  assert.match(
+    legitimate,
+    /Do not report a coverage gap merely because the unit is `out_of_scope`/u
+  );
   assert.match(suspicious, /conflict with repository-wide scope and reconnaissance evidence/u);
-  assert.match(suspicious, /Do not convert these coverage states directly into vulnerability findings/u);
+  assert.match(
+    suspicious,
+    /Do not convert these coverage states directly into vulnerability findings/u
+  );
 });
 
 test('zero-findings fixtures distinguish safety overclaim from neutral source-only reporting', () => {

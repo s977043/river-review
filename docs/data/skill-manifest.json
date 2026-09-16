@@ -768,8 +768,8 @@
     {
       "id": "unknown-coverage-review",
       "path": "skills/agent-skills/unknown-coverage-review",
-      "checksum": "sha256:a1bc87717c9c8ff1b1218c352e0ef4c49f0804ae8c0486729ea2b35859d9643e",
-      "files": 6
+      "checksum": "sha256:921ab0dd684ff3d11684cd14c8acee0c751963de9d9eba654498cd500882d2bd",
+      "files": 12
     },
     {
       "id": "vitest-mock-isolation",
