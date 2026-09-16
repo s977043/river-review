@@ -41,32 +41,29 @@ subsystem × trustBoundary × attackClassId
 skills/agent-skills/river-review-security-audit/references/attack-classes.json
 ```
 
+The coverage record carries the Phase 2 `taxonomyVersion` explicitly so a later run can detect taxonomy drift instead of silently interpreting an old ledger with new meanings.
+
 The Phase 3 contract does not create new executable skills or reviewer roles.
 
-## Unit status vocabulary
+## Coverage state vocabulary
+
+Coverage state is intentionally independent from finding lifecycle.
 
 ### `planned`
 
-The surface is applicable and should be investigated, but traceable investigation evidence has not yet been recorded.
+The surface is applicable and should be investigated, but the current audit has not yet recorded enough evidence to call the semantic unit covered.
 
 ### `covered`
 
 The surface was investigated with both:
 
 - at least one `reviewedPaths` entry
-- at least one `evidenceRefs` entry
+- at least one structured `evidenceRefs` entry
 
-`covered` does **not** mean safe.
-It means the investigation surface has traceable evidence.
-Zero findings is allowed, but zero findings alone can never produce this status.
+`covered` does **not** mean safe, vulnerability-free, established, or Gate-approved.
+It only means the semantic investigation unit has traceable source evidence under the current audit policy.
 
-### `candidate`
-
-The surface was investigated with traceable evidence and produced one or more candidate finding references.
-
-`candidate` is a coverage status only.
-It does not mean the finding is established.
-Candidate truth remains owned by deterministic verification and #1978 adversarial finding verification.
+Zero findings is allowed, but zero findings alone can never produce this state.
 
 ### `blocked`
 
@@ -78,20 +75,20 @@ Allowed reason codes:
 - `unsafe_execution_required`
 - `dependency_unavailable`
 
-A concrete `validationPlan` is required.
+Both a concrete `explanation` and a `validationPlan` are required.
 
 ### `deferred`
 
-The surface is intentionally postponed rather than silently omitted.
+The applicable surface is intentionally postponed rather than silently omitted.
 
 Allowed reason codes:
 
 - `budget_deferred`
 - `manual_defer`
 
-A concrete `validationPlan` is required.
+Both a concrete `explanation` and a `validationPlan` are required.
 
-### `out-of-scope`
+### `out_of_scope`
 
 The surface is explicitly excluded from this audit scope or is not applicable.
 
@@ -100,54 +97,117 @@ Allowed reason codes:
 - `scope_excluded`
 - `not_applicable`
 
-An explanation is required.
+A concrete `explanation` is required.
 Out-of-scope units do not count toward applicable coverage.
 
-## Aggregate status
+## Finding lifecycle is separate
 
-The derived ledger uses:
+The Epic originally listed `candidate` as a possible coverage status. Phase 3 intentionally does **not** use it.
 
-```text
-complete | partial | not_started
-```
+A candidate is a statement about a possible finding, not about whether the semantic investigation surface was covered.
+Coupling it to coverage would duplicate responsibilities owned by #1978 and make finding production influence coverage accounting.
 
-These values are local to `SecurityAuditCoverage` and do not modify #2212 `ReviewCoverage` semantics.
-
-- `complete`: every applicable unit is `covered` or `candidate`
-- `partial`: at least one applicable unit is investigated and at least one gap remains
-- `not_started`: no applicable unit is yet investigated, or no applicable units exist
-
-`complete` is not a security verdict.
-It must never be rendered or interpreted as `safe`, `secure`, or `no vulnerabilities`.
-
-## Finding-count invariant
-
-The contract intentionally contains no `findingsCount`-driven coverage rule.
+Instead, every unit has additive `relatedFindingIds` for traceability:
 
 ```text
-0 findings + evidence-backed investigation
-may be covered
-
-0 findings without evidence-backed investigation
-must not be covered
+coverage state = was this semantic surface investigated?
+relatedFindingIds = what findings are associated with the surface?
 ```
 
-`deriveSecurityAuditCoverage()` only summarizes caller-supplied semantic unit statuses.
-It does not infer `covered` from findings, reviewer success, or execution metadata.
+A unit can therefore be:
+
+```text
+state: covered
+relatedFindingIds: []
+```
+
+or:
+
+```text
+state: covered
+relatedFindingIds:
+  - finding:authz-001
+```
+
+Both are equally covered. Finding truth remains a separate verification concern.
+
+## No aggregate `complete` verdict
+
+Phase 3 deliberately avoids a top-level `complete | partial | not_started` status.
+
+The ledger exposes only observable counters and open semantic units:
+
+```text
+totalUnits
+applicableUnits
+coveredUnits
+plannedUnits
+blockedUnits
+deferredUnits
+outOfScopeUnits
+openUnitIds
+```
+
+This prevents `complete` from being mistaken for a security verdict and leaves later policy to the Coverage Critic and eventual opt-in Gate integration.
+
+`openUnitIds` contains `planned`, `blocked`, and `deferred` units.
+It excludes `covered` and `out_of_scope` units.
+
+## Evidence references
+
+`evidenceRefs` is structured instead of encoding `path:line` in a free-form string.
+
+Supported evidence kinds remain source-only:
+
+- `source`
+- `config`
+- `manifest`
+- `documentation`
+- `history`
+
+Each evidence reference records:
+
+```text
+kind
+path
+lineStart
+lineEnd
+note
+```
+
+Line numbers may be null for repository evidence that is not naturally line-addressable.
 
 ## Source-only boundary
 
-Phase 3 keeps the Phase 1/2 source-only policy.
+Phase 3 keeps the Phase 1/2 source-only policy and records it as:
+
+```text
+executionPolicy: source-only
+```
 
 When a hypothesis needs target-controlled execution and the sandbox contract does not exist, use:
 
 ```text
-status: blocked
+state: blocked
 reasonCode: unsafe_execution_required
+explanation: <why source evidence is insufficient>
 validationPlan: <safe future validation path>
 ```
 
-Do not execute target-controlled builds, tests, browsers, fuzzers, package scripts, or external probes to improve the coverage number.
+Do not execute target-controlled builds, tests, browsers, fuzzers, package scripts, or external probes to improve coverage numbers.
+
+## Deterministic semantic validation
+
+JSON Schema validates the local shape and state-specific requirements.
+`validateSecurityAuditCoverageSemantics()` adds checks that JSON Schema cannot express cleanly:
+
+- `taxonomyVersion` matches the Phase 2 registry
+- every `attackClassId` exists in the registry
+- unit ids are unique
+- `subsystem × trustBoundary × attackClassId` units are unique
+- derived counters and `openUnitIds` have not drifted from unit records
+
+These diagnostics are observe-only and do not affect Gate behavior.
 
 ## Gate boundary
 
@@ -175,12 +235,15 @@ Gate integration remains a later phase after dogfood and paired evaluation.
 Phase 3 foundation is complete when:
 
 - schema and runtime vocabularies are aligned
+- Phase 2 taxonomy provenance is explicit
 - every Phase 2 attack-class ID can be referenced
-- `covered` requires traceable path and evidence references
-- `candidate` requires a candidate finding reference
-- blocked/deferred surfaces cannot disappear without a validation plan
+- semantic unit identity is unique by subsystem × trust boundary × attack class
+- `covered` requires traceable reviewed paths and evidence references
+- finding lifecycle does not determine coverage state
+- blocked/deferred surfaces cannot disappear without explanation and a validation plan
 - out-of-scope surfaces cannot disappear without an explanation
 - zero findings are never used to derive coverage
+- no aggregate security-complete verdict is emitted
 - no Gate behavior changes
 - CI passes
 
