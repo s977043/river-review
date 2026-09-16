@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  deriveReviewFileScope,
-  planLocalReview,
-  runLocalReview,
-} from '../src/lib/local-runner.mjs';
-import { deriveReviewCoverage } from '../src/lib/review-coverage.mjs';
+import { planLocalReview, runLocalReview } from '../src/lib/local-runner.mjs';
+import { deriveReviewCoverage, deriveReviewFileScope } from '../src/lib/review-coverage.mjs';
 import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
 import { createTempGitRepo, runGit } from './helpers/temp-repo.mjs';
 

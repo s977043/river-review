@@ -1,3 +1,5 @@
+import { shouldExclude } from './utils.mjs';
+
 /**
  * Review execution coverage contract (#2212).
  *
@@ -86,4 +88,68 @@ export function deriveReviewCoverage(units = []) {
     incompleteRequiredUnitIds,
     units: normalizedUnits,
   };
+}
+
+function uniquePaths(paths = []) {
+  const seen = new Set();
+  const result = [];
+  for (const filePath of Array.isArray(paths) ? paths : []) {
+    if (typeof filePath !== 'string' || !filePath || seen.has(filePath)) continue;
+    seen.add(filePath);
+    result.push(filePath);
+  }
+  return result;
+}
+
+/**
+ * Build the observe-only file-selection ledger for Review Coverage (#2212 Slice C).
+ *
+ * `rawDiff` is the repository diff before `config.exclude.files`; `filteredDiff`
+ * is the exact diff handed to planning/reviewer execution after configured
+ * exclusions. `filesForReview` already reflects the LLM diff optimizer, so the
+ * difference lets us record why a changed path did not become a Review Unit
+ * subject without changing optimizer behavior or inventing file-level execution
+ * semantics.
+ */
+export function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns = []) {
+  const rawChanged = uniquePaths(rawDiff?.changedFiles ?? []);
+  const selectedCandidates = uniquePaths(
+    (filteredDiff?.filesForReview ?? filteredDiff?.files ?? [])
+      .map((file) => file?.path)
+      .filter(Boolean)
+  );
+  const selectedSet = new Set(selectedCandidates);
+  const rawSet = new Set(rawChanged);
+  const selected = rawChanged.length
+    ? rawChanged.filter((filePath) => selectedSet.has(filePath))
+    : selectedCandidates;
+
+  // A selected path not present in changedFiles can occur only on synthetic
+  // programmatic input. Keep it rather than silently losing caller-provided
+  // scope while preserving raw changed-file order for normal repository runs.
+  for (const filePath of selectedCandidates) {
+    if (!rawSet.has(filePath) && !selected.includes(filePath)) selected.push(filePath);
+  }
+
+  const excluded = rawChanged
+    .filter((filePath) => !selectedSet.has(filePath))
+    .map((filePath) => ({
+      path: filePath,
+      reasonCode: shouldExclude(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
+    }));
+
+  return { selected, excluded };
+}
+
+/**
+ * Attach the file-selection ledger (#2212 Slice C) to an orchestration-derived
+ * Review Coverage object.
+ *
+ * Counters / status / units are never recomputed here: this only enriches an
+ * existing observation. Callers without a ledger keep the exact pre-Slice-C
+ * coverage object (or `null` when there is none at all).
+ */
+export function attachReviewFileScope(coverage, fileScope) {
+  if (coverage && fileScope) return { ...coverage, fileScope };
+  return coverage ?? null;
 }
