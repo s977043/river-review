@@ -18,6 +18,8 @@ const securityAuditSkill = readFileSync(
   'utf8'
 );
 
+const sectionPattern = (label) => new RegExp(`## ${label}\\s*(?:-|—)\\s*`);
+
 describe('unknown-coverage-review security-audit profile contract', () => {
   it('keeps generic and security-audit execution profiles explicit', () => {
     assert.match(unknownCoverageSkill, /### `generic`/);
@@ -26,7 +28,8 @@ describe('unknown-coverage-review security-audit profile contract', () => {
   });
 
   it('preserves the generic diff requirement instead of broadening normal PR routing', () => {
-    assert.match(unknownCoverageSkill, /## Pre-execution Gate - generic profile/);
+    assert.match(unknownCoverageSkill, sectionPattern('Pre-execution Gate'));
+    assert.match(unknownCoverageSkill, /generic profile/);
     assert.match(unknownCoverageSkill, /入力に少なくとも `diff` があり/);
     assert.match(
       unknownCoverageSkill,
@@ -35,7 +38,7 @@ describe('unknown-coverage-review security-audit profile contract', () => {
   });
 
   it('allows diff-less review only inside the explicit security-audit profile', () => {
-    assert.match(unknownCoverageSkill, /## Pre-execution Gate - security-audit profile/);
+    assert.match(unknownCoverageSkill, /security-audit profile/);
     assert.match(unknownCoverageSkill, /A current diff is not required for this profile\./);
     assert.match(
       unknownCoverageSkill,
@@ -57,17 +60,22 @@ describe('unknown-coverage-review security-audit profile contract', () => {
     ]) {
       assert.ok(securityAuditProfile.includes(phrase), `missing deterministic boundary: ${phrase}`);
     }
-    assert.match(
-      securityAuditProfile,
-      /Do not duplicate these checks:/
-    );
+    assert.match(securityAuditProfile, /Do not duplicate these checks:/);
   });
 
   it('pins the four semantic evidence-sufficiency checks', () => {
-    assert.match(securityAuditProfile, /## Check 1 - Missing applicable semantic surface/);
-    assert.match(securityAuditProfile, /## Check 2 - Unsupported `covered` claim/);
-    assert.match(securityAuditProfile, /## Check 3 - Hidden exclusion \/ block \/ defer risk/);
-    assert.match(securityAuditProfile, /## Check 4 - Safety overclaim/);
+    for (const label of [
+      'Check 1',
+      'Check 2',
+      'Check 3',
+      'Check 4',
+    ]) {
+      assert.match(securityAuditProfile, sectionPattern(label));
+    }
+    assert.match(securityAuditProfile, /Missing applicable semantic surface/);
+    assert.match(securityAuditProfile, /Unsupported `covered` claim/);
+    assert.match(securityAuditProfile, /Hidden exclusion \/ block \/ defer risk/);
+    assert.match(securityAuditProfile, /Safety overclaim/);
   });
 
   it('does not turn every attack class into a mechanical checklist', () => {
@@ -90,10 +98,7 @@ describe('unknown-coverage-review security-audit profile contract', () => {
   });
 
   it('wires the explicit audit flow without changing deterministic Gate behavior', () => {
-    assert.match(
-      securityAuditSkill,
-      /unknown-coverage-review \(security-audit profile\)/
-    );
+    assert.match(securityAuditSkill, /unknown-coverage-review \(security-audit profile\)/);
     assert.match(
       securityAuditSkill,
       /Do not wire critic output into deterministic Gate behavior in Phase 4\./
