@@ -1,5 +1,6 @@
 name: Temporary Phase 4 Coverage Critic Validation
 
+# Temporary branch-only validator for #2278. Remove before opening the PR.
 on:
   push:
     branches:
