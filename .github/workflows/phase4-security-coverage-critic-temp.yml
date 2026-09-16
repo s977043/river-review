@@ -1,0 +1,77 @@
+name: Temp Validate Phase4 Security Coverage Critic
+
+on:
+  push:
+    branches:
+      - feat/2267-security-coverage-critic
+    paths:
+      - .github/workflows/phase4-security-coverage-critic-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2267-security-coverage-critic
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Format Phase 4 files
+        run: |
+          npx prettier --write \
+            docs/development/2267-phase4-security-coverage-critic.md \
+            skills/agent-skills/unknown-coverage-review/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/04-security-audit-open-units.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/05-security-audit-covered-zero-findings.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/06-security-audit-missing-expected-unit.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/07-security-audit-scope-universe-unknown.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md \
+            tests/security-audit-coverage-profile.test.mjs
+
+      - name: Regenerate skill artifacts
+        run: |
+          npm run skills:manifest
+          npm run skills:registry
+          npm run skills:catalog
+
+      - name: Validate Phase 4 contracts
+        run: |
+          node --test tests/security-audit-coverage.test.mjs tests/security-audit-coverage-profile.test.mjs
+          npm run skills:validate
+          npm run agent-skills:validate
+          npm run skills:validate:refs
+          npm run skills:manifest:check
+          npm run skills:registry:check
+          npm run skills:catalog:check
+          npm run meta:validate
+          npx prettier --check \
+            docs/development/2267-phase4-security-coverage-critic.md \
+            skills/agent-skills/unknown-coverage-review/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/04-security-audit-open-units.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/05-security-audit-covered-zero-findings.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/06-security-audit-missing-expected-unit.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/07-security-audit-scope-universe-unknown.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md \
+            tests/security-audit-coverage-profile.test.mjs
+
+      - name: Commit generated and formatted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/phase4-security-coverage-critic-temp.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated/format changes"
+            exit 0
+          fi
+          git commit -m "chore(security): finalize phase4 generated artifacts"
+          git push origin HEAD:feat/2267-security-coverage-critic
