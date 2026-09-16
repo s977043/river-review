@@ -145,7 +145,7 @@ Existing finding axes already include:
 - `askRelevance` in the #1978 implementation
 
 Cloudflare's conceptual `confirmed / needs_validation / rejected` states are useful.
-#2267 MUST first map them to existing axes.
+Issue #2267 MUST first map them to existing axes.
 
 If an additional epistemic axis remains necessary, it needs distinct semantics and a distinct name.
 A candidate vocabulary is:
@@ -163,7 +163,8 @@ This ADR does not approve a schema field with those values yet.
 Phase 1 of the security-audit integration is source-only.
 
 The audit MUST NOT run target-controlled builds or tests without a later sandbox contract.
-The same restriction applies to browsers, emulators, fuzzers, package scripts, and fixtures.
+The same restriction applies to browsers, emulators, and fuzzers.
+It also applies to package scripts and fixtures.
 
 A future execution adapter must provide these controls:
 
@@ -234,7 +235,8 @@ Relation to the current change remains relevant as well.
 ### A. Vendor Cloudflare `security-audit-skill` as River Review's audit engine
 
 Rejected because it duplicates several existing River Review components.
-Those components include the Skill Registry, finding model, verifier, W-check, and reviewer orchestration.
+Those components include the Skill Registry, finding model, and verifier.
+They also include W-check and reviewer orchestration.
 Vendoring would also create an upstream synchronization burden.
 
 ### B. Extend `ReviewCoverage` to include trust-boundary / attack-class states
