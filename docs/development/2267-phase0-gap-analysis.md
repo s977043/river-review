@@ -111,7 +111,7 @@ candidate truth
 ### 3.6 Reviewer Identity (#1760)
 
 Issue #1760 explores reviewer provenance and stronger actor identity.
-#2267 needs only enough provenance to enforce logical independence between finder and verifier.
+Issue #2267 needs only enough provenance to enforce logical independence between finder and verifier.
 
 The minimum useful contract is an execution or run identity.
 Cryptographic signing is not required here.
