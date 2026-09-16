@@ -106,16 +106,23 @@ function extractGateCommands(selected) {
  */
 function safeExecutionMetadata(result) {
   const metadata = {};
-  if (typeof result?.durationMs === 'number' && Number.isFinite(result.durationMs) && result.durationMs >= 0) {
+  if (
+    typeof result?.durationMs === 'number' &&
+    Number.isFinite(result.durationMs) &&
+    result.durationMs >= 0
+  ) {
     metadata.durationMs = result.durationMs;
   }
-  if (Number.isInteger(result?.exitCode)) {
+  if (Number.isInteger(result?.exitCode) && result.exitCode >= 0) {
     metadata.exitCode = result.exitCode;
   }
   if (Number.isInteger(result?.stdoutBytes) && result.stdoutBytes >= 0) {
     metadata.stdoutBytes = result.stdoutBytes;
   }
-  if (['spawn-error', 'timeout', 'invalid-entry'].includes(result?.unrunnableCause)) {
+  if (
+    result?.status === 'unrunnable' &&
+    ['spawn-error', 'timeout', 'invalid-entry'].includes(result?.unrunnableCause)
+  ) {
     metadata.unrunnableCause = result.unrunnableCause;
   }
   return metadata;
