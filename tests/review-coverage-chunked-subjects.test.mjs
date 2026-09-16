@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { optimizeDiff, renderDiffText } from '../src/lib/diff-processor.mjs';
-import { deriveReviewFileScope } from '../src/lib/local-runner.mjs';
+import { deriveReviewFileScope } from '../src/lib/review-coverage.mjs';
 import { runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
 
 /** Paths the LLM diff optimizer drops (Markdown, lock files, `dist/` output). */

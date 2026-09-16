@@ -1,3 +1,5 @@
+import { minimatch } from 'minimatch';
+
 /**
  * Parse a comma-separated list string into a trimmed array.
  * Empty/undefined input returns an empty array.
@@ -128,4 +130,16 @@ export function resolveAvailableDependencies(inputDependencies) {
   if (envDeps.length) return [...new Set(envDeps)];
   if (stubEnabled) return [...dependencyStubs];
   return null; // null disables dependency-based skipping
+}
+
+/**
+ * Glob-match a repository-relative path against `config.exclude.files` patterns.
+ *
+ * Shared between `src/lib/local-runner.mjs` (diff-level exclusion) and
+ * `src/lib/review-coverage.mjs` (file-scope exclusion reason codes) so the two
+ * always agree on what "configured exclusion" means. `dot: true` keeps dotfiles
+ * matchable by `.*` / `.git*` style patterns.
+ */
+export function shouldExclude(filePath, patterns = []) {
+  return patterns.some((pattern) => minimatch(filePath, pattern, { dot: true }));
 }
