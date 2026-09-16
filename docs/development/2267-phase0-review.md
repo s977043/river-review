@@ -1,4 +1,4 @@
-# #2267 Phase 0 Review — Security Audit Harness Integration
+# #2267 Phase 0 Review—Security Audit Harness Integration
 
 ## Scope
 
@@ -19,7 +19,7 @@ No blocking issue was found after the fixes described below.
 
 The proposed direction is acceptable because it adds no runtime behavior and explicitly prevents the highest-risk integration mistakes: duplicate orchestration, coverage semantic collision, premature status vocabulary growth, unsandboxed target execution, and early Gate coupling.
 
-## Review 1 — Architecture / Responsibility Boundaries
+## Review 1—Architecture / Responsibility Boundaries
 
 ### Checks
 
@@ -49,7 +49,7 @@ The new work is limited to integration gaps, primarily semantic security coverag
 
 `SecurityAuditCoverage` is currently a concept, not an approved schema. PR3 must prove the minimum contract instead of starting from a large generalized schema.
 
-## Review 2 — Contract / Schema Compatibility
+## Review 2—Contract / Schema Compatibility
 
 ### Checks
 
@@ -79,7 +79,7 @@ This is important because existing fields already cover several different axes:
 
 Adding another enum before a concrete integration point would be premature.
 
-## Review 3 — Security / Execution Safety
+## Review 3—Security / Execution Safety
 
 ### Checks
 
@@ -108,7 +108,7 @@ rather than executing with ambient credentials/network or silently rejecting the
 
 The future sandbox adapter must be reviewed independently before any code-execution capability is enabled. It should remain a separate issue/PR from source-only audit functionality.
 
-## Review 4 — Product / Developer Experience / Cost
+## Review 4—Product / Developer Experience / Cost
 
 ### Checks
 
@@ -137,7 +137,7 @@ Final-record verification is proposed as `quick / standard / deep`, allowing cos
 
 Gate integration is intentionally delayed until paired evaluation.
 
-## Review 5 — Evaluation / False-Positive Control
+## Review 5—Evaluation / False-Positive Control
 
 ### Checks
 
