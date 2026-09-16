@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/security-audit-coverage.schema.json",
+  "title": "River Review Security Audit Coverage",
+  "description": "Observe-only semantic security-audit coverage. This contract records which subsystem × trust-boundary × attack-class surfaces were investigated or remain incomplete. It is independent from ReviewCoverage execution completeness and does not affect Gate behavior.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "status",
+    "totalUnits",
+    "applicableUnits",
+    "investigatedUnits",
+    "gapUnitIds",
+    "units"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1" },
+    "status": {
+      "type": "string",
+      "enum": ["complete", "partial", "not_started"]
+    },
+    "totalUnits": { "type": "integer", "minimum": 0 },
+    "applicableUnits": { "type": "integer", "minimum": 0 },
+    "investigatedUnits": { "type": "integer", "minimum": 0 },
+    "gapUnitIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "units": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/securityAuditUnit" }
+    }
+  },
+  "$defs": {
+    "nonEmptyStringArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "nullableString": {
+      "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
+    },
+    "securityAuditUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "subsystem",
+        "trustBoundary",
+        "attackClassId",
+        "status",
+        "reasonCode",
+        "reviewedPaths",
+        "evidenceRefs",
+        "candidateFindingIds",
+        "validationPlan",
+        "explanation"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "subsystem": { "type": "string", "minLength": 1 },
+        "trustBoundary": { "type": "string", "minLength": 1 },
+        "attackClassId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "covered", "candidate", "blocked", "deferred", "out-of-scope"]
+        },
+        "reasonCode": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "enum": [
+                "source_evidence_insufficient",
+                "unsafe_execution_required",
+                "dependency_unavailable",
+                "budget_deferred",
+                "manual_defer",
+                "scope_excluded",
+                "not_applicable"
+              ]
+            }
+          ]
+        },
+        "reviewedPaths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "candidateFindingIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "validationPlan": { "$ref": "#/$defs/nullableString" },
+        "explanation": { "$ref": "#/$defs/nullableString" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["planned", "covered", "candidate"] } },
+            "required": ["status"]
+          },
+          "then": { "properties": { "reasonCode": { "type": "null" } } }
+        },
+        {
+          "if": {
+            "properties": { "status": { "enum": ["covered", "candidate"] } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "reviewedPaths": { "$ref": "#/$defs/nonEmptyStringArray" },
+              "evidenceRefs": { "$ref": "#/$defs/nonEmptyStringArray" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "candidate" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "candidateFindingIds": { "$ref": "#/$defs/nonEmptyStringArray" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "blocked" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "reasonCode": {
+                "enum": [
+                  "source_evidence_insufficient",
+                  "unsafe_execution_required",
+                  "dependency_unavailable"
+                ]
+              },
+              "validationPlan": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "deferred" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "reasonCode": { "enum": ["budget_deferred", "manual_defer"] },
+              "validationPlan": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "out-of-scope" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "reasonCode": { "enum": ["scope_excluded", "not_applicable"] },
+              "explanation": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
