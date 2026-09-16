@@ -39,11 +39,9 @@ Route that request to `river-review-security`.
 
 Select exactly one mode before reviewing.
 
-| Mode | Use when | Required behavior |
-| --- | --- | --- |
-| `guidance` | The user wants methodology, planning, or an audit approach | Explain the method and constraints. Do not claim that audit work was executed. |
-| `focused` | The user names a bounded subsystem, path, component, or security surface | Freeze that scope and review only source evidence inside the boundary. |
-| `full-audit` | The user explicitly requests repository-wide audit coverage | Perform repository reconnaissance and source review across the repository. Do not claim semantic coverage completeness until `SecurityAuditCoverage` exists. |
+- `guidance`: use when the user wants methodology, planning, or an audit approach. Explain the method and constraints. Do not claim that audit work was executed.
+- `focused`: use when the user names a bounded subsystem, path, component, or security surface. Freeze that scope and review only source evidence inside the boundary.
+- `full-audit`: use only when the user explicitly requests repository-wide audit coverage. Perform repository reconnaissance and source review across the repository. Do not claim semantic coverage completeness until `SecurityAuditCoverage` exists.
 
 If the request does not clearly justify `full-audit`, use `focused` or `guidance`.
 
@@ -135,13 +133,11 @@ Reconnaissance is an investigation plan, not proof of safety.
 
 Use existing River Review skills when their domain applies.
 
-| Surface | Existing skill | Use |
-| --- | --- | --- |
-| Application security patterns | `security-basic` | Injection, unsafe sinks, secrets, validation, common application risks |
-| Privacy and sensitive-data design | `security-privacy-design` | Retention, deletion, encryption, residency, privacy rights |
-| Trust boundaries and authorization | `trust-boundaries-authz` | Authn/authz responsibility, claims propagation, tenant boundaries |
-| Ordinary changed-code security review | `river-review-security` | Use only when the task is actually diff-oriented rather than an audit |
-| Attack-path exploration | `adversarial-review` | Optional complementary artifact review. It is not a finding verifier. |
+- `security-basic`: application security patterns such as injection, unsafe sinks, secrets, validation, and common application risks.
+- `security-privacy-design`: privacy and sensitive-data design such as retention, deletion, encryption, residency, and privacy rights.
+- `trust-boundaries-authz`: trust boundaries and authorization responsibilities, claims propagation, and tenant boundaries.
+- `river-review-security`: ordinary changed-code security review. Use only when the task is actually diff-oriented rather than an audit.
+- `adversarial-review`: optional complementary attack-path exploration. It is not a finding verifier.
 
 Do not duplicate the guidance of these skills inside this entry skill.
 
