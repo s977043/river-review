@@ -20,7 +20,8 @@ No blocking issue remains after the fixes described below.
 
 The direction is acceptable because Phase 0 adds no runtime behavior.
 It also blocks the highest-risk integration mistakes.
-Those mistakes include duplicate orchestration, coverage semantic collision, premature status growth, unsandboxed execution, and early Gate coupling.
+Those mistakes include duplicate orchestration, coverage semantic collision, and premature status growth.
+They also include unsandboxed execution and early Gate coupling.
 
 ## Review 1—Architecture / Responsibility Boundaries
 
@@ -47,7 +48,8 @@ The ADR assigns existing concerns to their current owners:
 - capability evolution -> #1574
 
 New work is limited to integration gaps.
-The main gaps are semantic security coverage, an explicit full-audit entry point, independence provenance, final-record verification, and target-audit carry-forward.
+The first group covers semantic security coverage, an explicit full-audit entry point, and independence provenance.
+The second group covers final-record verification and target-audit carry-forward.
 
 ### Architecture risk retained for follow-up
 
@@ -100,7 +102,8 @@ Adding another enum before a concrete integration point would be premature.
 
 The ADR fixes `source-only` as the initial execution policy.
 A later OS-enforced sandbox contract is required before target-controlled execution.
-This restriction covers build, test, browser, emulator, and fuzz execution.
+This restriction covers build, test, and browser execution.
+It also covers emulator and fuzz execution.
 
 The fail-safe direction is correct:
 
@@ -198,7 +201,8 @@ Verified against current `main`:
 - `src/lib/finding-critic.mjs` describes itself as a deterministic #1978 skeleton and is not CLI-wired
 - `src/lib/review-coverage.mjs` owns Review Coverage derivation
 - `docs/development/review-coverage-contract.md` separates execution coverage from finding quality and reviewer independence
-- `schemas/review-artifact.schema.json` defines `status`, `scope`, `sourceKind`, `agreement`, `consensusLevel`, and `validatedStatus`
+- `schemas/review-artifact.schema.json` defines `status`, `scope`, and `sourceKind`
+- the same schema also defines `agreement`, `consensusLevel`, and `validatedStatus`
 - `river-review-security`, `adversarial-review`, `unknown-coverage-review`, and `independent-review-synthesis` exist
 
 ## Non-blocking Follow-ups
