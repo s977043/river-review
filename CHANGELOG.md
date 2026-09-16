@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.112.0](https://github.com/s977043/river-review/compare/v1.111.3...v1.112.0) (2026-09-15)
+
+
+### Features
+
+* **viewpoints:** add neutral API compatibility signals ([#2252](https://github.com/s977043/river-review/issues/2252)) ([c4af4bf](https://github.com/s977043/river-review/commit/c4af4bf400178ad8c1b0568de1798c1addd4f1a7))
+* **viewpoints:** add observe-mode matcher ([#2252](https://github.com/s977043/river-review/issues/2252)) ([026209b](https://github.com/s977043/river-review/commit/026209b4f2cb379fa937e3bea1d7570fe5caed80))
+* **viewpoints:** add structured review knowledge foundation ([#2252](https://github.com/s977043/river-review/issues/2252)) ([8c67ff8](https://github.com/s977043/river-review/commit/8c67ff88e80e878830b47f9fb12f625fc99962c1))
+
 ## [1.111.3](https://github.com/s977043/river-review/compare/v1.111.2...v1.111.3) (2026-09-15)
 
 
