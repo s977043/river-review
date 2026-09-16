@@ -283,11 +283,16 @@ export function parseUnifiedDiff(diffText) {
     }
     if (!currentHunk) continue;
     currentHunk.lines.push(line);
-    if (line.startsWith('+') && !line.startsWith('+++')) {
+    // No `+++` / `---` exclusion here: a header now reaches the parser only as
+    // the three-line triple above, so anything arriving at this counter is hunk
+    // content. `+++ x` is the added line `++ x` and `--- x` is the deleted line
+    // `-- x`; excluding either miscounts `newLineNumber`, and a deleted line
+    // must not advance it at all (#2249 review).
+    if (line.startsWith('+')) {
       currentFile.addedLines.push(newLineNumber);
       currentHunk.addedLines.push(newLineNumber);
       newLineNumber += 1;
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
+    } else if (line.startsWith('-')) {
       // deletion: do not advance new line number
     } else {
       newLineNumber += 1;

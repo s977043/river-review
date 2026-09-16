@@ -324,5 +324,40 @@ test('hunks and added lines after a rejected ghost stay on the real file', () =>
   const [file, ...rest] = parseUnifiedDiff(text).files;
   assert.equal(rest.length, 0);
   assert.equal(file.hunks.length, 2, 'the second hunk belongs to a.md, not to a ghost');
-  assert.deepEqual(file.addedLines, [1, 20]);
+  // `+++ phantom.md` is the added line `++ phantom.md` at new-file line 2. The
+  // earlier expectation of [1, 20] pinned an undercount that the `+++` guard in
+  // the body counter produced; the guard is gone, so the added line is counted.
+  assert.deepEqual(file.addedLines, [1, 2, 20]);
+});
+
+test('a deleted `-- ` line does not advance the new-file line number', () => {
+  // Regression for the review of #2249: once the header test became the
+  // three-line triple, a body line `--- del.md` reaches the line counter for
+  // the first time. Excluding it there made a DELETED line advance
+  // `newLineNumber`, shifting every following addedLines entry by one —
+  // `addedLines` is tolerance-0 ground truth for verifier.mjs, so the shift
+  // rejects valid findings.
+  const files = withTempRepo((dir, git) => {
+    writeFileSync(join(dir, 'f.md'), 'l1\n-- del.md\nl3\n');
+    git('add', '-A');
+    git('commit', '-qm', 'seed');
+    writeFileSync(join(dir, 'f.md'), 'l1\nADD1\nl3\nADD2\n');
+    git('add', '-A');
+    return parseUnifiedDiff(git('diff', '--cached', '--unified=3', '--no-color')).files;
+  });
+  assert.equal(files.length, 1);
+  assert.deepEqual(files[0].addedLines, [2, 4]);
+});
+
+test('an added `++ ` line is counted as an addition', () => {
+  const files = withTempRepo((dir, git) => {
+    writeFileSync(join(dir, 'g.md'), 'l1\nl2\n');
+    git('add', '-A');
+    git('commit', '-qm', 'seed');
+    writeFileSync(join(dir, 'g.md'), 'l1\n++ add.md\nl2\nTAIL\n');
+    git('add', '-A');
+    return parseUnifiedDiff(git('diff', '--cached', '--unified=3', '--no-color')).files;
+  });
+  assert.equal(files.length, 1);
+  assert.deepEqual(files[0].addedLines, [2, 4]);
 });
