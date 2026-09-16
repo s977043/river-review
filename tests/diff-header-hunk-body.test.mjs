@@ -35,9 +35,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
-import { diffWithContext } from '../src/lib/git.mjs';
+import { collectAddedLineHints, diffWithContext } from '../src/lib/git.mjs';
 import { createTempGitRepo, writeFileRelative, runGit } from './helpers/temp-repo.mjs';
-import { collectAddedLineHints } from '../src/lib/git.mjs';
 
 const LONG_BODY = Array.from({ length: 80 }, (_, i) => `line${i + 1}`);
 
@@ -277,5 +276,97 @@ describe('parseUnifiedDiff: a hunk whose declared counts do not match its body',
     assert.deepEqual(Object.fromEntries(collectAddedLineHints(DIFF)), {
       'src/lib/format.mjs': 10,
     });
+  });
+});
+
+// A hunk header may LIE about how many lines its body has. These fixtures are
+// written by hand on purpose: the point is exactly the shapes git never emits
+// but a hand-edited or tool-rewritten patch does, reaching us through
+// `review plan|exec --artifact diff=<path>`. Each one places a would-be header
+// AFTER the point where a mis-tuned budget frees the hunk, and follows it with
+// a second `@@` — a ghost is only recorded once a hunk attaches to it.
+describe('parseUnifiedDiff: a body line must not become a file (#2249 follow-up)', () => {
+  const SECOND_HUNK = ['@@ -20,1 +20,1 @@', '-p', '+q', ''];
+
+  function assertNoGhost(diff, expected) {
+    assert.deepEqual(
+      parseUnifiedDiff(diff).files.map((f) => f.path),
+      expected,
+      'parseUnifiedDiff registered a path that is not in the diff'
+    );
+    assert.deepEqual(
+      [...collectAddedLineHints(diff).keys()],
+      expected,
+      'collectAddedLineHints registered a path that is not in the diff'
+    );
+  }
+
+  it('understated counts do not turn a later `+++ foo` into a file', () => {
+    // Declares 1 line per side over a 3-line body, so the budget empties while
+    // the body is still going. `+++ phantom.md` has no `--- ` before it, so the
+    // header PAIR never opens.
+    assertNoGhost(
+      [
+        '--- a/a.md',
+        '+++ b/a.md',
+        '@@ -1,1 +1,1 @@',
+        '-old',
+        '+new',
+        '+++ phantom.md',
+        ...SECOND_HUNK,
+      ].join('\n'),
+      ['a.md']
+    );
+  });
+
+  it('an omitted `@@` count means 1, not 0', () => {
+    // `@@ -3 +4 @@` is the abbreviated form. Read as 0/0 the hunk never opens,
+    // and the forged pair in its body (`-- old.md` -> `++ new.md`) is read as a
+    // file header pair.
+    assertNoGhost(
+      ['--- a/a.md', '+++ b/a.md', '@@ -3 +4 @@', '--- old.md', '+++ new.md', ...SECOND_HUNK].join(
+        '\n'
+      ),
+      ['a.md']
+    );
+  });
+
+  it('`\\ No newline at end of file` does not spend the budget', () => {
+    // It annotates the previous line and belongs to neither side's count.
+    // Charged as a line, the budget empties one line early and the forged pair
+    // that follows is read as a header pair.
+    assertNoGhost(
+      [
+        '--- a/a.md',
+        '+++ b/a.md',
+        '@@ -1,2 +1,2 @@',
+        '-old',
+        '\\ No newline at end of file',
+        '+new',
+        '--- forged.md',
+        '+++ forged2.md',
+        ...SECOND_HUNK,
+      ].join('\n'),
+      ['a.md']
+    );
+  });
+
+  it('an empty line counts as body, not as a hunk terminator', () => {
+    // Tools that strip trailing whitespace turn a blank context line ' ' into
+    // ''. Treated as unprefixed it would end the hunk, and the forged pair
+    // after it would be read as a header pair.
+    assertNoGhost(
+      [
+        '--- a/a.md',
+        '+++ b/a.md',
+        '@@ -1,4 +1,4 @@',
+        ' keep',
+        '',
+        '--- old.md',
+        '+++ new.md',
+        ...SECOND_HUNK,
+      ].join('\n'),
+      ['a.md']
+    );
   });
 });

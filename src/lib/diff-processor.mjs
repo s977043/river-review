@@ -243,7 +243,7 @@ export function parseUnifiedDiff(diffText) {
       hunk.resetFile();
       continue;
     }
-    hunk.closeIfNotBodyLine(line);
+    hunk.observeLine(line);
     if (hunk.isHeader(line, '--- ')) {
       pendingOldPath = parseDiffHeaderPath(line.slice(4));
       continue;
