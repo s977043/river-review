@@ -438,5 +438,5 @@ This makes #2267 an integration epic, not a new framework project.
 - `skills/agent-skills/adversarial-review/SKILL.md`
 - `skills/agent-skills/unknown-coverage-review/SKILL.md`
 - `skills/midstream/independent-review-synthesis/SKILL.md`
-- https://github.com/cloudflare/security-audit-skill
-- https://blog.cloudflare.com/build-your-own-vulnerability-harness/
+- [Cloudflare security-audit-skill](https://github.com/cloudflare/security-audit-skill)
+- [Build your own vulnerability harness](https://blog.cloudflare.com/build-your-own-vulnerability-harness/)
