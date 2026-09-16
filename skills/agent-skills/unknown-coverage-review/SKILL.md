@@ -8,6 +8,7 @@ description: |
   の meta 評価のみを行う。finding verification 後の合成ステップとして report-only で
   実行し、残存 Unknown を output-format §4「Unverified / Residual Risk」の Unknown
   Coverage 下位構造へ、判定を既存 verdict 語彙（GO/ESCALATE/NO_GO）へ写像する。
+  Security Audit profile では SecurityAuditCoverage の証拠充足を report-only で評価し、Gate へは接続しない。
   新しい語彙・schema は作らない。
 category: midstream
 phase: [upstream, midstream, downstream]
@@ -31,7 +32,7 @@ tags:
     meta,
     synthesis,
   ]
-version: '0.1.0'
+version: '0.2.0'
 license: MIT
 ---
 
@@ -65,6 +66,30 @@ AI coding agent の実行能力が上がるほど、見逃しは単純なコー�
 - **観点6 の plan 代替 evidence**: 観点6（Plan / Assumption）は `plan` artifact 欠損時、**PR 本文へ前提・open question が inline 列挙されていれば列挙分のみ部分評価**する（外部 issue は取得・推測しない）。**計画 issue の bare 参照（`#NNNN`）のみなら skip** し `skippedSkills` に記録する。この分岐は registry skill `assumption-resolution-trace` と同一ルールに揃える。
 - **PlanGate #810 ledger**: PlanGate #810 が assumption/unknown ledger を出力する場合も、専用 artifact を新設しない。`plan` artifact 経由で受け取る同一の artifact-driven パターンに従う（[artifact-input-contract.md](../../../pages/reference/artifact-input-contract.md)）。欠損時は上記と同じデグレード（`skippedSkills`）を適用する。PlanGate への依存は必須にしない。
 
+### Security Audit profile exception
+
+`river-review-security-audit` から明示的に Security Audit profile として呼ばれ、schema と `validateSecurityAuditCoverageSemantics()` を通過済みの `SecurityAuditCoverage` が供給される場合は、上記の通常 diff gate を適用しない。repository/subsystem audit は current diff に限定されないため、`diff` は必須ではない。
+
+この alternate profile は [SECURITY-AUDIT-PROFILE.md](./references/SECURITY-AUDIT-PROFILE.md) を SSoT とする。Phase 4 では profile 選択と coverage artifact の供給は caller 責務であり、新しい `inputContext` enum や runner の自動 wiring は追加しない。
+
+## Invocation profiles
+
+### Default review synthesis
+
+通常の PR / diff review では、上記 Pre-execution Gate と以下の 6 Unknown 観点をそのまま使う。既存の verdict mapping、diff anchor、`skippedSkills` 契約も維持する。
+
+### Security Audit coverage synthesis
+
+明示的な repository/subsystem security audit では Security Audit profile を使う。ここでは defect 発見ではなく、Phase 3 の semantic coverage ledger に残る証拠不足・未説明 omission・不適切な安全性主張を評価する。
+
+Security Audit profile は以下を上書きする。
+
+- current diff は不要。coverage `evidenceRefs` / `reviewedPaths` を source traceability として使う。
+- generic verdict-to-Gate mapping は使わない。Phase 4 は report-only。
+- coverage state だけから vulnerability finding / severity を作らない。
+- Phase 3 の deterministic validator が所有する taxonomy / duplicate / summary drift を LLM で再判定しない。
+- expected semantic scope が無ければ、ledger が自分自身の completeness を証明したとはみなさない。
+
 ## 6 Unknown 観点 / Perspectives
 
 Issue #1470 の 6 カテゴリを、defect ではなく **evidence-sufficiency の meta 質問**として扱う。各観点の defect 検出は既存 skill へ委譲する（[DELEGATION.md](./references/DELEGATION.md)）。本観点は委譲先が扱わない **残余（証拠が足りているかの合成）のみ**を検出する。
@@ -94,7 +119,10 @@ report-only 契約に従う。**本観点はマージを止めない**。判定�
 
 - 残存 Unknown は [output-format.md](../../../docs/review/output-format.md) §4「Unverified / Residual Risk」の **Unknown Coverage（残存 Unknown / evidence_missing / resolution）** 下位構造へ出力する。各 Unknown は category・severity・blocking・evidence_missing・resolution を持つ。
 - 解消済み Unknown は Good Points 節に根拠（リンク済み受入条件・テスト等）を添えて記録する。分量目安は**観点ごとに代表 1 件・1 行に要約**する（低リスク PR では解消済み記録が出力の大半を占めやすいため）。
-- verdict は新語彙を作らず既存 `gate.decision` へ写像する（loop-convergence-contract.md「Unknown Coverage verdict の写像」表が SSoT）。
+
+### Default review synthesis verdict mapping
+
+通常の review synthesis では verdict を新語彙として増やさず、既存 `gate.decision` へ写像する（loop-convergence-contract.md「Unknown Coverage verdict の写像」表が SSoT）。
 
 | verdict        | 既存語彙                     | 条件                                                                                                                              |
 | -------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -114,14 +142,30 @@ report-only 契約に従う。**本観点はマージを止めない**。判定�
   ]
   ```
 
+### Security Audit profile Gate override
+
+Security Audit profile では上記 verdict-to-Gate mapping を適用しない。#2267 Phase 4 は telemetry / synthesis の評価段階であり、Gate integration は ADR-010 D8 と Phase 12 まで保留する。
+
+Security Audit profile の出力は次へ限定する。
+
+- `Unverified / Residual Risk` の coverage observation
+- evidence-sufficiency に関する `questions`
+- source-only 境界を保つ `actions`
+
+`planned` / `blocked` / `deferred` / scope omission を、coverage state だけで `ESCALATE` / `NO_GO` へ変換しない。coverage state だけから vulnerability finding や vulnerability severity も作らない。
+
 ## False-positive guards
 
-- 指摘の `file:line` は差分内にあること（VERIFICATION の evidence 規則）。差分外の推測に基づく Unknown は finding にせず question として返す。
+- 指摘の `file:line` は差分内にあること（VERIFICATION の evidence 規則）。差分外の推測に基づく Unknown は finding にせず question として返す。**Security Audit profile ではこの diff anchor 規則を適用せず、coverage ledger の `reviewedPaths` / `evidenceRefs` による repository source traceability を使う。**
 - 委譲表に該当する defect は出さない（委譲先 skill の実行に委ねる）。
 - 「証拠が repo 内・別ファイル・PR 本文に存在する可能性」を Grep / artifact 参照で棄却できない場合は、finding ではなく question にする。
 - 低リスク PR（小さな明確なバグ修正・既存パターン踏襲）では過剰な Unknown を出さない。観点ごとに **finding と question の合算で** 最大 5 件とする。question は severity を持たないため **`info` 相当として扱い、保持の優先順は findings（severity 降順）→ questions とし、上限超過分は優先度の低い側（questions → 低 severity findings）から切り捨てる**。
 - correctness bug・セキュリティ欠陥そのものは対象外（defect 系観点の責務）。
+- Security Audit profile では schema/semantic validator の taxonomy mismatch、unknown class、duplicate unit、summary drift を重複指摘しない。deterministic validation が失敗した場合は profile 評価より先に ledger 修正を求める。
+- Security Audit profile では expected semantic scope が無い状態から missing unit を捏造しない。coverage universe の独立検証不能を question / observation として残す。
 
 ## References
 
 - [DELEGATION.md](./references/DELEGATION.md) — 既存 skill への委譲表・証拠要件・分界
+- [SECURITY-AUDIT-PROFILE.md](./references/SECURITY-AUDIT-PROFILE.md) — #2267 Security Audit Coverage Critic profile
+- `docs/development/2267-phase4-security-coverage-critic.md`
