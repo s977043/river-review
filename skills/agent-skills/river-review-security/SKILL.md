@@ -94,9 +94,10 @@ repository / subsystem security audit
 
 ## 他スキルとの関係
 
+`river-review-security-audit` は通常 diff review ではなく、明示的な repository / subsystem audit を担当する委譲先である。
+
 | スキル                          | 関係 | 棲み分け                                                   |
 | ------------------------------- | ---- | ---------------------------------------------------------- |
-| `river-review-security-audit`   | 委譲 | security は通常diff、security-audit は明示的なrepo/subsystem監査 |
 | `adversarial-review` (War Game) | 補完 | security は既知パターン検出、War Game は未知の攻撃経路発見 |
 | `river-review-architecture`     | 補完 | security は「脆弱性」、architecture は「構造的安全性」     |
 
