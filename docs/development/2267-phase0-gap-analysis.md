@@ -1,4 +1,4 @@
-# #2267 Phase 0 — Cloudflare Security Audit Harness Gap Analysis
+# #2267 Phase 0—Cloudflare Security Audit Harness Gap Analysis
 
 ## Status
 
@@ -324,52 +324,52 @@ The following would be architectural regressions:
 
 ## 12. Proposed implementation slices
 
-### PR1 — Phase 0 boundary documents
+### PR1—Phase 0 boundary documents
 
 - ADR-010
 - this gap analysis
 - no behavior change
 
-### PR2 — Source-only audit entry skill
+### PR2—Source-only audit entry skill
 
 - explicit `river-review-security-audit`
 - guidance/focused/full-audit modes
 - no target execution
 
-### PR3 — Semantic security coverage contract
+### PR3—Semantic security coverage contract
 
 - experimental schema/artifact
 - deterministic statuses/reasons
 - observe-only
 
-### PR4 — Coverage critic integration
+### PR4—Coverage critic integration
 
 - evaluate reuse of `unknown-coverage-review`
 - no duplicate generic critic
 
-### PR5 — #1978 runtime integration / independence
+### PR5—#1978 runtime integration / independence
 
 - finder/verifier provenance
 - fail-safe incomplete handling
 
-### PR6 — Final record verification profiles
+### PR6—Final record verification profiles
 
 - quick/standard/deep behavior
 - risk/cost evaluation
 
-### PR7 — Repeat-run / reporting
+### PR7—Repeat-run / reporting
 
 - compatible prior audit lookup
 - stale-source revalidation rules
 - structured audit outputs
 
-### Later — Sandbox adapter / Gate
+### Later—Sandbox adapter / Gate
 
 Only after evaluation.
 
 ## 13. Evaluation gates
 
-### Gate A — Architecture
+### Gate A—Architecture
 
 Pass when:
 
@@ -378,15 +378,15 @@ Pass when:
 - candidate validation uses #1978
 - full audit is opt-in
 
-### Gate B — Quality
+### Gate B—Quality
 
 Pass when paired evaluation shows useful improvement in at least the precision / missed-critical / human-reversal dimensions without an unacceptable false-block increase.
 
-### Gate C — Cost / UX
+### Gate C—Cost / UX
 
 Pass when normal PR review cost and latency are unaffected and explicit security-audit profiles have measurable budgets.
 
-### Gate D — Gate integration
+### Gate D—Gate integration
 
 Only after A-C pass. Gate integration starts opt-in/shadow and must fail safe on incomplete coverage or failed verification.
 
