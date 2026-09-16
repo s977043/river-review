@@ -1,0 +1,47 @@
+name: Temp Format Phase2 Registry Files
+
+on:
+  push:
+    branches:
+      - feat/2267-security-attack-class-registry
+    paths:
+      - .github/workflows/phase2-format-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2267-security-attack-class-registry
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Format Phase 2 files
+        run: |
+          npx prettier --write \
+            skills/agent-skills/river-review-security-audit/references/attack-classes.json \
+            tests/security-attack-class-registry.test.mjs
+
+      - name: Validate targeted files
+        run: |
+          npx prettier --check \
+            skills/agent-skills/river-review-security-audit/references/attack-classes.json \
+            tests/security-attack-class-registry.test.mjs
+          node --experimental-test-isolation=none --test tests/security-attack-class-registry.test.mjs
+
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            skills/agent-skills/river-review-security-audit/references/attack-classes.json \
+            tests/security-attack-class-registry.test.mjs
+          git commit -m "style(security): format attack class registry"
+          git push origin HEAD:feat/2267-security-attack-class-registry
