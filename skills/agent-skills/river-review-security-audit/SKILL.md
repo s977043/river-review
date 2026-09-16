@@ -4,7 +4,7 @@ name: river-review-security-audit
 description: |
   Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。
   通常の PR セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、
-  evidence と unresolved hypothesis の記録を行う。target-controlled code は実行しない。
+  evidence と unresolved hypothesis、observe-only SecurityAuditCoverage の記録を行う。target-controlled code は実行しない。
 category: midstream
 phase: [upstream, midstream]
 severity: critical
@@ -13,7 +13,7 @@ applyTo:
 inputContext: [diff, fullFile]
 outputKind: [summary, findings, actions, questions]
 tags: [security, audit, entry, routing, source-only]
-version: 0.2.0
+version: 0.3.0
 license: MIT
 ---
 
@@ -41,13 +41,13 @@ Select exactly one mode before reviewing.
 
 - `guidance`: use when the user wants methodology, planning, or an audit approach. Explain the method and constraints. Do not claim that audit work was executed.
 - `focused`: use when the user names a bounded subsystem, path, component, or security surface. Freeze that scope and review only source evidence inside the boundary.
-- `full-audit`: use only when the user explicitly requests repository-wide audit coverage. Perform repository reconnaissance and source review across the repository. Do not claim semantic coverage completeness until `SecurityAuditCoverage` exists.
+- `full-audit`: use only when the user explicitly requests repository-wide audit coverage. Perform repository reconnaissance and source review across the repository. Semantic coverage is observe-only and never a safety guarantee.
 
 If the request does not clearly justify `full-audit`, use `focused` or `guidance`.
 
 ## Non-negotiable Source-only Policy
 
-Version 0.2.0 is source-only.
+Version 0.3.0 is source-only.
 
 Allowed evidence collection:
 
@@ -83,8 +83,10 @@ Explicit audit request
   -> mode selection
   -> scope freeze
   -> source reconnaissance
+  -> attack-class planning
   -> existing security skills
-  -> candidate findings
+  -> candidate findings / unresolved hypotheses
+  -> observe-only SecurityAuditCoverage ledger
   -> existing verification path
   -> audit summary
 ```
@@ -98,7 +100,6 @@ The following responsibilities remain outside this skill:
 - execution coverage: #2212 Review Coverage
 - materiality and disposition: #1857 Semantic Precision
 - final Gate decision: existing deterministic Gate
-- semantic `SecurityAuditCoverage`: Phase 3 follow-up of #2267
 - independent final-record verification: later #2267 phase
 - sandboxed target execution: later dedicated phase
 
@@ -146,7 +147,6 @@ principal
 
 An attack class is an investigation hypothesis, not a checklist completion badge.
 A class with zero findings is not automatically covered, and a non-applicable class must be explained rather than silently omitted.
-`SecurityAuditCoverage` will consume this taxonomy in a later phase; this skill does not emit semantic coverage status yet.
 
 ### 4. Reuse existing security skills
 
@@ -197,13 +197,40 @@ For every unresolved hypothesis, provide:
 
 Do not assign severity solely from an unresolved runtime assumption.
 
-### 8. Report without claiming unsupported coverage
+### 8. Record observe-only SecurityAuditCoverage
 
-Until the dedicated `SecurityAuditCoverage` contract is implemented, use descriptive coverage notes only.
-Never emit `security coverage complete` or an equivalent guarantee from this skill.
+Use `schemas/security-audit-coverage.schema.json` and `src/lib/security-audit-coverage.mjs` as the semantic coverage contract.
+The unit is:
+
+```text
+subsystem × trustBoundary × attackClassId
+```
+
+Use only the closed unit status vocabulary:
+
+```text
+planned | covered | candidate | blocked | deferred | out-of-scope
+```
+
+Rules:
+
+- `covered` requires traceable `reviewedPaths` and `evidenceRefs`.
+- `candidate` requires traceable investigation evidence plus at least one candidate finding reference.
+- `blocked` and `deferred` require a concrete validation plan.
+- `out-of-scope` requires an explicit reason and explanation.
+- zero findings alone never produces `covered`.
+- reviewer execution success alone never produces `covered`.
+- `SecurityAuditCoverage.status == complete` means no applicable semantic coverage gap remains in the planned audit scope; it does not mean the target is safe.
+
+Do not merge this ledger with #2212 `ReviewCoverage`.
+Do not feed this observe-only status into Gate behavior in Phase 3.
+
+### 9. Report without claiming safety
 
 A `full-audit` run means repository-wide source investigation was attempted.
-It does not mean all security attack classes were proven covered.
+It does not mean all security attack classes were proven safe.
+
+Never render `SecurityAuditCoverage.status == complete` as `secure`, `safe`, `no vulnerabilities`, or an equivalent guarantee.
 
 ## Output Contract
 
@@ -213,7 +240,7 @@ Start with this header:
 Audit mode: guidance | focused | full-audit
 Execution policy: source-only
 Scope: <repository | subsystem | path | trust boundary>
-Coverage claim: descriptive-only; SecurityAuditCoverage not yet active
+SecurityAuditCoverage: observe-only
 ```
 
 Then emit these sections:
@@ -221,7 +248,7 @@ Then emit these sections:
 1. **Reconnaissance** — relevant entry points, trust boundaries, sensitive assets, and inspected source areas.
 2. **Candidate findings** — evidence-grounded findings produced through existing River Review skill contracts.
 3. **Unresolved hypotheses** — missing facts, blockers, and validation plans.
-4. **Reviewed surfaces** — descriptive list of source surfaces inspected. This is not semantic coverage certification.
+4. **Security audit coverage** — semantic units keyed by subsystem × trust boundary × attack class using the Phase 3 contract.
 5. **Next validation actions** — only actions that preserve the source-only policy unless a later sandbox phase is explicitly available.
 
 For findings, preserve the existing River Review finding shape where possible:
@@ -243,9 +270,10 @@ For findings, preserve the existing River Review finding shape where possible:
 - No repository mutation as part of the audit itself.
 - No `0 findings == safe` inference.
 - No `full-audit == complete coverage` inference.
+- No `SecurityAuditCoverage complete == safe` inference.
 - No consensus-as-correctness inference.
 - No automatic Gate behavior change.
-- No new status vocabulary from this skill.
+- No ad hoc status vocabulary outside the dedicated coverage contract.
 
 ## Relationship to Normal Security Review
 
@@ -263,6 +291,9 @@ When both phrases appear, prefer this audit skill only if the user explicitly as
 
 - `docs/adr/010-security-audit-harness-integration.md`
 - `docs/development/2267-phase0-gap-analysis.md`
+- `docs/development/2267-phase3-security-audit-coverage.md`
+- `schemas/security-audit-coverage.schema.json`
+- `src/lib/security-audit-coverage.mjs`
 - `skills/agent-skills/river-review-security-audit/references/attack-classes.json`
 - `skills/agent-skills/river-review-security/SKILL.md`
 - `skills/agent-skills/adversarial-review/SKILL.md`
