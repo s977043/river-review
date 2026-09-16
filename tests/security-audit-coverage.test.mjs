@@ -128,7 +128,10 @@ describe('deriveSecurityAuditCoverage', () => {
 describe('security audit coverage schema', () => {
   it('stays aligned with the runtime unit-state vocabulary', () => {
     const schema = JSON.parse(
-      readFileSync(new URL('../schemas/security-audit-coverage.schema.json', import.meta.url), 'utf8')
+      readFileSync(
+        new URL('../schemas/security-audit-coverage.schema.json', import.meta.url),
+        'utf8'
+      )
     );
 
     assert.deepEqual(schema.$defs.securityAuditUnit.properties.state.enum, [
@@ -227,10 +230,7 @@ describe('validateSecurityAuditCoverageSemantics', () => {
   });
 
   it('detects duplicate ids and duplicate semantic units', () => {
-    const coverage = derive([
-      unit('same-id'),
-      unit('same-id', 'planned'),
-    ]);
+    const coverage = derive([unit('same-id'), unit('same-id', 'planned')]);
     const codes = validateSecurityAuditCoverageSemantics(coverage, attackRegistry).map(
       ({ code }) => code
     );

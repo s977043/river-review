@@ -152,7 +152,11 @@
           "then": {
             "properties": {
               "reviewedPaths": { "$ref": "#/$defs/nonEmptyStringArray" },
-              "evidenceRefs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sourceEvidenceRef" } },
+              "evidenceRefs": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/$defs/sourceEvidenceRef" }
+              },
               "validationPlan": { "type": "null" }
             }
           }
