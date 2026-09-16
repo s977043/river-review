@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.113.0](https://github.com/s977043/river-review/compare/v1.112.0...v1.113.0) (2026-09-16)
+
+
+### Features
+
+* **evidence:** preserve safe deterministic execution metadata ([#2275](https://github.com/s977043/river-review/issues/2275)) ([#2276](https://github.com/s977043/river-review/issues/2276)) ([274af2f](https://github.com/s977043/river-review/commit/274af2ff39b02a3eb1bfd733c93c4e83e5fbe814))
+* **security:** add observe-only security audit coverage ([#2277](https://github.com/s977043/river-review/issues/2277)) ([3f486aa](https://github.com/s977043/river-review/commit/3f486aa763af0ad965ff76e0366defe508c5342e))
+* **security:** add security attack class registry ([#2274](https://github.com/s977043/river-review/issues/2274)) ([292110b](https://github.com/s977043/river-review/commit/292110b775fa95e91d902e10d4afe68e9d6cb8f6))
+* **security:** add source-only security audit entry skill ([#2272](https://github.com/s977043/river-review/issues/2272)) ([421d88a](https://github.com/s977043/river-review/commit/421d88aa8096c404a5212ce44a1504f2109b6ed2))
+
 ## [1.112.0](https://github.com/s977043/river-review/compare/v1.111.3...v1.112.0) (2026-09-15)
 
 
