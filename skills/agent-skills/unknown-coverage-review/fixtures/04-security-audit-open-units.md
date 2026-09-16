@@ -19,7 +19,7 @@
 {
   "kind": "SecurityAuditCoverage",
   "schemaVersion": "1",
-  "taxonomyVersion": "1.0.0",
+  "taxonomyVersion": "0.1.0",
   "executionPolicy": "source-only",
   "totalUnits": 4,
   "applicableUnits": 4,
@@ -31,10 +31,10 @@
   "openUnitIds": ["auth-authz", "agent-tool-boundary", "billing-webhook-replay"],
   "units": [
     {
-      "id": "session-fixation",
+      "id": "auth-session",
       "subsystem": "auth",
       "trustBoundary": "browser-to-session-service",
-      "attackClassId": "session-fixation",
+      "attackClassId": "authn-authz",
       "state": "covered",
       "reasonCode": null,
       "reviewedPaths": ["src/auth/session.mjs"],
@@ -44,7 +44,7 @@
           "path": "src/auth/session.mjs",
           "lineStart": 40,
           "lineEnd": 95,
-          "note": "session id rotation and cookie handling inspected"
+          "note": "session identity propagation and authorization handling inspected"
         }
       ],
       "relatedFindingIds": [],
@@ -55,7 +55,7 @@
       "id": "auth-authz",
       "subsystem": "auth",
       "trustBoundary": "api-to-authorization-service",
-      "attackClassId": "authorization-bypass",
+      "attackClassId": "authn-authz",
       "state": "planned",
       "reasonCode": null,
       "reviewedPaths": [],
@@ -68,7 +68,7 @@
       "id": "agent-tool-boundary",
       "subsystem": "agent-runtime",
       "trustBoundary": "model-to-tool-executor",
-      "attackClassId": "tool-authorization-bypass",
+      "attackClassId": "ai-agent-security",
       "state": "blocked",
       "reasonCode": "unsafe_execution_required",
       "reviewedPaths": ["src/agent/tools.mjs"],
@@ -81,7 +81,7 @@
       "id": "billing-webhook-replay",
       "subsystem": "billing",
       "trustBoundary": "payment-provider-to-webhook-handler",
-      "attackClassId": "replay-attack",
+      "attackClassId": "rpc-messaging",
       "state": "deferred",
       "reasonCode": "budget_deferred",
       "reviewedPaths": ["src/billing/webhook.mjs"],
@@ -99,7 +99,7 @@
 1. `auth-authz` is surfaced as an open semantic investigation surface with the missing source evidence identified.
 2. `agent-tool-boundary` preserves `unsafe_execution_required` and its safe validation plan. The critic does not execute target code.
 3. `billing-webhook-replay` remains visible as deferred residual risk with its follow-up plan.
-4. `session-fixation` is not treated as unsafe merely because `relatedFindingIds` is empty.
+4. `auth-session` is not treated as unsafe merely because `relatedFindingIds` is empty.
 5. The critic does not create a vulnerability finding solely from any open state.
 6. The critic does not mutate or recommend a concrete `gate.decision` in the Security Audit profile.
 7. The output does not claim the repository is safe or complete.
