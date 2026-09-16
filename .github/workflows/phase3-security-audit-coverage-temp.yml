@@ -23,8 +23,9 @@ jobs:
       - name: Setup dependencies
         uses: ./.github/actions/setup-node-deps
 
-      - name: Format Phase 3 files
+      - name: Normalize Phase 3 files
         run: |
+          npm run fix:dashes
           npx prettier --write \
             schemas/security-audit-coverage.schema.json \
             src/lib/security-audit-coverage.mjs \
@@ -32,6 +33,7 @@ jobs:
             tests/helpers/schema-validator.mjs \
             docs/development/2267-phase3-security-audit-coverage.md \
             skills/agent-skills/river-review-security-audit/SKILL.md
+          npm run check:dashes
 
       - name: Regenerate skill-derived artifacts
         run: |
