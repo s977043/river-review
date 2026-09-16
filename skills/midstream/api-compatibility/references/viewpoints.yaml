@@ -1,0 +1,56 @@
+version: 1
+skillId: api-compatibility
+
+viewpoints:
+  - id: backward-compatibility
+    title: Backward compatibility
+    activatesOn:
+      - api-contract-changed
+      - dto-field-removed
+      - dto-field-type-changed
+      - dto-requiredness-tightened
+    question: 既存consumerとの後方互換性が維持されているか。
+    requiredEvidence:
+      - changed-contract
+      - affected-consumers
+    evidenceHints:
+      - versioning
+      - migration-path
+      - consumer-update
+      - contract-test
+    falsePositiveGuards:
+      - new-endpoint-only
+      - test-fixture-only
+
+  - id: api-test-coverage
+    title: API contract test coverage
+    activatesOn:
+      - api-contract-changed
+      - dto-field-removed
+      - dto-field-type-changed
+      - dto-requiredness-tightened
+    question: API契約変更を検証するテストが追加または更新されているか。
+    requiredEvidence:
+      - changed-contract
+      - related-tests
+    evidenceHints:
+      - integration-test
+      - api-test
+      - contract-test
+    falsePositiveGuards:
+      - test-fixture-only
+
+  - id: optional-field-consumer-handling
+    title: Optional field consumer handling
+    activatesOn:
+      - dto-optional-field-added
+    question: 追加されたoptional fieldをconsumer側が安全に扱えるか。
+    requiredEvidence:
+      - changed-contract
+      - affected-consumers
+    evidenceHints:
+      - nullability-handling
+      - consumer-test
+    falsePositiveGuards:
+      - server-only-contract
+      - test-fixture-only

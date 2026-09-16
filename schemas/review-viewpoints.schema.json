@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/review-viewpoints.schema.json",
+  "title": "River Review Skill Viewpoints Schema",
+  "description": "Experimental data-only schema for reusable review knowledge owned by a selected Skill. It does not define routing, evaluator choice, policy, gate actions, or executable behavior.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "skillId", "viewpoints"],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "identifierList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "viewpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "activatesOn", "question", "requiredEvidence"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Unique identifier within the owning Skill. Duplicate ids are rejected by the loader."
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Human-readable viewpoint name."
+        },
+        "activatesOn": {
+          "$ref": "#/$defs/identifierList",
+          "description": "Experimental signal vocabulary that may activate this viewpoint. These values do not perform routing or execute code."
+        },
+        "question": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Review question to verify. It must not assert that a violation already exists."
+        },
+        "requiredEvidence": {
+          "$ref": "#/$defs/identifierList",
+          "description": "Evidence categories required before the evaluator can answer the review question."
+        },
+        "evidenceHints": {
+          "$ref": "#/$defs/identifierList",
+          "description": "Optional evidence categories that help resolve the question but are not mandatory."
+        },
+        "falsePositiveGuards": {
+          "$ref": "#/$defs/identifierList",
+          "description": "Known applicability exclusions. They are knowledge only and do not define gate policy."
+        }
+      }
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Experimental schema revision. This is not yet a Stable Interface."
+    },
+    "skillId": {
+      "$ref": "#/$defs/identifier",
+      "description": "ID of the Skill that owns these viewpoints."
+    },
+    "viewpoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/viewpoint"
+      }
+    }
+  }
+}
