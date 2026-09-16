@@ -366,7 +366,7 @@ jobs:
         run: |
           set -euo pipefail
           for d in react react-dom recharts @docusaurus/core @mermaid-js/layout-elk; do
-            if [ -d "$d" ]; then
+            if [ -d "node_modules/$d" ]; then
               echo "::error::$d should not be installed with --omit=dev"; exit 1
             fi
           done
