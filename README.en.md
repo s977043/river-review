@@ -398,7 +398,7 @@ Operating assumptions:
 
 ### Local review run (river run .)
 
-> **Note**: River Review is [not published to npm](#getting-started) (project policy), so the `river` CLI is run inside the repo via `npm run river -- ...`. Plugin-based review is CLI-independent ([Installing the river-review plugin](#installing-the-river-review-plugin)).
+> **Note**: River Review is [not published to npm](#getting-started) (project policy), so the `river` CLI is run inside the repo via `npm run river -- ...`. Plugin-based review is CLI-independent ([Installing the plugin](#installing-the-river-review-plugin)).
 
 1. Inside the repo, run `npm run river -- run . --dry-run` to review the current diff locally (no posting to GitHub).
 2. Add `--debug` to print the merge base, target file list, prompt preview, token estimate, and diff excerpts to stdout.
