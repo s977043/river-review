@@ -2,28 +2,40 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://river-review.the3396.com/schemas/security-audit-coverage.schema.json",
   "title": "River Review Security Audit Coverage",
-  "description": "Observe-only semantic security-audit coverage. This contract records which subsystem × trust-boundary × attack-class surfaces were investigated or remain incomplete. It is independent from ReviewCoverage execution completeness and does not affect Gate behavior.",
+  "description": "Observe-only semantic security-audit coverage. Records which subsystem × trust-boundary × attack-class surfaces were investigated or remain open. It is independent from ReviewCoverage execution completeness, finding lifecycle, and Gate behavior.",
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "kind",
     "schemaVersion",
-    "status",
+    "taxonomyVersion",
+    "executionPolicy",
     "totalUnits",
     "applicableUnits",
-    "investigatedUnits",
-    "gapUnitIds",
+    "coveredUnits",
+    "plannedUnits",
+    "blockedUnits",
+    "deferredUnits",
+    "outOfScopeUnits",
+    "openUnitIds",
     "units"
   ],
   "properties": {
+    "kind": { "const": "SecurityAuditCoverage" },
     "schemaVersion": { "type": "string", "const": "1" },
-    "status": {
+    "taxonomyVersion": {
       "type": "string",
-      "enum": ["complete", "partial", "not_started"]
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
+    "executionPolicy": { "const": "source-only" },
     "totalUnits": { "type": "integer", "minimum": 0 },
     "applicableUnits": { "type": "integer", "minimum": 0 },
-    "investigatedUnits": { "type": "integer", "minimum": 0 },
-    "gapUnitIds": {
+    "coveredUnits": { "type": "integer", "minimum": 0 },
+    "plannedUnits": { "type": "integer", "minimum": 0 },
+    "blockedUnits": { "type": "integer", "minimum": 0 },
+    "deferredUnits": { "type": "integer", "minimum": 0 },
+    "outOfScopeUnits": { "type": "integer", "minimum": 0 },
+    "openUnitIds": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true
@@ -43,6 +55,25 @@
     "nullableString": {
       "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
     },
+    "sourceEvidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "lineStart", "lineEnd", "note"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["source", "config", "manifest", "documentation", "history"]
+        },
+        "path": { "type": "string", "minLength": 1 },
+        "lineStart": {
+          "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 1 }]
+        },
+        "lineEnd": {
+          "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 1 }]
+        },
+        "note": { "$ref": "#/$defs/nullableString" }
+      }
+    },
     "securityAuditUnit": {
       "type": "object",
       "additionalProperties": false,
@@ -51,11 +82,11 @@
         "subsystem",
         "trustBoundary",
         "attackClassId",
-        "status",
+        "state",
         "reasonCode",
         "reviewedPaths",
         "evidenceRefs",
-        "candidateFindingIds",
+        "relatedFindingIds",
         "validationPlan",
         "explanation"
       ],
@@ -67,9 +98,9 @@
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         },
-        "status": {
+        "state": {
           "type": "string",
-          "enum": ["planned", "covered", "candidate", "blocked", "deferred", "out-of-scope"]
+          "enum": ["planned", "covered", "blocked", "deferred", "out_of_scope"]
         },
         "reasonCode": {
           "oneOf": [
@@ -95,10 +126,9 @@
         },
         "evidenceRefs": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
-          "uniqueItems": true
+          "items": { "$ref": "#/$defs/sourceEvidenceRef" }
         },
-        "candidateFindingIds": {
+        "relatedFindingIds": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
@@ -109,38 +139,28 @@
       "allOf": [
         {
           "if": {
-            "properties": { "status": { "enum": ["planned", "covered", "candidate"] } },
-            "required": ["status"]
+            "properties": { "state": { "enum": ["planned", "covered"] } },
+            "required": ["state"]
           },
           "then": { "properties": { "reasonCode": { "type": "null" } } }
         },
         {
           "if": {
-            "properties": { "status": { "enum": ["covered", "candidate"] } },
-            "required": ["status"]
+            "properties": { "state": { "const": "covered" } },
+            "required": ["state"]
           },
           "then": {
             "properties": {
               "reviewedPaths": { "$ref": "#/$defs/nonEmptyStringArray" },
-              "evidenceRefs": { "$ref": "#/$defs/nonEmptyStringArray" }
+              "evidenceRefs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sourceEvidenceRef" } },
+              "validationPlan": { "type": "null" }
             }
           }
         },
         {
           "if": {
-            "properties": { "status": { "const": "candidate" } },
-            "required": ["status"]
-          },
-          "then": {
-            "properties": {
-              "candidateFindingIds": { "$ref": "#/$defs/nonEmptyStringArray" }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": { "status": { "const": "blocked" } },
-            "required": ["status"]
+            "properties": { "state": { "const": "blocked" } },
+            "required": ["state"]
           },
           "then": {
             "properties": {
@@ -151,30 +171,33 @@
                   "dependency_unavailable"
                 ]
               },
-              "validationPlan": { "type": "string", "minLength": 1 }
+              "validationPlan": { "type": "string", "minLength": 1 },
+              "explanation": { "type": "string", "minLength": 1 }
             }
           }
         },
         {
           "if": {
-            "properties": { "status": { "const": "deferred" } },
-            "required": ["status"]
+            "properties": { "state": { "const": "deferred" } },
+            "required": ["state"]
           },
           "then": {
             "properties": {
               "reasonCode": { "enum": ["budget_deferred", "manual_defer"] },
-              "validationPlan": { "type": "string", "minLength": 1 }
+              "validationPlan": { "type": "string", "minLength": 1 },
+              "explanation": { "type": "string", "minLength": 1 }
             }
           }
         },
         {
           "if": {
-            "properties": { "status": { "const": "out-of-scope" } },
-            "required": ["status"]
+            "properties": { "state": { "const": "out_of_scope" } },
+            "required": ["state"]
           },
           "then": {
             "properties": {
               "reasonCode": { "enum": ["scope_excluded", "not_applicable"] },
+              "validationPlan": { "type": "null" },
               "explanation": { "type": "string", "minLength": 1 }
             }
           }
