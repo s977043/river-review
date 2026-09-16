@@ -171,9 +171,9 @@ Security-audit findings do not change current Gate behavior during observation a
 Before any Gate integration, River Review must compare at least:
 
 1. current baseline
-2. baseline + semantic security coverage
-3. + adversarial candidate validation
-4. + final record verification
+2. baseline with semantic security coverage
+3. baseline with semantic security coverage and adversarial candidate validation
+4. baseline with semantic security coverage, adversarial candidate validation, and final record verification
 
 Primary evaluation signals include established-finding precision, false positives, missed critical/high-impact issues, human reversal, false block rate, latency, and token/cost overhead.
 
