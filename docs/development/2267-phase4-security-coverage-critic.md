@@ -30,7 +30,8 @@ Phase 4 therefore reuses the existing skill and adds only the context-specific p
 ### Generic profile
 
 The existing behavior remains unchanged.
-It runs after finding verification in a diff or PR flow and requires a current diff that touches executable code, migration, schema, public API, or configuration.
+It runs after finding verification in a diff or PR flow.
+It also requires a current diff that touches executable code, migration, schema, public API, or configuration.
 
 Phase 4 does not weaken that entry condition.
 
@@ -221,4 +222,5 @@ Phase 4 is ready when:
 
 ## Next phase
 
-Phase 5 connects the existing #1978 finding verification path and reviewer identity/provenance so finder and verifier independence can be inspected without creating a second finding state machine.
+Phase 5 connects the existing #1978 finding verification path and reviewer identity/provenance.
+This makes finder and verifier independence inspectable without creating a second finding state machine.
