@@ -1,4 +1,4 @@
-# ADR-010: Security Audit Harness Integration — Discovery / Verification / Judgment の分離
+# ADR-010: Security Audit Harness Integration—Discovery / Verification / Judgment の分離
 
 ## Status
 
@@ -35,7 +35,7 @@ Reimplementing the Cloudflare harness as a separate framework would duplicate th
 
 ## Decision
 
-### D1 — Integrate the pattern, not the implementation
+### D1—Integrate the pattern, not the implementation
 
 River Review will not vendor or fork the Cloudflare skill as its security-audit source of truth.
 
@@ -52,7 +52,7 @@ The integration may adopt the following patterns:
 
 Cloudflare-specific prompts, file layouts, and verdict field names are not imported as canonical River Review contracts.
 
-### D2 — Keep normal PR security review and full security audit separate
+### D2—Keep normal PR security review and full security audit separate
 
 `river-review-security` remains the normal diff-oriented security review entry point.
 
@@ -60,7 +60,7 @@ A future `river-review-security-audit` entry point, if implemented, is for expli
 
 A full audit MUST NOT become the default path for ordinary PR review because its reconnaissance, broader coverage, and independent verification have materially higher cost and latency.
 
-### D3 — ReviewCoverage and SecurityAuditCoverage are different contracts
+### D3—ReviewCoverage and SecurityAuditCoverage are different contracts
 
 Existing `ReviewCoverage` answers:
 
@@ -84,7 +84,7 @@ SecurityAuditCoverage
 
 `0 findings` proves neither contract is complete.
 
-### D4 — Separate Discovery, Verification, Judgment, and Gate
+### D4—Separate Discovery, Verification, Judgment, and Gate
 
 The pipeline is fixed conceptually as:
 
@@ -108,7 +108,7 @@ Responsibilities:
 
 The system MUST NOT answer "is this true?" and "should this block?" as one undifferentiated LLM judgment.
 
-### D5 — Reuse #1978 for candidate adversarial verification
+### D5—Reuse #1978 for candidate adversarial verification
 
 `src/lib/finding-critic.mjs` and #1978 remain the source of truth for the Reviewer↔Critic finding validation protocol.
 
@@ -122,7 +122,7 @@ finderRunId != verifierRunId
 
 and provenance compatible with #1760, but cryptographic signing is not required by #2267.
 
-### D6 — Do not create a new status vocabulary before proving a gap
+### D6—Do not create a new status vocabulary before proving a gap
 
 Existing finding axes already include:
 
@@ -147,7 +147,7 @@ refuted
 
 but this ADR does not approve a schema field with those values yet.
 
-### D7 — Source-only is the safe default
+### D7—Source-only is the safe default
 
 Phase 1 of the security-audit integration is source-only.
 
@@ -164,7 +164,7 @@ A future execution adapter must provide, at minimum:
 
 If the required sandbox controls cannot be enforced, the system must leave the relevant hypothesis unresolved rather than execute unsafely.
 
-### D8 — Gate integration is the final, opt-in phase
+### D8—Gate integration is the final, opt-in phase
 
 Security-audit findings do not change current Gate behavior during observation and evaluation phases.
 
