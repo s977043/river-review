@@ -33,8 +33,11 @@ jobs:
             docs/development/2267-phase3-security-audit-coverage.md \
             skills/agent-skills/river-review-security-audit/SKILL.md
 
-      - name: Regenerate skill manifest
-        run: npm run skills:manifest
+      - name: Regenerate skill-derived artifacts
+        run: |
+          npm run skills:manifest
+          npm run skills:catalog
+          npm run skills:registry
 
       - name: Run targeted tests
         run: node --experimental-test-isolation=none --test tests/security-audit-coverage.test.mjs tests/security-attack-class-registry.test.mjs
@@ -58,7 +61,9 @@ jobs:
             tests/helpers/schema-validator.mjs \
             docs/development/2267-phase3-security-audit-coverage.md \
             skills/agent-skills/river-review-security-audit/SKILL.md \
-            docs/data/skill-manifest.json
+            docs/data/skill-manifest.json \
+            pages/reference/skills-catalog.md \
+            skills/registry.yaml
           if git diff --cached --quiet; then
             echo "No normalized changes to commit."
             exit 0
