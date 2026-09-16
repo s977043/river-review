@@ -47,7 +47,7 @@ If the request does not clearly justify `full-audit`, use `focused` or `guidance
 
 ## Non-negotiable Source-only Policy
 
-Version 0.1.0 is source-only.
+Version 0.2.0 is source-only.
 
 Allowed evidence collection:
 
