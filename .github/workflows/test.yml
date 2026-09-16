@@ -27,10 +27,63 @@ jobs:
       # runner-image bump that changes the rule set is visible in the log.
       - name: Show shellcheck version
         run: shellcheck --version
-      - name: Run linters
-        run: npm run lint
-      - name: Lint shell scripts (shellcheck)
+      - name: Check formatting
+        id: format
+        continue-on-error: true
+        run: npm run format:check
+      - name: Check dash normalization
+        id: dashes
+        continue-on-error: true
+        run: npm run check:dashes
+      - name: Check code hygiene
+        id: code
+        continue-on-error: true
+        run: npm run lint:code
+      - name: Lint Markdown
+        id: markdown
+        continue-on-error: true
+        run: npm run lint:md
+      - name: Lint prose
+        id: text
+        continue-on-error: true
+        run: npm run lint:text
+      - name: Lint shell scripts
+        id: shell
+        continue-on-error: true
         run: npm run lint:sh
+      - name: Summarize lint results
+        if: always()
+        run: |
+          {
+            echo '## Lint results'
+            echo
+            echo '| Check | Outcome |'
+            echo '| --- | --- |'
+            echo '| format:check | ${{ steps.format.outcome }} |'
+            echo '| check:dashes | ${{ steps.dashes.outcome }} |'
+            echo '| lint:code | ${{ steps.code.outcome }} |'
+            echo '| lint:md | ${{ steps.markdown.outcome }} |'
+            echo '| lint:text | ${{ steps.text.outcome }} |'
+            echo '| lint:sh | ${{ steps.shell.outcome }} |'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          for outcome in \
+            '${{ steps.format.outcome }}' \
+            '${{ steps.dashes.outcome }}' \
+            '${{ steps.code.outcome }}' \
+            '${{ steps.markdown.outcome }}' \
+            '${{ steps.text.outcome }}' \
+            '${{ steps.shell.outcome }}'; do
+            if [ "$outcome" != 'success' ]; then
+              failed=1
+            fi
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo '::error::One or more lint checks failed. See the individual steps and job summary for all failures.'
+            exit 1
+          fi
 
   test:
     name: Unit tests
@@ -313,7 +366,7 @@ jobs:
         run: |
           set -euo pipefail
           for d in react react-dom recharts @docusaurus/core @mermaid-js/layout-elk; do
-            if [ -d "node_modules/$d" ]; then
+            if [ -d "$d" ]; then
               echo "::error::$d should not be installed with --omit=dev"; exit 1
             fi
           done
