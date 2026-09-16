@@ -45,9 +45,6 @@ jobs:
           npm run skills:registry
           npm run skills:catalog
 
-      - name: Remove temporary workflow before repository enumeration checks
-        run: rm .github/workflows/phase4-2278-validate-temp.yml
-
       - name: Validate Phase 4 contracts
         run: |
           node --test \
@@ -60,7 +57,11 @@ jobs:
           npm run skills:manifest:check
           npm run skills:registry:check
           npm run skills:catalog:check
-          npm run meta:validate
+          node scripts/validate-meta-consistency.mjs
+          node scripts/check-sidebar-reachability.mjs
+          node scripts/check-vocabulary-literals.mjs
+          node scripts/check-control-characters.mjs
+          node scripts/generate-skill-catalog.mjs --check
           npx prettier --check \
             docs/development/2267-phase4-security-coverage-critic.md \
             skills/agent-skills/river-review-security-audit/SKILL.md \
@@ -74,6 +75,9 @@ jobs:
             skills/agent-skills/unknown-coverage-review/fixtures/09-security-audit-zero-findings-neutral.md \
             tests/security-audit-coverage-critic-profile.test.mjs \
             tests/security-audit-coverage-critic-fixtures.test.mjs
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/phase4-2278-validate-temp.yml
 
       - name: Commit finalized Phase 4 files and remove temporary workflow
         run: |
