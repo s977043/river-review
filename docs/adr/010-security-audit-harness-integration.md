@@ -243,5 +243,5 @@ Implementation follows #2267's staged plan. The next planned slice after this AD
 - #1857
 - #1574
 - `docs/development/2267-phase0-gap-analysis.md`
-- https://github.com/cloudflare/security-audit-skill
-- https://blog.cloudflare.com/build-your-own-vulnerability-harness/
+- [Cloudflare security-audit-skill](https://github.com/cloudflare/security-audit-skill)
+- [Build your own vulnerability harness](https://blog.cloudflare.com/build-your-own-vulnerability-harness/)
