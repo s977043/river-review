@@ -206,31 +206,31 @@ The unit is:
 subsystem × trustBoundary × attackClassId
 ```
 
-Use only the closed unit status vocabulary:
+Use only the closed unit state vocabulary:
 
 ```text
-planned | covered | candidate | blocked | deferred | out-of-scope
+planned | covered | blocked | deferred | out_of_scope
 ```
 
 Rules:
 
-- `covered` requires traceable `reviewedPaths` and `evidenceRefs`.
-- `candidate` requires traceable investigation evidence plus at least one candidate finding reference.
-- `blocked` and `deferred` require a concrete validation plan.
-- `out-of-scope` requires an explicit reason and explanation.
+- `covered` requires traceable `reviewedPaths` and structured `evidenceRefs`.
+- finding lifecycle is separate; `relatedFindingIds` is traceability only and never determines coverage state.
+- `blocked` and `deferred` require an explanation plus a concrete validation plan.
+- `out_of_scope` requires an explicit reason and explanation.
 - zero findings alone never produces `covered`.
 - reviewer execution success alone never produces `covered`.
-- `SecurityAuditCoverage.status == complete` means no applicable semantic coverage gap remains in the planned audit scope; it does not mean the target is safe.
+- the ledger emits counters and `openUnitIds`, not a security-complete verdict.
 
 Do not merge this ledger with #2212 `ReviewCoverage`.
-Do not feed this observe-only status into Gate behavior in Phase 3.
+Do not feed this observe-only telemetry into Gate behavior in Phase 3.
 
 ### 9. Report without claiming safety
 
 A `full-audit` run means repository-wide source investigation was attempted.
 It does not mean all security attack classes were proven safe.
 
-Never render `SecurityAuditCoverage.status == complete` as `secure`, `safe`, `no vulnerabilities`, or an equivalent guarantee.
+Never translate coverage counters, an empty `openUnitIds`, or zero findings into `secure`, `safe`, `no vulnerabilities`, or an equivalent guarantee.
 
 ## Output Contract
 
@@ -270,7 +270,7 @@ For findings, preserve the existing River Review finding shape where possible:
 - No repository mutation as part of the audit itself.
 - No `0 findings == safe` inference.
 - No `full-audit == complete coverage` inference.
-- No `SecurityAuditCoverage complete == safe` inference.
+- No coverage counters or empty `openUnitIds` == safe inference.
 - No consensus-as-correctness inference.
 - No automatic Gate behavior change.
 - No ad hoc status vocabulary outside the dedicated coverage contract.

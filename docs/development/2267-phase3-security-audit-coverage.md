@@ -1,4 +1,4 @@
-# #2267 Phase 3 — Security Audit Coverage Contract
+# #2267 Phase 3—Security Audit Coverage Contract
 
 ## Status
 
@@ -41,7 +41,7 @@ subsystem × trustBoundary × attackClassId
 skills/agent-skills/river-review-security-audit/references/attack-classes.json
 ```
 
-The coverage record carries the Phase 2 `taxonomyVersion` explicitly so a later run can detect taxonomy drift instead of silently interpreting an old ledger with new meanings.
+The coverage record carries the Phase 2 `taxonomyVersion` explicitly. A later run can detect taxonomy drift instead of silently interpreting an old ledger with new meanings.
 
 The Phase 3 contract does not create new executable skills or reviewer roles.
 
@@ -194,7 +194,7 @@ explanation: <why source evidence is insufficient>
 validationPlan: <safe future validation path>
 ```
 
-Do not execute target-controlled builds, tests, browsers, fuzzers, package scripts, or external probes to improve coverage numbers.
+Do not execute target-controlled builds or tests to improve coverage numbers. Do not use browsers or fuzzers. Do not run package scripts or external probes for that purpose.
 
 ## Deterministic semantic validation
 
