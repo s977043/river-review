@@ -23,7 +23,7 @@ jobs:
       - name: Setup dependencies
         uses: ./.github/actions/setup-node-deps
 
-      - name: Align Phase 3 audit skill semantics
+      - name: Align Phase 3 semantics and prose
         env:
           REPLACEMENT_B64: IyMjIDguIFJlY29yZCBvYnNlcnZlLW9ubHkgU2VjdXJpdHlBdWRpdENvdmVyYWdlCgpVc2UgYHNjaGVtYXMvc2VjdXJpdHktYXVkaXQtY292ZXJhZ2Uuc2NoZW1hLmpzb25gIGFuZCBgc3JjL2xpYi9zZWN1cml0eS1hdWRpdC1jb3ZlcmFnZS5tanNgIGFzIHRoZSBzZW1hbnRpYyBjb3ZlcmFnZSBjb250cmFjdC4KVGhlIHVuaXQgaXM6CgpgYGB0ZXh0CnN1YnN5c3RlbSDDlyB0cnVzdEJvdW5kYXJ5IMOXIGF0dGFja0NsYXNzSWQKYGBgCgpVc2Ugb25seSB0aGUgY2xvc2VkIHVuaXQgc3RhdGUgdm9jYWJ1bGFyeToKCmBgYHRleHQKcGxhbm5lZCB8IGNvdmVyZWQgfCBibG9ja2VkIHwgZGVmZXJyZWQgfCBvdXRfb2Zfc2NvcGUKYGBgCgpSdWxlczoKCi0gYGNvdmVyZWRgIHJlcXVpcmVzIHRyYWNlYWJsZSBgcmV2aWV3ZWRQYXRoc2AgYW5kIHN0cnVjdHVyZWQgYGV2aWRlbmNlUmVmc2AuCi0gZmluZGluZyBsaWZlY3ljbGUgaXMgc2VwYXJhdGU7IGByZWxhdGVkRmluZGluZ0lkc2AgaXMgdHJhY2VhYmlsaXR5IG9ubHkgYW5kIG5ldmVyIGRldGVybWluZXMgY292ZXJhZ2Ugc3RhdGUuCi0gYGJsb2NrZWRgIGFuZCBgZGVmZXJyZWRgIHJlcXVpcmUgYW4gZXhwbGFuYXRpb24gcGx1cyBhIGNvbmNyZXRlIHZhbGlkYXRpb24gcGxhbi4KLSBgb3V0X29mX3Njb3BlYCByZXF1aXJlcyBhbiBleHBsaWNpdCByZWFzb24gYW5kIGV4cGxhbmF0aW9uLgotIHplcm8gZmluZGluZ3MgYWxvbmUgbmV2ZXIgcHJvZHVjZXMgYGNvdmVyZWRgLgotIHJldmlld2VyIGV4ZWN1dGlvbiBzdWNjZXNzIGFsb25lIG5ldmVyIHByb2R1Y2VzIGBjb3ZlcmVkYC4KLSB0aGUgbGVkZ2VyIGVtaXRzIGNvdW50ZXJzIGFuZCBgb3BlblVuaXRJZHNgLCBub3QgYSBzZWN1cml0eS1jb21wbGV0ZSB2ZXJkaWN0LgoKRG8gbm90IG1lcmdlIHRoaXMgbGVkZ2VyIHdpdGggIzIyMTIgYFJldmlld0NvdmVyYWdlYC4KRG8gbm90IGZlZWQgdGhpcyBvYnNlcnZlLW9ubHkgdGVsZW1ldHJ5IGludG8gR2F0ZSBiZWhhdmlvciBpbiBQaGFzZSAzLgoKIyMjIDkuIFJlcG9ydCB3aXRob3V0IGNsYWltaW5nIHNhZmV0eQoKQSBgZnVsbC1hdWRpdGAgcnVuIG1lYW5zIHJlcG9zaXRvcnktd2lkZSBzb3VyY2UgaW52ZXN0aWdhdGlvbiB3YXMgYXR0ZW1wdGVkLgpJdCBkb2VzIG5vdCBtZWFuIGFsbCBzZWN1cml0eSBhdHRhY2sgY2xhc3NlcyB3ZXJlIHByb3ZlbiBzYWZlLgoKTmV2ZXIgdHJhbnNsYXRlIGNvdmVyYWdlIGNvdW50ZXJzLCBhbiBlbXB0eSBgb3BlblVuaXRJZHNgLCBvciB6ZXJvIGZpbmRpbmdzIGludG8gYHNlY3VyZWAsIGBzYWZlYCwgYG5vIHZ1bG5lcmFiaWxpdGllc2AsIG9yIGFuIGVxdWl2YWxlbnQgZ3VhcmFudGVlLgoK
         run: |
@@ -31,8 +31,9 @@ jobs:
           import base64
           import os
           from pathlib import Path
-          path = Path('skills/agent-skills/river-review-security-audit/SKILL.md')
-          text = path.read_text()
+
+          skill = Path('skills/agent-skills/river-review-security-audit/SKILL.md')
+          text = skill.read_text()
           start = text.index('### 8. Record observe-only SecurityAuditCoverage')
           end = text.index('## Output Contract', start)
           replacement = base64.b64decode(os.environ['REPLACEMENT_B64']).decode()
@@ -41,7 +42,19 @@ jobs:
               '- No `SecurityAuditCoverage complete == safe` inference.\n',
               '- No coverage counters or empty `openUnitIds` == safe inference.\n',
           )
-          path.write_text(text)
+          skill.write_text(text)
+
+          doc = Path('docs/development/2267-phase3-security-audit-coverage.md')
+          prose = doc.read_text()
+          prose = prose.replace(
+              'The coverage record carries the Phase 2 `taxonomyVersion` explicitly so a later run can detect taxonomy drift instead of silently interpreting an old ledger with new meanings.',
+              'The coverage record carries the Phase 2 `taxonomyVersion` explicitly. A later run can detect taxonomy drift instead of silently interpreting an old ledger with new meanings.',
+          )
+          prose = prose.replace(
+              'Do not execute target-controlled builds, tests, browsers, fuzzers, package scripts, or external probes to improve coverage numbers.',
+              'Do not execute target-controlled builds or tests to improve coverage numbers. Do not use browsers or fuzzers. Do not run package scripts or external probes for that purpose.',
+          )
+          doc.write_text(prose)
           PY
 
       - name: Normalize Phase 3 files
