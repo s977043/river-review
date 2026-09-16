@@ -4,7 +4,8 @@ name: river-review-security-audit
 description: |
   Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。
   通常の PR セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、
-  evidence と unresolved hypothesis、observe-only SecurityAuditCoverage の記録を行う。target-controlled code は実行しない。
+  evidence と unresolved hypothesis、observe-only SecurityAuditCoverage の記録、既存 unknown-coverage-review の
+  Security Audit profile による evidence-sufficiency 合成を行う。target-controlled code は実行しない。
 category: midstream
 phase: [upstream, midstream]
 severity: critical
@@ -13,7 +14,7 @@ applyTo:
 inputContext: [diff, fullFile]
 outputKind: [summary, findings, actions, questions]
 tags: [security, audit, entry, routing, source-only]
-version: 0.3.0
+version: 0.4.0
 license: MIT
 ---
 
@@ -47,7 +48,7 @@ If the request does not clearly justify `full-audit`, use `focused` or `guidance
 
 ## Non-negotiable Source-only Policy
 
-Version 0.3.0 is source-only.
+Version 0.4.0 is source-only.
 
 Allowed evidence collection:
 
@@ -88,6 +89,7 @@ Explicit audit request
   -> candidate findings / unresolved hypotheses
   -> observe-only SecurityAuditCoverage ledger
   -> existing verification path
+  -> unknown-coverage-review / Security Audit profile
   -> audit summary
 ```
 
@@ -129,6 +131,8 @@ At minimum identify, when present:
 - AI or agent tool boundaries
 
 Reconnaissance is an investigation plan, not proof of safety.
+
+Preserve the expected semantic scope when reconnaissance can identify it. This may be a simple list of planned `subsystem × trustBoundary × attackClassId` keys; Phase 4 does not require a new schema. Keeping this independent plan lets the later coverage critic detect a unit that disappeared from the ledger entirely.
 
 ### 3. Plan applicable attack classes
 
@@ -223,9 +227,27 @@ Rules:
 - the ledger emits counters and `openUnitIds`, not a security-complete verdict.
 
 Do not merge this ledger with #2212 `ReviewCoverage`.
-Do not feed this observe-only telemetry into Gate behavior in Phase 3.
+Do not feed this observe-only telemetry into Gate behavior in Phase 4.
 
-### 9. Report without claiming safety
+### 9. Run the existing Coverage Critic in Security Audit profile
+
+After the coverage object passes JSON Schema validation and `validateSecurityAuditCoverageSemantics()`, apply `unknown-coverage-review` using its [Security Audit profile](../unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md).
+
+This is reuse of the existing evidence-sufficiency meta skill, not a new critic engine.
+
+The profile checks judgment-heavy gaps that Phase 3 deterministic validation cannot decide:
+
+- relevance of `reviewedPaths` / `evidenceRefs` to the semantic unit;
+- visibility of `planned`, `blocked`, and `deferred` residual coverage;
+- credibility of `out_of_scope` rationale against frozen scope;
+- an expected semantic unit missing from the ledger when reconnaissance preserved an explicit expected scope;
+- unsafe conclusions derived from counters, empty `openUnitIds`, or zero findings.
+
+If no explicit expected scope was preserved, report that the coverage universe is not independently checkable. Do not generate the full Cartesian product of subsystems, trust boundaries, and attack classes.
+
+**Phase 4 Gate override:** Coverage Critic output is report-only. Do not map `planned`, `blocked`, `deferred`, or omitted semantic units to `GO`, `ESCALATE`, or `NO_GO`. Gate integration remains Phase 12.
+
+### 10. Report without claiming safety
 
 A `full-audit` run means repository-wide source investigation was attempted.
 It does not mean all security attack classes were proven safe.
@@ -241,6 +263,7 @@ Audit mode: guidance | focused | full-audit
 Execution policy: source-only
 Scope: <repository | subsystem | path | trust boundary>
 SecurityAuditCoverage: observe-only
+Coverage Critic: unknown-coverage-review / security-audit profile (report-only)
 ```
 
 Then emit these sections:
@@ -249,7 +272,8 @@ Then emit these sections:
 2. **Candidate findings** — evidence-grounded findings produced through existing River Review skill contracts.
 3. **Unresolved hypotheses** — missing facts, blockers, and validation plans.
 4. **Security audit coverage** — semantic units keyed by subsystem × trust boundary × attack class using the Phase 3 contract.
-5. **Next validation actions** — only actions that preserve the source-only policy unless a later sandbox phase is explicitly available.
+5. **Coverage critic observations** — evidence-sufficiency gaps, expected-scope omissions, and non-Gate residual-risk observations from the Security Audit profile.
+6. **Next validation actions** — only actions that preserve the source-only policy unless a later sandbox phase is explicitly available.
 
 For findings, preserve the existing River Review finding shape where possible:
 
@@ -274,6 +298,7 @@ For findings, preserve the existing River Review finding shape where possible:
 - No consensus-as-correctness inference.
 - No automatic Gate behavior change.
 - No ad hoc status vocabulary outside the dedicated coverage contract.
+- No self-certified coverage completeness when an independent expected semantic scope is unavailable.
 
 ## Relationship to Normal Security Review
 
@@ -292,9 +317,12 @@ When both phrases appear, prefer this audit skill only if the user explicitly as
 - `docs/adr/010-security-audit-harness-integration.md`
 - `docs/development/2267-phase0-gap-analysis.md`
 - `docs/development/2267-phase3-security-audit-coverage.md`
+- `docs/development/2267-phase4-security-coverage-critic.md`
 - `schemas/security-audit-coverage.schema.json`
 - `src/lib/security-audit-coverage.mjs`
 - `skills/agent-skills/river-review-security-audit/references/attack-classes.json`
+- `skills/agent-skills/unknown-coverage-review/SKILL.md`
+- `skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md`
 - `skills/agent-skills/river-review-security/SKILL.md`
 - `skills/agent-skills/adversarial-review/SKILL.md`
 - `skills/midstream/security-basic/SKILL.md`
