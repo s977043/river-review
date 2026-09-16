@@ -196,15 +196,15 @@ If evidence is insufficient to establish the coverage gap itself, ask a question
 
 The Phase 4 contract should preserve these cases:
 
-| case | expected result |
-| --- | --- |
-| relevant attack-class surface missing from ledger | residual coverage unknown |
-| `covered` with unrelated evidence | evidence-sufficiency residual |
-| explicit legitimate `out_of_scope` with reconnaissance support | no finding |
-| broad exclusions conflicting with reconnaissance | residual coverage unknown |
-| zero findings plus `safe` conclusion | safety-overclaim residual |
-| zero findings plus neutral source-only conclusion | no finding |
-| normal PR review with no explicit audit context | generic profile only; security-audit profile `NO_REVIEW` |
+| case                                                           | expected result                                          |
+| -------------------------------------------------------------- | -------------------------------------------------------- |
+| relevant attack-class surface missing from ledger              | residual coverage unknown                                |
+| `covered` with unrelated evidence                              | evidence-sufficiency residual                            |
+| explicit legitimate `out_of_scope` with reconnaissance support | no finding                                               |
+| broad exclusions conflicting with reconnaissance               | residual coverage unknown                                |
+| zero findings plus `safe` conclusion                           | safety-overclaim residual                                |
+| zero findings plus neutral source-only conclusion              | no finding                                               |
+| normal PR review with no explicit audit context                | generic profile only; security-audit profile `NO_REVIEW` |
 
 ## Non-goals
 

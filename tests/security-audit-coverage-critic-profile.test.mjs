@@ -24,7 +24,10 @@ describe('unknown-coverage-review security-audit profile contract', () => {
   it('keeps generic and security-audit execution profiles explicit', () => {
     assert.match(unknownCoverageSkill, /### `generic`/);
     assert.match(unknownCoverageSkill, /### `security-audit`/);
-    assert.match(unknownCoverageSkill, /Do not infer this profile from security-looking files or keywords\./);
+    assert.match(
+      unknownCoverageSkill,
+      /Do not infer this profile from security-looking files or keywords\./
+    );
   });
 
   it('preserves the generic diff requirement instead of broadening normal PR routing', () => {
@@ -44,10 +47,7 @@ describe('unknown-coverage-review security-audit profile contract', () => {
       unknownCoverageSkill,
       /That exception is profile-local and must not alter generic routing or generic pre-execution behavior\./
     );
-    assert.match(
-      securityAuditProfile,
-      /A current diff is \*\*not\*\* required for this profile\./
-    );
+    assert.match(securityAuditProfile, /A current diff is \*\*not\*\* required for this profile\./);
   });
 
   it('keeps deterministic Phase 3 validation outside the critic responsibility', () => {
