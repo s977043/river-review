@@ -23,6 +23,14 @@
  * caller never imports this module and behavior is unchanged. CI wiring
  * (action.yml) lands in (d). Tests inject a mock `execImpl` and `mkdtempImpl`
  * so no real process is spawned.
+ *
+ * SAFE EVIDENCE METADATA (#2275 PR-3A). The executor already classifies one
+ * command into a verdict plus bounded execution metadata. This orchestrator
+ * preserves only an explicit allowlist of that metadata (`durationMs`,
+ * `exitCode`, `stdoutBytes`, `unrunnableCause`) in `results[]`. Raw stdout /
+ * stderr or arbitrary executor fields are never copied. Gate aggregation is
+ * unchanged; this is additive evidence for the after-change fast-verification
+ * checkpoint and other provenance consumers.
  */
 
 import fs from 'node:fs/promises';
@@ -88,6 +96,39 @@ function extractGateCommands(selected) {
 }
 
 /**
+ * Copy only executor fields that are safe to persist as deterministic evidence.
+ * Unknown fields — especially raw stdout/stderr supplied by an injected executor
+ * in tests or by a future implementation — are intentionally dropped.
+ *
+ * @param {object | undefined} result
+ * @returns {{durationMs?: number, exitCode?: number, stdoutBytes?: number,
+ *   unrunnableCause?: 'spawn-error'|'timeout'|'invalid-entry'}}
+ */
+function safeExecutionMetadata(result) {
+  const metadata = {};
+  if (
+    typeof result?.durationMs === 'number' &&
+    Number.isFinite(result.durationMs) &&
+    result.durationMs >= 0
+  ) {
+    metadata.durationMs = result.durationMs;
+  }
+  if (Number.isInteger(result?.exitCode) && result.exitCode >= 0) {
+    metadata.exitCode = result.exitCode;
+  }
+  if (Number.isInteger(result?.stdoutBytes) && result.stdoutBytes >= 0) {
+    metadata.stdoutBytes = result.stdoutBytes;
+  }
+  if (
+    result?.status === 'unrunnable' &&
+    ['spawn-error', 'timeout', 'invalid-entry'].includes(result?.unrunnableCause)
+  ) {
+    metadata.unrunnableCause = result.unrunnableCause;
+  }
+  return metadata;
+}
+
+/**
  * Run the deterministic gates for a review pass and aggregate their verdicts.
  *
  * Processing (§11.5.3 confluence):
@@ -101,6 +142,8 @@ function extractGateCommands(selected) {
  *     `execImpl`. Temp dirs are removed in `finally` on every path.
  *  5. Aggregate: any `fail` → strictBlock; any `unrunnable` → deterministicUnrunnable.
  *     Both can be true at once (the gate composes 5b > 5c).
+ *  6. Preserve only safe bounded executor metadata in `results[]`; raw process
+ *     output is never copied into the orchestrator result.
  *
  * @param {object} opts
  * @param {string} [opts.trustedTree] base-checkout path (host-trusted allowlist source)
@@ -112,7 +155,9 @@ function extractGateCommands(selected) {
  *   injected executor; defaults to `executeDeterministicCommand`
  * @param {(prefix: string) => Promise<string>} [opts.mkdtempImpl] injected mkdtemp (tests)
  * @returns {Promise<{ strictBlock: boolean, deterministicUnrunnable: boolean,
- *   results: Array<{ skillId: string, status: string, reasonCode: string }> }>}
+ *   results: Array<{ skillId: string, status: string, reasonCode: string,
+ *     durationMs?: number, exitCode?: number, stdoutBytes?: number,
+ *     unrunnableCause?: 'spawn-error'|'timeout'|'invalid-entry' }> }>}
  */
 export async function runDeterministicGates({
   trustedTree,
@@ -159,7 +204,12 @@ export async function runDeterministicGates({
       const reasonCode = result?.reasonCode;
       if (status === 'fail') strictBlock = true;
       if (status === 'unrunnable') deterministicUnrunnable = true;
-      results.push({ skillId: gate.skillId, status, reasonCode });
+      results.push({
+        skillId: gate.skillId,
+        status,
+        reasonCode,
+        ...safeExecutionMetadata(result),
+      });
     } finally {
       // Remove both sandbox temp dirs on every path. Each rm is individually
       // guarded so a failure removing one still attempts the other (gemini #1433).

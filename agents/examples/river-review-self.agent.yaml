@@ -4,7 +4,7 @@ metadata:
   name: River Review (self-review)
   owner: s977043
   description: 'River Reviewがそれ自身のPRをレビューする自己参照的な設定例。TypeScript/ESM・スキーマ検証・CLIテストを重点観点とする。'
-  repository: s977043/river-reviewer
+  repository: s977043/river-review
   license: Apache-2.0
   tags:
     - 'code-review'

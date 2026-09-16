@@ -52,7 +52,7 @@ gh issue close 146 --repo "$REPO" --comment "評価ランナー（\`npm run eval
 - \`src/lib/review-fixtures-eval.mjs\`
 - \`package.json\` の \`eval:fixtures\` スクリプト
 
-使用方法とオプション詳細は [Evaluation Fixture Format](https://river-reviewer.vercel.app/reference/evaluation-fixture-format) に記載済みです。
+使用方法とオプション詳細は [Evaluation Fixture Format](https://river-review.the3396.com/reference/evaluation-fixture-format) に記載済みです。
 
 クローズします。"
 echo "✓ Issue #146 をクローズしました"
@@ -84,7 +84,7 @@ gh issue close 144 --repo "$REPO" --comment "フィクスチャ形式の定義�
 
 追加ドキュメント:
 - \`pages/reference/evaluation-fixture-format.md\`
-- 公開URL: https://river-reviewer.vercel.app/reference/evaluation-fixture-format
+- 公開URL: https://river-review.the3396.com/reference/evaluation-fixture-format
 
 ドキュメントには以下を含みます。
 - フィクスチャの構造（cases.json形式）
