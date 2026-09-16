@@ -10,7 +10,7 @@ import { REVIEWER_ROLES } from '../src/lib/reviewer-orchestrator.mjs';
 const repoRoot = fileURLToPath(new URL('../', import.meta.url));
 const registryUrl = new URL(
   '../skills/agent-skills/river-review-security-audit/references/attack-classes.json',
-  import.meta.url,
+  import.meta.url
 );
 const schemaUrl = new URL('../schemas/security-attack-class-registry.schema.json', import.meta.url);
 
@@ -19,7 +19,7 @@ const schema = JSON.parse(readFileSync(schemaUrl, 'utf8'));
 const skillIds = new Set(
   globSync('skills/**/SKILL.md', { cwd: repoRoot, absolute: true })
     .map((path) => matter(readFileSync(path, 'utf8')).data.id)
-    .filter(Boolean),
+    .filter(Boolean)
 );
 
 const EXPECTED_EVIDENCE_FIELDS = [
@@ -70,7 +70,7 @@ test('security attack class registry references existing skills and reviewer rol
     for (const reviewerId of attackClass.reviewerHints) {
       assert.ok(
         reviewerId in REVIEWER_ROLES,
-        `${attackClass.id} references unknown reviewer role: ${reviewerId}`,
+        `${attackClass.id} references unknown reviewer role: ${reviewerId}`
       );
     }
   }

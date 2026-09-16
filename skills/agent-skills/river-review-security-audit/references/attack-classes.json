@@ -54,10 +54,7 @@
         "identify authorization decision points and default-deny behavior",
         "verify object- and action-level checks at the enforcement boundary"
       ],
-      "notSufficient": [
-        "authentication success alone",
-        "UI-level hiding of privileged actions"
-      ]
+      "notSufficient": ["authentication success alone", "UI-level hiding of privileged actions"]
     },
     {
       "id": "tenant-isolation",
