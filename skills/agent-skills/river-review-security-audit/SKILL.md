@@ -13,7 +13,7 @@ applyTo:
 inputContext: [diff, fullFile]
 outputKind: [summary, findings, actions, questions]
 tags: [security, audit, entry, routing, source-only]
-version: 0.1.0
+version: 0.2.0
 license: MIT
 ---
 
@@ -98,7 +98,7 @@ The following responsibilities remain outside this skill:
 - execution coverage: #2212 Review Coverage
 - materiality and disposition: #1857 Semantic Precision
 - final Gate decision: existing deterministic Gate
-- semantic `SecurityAuditCoverage`: Phase 2 follow-up of #2267
+- semantic `SecurityAuditCoverage`: Phase 3 follow-up of #2267
 - independent final-record verification: later #2267 phase
 - sandboxed target execution: later dedicated phase
 
@@ -129,7 +129,26 @@ At minimum identify, when present:
 
 Reconnaissance is an investigation plan, not proof of safety.
 
-### 3. Reuse existing security skills
+### 3. Plan applicable attack classes
+
+Use `references/attack-classes.json` as the taxonomy SSoT for audit planning.
+Select only classes supported by reconnaissance evidence; do not run all classes mechanically.
+For every applicable class, preserve the registry evidence contract:
+
+```text
+principal
+  -> input or action
+  -> control or missing control
+  -> trust boundary
+  -> affected resource or principal
+  -> concrete security outcome
+```
+
+An attack class is an investigation hypothesis, not a checklist completion badge.
+A class with zero findings is not automatically covered, and a non-applicable class must be explained rather than silently omitted.
+`SecurityAuditCoverage` will consume this taxonomy in a later phase; this skill does not emit semantic coverage status yet.
+
+### 4. Reuse existing security skills
 
 Use existing River Review skills when their domain applies.
 
@@ -141,7 +160,7 @@ Use existing River Review skills when their domain applies.
 
 Do not duplicate the guidance of these skills inside this entry skill.
 
-### 4. Treat findings as evidence-grounded candidates
+### 5. Treat findings as evidence-grounded candidates
 
 Every reported candidate must identify concrete source evidence.
 Require enough information to answer:
@@ -158,7 +177,7 @@ principal
 A missing best practice is not automatically a vulnerability.
 A candidate without a concrete boundary failure or security outcome remains an open question or unresolved hypothesis.
 
-### 5. Preserve verification boundaries
+### 6. Preserve verification boundaries
 
 This entry skill does not claim independent adversarial verification unless the existing #1978 path actually ran with an independent verifier.
 
@@ -166,7 +185,7 @@ If only source review ran, report the result as candidate-level evidence.
 Do not relabel reviewer agreement as correctness.
 Do not introduce a new validation enum in this skill.
 
-### 6. Record unresolved hypotheses explicitly
+### 7. Record unresolved hypotheses explicitly
 
 For every unresolved hypothesis, provide:
 
@@ -178,7 +197,7 @@ For every unresolved hypothesis, provide:
 
 Do not assign severity solely from an unresolved runtime assumption.
 
-### 7. Report without claiming unsupported coverage
+### 8. Report without claiming unsupported coverage
 
 Until the dedicated `SecurityAuditCoverage` contract is implemented, use descriptive coverage notes only.
 Never emit `security coverage complete` or an equivalent guarantee from this skill.
@@ -244,6 +263,7 @@ When both phrases appear, prefer this audit skill only if the user explicitly as
 
 - `docs/adr/010-security-audit-harness-integration.md`
 - `docs/development/2267-phase0-gap-analysis.md`
+- `skills/agent-skills/river-review-security-audit/references/attack-classes.json`
 - `skills/agent-skills/river-review-security/SKILL.md`
 - `skills/agent-skills/adversarial-review/SKILL.md`
 - `skills/midstream/security-basic/SKILL.md`

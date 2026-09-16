@@ -660,8 +660,8 @@
     {
       "id": "river-review-security-audit",
       "path": "skills/agent-skills/river-review-security-audit",
-      "checksum": "sha256:fea48ac023c0259b577ba40d25330128c7965c99d2dfcae545780f6bb30343ea",
-      "files": 1
+      "checksum": "sha256:76db1334e09c07cf571677ab2d0d07e33742f19a60c5e5b1fc714aff1b4b6655",
+      "files": 2
     },
     {
       "id": "river-review-testing",
