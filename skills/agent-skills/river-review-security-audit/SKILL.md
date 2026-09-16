@@ -4,7 +4,7 @@ name: river-review-security-audit
 description: |
   Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。
   通常の PR セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、
-  evidence と unresolved hypothesis、observe-only SecurityAuditCoverage の記録を行う。target-controlled code は実行しない。
+  evidence と unresolved hypothesis、observe-only SecurityAuditCoverage、coverage critic を扱う。target-controlled code は実行しない。
 category: midstream
 phase: [upstream, midstream]
 severity: critical
@@ -13,7 +13,7 @@ applyTo:
 inputContext: [diff, fullFile]
 outputKind: [summary, findings, actions, questions]
 tags: [security, audit, entry, routing, source-only]
-version: 0.3.0
+version: 0.4.0
 license: MIT
 ---
 
@@ -47,7 +47,7 @@ If the request does not clearly justify `full-audit`, use `focused` or `guidance
 
 ## Non-negotiable Source-only Policy
 
-Version 0.3.0 is source-only.
+Version 0.4.0 is source-only.
 
 Allowed evidence collection:
 
@@ -86,8 +86,9 @@ Explicit audit request
   -> attack-class planning
   -> existing security skills
   -> candidate findings / unresolved hypotheses
+  -> existing finding verification path when available
   -> observe-only SecurityAuditCoverage ledger
-  -> existing verification path
+  -> unknown-coverage-review (security-audit profile)
   -> audit summary
 ```
 
@@ -223,14 +224,40 @@ Rules:
 - the ledger emits counters and `openUnitIds`, not a security-complete verdict.
 
 Do not merge this ledger with #2212 `ReviewCoverage`.
-Do not feed this observe-only telemetry into Gate behavior in Phase 3.
+The Phase 3 schema/runtime validator owns shape, taxonomy, duplicate, and summary invariants.
 
-### 9. Report without claiming safety
+### 9. Run the Security Audit Coverage Critic
+
+Before finalizing a focused or full-audit report, invoke `unknown-coverage-review` with its explicit `security-audit` profile.
+Use:
+
+- frozen audit scope
+- reconnaissance evidence
+- the Phase 2 attack-class registry
+- the validated Phase 3 `SecurityAuditCoverage` ledger
+- candidate findings / unresolved hypotheses when present
+- draft audit summary/report prose when available
+
+The critic evaluates evidence sufficiency only. It checks for:
+
+1. relevant semantic surfaces missing from the ledger
+2. `covered` claims whose evidence does not support the claimed scope
+3. exclusions, blocks, or deferrals that hide material coverage gaps
+4. prose that turns coverage or finding counts into an unsupported safety claim
+
+Do not use the critic to re-run Phase 3 deterministic validation.
+Do not require every attack class mechanically.
+Do not convert critic output into a vulnerability verdict.
+Do not wire critic output into deterministic Gate behavior in Phase 4.
+
+If the audit context or coverage ledger is missing, do not guess. Record that the critic could not run and keep the limitation explicit.
+
+### 10. Report without claiming safety
 
 A `full-audit` run means repository-wide source investigation was attempted.
 It does not mean all security attack classes were proven safe.
 
-Never translate coverage counters, an empty `openUnitIds`, or zero findings into `secure`, `safe`, `no vulnerabilities`, or an equivalent guarantee.
+Never translate coverage counters, an empty `openUnitIds`, zero findings, or a critic `pass` into `secure`, `safe`, `no vulnerabilities`, or an equivalent guarantee.
 
 ## Output Contract
 
@@ -241,6 +268,7 @@ Audit mode: guidance | focused | full-audit
 Execution policy: source-only
 Scope: <repository | subsystem | path | trust boundary>
 SecurityAuditCoverage: observe-only
+Coverage critic: not-run | report-only
 ```
 
 Then emit these sections:
@@ -249,7 +277,8 @@ Then emit these sections:
 2. **Candidate findings** — evidence-grounded findings produced through existing River Review skill contracts.
 3. **Unresolved hypotheses** — missing facts, blockers, and validation plans.
 4. **Security audit coverage** — semantic units keyed by subsystem × trust boundary × attack class using the Phase 3 contract.
-5. **Next validation actions** — only actions that preserve the source-only policy unless a later sandbox phase is explicitly available.
+5. **Coverage critic observations** — residual coverage unknowns from the `unknown-coverage-review` security-audit profile; omit only when the profile correctly returns `NO_REVIEW` and explain why.
+6. **Next validation actions** — only actions that preserve the source-only policy unless a later sandbox phase is explicitly available.
 
 For findings, preserve the existing River Review finding shape where possible:
 
@@ -263,6 +292,8 @@ For findings, preserve the existing River Review finding shape where possible:
   Skill: <originating skill id>
 ```
 
+Coverage critic observations use the existing Unknown Coverage residual-risk vocabulary rather than inventing a security-specific verdict schema.
+
 ## Fail-safe Rules
 
 - No target-controlled execution when sandbox guarantees are absent.
@@ -271,9 +302,11 @@ For findings, preserve the existing River Review finding shape where possible:
 - No `0 findings == safe` inference.
 - No `full-audit == complete coverage` inference.
 - No coverage counters or empty `openUnitIds` == safe inference.
+- No critic `pass == safe` inference.
 - No consensus-as-correctness inference.
 - No automatic Gate behavior change.
 - No ad hoc status vocabulary outside the dedicated coverage contract.
+- No generic `unknown-coverage-review` routing change to enable this profile.
 
 ## Relationship to Normal Security Review
 
@@ -286,6 +319,7 @@ river-review-security-audit
 ```
 
 When both phrases appear, prefer this audit skill only if the user explicitly asks for an audit scope beyond the current diff.
+The `unknown-coverage-review` security-audit profile is reachable only from this explicit audit flow; normal PR review keeps the existing generic profile behavior.
 
 ## References
 
@@ -295,6 +329,8 @@ When both phrases appear, prefer this audit skill only if the user explicitly as
 - `schemas/security-audit-coverage.schema.json`
 - `src/lib/security-audit-coverage.mjs`
 - `skills/agent-skills/river-review-security-audit/references/attack-classes.json`
+- `skills/agent-skills/unknown-coverage-review/SKILL.md`
+- `skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md`
 - `skills/agent-skills/river-review-security/SKILL.md`
 - `skills/agent-skills/adversarial-review/SKILL.md`
 - `skills/midstream/security-basic/SKILL.md`
