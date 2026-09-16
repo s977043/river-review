@@ -181,18 +181,16 @@ A repository-wide pre-existing finding MUST NOT automatically block an unrelated
 
 ## Responsibility Matrix
 
-| Concern | Source of truth |
-| --- | --- |
-| Reviewer fan-out / candidate generation | `src/lib/reviewer-orchestrator.mjs` |
-| Deterministic evidence checks | `src/lib/verifier.mjs` |
-| Candidate adversarial verification | #1978 / `src/lib/finding-critic.mjs` |
-| Review execution coverage | #2212 / `src/lib/review-coverage.mjs` |
-| Security semantic coverage | #2267 follow-up; not yet implemented |
-| Existing review synthesis / W-check | `independent-review-synthesis` |
-| Materiality / disposition | #1857 / ADR-007 |
-| Reviewer identity / provenance | #1760 |
-| Reviewer capability evolution | #1574 |
-| Final caller decision | existing deterministic Gate |
+- Reviewer fan-out / candidate generation: `src/lib/reviewer-orchestrator.mjs`
+- Deterministic evidence checks: `src/lib/verifier.mjs`
+- Candidate adversarial verification: #1978 / `src/lib/finding-critic.mjs`
+- Review execution coverage: #2212 / `src/lib/review-coverage.mjs`
+- Security semantic coverage: #2267 follow-up; not yet implemented
+- Existing review synthesis / W-check: `independent-review-synthesis`
+- Materiality / disposition: #1857 / ADR-007
+- Reviewer identity / provenance: #1760
+- Reviewer capability evolution: #1574
+- Final caller decision: existing deterministic Gate
 
 ## Consequences
 
