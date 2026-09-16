@@ -58,6 +58,13 @@ export function compileReviewCoverageValidator() {
   return compileSchemaFile('review-coverage.schema.json', { ajvOptions: { allErrors: true } });
 }
 
+/** Compiled validator for schemas/security-audit-coverage.schema.json (strict on). */
+export function compileSecurityAuditCoverageValidator() {
+  return compileSchemaFile('security-audit-coverage.schema.json', {
+    ajvOptions: { allErrors: true },
+  });
+}
+
 /** Compiled validator for schemas/suppression-context.schema.json (strict on). */
 export function compileSuppressionContextValidator() {
   return compileSchemaFile('suppression-context.schema.json', { ajvOptions: { allErrors: true } });
