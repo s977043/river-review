@@ -1,0 +1,113 @@
+name: Temp Align Phase4 Critic Ordering
+
+on:
+  push:
+    branches:
+      - feat/2278-security-audit-coverage-critic
+    paths:
+      - .github/workflows/phase4-order-fix-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  align-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2278-security-audit-coverage-critic
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Align Phase 4 ordering and profile wording
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          audit = Path('skills/agent-skills/river-review-security-audit/SKILL.md')
+          text = audit.read_text()
+          old = '''  -> observe-only SecurityAuditCoverage ledger\n  -> unknown-coverage-review (security-audit profile)\n  -> existing verification path\n  -> audit summary'''
+          new = '''  -> observe-only SecurityAuditCoverage ledger\n  -> existing verification path\n  -> unknown-coverage-review (security-audit profile)\n  -> audit summary'''
+          if old not in text:
+              raise SystemExit('audit flow ordering text not found')
+          text = text.replace(old, new, 1)
+          old = 'After the `SecurityAuditCoverage` ledger passes its deterministic schema/semantic validation, invoke `unknown-coverage-review` with `profile: security-audit` before finalizing the audit summary.'
+          new = 'After the `SecurityAuditCoverage` ledger passes its deterministic schema/semantic validation and the current audit flow completes its existing finding-verification step, invoke `unknown-coverage-review` with `profile: security-audit` before finalizing the audit summary.'
+          if old not in text:
+              raise SystemExit('audit critic ordering sentence not found')
+          audit.write_text(text.replace(old, new, 1))
+
+          profile = Path('skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md')
+          text = profile.read_text()
+          old = '- the caller asks for the post-coverage synthesis step before the audit summary.\n'
+          new = old + '- the current audit flow has completed its existing finding-verification step for candidate findings that can be verified; Phase 4 does not claim the independent-verifier guarantees planned for Phase 5.\n'
+          if old not in text:
+              raise SystemExit('profile entry-condition insertion point not found')
+          profile.write_text(text.replace(old, new, 1))
+
+          delegation = Path('skills/agent-skills/unknown-coverage-review/references/DELEGATION.md')
+          text = delegation.read_text()
+          text = text.replace('## Pre-execution Gate（再掲）', '## Generic Profile Pre-execution Gate（再掲）', 1)
+          delegation.write_text(text)
+
+          skill = Path('skills/agent-skills/unknown-coverage-review/SKILL.md')
+          text = skill.read_text()
+          old = '''  実行し、残存 Unknown を output-format §4「Unverified / Residual Risk」の Unknown\n  Coverage 下位構造へ、判定を既存 verdict 語彙（GO/ESCALATE/NO_GO）へ写像する。\n  新しい語彙・schema は作らない。'''
+          new = '''  実行する。generic profile は残存 Unknown を output-format §4「Unverified / Residual Risk」の\n  Unknown Coverage 下位構造へ出力し、判定を既存 verdict 語彙（GO/ESCALATE/NO_GO）へ写像する。\n  security-audit profile は同じ evidence-sufficiency 語彙を report-only で再利用する。新しい語彙・schema は作らない。'''
+          if old not in text:
+              raise SystemExit('unknown coverage description text not found')
+          skill.write_text(text.replace(old, new, 1))
+
+          test = Path('tests/security-audit-coverage-critic-contract.test.mjs')
+          text = test.read_text()
+          old = r'''/observe-only SecurityAuditCoverage ledger\s*\n\s*-> unknown-coverage-review \(security-audit profile\)\s*\n\s*-> existing verification path/is,'''
+          new = r'''/observe-only SecurityAuditCoverage ledger\s*\n\s*-> existing verification path\s*\n\s*-> unknown-coverage-review \(security-audit profile\)/is,'''
+          if old not in text:
+              raise SystemExit('test ordering regex not found')
+          test.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Format and regenerate
+        run: |
+          npx prettier --write \
+            skills/agent-skills/unknown-coverage-review/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/references/DELEGATION.md \
+            skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md \
+            tests/security-audit-coverage-critic-contract.test.mjs
+          npm run skills:registry
+          npm run skills:catalog
+          npm run skills:manifest
+
+      - name: Validate corrected contract
+        run: |
+          node --experimental-test-isolation=none --test tests/security-audit-coverage-critic-contract.test.mjs
+          npm run agent-skills:validate
+          npm run skills:registry:check
+          npm run skills:catalog:check
+          npm run skills:manifest:check
+          npm run format:check
+
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            skills/agent-skills/unknown-coverage-review/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/references/DELEGATION.md \
+            skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md \
+            tests/security-audit-coverage-critic-contract.test.mjs \
+            skills/registry.yaml \
+            pages/reference/skills-catalog.md \
+            docs/data/skill-manifest.json
+          if git diff --cached --quiet; then
+            echo "No ordering correction to commit."
+            exit 0
+          fi
+          git commit -m "fix(security): run coverage critic after verification"
+          git push origin HEAD:feat/2278-security-audit-coverage-critic
