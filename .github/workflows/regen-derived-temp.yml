@@ -1,0 +1,41 @@
+name: Temp Regenerate Skill Derived Files
+
+on:
+  push:
+    branches:
+      - feat/2267-security-audit-entry-skill
+    paths:
+      - .github/workflows/regen-derived-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2267-security-audit-entry-skill
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Regenerate derived skill artifacts
+        run: |
+          npm run skills:catalog
+          npm run skills:manifest
+
+      - name: Commit generated artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/reference/skills-catalog.md docs/data/skill-manifest.json
+          if git diff --cached --quiet; then
+            echo "Generated artifacts already fresh."
+            exit 0
+          fi
+          git commit -m "chore(skills): regenerate derived artifacts"
+          git push origin HEAD:feat/2267-security-audit-entry-skill
