@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted for Phase 0 of #2267. This ADR fixes the integration boundary only. It does not enable a full repository security audit, change Gate behavior, execute target-controlled code, or add a new workflow engine.
+Accepted for Phase 0 of #2267.
+This ADR fixes the integration boundary only.
+It does not enable a full repository security audit or change Gate behavior.
+It also does not execute target-controlled code or add a new workflow engine.
 
 ## Context
 
@@ -31,7 +34,9 @@ River Review already contains overlapping capabilities:
 - Reviewer Identity exploration (#1760)
 - Review Evolution Cycle (#1574)
 
-Reimplementing the Cloudflare harness as a separate framework would duplicate these surfaces and create incompatible vocabularies. The missing value is the contract that connects the existing surfaces while keeping their responsibilities distinct.
+Reimplementing the Cloudflare harness as a separate framework would duplicate these surfaces.
+It would also create incompatible vocabularies.
+The missing value is a contract that connects existing surfaces while keeping responsibilities distinct.
 
 ## Decision
 
@@ -56,21 +61,24 @@ Cloudflare-specific prompts, file layouts, and verdict field names are not impor
 
 `river-review-security` remains the normal diff-oriented security review entry point.
 
-A future `river-review-security-audit` entry point, if implemented, is for explicit repository or subsystem audit requests only.
+A future `river-review-security-audit` entry point is reserved for explicit repository or subsystem audit requests.
 
-A full audit MUST NOT become the default path for ordinary PR review because its reconnaissance, broader coverage, and independent verification have materially higher cost and latency.
+A full audit MUST NOT become the default path for ordinary PR review.
+Its reconnaissance and broader coverage have materially higher cost and latency.
+Independent verification also adds cost.
 
 ### D3—ReviewCoverage and SecurityAuditCoverage are different contracts
 
 Existing `ReviewCoverage` answers:
 
-> Did the review work River Review planned actually execute?
+> Whether the review work planned by River Review actually executed.
 
-Its current unit is `reviewer role × diff chunk`, with `complete | partial | not_executed` derived from execution results.
+Its current unit is `reviewer role × diff chunk`.
+The derived state is `complete | partial | not_executed`.
 
-A future `SecurityAuditCoverage` would answer:
+A future `SecurityAuditCoverage` answers:
 
-> Which trust boundary × subsystem × attack class combinations were investigated, blocked, deferred, or left out of scope?
+> Which trust boundary × subsystem × attack class combinations were investigated or left incomplete.
 
 The two contracts MUST NOT be merged into one semantic axis.
 
@@ -106,7 +114,7 @@ Responsibilities:
 - Semantic Precision Pass: decide materiality / disposition of an established issue
 - Gate: derive the caller-facing decision
 
-The system MUST NOT answer "is this true?" and "should this block?" as one undifferentiated LLM judgment.
+Truth and blocking policy MUST NOT be decided as one undifferentiated LLM judgment.
 
 ### D5—Reuse #1978 for candidate adversarial verification
 
@@ -120,7 +128,8 @@ A later integration may strengthen #1978 with an independence invariant such as:
 finderRunId != verifierRunId
 ```
 
-and provenance compatible with #1760, but cryptographic signing is not required by #2267.
+It may also add provenance compatible with #1760.
+Cryptographic signing is not required by #2267.
 
 ### D6—Do not create a new status vocabulary before proving a gap
 
@@ -135,9 +144,11 @@ Existing finding axes already include:
 - Semantic Precision `disposition` in ADR-007
 - `askRelevance` in the #1978 implementation
 
-Cloudflare's conceptual `confirmed / needs_validation / rejected` states are useful, but #2267 MUST first map them to existing axes.
+Cloudflare's conceptual `confirmed / needs_validation / rejected` states are useful.
+#2267 MUST first map them to existing axes.
 
-If an additional epistemic axis is still necessary after implementation analysis, it must use a distinct name and semantics. A candidate vocabulary is:
+If an additional epistemic axis remains necessary, it needs distinct semantics and a distinct name.
+A candidate vocabulary is:
 
 ```text
 established
@@ -145,39 +156,47 @@ unresolved
 refuted
 ```
 
-but this ADR does not approve a schema field with those values yet.
+This ADR does not approve a schema field with those values yet.
 
 ### D7—Source-only is the safe default
 
 Phase 1 of the security-audit integration is source-only.
 
-The audit MUST NOT run target-controlled builds, tests, browsers, emulators, fuzzers, package scripts, or fixtures unless a later sandbox contract provides all required controls.
+The audit MUST NOT run target-controlled builds or tests without a later sandbox contract.
+The same restriction applies to browsers, emulators, fuzzers, package scripts, and fixtures.
 
-A future execution adapter must provide, at minimum:
+A future execution adapter must provide these controls:
 
 - no external network for target-controlled processes
 - sanitized allowlisted environment
 - read-only target/toolchain
 - scratch-only writes
-- bounded CPU, memory, process count, disk, and wall-clock use
+- bounded CPU and memory use
+- bounded process count and disk use
+- bounded wall-clock use
 - no production/shared endpoints or identities
 
-If the required sandbox controls cannot be enforced, the system must leave the relevant hypothesis unresolved rather than execute unsafely.
+If these controls cannot be enforced, the related hypothesis remains unresolved.
+The system must not execute unsafely.
 
 ### D8—Gate integration is the final, opt-in phase
 
 Security-audit findings do not change current Gate behavior during observation and evaluation phases.
 
-Before any Gate integration, River Review must compare at least:
+Before Gate integration, River Review must compare at least:
 
 1. current baseline
 2. baseline with semantic security coverage
 3. baseline with semantic security coverage and adversarial candidate validation
-4. baseline with semantic security coverage, adversarial candidate validation, and final record verification
+4. baseline with semantic security coverage plus adversarial validation and final record verification
 
-Primary evaluation signals include established-finding precision, false positives, missed critical/high-impact issues, human reversal, false block rate, latency, and token/cost overhead.
+Primary evaluation signals include established-finding precision and false positives.
+They also include missed critical or high-impact issues and human reversal.
+False block rate, latency, and token or cost overhead are also required signals.
 
-A repository-wide pre-existing finding MUST NOT automatically block an unrelated current PR. `scope`, `askRelevance`, and relation to the current change remain relevant boundaries.
+A repository-wide pre-existing finding MUST NOT automatically block an unrelated current PR.
+`scope` and `askRelevance` remain relevant boundaries.
+Relation to the current change remains relevant as well.
 
 ## Responsibility Matrix
 
@@ -214,23 +233,31 @@ A repository-wide pre-existing finding MUST NOT automatically block an unrelated
 
 ### A. Vendor Cloudflare `security-audit-skill` as River Review's audit engine
 
-Rejected because it duplicates River Review's Skill Registry, finding model, verifier, W-check, and reviewer orchestration, and would create an upstream synchronization burden.
+Rejected because it duplicates several existing River Review components.
+Those components include the Skill Registry, finding model, verifier, W-check, and reviewer orchestration.
+Vendoring would also create an upstream synchronization burden.
 
 ### B. Extend `ReviewCoverage` to include trust-boundary / attack-class states
 
-Rejected because execution completion and semantic investigation breadth answer different questions. Mixing them would make `complete` ambiguous.
+Rejected because execution completion and semantic investigation breadth answer different questions.
+Mixing them would make `complete` ambiguous.
 
 ### C. Add `confirmed / needs_validation / rejected` directly to `validatedStatus`
 
-Rejected for Phase 0 because `validatedStatus` is already a synthesis-specific axis and overlaps only partially with #1978 final states. A vocabulary merge requires a separate schema decision backed by usage evidence.
+Rejected for Phase 0 because `validatedStatus` is already a synthesis-specific axis.
+It overlaps only partially with #1978 final states.
+A vocabulary merge requires a separate schema decision backed by usage evidence.
 
 ### D. Run local reproduction immediately without sandboxing
 
-Rejected because target-controlled code is untrusted in the audit context. Source-only incompleteness is preferable to unsafe execution.
+Rejected because target-controlled code is untrusted in the audit context.
+Source-only incompleteness is preferable to unsafe execution.
 
 ## Follow-up
 
-Implementation follows #2267's staged plan. The next planned slice after this ADR is the explicit source-only `river-review-security-audit` entry skill, followed by a separate semantic security coverage contract.
+Implementation follows #2267's staged plan.
+The next slice is the explicit source-only `river-review-security-audit` entry skill.
+A separate semantic security coverage contract follows that work.
 
 ## References
 
