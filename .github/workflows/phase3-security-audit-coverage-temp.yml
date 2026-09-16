@@ -1,0 +1,67 @@
+name: Temp Validate Phase3 Security Audit Coverage
+
+on:
+  push:
+    branches:
+      - feat/2267-security-audit-coverage
+    paths:
+      - .github/workflows/phase3-security-audit-coverage-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate-phase3:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2267-security-audit-coverage
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Format Phase 3 files
+        run: |
+          npx prettier --write \
+            schemas/security-audit-coverage.schema.json \
+            src/lib/security-audit-coverage.mjs \
+            tests/security-audit-coverage.test.mjs \
+            tests/helpers/schema-validator.mjs \
+            docs/development/2267-phase3-security-audit-coverage.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md
+
+      - name: Regenerate skill manifest
+        run: npm run skills:manifest
+
+      - name: Run targeted tests
+        run: node --experimental-test-isolation=none --test tests/security-audit-coverage.test.mjs tests/security-attack-class-registry.test.mjs
+
+      - name: Validate skills and generated artifacts
+        run: |
+          npm run agent-skills:validate
+          npm run skills:validate:refs
+          npm run skills:manifest:check
+          npm run skills:catalog:check
+          npm run skills:registry:check
+
+      - name: Commit normalized files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            schemas/security-audit-coverage.schema.json \
+            src/lib/security-audit-coverage.mjs \
+            tests/security-audit-coverage.test.mjs \
+            tests/helpers/schema-validator.mjs \
+            docs/development/2267-phase3-security-audit-coverage.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md \
+            docs/data/skill-manifest.json
+          if git diff --cached --quiet; then
+            echo "No normalized changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(security): normalize phase3 coverage artifacts"
+          git push origin HEAD:feat/2267-security-audit-coverage
