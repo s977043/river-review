@@ -64,12 +64,7 @@ describe('unknown-coverage-review security-audit profile contract', () => {
   });
 
   it('pins the four semantic evidence-sufficiency checks', () => {
-    for (const label of [
-      'Check 1',
-      'Check 2',
-      'Check 3',
-      'Check 4',
-    ]) {
+    for (const label of ['Check 1', 'Check 2', 'Check 3', 'Check 4']) {
       assert.match(securityAuditProfile, sectionPattern(label));
     }
     assert.match(securityAuditProfile, /Missing applicable semantic surface/);
@@ -87,14 +82,10 @@ describe('unknown-coverage-review security-audit profile contract', () => {
   });
 
   it('distinguishes a zero-findings safety claim from a neutral source-only report', () => {
-    assert.match(
-      securityAuditProfile,
-      /zero findings plus `safe` conclusion \| safety-overclaim residual/
-    );
-    assert.match(
-      securityAuditProfile,
-      /zero findings plus neutral source-only conclusion \| no finding/
-    );
+    assert.match(securityAuditProfile, /zero findings plus `safe` conclusion/);
+    assert.match(securityAuditProfile, /safety-overclaim residual/);
+    assert.match(securityAuditProfile, /zero findings plus neutral source-only conclusion/);
+    assert.match(securityAuditProfile, /zero findings without a safety claim is not a problem/);
   });
 
   it('wires the explicit audit flow without changing deterministic Gate behavior', () => {
