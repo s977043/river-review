@@ -1046,6 +1046,23 @@ classification → fixture / reference / suppression への還元までを束ね
 
 - findings / questions / actions
 
+### `river-review-security-audit`
+
+- 名前: `river-review-security-audit`
+- 概要: `Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。 通常の PR
+セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、 evidence と unresolved hypothesis
+の記録を行う。target-controlled code は実行しない。`
+- 対象:
+  - `**/*`
+- 重要度: critical
+- タグ: security / audit / entry / routing / source-only
+- 依存関係: none
+- 適用条件: phase=upstream / midstream, inputContext=diff / fullFile
+
+チェック項目の例:
+
+- summary / findings / actions / questions
+
 ### `security-privacy-design`
 
 - 名前: `Security & Privacy Design Review`
@@ -2271,7 +2288,8 @@ classification → fixture / reference / suppression への還元までを束ね
 ### `river-review-security`
 
 - 名前: `river-review-security`
-- 概要: `セキュリティ観点のレビューエージェント。 基本的なセキュリティチェック、認証・認可設計、プライバシー設計の個別スキルへルーティングする。`
+- 概要: `セキュリティ観点の通常レビューエージェント。 基本的なセキュリティチェック、認証・認可設計、プライバシー設計の個別スキルへルーティングする。 repository / subsystem の明示的な security
+audit は river-review-security-audit へ委譲する。`
 - 対象:
   - `src/**/*.{ts,tsx,js,jsx,mjs}`
   - `**/*.env*`
@@ -2285,6 +2303,23 @@ classification → fixture / reference / suppression への還元までを束ね
 チェック項目の例:
 
 - findings / actions
+
+### `river-review-security-audit`
+
+- 名前: `river-review-security-audit`
+- 概要: `Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。 通常の PR
+セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、 evidence と unresolved hypothesis
+の記録を行う。target-controlled code は実行しない。`
+- 対象:
+  - `**/*`
+- 重要度: critical
+- タグ: security / audit / entry / routing / source-only
+- 依存関係: none
+- 適用条件: phase=upstream / midstream, inputContext=diff / fullFile
+
+チェック項目の例:
+
+- summary / findings / actions / questions
 
 ### `secret-credential-scan`
 
