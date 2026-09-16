@@ -31,7 +31,7 @@ tags:
     meta,
     synthesis,
   ]
-version: '0.1.0'
+version: '0.2.0'
 license: MIT
 ---
 
@@ -54,7 +54,21 @@ AI coding agent の実行能力が上がるほど、見逃しは単純なコー�
 4. 何を確認すれば解消できるか
 5. マージを止めるべきか（既存 verdict 語彙への写像で表現）
 
-## Pre-execution Gate / 発火条件
+## Profile Selection
+
+Select exactly one execution profile before applying the evidence-sufficiency checks:
+
+```text
+profile: generic | security-audit
+```
+
+- `generic` is the existing diff/PR synthesis profile. Its diff-oriented Pre-execution Gate, output mapping, and report-only behavior remain unchanged.
+- `security-audit` is only for an explicit `river-review-security-audit` focused/full-audit flow with a shape-valid `SecurityAuditCoverage` ledger and reconnaissance evidence. It does not require a current diff because repository/subsystem audits may exist without one.
+
+Do not select `security-audit` from keyword routing or normal PR security review.
+Its detailed evidence-sufficiency contract lives in [SECURITY-AUDIT-PROFILE.md](./references/SECURITY-AUDIT-PROFILE.md).
+
+## Generic Profile Pre-execution Gate / 発火条件
 
 **最初に判定する**。満たさない場合は以降の観点を実行せず `NO_REVIEW` を返す。
 
@@ -88,7 +102,13 @@ Issue #1470 の 6 カテゴリを、defect ではなく **evidence-sufficiency �
 
 重複指摘を避けるため、個別 defect の検出は既存 registry skill に委譲し、本観点は **証拠充足の meta 評価のみ**を行う。委譲表・証拠要件・分界は [DELEGATION.md](./references/DELEGATION.md) を SSoT とする。委譲先が finding を出す領域を本観点は重複指摘しない。
 
-## Output / 出力
+## Security Audit Profile
+
+For `profile: security-audit`, use [SECURITY-AUDIT-PROFILE.md](./references/SECURITY-AUDIT-PROFILE.md).
+That profile evaluates semantic evidence sufficiency only after deterministic `SecurityAuditCoverage` validation.
+It remains report-only, does not duplicate finding verification, and does not directly change Gate behavior.
+
+## Generic Profile Output / 出力
 
 report-only 契約に従う。**本観点はマージを止めない**。判定素材を返すだけで、反復・停止・エスカレは caller の責務である。
 
@@ -125,3 +145,5 @@ report-only 契約に従う。**本観点はマージを止めない**。判定�
 ## References
 
 - [DELEGATION.md](./references/DELEGATION.md) — 既存 skill への委譲表・証拠要件・分界
+- [SECURITY-AUDIT-PROFILE.md](./references/SECURITY-AUDIT-PROFILE.md) — SecurityAuditCoverage の semantic evidence-sufficiency profile
+- [security-audit-profile-fixtures.json](./references/security-audit-profile-fixtures.json) — Phase 4 positive/false-positive contract fixtures

@@ -13,7 +13,7 @@ applyTo:
 inputContext: [diff, fullFile]
 outputKind: [summary, findings, actions, questions]
 tags: [security, audit, entry, routing, source-only]
-version: 0.3.0
+version: 0.4.0
 license: MIT
 ---
 
@@ -47,7 +47,7 @@ If the request does not clearly justify `full-audit`, use `focused` or `guidance
 
 ## Non-negotiable Source-only Policy
 
-Version 0.3.0 is source-only.
+Version 0.4.0 is source-only.
 
 Allowed evidence collection:
 
@@ -87,6 +87,7 @@ Explicit audit request
   -> existing security skills
   -> candidate findings / unresolved hypotheses
   -> observe-only SecurityAuditCoverage ledger
+  -> unknown-coverage-review (security-audit profile)
   -> existing verification path
   -> audit summary
 ```
@@ -225,7 +226,22 @@ Rules:
 Do not merge this ledger with #2212 `ReviewCoverage`.
 Do not feed this observe-only telemetry into Gate behavior in Phase 3.
 
-### 9. Report without claiming safety
+### 9. Critique semantic coverage evidence sufficiency
+
+After the `SecurityAuditCoverage` ledger passes its deterministic schema/semantic validation, invoke `unknown-coverage-review` with `profile: security-audit` before finalizing the audit summary.
+
+Use `skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md` as the profile contract. The critic checks only residual evidence sufficiency:
+
+- missing applicable semantic surfaces supported by reconnaissance evidence;
+- schema-valid `covered` units whose source evidence does not substantiate the claimed subsystem/boundary/class;
+- suspicious exclusion/defer/block patterns that may hide uninvestigated material surfaces;
+- prose that turns zero findings, coverage counters, or `full-audit` into a safety guarantee.
+
+Do not mechanically require every attack class.
+Do not duplicate `validateSecurityAuditCoverageSemantics()`, finding verification, Semantic Precision, or Gate policy.
+Phase 4 remains report-only: Gate behavior is unchanged.
+
+### 10. Report without claiming safety
 
 A `full-audit` run means repository-wide source investigation was attempted.
 It does not mean all security attack classes were proven safe.
@@ -295,6 +311,7 @@ When both phrases appear, prefer this audit skill only if the user explicitly as
 - `schemas/security-audit-coverage.schema.json`
 - `src/lib/security-audit-coverage.mjs`
 - `skills/agent-skills/river-review-security-audit/references/attack-classes.json`
+- `skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md`
 - `skills/agent-skills/river-review-security/SKILL.md`
 - `skills/agent-skills/adversarial-review/SKILL.md`
 - `skills/midstream/security-basic/SKILL.md`

@@ -6,11 +6,13 @@ const read = (relativePath) => readFileSync(new URL(`../${relativePath}`, import
 
 const unknownCoverageSkill = read('skills/agent-skills/unknown-coverage-review/SKILL.md');
 const profileReference = read(
-  'skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md',
+  'skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md'
 );
 const auditSkill = read('skills/agent-skills/river-review-security-audit/SKILL.md');
 const fixtures = JSON.parse(
-  read('skills/agent-skills/unknown-coverage-review/references/security-audit-profile-fixtures.json'),
+  read(
+    'skills/agent-skills/unknown-coverage-review/references/security-audit-profile-fixtures.json'
+  )
 );
 
 const EXPECTED_FIXTURES = new Map([
@@ -41,7 +43,7 @@ test('security-audit profile stays semantic and does not duplicate deterministic
 test('security audit entry invokes coverage critic after the observe-only ledger', () => {
   assert.match(
     auditSkill,
-    /observe-only SecurityAuditCoverage ledger\s*\n\s*-> unknown-coverage-review \(security-audit profile\)\s*\n\s*-> existing verification path/is,
+    /observe-only SecurityAuditCoverage ledger\s*\n\s*-> unknown-coverage-review \(security-audit profile\)\s*\n\s*-> existing verification path/is
   );
   assert.match(auditSkill, /Gate behavior.*unchanged/i);
 });
@@ -55,13 +57,16 @@ test('Phase 4 fixtures pin positive and false-positive guards', () => {
     assert.equal(
       fixture.expected.criticAction,
       EXPECTED_FIXTURES.get(fixture.id),
-      `unexpected critic action for ${fixture.id}`,
+      `unexpected critic action for ${fixture.id}`
     );
-    assert.ok(fixture.expected.reason.length > 0, `${fixture.id} must explain the expected behavior`);
+    assert.ok(
+      fixture.expected.reason.length > 0,
+      `${fixture.id} must explain the expected behavior`
+    );
   }
 
   assert.deepEqual(
     new Set(fixtures.fixtures.map(({ id }) => id)),
-    new Set(EXPECTED_FIXTURES.keys()),
+    new Set(EXPECTED_FIXTURES.keys())
   );
 });

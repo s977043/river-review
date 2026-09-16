@@ -10,6 +10,8 @@ Unknown Coverage Review は **evidence-sufficiency（証拠が足りているか
 - `diff` があり、実行コード・migration・schema・公開 API・設定に触れること（docs・コメントのみは対象外）。
 - `plan` / `review-self` 欠損時は該当観点を `skippedSkills` に記録してデグレードする（PlanGate 非依存）。
 
+この Gate は `profile: generic` 専用である。`profile: security-audit` は diff を必須にせず、[SECURITY-AUDIT-PROFILE.md](./SECURITY-AUDIT-PROFILE.md) の explicit audit context / SecurityAuditCoverage / reconnaissance evidence 条件に従う。どちらの profile でも defect は既存 security skill へ委譲し、本観点は evidence-sufficiency の残余だけを扱う。
+
 ## 証拠要件 / Evidence requirements
 
 - finding の `file:line` は差分内にアンカーする（差分外の推測に基づく Unknown は question として返す）。

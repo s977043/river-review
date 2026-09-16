@@ -10,9 +10,7 @@
           "public API accepts authenticated tenant-scoped requests",
           "shared storage contains tenant-owned resources"
         ],
-        "coverageUnits": [
-          "api|caller-to-api|authn-authz"
-        ],
+        "coverageUnits": ["api|caller-to-api|authn-authz"],
         "auditSummary": "Tenant isolation was reviewed."
       },
       "expected": {
@@ -23,9 +21,7 @@
     {
       "id": "covered-evidence-too-narrow",
       "input": {
-        "reconnaissance": [
-          "auth boundary spans API middleware, policy layer, and storage access"
-        ],
+        "reconnaissance": ["auth boundary spans API middleware, policy layer, and storage access"],
         "coverageUnit": {
           "semanticKey": "api|caller-to-storage|authn-authz",
           "state": "covered",
@@ -67,11 +63,7 @@
           "coveredUnits": 1,
           "deferredUnits": 3
         },
-        "explanations": [
-          "not relevant",
-          "not relevant",
-          "later"
-        ]
+        "explanations": ["not relevant", "not relevant", "later"]
       },
       "expected": {
         "criticAction": "raise_unknown",
