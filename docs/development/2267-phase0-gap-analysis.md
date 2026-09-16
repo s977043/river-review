@@ -23,20 +23,18 @@ River Review already implements important pieces of that pipeline. The correct i
 
 ## 2. External pattern -> current River Review mapping
 
-| Cloudflare concept | Current River Review surface | Gap / action |
-| --- | --- | --- |
-| Reconnaissance | repo context, Skill routing, security skills | Full-audit-specific trust-boundary reconnaissance is not first-class |
-| Isolated hunters | Reviewer roles / `reviewer-orchestrator.mjs` | Reuse orchestration; do not add a second fan-out engine |
-| Attack classes | `river-review-security`, `security-basic`, `trust-boundaries-authz`, adversarial War Game | Coverage is narrower / diff-oriented; add only missing domain skills after evidence |
-| Candidate validation by fresh verifier | #1978 / `finding-critic.mjs` | Core deterministic state machine exists; runtime integration/independence remains incomplete |
-| Structured findings | Review Artifact / output schemas | Reuse existing finding contract; avoid copying Cloudflare schema wholesale |
-| Independent final record verification | no equivalent mandatory post-validation stage | New capability candidate, risk-tiered |
-| Coverage ledger | #2212 Review Coverage | Existing ledger is execution coverage, not trust-boundary/attack-class coverage |
-| Coverage critic | `unknown-coverage-review` | Reuse/extend if semantics fit; avoid new generic Critic |
-| Confirmed / needs validation / rejected | `validatedStatus`, #1978 final status, disposition, status | Partial overlap; vocabulary collision risk is real |
-| Repeat runs improve coverage | #1574 is capability evolution, saved runs exist | Target-repository audit coverage reuse is a separate gap |
-| Sandboxed local evidence | no security-audit sandbox contract | Must remain source-only until an adapter can enforce safety constraints |
-| Target-neutral report | Review Artifact / Markdown outputs | Experimental audit artifact may be useful; machine-readable record remains SSoT |
+- Reconnaissance: repo context, Skill routing, and security skills already exist. Full-audit-specific trust-boundary reconnaissance is not first-class.
+- Isolated hunters: Reviewer roles and `reviewer-orchestrator.mjs` already provide fan-out. Reuse them instead of adding a second orchestration engine.
+- Attack classes: `river-review-security`, `security-basic`, `trust-boundaries-authz`, and adversarial War Game cover part of the space. Add only missing domain skills after evidence shows a gap.
+- Candidate validation by a fresh verifier: #1978 and `finding-critic.mjs` already define the deterministic state machine. Runtime integration and explicit independence remain incomplete.
+- Structured findings: Review Artifact and output schemas already exist. Do not copy the Cloudflare schema wholesale.
+- Independent final record verification: there is no equivalent mandatory post-validation stage. This is a new risk-tiered capability candidate.
+- Coverage ledger: #2212 Review Coverage exists, but it is execution coverage rather than trust-boundary/attack-class coverage.
+- Coverage critic: `unknown-coverage-review` is the first reuse candidate. Avoid a new generic Critic unless its semantics prove insufficient.
+- Confirmed / needs validation / rejected: River Review already has `validatedStatus`, #1978 final status, disposition, and lifecycle status. The overlap is partial, so vocabulary collision risk is real.
+- Repeat runs improve coverage: #1574 concerns capability evolution and saved runs already exist, but target-repository audit coverage reuse is a separate gap.
+- Sandboxed local evidence: River Review has no security-audit sandbox contract. The integration must remain source-only until an adapter can enforce safety constraints.
+- Target-neutral report: Review Artifact and Markdown outputs already exist. An experimental audit artifact may still be useful, but a machine-readable record must remain the SSoT.
 
 ## 3. Existing contracts that MUST remain authoritative
 
@@ -130,16 +128,14 @@ These loops may exchange artifacts later but must not share lifecycle semantics.
 
 The Review Artifact schema already defines:
 
-| Axis | Values / meaning |
-| --- | --- |
-| `severity` | `info / minor / major / critical` |
-| `confidence` | `high / medium / low` |
-| `status` | lifecycle: `open / suppressed / verified` |
-| `scope` | change origin: `in-diff / pre-existing` |
-| `sourceKind` | provenance: `ai-review / human-review / self-review` |
-| `agreement` | reviewers that independently raised the finding; not majority vote |
-| `consensusLevel` | display-only derived agreement metadata |
-| `validatedStatus` | synthesis result: `confirmed / dismissed-hallucination / dismissed-duplicate / needs-human-judgment` |
+- `severity`: `info / minor / major / critical`
+- `confidence`: `high / medium / low`
+- `status`: lifecycle values `open / suppressed / verified`
+- `scope`: change-origin values `in-diff / pre-existing`
+- `sourceKind`: provenance values `ai-review / human-review / self-review`
+- `agreement`: reviewers that independently raised the finding; it is not majority-vote evidence
+- `consensusLevel`: display-only metadata derived from agreement
+- `validatedStatus`: synthesis result values `confirmed / dismissed-hallucination / dismissed-duplicate / needs-human-judgment`
 
 #1978 also uses `validation.finalStatus` and `askRelevance` internally.
 
@@ -272,11 +268,9 @@ A distinct final-record check therefore has value for higher-risk audit profiles
 
 Proposed cost tiers:
 
-| Profile | Candidate validation | Final record verification |
-| --- | --- | --- |
-| quick | one fresh verifier | same verifier also checks the final record |
-| standard | independent candidate verifier | separate verifier for critical/major established findings |
-| deep | independent candidate verifier | separate verifier for every established finding |
+- `quick`: one fresh verifier performs candidate validation and also checks the final record.
+- `standard`: an independent candidate verifier runs first; a separate verifier checks critical/major established findings.
+- `deep`: an independent candidate verifier runs first; a separate verifier checks every established finding.
 
 This is a future implementation decision, not a Phase 0 behavior change.
 
