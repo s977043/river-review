@@ -1,0 +1,54 @@
+name: Temp Fix Phase2 Skill Version Text
+
+on:
+  push:
+    branches:
+      - feat/2267-security-attack-class-registry
+    paths:
+      - .github/workflows/phase2-version-fix-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2267-security-attack-class-registry
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Fix version text
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('skills/agent-skills/river-review-security-audit/SKILL.md')
+          text = path.read_text()
+          old = 'Version 0.1.0 is source-only.'
+          new = 'Version 0.2.0 is source-only.'
+          if old not in text:
+              raise SystemExit('expected version text not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Regenerate and validate
+        run: |
+          npm run skills:manifest
+          node --experimental-test-isolation=none --test tests/security-attack-class-registry.test.mjs
+          npm run agent-skills:validate
+          npm run skills:manifest:check
+          npm run skills:catalog:check
+          npm run skills:registry:check
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add skills/agent-skills/river-review-security-audit/SKILL.md docs/data/skill-manifest.json
+          git commit -m "fix(security): align audit skill version text"
+          git push origin HEAD:feat/2267-security-attack-class-registry
