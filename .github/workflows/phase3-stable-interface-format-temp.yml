@@ -1,0 +1,38 @@
+name: Temp Format Phase3 Stable Interface
+
+on:
+  push:
+    branches:
+      - feat/2267-security-audit-coverage
+    paths:
+      - .github/workflows/phase3-stable-interface-format-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-stable-interface:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2267-security-audit-coverage
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Format stable interface docs
+        run: |
+          npx prettier --write pages/reference/stable-interfaces.en.md pages/reference/stable-interfaces.md
+          npx prettier --check pages/reference/stable-interfaces.en.md pages/reference/stable-interfaces.md
+
+      - name: Commit formatted docs and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/phase3-stable-interface-format-temp.yml
+          git add pages/reference/stable-interfaces.en.md pages/reference/stable-interfaces.md .github/workflows/phase3-stable-interface-format-temp.yml
+          git commit -m "fix(docs): format phase3 stable interface entries"
+          git push origin HEAD:feat/2267-security-audit-coverage
