@@ -21,7 +21,7 @@ AI 支援開発（Claude Code / Codex / Cursor 等）でコードは速く書け
 River Review は、こうした問いに答えるためのフレームワークです。
 
 - この差分は承認された実装プランと一致しているか？
-- テストは plan で約束された境界条件を満たしているか？
+- テストは plan で約束された境界条件を満たすか？
 - この PR はチームの migration / security / a11y / dependency ポリシーに違反していないか？
 - 実装エージェントは、過去レビューのフィードバックを無視していないか？
 
@@ -438,7 +438,7 @@ river-review は同一リポジトリ内のマーケットプレイスから Cla
 
 - コマンド: `/river-review:setup-team` / `/river-review:review-local` / `/river-review:review-team` / `/river-review:challenge` が含まれる。加えて `/river-review:skill` / `/river-review:check` / `/river-review:pr` も使える。
 - エージェント: `river-review`（スキルルーティング型のコードレビュー・オーケストレーター）
-- スキル: オーケストレーターの `river-review` に加えて `river-review-code` / `river-review-security` / `river-review-performance` の各スキルが含まれる。さらに `river-review-architecture` / `river-review-testing` / `river-review-frontend` も含まれる。加えて `river-review-docs` / `adversarial-review` / `review-team` / `unknown-coverage-review` も含まれる。いずれも `/river-review:<skill-name>` で呼び出せる
+- スキル: オーケストレーターの `river-review` に加えて `river-review-code` / `river-review-security` / `river-review-security-audit` / `river-review-performance` の各スキルが含まれる。さらに `river-review-architecture` / `river-review-testing` / `river-review-frontend` も含まれる。加えて `river-review-docs` / `adversarial-review` / `review-team` / `unknown-coverage-review` も含まれる。いずれも `/river-review:<skill-name>` で呼び出せる
 
 管理: `/plugin enable|disable|uninstall river-review@river-review-marketplace`。
 
