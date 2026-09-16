@@ -1,0 +1,88 @@
+name: Temp Validate Phase4 2278 Coverage Critic
+
+on:
+  push:
+    branches:
+      - feat/2278-security-coverage-critic
+    paths:
+      - .github/workflows/phase4-2278-validate-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2278-security-coverage-critic
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-node-deps
+
+      - name: Format Phase 4 files
+        run: |
+          npx prettier --write \
+            docs/development/2267-phase4-security-coverage-critic.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/04-security-audit-missing-surface.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/05-security-audit-unsupported-covered.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/06-security-audit-legitimate-out-of-scope.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/07-security-audit-hidden-exclusion-defer.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/08-security-audit-zero-findings-safe-overclaim.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/09-security-audit-zero-findings-neutral.md \
+            tests/security-audit-coverage-critic-profile.test.mjs \
+            tests/security-audit-coverage-critic-fixtures.test.mjs
+
+      - name: Regenerate skill artifacts
+        run: |
+          npm run skills:manifest
+          npm run skills:registry
+          npm run skills:catalog
+
+      - name: Remove temporary workflow before repository enumeration checks
+        run: rm .github/workflows/phase4-2278-validate-temp.yml
+
+      - name: Validate Phase 4 contracts
+        run: |
+          node --test \
+            tests/security-audit-coverage.test.mjs \
+            tests/security-audit-coverage-critic-profile.test.mjs \
+            tests/security-audit-coverage-critic-fixtures.test.mjs
+          npm run skills:validate
+          npm run agent-skills:validate
+          npm run skills:validate:refs
+          npm run skills:manifest:check
+          npm run skills:registry:check
+          npm run skills:catalog:check
+          npm run meta:validate
+          npx prettier --check \
+            docs/development/2267-phase4-security-coverage-critic.md \
+            skills/agent-skills/river-review-security-audit/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/SKILL.md \
+            skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/04-security-audit-missing-surface.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/05-security-audit-unsupported-covered.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/06-security-audit-legitimate-out-of-scope.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/07-security-audit-hidden-exclusion-defer.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/08-security-audit-zero-findings-safe-overclaim.md \
+            skills/agent-skills/unknown-coverage-review/fixtures/09-security-audit-zero-findings-neutral.md \
+            tests/security-audit-coverage-critic-profile.test.mjs \
+            tests/security-audit-coverage-critic-fixtures.test.mjs
+
+      - name: Commit finalized Phase 4 files and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated, formatted, or cleanup changes"
+            exit 0
+          fi
+          git commit -m "chore(security): finalize phase4 coverage critic fixtures"
+          git push origin HEAD:feat/2278-security-coverage-critic
