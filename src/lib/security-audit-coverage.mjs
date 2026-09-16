@@ -69,10 +69,16 @@ export function deriveSecurityAuditCoverage(units = [], { taxonomyVersion } = {}
   if (typeof taxonomyVersion !== 'string' || !SEMVER_PATTERN.test(taxonomyVersion)) {
     throw new TypeError('taxonomyVersion must be an explicit semantic version');
   }
+  if (!Array.isArray(units)) {
+    throw new TypeError('units must be an array');
+  }
 
-  const normalizedUnits = Array.isArray(units)
-    ? units.filter(Boolean).map((unit) => ({ ...unit }))
-    : [];
+  const normalizedUnits = units.map((unit, index) => {
+    if (unit === null || typeof unit !== 'object' || Array.isArray(unit)) {
+      throw new TypeError(`units[${index}] must be an object`);
+    }
+    return { ...unit };
+  });
   const coveredUnits = unitsInState(normalizedUnits, 'covered').length;
   const plannedUnits = unitsInState(normalizedUnits, 'planned').length;
   const blockedUnits = unitsInState(normalizedUnits, 'blocked').length;
