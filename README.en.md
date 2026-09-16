@@ -263,7 +263,7 @@ See [`pages/guides/repo-wide-review.md`](pages/guides/repo-wide-review.md) and [
 - Inside the repo, run `npm run river -- run . --dry-run` to print skill selection and placeholder review comments for the current diff without sending anything externally (local mode is currently planning/preview only)
 - Add `--debug` to show merge base, changed files, token estimate, and a diff preview
 - Specify phase via `--phase upstream|midstream|downstream`; defaults to `RIVER_PHASE` env or `midstream`
-- Control contexts/dependencies (optional): set `RIVER_AVAILABLE_CONTEXTS=diff,tests` or `RIVER_AVAILABLE_DEPENDENCIES=code_search,test_runner` to skip skills that require unavailable inputs; if unset, dependency checks are bypassed for backward compatibility.
+- Control contexts/dependencies (optional): set `RIVER_AVAILABLE_CONTEXTS=diff,tests` or `RIVER_AVAILABLE_DEPENDENCIES=code_search,test_runner` to skip skills whose requirements are unmet (with reasons) during selection (dependency checks are skipped when unset).
 - Override via CLI flags: `--context diff,fullFile` and `--dependency code_search,test_runner` override the env vars (comma-separated).
 - Enable stub dependencies: set `RIVER_DEPENDENCY_STUBS=1` to treat known dependencies (`code_search`, `test_runner`, `coverage_report`, `adr_lookup`, `repo_metadata`, `tracing`) and any extension dependency starting with `custom:` (`custom:*`) as available so planning doesn’t skip them while provider implementations are being readied.
 
@@ -324,7 +324,7 @@ What you get (namespaced by plugin name):
 
 - Commands: `/river-review:setup-team`, `/river-review:review-local`, `/river-review:review-team`, `/river-review:challenge`, `/river-review:skill`, `/river-review:check`, `/river-review:pr`
 - Agent: `river-review` (skill-routed code-review orchestrator)
-- Skills: the orchestrator `river-review` plus `river-review-code`, `river-review-security`, `river-review-performance`, `river-review-architecture`, `river-review-testing`, `river-review-frontend`, `river-review-docs`, `adversarial-review`, `review-team`, and `unknown-coverage-review` — addressable as `/river-review:<skill-name>`
+- Skills: the orchestrator `river-review` plus `river-review-code`, `river-review-security`, `river-review-security-audit`, `river-review-performance`, `river-review-architecture`, `river-review-testing`, `river-review-frontend`, `river-review-docs`, `adversarial-review`, `review-team`, and `unknown-coverage-review` — addressable as `/river-review:<skill-name>`
 
 Manage: `/plugin enable|disable|uninstall river-review@river-review-marketplace`.
 
