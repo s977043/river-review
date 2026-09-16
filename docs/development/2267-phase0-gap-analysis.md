@@ -102,15 +102,15 @@ candidate truth
 
 ### 3.6 Reviewer Identity (#1760)
 
-#1760 explores reviewer provenance and stronger actor identity. #2267 only needs enough provenance to enforce logical independence between the candidate finder and verifier.
+Issue #1760 explores reviewer provenance and stronger actor identity. #2267 only needs enough provenance to enforce logical independence between the candidate finder and verifier.
 
 The minimum useful contract is an execution/run identity, not cryptographic signing.
 
 ### 3.7 Review Evolution Cycle (#1574)
 
-#1574 improves River Review itself from multiple historical runs.
+Issue #1574 improves River Review itself from multiple historical runs.
 
-#2267's repeat-run concern is different:
+The #2267 repeat-run concern is different:
 
 ```text
 #1574
@@ -137,7 +137,7 @@ The Review Artifact schema already defines:
 - `consensusLevel`: display-only metadata derived from agreement
 - `validatedStatus`: synthesis result values `confirmed / dismissed-hallucination / dismissed-duplicate / needs-human-judgment`
 
-#1978 also uses `validation.finalStatus` and `askRelevance` internally.
+Issue #1978 also uses `validation.finalStatus` and `askRelevance` internally.
 
 ### 4.2 Why Cloudflare's three verdicts cannot be copied directly
 
@@ -255,7 +255,7 @@ Logical independence is necessary; provider/model diversity is an evaluation var
 
 ## 8. Final record verification gap
 
-#1978 verifies the candidate claim, but the final structured record can still accumulate errors in:
+Issue #1978 verifies the candidate claim, but the final structured record can still accumulate errors in:
 
 - line/path correction
 - impact wording
