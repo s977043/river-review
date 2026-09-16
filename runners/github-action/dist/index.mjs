@@ -48880,17 +48880,23 @@ function parseUnifiedDiff(diffText) {
   let currentHunk = null;
   let newLineNumber = 0;
   let pendingOldPath = null;
+  // Header lines are only headers outside a hunk body, and that body ends by
+  // line budget rather than by a marker — see `createDiffHunkTracker` in
+  // git.mjs, shared with `collectAddedLineHints` (#2249).
+  const hunk = (0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .createDiffHunkTracker */ .aT)();
 
   for (const line of diffText.split('\n')) {
     if (line.startsWith('diff --git')) {
       currentHunk = null;
+      hunk.resetFile();
       continue;
     }
-    if (line.startsWith('--- ')) {
+    hunk.observeLine(line);
+    if (hunk.isHeader(line, '--- ')) {
       pendingOldPath = (0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .parseDiffHeaderPath */ .J0)(line.slice(4));
       continue;
     }
-    if (line.startsWith('+++ ')) {
+    if (hunk.isHeader(line, '+++ ')) {
       const newPathRaw = (0,_git_mjs__WEBPACK_IMPORTED_MODULE_0__/* .parseDiffHeaderPath */ .J0)(line.slice(4));
       const isDeletion = newPathRaw === '/dev/null';
       const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
@@ -48905,13 +48911,10 @@ function parseUnifiedDiff(diffText) {
       continue;
     }
     if (!currentFile) continue;
-    if (line.startsWith('@@')) {
-      const match = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
-      if (!match) continue;
-      const oldStart = Number.parseInt(match[1], 10);
-      const oldLines = match[2] ? Number.parseInt(match[2], 10) : 1;
-      const newStart = Number.parseInt(match[3], 10);
-      const newLines = match[4] ? Number.parseInt(match[4], 10) : 1;
+    if (!hunk.inHunk && line.startsWith('@@')) {
+      const parsed = hunk.beginHunk(line);
+      if (!parsed) continue;
+      const { oldStart, oldLines, newStart, newLines } = parsed;
       currentHunk = {
         header: line,
         oldStart,
@@ -48926,6 +48929,7 @@ function parseUnifiedDiff(diffText) {
       continue;
     }
     if (!currentHunk) continue;
+    hunk.consumeBodyLine(line);
     currentHunk.lines.push(line);
     if (line.startsWith('+') && !line.startsWith('+++')) {
       currentFile.addedLines.push(newLineNumber);
@@ -52011,10 +52015,11 @@ function deriveGateDecision({
 /* harmony export */   Rd: () => (/* binding */ detectDefaultBranch),
 /* harmony export */   XS: () => (/* binding */ GitError),
 /* harmony export */   Zb: () => (/* binding */ resolveBaseMergeBase),
+/* harmony export */   aT: () => (/* binding */ createDiffHunkTracker),
 /* harmony export */   kG: () => (/* binding */ GitRepoNotFoundError),
 /* harmony export */   mM: () => (/* binding */ isWorkingTreeDirty)
 /* harmony export */ });
-/* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, unquoteGitPath, normalizeGitPathToken, collectAddedLineHints */
+/* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, unquoteGitPath, normalizeGitPathToken, DIFF_HUNK_HEADER_RE, collectAddedLineHints */
 /* harmony import */ var node_child_process__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(1421);
 /* harmony import */ var node_util__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(7975);
 
@@ -52539,26 +52544,169 @@ async function diffWithContext(cwd, baseRef, { unified = 3 } = {}) {
   return runGit(['diff', `--unified=${unified}`, '--no-color', baseRef], { cwd });
 }
 
+/**
+ * Unified-diff hunk header. Groups oldStart/oldLines/newStart/newLines; a count
+ * omitted by the tool means 1.
+ */
+const DIFF_HUNK_HEADER_RE = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+
+/**
+ * Track whether the reader is inside a hunk BODY, which is the only thing that
+ * tells a real file header apart from an ordinary line of source.
+ *
+ * A `--- ` / `+++ ` line is a FILE HEADER only OUTSIDE a hunk body. Inside one,
+ * `+++ phantom.md` is just the added line `++ phantom.md` wearing a `+`, and
+ * reading it as a header registers a path that does not exist (#2249). Checking
+ * adjacency instead of hunk state is not enough: replacing `-- old.md` with
+ * `++ new.md` inside a hunk forges the whole `--- `/`+++ ` PAIR.
+ *
+ * The body ENDS on either of two signals, and BOTH are needed:
+ *
+ *   1. an unprefixed line. Every body line carries ` `, `+`, `-` or `\`, so a
+ *      line with none of them (`@@ …`, `diff -u -r a/f b/f`, `Only in …`)
+ *      cannot be body. This is what ends a hunk whose declared counts do not
+ *      match the body it actually carries — hand-written and tool-rewritten
+ *      patches do that, and a budget alone would swallow their next `@@`.
+ *   2. the line budget running out. `+++ b/f2.txt` IS prefixed (it is `+` on
+ *      `++ b/f2.txt`), so signal 1 cannot see it. `diff --git` is a git-only
+ *      line, so resetting on it alone leaves a non-git unified diff
+ *      (`diff -u -r`, patch files) stuck inside the first hunk forever and
+ *      reads every later file's header as body — a silent drop of every file
+ *      but the first. A body is exactly `oldLines` old-side and `newLines`
+ *      new-side lines, which is the terminator both dialects share.
+ *
+ * This is the SSoT for that rule: `collectAddedLineHints` here and
+ * `parseUnifiedDiff` (`diff-processor.mjs`) both drive one of these rather than
+ * keeping their own flag, because a divergence between them puts the two path
+ * routes back out of sync (#2241).
+ *
+ * A declared count can also LIE, and both directions bite:
+ *
+ *   - understating the body empties the budget early, and a later `+++ foo`
+ *     body line is then read as a header — a ghost that base never produced
+ *     on the hint route (#2249 follow-up). Guarded by requiring the PAIR:
+ *     every real `+++ ` header, in git and in `diff -u` alike, is immediately
+ *     preceded by its own `--- ` header, while a forged one inside a body is
+ *     not. This is a pairing rule, NOT the adjacency rule that was rejected
+ *     earlier: adjacency asked only "was the previous line `--- `", which a
+ *     `-- old.md` -> `++ new.md` edit satisfies; here the `--- ` must ALSO
+ *     have been accepted as a header, which inside a hunk body it cannot be.
+ *   - overstating it never empties the budget, so a following real header is
+ *     read as body. See "Remaining Risks" in the PR: closing that band means
+ *     accepting a `--- `/`+++ `/`@@ ` triple INSIDE a body, which is
+ *     byte-identical to the forged pair this guard exists to reject.
+ *
+ * @returns {{
+ *   inHunk: boolean,
+ *   isHeader: (line: string, prefix: '+++ '|'--- ') => boolean,
+ *   resetFile: () => void,
+ *   beginHunk: (line: string) => null | { oldStart: number, oldLines: number, newStart: number, newLines: number },
+ *   observeLine: (line: string) => void,
+ *   consumeBodyLine: (line: string) => void,
+ * }}
+ */
+function createDiffHunkTracker() {
+  let inHunk = false;
+  let remainingOld = 0;
+  let remainingNew = 0;
+  // Line numbering exists only to answer "was the accepted `--- ` header the
+  // line immediately before this one".
+  let lineNo = 0;
+  let oldHeaderLine = -1;
+  // The pairing rule only applies once a hunk has been seen for this file: a
+  // `+++ ` before any `@@` cannot be a body line, and artifact patches in the
+  // wild do carry a lone `+++ b/x` with no `--- ` (pinned by
+  // tests/cli-review-plan.test.mjs).
+  let sawHunk = false;
+
+  return {
+    get inHunk() {
+      return inHunk;
+    },
+    isHeader(line, prefix) {
+      if (inHunk || !line.startsWith(prefix)) return false;
+      if (prefix === '--- ') {
+        oldHeaderLine = lineNo;
+        return true;
+      }
+      // `+++ ` after a hunk has started only counts when it completes the pair
+      // opened on the line before. Without this, an understated hunk that
+      // frees the budget early turns the next `+++ foo` body line into a file.
+      return !sawHunk || oldHeaderLine === lineNo - 1;
+    },
+    /** A new `diff --git` starts a file: nothing can still be inside a hunk. */
+    resetFile() {
+      inHunk = false;
+      remainingOld = 0;
+      remainingNew = 0;
+      sawHunk = false;
+    },
+    /**
+     * Advance one line, and close the hunk when the line cannot be body at all
+     * (signal 1 above). Call this once per line, before the header tests.
+     */
+    observeLine(line) {
+      lineNo += 1;
+      if (!inHunk) return;
+      // '' is a context line whose single space some tools strip.
+      if (line === '') return;
+      const c = line[0];
+      if (c === ' ' || c === '+' || c === '-' || c === '\\') return;
+      inHunk = false;
+      remainingOld = 0;
+      remainingNew = 0;
+    },
+    /** Returns the parsed header, or null when the line is not one. */
+    beginHunk(line) {
+      const match = DIFF_HUNK_HEADER_RE.exec(line);
+      if (!match) return null;
+      const oldStart = Number.parseInt(match[1], 10);
+      const oldLines = match[2] === undefined ? 1 : Number.parseInt(match[2], 10);
+      const newStart = Number.parseInt(match[3], 10);
+      const newLines = match[4] === undefined ? 1 : Number.parseInt(match[4], 10);
+      remainingOld = oldLines;
+      remainingNew = newLines;
+      // `@@ -1,0 +1,0 @@` has no body at all, so it never opens one.
+      inHunk = remainingOld > 0 || remainingNew > 0;
+      sawHunk = true;
+      return { oldStart, oldLines, newStart, newLines };
+    },
+    /** Spend one line of the body budget; closes the hunk when it runs out. */
+    consumeBodyLine(line) {
+      if (!inHunk) return;
+      // `\ No newline at end of file` annotates the previous line and is not
+      // itself part of either side's line count.
+      if (line.startsWith('\\')) return;
+      if (line.startsWith('+')) remainingNew -= 1;
+      else if (line.startsWith('-')) remainingOld -= 1;
+      else {
+        remainingOld -= 1;
+        remainingNew -= 1;
+      }
+      if (remainingOld <= 0 && remainingNew <= 0) inHunk = false;
+    },
+  };
+}
+
 function collectAddedLineHints(diffText) {
   const hints = new Map();
   let currentFile = null;
-  // A `+++ ` line is a header only OUTSIDE a hunk body. Inside one,
-  // `+++ phantom.md` is just the added line `++ phantom.md` wearing a `+`, and
-  // reading it as a header hands `currentFile` to a path that does not exist —
-  // the next `@@` then registers a ghost entry for it. (A deleted `-- x`
-  // followed by an added `++ y` forges the whole `--- `/`+++ ` PAIR, so
-  // checking adjacency instead of hunk state would not be enough.) git emits
-  // every real header before that file's first `@@` and resets at each
-  // `diff --git`, so this keeps all real headers, quoted ones included.
-  let inHunk = false;
+  // See `createDiffHunkTracker`: a `+++ ` line is a header only outside a hunk
+  // body, and the body ends by line budget (#2249).
+  const hunk = createDiffHunkTracker();
 
   for (const line of diffText.split('\n')) {
     if (line.startsWith('diff --git')) {
-      inHunk = false;
+      hunk.resetFile();
       currentFile = null;
       continue;
     }
-    if (!inHunk && line.startsWith('+++ ')) {
+    hunk.observeLine(line);
+    if (hunk.isHeader(line, '--- ')) {
+      // Registered only to open the header PAIR; this route reads new paths.
+      continue;
+    }
+    if (hunk.isHeader(line, '+++ ')) {
       // Share the header parser with `parseUnifiedDiff` (#2241). A literal
       // `startsWith('+++ b/')` test missed every quoted path, whose header
       // reads `+++ "b/\346\227\245.mjs"`, so those files silently dropped out
@@ -52568,14 +52716,15 @@ function collectAddedLineHints(diffText) {
       currentFile = path === '/dev/null' ? null : path;
       continue;
     }
-    if (!line.startsWith('@@')) continue;
-    const match = /@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
-    if (!match) continue;
-    inHunk = true;
-    if (currentFile && !hints.has(currentFile)) {
-      const startLine = Number.parseInt(match[1], 10);
-      hints.set(currentFile, startLine);
+    if (!hunk.inHunk && line.startsWith('@@')) {
+      const parsed = hunk.beginHunk(line);
+      if (!parsed) continue;
+      if (currentFile && !hints.has(currentFile)) {
+        hints.set(currentFile, parsed.newStart);
+      }
+      continue;
     }
+    hunk.consumeBodyLine(line);
   }
   return hints;
 }
