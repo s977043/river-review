@@ -123,6 +123,18 @@ describe('deriveSecurityAuditCoverage', () => {
       /taxonomyVersion must be an explicit semantic version/
     );
   });
+
+  it('rejects malformed unit input instead of silently dropping coverage work', () => {
+    assert.throws(
+      () =>
+        deriveSecurityAuditCoverage(null, {
+          taxonomyVersion: attackRegistry.version,
+        }),
+      /units must be an array/
+    );
+
+    assert.throws(() => derive([unit('auth/authn'), null]), /units\[1\] must be an object/);
+  });
 });
 
 describe('security audit coverage schema', () => {
