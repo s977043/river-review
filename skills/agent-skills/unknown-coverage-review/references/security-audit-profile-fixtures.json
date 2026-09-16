@@ -1,0 +1,127 @@
+{
+  "kind": "SecurityAuditCoverageCriticFixtures",
+  "version": "1",
+  "profile": "security-audit",
+  "fixtures": [
+    {
+      "id": "missing-applicable-surface",
+      "input": {
+        "reconnaissance": [
+          "public API accepts authenticated tenant-scoped requests",
+          "shared storage contains tenant-owned resources"
+        ],
+        "coverageUnits": [
+          "api|caller-to-api|authn-authz"
+        ],
+        "auditSummary": "Tenant isolation was reviewed."
+      },
+      "expected": {
+        "criticAction": "raise_unknown",
+        "reason": "reconnaissance supports a tenant-isolation surface but no corresponding semantic unit exists"
+      }
+    },
+    {
+      "id": "covered-evidence-too-narrow",
+      "input": {
+        "reconnaissance": [
+          "auth boundary spans API middleware, policy layer, and storage access"
+        ],
+        "coverageUnit": {
+          "semanticKey": "api|caller-to-storage|authn-authz",
+          "state": "covered",
+          "reviewedPaths": ["src/api/handler.mjs"],
+          "evidenceRefs": ["src/api/handler.mjs:20-40"]
+        }
+      },
+      "expected": {
+        "criticAction": "raise_unknown",
+        "reason": "the cited evidence does not substantiate the full stated trust-boundary path"
+      }
+    },
+    {
+      "id": "legitimate-out-of-scope",
+      "input": {
+        "reconnaissance": [
+          "repository contains no browser runtime or browser-delivered client code"
+        ],
+        "coverageUnit": {
+          "semanticKey": "repository|browser-boundary|browser-client",
+          "state": "out_of_scope",
+          "reasonCode": "not_applicable",
+          "explanation": "No browser/client execution surface exists in the audited source."
+        }
+      },
+      "expected": {
+        "criticAction": "no_finding",
+        "reason": "the exclusion is supported by concrete reconnaissance evidence"
+      }
+    },
+    {
+      "id": "suspicious-mass-exclusion",
+      "input": {
+        "reconnaissance": [
+          "multiple public endpoints, cloud deployment manifests, and external integrations exist"
+        ],
+        "coverageSummary": {
+          "outOfScopeUnits": 8,
+          "coveredUnits": 1,
+          "deferredUnits": 3
+        },
+        "explanations": [
+          "not relevant",
+          "not relevant",
+          "later"
+        ]
+      },
+      "expected": {
+        "criticAction": "raise_unknown",
+        "reason": "broad exclusions/deferments are not sufficiently reconciled with discovered security surfaces"
+      }
+    },
+    {
+      "id": "zero-findings-safe-claim",
+      "input": {
+        "findingCount": 0,
+        "auditSummary": "No findings were found, so the repository is secure."
+      },
+      "expected": {
+        "criticAction": "raise_unknown",
+        "reason": "zero findings were translated into an unsupported safety guarantee"
+      }
+    },
+    {
+      "id": "zero-findings-neutral-claim",
+      "input": {
+        "findingCount": 0,
+        "auditSummary": "No findings were established in the inspected source surfaces. This is not a guarantee of safety."
+      },
+      "expected": {
+        "criticAction": "no_finding",
+        "reason": "the statement is scoped to observed evidence and does not claim security completeness"
+      }
+    },
+    {
+      "id": "generic-profile-regression-guard",
+      "input": {
+        "profile": "generic",
+        "diffPresent": false,
+        "explicitSecurityAudit": false
+      },
+      "expected": {
+        "criticAction": "no_review",
+        "reason": "generic profile retains the existing diff-oriented Pre-execution Gate"
+      }
+    },
+    {
+      "id": "gate-behavior-regression-guard",
+      "input": {
+        "profile": "security-audit",
+        "coverageUnknowns": 2
+      },
+      "expected": {
+        "criticAction": "report_only",
+        "reason": "Phase 4 profile contributes residual-risk material and does not directly change Gate behavior"
+      }
+    }
+  ]
+}
