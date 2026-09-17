@@ -247,11 +247,7 @@ export function parseUnifiedDiff(diffText) {
     // hunk's `@@` from minting a ghost file, without adding any hunk-termination
     // heuristic (#2261/#2280).
     const canOpenFile = !gitFormatted || gitFileBoundaryPending;
-    if (
-      canOpenFile &&
-      line.startsWith('--- ') &&
-      (lines[index + 1] ?? '').startsWith('+++ ')
-    ) {
+    if (canOpenFile && line.startsWith('--- ') && (lines[index + 1] ?? '').startsWith('+++ ')) {
       const nextAfterPair = lines[index + 2] ?? '';
       if (nextAfterPair.startsWith('@@')) {
         const oldPathRaw = parseDiffHeaderPath(line.slice(4));

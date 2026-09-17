@@ -393,7 +393,10 @@ test('band 4 (U0): a hunk-body pair plus the next `@@` stays on the real file (#
   const files = withU0Repo(
     (git) => parseUnifiedDiff(git('diff', '--cached', '--unified=0', '--no-color')).files
   );
-  assert.deepEqual(files.map((f) => f.path), ['notes.md']);
+  assert.deepEqual(
+    files.map((f) => f.path),
+    ['notes.md']
+  );
   assert.deepEqual(files[0].addedLines, [3, 31]);
   assert.equal(files[0].hunks.length, 2);
 });
@@ -403,8 +406,14 @@ test('band 4 (U0 vs U3): zero and three context lines resolve to the same file a
     u0: parseUnifiedDiff(git('diff', '--cached', '--unified=0', '--no-color')).files,
     u3: parseUnifiedDiff(git('diff', '--cached', '--unified=3', '--no-color')).files,
   }));
-  assert.deepEqual(u0.map((f) => f.path), ['notes.md']);
-  assert.deepEqual(u3.map((f) => f.path), ['notes.md']);
+  assert.deepEqual(
+    u0.map((f) => f.path),
+    ['notes.md']
+  );
+  assert.deepEqual(
+    u3.map((f) => f.path),
+    ['notes.md']
+  );
   assert.deepEqual(u0[0].addedLines, [3, 31]);
   assert.deepEqual(u3[0].addedLines, [3, 31]);
   assert.equal(u0[0].hunks.length, 2);
