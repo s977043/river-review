@@ -16,6 +16,7 @@ Gate / decision / auto-approve / Human Review の挙動は変更しない。
 saved run に保存済みの `reviewCoverage` から、次を集計する。
 
 - Review Coverage を持つ run 数
+- classified / unclassified run 数
 - coverage status distribution (`complete` / `partial` / `not_executed`)
 - required unit completion rate
 - required unit failure / timeout count and rate
@@ -25,9 +26,11 @@ saved run に保存済みの `reviewCoverage` から、次を集計する。
 
 ## Metric definitions
 
-### Observed runs
+### Observed / classified runs
 
-`reviewCoverage` object を持つ run を対象とする。coverage が存在しない legacy / single-reviewer run を incomplete とみなさない。
+`reviewCoverage` object を持つ run を observed とする。coverage が存在しない legacy / single-reviewer run を incomplete とみなさない。
+
+`status` が current v1 vocabulary (`complete` / `partial` / `not_executed`) に入らない observation は unclassified として明示し、rate の分母や required-unit 集計へ混ぜない。これにより self-reported / stale / future-shaped record が現在の dogfood rate を黙って歪めるのを避ける。
 
 ### Required unit completion rate
 
@@ -35,21 +38,21 @@ saved run に保存済みの `reviewCoverage` から、次を集計する。
 sum(completedRequiredUnits) / sum(requiredUnits)
 ```
 
-分母が 0 の場合は `N/A` とする。
+classified observation のみを対象とし、分母が 0 の場合は `N/A` とする。
 
 ### Required unit failure / timeout rate
 
-`units[]` のうち `required === true` かつ `status in {failed, timed_out}` の unit 数を `sum(requiredUnits)` で割る。
+classified observation の `units[]` のうち `required === true` かつ `status in {failed, timed_out}` の unit 数を `sum(requiredUnits)` で割る。
 
 ### Partial review rate
 
 ```text
-status == partial の observed run 数 / observed run 数
+status == partial の classified run 数 / classified run 数
 ```
 
 ### Zero findings + partial
 
-`findings.length === 0` かつ `reviewCoverage.status === partial` の run 数。
+`findings.length === 0` かつ `reviewCoverage.status === partial` の classified run 数。
 
 ## Explicit non-goals
 
@@ -61,6 +64,7 @@ status == partial の observed run 数 / observed run 数
 - ContextCoverage / SecurityAuditCoverage との統合
 - new top-level CLI command
 - new persistence format
+- saved record の trust elevation / full schema re-validation
 
 `fileScope.selected / excluded` は LLM-facing selection scope であり execution completion ではないため、file coverage rate の分母・分子には使わない。
 
@@ -71,6 +75,7 @@ status == partial の observed run 数 / observed run 数
 - Review Coverage の集計値は additive に追加する
 - legacy records に coverage がなくても既存 dashboard は成立する
 - Review Coverage セクションは observed run が 0 のとき表示しない
+- unknown / future status は unclassified として可視化し、既存v1 rateから除外する
 
 ## Tests
 
@@ -79,6 +84,7 @@ status == partial の observed run 数 / observed run 数
 - required completion rate across multiple runs
 - required failed / timed_out units are counted separately
 - optional unit failure is excluded from required failure metrics
+- unclassified status does not alter dogfood rate denominators
 - zero findings + partial is counted
 - zero required units yields N/A rather than divide-by-zero
 - dashboard markdown renders the new section only when observations exist
@@ -92,11 +98,11 @@ status == partial の observed run 数 / observed run 数
 
 ### Contract / SSoT — APPROVE WITH GUARD
 
-`reviewCoverage` の shape は `schemas/review-coverage.schema.json` が SSoT。dashboard はその観測値を再計算せず集計する。`fileScope` を execution coverage と解釈しない。
+`reviewCoverage` の shape は `schemas/review-coverage.schema.json` が SSoT。dashboard は coverage を再導出しない。`fileScope` を execution coverage と解釈しない。
 
 ### Reliability / fail-safe — APPROVE
 
-coverage absent を `complete` / `partial` のどちらにも捏造しない。0 denominator は `null` / `N/A` とする。
+coverage absent を `complete` / `partial` のどちらにも捏造しない。契約外 status は unclassified として rate から除外する。0 denominator は `null` / `N/A` とする。
 
 ### Backward compatibility — APPROVE
 
@@ -104,7 +110,7 @@ coverage absent を `complete` / `partial` のどちらにも捏造しない。0
 
 ### Security / trust boundary — APPROVE
 
-saved run は引き続き self-reported / untrusted observation。集計によって trust level を引き上げない。
+saved run は引き続き self-reported / untrusted observation。集計によって trust level を引き上げない。unclassified observation を明示して、壊れた観測を正常母集団へ黙って混ぜない。
 
 ### Operations / observability — APPROVE
 
@@ -112,7 +118,7 @@ saved run は引き続き self-reported / untrusted observation。集計によ�
 
 ### Testing / regression — APPROVE
 
-legacy absence、partial、timeout/failure、optional failure、0 findings、0 denominator を固定し、required CI green を必須とする。
+legacy absence、partial、timeout/failure、optional failure、unclassified status、0 findings、0 denominator を固定し、required CI green を必須とする。
 
 ## Completion rule
 
