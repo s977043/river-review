@@ -169,6 +169,7 @@ Do not add a new schema or verdict enum.
 Each residual item should state:
 
 - category
+- severity
 - blocking
 - evidence_missing
 - resolution

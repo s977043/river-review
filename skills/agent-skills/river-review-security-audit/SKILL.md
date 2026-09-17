@@ -276,7 +276,7 @@ Then emit these sections:
 2. **Candidate findings** — evidence-grounded findings produced through existing River Review skill contracts.
 3. **Unresolved hypotheses** — missing facts, blockers, and validation plans.
 4. **Security audit coverage** — semantic units keyed by subsystem × trust boundary × attack class using the Phase 3 contract.
-5. **Coverage critic observations** — residual coverage unknowns from the `unknown-coverage-review` security-audit profile; omit only when the profile correctly returns `NO_REVIEW` and explain why.
+5. **Unverified / Residual Risk — Unknown Coverage** — residual coverage unknowns from the `unknown-coverage-review` security-audit profile; omit only when the profile correctly returns `NO_REVIEW` and explain why.
 6. **Next validation actions** — only actions that preserve the source-only policy unless a later sandbox phase is explicitly available.
 
 For findings, preserve the existing River Review finding shape where possible:
