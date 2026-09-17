@@ -46,6 +46,11 @@ function planWithSkillPath(skillPath = apiCompatibilitySkillPath) {
   };
 }
 
+function planWithHeuristicSkill(skillPath = apiCompatibilitySkillPath) {
+  const plan = planWithSkillPath(skillPath);
+  return { selected: [...plan.selected, { metadata: { id: 'security-basic' } }] };
+}
+
 function explodingDiff() {
   const diff = {};
   Object.defineProperty(diff, 'files', {
@@ -90,7 +95,13 @@ test('observe mode records signal failures without changing review success seman
   const result = await runReviewViewpointStage({
     reviewConfig: { viewpoints: { mode: 'observe' } },
     diff: explodingDiff(),
-    plan: planWithSkillPath(),
+    // `security-basic` is what makes the heuristic collection actually touch the
+    // diff: collectHeuristicDetections only runs detectors whose skillId is in
+    // the plan, and `api-compatibility` owns no heuristic detector. Without a
+    // detector-backed Skill here the exploding diff is never read, so the
+    // `heuristic-signal-collection-failed` branch would go unexercised.
+    // It carries no `path`, so it contributes no catalog work of its own.
+    plan: planWithHeuristicSkill(),
   });
 
   assert.equal(result.mode, 'observe');
