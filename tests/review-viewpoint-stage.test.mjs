@@ -51,6 +51,13 @@ function planWithHeuristicSkill(skillPath = apiCompatibilitySkillPath) {
   return { selected: [...plan.selected, { metadata: { id: 'security-basic' } }] };
 }
 
+// Only a detector-backed Skill, so the heuristic branch is the sole source of a
+// throw. `planWithHeuristicSkill` keeps `api-compatibility` alongside it, which
+// means its signal producer throws too and masks whichever branch is under test.
+function planWithHeuristicSkillOnly() {
+  return { selected: [{ metadata: { id: 'security-basic' } }] };
+}
+
 function explodingDiff() {
   const diff = {};
   Object.defineProperty(diff, 'files', {
@@ -112,12 +119,31 @@ test('observe mode records signal failures without changing review success seman
   ]);
 });
 
-test('active mode fails closed when signal collection cannot be trusted', async () => {
+test('active mode fails closed when a signal producer throws', async () => {
+  // `planWithSkillPath()` selects only `api-compatibility`, which owns no
+  // heuristic detector, so the throw here comes from the signal producer.
   await assert.rejects(
     runReviewViewpointStage({
       reviewConfig: { viewpoints: { mode: 'active' } },
       diff: explodingDiff(),
       plan: planWithSkillPath(),
+    }),
+    (error) => error instanceof ReviewViewpointStageError
+  );
+});
+
+test('active mode fails closed when heuristic signal collection throws', async () => {
+  // The producer case above never reaches the heuristic branch: without a
+  // detector-backed Skill in the plan the exploding diff is never read. The plan
+  // here carries *only* the detector-backed Skill, so the producer cannot throw
+  // in its place — neutering the heuristic fail-closed branch makes this reject
+  // stop happening. Observe mode records the same failure as an error and still
+  // succeeds; the two must not converge.
+  await assert.rejects(
+    runReviewViewpointStage({
+      reviewConfig: { viewpoints: { mode: 'active' } },
+      diff: explodingDiff(),
+      plan: planWithHeuristicSkillOnly(),
     }),
     (error) => error instanceof ReviewViewpointStageError
   );
