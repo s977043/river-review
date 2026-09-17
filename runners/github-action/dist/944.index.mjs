@@ -11,6 +11,8 @@ __webpack_require__.r(__webpack_exports__);
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
   ALLOWLIST_RELATIVE_PATH: () => (/* binding */ ALLOWLIST_RELATIVE_PATH),
+  extractGateCommands: () => (/* binding */ extractGateCommands),
+  loadTrustedAllowlistEntries: () => (/* binding */ loadTrustedAllowlistEntries),
   runDeterministicGates: () => (/* binding */ runDeterministicGates)
 });
 
@@ -857,10 +859,14 @@ function emptyResult() {
  * surviving valid entries, or `null` when `trustedTree` is unusable / the file
  * is missing (safe-default: run nothing). Never reads the PR head allowlist.
  *
+ * Exported (#2275 PR-3B) so the fast-verification checkpoint can tell
+ * "the host never opted in" (null) apart from "opted in, nothing matched"
+ * without reading the allowlist a second time through its own code path.
+ *
  * @param {string | undefined} trustedTree base-checkout path
  * @returns {Promise<Array<object> | null>}
  */
-async function loadTrustedAllowlist(trustedTree) {
+async function loadTrustedAllowlistEntries(trustedTree) {
   if (typeof trustedTree !== 'string' || trustedTree.length === 0) return null;
   const allowlistPath = external_node_path_.join(trustedTree, ALLOWLIST_RELATIVE_PATH);
   let yamlText;
@@ -875,6 +881,8 @@ async function loadTrustedAllowlist(trustedTree) {
 
 /**
  * Extract the deterministic-gate command definitions from the selected skills.
+ * Exported (#2275 PR-3B) so the fast-verification checkpoint enumerates the
+ * checks it expects to run from this one definition rather than a second copy.
  * Only skills whose `metadata.deterministicGate` carries a non-empty `command`
  * are candidates. `args` defaults to `[]`.
  *
@@ -968,7 +976,7 @@ async function runDeterministicGates({
   execImpl,
   mkdtempImpl,
 } = {}) {
-  const validEntries = await loadTrustedAllowlist(trustedTree);
+  const validEntries = await loadTrustedAllowlistEntries(trustedTree);
   if (validEntries == null) return emptyResult();
 
   const gates = extractGateCommands(selected);
