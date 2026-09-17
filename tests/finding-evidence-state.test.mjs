@@ -41,10 +41,13 @@ describe('finding evidence state projection', () => {
     assert.equal(result.state, EVIDENCE_STATE.REFUTED);
   });
 
-  it('projects reviewer withdrawal to refuted', () => {
+  it('keeps reviewer withdrawal unresolved without refuting the claim', () => {
     const result = project(FINAL_STATUS.WITHDRAWN_BY_REVIEWER);
 
-    assert.equal(result.state, EVIDENCE_STATE.REFUTED);
+    assert.equal(result.state, EVIDENCE_STATE.UNRESOLVED);
+    assert.equal(result.reasonCode, EVIDENCE_STATE_REASON.REVIEWER_WITHDRAWAL);
+    assert.notEqual(result.state, EVIDENCE_STATE.REFUTED);
+    assert.equal(result.unresolvedContextComplete, false);
   });
 
   it('requires context for unresolved human judgment', () => {
