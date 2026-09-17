@@ -26,34 +26,37 @@ jobs:
       - run: npm ci
 
       - name: Remove Phase 4 ad-hoc vocabulary
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           profile = Path('skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md')
           text = profile.read_text()
           old = '''Suggested output:
 
-```text
-category: security-audit-coverage
-kind: missing_surface
-coverageUnit: <expected subsystem × trustBoundary × attackClassId>
-evidence_missing: <what investigation evidence is absent>
-resolution: <minimum source-only investigation needed>
-```
-'''
+          ```text
+          category: security-audit-coverage
+          kind: missing_surface
+          coverageUnit: <expected subsystem × trustBoundary × attackClassId>
+          evidence_missing: <what investigation evidence is absent>
+          resolution: <minimum source-only investigation needed>
+          ```
+          '''
+          old = old.replace('          ', '')
           new = '''Suggested output using the existing Unknown Coverage fields only:
 
-```text
-category: Security / Data
-severity: <existing River Review severity based on residual risk>
-blocking: <true | false>
-evidence_missing: <missing investigation evidence, including the expected subsystem × trustBoundary × attackClassId when relevant>
-resolution: <minimum source-only investigation needed>
-```
+          ```text
+          category: Security / Data
+          severity: <existing River Review severity based on residual risk>
+          blocking: <true | false>
+          evidence_missing: <missing investigation evidence, including the expected subsystem × trustBoundary × attackClassId when relevant>
+          resolution: <minimum source-only investigation needed>
+          ```
 
-Encode the expected semantic unit inside `evidence_missing` or `resolution`; do not add profile-specific output fields.
-'''
+          Encode the expected semantic unit inside `evidence_missing` or `resolution`; do not add profile-specific output fields.
+          '''
+          new = new.replace('          ', '')
           if old not in text:
               raise SystemExit('expected SECURITY-AUDIT-PROFILE block not found')
           profile.write_text(text.replace(old, new))
@@ -64,6 +67,7 @@ Encode the expected semantic unit inside `evidence_missing` or `resolution`; do 
           if old not in text:
               raise SystemExit('expected coverage critic header line not found')
           skill.write_text(text.replace(old, ''))
+          PY
 
       - name: Regenerate skill artifacts
         run: |
