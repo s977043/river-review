@@ -16,7 +16,7 @@ function project(finalStatus, extra = {}) {
 }
 
 describe('finding evidence state projection', () => {
-  it('projects confirmed validation to established', () => {
+  it('projects confirmed to established', () => {
     assert.deepEqual(project(FINAL_STATUS.CONFIRMED), {
       state: EVIDENCE_STATE.ESTABLISHED,
       source: 'validation.finalStatus',
@@ -28,50 +28,41 @@ describe('finding evidence state projection', () => {
     });
   });
 
-  it('projects evidence-grounded dismissal to refuted', () => {
-    assert.equal(project(FINAL_STATUS.DISMISSED_BY_EVIDENCE).state, EVIDENCE_STATE.REFUTED);
-    assert.equal(
-      project(FINAL_STATUS.DISMISSED_BY_EVIDENCE).reasonCode,
-      EVIDENCE_STATE_REASON.REFUTED
-    );
+  it('projects evidence dismissal to refuted', () => {
+    const result = project(FINAL_STATUS.DISMISSED_BY_EVIDENCE);
+
+    assert.equal(result.state, EVIDENCE_STATE.REFUTED);
+    assert.equal(result.reasonCode, EVIDENCE_STATE_REASON.REFUTED);
   });
 
-  it('projects deterministic hallucination dismissal to refuted', () => {
-    assert.equal(
-      project(FINAL_STATUS.DISMISSED_HALLUCINATION).state,
-      EVIDENCE_STATE.REFUTED
-    );
+  it('projects hallucination dismissal to refuted', () => {
+    const result = project(FINAL_STATUS.DISMISSED_HALLUCINATION);
+
+    assert.equal(result.state, EVIDENCE_STATE.REFUTED);
   });
 
-  it('projects reviewer withdrawal to refuted because the candidate no longer stands', () => {
-    assert.equal(
-      project(FINAL_STATUS.WITHDRAWN_BY_REVIEWER).state,
-      EVIDENCE_STATE.REFUTED
-    );
+  it('projects reviewer withdrawal to refuted', () => {
+    const result = project(FINAL_STATUS.WITHDRAWN_BY_REVIEWER);
+
+    assert.equal(result.state, EVIDENCE_STATE.REFUTED);
   });
 
-  it(
-    'projects needs-human-judgment to unresolved and requires blocker plus validation plan',
-    () => {
-      const incomplete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT);
-      const complete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT, {
-        blocker: 'Runtime behavior cannot be established from source only.',
-        validationPlan: 'Reproduce in the sandbox adapter when available.',
-      });
+  it('requires context for unresolved human judgment', () => {
+    const incomplete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT);
+    const complete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT, {
+      blocker: 'Runtime behavior cannot be established from source only.',
+      validationPlan: 'Reproduce in the sandbox adapter when available.',
+    });
 
-      assert.equal(incomplete.state, EVIDENCE_STATE.UNRESOLVED);
-      assert.equal(incomplete.unresolvedContextComplete, false);
-      assert.equal(complete.state, EVIDENCE_STATE.UNRESOLVED);
-      assert.equal(complete.unresolvedContextComplete, true);
-      assert.equal(complete.blocker, 'Runtime behavior cannot be established from source only.');
-      assert.equal(
-        complete.validationPlan,
-        'Reproduce in the sandbox adapter when available.'
-      );
-    }
-  );
+    assert.equal(incomplete.state, EVIDENCE_STATE.UNRESOLVED);
+    assert.equal(incomplete.unresolvedContextComplete, false);
+    assert.equal(complete.state, EVIDENCE_STATE.UNRESOLVED);
+    assert.equal(complete.unresolvedContextComplete, true);
+    assert.equal(complete.blocker, 'Runtime behavior cannot be established from source only.');
+    assert.equal(complete.validationPlan, 'Reproduce in the sandbox adapter when available.');
+  });
 
-  it('projects critic timeout to unresolved rather than a clean or established state', () => {
+  it('projects critic timeout to unresolved', () => {
     const result = project(FINAL_STATUS.CRITIC_TIMEOUT);
 
     assert.equal(result.state, EVIDENCE_STATE.UNRESOLVED);
@@ -79,7 +70,7 @@ describe('finding evidence state projection', () => {
     assert.equal(result.unresolvedContextComplete, false);
   });
 
-  it('does not treat out-of-ask relevance routing as refutation', () => {
+  it('does not refute out-of-ask findings', () => {
     const result = project(FINAL_STATUS.OUT_OF_ASK);
 
     assert.equal(result.state, EVIDENCE_STATE.UNRESOLVED);
@@ -87,16 +78,17 @@ describe('finding evidence state projection', () => {
     assert.notEqual(result.state, EVIDENCE_STATE.REFUTED);
   });
 
-  it('fails safe to unresolved when validation status is missing or malformed', () => {
+  it('fails safe when validation status is missing or malformed', () => {
     for (const input of [undefined, null, 42, false, 'finding', {}, { validation: null }]) {
       const result = projectFindingEvidenceState(input);
+
       assert.equal(result.state, EVIDENCE_STATE.UNRESOLVED);
       assert.equal(result.reasonCode, EVIDENCE_STATE_REASON.STATUS_MISSING);
       assert.equal(result.unresolvedContextComplete, false);
     }
   });
 
-  it('fails safe to unresolved for an unknown final status', () => {
+  it('fails safe for an unknown final status', () => {
     const result = project('dismissed-duplicate');
 
     assert.equal(result.state, EVIDENCE_STATE.UNRESOLVED);
@@ -104,37 +96,34 @@ describe('finding evidence state projection', () => {
     assert.notEqual(result.state, EVIDENCE_STATE.REFUTED);
   });
 
-  it('does not use validatedStatus alone as epistemic truth', () => {
+  it('does not use validatedStatus alone as truth', () => {
     const result = projectFindingEvidenceState({ validatedStatus: 'confirmed' });
 
     assert.equal(result.state, EVIDENCE_STATE.UNRESOLVED);
     assert.equal(result.reasonCode, EVIDENCE_STATE_REASON.STATUS_MISSING);
   });
 
-  it(
-    'does not let lifecycle, scope, severity, disposition, confidence, or agreement alter truth state',
-    () => {
-      const baseline = projectFindingEvidenceState({
-        validation: { finalStatus: FINAL_STATUS.CONFIRMED },
-      });
-      const decorated = projectFindingEvidenceState({
-        validation: { finalStatus: FINAL_STATUS.CONFIRMED },
-        status: 'suppressed',
-        scope: 'pre-existing',
-        severity: 'critical',
-        confidence: 'low',
-        disposition: 'advisory',
-        agreement: ['reviewer-a', 'reviewer-b', 'reviewer-c'],
-        validatedStatus: 'dismissed-duplicate',
-      });
+  it('keeps orthogonal axes out of evidence state', () => {
+    const baseline = projectFindingEvidenceState({
+      validation: { finalStatus: FINAL_STATUS.CONFIRMED },
+    });
+    const decorated = projectFindingEvidenceState({
+      validation: { finalStatus: FINAL_STATUS.CONFIRMED },
+      status: 'suppressed',
+      scope: 'pre-existing',
+      severity: 'critical',
+      confidence: 'low',
+      disposition: 'advisory',
+      agreement: ['reviewer-a', 'reviewer-b', 'reviewer-c'],
+      validatedStatus: 'dismissed-duplicate',
+    });
 
-      assert.equal(baseline.state, EVIDENCE_STATE.ESTABLISHED);
-      assert.equal(decorated.state, EVIDENCE_STATE.ESTABLISHED);
-      assert.equal(decorated.reasonCode, EVIDENCE_STATE_REASON.CONFIRMED);
-    }
-  );
+    assert.equal(baseline.state, EVIDENCE_STATE.ESTABLISHED);
+    assert.equal(decorated.state, EVIDENCE_STATE.ESTABLISHED);
+    assert.equal(decorated.reasonCode, EVIDENCE_STATE_REASON.CONFIRMED);
+  });
 
-  it('does not invent unresolved blocker or validation plan from malformed values', () => {
+  it('does not invent unresolved context', () => {
     const result = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT, {
       blocker: '   ',
       validationPlan: { command: 'npm test' },
@@ -145,7 +134,7 @@ describe('finding evidence state projection', () => {
     assert.equal(result.unresolvedContextComplete, false);
   });
 
-  it('trims caller-supplied unresolved context without rewriting it', () => {
+  it('trims caller-supplied unresolved context', () => {
     const result = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT, {
       blocker: '  Missing runtime evidence  ',
       validationPlan: '  Validate in a bounded sandbox  ',
@@ -156,7 +145,7 @@ describe('finding evidence state projection', () => {
     assert.equal(result.unresolvedContextComplete, true);
   });
 
-  it('ignores unresolved context for established and refuted records', () => {
+  it('ignores stale unresolved context after resolution', () => {
     const established = project(FINAL_STATUS.CONFIRMED, {
       blocker: 'stale blocker',
       validationPlan: 'stale plan',
