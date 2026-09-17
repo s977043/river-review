@@ -29,6 +29,10 @@ name: Blocked Label Guard
 # （`refs/heads/gh-readonly-queue/<base>/pr-<番号>-<base sha>`）から PR 番号を取り出し、
 # API で現在のラベルを読んで同じ判定を行う。
 #
+# 1 つの merge group が複数の PR を含む場合、head_ref が名指しするのは最後に積まれた 1 本
+# だけである。**各 PR は自分の entry で必ず一度は判定される**ので、group 内の先行 PR は
+# その PR 自身の entry の check-run が担保する。
+#
 # 残る窓は 1 つある。ある PR のキュー entry のガードが pass で確定したあとにラベルが付いた
 # 場合、その entry は再評価されない。ラベルを付けた側が UI / API でキューから除外する運用が
 # 必要になる（docs/governance.md「PR レビューとマージ」）。
@@ -85,8 +89,13 @@ jobs:
           set -euo pipefail
 
           if [ "$EVENT_NAME" = "merge_group" ]; then
+            # prefix と最小 sha 長まで固定する。`^.*/pr-<数字>-<hex>$` だけだと
+            # `refs/heads/my/pr-5-decade` のような無関係な ref も 5 にマッチし、
+            # フォーマットが変わったとき「fail せず誤った PR のラベルを読む」に転ぶ。
+            # base に `/` を含む形・base 自体が `pr-N-hex` で終わる形・大文字 sha は
+            # いずれもこの式で正しく抜ける。
             PR_NUMBER="$(printf '%s' "$MERGE_GROUP_HEAD_REF" \
-              | sed -n 's|^.*/pr-\([0-9][0-9]*\)-[0-9a-fA-F]\{1,\}$|\1|p')"
+              | sed -n 's|^refs/heads/gh-readonly-queue/.*/pr-\([0-9][0-9]*\)-[0-9a-fA-F]\{7,\}$|\1|p')"
             if [ -z "$PR_NUMBER" ]; then
               # 判定不能は pass ではなく fail にする。素通りさせるとキューの中身が
               # 無検査でマージされるためで、fail なら GitHub が当該 entry をキューから
@@ -94,8 +103,22 @@ jobs:
               echo "::error title=Merge group ref is unparsable::head_ref='${MERGE_GROUP_HEAD_REF}' から PR 番号を取り出せませんでした。"
               exit 1
             fi
-            if ! PR_LABELS="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '[.labels[].name]')"; then
-              echo "::error title=Label lookup failed::PR #${PR_NUMBER} のラベルを取得できませんでした。"
+            # secondary rate limit / 一時的な 5xx / ネットワーク断で即 fail にすると、
+            # ラベルが無い PR でも entry がキューから外れる。fail-safe の向き
+            # （最終的に取れなければ fail）は変えずに、3 回までバックオフ再試行する。
+            PR_LABELS=""
+            for attempt in 1 2 3; do
+              if PR_LABELS="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '[.labels[].name]')"; then
+                break
+              fi
+              PR_LABELS=""
+              if [ "$attempt" -lt 3 ]; then
+                echo "ラベル取得に失敗しました (${attempt}/3)。$((attempt * 5)) 秒待って再試行します。"
+                sleep "$((attempt * 5))"
+              fi
+            done
+            if [ -z "$PR_LABELS" ]; then
+              echo "::error title=Label lookup failed::PR #${PR_NUMBER} のラベルを 3 回取得できませんでした。"
               exit 1
             fi
           else

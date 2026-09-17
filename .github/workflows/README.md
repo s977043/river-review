@@ -107,7 +107,9 @@ gh api repos/s977043/river-review/rulesets/<id> --jq '[.rules[].type]'
 
 必須チェック 7 件は `pull_request` に加えて `merge_group` でも発火します。マージキューでは、キュー内の一時ブランチ（`gh-readonly-queue/<base>/pr-<番号>-<base sha>`）に対して必須チェックが改めて要求されます。`merge_group` を持たないワークフローの context はそこで一度も報告されず、キューが詰まります（[managing-a-merge-queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue)）。必須チェックを増やすときは、その `on:` に `merge_group` があるかを合わせて確認してください。
 
-`merge_group` の payload には `pull_request` が入りません。`Blocked label guard` は一時ブランチ名から PR 番号を取り出し、ラベルを API で読んで同じ判定を行います。判定不能（ref を解析できない、API が失敗する）は pass ではなく fail にします。素通りさせるとキューの中身が無検査でマージされるためです。
+`merge_group` の payload には `pull_request` が入りません。`Blocked label guard` は一時ブランチ名から PR 番号を取り出し、ラベルを API で読んで同じ判定を行います。API の取得は 3 回までバックオフ再試行し、最終的に取れなければ fail にします。判定不能（ref を解析できない、API が失敗する）を pass にしないのは、素通りさせるとキューの中身が無検査でマージされるためです。1 つの merge group が複数の PR を含む場合、`head_ref` が名指しするのは最後に積まれた 1 本だけですが、各 PR は自分の entry で必ず一度は判定されるため、先行する PR はその PR 自身の entry の check-run が担保します。
+
+キュー有効化時の運用メモ: `auto-rebuild-action-dist.yml` は `pull_request` でしか走りません。`Action dist freshness` がキュー内で落ちても bot による `dist/` の自動再生成は走らず、PR はキューから外れます。キューへ入れる前に PR イベント側で dist が緑になっていることを確認してください。
 
 ### 2. 必須チェックにしない場合
 
@@ -153,7 +155,10 @@ JSON
 - サードパーティ action は commit SHA でピン留めする。現状 `scorecard.yml` の `ossf/scorecard-action@v2.4.4` だけがタグ参照である
 - `permissions:` は 28 本すべてが top-level で宣言している。読み取りだけで済むものには `read-all` か `contents: read` を置き、書き込みが要るジョブにだけスコープを足す。`auto-milestone.yml` は `issues: write` のみを与える最小例である
 - 共有状態（ref・デプロイ・Issue・外部リソース）に触れるワークフローには `concurrency:` グループを設定する。読み取り専用のジョブでは省略してよい。現状 28 本中 26 本が設定済みで、例外は `hol-plugin-scanner.yml` と `blocked-label-guard.yml` の 2 本である
-- **必須チェックのワークフローには `concurrency:` を設定しない。** グループ内で cancel された run は `cancelled` の check-run を残し、pass でも fail でもない結論として必須チェックの判定を止める。`cancel-in-progress: false` にしても避けられない。グループ内に pending の run がある状態で新しい run が queue に入ると、既存の pending が cancel されて新しい run が置き換わる仕様のためである（[workflow-syntax#concurrency](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency)）。`blocked-label-guard.yml` はこの事故（#1778）を受けて `concurrency:` を外している
+- **必須チェックの `concurrency` グループは commit 単位で分ける。** 同じ commit について報告する run どうしが 1 グループへ入ると事故になる。グループ内で cancel された run は `cancelled` の check-run を残し、pass でも fail でもない結論として必須チェックの判定を止める（#1778）。`cancel-in-progress: false` にしても避けられない。グループ内に pending の run がある状態で新しい run が queue へ入ると、既存の pending は cancel される。出典は [workflow-syntax#concurrency](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency) である。cancel されるタイミングが in-progress から pending へ移るだけで、`cancelled` の check-run は残る。
+  - 害になる条件は「**cancel された run と生き残る run が同じ commit について報告する**」ことである。`blocked-label-guard.yml` は `labeled` / `unlabeled` を購読しており、同じ head sha に対して複数の run が立つ。グループを共有すると現在の head の判定が `cancelled` になるため、このワークフローは `concurrency:` を持たない（#1778 の事故そのもの）。
+  - `test.yml` は `concurrency:` を持つが、この条件に当たらない。購読しているのは `push`（main）/ `pull_request` / `merge_group` / `workflow_dispatch` で、`pull_request` で cancel が起きるのは push によって head が進んだときだけである。cancel される run は**古い commit**について報告するので、現在の head の必須チェックには影響しない。
+  - グループ名にはイベント名を含める（`ci-${{ github.event_name }}-${{ github.ref }}`）。`merge_group` では `cancel-in-progress` を false にする。キューの entry は一時ブランチごとに ref が一意なので衝突しない想定だが、必須チェックの結論を cancel が左右しうる経路をキュー側に残さない。
 - `GITHUB_TOKEN` による push は下流の `pull_request` ワークフローを再発火させない（GitHub の再帰防止仕様）。dist 再ビルドや release-please のキックでこの制約に当たった場合の脱出手順は [CLAUDE.md](../../CLAUDE.md) の「`N of N required checks are expected` = bot/`GITHUB_TOKEN` push」を参照する
 - ワークフローや CI 自動化をマージする前のレビュー観点（並行実行・既定値の結合・部分失敗）は [AGENTS.md](../../AGENTS.md) の「Code-gen review」に従う
 
