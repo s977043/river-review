@@ -14,6 +14,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job below checks out and installs on its own, so none of them depends
+# on `lint`. That is deliberate: when `lint` gated them, a single style error
+# left the test and validation jobs `skipping`, and the PR learned nothing about
+# its own tests until the style fix had gone through a second full CI round. A
+# lint error now costs runner minutes instead of a round trip (#2251 sat blocked
+# for hours on one duplicate import).
 jobs:
   lint:
     name: Lint
@@ -88,7 +94,6 @@ jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
-    needs: lint
     timeout-minutes: 20
     permissions:
       contents: read
@@ -138,7 +143,6 @@ jobs:
   test-macos:
     name: Unit tests (macOS)
     runs-on: macos-latest
-    needs: lint
     timeout-minutes: 30
     permissions:
       contents: read
@@ -156,7 +160,6 @@ jobs:
   skill-validation:
     name: Skill schema validation
     runs-on: ubuntu-latest
-    needs: lint
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -178,7 +181,6 @@ jobs:
   meta-check:
     name: Meta consistency
     runs-on: ubuntu-latest
-    needs: lint
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -189,7 +191,6 @@ jobs:
   dist-check:
     name: Action dist freshness
     runs-on: ubuntu-latest
-    needs: lint
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -336,7 +337,6 @@ jobs:
     # Runs in parallel with the unit-test matrix (which already includes the
     # integration tests via `node --test` discovery); chaining it after `test`
     # only re-ran the same files a third time at the end of the critical path.
-    needs: lint
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -350,7 +350,6 @@ jobs:
   engine-install:
     name: Engine-only install (--omit=dev)
     runs-on: ubuntu-latest
-    needs: lint
     timeout-minutes: 10
     steps:
       - name: Checkout repository
