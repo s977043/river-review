@@ -209,6 +209,30 @@ River Review が認識する入力アーティファクトは以下の通りで�
 - **`--base` との優先順位**（#2046）: 明示指定した artifact（tier 1 CLI 引数 / tier 2 設定ファイル）は `review plan|exec --base <ref>` に優先する。ただし優先されるのは**そのパスにファイルが実在する場合**であり、実在しなければ `--base` の範囲が使われる（その旨を stderr で告知する）。tier 3 のディレクトリ自動検出（`diff.patch`）よりは `--base` が優先する。いずれの場合も、採用しなかった側を stderr の警告で告知する。
 - **結果が空の場合**: 供給された差分（指定または fallback 実行結果）が空であれば、`status` を `no-changes` とし、レビュー skill は実行されない。
 
+#### 差分の供給経路（実装の全列挙）
+
+上記の「指定方法（入力チャネル）」は artifact ファイルの解決順序であり、差分が River Review へ到達する経路そのものの一覧ではありません。実装には差分が系に入る入口が 8 本あります（2026-09-17 時点。fixture 評価専用の `review-fixtures-eval.mjs` / `repo-wide-fixtures-eval.mjs` は本番経路ではないため除外）。本節は経路ごとに、差分を作るのが誰か・context 幅・combined diff（`diff --cc` / `@@@`）が入りうるかを規定します。
+
+| #   | 経路（実装位置）                                                | surface                                         | 差分の生成者        | context 幅           | combined diff |
+| --- | --------------------------------------------------------------- | ----------------------------------------------- | ------------------- | -------------------- | ------------- |
+| 1   | `src/cli/commands/review.mjs:56` → `collectRepoDiff`            | `river review plan` / `river review exec`       | River Review（git） | 3                    | 入らない      |
+| 2   | `src/cli/commands/skills.mjs:133` → `collectRepoDiff`           | `river skills`                                  | River Review（git） | 3                    | 入らない      |
+| 3   | `src/lib/local-runner.mjs:269` `planLocalReview`                | `river run`（plan 相当）                        | River Review（git） | 3（`--debug` 時 10） | 入らない      |
+| 4   | `src/lib/local-runner.mjs:767` `doctorLocalReview`              | `river doctor`                                  | River Review（git） | 0（`--debug` 時 10） | 入らない      |
+| 5   | `src/lib/review-plan.mjs:484` / `:841` の artifact ファイル読み | tier 1 / 2 / 3 の `diff` artifact               | ホスト              | 規定しない           | 規定しない    |
+| 6   | `src/lib/review-plan.mjs:481` / `:838` `diffOverride.diffText`  | `review plan` / `exec` の `--base <ref>`        | River Review（git） | 3                    | 入らない      |
+| 7   | `src/lib/local-runner.mjs:531` `runLocalReview({ context })`    | プログラム的な埋め込み                          | ホスト              | 規定しない           | 規定しない    |
+| 8   | `runners/node-api/src/index.ts:342` の `diffText` オプション    | Node API（`review()` / `buildExecutionPlan()`） | ホスト              | 規定しない           | 規定しない    |
+
+- **git 生成経路（1 / 2 / 3 / 4 / 6）**: いずれも `src/lib/git.mjs:520` の `git diff --unified=<N> --no-color <baseRef>` を通る。base ref を明示する 2 ツリー間の diff なので、combined diff は出力されない。マージ競合中の作業ツリーでも出力は 2 ツリー形式のままであり、競合マーカーは通常の追加行として現れる（2026-09-17 に使い捨ての repo で実測）。
+- **context 幅**: 既定は 3 である。`river doctor`（経路 4）だけが 0 を使い、`--debug` を付けた経路 3 / 4 は 10 を使う。context 幅を選ぶのは River Review 側の実装上の判断であり、本契約が外部へ約束する値ではない。ホストが経路 5 / 7 / 8 で供給する差分の context 幅は **規定しない**。
+- **combined diff**: `diff --cc` / `@@@` 形式の差分は、本契約の「`git diff` 互換」に **含めない**。経路 5 / 7 / 8 で供給された場合の挙動は **規定しない**（現状の parse 層は `@@@` ハンクの本体を落とす。#2294）。
+
+#### 差分供給の責務の所在
+
+- **経路 1 / 2 / 3 / 4 / 6**: 差分の生成は River Review の責務にあたる。形式・context 幅・base の解決はすべて実装側で決まる。
+- **経路 5 / 7 / 8**: 差分の供給は **ホスト側の責務** にあたる。`reviewSignals` と同じく、本リポジトリ内に producer は存在しない。River Review は consumer として受け取るだけであり、渡された差分が実 git の出力であることも、unified diff として妥当であることも検査しない。ホストは `git diff --unified=3` 相当の 2 ツリー unified diff を渡す。非 git 生成の差分・手書きの patch・combined diff を渡した場合の挙動は **規定しない**。
+
 ### `junit`
 
 - **形式**: [JUnit XML](https://github.com/testmoapp/junitxml) 互換。ネストした `<testsuite>` を許容。
@@ -234,6 +258,8 @@ River Review は以下の順でアーティファクトを解決します。
 3. **カレントディレクトリ検出**（フォールバック）。ワークスペース直下から上記の既定ファイル名を探索する。
 
 どのチャネルも未指定の artifact については「欠損」と扱い、前節の「欠損時」挙動に従います。
+
+この 3 tier が適用される surface は `river review plan` と `river review exec` だけです。`river run` / `river skills` / `river doctor` は artifact 解決を行わず、差分を常に git から自身で取得します（前節「差分の供給経路」の経路 3 / 2 / 4）。
 
 ## 後続システムとの接続
 
