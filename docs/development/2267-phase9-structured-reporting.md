@@ -82,6 +82,22 @@ never hash the same as an unchanged one.
 The caller supplies the path to content digest map. This module reads no files, which keeps the
 slice source-only and free of any target execution.
 
+## Untrusted input is validated, not assumed
+
+Both modules treat their inputs as untrusted.
+
+- `buildSecurityAuditRunRecord` runs the embedded coverage through
+  `validateSecurityAuditCoverageSemantics`, the Phase 3 validator, and refuses a record whose
+  counters disagree with its own units. Passing an attack registry additionally enforces the
+  taxonomy-version and attack-class checks.
+- A prior `covered` unit that reviewed no path is refused. The revision of an empty path list is a
+  publicly computable constant, so without that guard it would match however much the source moved.
+- Unit identity comes from `securityAuditUnitSemanticKey`, exported by the Phase 3 module.
+  Phase 3 duplicate detection and Phase 9 carry-over matching therefore cannot disagree.
+  Neither side can fold two spellings of one name into two identities.
+- Severity is checked against the output-schema vocabulary at build time.
+  `generatedAt` must be a real calendar instant rather than merely ISO-shaped.
+
 ## Boundary against #1574
 
 ```text
@@ -100,6 +116,20 @@ The two never share state.
   `$id` rather than restating it.
 - `schemas/security-audit-coverage.schema.json` gains two additive optional unit fields,
   `sourceRevision` and `carriedOverFrom`. Existing Phase 3 records stay valid without them.
+
+Compatibility is one-directional, and deliberately so.
+The schema sets `additionalProperties: false` at the root and again on `securityAuditUnit`.
+
+```text
+old record -> new schema  = valid (both new fields are optional)
+new record -> old schema  = rejected (the two new unit fields are unknown there)
+```
+
+No writer emits a coverage record yet, so nothing is affected today.
+A consumer that pins the pre-Phase-9 schema must upgrade before reading a carried-over record.
+
+Both surfaces are listed as Experimental in `pages/reference/stable-interfaces.md` and its English
+counterpart.
 
 ## Follow-ups left open
 

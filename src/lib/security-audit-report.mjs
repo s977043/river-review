@@ -25,6 +25,7 @@
  */
 
 import { canonicalJson, nonEmptyNfcString } from './promotion-candidates.mjs';
+import { validateSecurityAuditCoverageSemantics } from './security-audit-coverage.mjs';
 import { sha256Hex } from './shadow-aggregate.mjs';
 
 /** Schema version of the run record. */
@@ -45,6 +46,30 @@ export const SECURITY_AUDIT_EVIDENCE_STATES = Object.freeze([
 
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
+/**
+ * Severity vocabulary of the output schema (`docs/review/output-format.md`).
+ * The builder rejects anything else rather than letting the JSON Schema be the
+ * only thing standing between an invented severity and a rendered report.
+ */
+export const SECURITY_AUDIT_SEVERITIES = Object.freeze(['critical', 'major', 'minor', 'info']);
+
+/**
+ * Codes from `validateSecurityAuditCoverageSemantics` that need the Phase 2
+ * attack registry to be meaningful. Without a registry they say nothing, so
+ * they are dropped rather than reported as if the coverage were broken.
+ */
+const REGISTRY_DEPENDENT_COVERAGE_CODES = new Set([
+  'unknown_attack_class',
+  'taxonomy_version_mismatch',
+]);
+
+function isRealInstant(value) {
+  // The pattern above accepts 2026-13-45T99:99:99Z. Round-tripping through Date
+  // is what actually rejects an impossible calendar date.
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value.slice(0, 19));
+}
+
 function requireString(value, field) {
   const normalized = nonEmptyNfcString(value);
   if (normalized === null) throw new TypeError(`${field} must be a non-empty string`);
@@ -63,6 +88,9 @@ function normalizeFinding(finding, index) {
   // exact blocker plus a validation plan. Rendering a severity for it would
   // manufacture a judgment the verification pipeline never made.
   const severity = nonEmptyNfcString(finding.severity);
+  if (severity !== null && !SECURITY_AUDIT_SEVERITIES.includes(severity)) {
+    throw new TypeError(`findings[${index}].severity is not a known severity`);
+  }
   if (evidenceState === 'unresolved') {
     if (severity !== null) {
       throw new TypeError(`findings[${index}] is unresolved and must not carry a severity`);
@@ -79,6 +107,9 @@ function normalizeFinding(finding, index) {
     subsystem: nonEmptyNfcString(finding.subsystem),
     blocker: nonEmptyNfcString(finding.blocker),
     validationPlan: nonEmptyNfcString(finding.validationPlan),
+    // `scope` defaults to `repository` because an audit finding with no stated
+    // scope is a repository-level observation, not a claim about the current
+    // change. Narrowing it is the caller's explicit act.
     scope: nonEmptyNfcString(finding.scope) ?? 'repository',
     askRelevance: nonEmptyNfcString(finding.askRelevance),
     evidenceRefs: Array.isArray(finding.evidenceRefs) ? finding.evidenceRefs : [],
@@ -111,6 +142,8 @@ function normalizeCandidate(candidate, index) {
  * @param {{repository: string, revision: string}} input.target audited target
  * @param {string} input.generatedAt ISO-8601 UTC instant
  * @param {object} input.coverage SecurityAuditCoverage (#2267 Phase 3)
+ * @param {object|null} [input.attackRegistry] Phase 2 registry. When supplied,
+ *   taxonomy-version and attack-class checks are enforced too.
  * @param {object|null} [input.repeatRun] SecurityAuditRepeatRun summary
  * @param {Array<object>} [input.candidates]
  * @param {Array<object>} [input.findings]
@@ -122,17 +155,33 @@ export function buildSecurityAuditRunRecord({
   target,
   generatedAt,
   coverage,
+  attackRegistry = null,
   repeatRun = null,
   candidates = [],
   findings = [],
   architectureNotes = [],
 } = {}) {
   const at = requireString(generatedAt, 'generatedAt');
-  if (!ISO_INSTANT.test(at)) {
+  if (!ISO_INSTANT.test(at) || !isRealInstant(at)) {
     throw new TypeError('generatedAt must be an ISO-8601 UTC instant');
   }
   if (coverage?.kind !== 'SecurityAuditCoverage') {
     throw new TypeError('coverage must be a SecurityAuditCoverage record');
+  }
+  if (!Array.isArray(coverage.units)) {
+    throw new TypeError('coverage.units must be an array');
+  }
+  // The record claims to be the SSoT, so a coverage block whose counters
+  // disagree with its own units must never reach it. Phase 3 already owns that
+  // check; calling it here is the point.
+  const coverageIssues = validateSecurityAuditCoverageSemantics(
+    coverage,
+    attackRegistry ?? { version: coverage.taxonomyVersion, classes: [] }
+  ).filter((issue) => attackRegistry != null || !REGISTRY_DEPENDENT_COVERAGE_CODES.has(issue.code));
+  if (coverageIssues.length > 0) {
+    throw new TypeError(
+      `coverage failed semantic validation: ${coverageIssues.map((i) => i.message).join('; ')}`
+    );
   }
   if (!Array.isArray(candidates) || !Array.isArray(findings)) {
     throw new TypeError('candidates and findings must be arrays');
@@ -175,10 +224,11 @@ function bullet(line) {
 }
 
 function severityLabel(finding) {
-  // No fallback severity. An unresolved finding has none by contract, and
-  // inventing one here is exactly the "recompute severity in prose" the Epic
-  // forbids.
-  return finding.severity ?? '(no severity — unresolved)';
+  // No fallback severity. Inventing one here is exactly the "recompute severity
+  // in prose" the Epic forbids. The label also must not name an evidence state
+  // the record does not carry: an established finding may legitimately have no
+  // severity yet, and printing "unresolved" for it would misreport its state.
+  return finding.severity ?? '(not recorded)';
 }
 
 /**
@@ -239,6 +289,18 @@ export function renderSecurityAuditReport(record) {
     }
   }
 
+  // Refuted findings are listed by id rather than dropped to a bare count: a
+  // reader has to be able to see which hypothesis was refuted, and a count
+  // alone silently loses that.
+  const refuted = record.findings.filter((f) => f.evidenceState === 'refuted');
+  lines.push('## Refuted findings', '');
+  lines.push(
+    refuted.length === 0
+      ? 'None recorded in this run.'
+      : refuted.map((f) => bullet(`\`${f.id}\` — ${f.title}`)).join('\n'),
+    ''
+  );
+
   if (record.repeatRun) {
     lines.push(
       '## Repeat run',
@@ -261,9 +323,10 @@ export function renderSecurityAuditReport(record) {
  */
 export function renderNeedsValidation(record) {
   const unresolved = record.findings.filter((f) => f.evidenceState === 'unresolved');
-  const openUnits = record.coverage.units.filter(
-    (unit) => unit.state === 'planned' || unit.state === 'blocked' || unit.state === 'deferred'
-  );
+  // `openUnitIds` is the Phase 3 derivation of what is still open. Re-filtering
+  // by state here would be a second copy of `OPEN_STATES` free to drift.
+  const openIds = new Set(record.coverage.openUnitIds);
+  const openUnits = record.coverage.units.filter((unit) => openIds.has(unit.id));
   const lines = [
     '# Needs Validation',
     '',

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { canonicalJson } from '../src/lib/promotion-candidates.mjs';
+import { securityAuditUnitSemanticKey } from '../src/lib/security-audit-coverage.mjs';
 import {
   deriveUnitSourceRevision,
   reconcileRepeatRunCoverage,
@@ -176,6 +177,78 @@ describe('reconcileRepeatRunCoverage', () => {
     assert.equal(coverage.coveredUnits, 0);
     assert.equal(repeatRun.priorUnitCount, 0);
     assert.deepEqual(repeatRun.carriedOverUnitIds, []);
+  });
+
+  it('refuses carry-over when the prior unit reviewed no path at all', () => {
+    // The revision of an empty path list is a publicly computable constant, so
+    // without this guard a prior unit with no reviewedPaths carried over no
+    // matter how much the source moved.
+    const emptyPrior = priorCoveredUnit({
+      reviewedPaths: [],
+      evidenceRefs: [],
+      sourceRevision: deriveUnitSourceRevision([], {}).revision,
+    });
+    const { coverage, repeatRun } = reconcile({}, [plannedUnit()], [emptyPrior]);
+
+    assert.equal(coverage.coveredUnits, 0);
+    assert.equal(coverage.plannedUnits, 1);
+    assert.deepEqual(repeatRun.carriedOverUnitIds, []);
+    assert.deepEqual(repeatRun.revalidationRequired, [
+      { unitId: 'auth/authn@run2', reason: 'no_prior_source_revision' },
+    ]);
+  });
+
+  it('does not carry coverage across a different attack class', () => {
+    const { coverage, repeatRun } = reconcile(
+      digestsV1,
+      [plannedUnit({ attackClassId: 'injection' })],
+      [priorCoveredUnit()]
+    );
+
+    assert.equal(coverage.coveredUnits, 0);
+    assert.deepEqual(repeatRun.carriedOverUnitIds, []);
+    assert.deepEqual(repeatRun.revalidationRequired, []);
+  });
+
+  it('does not carry coverage across a different trust boundary', () => {
+    const { coverage, repeatRun } = reconcile(
+      digestsV1,
+      [plannedUnit({ trustBoundary: 'public-internet -> edge' })],
+      [priorCoveredUnit()]
+    );
+
+    assert.equal(coverage.coveredUnits, 0);
+    assert.deepEqual(repeatRun.carriedOverUnitIds, []);
+    assert.deepEqual(repeatRun.revalidationRequired, []);
+  });
+
+  it('does not carry coverage across a different subsystem', () => {
+    const { coverage } = reconcile(
+      digestsV1,
+      [plannedUnit({ subsystem: 'billing' })],
+      [priorCoveredUnit()]
+    );
+
+    assert.equal(coverage.coveredUnits, 0);
+  });
+
+  it('matches unit identity through the Phase 3 semantic key, NFC included', () => {
+    // The same name in NFC and NFD is one unit for Phase 3 duplicate detection,
+    // so it must be one unit for carry-over matching too.
+    const nfd = 'cafe\u0301-svc';
+    const nfc = 'caf\u00e9-svc';
+    assert.notEqual(nfd, nfc);
+    assert.equal(
+      securityAuditUnitSemanticKey({ ...priorCoveredUnit(), subsystem: nfd }),
+      securityAuditUnitSemanticKey({ ...priorCoveredUnit(), subsystem: nfc })
+    );
+
+    const { coverage } = reconcile(
+      digestsV1,
+      [plannedUnit({ subsystem: nfd })],
+      [priorCoveredUnit({ subsystem: nfc })]
+    );
+    assert.equal(coverage.coveredUnits, 1);
   });
 
   it('leaves units this run already classified untouched', () => {

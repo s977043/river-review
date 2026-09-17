@@ -136,6 +136,36 @@ describe('buildSecurityAuditRunRecord', () => {
     );
   });
 
+  it('rejects a severity outside the output-schema vocabulary', () => {
+    assert.throws(
+      () => record({ findings: [{ ...establishedFinding, severity: 'CATASTROPHIC' }] }),
+      /not a known severity/
+    );
+  });
+
+  it('rejects a coverage block whose counters disagree with its own units', () => {
+    const forged = {
+      ...coverage,
+      coveredUnits: 100,
+      totalUnits: 100,
+      applicableUnits: 100,
+      units: [],
+    };
+    assert.throws(() => record({ coverage: forged }), /failed semantic validation/);
+  });
+
+  it('enforces taxonomy and attack-class checks when an attack registry is supplied', () => {
+    assert.throws(
+      () => record({ attackRegistry: { version: '99.0.0', classes: attackRegistry.classes } }),
+      /taxonomyVersion/
+    );
+    assert.ok(record({ attackRegistry }));
+  });
+
+  it('rejects a syntactically valid but impossible calendar instant', () => {
+    assert.throws(() => record({ generatedAt: '2026-13-45T99:99:99Z' }), /ISO-8601 UTC instant/);
+  });
+
   it('rejects an unknown evidence state rather than defaulting it', () => {
     assert.throws(
       () => record({ findings: [{ ...establishedFinding, evidenceState: 'confirmed' }] }),
@@ -160,7 +190,8 @@ describe('security audit prose rendering', () => {
     const report = renderSecurityAuditReport(
       record({ findings: [{ ...establishedFinding, severity: null }] })
     );
-    assert.match(report, /severity: \(no severity — unresolved\)/);
+    assert.match(report, /severity: \(not recorded\)/);
+    assert.doesNotMatch(report, /unresolved\)/);
     assert.doesNotMatch(report, /severity: (critical|major|minor|info)/);
   });
 
@@ -175,6 +206,17 @@ describe('security audit prose rendering', () => {
     const report = renderSecurityAuditReport(record({ findings: [] }));
     assert.match(report, /`0 findings` is not a proof of safety/);
     assert.match(report, /## Established findings\n\nNone recorded in this run\./);
+  });
+
+  it('lists refuted findings by id rather than collapsing them to a count', () => {
+    const report = renderSecurityAuditReport(
+      record({
+        findings: [
+          { ...establishedFinding, id: 'SA-009', evidenceState: 'refuted', severity: null },
+        ],
+      })
+    );
+    assert.match(report, /## Refuted findings\n\n- `SA-009` — /);
   });
 
   it('lists open coverage units and repeat-run revalidation in NEEDS-VALIDATION', () => {

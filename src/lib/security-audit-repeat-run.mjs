@@ -23,7 +23,12 @@
  */
 
 import { canonicalJson, nonEmptyNfcString } from './promotion-candidates.mjs';
-import { deriveSecurityAuditCoverage } from './security-audit-coverage.mjs';
+import {
+  deriveSecurityAuditCoverage,
+  // Unit identity is owned by the Phase 3 contract. Re-deriving it here would
+  // let repeat-run matching and Phase 3 duplicate detection disagree.
+  securityAuditUnitSemanticKey as semanticKey,
+} from './security-audit-coverage.mjs';
 import { sha256Hex } from './shadow-aggregate.mjs';
 
 /** Digest placeholder for a reviewed path the caller could not hash. */
@@ -43,14 +48,6 @@ function normalizePathList(paths) {
   return [...new Set(normalized)].sort();
 }
 
-function semanticKey(unit) {
-  return canonicalJson([
-    nonEmptyNfcString(unit?.subsystem),
-    nonEmptyNfcString(unit?.trustBoundary),
-    nonEmptyNfcString(unit?.attackClassId),
-  ]);
-}
-
 /**
  * Content-address the source a coverage unit claims to have reviewed.
  *
@@ -67,7 +64,15 @@ export function deriveUnitSourceRevision(reviewedPaths, sourceDigests = {}) {
   const paths = normalizePathList(reviewedPaths);
   const unknownPaths = [];
   const entries = paths.map((path) => {
-    const digest = nonEmptyNfcString(sourceDigests?.[path]);
+    // `Object.hasOwn` rather than a bare lookup: an inherited or proxied
+    // property must not stand in for a digest the caller never supplied.
+    const raw =
+      sourceDigests !== null &&
+      typeof sourceDigests === 'object' &&
+      Object.hasOwn(sourceDigests, path)
+        ? sourceDigests[path]
+        : undefined;
+    const digest = nonEmptyNfcString(raw);
     if (digest === null) unknownPaths.push(path);
     return [path, digest ?? UNKNOWN_SOURCE_DIGEST];
   });
@@ -81,6 +86,16 @@ function carryOverDecision(priorUnit, currentUnit, sourceDigests) {
   }
 
   const priorPaths = normalizePathList(priorUnit?.reviewedPaths);
+  // A prior unit that reviewed no path proves nothing about current source: the
+  // revision of an empty path list is a publicly computable constant, so it
+  // would match however much the repository changed. `covered` with no
+  // `reviewedPaths` also violates the Phase 3 schema, but this module must not
+  // rely on a downstream validator to keep its own "byte-identical only"
+  // contract.
+  if (priorPaths.length === 0) {
+    return { carry: false, reason: 'no_prior_source_revision' };
+  }
+
   const currentPaths = normalizePathList(currentUnit?.reviewedPaths);
   // A current planned unit usually carries no reviewedPaths yet; it inherits the
   // prior unit's path set. When it does declare paths, they must match, or the

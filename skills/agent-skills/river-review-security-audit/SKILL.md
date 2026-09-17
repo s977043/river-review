@@ -265,6 +265,11 @@ reviewed is byte-identical to the source in front of you now. Supply the current
 `path -> content digest` map; any path whose digest is missing, changed, or replaced returns the unit
 to `planned` and appears in `revalidationRequired`.
 
+Validate the prior record before trusting it. A prior run's coverage is untrusted input: check it
+against `schemas/security-audit-coverage.schema.json` and
+`validateSecurityAuditCoverageSemantics` from `src/lib/security-audit-coverage.mjs` before feeding it
+to reconciliation. A `covered` unit with no `reviewedPaths` is invalid, not a free carry-over.
+
 Rules:
 
 - never report a unit as covered on prior-run evidence when its source moved
@@ -287,6 +292,11 @@ NEEDS-VALIDATION.md
 ```
 
 The record is the SSoT. `REPORT.md` and `NEEDS-VALIDATION.md` are projections of it.
+
+Validate before emitting. The generated record must pass
+`schemas/security-audit-run-record.schema.json`, and its embedded coverage must pass both
+`schemas/security-audit-coverage.schema.json` and `validateSecurityAuditCoverageSemantics`.
+A coverage block whose counters disagree with its own units must never be recorded as the SSoT.
 
 Rules:
 
@@ -351,6 +361,7 @@ Coverage critic observations use the existing Unknown Coverage residual-risk voc
 - No ad hoc status vocabulary outside the dedicated coverage contract.
 - No carry-over of prior-run coverage when the reviewed source changed.
 - No severity or verdict recomputed from the prose report.
+- No prior-run record consumed without schema plus semantic validation.
 - No generic `unknown-coverage-review` routing change to enable this profile.
 
 ## Relationship to Normal Security Review
