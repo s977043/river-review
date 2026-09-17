@@ -197,7 +197,7 @@ describe('runReviewPlan — output (#802 Phase 3)', () => {
       resolveAllArtifactsImpl: async () => ({
         diff: { id: 'diff', path: '/repo/d.patch', source: 'cwd', exists: true, optional: true },
       }),
-      readFileImpl: async () => '+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
+      readFileImpl: async () => '--- /dev/null\n+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
       buildExecutionPlanImpl: async (args) => {
         planArgs = args;
         return {
@@ -238,7 +238,7 @@ describe('runReviewPlan — output (#802 Phase 3)', () => {
       resolveAllArtifactsImpl: async () => ({
         diff: { id: 'diff', path: '/repo/d.patch', source: 'cwd', exists: true, optional: true },
       }),
-      readFileImpl: async () => '+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
+      readFileImpl: async () => '--- /dev/null\n+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
       buildExecutionPlanImpl: async (args) => {
         planArgs = args;
         return { selected: [], skipped: [] };
@@ -256,7 +256,7 @@ describe('runReviewPlan — output (#802 Phase 3)', () => {
       resolveAllArtifactsImpl: async () => ({
         diff: { id: 'diff', path: '/repo/d.patch', source: 'cwd', exists: true, optional: true },
       }),
-      readFileImpl: async () => '+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
+      readFileImpl: async () => '--- /dev/null\n+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
       buildExecutionPlanImpl: async (args) => {
         planArgs = args;
         return { selected: [], skipped: [] };
@@ -1560,7 +1560,7 @@ describe('runReviewPlan — gate block (Epic #1347 S2)', () => {
       resolveAllArtifactsImpl: async () => ({
         diff: { id: 'diff', path: '/repo/d.patch', source: 'cwd', exists: true, optional: true },
       }),
-      readFileImpl: async () => '+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
+      readFileImpl: async () => '--- /dev/null\n+++ b/src/foo.mjs\n@@ -0,0 +1 @@\n+x\n',
       buildExecutionPlanImpl: async () => ({
         selected: [],
         skipped: [],
@@ -1582,7 +1582,7 @@ describe('runReviewPlan — gate block (Epic #1347 S2)', () => {
       resolveAllArtifactsImpl: async () => ({
         diff: { id: 'diff', path: '/repo/d.patch', source: 'cwd', exists: true, optional: true },
       }),
-      readFileImpl: async () => '+++ b/src/db/migrate.mjs\n@@ -0,0 +1 @@\n+x\n',
+      readFileImpl: async () => '--- /dev/null\n+++ b/src/db/migrate.mjs\n@@ -0,0 +1 @@\n+x\n',
       loadRiskMapImpl: async () => ({
         version: '1',
         rules: [{ match: 'src/db/**', action: 'require_human_review' }],
@@ -1617,7 +1617,7 @@ describe('runReviewPlan — gate block (Epic #1347 S2)', () => {
       resolveAllArtifactsImpl: async () => ({
         diff: { id: 'diff', path: '/repo/d.patch', source: 'cwd', exists: true, optional: true },
       }),
-      readFileImpl: async () => '+++ b/.river/risk-map.yaml\n@@ -0,0 +1 @@\n+x\n',
+      readFileImpl: async () => '--- /dev/null\n+++ b/.river/risk-map.yaml\n@@ -0,0 +1 @@\n+x\n',
       buildExecutionPlanImpl: async () => ({ selected: [], skipped: [] }),
     });
     assert.equal(validate(artifact), true, JSON.stringify(validate.errors));
