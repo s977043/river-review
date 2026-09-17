@@ -1,6 +1,7 @@
 # Review Coverage dogfood metrics plan
 
-Issue: #2212
+Issue: #2300  
+Parent: #2212
 
 ## Goal
 
