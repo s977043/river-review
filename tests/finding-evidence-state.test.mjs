@@ -50,23 +50,26 @@ describe('finding evidence state projection', () => {
     );
   });
 
-  it('projects needs-human-judgment to unresolved and requires blocker plus validation plan', () => {
-    const incomplete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT);
-    const complete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT, {
-      blocker: 'Runtime behavior cannot be established from source only.',
-      validationPlan: 'Reproduce in the sandbox adapter when available.',
-    });
+  it(
+    'projects needs-human-judgment to unresolved and requires blocker plus validation plan',
+    () => {
+      const incomplete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT);
+      const complete = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT, {
+        blocker: 'Runtime behavior cannot be established from source only.',
+        validationPlan: 'Reproduce in the sandbox adapter when available.',
+      });
 
-    assert.equal(incomplete.state, EVIDENCE_STATE.UNRESOLVED);
-    assert.equal(incomplete.unresolvedContextComplete, false);
-    assert.equal(complete.state, EVIDENCE_STATE.UNRESOLVED);
-    assert.equal(complete.unresolvedContextComplete, true);
-    assert.equal(complete.blocker, 'Runtime behavior cannot be established from source only.');
-    assert.equal(
-      complete.validationPlan,
-      'Reproduce in the sandbox adapter when available.'
-    );
-  });
+      assert.equal(incomplete.state, EVIDENCE_STATE.UNRESOLVED);
+      assert.equal(incomplete.unresolvedContextComplete, false);
+      assert.equal(complete.state, EVIDENCE_STATE.UNRESOLVED);
+      assert.equal(complete.unresolvedContextComplete, true);
+      assert.equal(complete.blocker, 'Runtime behavior cannot be established from source only.');
+      assert.equal(
+        complete.validationPlan,
+        'Reproduce in the sandbox adapter when available.'
+      );
+    }
+  );
 
   it('projects critic timeout to unresolved rather than a clean or established state', () => {
     const result = project(FINAL_STATUS.CRITIC_TIMEOUT);
@@ -108,25 +111,28 @@ describe('finding evidence state projection', () => {
     assert.equal(result.reasonCode, EVIDENCE_STATE_REASON.STATUS_MISSING);
   });
 
-  it('does not let lifecycle, scope, severity, disposition, confidence, or agreement alter truth state', () => {
-    const baseline = projectFindingEvidenceState({
-      validation: { finalStatus: FINAL_STATUS.CONFIRMED },
-    });
-    const decorated = projectFindingEvidenceState({
-      validation: { finalStatus: FINAL_STATUS.CONFIRMED },
-      status: 'suppressed',
-      scope: 'pre-existing',
-      severity: 'critical',
-      confidence: 'low',
-      disposition: 'advisory',
-      agreement: ['reviewer-a', 'reviewer-b', 'reviewer-c'],
-      validatedStatus: 'dismissed-duplicate',
-    });
+  it(
+    'does not let lifecycle, scope, severity, disposition, confidence, or agreement alter truth state',
+    () => {
+      const baseline = projectFindingEvidenceState({
+        validation: { finalStatus: FINAL_STATUS.CONFIRMED },
+      });
+      const decorated = projectFindingEvidenceState({
+        validation: { finalStatus: FINAL_STATUS.CONFIRMED },
+        status: 'suppressed',
+        scope: 'pre-existing',
+        severity: 'critical',
+        confidence: 'low',
+        disposition: 'advisory',
+        agreement: ['reviewer-a', 'reviewer-b', 'reviewer-c'],
+        validatedStatus: 'dismissed-duplicate',
+      });
 
-    assert.equal(baseline.state, EVIDENCE_STATE.ESTABLISHED);
-    assert.equal(decorated.state, EVIDENCE_STATE.ESTABLISHED);
-    assert.equal(decorated.reasonCode, EVIDENCE_STATE_REASON.CONFIRMED);
-  });
+      assert.equal(baseline.state, EVIDENCE_STATE.ESTABLISHED);
+      assert.equal(decorated.state, EVIDENCE_STATE.ESTABLISHED);
+      assert.equal(decorated.reasonCode, EVIDENCE_STATE_REASON.CONFIRMED);
+    }
+  );
 
   it('does not invent unresolved blocker or validation plan from malformed values', () => {
     const result = project(FINAL_STATUS.NEEDS_HUMAN_JUDGMENT, {
