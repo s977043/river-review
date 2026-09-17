@@ -9,15 +9,39 @@ name: Blocked Label Guard
 # labeled / unlabeled だけでなく opened / reopened / synchronize でも走らせる。
 # ラベル付与後に push された場合、labeled イベントだけでは古い成功結果が
 # 最新コミットに対する判定として残らないため、再評価の機会を確保する。
+#
+# merge_group でも走らせる。マージキューでは必須チェックがキュー内の一時ブランチに対して
+# 再実行され、`merge_group` を持たないワークフローの context は一度も報告されないため
+# キューが詰まる（https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue）。
+#
+# merge_group 時に「no-op で pass」にはしない。GitHub のドキュメントが挙げるキュー除外の
+# 事由は「CI の失敗」「タイムアウト」「API / UI からの除外要求」「自動解決できない
+# branch protection の失敗」の 4 つで、**ラベルの付与は含まれない**。したがって
+# 「キューへ入れたあとに `blocked` を付けた」PR はキューに残り続ける。no-op pass にすると
+# 次の失敗シナリオが素通りする:
+#
+#   1. 指摘者がまだラベルを付けていない状態で PR がキューへ入る
+#   2. 指摘者が未解決の指摘に気づき `blocked` を付ける（PR イベント側のガードは赤くなるが、
+#      キュー内の一時ブランチに対する判定はそれとは別の check-run である）
+#   3. merge_group のガードが no-op pass を返す → そのまま main へマージされる
+#
+# これは #1746 / #1761 と同型の事故にあたる。そこで merge_group では、一時ブランチ名
+# （`refs/heads/gh-readonly-queue/<base>/pr-<番号>-<base sha>`）から PR 番号を取り出し、
+# API で現在のラベルを読んで同じ判定を行う。
+#
+# 残る窓は 1 つある。ある PR のキュー entry のガードが pass で確定したあとにラベルが付いた
+# 場合、その entry は再評価されない。ラベルを付けた側が UI / API でキューから除外する運用が
+# 必要になる（docs/governance.md「PR レビューとマージ」）。
 
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
+  merge_group:
 
 # 既定の GITHUB_TOKEN 権限はこのリポジトリでは write（`gh api
 # repos/s977043/river-review/actions/permissions/workflow` で確認）。
-# 判定に必要なのは event payload の labels だけで API 呼び出しもしないため、
-# top-level で最小権限まで絞る。
+# top-level では最小権限まで絞り、merge_group 時のラベル取得に必要な
+# `pull-requests: read` だけをジョブ側で足す。
 permissions:
   contents: read
 
@@ -40,16 +64,44 @@ jobs:
     name: Blocked label guard
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      # merge_group では event payload に labels が無いため、PR のラベルを API で読む。
+      pull-requests: read
     steps:
       - name: Check merge-blocking labels
         env:
           # 阻止ラベルの定義箇所はここ 1 つ。増やすときはカンマ区切りで足す
           # （例: 'blocked,do-not-merge'）。比較は前後空白除去 + 小文字化で行う。
           BLOCKING_LABELS: 'blocked'
-          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          # pull_request 用。merge_group では両方とも空になる。
+          PR_LABELS_EVENT: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_NUMBER_EVENT: ${{ github.event.pull_request.number }}
+          # merge_group 用。`refs/heads/gh-readonly-queue/<base>/pr-<番号>-<base sha>`。
+          MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+
+          if [ "$EVENT_NAME" = "merge_group" ]; then
+            PR_NUMBER="$(printf '%s' "$MERGE_GROUP_HEAD_REF" \
+              | sed -n 's|^.*/pr-\([0-9][0-9]*\)-[0-9a-fA-F]\{1,\}$|\1|p')"
+            if [ -z "$PR_NUMBER" ]; then
+              # 判定不能は pass ではなく fail にする。素通りさせるとキューの中身が
+              # 無検査でマージされるためで、fail なら GitHub が当該 entry をキューから
+              # 外し、再投入で測り直せる。
+              echo "::error title=Merge group ref is unparsable::head_ref='${MERGE_GROUP_HEAD_REF}' から PR 番号を取り出せませんでした。"
+              exit 1
+            fi
+            if ! PR_LABELS="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '[.labels[].name]')"; then
+              echo "::error title=Label lookup failed::PR #${PR_NUMBER} のラベルを取得できませんでした。"
+              exit 1
+            fi
+          else
+            PR_NUMBER="$PR_NUMBER_EVENT"
+            PR_LABELS="$PR_LABELS_EVENT"
+          fi
 
           matched="$(jq -rn \
             --argjson labels "$PR_LABELS" \

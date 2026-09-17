@@ -5,6 +5,10 @@ on:
     branches:
       - main
   pull_request:
+  # マージキューの一時ブランチでも必須チェックを走らせる。`merge_group` を持たない
+  # ワークフローの context はキュー内で一度も報告されず、キューが詰まる
+  # （https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue）。
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -208,6 +212,9 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           # Previous tip of the pushed branch. Empty for workflow_dispatch.
           PUSH_BEFORE_SHA: ${{ github.event.before }}
+          # Base of the merge group's temporary branch (the target-branch tip the
+          # queued changes were stacked onto). Empty for every other event.
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
         run: |
           # Base revision of the change under review.
           #
@@ -231,6 +238,12 @@ jobs:
               echo "HEAD is not the pull request merge commit; falling back to the event payload base."
               BASE_SHA="$PR_BASE_SHA"
             fi
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            # The merge group's head is the queued changes stacked onto base_sha,
+            # so base_sha is the exact base of the change under review. Without
+            # this branch BASE_SHA would be empty and the fail-safe below would
+            # rebuild on every queue entry.
+            BASE_SHA="$MERGE_GROUP_BASE_SHA"
           else
             BASE_SHA="$PUSH_BEFORE_SHA"
           fi
