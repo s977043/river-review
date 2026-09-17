@@ -68,6 +68,18 @@ describe('reviewer execution independence', () => {
     });
   });
 
+  it('treats a missing or malformed input object as unknown', () => {
+    for (const input of [null, 42, false, 'not-provenance']) {
+      assert.deepEqual(evaluateReviewerIndependence(input), {
+        status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+        independent: false,
+        finderRunId: null,
+        verifierRunId: null,
+        reasonCode: REVIEWER_INDEPENDENCE_REASON.BOTH_RUN_IDS_MISSING,
+      });
+    }
+  });
+
   it('treats whitespace-only and non-string ids as missing instead of coercing them', () => {
     assert.equal(
       evaluateReviewerIndependence({ finderRunId: '   ', verifierRunId: 42 }).reasonCode,
