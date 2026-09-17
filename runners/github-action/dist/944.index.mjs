@@ -11,6 +11,8 @@ __webpack_require__.r(__webpack_exports__);
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
   ALLOWLIST_RELATIVE_PATH: () => (/* binding */ ALLOWLIST_RELATIVE_PATH),
+  extractGateCommands: () => (/* binding */ extractGateCommands),
+  loadTrustedAllowlistEntries: () => (/* binding */ loadTrustedAllowlistEntries),
   runDeterministicGates: () => (/* binding */ runDeterministicGates)
 });
 
@@ -857,10 +859,14 @@ function emptyResult() {
  * surviving valid entries, or `null` when `trustedTree` is unusable / the file
  * is missing (safe-default: run nothing). Never reads the PR head allowlist.
  *
+ * Exported (#2275 PR-3B) so the fast-verification checkpoint can tell
+ * "the host never opted in" (null) apart from "opted in, nothing matched"
+ * without reading the allowlist a second time through its own code path.
+ *
  * @param {string | undefined} trustedTree base-checkout path
  * @returns {Promise<Array<object> | null>}
  */
-async function loadTrustedAllowlist(trustedTree) {
+async function loadTrustedAllowlistEntries(trustedTree) {
   if (typeof trustedTree !== 'string' || trustedTree.length === 0) return null;
   const allowlistPath = external_node_path_.join(trustedTree, ALLOWLIST_RELATIVE_PATH);
   let yamlText;
@@ -875,6 +881,8 @@ async function loadTrustedAllowlist(trustedTree) {
 
 /**
  * Extract the deterministic-gate command definitions from the selected skills.
+ * Exported (#2275 PR-3B) so the fast-verification checkpoint enumerates the
+ * checks it expects to run from this one definition rather than a second copy.
  * Only skills whose `metadata.deterministicGate` carries a non-empty `command`
  * are candidates. `args` defaults to `[]`.
  *
@@ -943,7 +951,10 @@ function safeExecutionMetadata(result) {
  *  5. Aggregate: any `fail` → strictBlock; any `unrunnable` → deterministicUnrunnable.
  *     Both can be true at once (the gate composes 5b > 5c).
  *  6. Preserve only safe bounded executor metadata in `results[]`; raw process
- *     output is never copied into the orchestrator result.
+ *     output is never copied into the orchestrator result. Each row carries the
+ *     `gateIndex` it came from: `skillId` falls back to the command string for a
+ *     skill without an id, so two gates on the same command with different args
+ *     share a skillId and cannot be told apart by it (#2275 PR-3B review).
  *
  * @param {object} opts
  * @param {string} [opts.trustedTree] base-checkout path (host-trusted allowlist source)
@@ -955,7 +966,7 @@ function safeExecutionMetadata(result) {
  *   injected executor; defaults to `executeDeterministicCommand`
  * @param {(prefix: string) => Promise<string>} [opts.mkdtempImpl] injected mkdtemp (tests)
  * @returns {Promise<{ strictBlock: boolean, deterministicUnrunnable: boolean,
- *   results: Array<{ skillId: string, status: string, reasonCode: string,
+ *   results: Array<{ gateIndex: number, skillId: string, status: string, reasonCode: string,
  *     durationMs?: number, exitCode?: number, stdoutBytes?: number,
  *     unrunnableCause?: 'spawn-error'|'timeout'|'invalid-entry' }> }>}
  */
@@ -968,7 +979,7 @@ async function runDeterministicGates({
   execImpl,
   mkdtempImpl,
 } = {}) {
-  const validEntries = await loadTrustedAllowlist(trustedTree);
+  const validEntries = await loadTrustedAllowlistEntries(trustedTree);
   if (validEntries == null) return emptyResult();
 
   const gates = extractGateCommands(selected);
@@ -980,7 +991,7 @@ async function runDeterministicGates({
   let deterministicUnrunnable = false;
   const results = [];
 
-  for (const gate of gates) {
+  for (const [gateIndex, gate] of gates.entries()) {
     const entry = matchCommand({ command: gate.command, args: gate.args }, validEntries);
     // Not on the host-trusted allowlist → never run it.
     if (entry == null) continue;
@@ -1005,6 +1016,7 @@ async function runDeterministicGates({
       if (status === 'fail') strictBlock = true;
       if (status === 'unrunnable') deterministicUnrunnable = true;
       results.push({
+        gateIndex,
         skillId: gate.skillId,
         status,
         reasonCode,
