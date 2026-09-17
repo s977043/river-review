@@ -56139,6 +56139,176 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 
 /***/ }),
 
+/***/ 3054:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   Ix: () => (/* binding */ deriveReviewCoverage),
+/* harmony export */   Vb: () => (/* binding */ REVIEW_COVERAGE_STATUSES),
+/* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
+/* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
+/* harmony export */   or: () => (/* binding */ deriveReviewFileScope)
+/* harmony export */ });
+/* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
+
+
+/**
+ * Review execution coverage contract (#2212).
+ *
+ * Coverage answers whether the review work that was expected to run actually
+ * completed. It is deliberately independent from finding count, skill routing,
+ * context supply, and gate policy.
+ */
+
+const REVIEW_UNIT_STATUSES = Object.freeze(['completed', 'failed', 'timed_out']);
+const REVIEW_COVERAGE_STATUSES = Object.freeze(['complete', 'partial', 'not_executed']);
+
+function isCompleted(unit) {
+  return unit?.status === 'completed';
+}
+
+function normalizeRequired(unit) {
+  // Fail-safe default: an execution unit is required unless policy explicitly
+  // marks it optional. Materialize the default in the returned unit as well so
+  // the derived coverage object conforms to review-coverage.schema.json.
+  return { ...unit, required: unit?.required !== false };
+}
+
+function isRequired(unit) {
+  return unit?.required === true;
+}
+
+/**
+ * Derive machine-readable review execution coverage from already-planned units.
+ *
+ * This function is intentionally pure and has no gate side effects. Runtime
+ * wiring in reviewer-orchestrator is a separate step so observe-only telemetry
+ * can land before any policy change.
+ *
+ * @param {Array<object>} units planned/executed review units
+ * @returns {{
+ *   schemaVersion: '1',
+ *   status: 'complete'|'partial'|'not_executed',
+ *   expectedUnits: number,
+ *   completedUnits: number,
+ *   requiredUnits: number,
+ *   completedRequiredUnits: number,
+ *   incompleteRequiredUnitIds: string[],
+ *   units: Array<object>
+ * }}
+ */
+function deriveReviewCoverage(units = []) {
+  const normalizedUnits = Array.isArray(units)
+    ? units.filter(Boolean).map((unit) => normalizeRequired(unit))
+    : [];
+  const expectedUnits = normalizedUnits.length;
+  const completedUnits = normalizedUnits.filter(isCompleted).length;
+  const required = normalizedUnits.filter(isRequired);
+  const requiredUnits = required.length;
+  const completedRequiredUnits = required.filter(isCompleted).length;
+  const incompleteRequiredUnitIds = required
+    .filter((unit) => !isCompleted(unit))
+    .map((unit) => unit.id)
+    .filter((id) => typeof id === 'string' && id.length > 0);
+
+  let status;
+  if (expectedUnits === 0) {
+    status = 'not_executed';
+  } else if (requiredUnits === 0) {
+    // Defensive path for future policies that may make every unit optional.
+    status =
+      completedUnits === expectedUnits
+        ? 'complete'
+        : completedUnits > 0
+          ? 'partial'
+          : 'not_executed';
+  } else if (completedRequiredUnits === requiredUnits) {
+    status = 'complete';
+  } else if (completedRequiredUnits === 0) {
+    status = 'not_executed';
+  } else {
+    status = 'partial';
+  }
+
+  return {
+    schemaVersion: '1',
+    status,
+    expectedUnits,
+    completedUnits,
+    requiredUnits,
+    completedRequiredUnits,
+    incompleteRequiredUnitIds,
+    units: normalizedUnits,
+  };
+}
+
+function uniquePaths(paths = []) {
+  const seen = new Set();
+  const result = [];
+  for (const filePath of Array.isArray(paths) ? paths : []) {
+    if (typeof filePath !== 'string' || !filePath || seen.has(filePath)) continue;
+    seen.add(filePath);
+    result.push(filePath);
+  }
+  return result;
+}
+
+/**
+ * Build the observe-only file-selection ledger for Review Coverage (#2212 Slice C).
+ *
+ * `rawDiff` is the repository diff before `config.exclude.files`; `filteredDiff`
+ * is the exact diff handed to planning/reviewer execution after configured
+ * exclusions. `filesForReview` already reflects the LLM diff optimizer, so the
+ * difference lets us record why a changed path did not become a Review Unit
+ * subject without changing optimizer behavior or inventing file-level execution
+ * semantics.
+ */
+function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns = []) {
+  const rawChanged = uniquePaths(rawDiff?.changedFiles ?? []);
+  const selectedCandidates = uniquePaths(
+    (filteredDiff?.filesForReview ?? filteredDiff?.files ?? [])
+      .map((file) => file?.path)
+      .filter(Boolean)
+  );
+  const selectedSet = new Set(selectedCandidates);
+  const rawSet = new Set(rawChanged);
+  const selected = rawChanged.length
+    ? rawChanged.filter((filePath) => selectedSet.has(filePath))
+    : selectedCandidates;
+
+  // A selected path not present in changedFiles can occur only on synthetic
+  // programmatic input. Keep it rather than silently losing caller-provided
+  // scope while preserving raw changed-file order for normal repository runs.
+  for (const filePath of selectedCandidates) {
+    if (!rawSet.has(filePath) && !selected.includes(filePath)) selected.push(filePath);
+  }
+
+  const excluded = rawChanged
+    .filter((filePath) => !selectedSet.has(filePath))
+    .map((filePath) => ({
+      path: filePath,
+      reasonCode: (0,_utils_mjs__WEBPACK_IMPORTED_MODULE_0__/* .shouldExclude */ .Ip)(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
+    }));
+
+  return { selected, excluded };
+}
+
+/**
+ * Attach the file-selection ledger (#2212 Slice C) to an orchestration-derived
+ * Review Coverage object.
+ *
+ * Counters / status / units are never recomputed here: this only enriches an
+ * existing observation. Callers without a ledger keep the exact pre-Slice-C
+ * coverage object (or `null` when there is none at all).
+ */
+function attachReviewFileScope(coverage, fileScope) {
+  if (coverage && fileScope) return { ...coverage, fileScope };
+  return coverage ?? null;
+}
+
+
+/***/ }),
+
 /***/ 9669:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
@@ -81205,163 +81375,8 @@ function synthesizeTeamLeadReport({ findings = [], reviewerResults = [] }) {
   };
 }
 
-;// CONCATENATED MODULE: ./src/lib/review-coverage.mjs
-
-
-/**
- * Review execution coverage contract (#2212).
- *
- * Coverage answers whether the review work that was expected to run actually
- * completed. It is deliberately independent from finding count, skill routing,
- * context supply, and gate policy.
- */
-
-const REVIEW_UNIT_STATUSES = Object.freeze(['completed', 'failed', 'timed_out']);
-const REVIEW_COVERAGE_STATUSES = Object.freeze(['complete', 'partial', 'not_executed']);
-
-function isCompleted(unit) {
-  return unit?.status === 'completed';
-}
-
-function normalizeRequired(unit) {
-  // Fail-safe default: an execution unit is required unless policy explicitly
-  // marks it optional. Materialize the default in the returned unit as well so
-  // the derived coverage object conforms to review-coverage.schema.json.
-  return { ...unit, required: unit?.required !== false };
-}
-
-function isRequired(unit) {
-  return unit?.required === true;
-}
-
-/**
- * Derive machine-readable review execution coverage from already-planned units.
- *
- * This function is intentionally pure and has no gate side effects. Runtime
- * wiring in reviewer-orchestrator is a separate step so observe-only telemetry
- * can land before any policy change.
- *
- * @param {Array<object>} units planned/executed review units
- * @returns {{
- *   schemaVersion: '1',
- *   status: 'complete'|'partial'|'not_executed',
- *   expectedUnits: number,
- *   completedUnits: number,
- *   requiredUnits: number,
- *   completedRequiredUnits: number,
- *   incompleteRequiredUnitIds: string[],
- *   units: Array<object>
- * }}
- */
-function deriveReviewCoverage(units = []) {
-  const normalizedUnits = Array.isArray(units)
-    ? units.filter(Boolean).map((unit) => normalizeRequired(unit))
-    : [];
-  const expectedUnits = normalizedUnits.length;
-  const completedUnits = normalizedUnits.filter(isCompleted).length;
-  const required = normalizedUnits.filter(isRequired);
-  const requiredUnits = required.length;
-  const completedRequiredUnits = required.filter(isCompleted).length;
-  const incompleteRequiredUnitIds = required
-    .filter((unit) => !isCompleted(unit))
-    .map((unit) => unit.id)
-    .filter((id) => typeof id === 'string' && id.length > 0);
-
-  let status;
-  if (expectedUnits === 0) {
-    status = 'not_executed';
-  } else if (requiredUnits === 0) {
-    // Defensive path for future policies that may make every unit optional.
-    status =
-      completedUnits === expectedUnits
-        ? 'complete'
-        : completedUnits > 0
-          ? 'partial'
-          : 'not_executed';
-  } else if (completedRequiredUnits === requiredUnits) {
-    status = 'complete';
-  } else if (completedRequiredUnits === 0) {
-    status = 'not_executed';
-  } else {
-    status = 'partial';
-  }
-
-  return {
-    schemaVersion: '1',
-    status,
-    expectedUnits,
-    completedUnits,
-    requiredUnits,
-    completedRequiredUnits,
-    incompleteRequiredUnitIds,
-    units: normalizedUnits,
-  };
-}
-
-function uniquePaths(paths = []) {
-  const seen = new Set();
-  const result = [];
-  for (const filePath of Array.isArray(paths) ? paths : []) {
-    if (typeof filePath !== 'string' || !filePath || seen.has(filePath)) continue;
-    seen.add(filePath);
-    result.push(filePath);
-  }
-  return result;
-}
-
-/**
- * Build the observe-only file-selection ledger for Review Coverage (#2212 Slice C).
- *
- * `rawDiff` is the repository diff before `config.exclude.files`; `filteredDiff`
- * is the exact diff handed to planning/reviewer execution after configured
- * exclusions. `filesForReview` already reflects the LLM diff optimizer, so the
- * difference lets us record why a changed path did not become a Review Unit
- * subject without changing optimizer behavior or inventing file-level execution
- * semantics.
- */
-function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns = []) {
-  const rawChanged = uniquePaths(rawDiff?.changedFiles ?? []);
-  const selectedCandidates = uniquePaths(
-    (filteredDiff?.filesForReview ?? filteredDiff?.files ?? [])
-      .map((file) => file?.path)
-      .filter(Boolean)
-  );
-  const selectedSet = new Set(selectedCandidates);
-  const rawSet = new Set(rawChanged);
-  const selected = rawChanged.length
-    ? rawChanged.filter((filePath) => selectedSet.has(filePath))
-    : selectedCandidates;
-
-  // A selected path not present in changedFiles can occur only on synthetic
-  // programmatic input. Keep it rather than silently losing caller-provided
-  // scope while preserving raw changed-file order for normal repository runs.
-  for (const filePath of selectedCandidates) {
-    if (!rawSet.has(filePath) && !selected.includes(filePath)) selected.push(filePath);
-  }
-
-  const excluded = rawChanged
-    .filter((filePath) => !selectedSet.has(filePath))
-    .map((filePath) => ({
-      path: filePath,
-      reasonCode: (0,utils/* shouldExclude */.Ip)(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
-    }));
-
-  return { selected, excluded };
-}
-
-/**
- * Attach the file-selection ledger (#2212 Slice C) to an orchestration-derived
- * Review Coverage object.
- *
- * Counters / status / units are never recomputed here: this only enriches an
- * existing observation. Callers without a ledger keep the exact pre-Slice-C
- * coverage object (or `null` when there is none at all).
- */
-function attachReviewFileScope(coverage, fileScope) {
-  if (coverage && fileScope) return { ...coverage, fileScope };
-  return coverage ?? null;
-}
-
+// EXTERNAL MODULE: ./src/lib/review-coverage.mjs
+var review_coverage = __nccwpck_require__(3054);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
 
 
@@ -82229,7 +82244,7 @@ async function runReviewerOrchestration({
       findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
-  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+  const reviewCoverage = (0,review_coverage/* deriveReviewCoverage */.Ix)(reviewUnits);
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
@@ -83048,7 +83063,7 @@ async function collectLocalContext({
   const rawDiff = await (0,diff_processor/* collectRepoDiff */.KD)(repoRoot, mergeBase, { contextLines });
   const exclusionPatterns = config.exclude?.files ?? [];
   const diff = applyFileExclusions(rawDiff, exclusionPatterns);
-  const reviewFileScope = deriveReviewFileScope(rawDiff, diff, exclusionPatterns);
+  const reviewFileScope = (0,review_coverage/* deriveReviewFileScope */.or)(rawDiff, diff, exclusionPatterns);
   const reviewFiles = diff.filesForReview?.map((file) => file.path) ?? diff.changedFiles;
   // #1606: declare `fullFile` as an available input context when the runner can
   // honestly supply the current change set's full source text. The content is
@@ -83481,7 +83496,7 @@ async function runLocalReview({
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here, and callers that provide an older context
   // without the ledger keep the exact pre-Slice-C Review Coverage object.
-  const reviewCoverage = attachReviewFileScope(review.reviewCoverage, context.reviewFileScope);
+  const reviewCoverage = (0,review_coverage/* attachReviewFileScope */.oG)(review.reviewCoverage, context.reviewFileScope);
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
