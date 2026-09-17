@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.115.0](https://github.com/s977043/river-review/compare/v1.114.0...v1.115.0) (2026-09-17)
+
+
+### Features
+
+* **review:** add derived evidence state projection ([#2292](https://github.com/s977043/river-review/issues/2292)) ([69b93a0](https://github.com/s977043/river-review/commit/69b93a018cce1c30995cbd30a0eb58379a033057))
+* **review:** add derived evidence state projection ([#2292](https://github.com/s977043/river-review/issues/2292)) ([1dbf711](https://github.com/s977043/river-review/commit/1dbf7113ae583f13aefa9fcdc41cc08720acc109))
+* **review:** add reviewer execution independence contract ([#2286](https://github.com/s977043/river-review/issues/2286)) ([41ea559](https://github.com/s977043/river-review/commit/41ea559bdee960c696d53a252a68e17a8ea1f25e))
+* **security:** add reviewer execution independence contract ([33445e6](https://github.com/s977043/river-review/commit/33445e648b2f5f17f998257e4ae0593b1f401932))
+
+
+### Bug Fixes
+
+* **docs:** satisfy Phase 6 prose lint ([#2292](https://github.com/s977043/river-review/issues/2292)) ([079b266](https://github.com/s977043/river-review/commit/079b2667efcbe862eb664a081af53a91562fdbf1))
+* **review:** fail safe on missing independence input ([#2286](https://github.com/s977043/river-review/issues/2286)) ([830d132](https://github.com/s977043/river-review/commit/830d132772435b874737c0bdae8f0ac07b00bb56))
+* **review:** keep reviewer withdrawal unresolved ([7418e02](https://github.com/s977043/river-review/commit/7418e02aea7852a3db4f2fe0eb612679ca0f2c18))
+
 ## [1.114.0](https://github.com/s977043/river-review/compare/v1.113.0...v1.114.0) (2026-09-17)
 
 
