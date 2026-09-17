@@ -268,7 +268,6 @@ Audit mode: guidance | focused | full-audit
 Execution policy: source-only
 Scope: <repository | subsystem | path | trust boundary>
 SecurityAuditCoverage: observe-only
-Coverage critic: not-run | report-only
 ```
 
 Then emit these sections:

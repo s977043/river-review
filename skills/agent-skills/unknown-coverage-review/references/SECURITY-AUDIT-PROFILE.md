@@ -99,15 +99,17 @@ False-positive guards:
 - do not report a missing unit if reconnaissance evidence is ambiguous; return a question instead
 - do not duplicate a defect already emitted by an existing security skill
 
-Suggested output:
+Suggested output using the existing Unknown Coverage fields only:
 
 ```text
-category: security-audit-coverage
-kind: missing_surface
-coverageUnit: <expected subsystem × trustBoundary × attackClassId>
-evidence_missing: <what investigation evidence is absent>
+category: Security / Data
+severity: <existing River Review severity based on residual risk>
+blocking: <true | false>
+evidence_missing: <missing investigation evidence, including the expected subsystem × trustBoundary × attackClassId when relevant>
 resolution: <minimum source-only investigation needed>
 ```
+
+Encode the expected semantic unit inside `evidence_missing` or `resolution`; do not add profile-specific output fields.
 
 ## Check 2 — Unsupported `covered` claim
 
