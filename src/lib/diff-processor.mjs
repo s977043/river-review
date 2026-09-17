@@ -226,23 +226,64 @@ export function parseUnifiedDiff(diffText) {
   let currentFile = null;
   let currentHunk = null;
   let newLineNumber = 0;
+  let gitFormatted = false;
+  let gitFileBoundaryPending = false;
 
   const lines = diffText.split('\n');
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line.startsWith('diff --git')) {
+    // Any `diff ` line at column 0 is a producer section marker, never hunk
+    // content: every body line inside a well-formed hunk carries a ` `/`+`/`-`
+    // prefix, so an unprefixed `diff ` can only be a section header.
+    //
+    // The match is the whole `diff ` family, not the literal `diff --git`, and
+    // not `diff --` either. Both narrower forms leave `gitFileBoundaryPending`
+    // unarmed for section headers that real producers do emit, and an unarmed
+    // section is absorbed into the PREVIOUS file — which injects that section's
+    // line numbers into a real file. Two producers were measured doing this
+    // (#2288 review):
+    //   - `diff --cc <path>` / `diff --combined <path>`, which Git emits for
+    //     merge commits (`git show --cc`, `git log -p --cc`);
+    //   - `diff -u -r a/f b/f`, which GNU diff emits with SHORT options. The
+    //     long form `diff --unified --recursive` happens to start with `diff --`
+    //     and so was already handled, which is exactly why a `diff --` anchor
+    //     looked sufficient until the short form was measured.
+    //
+    // Combined sections still parse as zero hunks because the hunk regexp below
+    // does not accept the `@@@ ... @@@` form — see #2294, which owns that gap.
+    if (line.startsWith('diff ')) {
+      gitFormatted = true;
+      gitFileBoundaryPending = true;
       currentHunk = null;
       continue;
     }
-    // A file header is only recognised as the complete three-line sequence
-    // `--- <old>` / `+++ <new>` / `@@ ...`. Every real unified-diff producer
-    // emits those three lines adjacently, while an unprefixed `@@` line can
-    // never occur inside a well-formed hunk body — so the third line is what
-    // separates a genuine header from diff content that merely looks like one
-    // (a hunk body line `+++ phantom.md`, i.e. the added line `++ phantom.md`).
-    // This is a structural test on the header itself; it deliberately does not
-    // depend on tracking where a hunk ends.
-    if (line.startsWith('--- ') && (lines[index + 1] ?? '').startsWith('+++ ')) {
+    // A file header still requires the complete three-line sequence
+    // `--- <old>` / `+++ <new>` / `@@ ...`. For plain unified diff this remains
+    // the structural discriminator because there is no stronger file marker.
+    // Once a Git `diff --git` marker has been observed, however, the triple is
+    // accepted only while that marker's file boundary is still pending. This
+    // prevents `--unified=0` hunk content (`--- x` / `+++ y`) plus the next
+    // hunk's `@@` from minting a ghost file, without adding any hunk-termination
+    // heuristic (#2261/#2280).
+    //
+    // Known limitation, scoped narrowly: input that CONCATENATES a
+    // Git-formatted section with a section that carries NO `diff ` header line
+    // at all still absorbs the marker-less section into the previous file. Such
+    // a section is byte-for-byte indistinguishable from the `--unified=0` ghost
+    // above, so separating them would need a hunk-termination rule — the exact
+    // approach that failed across four consecutive designs in #2261.
+    //
+    // Do not read this as "no producer emits a concatenated diff". Producers
+    // do, and those cases are handled: every Git and GNU diff section carries a
+    // `diff ` header line, so the marker above re-arms for each one. The gap is
+    // only a section stripped of that header, which is hand-authored input.
+    // An earlier revision of this comment claimed the broader exemption and was
+    // disproved by measurement (#2288 review) — the `diff -u -r` short-option
+    // concatenation it declared impossible was injecting line numbers into a
+    // real file. Pinned by the band-4 and band-6 concatenation tests, both of
+    // which assert addedLines and not only paths.
+    const canOpenFile = !gitFormatted || gitFileBoundaryPending;
+    if (canOpenFile && line.startsWith('--- ') && (lines[index + 1] ?? '').startsWith('+++ ')) {
       const nextAfterPair = lines[index + 2] ?? '';
       if (nextAfterPair.startsWith('@@')) {
         const oldPathRaw = parseDiffHeaderPath(line.slice(4));
@@ -256,6 +297,7 @@ export function parseUnifiedDiff(diffText) {
         files.push(currentFile);
         currentHunk = null;
         newLineNumber = 0;
+        if (gitFormatted) gitFileBoundaryPending = false;
         index += 1;
         continue;
       }
@@ -284,10 +326,10 @@ export function parseUnifiedDiff(diffText) {
     if (!currentHunk) continue;
     currentHunk.lines.push(line);
     // No `+++` / `---` exclusion here: a header now reaches the parser only as
-    // the three-line triple above, so anything arriving at this counter is hunk
-    // content. `+++ x` is the added line `++ x` and `--- x` is the deleted line
-    // `-- x`; excluding either miscounts `newLineNumber`, and a deleted line
-    // must not advance it at all (#2249 review).
+    // an accepted file-boundary triple above, so anything arriving at this
+    // counter is hunk content. `+++ x` is the added line `++ x` and `--- x` is
+    // the deleted line `-- x`; excluding either miscounts `newLineNumber`, and
+    // a deleted line must not advance it at all (#2249 review).
     if (line.startsWith('+')) {
       currentFile.addedLines.push(newLineNumber);
       currentHunk.addedLines.push(newLineNumber);
