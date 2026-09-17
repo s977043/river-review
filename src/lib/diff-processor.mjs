@@ -226,30 +226,39 @@ export function parseUnifiedDiff(diffText) {
   let currentFile = null;
   let currentHunk = null;
   let newLineNumber = 0;
-  let pendingOldPath = null;
 
-  for (const line of diffText.split('\n')) {
+  const lines = diffText.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     if (line.startsWith('diff --git')) {
       currentHunk = null;
       continue;
     }
-    if (line.startsWith('--- ')) {
-      pendingOldPath = parseDiffHeaderPath(line.slice(4));
-      continue;
-    }
-    if (line.startsWith('+++ ')) {
-      const newPathRaw = parseDiffHeaderPath(line.slice(4));
-      const isDeletion = newPathRaw === '/dev/null';
-      const oldPath = pendingOldPath ?? (isDeletion ? '/dev/null' : newPathRaw);
-      const newPath = isDeletion ? '/dev/null' : newPathRaw;
-      const path = isDeletion ? oldPath : newPath;
+    // A file header is only recognised as the complete three-line sequence
+    // `--- <old>` / `+++ <new>` / `@@ ...`. Every real unified-diff producer
+    // emits those three lines adjacently, while an unprefixed `@@` line can
+    // never occur inside a well-formed hunk body — so the third line is what
+    // separates a genuine header from diff content that merely looks like one
+    // (a hunk body line `+++ phantom.md`, i.e. the added line `++ phantom.md`).
+    // This is a structural test on the header itself; it deliberately does not
+    // depend on tracking where a hunk ends.
+    if (line.startsWith('--- ') && (lines[index + 1] ?? '').startsWith('+++ ')) {
+      const nextAfterPair = lines[index + 2] ?? '';
+      if (nextAfterPair.startsWith('@@')) {
+        const oldPathRaw = parseDiffHeaderPath(line.slice(4));
+        const newPathRaw = parseDiffHeaderPath(lines[index + 1].slice(4));
+        const isDeletion = newPathRaw === '/dev/null';
+        const oldPath = oldPathRaw ?? (isDeletion ? '/dev/null' : newPathRaw);
+        const newPath = isDeletion ? '/dev/null' : newPathRaw;
+        const path = isDeletion ? oldPath : newPath;
 
-      currentFile = { path, newPath, oldPath, hunks: [], addedLines: [] };
-      files.push(currentFile);
-      currentHunk = null;
-      newLineNumber = 0;
-      pendingOldPath = null;
-      continue;
+        currentFile = { path, newPath, oldPath, hunks: [], addedLines: [] };
+        files.push(currentFile);
+        currentHunk = null;
+        newLineNumber = 0;
+        index += 1;
+        continue;
+      }
     }
     if (!currentFile) continue;
     if (line.startsWith('@@')) {
@@ -274,11 +283,16 @@ export function parseUnifiedDiff(diffText) {
     }
     if (!currentHunk) continue;
     currentHunk.lines.push(line);
-    if (line.startsWith('+') && !line.startsWith('+++')) {
+    // No `+++` / `---` exclusion here: a header now reaches the parser only as
+    // the three-line triple above, so anything arriving at this counter is hunk
+    // content. `+++ x` is the added line `++ x` and `--- x` is the deleted line
+    // `-- x`; excluding either miscounts `newLineNumber`, and a deleted line
+    // must not advance it at all (#2249 review).
+    if (line.startsWith('+')) {
       currentFile.addedLines.push(newLineNumber);
       currentHunk.addedLines.push(newLineNumber);
       newLineNumber += 1;
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
+    } else if (line.startsWith('-')) {
       // deletion: do not advance new line number
     } else {
       newLineNumber += 1;

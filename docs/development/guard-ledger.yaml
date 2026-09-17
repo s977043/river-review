@@ -329,6 +329,19 @@ guards:
     reviewAfter: '2026-11-03'
     notes: src/cli.mjs の入力形式は EXPECTED_CONTRACT_COUNTS で pin されている。他のファイル・CI ジョブについては pin が無い。
 
+  - id: an-input-shape-is-not-a-safety-argument
+    title: An input shape is not a safety argument
+    mechanized: none
+    verifiedBy: []
+    addedAt: '2026-09-17'
+    reviewAfter: '2026-12-16'
+    notes: >-
+      「実 git が出さない形だから安全」「回帰スイープ N 本で差分 0 だから安全」の 2 つを禁じる。
+      2026-09-17 に同日 3 回破れた（#2280 の U0 帯域 / #2294 の combined diff / 21 ファイル比較で
+      「U0 は壊れない」と誤結論）。機械検証は無い。到達可能性の主張は経路 1 本で死ぬので grep で
+      潰せるが、「この形は無害」の側は測定母集団の言語化を求めるもので決定論では検査できない。
+      入力分布の帯域リストが陳腐化していないかを reviewAfter で見直す。
+
 # ガード以外の期限付きの決定（#1843）。
 decisions:
   - id: deprecate-close-issues-sh

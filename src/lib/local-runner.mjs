@@ -1,11 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { minimatch } from 'minimatch';
 import { ConfigLoader } from '../config/loader.mjs';
 import { hasSelection, resolveSelectionSkillIds } from './selection.mjs';
 import { collectRepoDiff, renderDiffText } from './diff-processor.mjs';
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
+import { attachReviewFileScope, deriveReviewFileScope } from './review-coverage.mjs';
 import {
   detectDefaultBranch,
   ensureGitRepo,
@@ -28,6 +28,7 @@ import {
   parseList,
   resolveAvailableContexts as resolveAvailableContextsShared,
   resolveAvailableDependencies as resolveAvailableDependenciesShared,
+  shouldExclude,
 } from './utils.mjs';
 import { resolveFullFileSupply } from './fullfile-supply.mjs';
 import {
@@ -46,61 +47,6 @@ function normalizePhase(phase) {
 }
 
 const configLoader = new ConfigLoader();
-
-function shouldExclude(filePath, patterns = []) {
-  return patterns.some((pattern) => minimatch(filePath, pattern, { dot: true }));
-}
-
-function uniquePaths(paths = []) {
-  const seen = new Set();
-  const result = [];
-  for (const filePath of Array.isArray(paths) ? paths : []) {
-    if (typeof filePath !== 'string' || !filePath || seen.has(filePath)) continue;
-    seen.add(filePath);
-    result.push(filePath);
-  }
-  return result;
-}
-
-/**
- * Build the observe-only file-selection ledger for Review Coverage (#2212 Slice C).
- *
- * `rawDiff` is the repository diff before `config.exclude.files`; `filteredDiff`
- * is the exact diff handed to planning/reviewer execution after configured
- * exclusions. `filesForReview` already reflects the LLM diff optimizer, so the
- * difference lets us record why a changed path did not become a Review Unit
- * subject without changing optimizer behavior or inventing file-level execution
- * semantics.
- */
-export function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns = []) {
-  const rawChanged = uniquePaths(rawDiff?.changedFiles ?? []);
-  const selectedCandidates = uniquePaths(
-    (filteredDiff?.filesForReview ?? filteredDiff?.files ?? [])
-      .map((file) => file?.path)
-      .filter(Boolean)
-  );
-  const selectedSet = new Set(selectedCandidates);
-  const rawSet = new Set(rawChanged);
-  const selected = rawChanged.length
-    ? rawChanged.filter((filePath) => selectedSet.has(filePath))
-    : selectedCandidates;
-
-  // A selected path not present in changedFiles can occur only on synthetic
-  // programmatic input. Keep it rather than silently losing caller-provided
-  // scope while preserving raw changed-file order for normal repository runs.
-  for (const filePath of selectedCandidates) {
-    if (!rawSet.has(filePath) && !selected.includes(filePath)) selected.push(filePath);
-  }
-
-  const excluded = rawChanged
-    .filter((filePath) => !selectedSet.has(filePath))
-    .map((filePath) => ({
-      path: filePath,
-      reasonCode: shouldExclude(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
-    }));
-
-  return { selected, excluded };
-}
 
 function applyFileExclusions(diff, patterns = []) {
   if (!patterns.length) return diff;
@@ -687,10 +633,7 @@ export async function runLocalReview({
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here, and callers that provide an older context
   // without the ledger keep the exact pre-Slice-C Review Coverage object.
-  const reviewCoverage =
-    review.reviewCoverage && context.reviewFileScope
-      ? { ...review.reviewCoverage, fileScope: context.reviewFileScope }
-      : (review.reviewCoverage ?? null);
+  const reviewCoverage = attachReviewFileScope(review.reviewCoverage, context.reviewFileScope);
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical

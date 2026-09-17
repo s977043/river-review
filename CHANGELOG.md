@@ -1,5 +1,53 @@
 # Changelog
 
+## [1.115.0](https://github.com/s977043/river-review/compare/v1.114.0...v1.115.0) (2026-09-17)
+
+
+### Features
+
+* **review:** add derived evidence state projection ([#2292](https://github.com/s977043/river-review/issues/2292)) ([69b93a0](https://github.com/s977043/river-review/commit/69b93a018cce1c30995cbd30a0eb58379a033057))
+* **review:** add derived evidence state projection ([#2292](https://github.com/s977043/river-review/issues/2292)) ([1dbf711](https://github.com/s977043/river-review/commit/1dbf7113ae583f13aefa9fcdc41cc08720acc109))
+* **review:** add reviewer execution independence contract ([#2286](https://github.com/s977043/river-review/issues/2286)) ([41ea559](https://github.com/s977043/river-review/commit/41ea559bdee960c696d53a252a68e17a8ea1f25e))
+* **security:** add reviewer execution independence contract ([33445e6](https://github.com/s977043/river-review/commit/33445e648b2f5f17f998257e4ae0593b1f401932))
+
+
+### Bug Fixes
+
+* **docs:** satisfy Phase 6 prose lint ([#2292](https://github.com/s977043/river-review/issues/2292)) ([079b266](https://github.com/s977043/river-review/commit/079b2667efcbe862eb664a081af53a91562fdbf1))
+* **review:** fail safe on missing independence input ([#2286](https://github.com/s977043/river-review/issues/2286)) ([830d132](https://github.com/s977043/river-review/commit/830d132772435b874737c0bdae8f0ac07b00bb56))
+* **review:** keep reviewer withdrawal unresolved ([7418e02](https://github.com/s977043/river-review/commit/7418e02aea7852a3db4f2fe0eb612679ca0f2c18))
+
+## [1.114.0](https://github.com/s977043/river-review/compare/v1.113.0...v1.114.0) (2026-09-17)
+
+
+### Features
+
+* **security:** reuse unknown coverage review as audit coverage critic ([#2279](https://github.com/s977043/river-review/issues/2279)) ([0d0b5d2](https://github.com/s977043/river-review/commit/0d0b5d20dfa8634651b803993c7df9eaac1afa45))
+
+
+### Bug Fixes
+
+* **diff:** recognise a file header only as a `---`/`+++`/`@@` triple ([#2249](https://github.com/s977043/river-review/issues/2249)) ([#2264](https://github.com/s977043/river-review/issues/2264)) ([e9d94fa](https://github.com/s977043/river-review/commit/e9d94fab67cb642ba27bbce2b86a3cd8001ba85d))
+
+## [1.113.0](https://github.com/s977043/river-review/compare/v1.112.0...v1.113.0) (2026-09-16)
+
+
+### Features
+
+* **evidence:** preserve safe deterministic execution metadata ([#2275](https://github.com/s977043/river-review/issues/2275)) ([#2276](https://github.com/s977043/river-review/issues/2276)) ([274af2f](https://github.com/s977043/river-review/commit/274af2ff39b02a3eb1bfd733c93c4e83e5fbe814))
+* **security:** add observe-only security audit coverage ([#2277](https://github.com/s977043/river-review/issues/2277)) ([3f486aa](https://github.com/s977043/river-review/commit/3f486aa763af0ad965ff76e0366defe508c5342e))
+* **security:** add security attack class registry ([#2274](https://github.com/s977043/river-review/issues/2274)) ([292110b](https://github.com/s977043/river-review/commit/292110b775fa95e91d902e10d4afe68e9d6cb8f6))
+* **security:** add source-only security audit entry skill ([#2272](https://github.com/s977043/river-review/issues/2272)) ([421d88a](https://github.com/s977043/river-review/commit/421d88aa8096c404a5212ce44a1504f2109b6ed2))
+
+## [1.112.0](https://github.com/s977043/river-review/compare/v1.111.3...v1.112.0) (2026-09-15)
+
+
+### Features
+
+* **viewpoints:** add neutral API compatibility signals ([#2252](https://github.com/s977043/river-review/issues/2252)) ([c4af4bf](https://github.com/s977043/river-review/commit/c4af4bf400178ad8c1b0568de1798c1addd4f1a7))
+* **viewpoints:** add observe-mode matcher ([#2252](https://github.com/s977043/river-review/issues/2252)) ([026209b](https://github.com/s977043/river-review/commit/026209b4f2cb379fa937e3bea1d7570fe5caed80))
+* **viewpoints:** add structured review knowledge foundation ([#2252](https://github.com/s977043/river-review/issues/2252)) ([8c67ff8](https://github.com/s977043/river-review/commit/8c67ff88e80e878830b47f9fb12f625fc99962c1))
+
 ## [1.111.3](https://github.com/s977043/river-review/compare/v1.111.2...v1.111.3) (2026-09-15)
 
 
