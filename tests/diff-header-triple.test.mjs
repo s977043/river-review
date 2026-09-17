@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { collectAddedLineHints } from '../src/lib/git.mjs';
 
-// Issues #2249 / #2260 / #2280.
+// Issues #2249 / #2260 / #2280, plus the PR #2288 review.
 //
 // `parseUnifiedDiff` recognises a file header only as the complete three-line
 // sequence `--- <old>` / `+++ <new>` / `@@ ...`. For plain unified diff, that
@@ -17,7 +17,10 @@ import { collectAddedLineHints } from '../src/lib/git.mjs';
 // accepts the next triple as a file boundary. This prevents a `--unified=0`
 // hunk-body pair plus the next `@@` from forging a file boundary.
 //
-// The four input bands below are run deliberately because the earlier attempt
+// The marker is the `diff --` FAMILY, not the literal `diff --git`, because
+// real Git labels merge sections `diff --cc <path>` (band 5).
+//
+// The five input bands below are run deliberately because the earlier attempt
 // at #2249 (PR #2251, closed) tracked where a hunk ENDS and broke a different
 // band on each iteration. The current rule uses the producer's Git file marker
 // when available and does not add a hunk-termination heuristic.
@@ -449,4 +452,141 @@ test('band 4 (U0): parseUnifiedDiff and collectAddedLineHints agree on real file
   assert.deepEqual(parsedPaths, ['notes.md']);
   assert.deepEqual(hintPaths, ['notes.md']);
   assert.deepEqual(parsedPaths, hintPaths);
+});
+
+// --- Band 5: combined diff (`diff --cc`) — PR #2288 review -----------------
+//
+// Real Git labels a merge commit's sections `diff --cc <path>`, not
+// `diff --git`. When the file-marker check was anchored on the literal
+// `diff --git`, `gitFileBoundaryPending` was never re-armed for a combined
+// section, so the section that followed a `diff --git` section was absorbed
+// into the PREVIOUS file — measured on `origin/main` a7300837 vs PR head
+// a8a9cb92 with `git log -p --cc`:
+//
+//   base: later.txt[1]  shared.txt[]  shared.txt[1]  ...
+//   head: later.txt[1,12,15]          shared.txt[1]  ...
+//
+// i.e. the combined entry disappeared and line numbers 12 and 15 were injected
+// into a one-line file. The marker check therefore matches the `diff --`
+// family. NOTE: combined hunks still parse as zero hunks because the hunk
+// regex does not accept `@@@` (issue #2294) — that is unchanged from `main`
+// and deliberately out of scope here.
+
+const withMergeRepo = (fn) =>
+  withTempRepo((dir, git) => {
+    git('config', 'commit.gpgsign', 'false');
+    writeFileSync(join(dir, 'shared.txt'), 'a\nb\nc\n');
+    git('add', '-A');
+    git('commit', '-qm', 'seed');
+    git('switch', '-qc', 'feat');
+    writeFileSync(join(dir, 'shared.txt'), 'a\nB\nc\n');
+    git('add', '-A');
+    git('commit', '-qm', 'feat');
+    git('switch', '-q', '-');
+    writeFileSync(join(dir, 'shared.txt'), 'A\nb\nc\n');
+    git('add', '-A');
+    git('commit', '-qm', 'trunk');
+    try {
+      git('merge', '--no-edit', 'feat');
+    } catch {
+      // expected conflict; resolve it so the merge commit is a real one
+    }
+    writeFileSync(join(dir, 'shared.txt'), 'A\nB\nc\n');
+    git('add', '-A');
+    git('commit', '-qm', 'resolve');
+    // A plain commit AFTER the merge, so a `diff --git` section precedes the
+    // `diff --cc` section in `git log -p --cc` output. Without this ordering
+    // the defect does not reproduce.
+    writeFileSync(join(dir, 'later.txt'), 'x\n');
+    git('add', '-A');
+    git('commit', '-qm', 'later');
+    return fn(git);
+  });
+
+test('band 5 (--cc): a combined section is not absorbed into the preceding file (#2288)', () => {
+  const { text, files } = withMergeRepo((git) => {
+    const t = git('log', '-p', '--cc', '--no-color');
+    return { text: t, files: parseUnifiedDiff(t).files };
+  });
+  assert.ok(/^diff --cc /m.test(text), 'the fixture really contains a `diff --cc` section');
+  assert.ok(/^diff --git /m.test(text), 'a `diff --git` section precedes it');
+
+  const later = files.filter((f) => f.path === 'later.txt');
+  assert.equal(later.length, 1);
+  assert.deepEqual(
+    later[0].addedLines,
+    [1],
+    'the one-line file must not absorb the combined section’s line numbers'
+  );
+
+  // The combined section registers as its own entry rather than vanishing.
+  assert.ok(
+    files.length >= 2 && files.some((f) => f.path === 'shared.txt' && f.hunks.length === 0),
+    'the `diff --cc` section is a distinct file entry (zero hunks until #2294)'
+  );
+});
+
+test('band 5 (--cc): `git show --cc` of the merge alone registers the combined file', () => {
+  const files = withMergeRepo(
+    (git) => parseUnifiedDiff(git('show', '--cc', '--no-color', 'HEAD~1')).files
+  );
+  assert.deepEqual(
+    files.map((f) => f.path),
+    ['shared.txt']
+  );
+});
+
+// --- The `diff --` widening must not mint ghosts from hunk CONTENT ----------
+//
+// The failure mode this guards against is the one that recurred four times in
+// #2261: a newly added boundary signal that fires inside a hunk body. It
+// cannot fire here, because every line inside a well-formed hunk body carries
+// a ` `/`+`/`-` prefix, so `diff --stat` as file CONTENT reaches the parser as
+// `+diff --stat`, never at column 0.
+
+test('a hunk body containing `diff --` content lines mints no ghost file', () => {
+  const run = (unified) =>
+    withTempRepo((dir, git) => {
+      writeFileSync(join(dir, 'doc.md'), 'l1\nl2\nl3\n');
+      git('add', '-A');
+      git('commit', '-qm', 'seed');
+      writeFileSync(join(dir, 'doc.md'), 'l1\ndiff --stat\ndiff --git a/ghost.md b/ghost.md\nl3\n');
+      git('add', '-A');
+      return parseUnifiedDiff(git('diff', '--cached', unified, '--no-color')).files;
+    });
+  for (const unified of ['--unified=3', '--unified=0']) {
+    const files = run(unified);
+    assert.deepEqual(
+      files.map((f) => f.path),
+      ['doc.md'],
+      `no ghost with ${unified}`
+    );
+    assert.deepEqual(files[0].addedLines, [2, 3], `additions are counted with ${unified}`);
+  }
+});
+
+// --- Known limitation, pinned so it cannot change silently ------------------
+
+test('KNOWN LIMITATION: a marker-less section concatenated after a Git section is absorbed', () => {
+  // CHARACTERISATION, NOT A CONTRACT. This shape is byte-for-byte identical to
+  // the band-4 `--unified=0` ghost, so splitting them apart requires a
+  // hunk-termination rule — the approach that failed four times in #2261. No
+  // diff producer emits it. Recorded here so the trade-off is visible: on
+  // `origin/main` a7300837 this parsed as ['a.txt', 'b.txt'].
+  const files = withTempRepo((dir, git) => {
+    writeFileSync(join(dir, 'a.txt'), 'a\n');
+    git('add', '-A');
+    git('commit', '-qm', 'seed');
+    writeFileSync(join(dir, 'a.txt'), 'A\n');
+    git('add', '-A');
+    const gitPart = git('diff', '--cached', '--no-color');
+    return parseUnifiedDiff(
+      gitPart + ['--- a/b.txt', '+++ b/b.txt', '@@ -1 +1 @@', '-b', '+B', ''].join('\n')
+    ).files;
+  });
+  assert.deepEqual(
+    files.map((f) => f.path),
+    ['a.txt'],
+    'the marker-less section is absorbed; see the band-5 rationale'
+  );
 });

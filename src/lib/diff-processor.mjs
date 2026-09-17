@@ -232,7 +232,17 @@ export function parseUnifiedDiff(diffText) {
   const lines = diffText.split('\n');
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line.startsWith('diff --git')) {
+    // Any `diff --<mode>` line at column 0 is a producer file marker, never
+    // hunk content: every body line inside a well-formed hunk carries a
+    // ` `/`+`/`-` prefix, so an unprefixed `diff --` can only be a section
+    // header. Matching the family rather than the literal `diff --git` matters
+    // because real Git emits `diff --cc <path>` (and `diff --combined <path>`)
+    // for merge commits — `git show --cc`, `git log -p --cc`. Anchoring on
+    // `diff --git` alone left `gitFileBoundaryPending` unarmed for those
+    // sections, so a combined section following a `diff --git` section was
+    // absorbed into the previous file and injected its line numbers there
+    // (#2288 review).
+    if (line.startsWith('diff --')) {
       gitFormatted = true;
       gitFileBoundaryPending = true;
       currentHunk = null;
@@ -246,6 +256,16 @@ export function parseUnifiedDiff(diffText) {
     // prevents `--unified=0` hunk content (`--- x` / `+++ y`) plus the next
     // hunk's `@@` from minting a ghost file, without adding any hunk-termination
     // heuristic (#2261/#2280).
+    //
+    // Known and deliberate limitation: in input that CONCATENATES a
+    // Git-formatted section with a section carrying no `diff --` marker, the
+    // marker-less section is absorbed into the previous file. That shape is
+    // byte-for-byte indistinguishable from the `--unified=0` ghost above, so
+    // separating them would need a hunk-termination rule — the exact approach
+    // that failed across four consecutive designs in #2261. No diff producer
+    // emits that shape (it only arises from hand-concatenated input), and it
+    // under-reports (a file is missed) rather than mis-reporting line numbers
+    // onto a real file. Pinned by the band-4 concatenation test.
     const canOpenFile = !gitFormatted || gitFileBoundaryPending;
     if (canOpenFile && line.startsWith('--- ') && (lines[index + 1] ?? '').startsWith('+++ ')) {
       const nextAfterPair = lines[index + 2] ?? '';
