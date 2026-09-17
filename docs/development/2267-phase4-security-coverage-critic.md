@@ -31,7 +31,8 @@ Phase 4 therefore reuses the existing skill and adds only the context-specific p
 
 The existing behavior remains unchanged.
 It runs after finding verification in a diff or PR flow.
-It also requires a current diff that touches executable code, migration, schema, public API, or configuration.
+It also requires a current diff that touches executable code, migration, or schema.
+A public API or configuration change also satisfies the requirement.
 
 Phase 4 does not weaken that entry condition.
 
