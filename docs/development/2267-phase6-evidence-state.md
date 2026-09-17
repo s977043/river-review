@@ -81,27 +81,31 @@ Those decisions stay on their existing axes.
 
 ### Refuted
 
-The following #1978 terminal outcomes mean the candidate claim no longer stands:
+Only terminal outcomes that actually reject the claim on evidence or deterministic hallucination grounds project to `refuted`:
 
 ```text
-withdrawn-by-reviewer
 dismissed-by-evidence
 dismissed-hallucination
   -> evidenceState = refuted
 ```
 
-`withdrawn-by-reviewer` is included because #1978 drops the candidate when the Reviewer withdraws it after the Critic exchange.
-Phase 6 does not interpret generic suppression or deduplication as refutation.
+A dropped record is not automatically refuted.
+Routing and epistemic truth stay separate.
 
 ### Unresolved
 
-The following cannot establish or refute the claim:
+The following do not establish the claim and also do not prove it false:
 
 ```text
+withdrawn-by-reviewer
 needs-human-judgment
 critic-timeout
   -> evidenceState = unresolved
 ```
+
+The `withdrawn-by-reviewer` distinction is deliberate.
+#1978 Phase 1b classifies the withdrawal fixture as an `unsupported-claim` and explicitly verifies that it is **not** spelled `dismissed-by-evidence` when the Critic supplied no grounded citation.
+The candidate is dropped from routing, but withdrawal alone is not evidence of falsity.
 
 Missing, malformed, or unknown `validation.finalStatus` also projects fail-safe to `unresolved`.
 
@@ -112,6 +116,7 @@ It is a relevance outcome, not evidence that the finding is false.
 Therefore:
 
 ```text
+withdrawn-by-reviewer != refuted
 out-of-ask != refuted
 ```
 
@@ -183,6 +188,7 @@ Properties:
 - imports `FINAL_STATUS` from #1978 instead of re-declaring its vocabulary
 - reads only `validation.finalStatus` as the v1 epistemic source
 - unknown or missing validation fails safe to `unresolved`
+- Reviewer withdrawal remains `unresolved` unless separate grounded evidence refutes the claim
 - `out-of-ask` never becomes `refuted`
 - legacy `validatedStatus` does not establish truth
 - lifecycle / scope / severity / disposition / confidence / agreement do not alter the projection
@@ -216,7 +222,7 @@ No public Review Artifact field is added in this phase.
 - confirmed -> established
 - evidence dismissal -> refuted
 - hallucination dismissal -> refuted
-- Reviewer withdrawal -> refuted
+- Reviewer withdrawal -> unresolved, never refuted
 - needs-human-judgment -> unresolved
 - Critic timeout -> unresolved
 - out-of-ask -> unresolved, never refuted
@@ -234,7 +240,7 @@ PASS if this remains a projection of #1978 rather than a second state machine.
 
 ### Security
 
-PASS with fail-safe behavior: missing / timeout / unknown never becomes established.
+PASS with fail-safe behavior: missing / timeout / unknown / unsupported withdrawal never becomes established.
 Unsafe target execution remains prohibited.
 
 ### Contract
@@ -259,6 +265,7 @@ PASS because the helper has no normal runtime wiring and cannot change existing 
 
 Stop and redesign if future integration requires any of these:
 
+- treating Reviewer withdrawal as evidence-grounded refutation without separate evidence
 - treating `out-of-ask` as refuted
 - treating duplicate suppression as refuted
 - inventing blocker / validation plan from free-form text
