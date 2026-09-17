@@ -51,6 +51,7 @@ function normalizeRunId(value) {
  * Evaluate the minimum logical finder/verifier separation required by #2267.
  *
  * Fail-safe behavior:
+ * - missing or malformed input is UNKNOWN, never independent
  * - missing identity is UNKNOWN, never independent
  * - equal identities are SAME_EXECUTION, never independent
  * - only two present, distinct ids are INDEPENDENT
@@ -59,7 +60,7 @@ function normalizeRunId(value) {
  * after normalization. It is not evidence that the validation is correct or
  * that the ids are tamper-evident.
  *
- * @param {{ finderRunId?: unknown, verifierRunId?: unknown }} [input]
+ * @param {unknown} [input]
  * @returns {{
  *   status: string,
  *   independent: boolean,
@@ -68,9 +69,9 @@ function normalizeRunId(value) {
  *   reasonCode: string
  * }}
  */
-export function evaluateReviewerIndependence({ finderRunId, verifierRunId } = {}) {
-  const finder = normalizeRunId(finderRunId);
-  const verifier = normalizeRunId(verifierRunId);
+export function evaluateReviewerIndependence(input = {}) {
+  const finder = normalizeRunId(input?.finderRunId);
+  const verifier = normalizeRunId(input?.verifierRunId);
 
   if (finder === null && verifier === null) {
     return {
