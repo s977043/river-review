@@ -133,7 +133,7 @@ Review `out_of_scope`, `blocked`, and `deferred` units as evidence-sufficiency c
 
 Raise residual risk when:
 
-- `out_of_scope` or `not_applicable` conflicts with reconnaissance evidence
+- `out_of_scope` with `reasonCode: not_applicable` conflicts with reconnaissance evidence
 - many relevant surfaces are excluded with copy-pasted or non-specific explanations
 - `blocked` explains the constraint but its validation plan cannot resolve the missing fact
 - `deferred` is being used as a silent substitute for unplanned work
