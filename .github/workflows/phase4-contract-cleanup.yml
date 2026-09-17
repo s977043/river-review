@@ -1,0 +1,83 @@
+name: Phase 4 contract cleanup
+
+on:
+  push:
+    branches:
+      - feat/2278-security-coverage-critic
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/2278-security-coverage-critic
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Align output contract and regression test
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          profile = Path('skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md')
+          text = profile.read_text()
+          old = '- category\n- blocking\n- evidence_missing\n- resolution\n'
+          new = '- category\n- severity\n- blocking\n- evidence_missing\n- resolution\n'
+          if old not in text:
+              raise SystemExit('expected residual field list not found')
+          profile.write_text(text.replace(old, new, 1))
+
+          skill = Path('skills/agent-skills/river-review-security-audit/SKILL.md')
+          text = skill.read_text()
+          old = '5. **Coverage critic observations** — residual coverage unknowns from the `unknown-coverage-review` security-audit profile; omit only when the profile correctly returns `NO_REVIEW` and explain why.\n'
+          new = '5. **Unverified / Residual Risk — Unknown Coverage** — residual coverage unknowns from the `unknown-coverage-review` security-audit profile; omit only when the profile correctly returns `NO_REVIEW` and explain why.\n'
+          if old not in text:
+              raise SystemExit('expected coverage critic section not found')
+          skill.write_text(text.replace(old, new, 1))
+
+          test = Path('tests/security-audit-coverage-critic-profile.test.mjs')
+          text = test.read_text()
+          marker = '\n});\n'
+          insertion = '''
+
+  it('reuses the existing Unknown Coverage output contract without ad-hoc status fields', () => {
+    assert.doesNotMatch(securityAuditProfile, /^kind: missing_surface$/m);
+    assert.doesNotMatch(securityAuditProfile, /^coverageUnit:/m);
+    assert.match(securityAuditProfile, /- severity/);
+    assert.doesNotMatch(securityAuditSkill, /Coverage critic: not-run/);
+    assert.match(securityAuditSkill, /\*\*Unverified \/ Residual Risk — Unknown Coverage\*\*/);
+  });
+'''
+          idx = text.rfind(marker)
+          if idx < 0:
+              raise SystemExit('test suite closing marker not found')
+          test.write_text(text[:idx] + insertion + text[idx:])
+          PY
+
+      - name: Regenerate skill artifacts
+        run: |
+          npm run skills:catalog
+          npm run skills:manifest
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/phase4-contract-cleanup.yml
+
+      - name: Commit cleanup
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'test(security): pin existing phase4 output contract'
+          git push origin HEAD:feat/2278-security-coverage-critic
