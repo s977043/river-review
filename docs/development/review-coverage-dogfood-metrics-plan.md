@@ -77,6 +77,7 @@ status == partial の observed run 数 / observed run 数
 - complete / partial / not_executed status distribution
 - required completion rate across multiple runs
 - required failed / timed_out units are counted separately
+- optional unit failure is excluded from required failure metrics
 - zero findings + partial is counted
 - zero required units yields N/A rather than divide-by-zero
 - dashboard markdown renders the new section only when observations exist
@@ -110,7 +111,7 @@ saved run は引き続き self-reported / untrusted observation。集計によ�
 
 ### Testing / regression — APPROVE
 
-legacy absence、partial、timeout/failure、0 findings、0 denominator を固定し、required CI green を必須とする。
+legacy absence、partial、timeout/failure、optional failure、0 findings、0 denominator を固定し、required CI green を必須とする。
 
 ## Completion rule
 
