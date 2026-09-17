@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.114.0](https://github.com/s977043/river-review/compare/v1.113.0...v1.114.0) (2026-09-17)
+
+
+### Features
+
+* **security:** reuse unknown coverage review as audit coverage critic ([#2279](https://github.com/s977043/river-review/issues/2279)) ([0d0b5d2](https://github.com/s977043/river-review/commit/0d0b5d20dfa8634651b803993c7df9eaac1afa45))
+
+
+### Bug Fixes
+
+* **diff:** recognise a file header only as a `---`/`+++`/`@@` triple ([#2249](https://github.com/s977043/river-review/issues/2249)) ([#2264](https://github.com/s977043/river-review/issues/2264)) ([e9d94fa](https://github.com/s977043/river-review/commit/e9d94fab67cb642ba27bbce2b86a3cd8001ba85d))
+
 ## [1.113.0](https://github.com/s977043/river-review/compare/v1.112.0...v1.113.0) (2026-09-16)
 
 
