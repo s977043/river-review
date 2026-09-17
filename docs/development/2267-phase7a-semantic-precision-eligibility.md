@@ -44,7 +44,7 @@ established != high severity
 established != Gate approved
 ```
 
-#1857 remains the owner of disposition.
+Issue #1857 remains the owner of disposition.
 
 ## Why unresolved findings do not proceed
 
