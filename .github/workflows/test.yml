@@ -5,14 +5,31 @@ on:
     branches:
       - main
   pull_request:
+  # マージキューの一時ブランチでも必須チェックを走らせる。`merge_group` を持たない
+  # ワークフローの context はキュー内で一度も報告されず、キューが詰まる
+  # （https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue）。
+  merge_group:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# cancel された run は `cancelled` の check-run を残し、pass でも fail でもない結論として
+# 必須チェックの判定を止める（#1778）。害になるのは **cancel された run と生き残る run が
+# 同じ commit について報告する場合**に限る。そこで group と cancel 条件を次のように置く。
+#
+# - group にイベント名を含める。`pull_request` の run と `merge_group` の run が同じ group に
+#   入らないことを ref 依存でなく明示する。
+# - `merge_group` では cancel しない。キューの entry は一時ブランチごとに ref が一意なので
+#   衝突しない想定だが、必須チェックの結論を cancel が左右しうる経路は残さない。
+# - `pull_request` では従来どおり cancel する。この workflow は `labeled` / `unlabeled` を
+#   購読しておらず、cancel が起きるのは push で head が進んだときだけである。cancel される
+#   run は**古い commit**について報告するので、現在の head の必須チェックには影響しない。
+#   #1778 は同じ head sha に対する複数イベントが 1 つの group を共有した事例であり、
+#   この workflow はその条件に当たらない。
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 # Every job below checks out and installs on its own, so none of them depends
 # on `lint`. That is deliberate: when `lint` gated them, a single style error
@@ -209,6 +226,9 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           # Previous tip of the pushed branch. Empty for workflow_dispatch.
           PUSH_BEFORE_SHA: ${{ github.event.before }}
+          # Base of the merge group's temporary branch (the target-branch tip the
+          # queued changes were stacked onto). Empty for every other event.
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
         run: |
           # Base revision of the change under review.
           #
@@ -232,6 +252,12 @@ jobs:
               echo "HEAD is not the pull request merge commit; falling back to the event payload base."
               BASE_SHA="$PR_BASE_SHA"
             fi
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            # The merge group's head is the queued changes stacked onto base_sha,
+            # so base_sha is the exact base of the change under review. Without
+            # this branch BASE_SHA would be empty and the fail-safe below would
+            # rebuild on every queue entry.
+            BASE_SHA="$MERGE_GROUP_BASE_SHA"
           else
             BASE_SHA="$PUSH_BEFORE_SHA"
           fi
