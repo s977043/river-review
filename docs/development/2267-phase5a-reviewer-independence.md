@@ -4,14 +4,18 @@
 
 Phase 5A foundation for #2267, tracked by #2286.
 
-This slice defines the minimum deterministic contract needed to distinguish a finder execution from a verifier execution before Security Audit can claim independent adversarial verification.
-It does not activate the #1978 LLM Critic runtime, add a new finding state machine, change normal PR review, or alter deterministic Gate behavior.
+This slice defines the minimum deterministic contract needed to distinguish a finder execution from a verifier execution.
+Security Audit can use that distinction before it claims independent adversarial verification.
+It does not activate the #1978 LLM Critic runtime or add a new finding state machine.
+Normal PR review and deterministic Gate behavior stay unchanged.
 
 ## Why Phase 5 is split
 
-#1978 already provides the Evidence-Grounded Adversarial Review state machine and fixtures.
-Phase 0 / 1a / 1b are on `main`, while promotion into runtime remains blocked by the paired-evaluation requirement.
-That evaluation needs real LLM Critic responses, and the current repository policy does not provide the required API key through repository secrets.
+Issue #1978 already provides the Evidence-Grounded Adversarial Review state machine and fixtures.
+Phase 0 / 1a / 1b are on `main`.
+Promotion into runtime remains blocked by the paired-evaluation requirement.
+That evaluation needs real LLM Critic responses.
+The current repository policy does not provide the required API key through repository secrets.
 
 Phase 5 therefore separates two concerns:
 
@@ -69,7 +73,8 @@ It does not prove:
 - Gate approval
 
 Provider or model diversity may be recorded as future provenance, but it is not a correctness condition in Phase 5A.
-Cryptographic Reviewer Identity, signatures, key handling, override records, and stronger actor provenance remain owned by #1760.
+Cryptographic Reviewer Identity and signatures remain owned by #1760.
+Key handling, override records, and stronger actor provenance remain there as well.
 
 ## Placement
 
@@ -90,7 +95,8 @@ This keeps the existing Finding Critic behavior, normal PR latency, token usage,
 
 ## Security Audit integration boundary
 
-When Phase 5B becomes eligible, an explicit focused or full Security Audit may use the contract as a precondition before claiming that a candidate finding received independent adversarial verification.
+When Phase 5B becomes eligible, an explicit focused or full Security Audit may use the contract as a precondition.
+The contract is required before claiming that a candidate finding received independent adversarial verification.
 
 The intended future sequence is:
 
@@ -116,7 +122,7 @@ Rules:
 
 ## Relationship to #1978
 
-#1978 remains the SSoT for:
+Issue #1978 remains the SSoT for:
 
 - `AGREE | DISAGREE_EVIDENCE | DISAGREE_CONCERN`
 - Reviewer response `KEEP | REVISE | WITHDRAW`
@@ -129,11 +135,15 @@ Rules:
 
 Phase 5A does not add or reinterpret any of those states.
 
-The real LLM Critic runner, candidate-to-Critic fan-out, reviewer rebuttal loop, risk-based activation, and validated-finding routing remain deferred until #1978 paired evaluation can be executed and reviewed.
+The real LLM Critic runner and candidate-to-Critic fan-out remain deferred.
+The reviewer rebuttal loop, risk-based activation, and validated-finding routing are also deferred.
+Phase 5B waits until #1978 paired evaluation can be executed and reviewed.
 
 ## Relationship to #1760
 
-#1760 owns the broader Reviewer Identity problem, including actor identity, Review Record provenance, signatures, override, supersede, and tamper evidence.
+Issue #1760 owns the broader Reviewer Identity problem.
+This includes actor identity, Review Record provenance, and signatures.
+It also includes override, supersede, and tamper evidence.
 
 Phase 5A intentionally avoids creating a second identity schema.
 Its run-ID comparison is only a minimum logical separation contract that future #1760 provenance can strengthen.
@@ -194,7 +204,7 @@ Existing #1978 Finding Critic tests remain the regression guard for the validati
 ### Evaluation
 
 - Phase 5A is deterministic and can proceed without model evaluation
-- Phase 5B remains blocked until #1978 paired evaluation can measure precision, false positives, F1, cost, and latency
+- Phase 5B remains blocked until #1978 paired evaluation can measure precision and false positives. The evaluation must also measure F1, cost, and latency.
 
 ## No-go conditions
 
