@@ -61,6 +61,8 @@ describe('Review Coverage dogfood dashboard (#2212)', () => {
 
     assert.equal(dashboard.totalRuns, 2);
     assert.equal(dashboard.reviewCoverage.observedRuns, 1);
+    assert.equal(dashboard.reviewCoverage.classifiedRuns, 1);
+    assert.equal(dashboard.reviewCoverage.unclassifiedRuns, 0);
     assert.equal(dashboard.reviewCoverage.statusDistribution.complete, 1);
     assert.equal(dashboard.reviewCoverage.statusDistribution.partial ?? 0, 0);
     assert.equal(dashboard.reviewCoverage.partialReviewRate, 0);
@@ -94,6 +96,8 @@ describe('Review Coverage dogfood dashboard (#2212)', () => {
     const coverage = dashboard.reviewCoverage;
 
     assert.equal(coverage.observedRuns, 3);
+    assert.equal(coverage.classifiedRuns, 3);
+    assert.equal(coverage.unclassifiedRuns, 0);
     assert.deepEqual(coverage.statusDistribution, {
       complete: 1,
       partial: 1,
@@ -138,6 +142,36 @@ describe('Review Coverage dogfood dashboard (#2212)', () => {
     assert.equal(dashboard.reviewCoverage.requiredFailureOrTimeoutRate, null);
     assert.match(markdown, /Required unit completion rate \| N\/A/);
     assert.match(markdown, /Required failure\/timeout rate \| N\/A/);
+  });
+
+  it('keeps unclassified coverage out of dogfood rate denominators', () => {
+    const partial = makeCoverage({
+      status: 'partial',
+      requiredUnits: 1,
+      completedRequiredUnits: 0,
+      units: [unit('partial', 'timed_out')],
+    });
+    const malformed = makeCoverage({
+      status: 'future_status',
+      requiredUnits: 99,
+      completedRequiredUnits: 99,
+      units: [unit('malformed', 'completed')],
+    });
+
+    const dashboard = computeDashboard([
+      run({ findings: [], reviewCoverage: partial }),
+      run({ findings: [], reviewCoverage: malformed }),
+    ]);
+    const coverage = dashboard.reviewCoverage;
+    const markdown = formatDashboard(dashboard);
+
+    assert.equal(coverage.observedRuns, 2);
+    assert.equal(coverage.classifiedRuns, 1);
+    assert.equal(coverage.unclassifiedRuns, 1);
+    assert.equal(coverage.requiredUnits, 1);
+    assert.equal(coverage.completedRequiredUnits, 0);
+    assert.equal(coverage.partialReviewRate, 1);
+    assert.match(markdown, /Unclassified coverage runs \| 1/);
   });
 
   it('renders Review Coverage only when observations exist', () => {
