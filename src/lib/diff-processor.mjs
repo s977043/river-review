@@ -232,17 +232,26 @@ export function parseUnifiedDiff(diffText) {
   const lines = diffText.split('\n');
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    // Any `diff --<mode>` line at column 0 is a producer file marker, never
-    // hunk content: every body line inside a well-formed hunk carries a
-    // ` `/`+`/`-` prefix, so an unprefixed `diff --` can only be a section
-    // header. Matching the family rather than the literal `diff --git` matters
-    // because real Git emits `diff --cc <path>` (and `diff --combined <path>`)
-    // for merge commits — `git show --cc`, `git log -p --cc`. Anchoring on
-    // `diff --git` alone left `gitFileBoundaryPending` unarmed for those
-    // sections, so a combined section following a `diff --git` section was
-    // absorbed into the previous file and injected its line numbers there
-    // (#2288 review).
-    if (line.startsWith('diff --')) {
+    // Any `diff ` line at column 0 is a producer section marker, never hunk
+    // content: every body line inside a well-formed hunk carries a ` `/`+`/`-`
+    // prefix, so an unprefixed `diff ` can only be a section header.
+    //
+    // The match is the whole `diff ` family, not the literal `diff --git`, and
+    // not `diff --` either. Both narrower forms leave `gitFileBoundaryPending`
+    // unarmed for section headers that real producers do emit, and an unarmed
+    // section is absorbed into the PREVIOUS file — which injects that section's
+    // line numbers into a real file. Two producers were measured doing this
+    // (#2288 review):
+    //   - `diff --cc <path>` / `diff --combined <path>`, which Git emits for
+    //     merge commits (`git show --cc`, `git log -p --cc`);
+    //   - `diff -u -r a/f b/f`, which GNU diff emits with SHORT options. The
+    //     long form `diff --unified --recursive` happens to start with `diff --`
+    //     and so was already handled, which is exactly why a `diff --` anchor
+    //     looked sufficient until the short form was measured.
+    //
+    // Combined sections still parse as zero hunks because the hunk regexp below
+    // does not accept the `@@@ ... @@@` form — see #2294, which owns that gap.
+    if (line.startsWith('diff ')) {
       gitFormatted = true;
       gitFileBoundaryPending = true;
       currentHunk = null;
@@ -257,15 +266,22 @@ export function parseUnifiedDiff(diffText) {
     // hunk's `@@` from minting a ghost file, without adding any hunk-termination
     // heuristic (#2261/#2280).
     //
-    // Known and deliberate limitation: in input that CONCATENATES a
-    // Git-formatted section with a section carrying no `diff --` marker, the
-    // marker-less section is absorbed into the previous file. That shape is
-    // byte-for-byte indistinguishable from the `--unified=0` ghost above, so
-    // separating them would need a hunk-termination rule — the exact approach
-    // that failed across four consecutive designs in #2261. No diff producer
-    // emits that shape (it only arises from hand-concatenated input), and it
-    // under-reports (a file is missed) rather than mis-reporting line numbers
-    // onto a real file. Pinned by the band-4 concatenation test.
+    // Known limitation, scoped narrowly: input that CONCATENATES a
+    // Git-formatted section with a section that carries NO `diff ` header line
+    // at all still absorbs the marker-less section into the previous file. Such
+    // a section is byte-for-byte indistinguishable from the `--unified=0` ghost
+    // above, so separating them would need a hunk-termination rule — the exact
+    // approach that failed across four consecutive designs in #2261.
+    //
+    // Do not read this as "no producer emits a concatenated diff". Producers
+    // do, and those cases are handled: every Git and GNU diff section carries a
+    // `diff ` header line, so the marker above re-arms for each one. The gap is
+    // only a section stripped of that header, which is hand-authored input.
+    // An earlier revision of this comment claimed the broader exemption and was
+    // disproved by measurement (#2288 review) — the `diff -u -r` short-option
+    // concatenation it declared impossible was injecting line numbers into a
+    // real file. Pinned by the band-4 and band-6 concatenation tests, both of
+    // which assert addedLines and not only paths.
     const canOpenFile = !gitFormatted || gitFileBoundaryPending;
     if (canOpenFile && line.startsWith('--- ') && (lines[index + 1] ?? '').startsWith('+++ ')) {
       const nextAfterPair = lines[index + 2] ?? '';

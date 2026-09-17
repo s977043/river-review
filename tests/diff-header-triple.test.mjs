@@ -17,8 +17,11 @@ import { collectAddedLineHints } from '../src/lib/git.mjs';
 // accepts the next triple as a file boundary. This prevents a `--unified=0`
 // hunk-body pair plus the next `@@` from forging a file boundary.
 //
-// The marker is the `diff --` FAMILY, not the literal `diff --git`, because
-// real Git labels merge sections `diff --cc <path>` (band 5).
+// The marker is the whole `diff ` FAMILY, not the literal `diff --git` and not
+// `diff --`: real Git labels merge sections `diff --cc <path>` (band 5), and
+// GNU diff's SHORT options produce `diff -u -r a/f b/f` (band 6). Any section
+// header the marker fails to match is absorbed into the PREVIOUS file, which
+// injects that section's line numbers into a real file.
 //
 // The five input bands below are run deliberately because the earlier attempt
 // at #2249 (PR #2251, closed) tracked where a hunk ENDS and broke a different
@@ -456,21 +459,25 @@ test('band 4 (U0): parseUnifiedDiff and collectAddedLineHints agree on real file
 
 // --- Band 5: combined diff (`diff --cc`) — PR #2288 review -----------------
 //
-// Real Git labels a merge commit's sections `diff --cc <path>`, not
-// `diff --git`. When the file-marker check was anchored on the literal
-// `diff --git`, `gitFileBoundaryPending` was never re-armed for a combined
-// section, so the section that followed a `diff --git` section was absorbed
-// into the PREVIOUS file — measured on `origin/main` a7300837 vs PR head
-// a8a9cb92 with `git log -p --cc`:
+// This is NOT a defect inherited from `main`. `main` handles combined diff
+// correctly, because it accepts the `--- `/`+++ `/`@@ ` triple unconditionally
+// and needs no section marker at all. The defect was introduced by THIS PR's
+// `gitFileBoundaryPending` gate: once the gate exists, a section whose header
+// the marker fails to match is never re-armed, so it is absorbed into the
+// PREVIOUS file. Real Git labels merge sections `diff --cc <path>`, which the
+// first revision's `diff --git` anchor did not match. Measured on `origin/main`
+// a7300837 versus PR head a8a9cb92 with `git log -p --cc`:
 //
-//   base: later.txt[1]  shared.txt[]  shared.txt[1]  ...
-//   head: later.txt[1,12,15]          shared.txt[1]  ...
+//   base (correct):  later.txt[1]        shared.txt[]  shared.txt[1]  ...
+//   head (defective): later.txt[1,12,15]               shared.txt[1]  ...
 //
 // i.e. the combined entry disappeared and line numbers 12 and 15 were injected
-// into a one-line file. The marker check therefore matches the `diff --`
-// family. NOTE: combined hunks still parse as zero hunks because the hunk
-// regex does not accept `@@@` (issue #2294) — that is unchanged from `main`
-// and deliberately out of scope here.
+// into a one-line file. So these tests close a gap this PR opened; they do not
+// fix `main`. Band 6 covers the second producer with the same shape.
+//
+// NOTE: combined hunks still parse as zero hunks because the hunk regexp does
+// not accept `@@@` — that IS a pre-existing `main` behaviour, owned by issue
+// #2294 and deliberately out of scope here.
 
 const withMergeRepo = (fn) =>
   withTempRepo((dir, git) => {
@@ -565,14 +572,108 @@ test('a hunk body containing `diff --` content lines mints no ghost file', () =>
   }
 });
 
+// --- Band 6: a Git section concatenated with real GNU diff output ----------
+//
+// The second producer whose section header a narrower marker missed. GNU diff
+// writes `diff <options> <left> <right>` above each file. With SHORT options
+// that is `diff -u -r a/f1.txt b/f1.txt`, which does NOT start with `diff --`;
+// with long options it is `diff --unified --recursive …`, which does. That
+// asymmetry is why the long form passed while the short form was broken, and
+// why the marker must be the `diff ` family.
+//
+// Measured on the concatenation below (git section first, GNU short options):
+//   base  a7300837 : cc1.txt[1]  f1.txt[2]  f2.txt[2]
+//   head  470f6aa2 : cc1.txt[1,3,2,4,2]          <- two files lost, line
+//                                                   numbers 3/2/4/2 injected
+//                                                   into a one-line file
+//   fixed (`diff `): cc1.txt[1]  f1.txt[2]  f2.txt[2]
+//
+// Both concatenation orders and both option styles are asserted, because the
+// defect was order- and style-dependent and a single arrangement hid it.
+
+const gnuRecursiveDiff = (cwd, flags) => {
+  try {
+    return execFileSync('diff', [...flags, 'a', 'b'], { cwd, encoding: 'utf8' });
+  } catch (error) {
+    // `diff` exits 1 when the inputs differ, which is the expected case here.
+    return error.stdout ?? '';
+  }
+};
+
+const gitPlusGnu = (order, flags) =>
+  withTempRepo((dir, git) => {
+    writeFileSync(join(dir, 'cc1.txt'), 'a\n');
+    git('add', '-A');
+    git('commit', '-qm', 'seed');
+    writeFileSync(join(dir, 'cc1.txt'), 'A\n');
+    git('add', '-A');
+    const gitPart = git('diff', '--cached', '--no-color');
+    mkdirSync(join(dir, 'a'));
+    mkdirSync(join(dir, 'b'));
+    for (const name of ['f1.txt', 'f2.txt']) {
+      writeFileSync(join(dir, 'a', name), `keep\n${name}-old\n`);
+      writeFileSync(join(dir, 'b', name), `keep\n${name}-new\n`);
+    }
+    const gnuPart = gnuRecursiveDiff(dir, flags);
+    const text = order === 'git-first' ? gitPart + gnuPart : gnuPart + gitPart;
+    return parseUnifiedDiff(text).files;
+  });
+
+for (const [label, flags] of [
+  ['short options (`-u -r`)', ['-u', '-r']],
+  ['long options (`--unified --recursive`)', ['--unified', '--recursive']],
+]) {
+  test(`band 6 (git + GNU, ${label}): every file survives with its own added lines`, () => {
+    const files = gitPlusGnu('git-first', flags);
+    assert.deepEqual(
+      files.map((f) => f.path),
+      ['cc1.txt', 'f1.txt', 'f2.txt'],
+      'no GNU section is absorbed into the preceding Git section'
+    );
+    // Asserting addedLines is the point of this test: the earlier revision was
+    // green on paths alone while injecting foreign line numbers into cc1.txt.
+    assert.deepEqual(
+      files.map((f) => f.addedLines),
+      [[1], [2], [2]],
+      'no file absorbs another section’s line numbers'
+    );
+    assert.deepEqual(
+      files.map((f) => f.hunks.length),
+      [1, 1, 1]
+    );
+  });
+
+  test(`band 6 (GNU + git, ${label}): the reverse concatenation order also survives`, () => {
+    const files = gitPlusGnu('gnu-first', flags);
+    assert.deepEqual(
+      files.map((f) => f.path),
+      ['f1.txt', 'f2.txt', 'cc1.txt']
+    );
+    assert.deepEqual(
+      files.map((f) => f.addedLines),
+      [[2], [2], [1]]
+    );
+  });
+}
+
 // --- Known limitation, pinned so it cannot change silently ------------------
 
-test('KNOWN LIMITATION: a marker-less section concatenated after a Git section is absorbed', () => {
-  // CHARACTERISATION, NOT A CONTRACT. This shape is byte-for-byte identical to
-  // the band-4 `--unified=0` ghost, so splitting them apart requires a
-  // hunk-termination rule — the approach that failed four times in #2261. No
-  // diff producer emits it. Recorded here so the trade-off is visible: on
-  // `origin/main` a7300837 this parsed as ['a.txt', 'b.txt'].
+test('KNOWN LIMITATION: a section with NO `diff ` header line at all is absorbed', () => {
+  // CHARACTERISATION, NOT A CONTRACT.
+  //
+  // Scope: a section that carries no `diff ` header line whatsoever. Every real
+  // producer measured (Git `diff --git`/`diff --cc`, GNU diff in both option
+  // styles — band 6) writes one, so this shape is hand-authored. Stripped of
+  // that line it is byte-for-byte identical to the band-4 `--unified=0` ghost,
+  // and splitting the two apart requires a hunk-termination rule — the approach
+  // that failed four consecutive times in #2261.
+  //
+  // Do NOT generalise this to "concatenated diffs are unsupported": band 6
+  // pins the producer-generated concatenations as working. An earlier revision
+  // made that broader claim and was disproved by measurement (#2288 review).
+  //
+  // Measured on `origin/main` a7300837 this parsed as:
+  //   [{ path: 'a.txt', addedLines: [1] }, { path: 'b.txt', addedLines: [1] }]
   const files = withTempRepo((dir, git) => {
     writeFileSync(join(dir, 'a.txt'), 'a\n');
     git('add', '-A');
@@ -587,6 +688,13 @@ test('KNOWN LIMITATION: a marker-less section concatenated after a Git section i
   assert.deepEqual(
     files.map((f) => f.path),
     ['a.txt'],
-    'the marker-less section is absorbed; see the band-5 rationale'
+    'the header-less section is absorbed; see the band-6 rationale'
+  );
+  // Asserted so the cost of the limitation is visible rather than hidden behind
+  // a paths-only check: `a.txt` really does pick up b.txt's line number.
+  assert.deepEqual(
+    files.map((f) => f.addedLines),
+    [[1, 2, 1]],
+    'and its line numbers land on a.txt — this is the cost being accepted'
   );
 });
