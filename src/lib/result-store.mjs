@@ -11,6 +11,9 @@ import { nonEmptyNfcString } from './promotion-candidates.mjs';
 // #1857: the retired reason code is imported, never re-typed here, so the
 // legacy-record counter below cannot drift from the constant it looks for.
 import { SUPPRESS_REASONS } from './finding-factory.mjs';
+// #2300: the Review Coverage status vocabularies are imported, never re-typed,
+// so the dashboard cannot drift from the contract it reports on.
+import { REVIEW_COVERAGE_STATUSES, REVIEW_UNIT_STATUSES } from './review-coverage.mjs';
 
 const STORE_DIR_NAME = '.river/runs';
 const GLOBAL_STORE_DIR = path.join(os.homedir(), '.river', 'runs');
@@ -336,7 +339,7 @@ function computeReviewCoverageDashboard(runRecords) {
   for (const record of observed) {
     const coverage = record.reviewCoverage;
     const status = coverage.status;
-    const classified = status === 'complete' || status === 'partial' || status === 'not_executed';
+    const classified = REVIEW_COVERAGE_STATUSES.includes(status);
     if (!classified) {
       unclassifiedRuns += 1;
       continue;
@@ -347,7 +350,12 @@ function computeReviewCoverageDashboard(runRecords) {
     completedRequiredUnits += nonNegativeInteger(coverage.completedRequiredUnits);
 
     for (const unit of Array.isArray(coverage.units) ? coverage.units : []) {
-      if (unit?.required !== true) continue;
+      // Mirror `normalizeRequired` in review-coverage.mjs: a unit is required
+      // unless policy explicitly marks it optional. Treating a missing
+      // `required` field as optional here would under-report the failure rate
+      // for legacy / hand-written / externally produced run records.
+      if (unit?.required === false) continue;
+      if (!REVIEW_UNIT_STATUSES.includes(unit.status)) continue;
       if (unit.status === 'failed') requiredFailedUnits += 1;
       if (unit.status === 'timed_out') requiredTimedOutUnits += 1;
     }
@@ -368,8 +376,7 @@ function computeReviewCoverageDashboard(runRecords) {
     statusDistribution,
     requiredUnits,
     completedRequiredUnits,
-    requiredUnitCompletionRate:
-      requiredUnits > 0 ? completedRequiredUnits / requiredUnits : null,
+    requiredUnitCompletionRate: requiredUnits > 0 ? completedRequiredUnits / requiredUnits : null,
     requiredFailedUnits,
     requiredTimedOutUnits,
     requiredFailureOrTimeoutRate:

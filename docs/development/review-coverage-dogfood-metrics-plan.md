@@ -92,31 +92,31 @@ status == partial の classified run 数 / classified run 数
 
 ## Plan review
 
-### Architecture / responsibility boundaries — APPROVE
+### Architecture / responsibility boundaries—APPROVE
 
 既存の run store → `computeDashboard()` → `formatDashboard()` の一方向経路に載せる。新しい metrics subsystem は作らない。
 
-### Contract / SSoT — APPROVE WITH GUARD
+### Contract / SSoT—APPROVE WITH GUARD
 
 `reviewCoverage` の shape は `schemas/review-coverage.schema.json` が SSoT。dashboard は coverage を再導出しない。`fileScope` を execution coverage と解釈しない。
 
-### Reliability / fail-safe — APPROVE
+### Reliability / fail-safe—APPROVE
 
 coverage absent を `complete` / `partial` のどちらにも捏造しない。契約外 status は unclassified として rate から除外する。0 denominator は `null` / `N/A` とする。
 
-### Backward compatibility — APPROVE
+### Backward compatibility—APPROVE
 
 保存形式・Gate・decision を変更せず additive な dashboard metric のみ追加する。
 
-### Security / trust boundary — APPROVE
+### Security / trust boundary—APPROVE
 
 saved run は引き続き self-reported / untrusted observation。集計によって trust level を引き上げない。unclassified observation を明示して、壊れた観測を正常母集団へ黙って混ぜない。
 
-### Operations / observability — APPROVE
+### Operations / observability—APPROVE
 
 既存 `river runs summary` / job-summary surface で dogfood可能になる。新しい運用面を増やさない。
 
-### Testing / regression — APPROVE
+### Testing / regression—APPROVE
 
 legacy absence、partial、timeout/failure、optional failure、unclassified status、0 findings、0 denominator を固定し、required CI green を必須とする。
 

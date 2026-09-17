@@ -23,6 +23,7 @@ export const modules = {
 /* harmony import */ var _shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(4029);
 /* harmony import */ var _promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(3077);
 /* harmony import */ var _finding_factory_mjs__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(1535);
+/* harmony import */ var _review_coverage_mjs__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(3054);
 
 
 
@@ -35,6 +36,9 @@ export const modules = {
 
 // #1857: the retired reason code is imported, never re-typed here, so the
 // legacy-record counter below cannot drift from the constant it looks for.
+
+// #2300: the Review Coverage status vocabularies are imported, never re-typed,
+// so the dashboard cannot drift from the contract it reports on.
 
 
 const STORE_DIR_NAME = '.river/runs';
@@ -361,7 +365,7 @@ function computeReviewCoverageDashboard(runRecords) {
   for (const record of observed) {
     const coverage = record.reviewCoverage;
     const status = coverage.status;
-    const classified = status === 'complete' || status === 'partial' || status === 'not_executed';
+    const classified = _review_coverage_mjs__WEBPACK_IMPORTED_MODULE_7__/* .REVIEW_COVERAGE_STATUSES */ .Vb.includes(status);
     if (!classified) {
       unclassifiedRuns += 1;
       continue;
@@ -372,7 +376,12 @@ function computeReviewCoverageDashboard(runRecords) {
     completedRequiredUnits += nonNegativeInteger(coverage.completedRequiredUnits);
 
     for (const unit of Array.isArray(coverage.units) ? coverage.units : []) {
-      if (unit?.required !== true) continue;
+      // Mirror `normalizeRequired` in review-coverage.mjs: a unit is required
+      // unless policy explicitly marks it optional. Treating a missing
+      // `required` field as optional here would under-report the failure rate
+      // for legacy / hand-written / externally produced run records.
+      if (unit?.required === false) continue;
+      if (!_review_coverage_mjs__WEBPACK_IMPORTED_MODULE_7__/* .REVIEW_UNIT_STATUSES */ .fA.includes(unit.status)) continue;
       if (unit.status === 'failed') requiredFailedUnits += 1;
       if (unit.status === 'timed_out') requiredTimedOutUnits += 1;
     }
@@ -393,8 +402,7 @@ function computeReviewCoverageDashboard(runRecords) {
     statusDistribution,
     requiredUnits,
     completedRequiredUnits,
-    requiredUnitCompletionRate:
-      requiredUnits > 0 ? completedRequiredUnits / requiredUnits : null,
+    requiredUnitCompletionRate: requiredUnits > 0 ? completedRequiredUnits / requiredUnits : null,
     requiredFailedUnits,
     requiredTimedOutUnits,
     requiredFailureOrTimeoutRate:

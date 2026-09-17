@@ -2,12 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeDashboard, formatDashboard } from '../src/lib/result-store.mjs';
 
-function makeCoverage({
-  status,
-  requiredUnits,
-  completedRequiredUnits,
-  units = [],
-} = {}) {
+function makeCoverage({ status, requiredUnits, completedRequiredUnits, units = [] } = {}) {
   return {
     schemaVersion: '1',
     status,
@@ -172,6 +167,56 @@ describe('Review Coverage dogfood dashboard (#2212)', () => {
     assert.equal(coverage.completedRequiredUnits, 0);
     assert.equal(coverage.partialReviewRate, 1);
     assert.match(markdown, /Unclassified coverage runs \| 1/);
+  });
+
+  it('counts a unit with no `required` field as required (#2300 review)', () => {
+    // `normalizeRequired` (src/lib/review-coverage.mjs) defaults an omitted
+    // `required` to true. A run record that predates the field — or one written
+    // by hand or by an external producer — must therefore be counted as
+    // required here too, otherwise `requiredFailureOrTimeoutRate` under-reports.
+    const legacyUnit = {
+      id: 'legacy-no-required',
+      kind: 'diff-chunk',
+      subjects: ['src/legacy.mjs'],
+      reviewerRole: 'bug-hunter',
+      status: 'failed',
+      reasonCode: 'reviewer_error',
+      findingsCount: 0,
+    };
+    assert.equal('required' in legacyUnit, false);
+
+    const coverage = {
+      schemaVersion: '1',
+      status: 'partial',
+      expectedUnits: 1,
+      completedUnits: 0,
+      requiredUnits: 1,
+      completedRequiredUnits: 0,
+      incompleteRequiredUnitIds: [legacyUnit.id],
+      units: [legacyUnit],
+    };
+
+    const { reviewCoverage } = computeDashboard([run({ reviewCoverage: coverage })]);
+
+    assert.equal(reviewCoverage.requiredUnits, 1);
+    assert.equal(reviewCoverage.requiredFailedUnits, 1);
+    assert.equal(reviewCoverage.requiredTimedOutUnits, 0);
+    assert.equal(reviewCoverage.requiredFailureOrTimeoutRate, 1);
+  });
+
+  it('still excludes a unit explicitly marked optional (#2300 review)', () => {
+    const coverage = makeCoverage({
+      status: 'partial',
+      requiredUnits: 0,
+      completedRequiredUnits: 0,
+      units: [unit('optional-failed', 'failed', { required: false })],
+    });
+
+    const { reviewCoverage } = computeDashboard([run({ reviewCoverage: coverage })]);
+
+    assert.equal(reviewCoverage.requiredFailedUnits, 0);
+    assert.equal(reviewCoverage.requiredTimedOutUnits, 0);
+    assert.equal(reviewCoverage.requiredFailureOrTimeoutRate, null);
   });
 
   it('renders Review Coverage only when observations exist', () => {
