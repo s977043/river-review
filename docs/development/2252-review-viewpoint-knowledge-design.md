@@ -132,17 +132,29 @@ Repository custom catalog と organization catalog は扱いません。
 この Slice では、`activatesOn` の signal vocabulary は実行へ接続しません。
 後続の observe-mode で既存 detector result から内部正規化して接続します。
 
-## 次の Slice
+## Runtime Slice の進行
 
-次は observe-mode を実装します。
+Foundation 後の runtime 接続は小さい Slice に分割します。
 
-1. 既存 detector result の内部 signal への正規化
-2. signal と Viewpoint の照合
-3. Review Obligation の生成、および複数 signal 一致時の Viewpoint id 単位での dedupe
-4. finding、gate、LLM context へ影響させない結果記録
-5. 既存挙動との parity、および activation precision / recall の計測
+1. Phase 5: 既存 heuristic detector の neutral detection を Finding presentation から分離
+2. Phase 5.5: `api-compatibility` Pilot の neutral signal producer を追加
+3. Phase 6: `review.viewpoints.mode = off | observe | active` を導入
+   - `off`: detector / Catalog I/O / prompt 変更なし
+   - `observe`: signal → Viewpoint → Review Obligation を計算し、`debug.execution.reviewViewpoints` に記録するが prompt は変更しない
+   - `active`: matched Review Obligation だけを LLM context へ追加する
+4. Phase 7+: Activation Precision / Recall、Finding Precision / Recall、token / latency、provider parity を測定し、Pilot 拡大を判断
 
-observe-mode で有効性を確認した後に active-mode を検討します。
+Phase 6 でも Viewpoint は Finding を断定しません。prompt へ追加するのは `question` / `requiredEvidence` / evidence hints / false-positive guards だけで、signal の一致自体を違反の証拠として扱いません。
+
+`observe` は prompt だけでなく既存レビューの成功・失敗特性も変えないことを不変条件とします。signal producer、heuristic signal collection、Catalog 解決でエラーが起きた場合は `debug.execution.reviewViewpoints.errors` にコードだけを記録して fail-soft に継続します。`active` は Viewpoint Knowledge をレビュー入力として明示的に利用するモードなので、同じエラーは fail-closed とします。
+
+### Runtime trust boundary
+
+runtime は対象 repository から Viewpoint path を受け取りません。Skill discovery と同じ package-root SSoT から selected built-in Skill の実体を確認し、その Skill 配下の `references/viewpoints.yaml` だけを読み込みます。GitHub Action の bundle では host が固定する `RIVER_REPO_ROOT` を Skill loader と共用します。
+
+selected Skill の `SKILL.md` だけでなく、最終的に読み込む `references/viewpoints.yaml` 自体も `realpath` で canonicalize し、どちらも配布済み `skills/` root 内にあることを確認します。これにより、trusted tree 内の `references/` や catalog file が symlink で root 外を指す場合も読み込みません。`observe` はその事実を観測エラーとして記録し、`active` は fail-closed とします。
+
+Repository custom catalog / organization catalog は v1 の対象外です。
 
 ## 完了条件
 
