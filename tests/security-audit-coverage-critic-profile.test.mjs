@@ -102,4 +102,12 @@ describe('unknown-coverage-review security-audit profile contract', () => {
     assert.match(securityAuditSkill, /No critic `pass == safe` inference\./);
     assert.match(securityAuditSkill, /No target-controlled execution/);
   });
+
+  it('reuses the existing Unknown Coverage output contract without ad-hoc status fields', () => {
+    assert.doesNotMatch(securityAuditProfile, /^kind: missing_surface$/m);
+    assert.doesNotMatch(securityAuditProfile, /^coverageUnit:/m);
+    assert.match(securityAuditProfile, /- severity/);
+    assert.doesNotMatch(securityAuditSkill, /Coverage critic: not-run/);
+    assert.match(securityAuditSkill, /\*\*Unverified \/ Residual Risk — Unknown Coverage\*\*/);
+  });
 });
