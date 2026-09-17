@@ -54,7 +54,8 @@ But `dismissed-duplicate` does not mean the claim is false.
 It means another record owns the canonical representation.
 Projecting that value to `refuted` would mix record identity with epistemic truth.
 
-The #1978 gap analysis also records that `validatedStatus` was declared for synthesis while the Finding Critic writes a separate `validation.finalStatus` field.
+The #1978 gap analysis records `validatedStatus` as a synthesis vocabulary.
+The Finding Critic writes a separate `validation.finalStatus` field.
 Phase 6 preserves that separation.
 
 ## Projection table
@@ -166,7 +167,8 @@ Phase 6 does not change that behavior because doing so would alter generic revie
 For Security Audit presentation, an unresolved candidate severity must not be presented as a **final severity**.
 Severity becomes final only after the finding is established and then passes the later materiality / semantic-precision step.
 
-If future artifacts need to preserve an impact hypothesis for unresolved findings, it must be named as a hypothesis rather than silently reusing final severity semantics.
+Future artifacts may need to preserve an impact hypothesis for unresolved findings.
+If so, they must name it as a hypothesis instead of silently reusing final severity semantics.
 
 ## Implementation
 
@@ -183,11 +185,13 @@ Properties:
 - unknown or missing validation fails safe to `unresolved`
 - `out-of-ask` never becomes `refuted`
 - legacy `validatedStatus` does not establish truth
-- lifecycle, scope, severity, disposition, confidence, and agreement do not alter the projection
+- lifecycle / scope / severity / disposition / confidence / agreement do not alter the projection
 - unresolved blocker / validation plan are caller supplied only
 
 The helper is not wired into normal runtime paths in Phase 6.
-It is a reusable contract for the explicit Security Audit path and the future Phase 9 structured artifact.
+
+It is a reusable contract for the explicit Security Audit path.
+Phase 9 can also reuse it for the structured Security Audit artifact.
 
 ## Compatibility
 
