@@ -137,7 +137,7 @@ describe('runDeterministicGates — single matching command', () => {
     assert.equal(result.strictBlock, false);
     assert.equal(result.deterministicUnrunnable, false);
     assert.deepEqual(result.results, [
-      { skillId: 's1', status: 'pass', reasonCode: 'DETERMINISTIC_PASS' },
+      { gateIndex: 0, skillId: 's1', status: 'pass', reasonCode: 'DETERMINISTIC_PASS' },
     ]);
     assert.equal(calls.length, 1);
     // The executor received the matched entry and a scrubbed env (no secrets).

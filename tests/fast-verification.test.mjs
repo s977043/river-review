@@ -66,8 +66,10 @@ async function writeAllowlist(dir, commands) {
   const allowlistPath = path.join(dir, ALLOWLIST_RELATIVE_PATH);
   await fs.mkdir(path.dirname(allowlistPath), { recursive: true });
   const lines = ['version: 1', 'commands:'];
-  for (const command of commands) {
+  for (const entry of commands) {
+    const { command, args } = typeof entry === 'string' ? { command: entry } : entry;
     lines.push(`  - command: ${command}`, '    selfContained: true');
+    if (args) lines.push(`    args: [${args.map((arg) => JSON.stringify(arg)).join(', ')}]`);
   }
   await fs.writeFile(allowlistPath, lines.join('\n'), 'utf8');
 }
@@ -461,34 +463,69 @@ test('only an after-change observe resolution is accepted', async () => {
   assert.deepEqual(registry.triggers['after-change'].entries, []);
 });
 
-// Adversarial #9 + #10, mechanized: the module's own import list is the check.
-test('the checkpoint imports no model, no network and no gate authority', async () => {
-  const source = await fs.readFile(path.join(repoRoot, 'src/lib/fast-verification.mjs'), 'utf8');
-  const imports = [...source.matchAll(/^import[^;]*?from\s+'([^']+)';/gms)].map((m) => m[1]);
-  assert.deepEqual(imports.sort(), [
-    './deterministic-command-orchestrator.mjs',
-    './promotion-candidates.mjs',
+// Adversarial #9 + #10, mechanized over the TRANSITIVE import closure, not
+// just this file: scanning one file's import lines let a `node:https` added to
+// the orchestrator survive as a mutation (#2304 adversarial review).
+async function importClosure(entryPath) {
+  const visited = new Set();
+  const external = new Set();
+  const dynamic = [];
+  const queue = [entryPath];
+  while (queue.length > 0) {
+    const file = queue.shift();
+    if (visited.has(file)) continue;
+    visited.add(file);
+    const text = await fs.readFile(file, 'utf8');
+    if (/\bimport\s*\(/.test(text) || /\brequire\s*\(/.test(text)) dynamic.push(file);
+    const specifiers = [
+      ...text.matchAll(/(?:^|\n)\s*import[^;]*?from\s+['"]([^'"]+)['"]/gs),
+      ...text.matchAll(/(?:^|\n)\s*export[^;]*?from\s+['"]([^'"]+)['"]/gs),
+    ].map((match) => match[1]);
+    for (const specifier of specifiers) {
+      if (specifier.startsWith('.')) {
+        queue.push(path.resolve(path.dirname(file), specifier));
+      } else {
+        external.add(specifier);
+      }
+    }
+  }
+  return { visited, external, dynamic };
+}
+
+test('the checkpoint reaches no model, no network and no gate authority', async () => {
+  const entry = path.join(repoRoot, 'src/lib/fast-verification.mjs');
+  const { visited, external, dynamic } = await importClosure(entry);
+
+  // Pinned so that ADDING a module to the closure is a test failure to be
+  // looked at, not a silent widening of what this checkpoint can reach.
+  assert.deepEqual([...external].sort(), [
+    'fs',
+    'js-yaml',
+    'node:child_process',
+    'node:crypto',
+    'node:fs',
+    'node:fs/promises',
+    'node:os',
+    'node:path',
+    'path',
   ]);
-  // Comments explain which host words are deliberately absent, so the scan is
-  // over code lines only.
+  assert.deepEqual(dynamic, [], 'a dynamic import can reach anything, so there must be none');
+  assert.ok(visited.size > 1, 'the closure must actually have been walked');
+  for (const file of visited) {
+    assert.ok(
+      !/(^|\/)(llm-pipeline|openai-planner|gate-decision|run-gate|gate-exit)\.mjs$/.test(file),
+      `the closure must not reach ${file}`
+    );
+  }
+
+  // Host vocabulary stays in the adapter. Comments explain which host words are
+  // deliberately absent, so the scan is over code lines only.
+  const source = await fs.readFile(entry, 'utf8');
   const code = source
     .split('\n')
     .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
     .join('\n');
-  for (const forbidden of [
-    'node:http',
-    'node:https',
-    'node:net',
-    'node:child_process',
-    'fetch(',
-    'llm-pipeline',
-    'openai',
-    'anthropic',
-    'gate-decision',
-    'run-gate',
-    'PostToolUse',
-    'MultiEdit',
-  ]) {
+  for (const forbidden of ['PostToolUse', 'MultiEdit', 'fetch(']) {
     assert.ok(!code.includes(forbidden), `fast-verification.mjs must not reference ${forbidden}`);
   }
 });
@@ -531,4 +568,205 @@ test('the evidence validates against its published schema', async () => {
       `schema is missing check property "${key}"`
     );
   }
+});
+
+// Blocker (#2304 adversarial review): `skillId` is not an identity. A skill
+// without an `id` falls back to its command string, so two gates on the same
+// command with different args used to collapse into one map key and a real
+// `fail` was reported as `pass`.
+test('two gates sharing a command keep their own verdicts', async () => {
+  const trustedTree = await makeTrustedTree([
+    { command: '/usr/bin/tool', args: ['lint'] },
+    { command: '/usr/bin/tool', args: ['test'] },
+  ]);
+  const reviewSourceDir = await makeSourceDir();
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['changed.txt'],
+    // No `id`: extractGateCommands falls back to the command string for both.
+    selected: [
+      { metadata: { deterministicGate: { command: '/usr/bin/tool', args: ['lint'] } } },
+      { metadata: { deterministicGate: { command: '/usr/bin/tool', args: ['test'] } } },
+    ],
+    trustedTree,
+    reviewSourceDir,
+    now: clock(),
+    runGatesImpl: gatesWith(async ({ entry }) =>
+      entry.args?.[0] === 'lint'
+        ? { status: 'fail', reasonCode: 'STRICT_BLOCK', exitCode: 1 }
+        : { status: 'pass', reasonCode: 'DETERMINISTIC_PASS', exitCode: 0 }
+    ),
+  });
+
+  assert.equal(evidence.checks.length, 2);
+  assert.deepEqual(
+    evidence.checks.map((check) => check.status),
+    [CHECK_STATUS.FAIL, CHECK_STATUS.PASS]
+  );
+  assert.equal(evidence.status, CHECK_STATUS.FAIL, 'a real fail must not be reported as pass');
+});
+
+test('results that cannot be attributed to a gate are unrunnable, not pass', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDir();
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['changed.txt'],
+    selected: [skill('skill-ok', '/usr/bin/tool-ok')],
+    trustedTree,
+    reviewSourceDir,
+    now: clock(),
+    // A caller-supplied orchestrator that omits the correlation key.
+    runGatesImpl: async () => ({
+      results: [{ skillId: 'skill-ok', status: 'pass', reasonCode: 'DETERMINISTIC_PASS' }],
+    }),
+  });
+
+  assert.equal(evidence.checks[0].status, CHECK_STATUS.UNRUNNABLE);
+  assert.equal(evidence.checks[0].reasonCode, FAST_VERIFICATION_REASON.RESULT_CORRELATION_FAILED);
+});
+
+// Major-1.
+test('an unreadable subject revision makes the verdicts stale, not pass', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDir();
+  for (const unreadable of [null, '', '   ', 42]) {
+    const evidence = await runFastVerification({
+      resolution: await afterChangeResolution(),
+      subjectRevision: SUBJECT,
+      changedFiles: ['changed.txt'],
+      selected: [skill('skill-ok', '/usr/bin/tool-ok')],
+      trustedTree,
+      reviewSourceDir,
+      now: clock(),
+      readSubjectRevision: () => unreadable,
+      runGatesImpl: gatesWith(async () => ({ status: 'pass', reasonCode: 'DETERMINISTIC_PASS' })),
+    });
+    assert.equal(evidence.status, CHECK_STATUS.STALE, `unreadable revision ${String(unreadable)}`);
+    assert.equal(evidence.reasonCode, FAST_VERIFICATION_REASON.SUBJECT_REVISION_UNREADABLE);
+    assert.equal(evidence.checks[0].supersededStatus, CHECK_STATUS.PASS);
+  }
+});
+
+// Major-2: the production wiring itself, with nothing injected. A stub default
+// would satisfy an allowlist-miss assertion just as well, so this drives a real
+// allowlisted command to a real verdict — only the real orchestrator can
+// produce it.
+test('the default runGatesImpl is the real orchestrator', async (t) => {
+  const realCommand = '/bin/echo';
+  try {
+    await fs.access(realCommand);
+  } catch {
+    t.skip(`${realCommand} is not available on this platform`);
+    return;
+  }
+  const trustedTree = await makeTrustedTree([realCommand]);
+  const reviewSourceDir = await makeSourceDir();
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['changed.txt'],
+    selected: [skill('skill-real', realCommand), skill('skill-unlisted', '/usr/bin/tool-unlisted')],
+    trustedTree,
+    reviewSourceDir,
+    processEnv: process.env,
+    now: clock(),
+  });
+
+  const real = evidence.checks.find((check) => check.id === 'skill-real');
+  assert.equal(real.status, CHECK_STATUS.PASS, 'the real executor must have run and succeeded');
+  assert.equal(real.exitCode, 0);
+  assert.equal(typeof real.durationMs, 'number');
+  const unlisted = evidence.checks.find((check) => check.id === 'skill-unlisted');
+  assert.equal(unlisted.status, CHECK_STATUS.BYPASSED);
+  assert.equal(unlisted.reasonCode, FAST_VERIFICATION_REASON.ALLOWLIST_MISS);
+});
+
+// Major-4: the env the sandbox scrubs has to actually arrive.
+test('processEnv is forwarded to the orchestrator', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDir();
+  const processEnv = { RIVER_TEST_SENTINEL: 'sentinel' };
+  const calls = [];
+  await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['changed.txt'],
+    selected: [skill('skill-ok', '/usr/bin/tool-ok')],
+    trustedTree,
+    reviewSourceDir,
+    processEnv,
+    now: clock(),
+    runGatesImpl: gatesWith(
+      async () => ({ status: 'pass', reasonCode: 'DETERMINISTIC_PASS' }),
+      calls
+    ),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].processEnv, processEnv);
+  assert.equal(calls[0].trustedTree, trustedTree);
+  assert.equal(calls[0].reviewSourceDir, reviewSourceDir);
+});
+
+// Minor: only the known-safe executor fields reach the evidence, even when the
+// orchestrator is injected and hands over more than the real one would.
+test('a check row copies only the allowlisted execution metadata', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDir();
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['changed.txt'],
+    selected: [skill('skill-ok', '/usr/bin/tool-ok')],
+    trustedTree,
+    reviewSourceDir,
+    now: clock(),
+    runGatesImpl: async () => ({
+      results: [
+        {
+          gateIndex: 0,
+          skillId: 'skill-ok',
+          status: 'pass',
+          reasonCode: 'DETERMINISTIC_PASS',
+          durationMs: 2,
+          stdout: 'AWS_SECRET_ACCESS_KEY=deadbeefdeadbeef',
+          cwd: '/Users/someone/private/path',
+          env: { TOKEN: 'ghp_deadbeef' },
+        },
+      ],
+    }),
+  });
+
+  assert.deepEqual(evidence.checks, [
+    { id: 'skill-ok', status: 'pass', reasonCode: 'DETERMINISTIC_PASS', durationMs: 2 },
+  ]);
+  const serialized = JSON.stringify(evidence);
+  for (const leak of ['AWS_SECRET_ACCESS_KEY', '/Users/someone/private/path', 'ghp_deadbeef']) {
+    assert.ok(!serialized.includes(leak), `evidence must not carry ${leak}`);
+  }
+});
+
+// Minor: a validated-but-unusable allowlist is its own host condition.
+test('an allowlist with no usable entry is bypassed with its own reason', async () => {
+  const reviewSourceDir = await makeSourceDir();
+  const trustedTree = await makeTempDir('river-fastverify-broken-');
+  const allowlistPath = path.join(trustedTree, ALLOWLIST_RELATIVE_PATH);
+  await fs.mkdir(path.dirname(allowlistPath), { recursive: true });
+  await fs.writeFile(allowlistPath, 'version: 1\ncommands: []\n', 'utf8');
+
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['changed.txt'],
+    selected: [skill('skill-ok', '/usr/bin/tool-ok')],
+    trustedTree,
+    reviewSourceDir,
+    now: clock(),
+  });
+
+  assert.equal(evidence.status, CHECK_STATUS.BYPASSED);
+  assert.equal(evidence.reasonCode, FAST_VERIFICATION_REASON.TRUSTED_ALLOWLIST_EMPTY);
 });

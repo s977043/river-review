@@ -74,10 +74,56 @@ export const FAST_VERIFICATION_REASON = Object.freeze({
   NO_CHANGED_FILES: 'no-changed-files',
   DUPLICATE_OCCURRENCE: 'duplicate-occurrence',
   TRUSTED_ALLOWLIST_ABSENT: 'trusted-allowlist-absent',
+  TRUSTED_ALLOWLIST_EMPTY: 'trusted-allowlist-empty',
   ALLOWLIST_MISS: 'allowlist-miss',
   EXECUTOR_STATUS_MISSING: 'executor-status-missing',
+  RESULT_CORRELATION_FAILED: 'result-correlation-failed',
   SUBJECT_REVISION_CHANGED: 'subject-revision-changed',
+  SUBJECT_REVISION_UNREADABLE: 'subject-revision-unreadable',
 });
+
+/**
+ * The ONLY executor fields copied onto a check row. The orchestrator already
+ * filters what it preserves, but `runGatesImpl` is injectable, so this module
+ * does not inherit that guarantee and re-states it at its own boundary rather
+ * than spreading whatever object it was handed.
+ */
+const SAFE_CHECK_METADATA_KEYS = Object.freeze([
+  'durationMs',
+  'exitCode',
+  'stdoutBytes',
+  'unrunnableCause',
+]);
+
+function safeCheckMetadata(result) {
+  const metadata = {};
+  for (const key of SAFE_CHECK_METADATA_KEYS) {
+    if (result?.[key] !== undefined) metadata[key] = result[key];
+  }
+  return metadata;
+}
+
+/**
+ * Map orchestrator result rows onto the gate positions that produced them.
+ * Returns `null` when the rows cannot be attributed — a missing, duplicate or
+ * out-of-range `gateIndex` — so the caller can refuse to read any of them as a
+ * verdict instead of guessing.
+ *
+ * @param {unknown} results
+ * @param {number} gateCount
+ * @returns {Map<number, object> | null}
+ */
+function correlateResults(results, gateCount) {
+  const rows = Array.isArray(results) ? results : [];
+  const byGateIndex = new Map();
+  for (const row of rows) {
+    const index = row?.gateIndex;
+    if (!Number.isInteger(index) || index < 0 || index >= gateCount) return null;
+    if (byGateIndex.has(index)) return null;
+    byGateIndex.set(index, row);
+  }
+  return byGateIndex;
+}
 
 export class FastVerificationError extends Error {
   constructor(message, options) {
@@ -266,12 +312,17 @@ export async function runFastVerification({
   // base tree only; a head-side allowlist is never consulted, here or in the
   // orchestrator. Absent → bypassed with a reason, never pass.
   const trustedEntries = await loadAllowlistImpl(trustedTree);
-  if (trustedEntries == null) {
+  if (trustedEntries == null || trustedEntries.length === 0) {
+    // An allowlist that is absent and one that survived validation with zero
+    // entries are different host conditions, and a reader has to be able to
+    // tell "no allowlist was published" from "the published one is unusable".
+    const reason =
+      trustedEntries == null
+        ? FAST_VERIFICATION_REASON.TRUSTED_ALLOWLIST_ABSENT
+        : FAST_VERIFICATION_REASON.TRUSTED_ALLOWLIST_EMPTY;
     return finish(
-      checkIds.map((id) =>
-        checkEntry(id, CHECK_STATUS.BYPASSED, FAST_VERIFICATION_REASON.TRUSTED_ALLOWLIST_ABSENT)
-      ),
-      FAST_VERIFICATION_REASON.TRUSTED_ALLOWLIST_ABSENT
+      checkIds.map((id) => checkEntry(id, CHECK_STATUS.BYPASSED, reason)),
+      reason
     );
   }
 
@@ -283,19 +334,31 @@ export async function runFastVerification({
     changedFiles: files,
     processEnv,
   });
-  const byId = new Map();
-  for (const result of Array.isArray(gateResult?.results) ? gateResult.results : []) {
-    byId.set(String(result?.skillId), result);
-  }
+  // Correlate results to gates BY POSITION, never by `skillId`. A skill
+  // without an id falls back to its command string in `extractGateCommands`,
+  // so two gates on the same command with different args share a skillId: a
+  // skillId-keyed map silently dropped one of them and reported the survivor's
+  // verdict for both — a real `fail` disappearing behind a `pass`.
+  const byGateIndex = correlateResults(gateResult?.results, checkIds.length);
 
-  const checks = checkIds.map((id) => {
-    const result = byId.get(id);
+  const checks = checkIds.map((id, gateIndex) => {
+    if (byGateIndex == null) {
+      // The results could not be correlated to the gates that produced them.
+      // No row can be attributed, so no row is a verdict.
+      return checkEntry(
+        id,
+        CHECK_STATUS.UNRUNNABLE,
+        FAST_VERIFICATION_REASON.RESULT_CORRELATION_FAILED
+      );
+    }
+    const result = byGateIndex.get(gateIndex);
     // A selected check the orchestrator did not run: the trusted allowlist
     // does not carry this exact argv. Not an execution, so not a verdict.
     if (result == null) {
       return checkEntry(id, CHECK_STATUS.BYPASSED, FAST_VERIFICATION_REASON.ALLOWLIST_MISS);
     }
-    const { skillId: _skillId, status, reasonCode, ...metadata } = result;
+    const { status, reasonCode } = result;
+    const metadata = safeCheckMetadata(result);
     if (status !== CHECK_STATUS.PASS && status !== CHECK_STATUS.FAIL) {
       // Anything the executor could not turn into a verdict is unrunnable —
       // including an absent or unrecognized status, which must not decay to pass.
@@ -308,22 +371,28 @@ export async function runFastVerification({
     });
   });
 
-  // (e) Staleness. If the subject moved while the checks ran, the verdicts
-  // describe a revision that is no longer the subject.
-  const currentRevision =
-    typeof readSubjectRevision === 'function' ? nonEmptyString(await readSubjectRevision()) : null;
-  if (currentRevision != null && currentRevision !== revision) {
-    const staled = checks.map((check) =>
-      EXECUTED_STATUSES.includes(check.status)
-        ? {
-            ...check,
-            status: CHECK_STATUS.STALE,
-            reasonCode: FAST_VERIFICATION_REASON.SUBJECT_REVISION_CHANGED,
-            supersededStatus: check.status,
-          }
-        : check
-    );
-    return finish(staled, FAST_VERIFICATION_REASON.SUBJECT_REVISION_CHANGED);
+  // (e) Staleness. If the subject moved while the checks ran — or could not be
+  // re-read at all — the verdicts may not be read as verdicts on the subject.
+  // "I could not confirm the revision" is not "the revision did not move".
+  if (typeof readSubjectRevision === 'function') {
+    const currentRevision = nonEmptyString(await readSubjectRevision());
+    if (currentRevision !== revision) {
+      const reasonCode =
+        currentRevision == null
+          ? FAST_VERIFICATION_REASON.SUBJECT_REVISION_UNREADABLE
+          : FAST_VERIFICATION_REASON.SUBJECT_REVISION_CHANGED;
+      const staled = checks.map((check) =>
+        EXECUTED_STATUSES.includes(check.status)
+          ? {
+              ...check,
+              status: CHECK_STATUS.STALE,
+              reasonCode,
+              supersededStatus: check.status,
+            }
+          : check
+      );
+      return finish(staled, reasonCode);
+    }
   }
 
   return finish(checks, FAST_VERIFICATION_REASON.EXECUTED);

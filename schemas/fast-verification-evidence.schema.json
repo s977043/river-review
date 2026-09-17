@@ -88,9 +88,12 @@
         "no-changed-files",
         "duplicate-occurrence",
         "trusted-allowlist-absent",
+        "trusted-allowlist-empty",
         "allowlist-miss",
         "executor-status-missing",
+        "result-correlation-failed",
         "subject-revision-changed",
+        "subject-revision-unreadable",
         "DETERMINISTIC_PASS",
         "STRICT_BLOCK",
         "DETERMINISTIC_UNRUNNABLE"
@@ -107,7 +110,7 @@
           "minLength": 1
         },
         "status": {
-          "description": "pass = ran and succeeded on this revision. fail = ran and reported failure. unrunnable = attempted, no verdict (spawn error, timeout, invalid entry, or an executor status that cannot be read). skipped = nothing to run (no check selected, no changed file, duplicate occurrence). bypassed = running was not permitted (no host-trusted allowlist, or this exact argv is not on it). stale = a verdict exists but describes a revision that is no longer the subject.",
+          "description": "pass = ran and succeeded on this revision. fail = ran and reported failure. unrunnable = attempted, no verdict (spawn error, timeout, invalid entry, an executor status that cannot be read, or results that cannot be attributed to the gates that produced them). skipped = nothing to run (no check selected, no changed file, duplicate occurrence). bypassed = running was not permitted (no host-trusted allowlist, an unusable one, or this exact argv is not on it). stale = a verdict exists but may not be read as a verdict on the subject, because the subject revision moved or could not be confirmed afterwards.",
           "$ref": "#/$defs/status"
         },
         "reasonCode": { "$ref": "#/$defs/reasonCode" },
