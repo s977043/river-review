@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.116.0](https://github.com/s977043/river-review/compare/v1.115.0...v1.116.0) (2026-09-17)
+
+
+### Features
+
+* **review:** add Review Coverage dogfood metrics ([#2300](https://github.com/s977043/river-review/issues/2300)) ([#2301](https://github.com/s977043/river-review/issues/2301)) ([713a633](https://github.com/s977043/river-review/commit/713a63370188e96e3d8b66e60c36864fd6db4894))
+* **review:** gate Semantic Precision on established evidence ([#2297](https://github.com/s977043/river-review/issues/2297)) ([#2298](https://github.com/s977043/river-review/issues/2298)) ([c9c5ec0](https://github.com/s977043/river-review/commit/c9c5ec0ee4a23b9cc0945b71738e6a20175ef0dd))
+* **viewpoints:** wire observe and active runtime modes ([#2252](https://github.com/s977043/river-review/issues/2252)) ([#2259](https://github.com/s977043/river-review/issues/2259)) ([a730083](https://github.com/s977043/river-review/commit/a7300837fe7b582fe0db08750d0f9c0a4ede0514))
+
 ## [1.115.0](https://github.com/s977043/river-review/compare/v1.114.0...v1.115.0) (2026-09-17)
 
 
