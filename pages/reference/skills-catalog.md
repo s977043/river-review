@@ -1051,7 +1051,8 @@ classification → fixture / reference / suppression への還元までを束ね
 - 名前: `river-review-security-audit`
 - 概要: `Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。 通常の PR
 セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、 evidence と unresolved hypothesis、observe-only
-SecurityAuditCoverage、coverage critic を扱う。target-controlled code は実行しない。`
+SecurityAuditCoverage、coverage critic、 structured audit artifact と repeat-run coverage を扱う。target-controlled
+code は実行しない。`
 - 対象:
   - `**/*`
 - 重要度: critical
@@ -2309,7 +2310,8 @@ audit は river-review-security-audit へ委譲する。`
 - 名前: `river-review-security-audit`
 - 概要: `Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。 通常の PR
 セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、 evidence と unresolved hypothesis、observe-only
-SecurityAuditCoverage、coverage critic を扱う。target-controlled code は実行しない。`
+SecurityAuditCoverage、coverage critic、 structured audit artifact と repeat-run coverage を扱う。target-controlled
+code は実行しない。`
 - 対象:
   - `**/*`
 - 重要度: critical

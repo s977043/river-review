@@ -65,6 +65,18 @@ export function compileSecurityAuditCoverageValidator() {
   });
 }
 
+/**
+ * Compiled validator for schemas/security-audit-run-record.schema.json.
+ * The run record embeds a SecurityAuditCoverage by `$id`, so the coverage
+ * schema is registered as a ref rather than duplicated.
+ */
+export function compileSecurityAuditRunRecordValidator() {
+  return compileSchemaFile('security-audit-run-record.schema.json', {
+    ajvOptions: { allErrors: true },
+    refs: [{ schema: readSchema('security-audit-coverage.schema.json') }],
+  });
+}
+
 /** Compiled validator for schemas/suppression-context.schema.json (strict on). */
 export function compileSuppressionContextValidator() {
   return compileSchemaFile('suppression-context.schema.json', { ajvOptions: { allErrors: true } });

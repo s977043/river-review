@@ -4,7 +4,8 @@ name: river-review-security-audit
 description: |
   Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。
   通常の PR セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、
-  evidence と unresolved hypothesis、observe-only SecurityAuditCoverage、coverage critic を扱う。target-controlled code は実行しない。
+  evidence と unresolved hypothesis、observe-only SecurityAuditCoverage、coverage critic、
+  structured audit artifact と repeat-run coverage を扱う。target-controlled code は実行しない。
 category: midstream
 phase: [upstream, midstream]
 severity: critical
@@ -13,7 +14,7 @@ applyTo:
 inputContext: [diff, fullFile]
 outputKind: [summary, findings, actions, questions]
 tags: [security, audit, entry, routing, source-only]
-version: 0.4.0
+version: 0.5.0
 license: MIT
 ---
 
@@ -47,7 +48,7 @@ If the request does not clearly justify `full-audit`, use `focused` or `guidance
 
 ## Non-negotiable Source-only Policy
 
-Version 0.4.0 is source-only.
+Version 0.5.0 is source-only.
 
 Allowed evidence collection:
 
@@ -89,6 +90,8 @@ Explicit audit request
   -> existing finding verification path when available
   -> observe-only SecurityAuditCoverage ledger
   -> unknown-coverage-review (security-audit profile)
+  -> repeat-run coverage reconciliation (when a prior run exists)
+  -> structured audit artifact set
   -> audit summary
 ```
 
@@ -252,7 +255,47 @@ Do not wire critic output into deterministic Gate behavior in Phase 4.
 
 If the audit context or coverage ledger is missing, do not guess. Record that the critic could not run and keep the limitation explicit.
 
-### 10. Report without claiming safety
+### 10. Reconcile coverage against a prior run
+
+When a prior audit run of the same target exists, reconcile before reporting.
+Use `src/lib/security-audit-repeat-run.mjs`.
+
+`prior covered != current safe`. A prior `covered` unit is carried over only when the source it
+reviewed is byte-identical to the source in front of you now. Supply the current
+`path -> content digest` map; any path whose digest is missing, changed, or replaced returns the unit
+to `planned` and appears in `revalidationRequired`.
+
+Rules:
+
+- never report a unit as covered on prior-run evidence when its source moved
+- never promote a prior `blocked`, `deferred`, or `out_of_scope` unit through carry-over
+- keep this accumulation separate from #1574, which improves River Review's own reviewer capability
+
+### 11. Emit the structured audit artifact set
+
+For `focused` and `full-audit` runs, build the machine-readable record with
+`src/lib/security-audit-report.mjs` and emit `.river/security-audit/`:
+
+```text
+run-metadata.json
+architecture.md
+audit-coverage.json
+candidates.json
+findings.json
+REPORT.md
+NEEDS-VALIDATION.md
+```
+
+The record is the SSoT. `REPORT.md` and `NEEDS-VALIDATION.md` are projections of it.
+
+Rules:
+
+- do not recompute verdict, severity, or evidence state from the prose report
+- an unresolved finding carries no severity, only the exact blocker and the validation plan
+- the artifact set is experimental and carries `executionPolicy: source-only`
+- writing these files is the only repository mutation this flow may perform, and only under `.river/`
+
+### 12. Report without claiming safety
 
 A `full-audit` run means repository-wide source investigation was attempted.
 It does not mean all security attack classes were proven safe.
@@ -278,6 +321,7 @@ Then emit these sections:
 4. **Security audit coverage** — semantic units keyed by subsystem × trust boundary × attack class using the Phase 3 contract.
 5. **Unverified / Residual Risk — Unknown Coverage** — residual coverage unknowns from the `unknown-coverage-review` security-audit profile; omit only when the profile correctly returns `NO_REVIEW` and explain why.
 6. **Next validation actions** — only actions that preserve the source-only policy unless a later sandbox phase is explicitly available.
+7. **Structured artifacts** — the `.river/security-audit/` paths written for this run, plus the repeat-run carry-over and revalidation counts when a prior run existed. Omit this section for `guidance` mode.
 
 For findings, preserve the existing River Review finding shape where possible:
 
@@ -305,6 +349,8 @@ Coverage critic observations use the existing Unknown Coverage residual-risk voc
 - No consensus-as-correctness inference.
 - No automatic Gate behavior change.
 - No ad hoc status vocabulary outside the dedicated coverage contract.
+- No carry-over of prior-run coverage when the reviewed source changed.
+- No severity or verdict recomputed from the prose report.
 - No generic `unknown-coverage-review` routing change to enable this profile.
 
 ## Relationship to Normal Security Review
@@ -325,8 +371,12 @@ The `unknown-coverage-review` security-audit profile is reachable only from this
 - `docs/adr/010-security-audit-harness-integration.md`
 - `docs/development/2267-phase0-gap-analysis.md`
 - `docs/development/2267-phase3-security-audit-coverage.md`
+- `docs/development/2267-phase9-structured-reporting.md`
 - `schemas/security-audit-coverage.schema.json`
+- `schemas/security-audit-run-record.schema.json`
 - `src/lib/security-audit-coverage.mjs`
+- `src/lib/security-audit-report.mjs`
+- `src/lib/security-audit-repeat-run.mjs`
 - `skills/agent-skills/river-review-security-audit/references/attack-classes.json`
 - `skills/agent-skills/unknown-coverage-review/SKILL.md`
 - `skills/agent-skills/unknown-coverage-review/references/SECURITY-AUDIT-PROFILE.md`
