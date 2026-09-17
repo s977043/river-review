@@ -104,7 +104,8 @@ critic-timeout
 ```
 
 The `withdrawn-by-reviewer` distinction is deliberate.
-#1978 Phase 1b classifies the withdrawal fixture as an `unsupported-claim` and explicitly verifies that it is **not** spelled `dismissed-by-evidence` when the Critic supplied no grounded citation.
+Issue #1978 Phase 1b classifies the withdrawal fixture as an `unsupported-claim`.
+It explicitly verifies that the status is **not** `dismissed-by-evidence` when the Critic supplied no grounded citation.
 The candidate is dropped from routing, but withdrawal alone is not evidence of falsity.
 
 Missing, malformed, or unknown `validation.finalStatus` also projects fail-safe to `unresolved`.
