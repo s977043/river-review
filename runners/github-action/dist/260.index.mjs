@@ -336,6 +336,65 @@ async function loadRunRecord(storeDir, runId) {
   return JSON.parse(raw);
 }
 
+function nonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+/**
+ * Aggregate observe-only Review Coverage telemetry from saved runs (#2212).
+ *
+ * Absence is not interpreted as incomplete: legacy and non-orchestrated runs
+ * legitimately have no Review Coverage observation. The saved contract remains
+ * the SSoT; this helper only aggregates its counters and unit outcomes.
+ */
+function computeReviewCoverageDashboard(runRecords) {
+  const observed = runRecords.filter(
+    (record) => record?.reviewCoverage && typeof record.reviewCoverage === 'object'
+  );
+  const statusDistribution = {};
+  let requiredUnits = 0;
+  let completedRequiredUnits = 0;
+  let requiredFailedUnits = 0;
+  let requiredTimedOutUnits = 0;
+  let zeroFindingsPartialRuns = 0;
+
+  for (const record of observed) {
+    const coverage = record.reviewCoverage;
+    const status = typeof coverage.status === 'string' ? coverage.status : 'unknown';
+    statusDistribution[status] = (statusDistribution[status] ?? 0) + 1;
+    requiredUnits += nonNegativeInteger(coverage.requiredUnits);
+    completedRequiredUnits += nonNegativeInteger(coverage.completedRequiredUnits);
+
+    for (const unit of Array.isArray(coverage.units) ? coverage.units : []) {
+      if (unit?.required !== true) continue;
+      if (unit.status === 'failed') requiredFailedUnits += 1;
+      if (unit.status === 'timed_out') requiredTimedOutUnits += 1;
+    }
+
+    if (status === 'partial' && Array.isArray(record.findings) && record.findings.length === 0) {
+      zeroFindingsPartialRuns += 1;
+    }
+  }
+
+  const partialRuns = statusDistribution.partial ?? 0;
+  const requiredIncompleteUnits = requiredFailedUnits + requiredTimedOutUnits;
+
+  return {
+    observedRuns: observed.length,
+    statusDistribution,
+    requiredUnits,
+    completedRequiredUnits,
+    requiredUnitCompletionRate:
+      requiredUnits > 0 ? completedRequiredUnits / requiredUnits : null,
+    requiredFailedUnits,
+    requiredTimedOutUnits,
+    requiredFailureOrTimeoutRate:
+      requiredUnits > 0 ? requiredIncompleteUnits / requiredUnits : null,
+    partialReviewRate: observed.length > 0 ? partialRuns / observed.length : null,
+    zeroFindingsPartialRuns,
+  };
+}
+
 /**
  * Compute aggregate dashboard metrics across a list of run records.
  *
@@ -361,6 +420,8 @@ async function loadRunRecord(storeDir, runId) {
  * is what lets a reader tell a real trend from the split.
  */
 function computeDashboard(runRecords) {
+  const reviewCoverage = computeReviewCoverageDashboard(runRecords);
+
   if (!runRecords.length) {
     return {
       totalRuns: 0,
@@ -373,6 +434,7 @@ function computeDashboard(runRecords) {
       confidenceDistribution: {},
       reviewerRoleDistribution: {},
       avgFindingsPerRun: null,
+      reviewCoverage,
     };
   }
 
@@ -411,6 +473,7 @@ function computeDashboard(runRecords) {
     confidenceDistribution: confidenceDist,
     reviewerRoleDistribution: roleDist,
     avgFindingsPerRun: total / runRecords.length,
+    reviewCoverage,
   };
 }
 
@@ -443,6 +506,40 @@ function formatDashboard(dashboard) {
     dashboard.avgFindingsPerRun !== null ? dashboard.avgFindingsPerRun.toFixed(1) : 'N/A';
   lines.push(`| Avg findings/run | ${avgF} |`);
   lines.push('');
+
+  const coverage = dashboard.reviewCoverage;
+  if (coverage?.observedRuns > 0) {
+    const requiredCompletion =
+      coverage.requiredUnitCompletionRate !== null
+        ? `${(coverage.requiredUnitCompletionRate * 100).toFixed(1)}%`
+        : 'N/A';
+    const requiredFailureOrTimeout =
+      coverage.requiredFailureOrTimeoutRate !== null
+        ? `${(coverage.requiredFailureOrTimeoutRate * 100).toFixed(1)}%`
+        : 'N/A';
+    const partialRate =
+      coverage.partialReviewRate !== null
+        ? `${(coverage.partialReviewRate * 100).toFixed(1)}%`
+        : 'N/A';
+
+    lines.push('### Review Coverage (observe-only)');
+    lines.push('| Metric | Value |');
+    lines.push('|---|---|');
+    lines.push(`| Observed runs | ${coverage.observedRuns} |`);
+    lines.push(`| Complete runs | ${coverage.statusDistribution.complete ?? 0} |`);
+    lines.push(`| Partial runs | ${coverage.statusDistribution.partial ?? 0} |`);
+    lines.push(`| Not executed runs | ${coverage.statusDistribution.not_executed ?? 0} |`);
+    if ((coverage.statusDistribution.unknown ?? 0) > 0) {
+      lines.push(`| Unknown status runs | ${coverage.statusDistribution.unknown} |`);
+    }
+    lines.push(`| Required unit completion rate | ${requiredCompletion} |`);
+    lines.push(`| Required failed units | ${coverage.requiredFailedUnits} |`);
+    lines.push(`| Required timed-out units | ${coverage.requiredTimedOutUnits} |`);
+    lines.push(`| Required failure/timeout rate | ${requiredFailureOrTimeout} |`);
+    lines.push(`| Partial review rate | ${partialRate} |`);
+    lines.push(`| Zero findings + partial runs | ${coverage.zeroFindingsPartialRuns} |`);
+    lines.push('');
+  }
 
   if (Object.keys(dashboard.severityDistribution).length) {
     lines.push('### Severity Distribution');
