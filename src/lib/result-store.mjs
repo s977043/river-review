@@ -11,6 +11,9 @@ import { nonEmptyNfcString } from './promotion-candidates.mjs';
 // #1857: the retired reason code is imported, never re-typed here, so the
 // legacy-record counter below cannot drift from the constant it looks for.
 import { SUPPRESS_REASONS } from './finding-factory.mjs';
+// #2300: the Review Coverage status vocabularies are imported, never re-typed,
+// so the dashboard cannot drift from the contract it reports on.
+import { REVIEW_COVERAGE_STATUSES, REVIEW_UNIT_STATUSES } from './review-coverage.mjs';
 
 const STORE_DIR_NAME = '.river/runs';
 const GLOBAL_STORE_DIR = path.join(os.homedir(), '.river', 'runs');
@@ -266,10 +269,9 @@ export async function listRunRecords(storeDir) {
           reviewedTarget: rec.reviewedTarget,
           findingsCount: rec.finalSummary?.findingsCount ?? 0,
           suppressedCount: rec.finalSummary?.suppressedCount ?? 0,
-          // #1857: without this, `river runs list` prints a `suppressed=` that
-          // silently means one thing for pre-split records (dispositions plus
-          // cap overflow) and another for post-split ones (dispositions only),
-          // with nothing on screen to tell the two apart.
+          // #1857: without this, `river runs list` prints `suppressed=` from this metadata. It must
+          // also carry `overflowCount`, otherwise the printed line means one thing for
+          // pre-split records and another for post-split ones with nothing to say so.
           overflowCount: rec.finalSummary?.overflowCount ?? 0,
           overviewCount: rec.finalSummary?.overviewCount ?? 0,
           changedFilesCount: rec.finalSummary?.changedFilesCount ?? 0,
@@ -311,6 +313,79 @@ export async function loadRunRecord(storeDir, runId) {
   return JSON.parse(raw);
 }
 
+function nonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+/**
+ * Aggregate observe-only Review Coverage telemetry from saved runs (#2212).
+ *
+ * Absence is not interpreted as incomplete: legacy and non-orchestrated runs
+ * legitimately have no Review Coverage observation. The saved contract remains
+ * the SSoT; this helper only aggregates its counters and unit outcomes.
+ */
+function computeReviewCoverageDashboard(runRecords) {
+  const observed = runRecords.filter(
+    (record) => record?.reviewCoverage && typeof record.reviewCoverage === 'object'
+  );
+  const statusDistribution = {};
+  let requiredUnits = 0;
+  let completedRequiredUnits = 0;
+  let requiredFailedUnits = 0;
+  let requiredTimedOutUnits = 0;
+  let zeroFindingsPartialRuns = 0;
+  let unclassifiedRuns = 0;
+
+  for (const record of observed) {
+    const coverage = record.reviewCoverage;
+    const status = coverage.status;
+    const classified = REVIEW_COVERAGE_STATUSES.includes(status);
+    if (!classified) {
+      unclassifiedRuns += 1;
+      continue;
+    }
+
+    statusDistribution[status] = (statusDistribution[status] ?? 0) + 1;
+    requiredUnits += nonNegativeInteger(coverage.requiredUnits);
+    completedRequiredUnits += nonNegativeInteger(coverage.completedRequiredUnits);
+
+    for (const unit of Array.isArray(coverage.units) ? coverage.units : []) {
+      // Mirror `normalizeRequired` in review-coverage.mjs: a unit is required
+      // unless policy explicitly marks it optional. Treating a missing
+      // `required` field as optional here would under-report the failure rate
+      // for legacy / hand-written / externally produced run records.
+      if (unit?.required === false) continue;
+      if (!REVIEW_UNIT_STATUSES.includes(unit.status)) continue;
+      if (unit.status === 'failed') requiredFailedUnits += 1;
+      if (unit.status === 'timed_out') requiredTimedOutUnits += 1;
+    }
+
+    if (status === 'partial' && Array.isArray(record.findings) && record.findings.length === 0) {
+      zeroFindingsPartialRuns += 1;
+    }
+  }
+
+  const partialRuns = statusDistribution.partial ?? 0;
+  const classifiedRuns = observed.length - unclassifiedRuns;
+  const requiredIncompleteUnits = requiredFailedUnits + requiredTimedOutUnits;
+
+  return {
+    observedRuns: observed.length,
+    classifiedRuns,
+    unclassifiedRuns,
+    statusDistribution,
+    requiredUnits,
+    completedRequiredUnits,
+    requiredUnitCompletionRate: requiredUnits > 0 ? completedRequiredUnits / requiredUnits : null,
+    requiredFailedUnits,
+    requiredTimedOutUnits,
+    requiredFailureOrTimeoutRate:
+      requiredUnits > 0 ? requiredIncompleteUnits / requiredUnits : null,
+    partialReviewRate: classifiedRuns > 0 ? partialRuns / classifiedRuns : null,
+    zeroFindingsPartialRuns,
+  };
+}
+
 /**
  * Compute aggregate dashboard metrics across a list of run records.
  *
@@ -336,6 +411,8 @@ export async function loadRunRecord(storeDir, runId) {
  * is what lets a reader tell a real trend from the split.
  */
 export function computeDashboard(runRecords) {
+  const reviewCoverage = computeReviewCoverageDashboard(runRecords);
+
   if (!runRecords.length) {
     return {
       totalRuns: 0,
@@ -348,6 +425,7 @@ export function computeDashboard(runRecords) {
       confidenceDistribution: {},
       reviewerRoleDistribution: {},
       avgFindingsPerRun: null,
+      reviewCoverage,
     };
   }
 
@@ -386,6 +464,7 @@ export function computeDashboard(runRecords) {
     confidenceDistribution: confidenceDist,
     reviewerRoleDistribution: roleDist,
     avgFindingsPerRun: total / runRecords.length,
+    reviewCoverage,
   };
 }
 
@@ -418,6 +497,40 @@ export function formatDashboard(dashboard) {
     dashboard.avgFindingsPerRun !== null ? dashboard.avgFindingsPerRun.toFixed(1) : 'N/A';
   lines.push(`| Avg findings/run | ${avgF} |`);
   lines.push('');
+
+  const coverage = dashboard.reviewCoverage;
+  if (coverage?.observedRuns > 0) {
+    const requiredCompletion =
+      coverage.requiredUnitCompletionRate !== null
+        ? `${(coverage.requiredUnitCompletionRate * 100).toFixed(1)}%`
+        : 'N/A';
+    const requiredFailureOrTimeout =
+      coverage.requiredFailureOrTimeoutRate !== null
+        ? `${(coverage.requiredFailureOrTimeoutRate * 100).toFixed(1)}%`
+        : 'N/A';
+    const partialRate =
+      coverage.partialReviewRate !== null
+        ? `${(coverage.partialReviewRate * 100).toFixed(1)}%`
+        : 'N/A';
+
+    lines.push('### Review Coverage (observe-only)');
+    lines.push('| Metric | Value |');
+    lines.push('|---|---|');
+    lines.push(`| Observed runs | ${coverage.observedRuns} |`);
+    lines.push(`| Complete runs | ${coverage.statusDistribution.complete ?? 0} |`);
+    lines.push(`| Partial runs | ${coverage.statusDistribution.partial ?? 0} |`);
+    lines.push(`| Not executed runs | ${coverage.statusDistribution.not_executed ?? 0} |`);
+    if (coverage.unclassifiedRuns > 0) {
+      lines.push(`| Unclassified coverage runs | ${coverage.unclassifiedRuns} |`);
+    }
+    lines.push(`| Required unit completion rate | ${requiredCompletion} |`);
+    lines.push(`| Required failed units | ${coverage.requiredFailedUnits} |`);
+    lines.push(`| Required timed-out units | ${coverage.requiredTimedOutUnits} |`);
+    lines.push(`| Required failure/timeout rate | ${requiredFailureOrTimeout} |`);
+    lines.push(`| Partial review rate | ${partialRate} |`);
+    lines.push(`| Zero findings + partial runs | ${coverage.zeroFindingsPartialRuns} |`);
+    lines.push('');
+  }
 
   if (Object.keys(dashboard.severityDistribution).length) {
     lines.push('### Severity Distribution');

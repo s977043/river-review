@@ -47800,6 +47800,9 @@ const defaultConfig = Object.freeze({
     // ADR-006 / #1859: Prompt Compiler の既定は off。off のとき
     // review-engine は compiled プロンプトを組まず、挙動は導入前と同一になる。
     promptCompiler: { mode: 'off' },
+    // #2252: Review Viewpoint Catalog is opt-in. observe records activation
+    // without changing prompts; active injects matched Review Obligations.
+    viewpoints: { mode: 'off' },
   },
   exclude: {
     files: [],
@@ -47891,8 +47894,15 @@ const promptCompilerConfigSchema = schemas/* object */.Ikc({
   mode: schemas/* enum */.k5n(['off', 'observe', 'active']).optional(),
 });
 
+// #2252: Review Viewpoint runtime mode. Separate from Prompt Compiler because
+// knowledge activation and model-specific prompt rendering are independent.
+const reviewViewpointsConfigSchema = schemas/* object */.Ikc({
+  mode: schemas/* enum */.k5n(['off', 'observe', 'active']).optional(),
+});
+
 const reviewConfigSchema = schemas/* object */.Ikc({
   promptCompiler: promptCompilerConfigSchema.optional(),
+  viewpoints: reviewViewpointsConfigSchema.optional(),
   language: schemas/* enum */.k5n(['ja', 'en']).optional(),
   severity: schemas/* enum */.k5n(['strict', 'normal', 'relaxed']).optional(),
   additionalInstructions: schemas/* array */.YOg(schemas/* string */.YjP().min(1)).optional(),
@@ -52608,10 +52618,11 @@ function collectAddedLineHints(diffText) {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   EF: () => (/* binding */ HEURISTIC_KIND_PRESENTATIONS),
+/* harmony export */   bg: () => (/* binding */ collectHeuristicDetections),
 /* harmony export */   y2: () => (/* binding */ HEURISTIC_SKILL_IDS),
 /* harmony export */   zq: () => (/* binding */ buildHeuristicComments)
 /* harmony export */ });
-/* unused harmony exports SKILL_HEURISTIC_MAP, collectHeuristicDetections */
+/* unused harmony export SKILL_HEURISTIC_MAP */
 /* harmony import */ var _diff_processor_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(861);
 /**
  * ヒューリスティック検出器レジストリ（単一の真実 / SSoT）
@@ -56145,7 +56156,177 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 
 /***/ }),
 
-/***/ 9669:
+/***/ 3054:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   Ix: () => (/* binding */ deriveReviewCoverage),
+/* harmony export */   Vb: () => (/* binding */ REVIEW_COVERAGE_STATUSES),
+/* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
+/* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
+/* harmony export */   or: () => (/* binding */ deriveReviewFileScope)
+/* harmony export */ });
+/* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
+
+
+/**
+ * Review execution coverage contract (#2212).
+ *
+ * Coverage answers whether the review work that was expected to run actually
+ * completed. It is deliberately independent from finding count, skill routing,
+ * context supply, and gate policy.
+ */
+
+const REVIEW_UNIT_STATUSES = Object.freeze(['completed', 'failed', 'timed_out']);
+const REVIEW_COVERAGE_STATUSES = Object.freeze(['complete', 'partial', 'not_executed']);
+
+function isCompleted(unit) {
+  return unit?.status === 'completed';
+}
+
+function normalizeRequired(unit) {
+  // Fail-safe default: an execution unit is required unless policy explicitly
+  // marks it optional. Materialize the default in the returned unit as well so
+  // the derived coverage object conforms to review-coverage.schema.json.
+  return { ...unit, required: unit?.required !== false };
+}
+
+function isRequired(unit) {
+  return unit?.required === true;
+}
+
+/**
+ * Derive machine-readable review execution coverage from already-planned units.
+ *
+ * This function is intentionally pure and has no gate side effects. Runtime
+ * wiring in reviewer-orchestrator is a separate step so observe-only telemetry
+ * can land before any policy change.
+ *
+ * @param {Array<object>} units planned/executed review units
+ * @returns {{
+ *   schemaVersion: '1',
+ *   status: 'complete'|'partial'|'not_executed',
+ *   expectedUnits: number,
+ *   completedUnits: number,
+ *   requiredUnits: number,
+ *   completedRequiredUnits: number,
+ *   incompleteRequiredUnitIds: string[],
+ *   units: Array<object>
+ * }}
+ */
+function deriveReviewCoverage(units = []) {
+  const normalizedUnits = Array.isArray(units)
+    ? units.filter(Boolean).map((unit) => normalizeRequired(unit))
+    : [];
+  const expectedUnits = normalizedUnits.length;
+  const completedUnits = normalizedUnits.filter(isCompleted).length;
+  const required = normalizedUnits.filter(isRequired);
+  const requiredUnits = required.length;
+  const completedRequiredUnits = required.filter(isCompleted).length;
+  const incompleteRequiredUnitIds = required
+    .filter((unit) => !isCompleted(unit))
+    .map((unit) => unit.id)
+    .filter((id) => typeof id === 'string' && id.length > 0);
+
+  let status;
+  if (expectedUnits === 0) {
+    status = 'not_executed';
+  } else if (requiredUnits === 0) {
+    // Defensive path for future policies that may make every unit optional.
+    status =
+      completedUnits === expectedUnits
+        ? 'complete'
+        : completedUnits > 0
+          ? 'partial'
+          : 'not_executed';
+  } else if (completedRequiredUnits === requiredUnits) {
+    status = 'complete';
+  } else if (completedRequiredUnits === 0) {
+    status = 'not_executed';
+  } else {
+    status = 'partial';
+  }
+
+  return {
+    schemaVersion: '1',
+    status,
+    expectedUnits,
+    completedUnits,
+    requiredUnits,
+    completedRequiredUnits,
+    incompleteRequiredUnitIds,
+    units: normalizedUnits,
+  };
+}
+
+function uniquePaths(paths = []) {
+  const seen = new Set();
+  const result = [];
+  for (const filePath of Array.isArray(paths) ? paths : []) {
+    if (typeof filePath !== 'string' || !filePath || seen.has(filePath)) continue;
+    seen.add(filePath);
+    result.push(filePath);
+  }
+  return result;
+}
+
+/**
+ * Build the observe-only file-selection ledger for Review Coverage (#2212 Slice C).
+ *
+ * `rawDiff` is the repository diff before `config.exclude.files`; `filteredDiff`
+ * is the exact diff handed to planning/reviewer execution after configured
+ * exclusions. `filesForReview` already reflects the LLM diff optimizer, so the
+ * difference lets us record why a changed path did not become a Review Unit
+ * subject without changing optimizer behavior or inventing file-level execution
+ * semantics.
+ */
+function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns = []) {
+  const rawChanged = uniquePaths(rawDiff?.changedFiles ?? []);
+  const selectedCandidates = uniquePaths(
+    (filteredDiff?.filesForReview ?? filteredDiff?.files ?? [])
+      .map((file) => file?.path)
+      .filter(Boolean)
+  );
+  const selectedSet = new Set(selectedCandidates);
+  const rawSet = new Set(rawChanged);
+  const selected = rawChanged.length
+    ? rawChanged.filter((filePath) => selectedSet.has(filePath))
+    : selectedCandidates;
+
+  // A selected path not present in changedFiles can occur only on synthetic
+  // programmatic input. Keep it rather than silently losing caller-provided
+  // scope while preserving raw changed-file order for normal repository runs.
+  for (const filePath of selectedCandidates) {
+    if (!rawSet.has(filePath) && !selected.includes(filePath)) selected.push(filePath);
+  }
+
+  const excluded = rawChanged
+    .filter((filePath) => !selectedSet.has(filePath))
+    .map((filePath) => ({
+      path: filePath,
+      reasonCode: (0,_utils_mjs__WEBPACK_IMPORTED_MODULE_0__/* .shouldExclude */ .Ip)(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
+    }));
+
+  return { selected, excluded };
+}
+
+/**
+ * Attach the file-selection ledger (#2212 Slice C) to an orchestration-derived
+ * Review Coverage object.
+ *
+ * Counters / status / units are never recomputed here: this only enriches an
+ * existing observation. Callers without a ledger keep the exact pre-Slice-C
+ * coverage object (or `null` when there is none at all).
+ */
+function attachReviewFileScope(coverage, fileScope) {
+  if (coverage && fileScope) return { ...coverage, fileScope };
+  return coverage ?? null;
+}
+
+
+/***/ }),
+
+/***/ 6641:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
@@ -57089,6 +57270,47 @@ function buildPrDescriptionSection(prBody) {
   return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。\n\n---\n${body}\n---\n`;
 }
 
+function reviewObligationOneLine(value) {
+  return String(value ?? '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+}
+
+function reviewObligationList(values) {
+  return (values ?? []).map(reviewObligationOneLine).filter(Boolean).join(', ');
+}
+
+/**
+ * Render matched Review Obligations as questions that require evidence, never
+ * as pre-asserted Findings. Activation details stay out of the prompt: they are
+ * runtime provenance, not evidence that a violation exists.
+ */
+function buildReviewObligationsSection(obligations = [], language = 'ja') {
+  if (!obligations?.length) return '';
+
+  const instruction =
+    language === 'en'
+      ? 'The following items are review obligations, not findings. Verify the required evidence in the diff and context. Emit a finding only when evidence supports a real issue; never invent missing evidence, and respect false-positive guards.'
+      : '以下は「確認すべき観点」であり、問題の存在を示す Finding ではありません。差分と文脈から Required evidence を確認し、実際の問題を裏付ける証拠がある場合だけ Finding を出してください。証拠を推測・捏造せず、False-positive guards に該当する場合は指摘しないでください。';
+  const lines = [];
+
+  for (const obligation of obligations) {
+    lines.push(
+      `- [${reviewObligationOneLine(obligation.id)}] ${reviewObligationOneLine(obligation.title)}`
+    );
+    lines.push(`  - Question: ${reviewObligationOneLine(obligation.question)}`);
+    lines.push(
+      `  - Required evidence: ${reviewObligationList(obligation.requiredEvidence) || '(none)'}`
+    );
+    const hints = reviewObligationList(obligation.evidenceHints);
+    if (hints) lines.push(`  - Evidence hints: ${hints}`);
+    const guards = reviewObligationList(obligation.falsePositiveGuards);
+    if (guards) lines.push(`  - False-positive guards: ${guards}`);
+  }
+
+  return `\n### Review Obligations\n\n${instruction}\n\n${lines.join('\n')}\n`;
+}
+
 // Opt-in (review.walkthrough). Asks the model to prepend a per-file walkthrough
 // to its output so reviewers see what changed, the risk, and a reading order.
 function buildWalkthroughSection(enabled) {
@@ -57376,6 +57598,7 @@ function renderContextBlock(ir) {
     buildPrDescriptionSection(c.prDescription),
     buildWalkthroughSection(ir.constraints.walkthrough),
     buildHandoffSection(ir.constraints.agentHandoff),
+    buildReviewObligationsSection(c.reviewObligations, ir.outputContract.language),
   ].join('');
 }
 
@@ -57593,7 +57816,7 @@ function resolveProfile(params) {
 //   オブジェクトを返す。tests/prompt-compiler-invariants.test.mjs が pin する。
 
 /** IR のバージョン。形を変えたら上げる。 */
-const REVIEW_REQUEST_IR_VERSION = '1';
+const REVIEW_REQUEST_IR_VERSION = '2';
 
 /** 凍結対象のネスト。浅い freeze では profile 側の書き換えを防げない。 */
 function deepFreeze(value) {
@@ -57644,6 +57867,7 @@ function buildReviewRequest({
       riskAssessment: context?.riskAssessment ?? null,
       repoContext: context?.repoContext ?? null,
       prDescription: context?.prDescription ?? null,
+      reviewObligations: context?.reviewObligations ?? [],
     },
     constraints: {
       maxFindings: constraints?.maxFindings ?? null,
@@ -57774,6 +57998,7 @@ function runPromptCompilerStage({
   riskAssessment,
   repoContext,
   prBody,
+  reviewObligations,
   language,
   openAIConfig,
 }) {
@@ -57805,6 +58030,7 @@ function runPromptCompilerStage({
       riskAssessment,
       repoContext,
       prDescription: prBody,
+      reviewObligations,
     },
     constraints: {
       maxFindings: compiledDepthConfig.maxFindings,
@@ -57832,6 +58058,764 @@ function runPromptCompilerStage({
   };
 }
 
+// EXTERNAL MODULE: external "node:fs"
+var external_node_fs_ = __nccwpck_require__(3024);
+// EXTERNAL MODULE: external "node:path"
+var external_node_path_ = __nccwpck_require__(6760);
+// EXTERNAL MODULE: ./runners/core/skill-loader.mjs + 1 modules
+var skill_loader = __nccwpck_require__(8478);
+;// CONCATENATED MODULE: ./src/lib/api-compatibility-signals.mjs
+const CONTRACT_PATH_RE = /(?:^|\/)(?:api|apis|dto|dtos|contract|contracts)(?:\/|\.|-|_)/i;
+const TYPESCRIPT_PATH_RE = /\.(?:ts|tsx)$/i;
+const TEST_PATH_RE =
+  /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
+const CONTRACT_DECLARATION_RE =
+  /\binterface\s+[A-Za-z_$][\w$]*(?:Dto|DTO|Request|Response|Api|API|Contract|Schema)[\w$]*\s*(?:extends\s+[^\{]+)?\{|\btype\s+[A-Za-z_$][\w$]*(?:Dto|DTO|Request|Response|Api|API|Contract|Schema)[\w$]*\s*=\s*\{|\bconst\s+[A-Za-z_$][\w$]*(?:Dto|DTO|Request|Response|Api|API|Contract|Schema)[\w$]*\s*=\s*z\.object\s*\(/;
+const PROPERTY_RE =
+  /^\s*(?:readonly\s+)?(?<name>[A-Za-z_$][\w$]*)(?<optional>\?)?\s*:\s*(?<type>.+?)\s*[;,]?\s*$/;
+
+function normalizeType(type) {
+  return String(type)
+    .replace(/[;,]\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseProperty(text) {
+  const trimmed = String(text ?? '').trim();
+  if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('*')) return null;
+  if (/^(?:interface|type|class|const|let|var|function|return|import|export)\b/.test(trimmed)) {
+    return null;
+  }
+
+  const match = PROPERTY_RE.exec(text);
+  if (!match?.groups) return null;
+  const type = normalizeType(match.groups.type);
+  if (!type || type === '{' || type.endsWith('=>')) return null;
+
+  return {
+    name: match.groups.name,
+    optional: match.groups.optional === '?',
+    type,
+  };
+}
+
+function hunkHasContractDeclaration(hunk) {
+  return (hunk?.lines ?? []).some((rawLine) =>
+    CONTRACT_DECLARATION_RE.test(String(rawLine).slice(1))
+  );
+}
+
+function collectChangedProperties(file, { declarationScoped = false } = {}) {
+  const removed = new Map();
+  const added = new Map();
+
+  for (const hunk of file?.hunks ?? []) {
+    if (declarationScoped && !hunkHasContractDeclaration(hunk)) continue;
+    let newLine = Number.isInteger(hunk?.newStart) ? hunk.newStart : 1;
+
+    for (const rawLine of hunk?.lines ?? []) {
+      const line = String(rawLine);
+      if (line.startsWith('+++') || line.startsWith('---')) continue;
+
+      if (line.startsWith('-')) {
+        const property = parseProperty(line.slice(1));
+        if (property) {
+          const entries = removed.get(property.name) ?? [];
+          entries.push({ ...property, line: newLine });
+          removed.set(property.name, entries);
+        }
+        continue;
+      }
+
+      if (line.startsWith('+')) {
+        const property = parseProperty(line.slice(1));
+        if (property) {
+          const entries = added.get(property.name) ?? [];
+          entries.push({ ...property, line: newLine });
+          added.set(property.name, entries);
+        }
+        newLine += 1;
+        continue;
+      }
+
+      newLine += 1;
+    }
+  }
+
+  return { removed, added };
+}
+
+function first(entries) {
+  return Array.isArray(entries) && entries.length > 0 ? entries[0] : null;
+}
+
+/**
+ * Extract neutral, deterministic facts that can activate api-compatibility
+ * Review Viewpoints. These are signals, not findings: no severity, policy,
+ * violation decision, or gate behavior is attached here.
+ *
+ * The v1 detector is deliberately conservative. It handles TypeScript property
+ * changes only when an API/DTO/contract path or a contract-named declaration
+ * identifies the boundary. Declaration-based fallback is hunk-scoped so an
+ * unrelated internal type in the same file does not inherit contract status.
+ * New files and test/fixture files are excluded because they cannot establish a
+ * breaking change to an existing production contract.
+ *
+ * @param {{diff?: {files?: Array<object>}}} options
+ * @returns {Array<{kind: string, file: string, line?: number}>}
+ */
+function detectApiCompatibilitySignals({ diff } = {}) {
+  const signals = [];
+
+  for (const file of diff?.files ?? []) {
+    const filePath = typeof file?.path === 'string' ? file.path : '';
+    if (!filePath || filePath === '/dev/null') continue;
+    if (!TYPESCRIPT_PATH_RE.test(filePath) || TEST_PATH_RE.test(filePath)) continue;
+    if (!file.oldPath || file.oldPath === '/dev/null') continue;
+
+    const pathBased = CONTRACT_PATH_RE.test(filePath);
+    const declarationBased = (file.hunks ?? []).some(hunkHasContractDeclaration);
+    if (!pathBased && !declarationBased) continue;
+
+    const { removed, added } = collectChangedProperties(file, {
+      declarationScoped: !pathBased,
+    });
+    const names = new Set([...removed.keys(), ...added.keys()]);
+
+    for (const name of names) {
+      const before = first(removed.get(name));
+      const after = first(added.get(name));
+
+      if (before && !after) {
+        signals.push({ kind: 'dto-field-removed', file: filePath, line: before.line });
+        continue;
+      }
+
+      if (!before && after) {
+        if (after.optional) {
+          signals.push({ kind: 'dto-optional-field-added', file: filePath, line: after.line });
+        }
+        continue;
+      }
+
+      if (!before || !after) continue;
+
+      if (before.optional && !after.optional && before.type === after.type) {
+        signals.push({ kind: 'dto-requiredness-tightened', file: filePath, line: after.line });
+        continue;
+      }
+
+      if (before.type !== after.type) {
+        signals.push({ kind: 'dto-field-type-changed', file: filePath, line: after.line });
+      }
+    }
+  }
+
+  return signals;
+}
+
+;// CONCATENATED MODULE: ./src/lib/review-viewpoint-observer.mjs
+function assertViewpointDocument(document) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) {
+    throw new TypeError('review viewpoint document must be an object');
+  }
+  if (typeof document.skillId !== 'string' || document.skillId.trim() === '') {
+    throw new TypeError('review viewpoint document requires a non-empty skillId');
+  }
+  if (!Array.isArray(document.viewpoints)) {
+    throw new TypeError('review viewpoint document requires a viewpoints array');
+  }
+}
+
+function normalizeDetectorSignals(detections) {
+  if (!Array.isArray(detections)) {
+    throw new TypeError('detector results must be an array');
+  }
+
+  const signals = [];
+  const seen = new Set();
+
+  for (const [index, detection] of detections.entries()) {
+    if (!detection || typeof detection !== 'object' || Array.isArray(detection)) {
+      throw new TypeError(`detector result at index ${index} must be an object`);
+    }
+
+    const kind = typeof detection.kind === 'string' ? detection.kind.trim() : '';
+    if (!kind) {
+      throw new TypeError(`detector result at index ${index} requires a non-empty kind`);
+    }
+
+    const signal = { kind };
+    if (typeof detection.file === 'string' && detection.file.length > 0) {
+      signal.file = detection.file;
+    }
+    if (Number.isInteger(detection.line) && detection.line > 0) {
+      signal.line = detection.line;
+    }
+
+    const key = `${signal.kind}\u0000${signal.file ?? ''}\u0000${signal.line ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    signals.push(signal);
+  }
+
+  return signals;
+}
+
+function matchViewpoints(document, signals) {
+  const signalsByKind = new Map();
+  for (const signal of signals) {
+    const bucket = signalsByKind.get(signal.kind) ?? [];
+    bucket.push(signal);
+    signalsByKind.set(signal.kind, bucket);
+  }
+
+  const applicableViewpoints = [];
+  for (const viewpoint of document.viewpoints) {
+    const matchedKinds = [];
+    const matchedSignals = [];
+
+    for (const kind of viewpoint.activatesOn ?? []) {
+      const matches = signalsByKind.get(kind);
+      if (!matches?.length) continue;
+      matchedKinds.push(kind);
+      matchedSignals.push(...matches);
+    }
+
+    if (matchedKinds.length === 0) continue;
+
+    applicableViewpoints.push({
+      id: viewpoint.id,
+      title: viewpoint.title,
+      matchedKinds,
+      matchedSignals,
+    });
+  }
+
+  return applicableViewpoints;
+}
+
+function buildReviewObligations(document, applicableViewpoints) {
+  const viewpointsById = new Map(document.viewpoints.map((viewpoint) => [viewpoint.id, viewpoint]));
+
+  return applicableViewpoints.map((applicable) => {
+    const viewpoint = viewpointsById.get(applicable.id);
+    return {
+      id: `${document.skillId}/${viewpoint.id}`,
+      skillId: document.skillId,
+      viewpointId: viewpoint.id,
+      title: viewpoint.title,
+      question: viewpoint.question,
+      requiredEvidence: [...viewpoint.requiredEvidence],
+      evidenceHints: [...(viewpoint.evidenceHints ?? [])],
+      falsePositiveGuards: [...(viewpoint.falsePositiveGuards ?? [])],
+      activation: {
+        matchedKinds: [...applicable.matchedKinds],
+        matchedSignals: applicable.matchedSignals.map((signal) => ({ ...signal })),
+      },
+    };
+  });
+}
+
+function buildObserveComparison(detectorResultCount, signals, applicableViewpoints, obligations) {
+  const mappedSignalKeys = new Set();
+  for (const viewpoint of applicableViewpoints) {
+    for (const signal of viewpoint.matchedSignals) {
+      mappedSignalKeys.add(`${signal.kind}\u0000${signal.file ?? ''}\u0000${signal.line ?? ''}`);
+    }
+  }
+
+  const unmappedSignals = signals.filter(
+    (signal) =>
+      !mappedSignalKeys.has(`${signal.kind}\u0000${signal.file ?? ''}\u0000${signal.line ?? ''}`)
+  );
+
+  return {
+    detectorResultCount,
+    normalizedSignalCount: signals.length,
+    mappedSignalCount: mappedSignalKeys.size,
+    unmappedSignalCount: unmappedSignals.length,
+    activatedViewpointCount: applicableViewpoints.length,
+    obligationCount: obligations.length,
+    unmappedSignals: unmappedSignals.map((signal) => ({ ...signal })),
+  };
+}
+
+/**
+ * Calculate observe-mode Review Viewpoint activation from existing heuristic
+ * detector results without changing findings, gates, policy, or LLM context.
+ *
+ * The input detector shape is intentionally the existing internal
+ * `{ file, line, kind }` contract. This does not introduce a public
+ * ReviewSignal schema; normalization is private to this module until multiple
+ * signal producers demonstrate a real shared abstraction is needed.
+ *
+ * `comparison` is the serializable old/new observation record: existing
+ * detector results versus newly normalized signals and activated
+ * viewpoints/obligations. Persistence is intentionally left to the runtime
+ * adapter so this module does not acquire run-artifact or orchestration
+ * responsibilities.
+ *
+ * @param {object} document validated Review Viewpoint document
+ * @param {Array<{kind: string, file?: string, line?: number}>} detections existing detector results for the owning Skill
+ * @returns {{mode: 'observe', skillId: string, signals: object[], applicableViewpoints: object[], obligations: object[], comparison: object}}
+ */
+function observeReviewViewpoints(document, detections = []) {
+  assertViewpointDocument(document);
+  const signals = normalizeDetectorSignals(detections);
+  const applicableViewpoints = matchViewpoints(document, signals);
+  const obligations = buildReviewObligations(document, applicableViewpoints);
+  const comparison = buildObserveComparison(
+    detections.length,
+    signals,
+    applicableViewpoints,
+    obligations
+  );
+
+  return {
+    mode: 'observe',
+    skillId: document.skillId,
+    signals,
+    applicableViewpoints,
+    obligations,
+    comparison,
+  };
+}
+
+// EXTERNAL MODULE: external "node:url"
+var external_node_url_ = __nccwpck_require__(3136);
+// EXTERNAL MODULE: ./node_modules/ajv/dist/2020.js
+var _2020 = __nccwpck_require__(2210);
+// EXTERNAL MODULE: ./node_modules/ajv-formats/dist/index.js
+var dist = __nccwpck_require__(2815);
+// EXTERNAL MODULE: ./node_modules/js-yaml/dist/js-yaml.mjs
+var js_yaml = __nccwpck_require__(3243);
+;// CONCATENATED MODULE: ./src/lib/review-viewpoints.mjs
+
+
+
+
+
+
+
+
+const review_viewpoints_filename = (0,external_node_url_.fileURLToPath)(import.meta.url);
+const review_viewpoints_dirname = external_node_path_.dirname(review_viewpoints_filename);
+const repoRoot = external_node_path_.resolve(review_viewpoints_dirname, '..', '..');
+const defaultReviewViewpointsSchemaPath = external_node_path_.join(
+  repoRoot,
+  'schemas',
+  'review-viewpoints.schema.json'
+);
+
+class ReviewViewpointsError extends Error {
+  constructor(message, details = undefined) {
+    super(message);
+    this.name = 'ReviewViewpointsError';
+    this.details = details;
+  }
+}
+
+let defaultValidatorPromise;
+
+function formatValidationErrors(errors = []) {
+  return errors
+    .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
+    .join('; ');
+}
+
+async function loadReviewViewpointsSchema(schemaPath = defaultReviewViewpointsSchemaPath) {
+  let raw;
+  try {
+    raw = await external_node_fs_.promises.readFile(schemaPath, 'utf8');
+  } catch (error) {
+    throw new ReviewViewpointsError(`Failed to read review viewpoints schema: ${schemaPath}`, {
+      cause: error,
+      schemaPath,
+    });
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new ReviewViewpointsError(`Failed to parse review viewpoints schema: ${schemaPath}`, {
+      cause: error,
+      schemaPath,
+    });
+  }
+}
+
+function createReviewViewpointsValidator(schema) {
+  const ajv = new _2020({ allErrors: true, strict: true });
+  dist(ajv);
+  return ajv.compile(schema);
+}
+
+async function getDefaultValidator() {
+  defaultValidatorPromise ??= loadReviewViewpointsSchema().then(createReviewViewpointsValidator);
+  return defaultValidatorPromise;
+}
+
+function findDuplicateViewpointIds(viewpoints = []) {
+  const seen = new Set();
+  const duplicates = new Set();
+
+  for (const viewpoint of viewpoints) {
+    const id = viewpoint?.id;
+    if (typeof id !== 'string') continue;
+    if (seen.has(id)) duplicates.add(id);
+    seen.add(id);
+  }
+
+  return [...duplicates].sort();
+}
+
+/**
+ * Load and validate the data-only viewpoints owned by a selected Skill.
+ *
+ * This loader intentionally does not perform Skill routing, evaluator selection,
+ * policy decisions, gate derivation, or arbitrary command/expression execution.
+ * The owning Skill id is required so a caller cannot silently attach knowledge
+ * from one Skill to another.
+ *
+ * @param {string} viewpointsPath
+ * @param {object} options
+ * @param {string} options.expectedSkillId Owning Skill id selected by the existing router.
+ * @returns {Promise<object>}
+ */
+async function loadReviewViewpoints(viewpointsPath, { expectedSkillId } = {}) {
+  if (typeof expectedSkillId !== 'string' || expectedSkillId.trim() === '') {
+    throw new ReviewViewpointsError('expectedSkillId is required to load review viewpoints', {
+      expectedSkillId,
+      viewpointsPath,
+    });
+  }
+
+  let raw;
+  try {
+    raw = await external_node_fs_.promises.readFile(viewpointsPath, 'utf8');
+  } catch (error) {
+    throw new ReviewViewpointsError(`Failed to read review viewpoints: ${viewpointsPath}`, {
+      cause: error,
+      viewpointsPath,
+    });
+  }
+
+  let document;
+  try {
+    document = js_yaml/* load */.Hh(raw);
+  } catch (error) {
+    throw new ReviewViewpointsError(`Failed to parse review viewpoints YAML: ${viewpointsPath}`, {
+      cause: error,
+      viewpointsPath,
+    });
+  }
+
+  const validate = await getDefaultValidator();
+  if (!validate(document)) {
+    throw new ReviewViewpointsError(
+      `Invalid review viewpoints at ${viewpointsPath}: ${formatValidationErrors(validate.errors)}`,
+      { errors: validate.errors ?? [], viewpointsPath }
+    );
+  }
+
+  const duplicateIds = findDuplicateViewpointIds(document.viewpoints);
+  if (duplicateIds.length > 0) {
+    throw new ReviewViewpointsError(
+      `Duplicate review viewpoint id(s) at ${viewpointsPath}: ${duplicateIds.join(', ')}`,
+      { duplicateIds, viewpointsPath }
+    );
+  }
+
+  if (document.skillId !== expectedSkillId) {
+    throw new ReviewViewpointsError(
+      `Review viewpoints skillId mismatch at ${viewpointsPath}: expected ${expectedSkillId}, got ${document.skillId}`,
+      { actualSkillId: document.skillId, expectedSkillId, viewpointsPath }
+    );
+  }
+
+  return document;
+}
+
+;// CONCATENATED MODULE: ./src/lib/review-viewpoint-stage.mjs
+
+
+
+
+
+
+
+
+
+// Skill discovery already resolves the River Review package root, including the
+// GitHub Action/ncc RIVER_REPO_ROOT override. Reuse that SSoT instead of
+// re-deriving it from this module's __dirname, which changes after bundling.
+const builtInSkillsRoot = skill_loader/* defaultPaths */.KJ.skillsDir;
+const REVIEW_VIEWPOINT_MODES = new Set(['off', 'observe', 'active']);
+
+const NEUTRAL_SIGNAL_PRODUCERS = new Map([
+  ['api-compatibility', ({ diff }) => detectApiCompatibilitySignals({ diff })],
+]);
+
+class ReviewViewpointStageError extends Error {
+  constructor(message, details = undefined) {
+    super(message);
+    this.name = 'ReviewViewpointStageError';
+    this.details = details;
+  }
+}
+
+function getSkillId(skill) {
+  return skill?.metadata?.id ?? skill?.id ?? null;
+}
+
+function isPathInside(root, candidate) {
+  const relative = external_node_path_.relative(root, candidate);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${external_node_path_.sep}`) &&
+    !external_node_path_.isAbsolute(relative)
+  );
+}
+
+async function resolveTrustedBuiltInSkillPath(skillPath) {
+  const resolved = external_node_path_.resolve(skillPath);
+  if (!isPathInside(external_node_path_.resolve(builtInSkillsRoot), resolved)) return null;
+
+  // Lexical containment alone is insufficient if a trusted-tree path is a
+  // symlink. Canonicalize both sides before deriving references/viewpoints.yaml.
+  const [realRoot, realSkillPath] = await Promise.all([
+    external_node_fs_.promises.realpath(builtInSkillsRoot),
+    external_node_fs_.promises.realpath(resolved),
+  ]);
+  if (!isPathInside(realRoot, realSkillPath)) return null;
+  return { realRoot, realSkillPath };
+}
+
+async function resolveTrustedViewpointsPath({ realRoot, realSkillPath }) {
+  const candidate = external_node_path_.join(external_node_path_.dirname(realSkillPath), 'references', 'viewpoints.yaml');
+
+  let realViewpointsPath;
+  try {
+    realViewpointsPath = await external_node_fs_.promises.realpath(candidate);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { status: 'missing' };
+    throw error;
+  }
+
+  // Re-check the final catalog path after resolving references/ and the file
+  // itself. Without this second realpath check, a symlink located inside a
+  // trusted Skill directory could still point outside the distributed skills
+  // root even though SKILL.md itself was trusted.
+  if (!isPathInside(realRoot, realViewpointsPath)) {
+    return { status: 'outside' };
+  }
+  return { status: 'ok', path: realViewpointsPath };
+}
+
+function groupHeuristicSignalsBySkill(detections) {
+  const bySkill = new Map();
+  for (const detection of detections) {
+    if (!detection?.skillId) continue;
+    const bucket = bySkill.get(detection.skillId) ?? [];
+    const { skillId: _skillId, ...signal } = detection;
+    bucket.push(signal);
+    bySkill.set(detection.skillId, bucket);
+  }
+  return bySkill;
+}
+
+function dedupeObligations(obligations) {
+  const seen = new Set();
+  const deduped = [];
+  for (const obligation of obligations) {
+    if (!obligation?.id || seen.has(obligation.id)) continue;
+    seen.add(obligation.id);
+    deduped.push(obligation);
+  }
+  return deduped;
+}
+
+function compactSkillObservation(observation) {
+  return {
+    skillId: observation.skillId,
+    signalCount: observation.signals.length,
+    activatedViewpointIds: observation.applicableViewpoints.map((viewpoint) => viewpoint.id),
+    obligationIds: observation.obligations.map((obligation) => obligation.id),
+    comparison: observation.comparison,
+  };
+}
+
+/**
+ * Resolve selected built-in Skill knowledge into Review Obligations.
+ *
+ * Modes:
+ * - off: return immediately without detector or filesystem work.
+ * - observe: calculate activation and return debug-safe observation only. Any
+ *   signal/catalog failure is recorded without changing the existing review's
+ *   success/failure behavior.
+ * - active: return the same observation plus obligations that callers may add
+ *   to the LLM prompt. Signal/catalog failures fail closed because active mode
+ *   explicitly opts into this knowledge as part of the review input.
+ *
+ * v1 deliberately refuses repository-owned/custom Skill paths. A selected Skill
+ * and its final `references/viewpoints.yaml` target must both canonicalize under
+ * the same distributed `skills/` root used by Skill discovery. This prevents a
+ * symlink inside the trusted tree from escaping the built-in-only boundary.
+ *
+ * @param {object} params
+ * @param {object} params.reviewConfig merged review configuration
+ * @param {object} params.diff raw parsed diff
+ * @param {object} params.plan execution plan with selected Skills
+ * @returns {Promise<null|{mode: 'observe'|'active', activeObligations: object[], observation: object}>}
+ */
+async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
+  const mode = reviewConfig?.viewpoints?.mode ?? 'off';
+  if (!REVIEW_VIEWPOINT_MODES.has(mode)) {
+    throw new ReviewViewpointStageError(`Unsupported review viewpoints mode: ${String(mode)}`);
+  }
+  if (mode === 'off') return null;
+
+  const selected = plan?.selected ?? [];
+  const observations = [];
+  const obligations = [];
+  const skipped = [];
+  const errors = [];
+
+  let heuristicSignals = new Map();
+  try {
+    heuristicSignals = groupHeuristicSignalsBySkill((0,heuristic_review/* collectHeuristicDetections */.bg)({ diff, plan }));
+  } catch (error) {
+    if (mode === 'active') {
+      throw new ReviewViewpointStageError('Failed to collect heuristic review signals', {
+        cause: error,
+      });
+    }
+    errors.push({ code: 'heuristic-signal-collection-failed' });
+  }
+
+  for (const skill of selected) {
+    const skillId = getSkillId(skill);
+    if (!skillId) continue;
+
+    const producer = NEUTRAL_SIGNAL_PRODUCERS.get(skillId);
+    let producerSignals = [];
+    if (producer) {
+      try {
+        producerSignals = producer({ diff, plan });
+      } catch (error) {
+        if (mode === 'active') {
+          throw new ReviewViewpointStageError(`Failed to produce review signals for ${skillId}`, {
+            cause: error,
+            skillId,
+          });
+        }
+        errors.push({ skillId, code: 'signal-producer-failed' });
+      }
+    }
+    const existingSignals = heuristicSignals.get(skillId) ?? [];
+    const signals = [...existingSignals, ...producerSignals];
+
+    const skillPath = skill?.path;
+    if (typeof skillPath !== 'string' || skillPath.length === 0) {
+      if (signals.length > 0) skipped.push({ skillId, reason: 'missing-skill-path' });
+      continue;
+    }
+
+    let trustedSkill;
+    try {
+      trustedSkill = await resolveTrustedBuiltInSkillPath(skillPath);
+    } catch (error) {
+      if (mode === 'active') {
+        throw new ReviewViewpointStageError(
+          `Failed to resolve built-in Skill path for ${skillId}`,
+          {
+            cause: error,
+            skillId,
+          }
+        );
+      }
+      errors.push({ skillId, code: 'skill-path-resolution-failed' });
+      continue;
+    }
+    if (!trustedSkill) {
+      if (signals.length > 0) skipped.push({ skillId, reason: 'outside-built-in-skills' });
+      continue;
+    }
+
+    let catalogResolution;
+    try {
+      catalogResolution = await resolveTrustedViewpointsPath(trustedSkill);
+    } catch (error) {
+      if (mode === 'active') {
+        throw new ReviewViewpointStageError(
+          `Failed to inspect built-in viewpoints for ${skillId}`,
+          {
+            cause: error,
+            skillId,
+          }
+        );
+      }
+      errors.push({ skillId, code: 'catalog-inspection-failed' });
+      continue;
+    }
+
+    if (catalogResolution.status === 'missing') continue;
+    if (catalogResolution.status === 'outside') {
+      if (mode === 'active') {
+        throw new ReviewViewpointStageError(
+          `Built-in viewpoints path escapes skills root for ${skillId}`,
+          { skillId }
+        );
+      }
+      errors.push({ skillId, code: 'catalog-path-outside-built-in-skills' });
+      continue;
+    }
+
+    const viewpointsPath = catalogResolution.path;
+    try {
+      const document = await loadReviewViewpoints(viewpointsPath, { expectedSkillId: skillId });
+      const observation = observeReviewViewpoints(document, signals);
+      observations.push(compactSkillObservation(observation));
+      obligations.push(...observation.obligations);
+    } catch (error) {
+      if (mode === 'active') {
+        throw new ReviewViewpointStageError(`Failed to load built-in viewpoints for ${skillId}`, {
+          cause: error,
+          skillId,
+        });
+      }
+      errors.push({ skillId, code: 'catalog-load-failed' });
+    }
+  }
+
+  const dedupedObligations = dedupeObligations(obligations);
+  const signalCount = observations.reduce((sum, item) => sum + item.signalCount, 0);
+  const activatedViewpointCount = observations.reduce(
+    (sum, item) => sum + item.activatedViewpointIds.length,
+    0
+  );
+
+  return {
+    mode,
+    activeObligations: mode === 'active' ? dedupedObligations : [],
+    observation: {
+      mode,
+      selectedSkillCount: selected.length,
+      catalogSkillCount: observations.length,
+      signalCount,
+      activatedViewpointCount,
+      obligationCount: dedupedObligations.length,
+      activeObligationCount: mode === 'active' ? dedupedObligations.length : 0,
+      skills: observations,
+      skipped,
+      errors,
+    },
+  };
+}
+
 ;// CONCATENATED MODULE: ./src/lib/review-engine.mjs
 
 
@@ -57851,6 +58835,7 @@ function runPromptCompilerStage({
 
 // ADR-006 / #1859 + #1861: Prompt Compiler の配線段。既定 off では
 // runPromptCompilerStage が即 null を返し、compiler 側は一切呼ばれない。
+
 
 
 const ENV_DEFAULT_MODEL = process.env.RIVER_OPENAI_MODEL || process.env.OPENAI_MODEL || null;
@@ -57897,6 +58882,7 @@ function buildPrompt({
   reviewMode,
   repoContext,
   prBody,
+  reviewObligations,
   maxChars = MAX_PROMPT_CHARS,
   config = config_default/* defaultConfig */.s,
 }) {
@@ -57918,7 +58904,7 @@ ${buildFileSummary(diffFiles)}
 Relevant skills:
 ${buildSkillSummary(plan)}
 
-${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${(0,repo_context/* buildRepoContextSection */.lQ)(repoContext)}${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildFindingContractSection(
+${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${(0,repo_context/* buildRepoContextSection */.lQ)(repoContext)}${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(
     {
       language,
       severity,
@@ -58245,6 +59231,12 @@ async function generateReview({
   // stays raw so heuristics/fallback below keep seeing every changed file
   // (#1543/#1547).
   const llmDiff = (0,diff_processor/* buildLlmDiffView */.wT)(diff);
+  const viewpointStage = await runReviewViewpointStage({
+    reviewConfig: effectiveConfig.review,
+    diff,
+    plan,
+  });
+  const reviewObligations = viewpointStage?.activeObligations ?? [];
   const promptInfo = buildPrompt({
     diffText: llmDiff.diffText,
     diffFiles: llmDiff.files,
@@ -58256,6 +59248,7 @@ async function generateReview({
     reviewMode,
     repoContext,
     prBody,
+    reviewObligations,
     maxChars: maxPromptChars,
     config: effectiveConfig,
   });
@@ -58301,6 +59294,13 @@ async function generateReview({
       : null,
   };
 
+  if (viewpointStage) {
+    debug.execution = {
+      ...(debug.execution ?? {}),
+      reviewViewpoints: viewpointStage.observation,
+    };
+  }
+
   // --- ADR-006 / #1859 + #1861: Prompt Compiler（配線はこの 1 箇所だけ）---
   //
   // 段の本体は src/prompt/compiler-stage.mjs にある。既定は off で、そのとき
@@ -58322,6 +59322,7 @@ async function generateReview({
     riskAssessment,
     repoContext,
     prBody,
+    reviewObligations,
     language,
     openAIConfig,
   });
@@ -81110,8 +82111,8 @@ async function resolveSelectionSkillIds(
   });
 }
 
-// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 11 modules
-var review_engine = __nccwpck_require__(9669);
+// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 15 modules
+var review_engine = __nccwpck_require__(6641);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
 
 
@@ -81211,163 +82212,8 @@ function synthesizeTeamLeadReport({ findings = [], reviewerResults = [] }) {
   };
 }
 
-;// CONCATENATED MODULE: ./src/lib/review-coverage.mjs
-
-
-/**
- * Review execution coverage contract (#2212).
- *
- * Coverage answers whether the review work that was expected to run actually
- * completed. It is deliberately independent from finding count, skill routing,
- * context supply, and gate policy.
- */
-
-const REVIEW_UNIT_STATUSES = Object.freeze(['completed', 'failed', 'timed_out']);
-const REVIEW_COVERAGE_STATUSES = Object.freeze(['complete', 'partial', 'not_executed']);
-
-function isCompleted(unit) {
-  return unit?.status === 'completed';
-}
-
-function normalizeRequired(unit) {
-  // Fail-safe default: an execution unit is required unless policy explicitly
-  // marks it optional. Materialize the default in the returned unit as well so
-  // the derived coverage object conforms to review-coverage.schema.json.
-  return { ...unit, required: unit?.required !== false };
-}
-
-function isRequired(unit) {
-  return unit?.required === true;
-}
-
-/**
- * Derive machine-readable review execution coverage from already-planned units.
- *
- * This function is intentionally pure and has no gate side effects. Runtime
- * wiring in reviewer-orchestrator is a separate step so observe-only telemetry
- * can land before any policy change.
- *
- * @param {Array<object>} units planned/executed review units
- * @returns {{
- *   schemaVersion: '1',
- *   status: 'complete'|'partial'|'not_executed',
- *   expectedUnits: number,
- *   completedUnits: number,
- *   requiredUnits: number,
- *   completedRequiredUnits: number,
- *   incompleteRequiredUnitIds: string[],
- *   units: Array<object>
- * }}
- */
-function deriveReviewCoverage(units = []) {
-  const normalizedUnits = Array.isArray(units)
-    ? units.filter(Boolean).map((unit) => normalizeRequired(unit))
-    : [];
-  const expectedUnits = normalizedUnits.length;
-  const completedUnits = normalizedUnits.filter(isCompleted).length;
-  const required = normalizedUnits.filter(isRequired);
-  const requiredUnits = required.length;
-  const completedRequiredUnits = required.filter(isCompleted).length;
-  const incompleteRequiredUnitIds = required
-    .filter((unit) => !isCompleted(unit))
-    .map((unit) => unit.id)
-    .filter((id) => typeof id === 'string' && id.length > 0);
-
-  let status;
-  if (expectedUnits === 0) {
-    status = 'not_executed';
-  } else if (requiredUnits === 0) {
-    // Defensive path for future policies that may make every unit optional.
-    status =
-      completedUnits === expectedUnits
-        ? 'complete'
-        : completedUnits > 0
-          ? 'partial'
-          : 'not_executed';
-  } else if (completedRequiredUnits === requiredUnits) {
-    status = 'complete';
-  } else if (completedRequiredUnits === 0) {
-    status = 'not_executed';
-  } else {
-    status = 'partial';
-  }
-
-  return {
-    schemaVersion: '1',
-    status,
-    expectedUnits,
-    completedUnits,
-    requiredUnits,
-    completedRequiredUnits,
-    incompleteRequiredUnitIds,
-    units: normalizedUnits,
-  };
-}
-
-function uniquePaths(paths = []) {
-  const seen = new Set();
-  const result = [];
-  for (const filePath of Array.isArray(paths) ? paths : []) {
-    if (typeof filePath !== 'string' || !filePath || seen.has(filePath)) continue;
-    seen.add(filePath);
-    result.push(filePath);
-  }
-  return result;
-}
-
-/**
- * Build the observe-only file-selection ledger for Review Coverage (#2212 Slice C).
- *
- * `rawDiff` is the repository diff before `config.exclude.files`; `filteredDiff`
- * is the exact diff handed to planning/reviewer execution after configured
- * exclusions. `filesForReview` already reflects the LLM diff optimizer, so the
- * difference lets us record why a changed path did not become a Review Unit
- * subject without changing optimizer behavior or inventing file-level execution
- * semantics.
- */
-function deriveReviewFileScope(rawDiff = {}, filteredDiff = {}, patterns = []) {
-  const rawChanged = uniquePaths(rawDiff?.changedFiles ?? []);
-  const selectedCandidates = uniquePaths(
-    (filteredDiff?.filesForReview ?? filteredDiff?.files ?? [])
-      .map((file) => file?.path)
-      .filter(Boolean)
-  );
-  const selectedSet = new Set(selectedCandidates);
-  const rawSet = new Set(rawChanged);
-  const selected = rawChanged.length
-    ? rawChanged.filter((filePath) => selectedSet.has(filePath))
-    : selectedCandidates;
-
-  // A selected path not present in changedFiles can occur only on synthetic
-  // programmatic input. Keep it rather than silently losing caller-provided
-  // scope while preserving raw changed-file order for normal repository runs.
-  for (const filePath of selectedCandidates) {
-    if (!rawSet.has(filePath) && !selected.includes(filePath)) selected.push(filePath);
-  }
-
-  const excluded = rawChanged
-    .filter((filePath) => !selectedSet.has(filePath))
-    .map((filePath) => ({
-      path: filePath,
-      reasonCode: (0,utils/* shouldExclude */.Ip)(filePath, patterns) ? 'configured_exclusion' : 'diff_optimization',
-    }));
-
-  return { selected, excluded };
-}
-
-/**
- * Attach the file-selection ledger (#2212 Slice C) to an orchestration-derived
- * Review Coverage object.
- *
- * Counters / status / units are never recomputed here: this only enriches an
- * existing observation. Callers without a ledger keep the exact pre-Slice-C
- * coverage object (or `null` when there is none at all).
- */
-function attachReviewFileScope(coverage, fileScope) {
-  if (coverage && fileScope) return { ...coverage, fileScope };
-  return coverage ?? null;
-}
-
+// EXTERNAL MODULE: ./src/lib/review-coverage.mjs
+var review_coverage = __nccwpck_require__(3054);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
 
 
@@ -82235,7 +83081,7 @@ async function runReviewerOrchestration({
       findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
-  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+  const reviewCoverage = (0,review_coverage/* deriveReviewCoverage */.Ix)(reviewUnits);
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
@@ -83054,7 +83900,7 @@ async function collectLocalContext({
   const rawDiff = await (0,diff_processor/* collectRepoDiff */.KD)(repoRoot, mergeBase, { contextLines });
   const exclusionPatterns = config.exclude?.files ?? [];
   const diff = applyFileExclusions(rawDiff, exclusionPatterns);
-  const reviewFileScope = deriveReviewFileScope(rawDiff, diff, exclusionPatterns);
+  const reviewFileScope = (0,review_coverage/* deriveReviewFileScope */.or)(rawDiff, diff, exclusionPatterns);
   const reviewFiles = diff.filesForReview?.map((file) => file.path) ?? diff.changedFiles;
   // #1606: declare `fullFile` as an available input context when the runner can
   // honestly supply the current change set's full source text. The content is
@@ -83487,7 +84333,7 @@ async function runLocalReview({
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here, and callers that provide an older context
   // without the ledger keep the exact pre-Slice-C Review Coverage object.
-  const reviewCoverage = attachReviewFileScope(review.reviewCoverage, context.reviewFileScope);
+  const reviewCoverage = (0,review_coverage/* attachReviewFileScope */.oG)(review.reviewCoverage, context.reviewFileScope);
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical

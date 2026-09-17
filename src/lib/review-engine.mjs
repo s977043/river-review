@@ -31,6 +31,7 @@ import {
   buildHandoffSection,
   buildPrDescriptionSection,
   buildProjectRulesSection,
+  buildReviewObligationsSection,
   buildRiskAssessmentSection,
   buildSkillSummary,
   buildSystemMessage,
@@ -39,6 +40,7 @@ import {
 // ADR-006 / #1859 + #1861: Prompt Compiler の配線段。既定 off では
 // runPromptCompilerStage が即 null を返し、compiler 側は一切呼ばれない。
 import { runPromptCompilerStage } from '../prompt/compiler-stage.mjs';
+import { runReviewViewpointStage } from './review-viewpoint-stage.mjs';
 
 const ENV_DEFAULT_MODEL = process.env.RIVER_OPENAI_MODEL || process.env.OPENAI_MODEL || null;
 const MAX_PROMPT_CHARS = 12000;
@@ -84,6 +86,7 @@ export function buildPrompt({
   reviewMode,
   repoContext,
   prBody,
+  reviewObligations,
   maxChars = MAX_PROMPT_CHARS,
   config = defaultConfig,
 }) {
@@ -105,7 +108,7 @@ ${buildFileSummary(diffFiles)}
 Relevant skills:
 ${buildSkillSummary(plan)}
 
-${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${buildRepoContextSection(repoContext)}${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildFindingContractSection(
+${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${buildRepoContextSection(repoContext)}${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(
     {
       language,
       severity,
@@ -432,6 +435,12 @@ export async function generateReview({
   // stays raw so heuristics/fallback below keep seeing every changed file
   // (#1543/#1547).
   const llmDiff = buildLlmDiffView(diff);
+  const viewpointStage = await runReviewViewpointStage({
+    reviewConfig: effectiveConfig.review,
+    diff,
+    plan,
+  });
+  const reviewObligations = viewpointStage?.activeObligations ?? [];
   const promptInfo = buildPrompt({
     diffText: llmDiff.diffText,
     diffFiles: llmDiff.files,
@@ -443,6 +452,7 @@ export async function generateReview({
     reviewMode,
     repoContext,
     prBody,
+    reviewObligations,
     maxChars: maxPromptChars,
     config: effectiveConfig,
   });
@@ -488,6 +498,13 @@ export async function generateReview({
       : null,
   };
 
+  if (viewpointStage) {
+    debug.execution = {
+      ...(debug.execution ?? {}),
+      reviewViewpoints: viewpointStage.observation,
+    };
+  }
+
   // --- ADR-006 / #1859 + #1861: Prompt Compiler（配線はこの 1 箇所だけ）---
   //
   // 段の本体は src/prompt/compiler-stage.mjs にある。既定は off で、そのとき
@@ -509,6 +526,7 @@ export async function generateReview({
     riskAssessment,
     repoContext,
     prBody,
+    reviewObligations,
     language,
     openAIConfig,
   });
