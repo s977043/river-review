@@ -1051,7 +1051,7 @@ classification → fixture / reference / suppression への還元までを束ね
 - 名前: `river-review-security-audit`
 - 概要: `Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。 通常の PR
 セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、 evidence と unresolved hypothesis、observe-only
-SecurityAuditCoverage の記録を行う。target-controlled code は実行しない。`
+SecurityAuditCoverage、coverage critic を扱う。target-controlled code は実行しない。`
 - 対象:
   - `**/*`
 - 重要度: critical
@@ -1109,9 +1109,9 @@ across services.`
 
 - 名前: `unknown-coverage-review`
 - 概要: `完成した差分・PR・検証証拠に残る Unknown（未確認の前提・調査されていない影響・ 不足している証拠）を横断合成する evidence-sufficiency のメタ観点。個別 defect の 検出は既存
-skill へ委譲し、本 skill は「そのリスク種別を調査した証拠が残っているか」 の meta 評価のみを行う。finding verification 後の合成ステップとして report-only で
-実行し、残存 Unknown を output-format §4「Unverified / Residual Risk」の Unknown Coverage 下位構造へ、判定を既存 verdict
-語彙（GO/ESCALATE/NO_GO）へ写像する。 新しい語彙・schema は作らない。`
+skill へ委譲し、本 skill は「そのリスク種別を調査した証拠が残っているか」 の meta 評価のみを行う。通常は finding verification 後の generic 合成ステップとして、 明示的
+Security Audit では SecurityAuditCoverage 専用 profile として report-only で実行する。 残存 Unknown は既存 Unknown Coverage
+構造へ出力し、新しい語彙・schema は作らない。`
 - 対象:
   - `src/**/*.{ts,tsx,js,jsx,mjs}`
   - `runners/**/*.{ts,js,mjs}`
@@ -1120,7 +1120,7 @@ skill へ委譲し、本 skill は「そのリスク種別を調査した証拠�
   - `**/*.sql`
   - `**/*.{yaml,yml,json,toml}`
 - 重要度: major
-- タグ: unknown-coverage / evidence-sufficiency / grill-for-unknowns / unknown-unknowns / map-territory / meta / synthesis
+- タグ: unknown-coverage / evidence-sufficiency / grill-for-unknowns / unknown-unknowns / map-territory / meta / synthesis / security-audit-coverage
 - 依存関係: none
 - 適用条件: phase=upstream / midstream / downstream, inputContext=diff / fullFile / reviewSelf / reviewExternal
 
@@ -2309,7 +2309,7 @@ audit は river-review-security-audit へ委譲する。`
 - 名前: `river-review-security-audit`
 - 概要: `Repository または subsystem を対象に、source-only で明示的なセキュリティ監査を行う entry skill。 通常の PR
 セキュリティレビューとは分離し、reconnaissance、scope 固定、既存 security skill への委譲、 evidence と unresolved hypothesis、observe-only
-SecurityAuditCoverage の記録を行う。target-controlled code は実行しない。`
+SecurityAuditCoverage、coverage critic を扱う。target-controlled code は実行しない。`
 - 対象:
   - `**/*`
 - 重要度: critical
@@ -2500,9 +2500,9 @@ under different names; or different concepts sharing a name).`
 
 - 名前: `unknown-coverage-review`
 - 概要: `完成した差分・PR・検証証拠に残る Unknown（未確認の前提・調査されていない影響・ 不足している証拠）を横断合成する evidence-sufficiency のメタ観点。個別 defect の 検出は既存
-skill へ委譲し、本 skill は「そのリスク種別を調査した証拠が残っているか」 の meta 評価のみを行う。finding verification 後の合成ステップとして report-only で
-実行し、残存 Unknown を output-format §4「Unverified / Residual Risk」の Unknown Coverage 下位構造へ、判定を既存 verdict
-語彙（GO/ESCALATE/NO_GO）へ写像する。 新しい語彙・schema は作らない。`
+skill へ委譲し、本 skill は「そのリスク種別を調査した証拠が残っているか」 の meta 評価のみを行う。通常は finding verification 後の generic 合成ステップとして、 明示的
+Security Audit では SecurityAuditCoverage 専用 profile として report-only で実行する。 残存 Unknown は既存 Unknown Coverage
+構造へ出力し、新しい語彙・schema は作らない。`
 - 対象:
   - `src/**/*.{ts,tsx,js,jsx,mjs}`
   - `runners/**/*.{ts,js,mjs}`
@@ -2511,7 +2511,7 @@ skill へ委譲し、本 skill は「そのリスク種別を調査した証拠�
   - `**/*.sql`
   - `**/*.{yaml,yml,json,toml}`
 - 重要度: major
-- タグ: unknown-coverage / evidence-sufficiency / grill-for-unknowns / unknown-unknowns / map-territory / meta / synthesis
+- タグ: unknown-coverage / evidence-sufficiency / grill-for-unknowns / unknown-unknowns / map-territory / meta / synthesis / security-audit-coverage
 - 依存関係: none
 - 適用条件: phase=upstream / midstream / downstream, inputContext=diff / fullFile / reviewSelf / reviewExternal
 
@@ -2770,9 +2770,9 @@ resolves / rejects は vitest-mock-isolation、tdd-ledger artifact ベースの 
 
 - 名前: `unknown-coverage-review`
 - 概要: `完成した差分・PR・検証証拠に残る Unknown（未確認の前提・調査されていない影響・ 不足している証拠）を横断合成する evidence-sufficiency のメタ観点。個別 defect の 検出は既存
-skill へ委譲し、本 skill は「そのリスク種別を調査した証拠が残っているか」 の meta 評価のみを行う。finding verification 後の合成ステップとして report-only で
-実行し、残存 Unknown を output-format §4「Unverified / Residual Risk」の Unknown Coverage 下位構造へ、判定を既存 verdict
-語彙（GO/ESCALATE/NO_GO）へ写像する。 新しい語彙・schema は作らない。`
+skill へ委譲し、本 skill は「そのリスク種別を調査した証拠が残っているか」 の meta 評価のみを行う。通常は finding verification 後の generic 合成ステップとして、 明示的
+Security Audit では SecurityAuditCoverage 専用 profile として report-only で実行する。 残存 Unknown は既存 Unknown Coverage
+構造へ出力し、新しい語彙・schema は作らない。`
 - 対象:
   - `src/**/*.{ts,tsx,js,jsx,mjs}`
   - `runners/**/*.{ts,js,mjs}`
@@ -2781,7 +2781,7 @@ skill へ委譲し、本 skill は「そのリスク種別を調査した証拠�
   - `**/*.sql`
   - `**/*.{yaml,yml,json,toml}`
 - 重要度: major
-- タグ: unknown-coverage / evidence-sufficiency / grill-for-unknowns / unknown-unknowns / map-territory / meta / synthesis
+- タグ: unknown-coverage / evidence-sufficiency / grill-for-unknowns / unknown-unknowns / map-territory / meta / synthesis / security-audit-coverage
 - 依存関係: none
 - 適用条件: phase=upstream / midstream / downstream, inputContext=diff / fullFile / reviewSelf / reviewExternal
 
