@@ -8,18 +8,19 @@ import { execFileSync } from 'node:child_process';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { collectAddedLineHints } from '../src/lib/git.mjs';
 
-// Issue #2249 / #2260.
+// Issues #2249 / #2260 / #2280.
 //
 // `parseUnifiedDiff` recognises a file header only as the complete three-line
-// sequence `--- <old>` / `+++ <new>` / `@@ ...`. The third line is the
-// discriminator: an unprefixed `@@` can never occur inside a well-formed hunk
-// body, while `--- x` / `+++ y` inside a body are just the deleted line `-- x`
-// and the added line `++ y`.
+// sequence `--- <old>` / `+++ <new>` / `@@ ...`. For plain unified diff, that
+// triple remains the structural discriminator. Once a Git `diff --git` marker
+// is observed, the parser additionally requires an unconsumed marker before it
+// accepts the next triple as a file boundary. This prevents a `--unified=0`
+// hunk-body pair plus the next `@@` from forging a file boundary.
 //
-// The three input bands below are run deliberately, because the earlier
-// attempt at this fix (PR #2251, closed) tracked where a hunk ENDS and broke a
-// different band on each iteration. A structural test on the header itself has
-// no hunk-termination rule to get wrong.
+// The four input bands below are run deliberately because the earlier attempt
+// at #2249 (PR #2251, closed) tracked where a hunk ENDS and broke a different
+// band on each iteration. The current rule uses the producer's Git file marker
+// when available and does not add a hunk-termination heuristic.
 
 const paths = (text) => parseUnifiedDiff(text).files.map((f) => f.path);
 
@@ -224,10 +225,10 @@ test('band 3: a lone body `+++ ` at end of input is not a header', () => {
 
 test('band 3: a forged `--- `/`+++ `/`@@ ` triple is accepted, as on main (D4)', () => {
   // A forged triple is syntactically indistinguishable from a real file
-  // boundary, so it stays accepted — this pins the behaviour as UNCHANGED from
-  // `main` rather than as desirable. Narrowing it further is what produced the
-  // regressions in the closed PR #2251; `collectAddedLineHints` (the only place
-  // D4 was ever observed) is out of scope and is a dead export.
+  // boundary in plain unified diff, so it stays accepted. Narrowing that case
+  // further is what produced the regressions in the closed PR #2251;
+  // `collectAddedLineHints` (the only place D4 was originally observed) is out
+  // of scope and is a dead export.
   const text = [
     '--- a/a.md',
     '+++ b/a.md',
@@ -365,16 +366,11 @@ test('an added `++ ` line is counted as an addition', () => {
 
 // --- Band 4: `--unified=0` (issue 2280) ------------------------------------
 //
-// EVERY assertion in this band pins the CURRENT, BROKEN behaviour. The
-// expected values below are NOT the correct behaviour; they exist so the full
-// width of the defect is visible before anyone changes the parser. See issue
-// 2280, and issue 2261 for the four consecutive designs that failed while
-// trying to fix this by adding hunk-termination rules.
-//
 // With zero context lines, a hunk body's deleted line `-- old.md` prints as
 // `--- old.md`, the added line `++ new.md` prints as `+++ new.md`, and the NEXT
-// hunk's `@@` follows immediately. That completes the three-line triple across
-// a hunk boundary, so a non-existent file is registered.
+// hunk's `@@` follows immediately. The three-line sequence is therefore not a
+// sufficient file-boundary proof for Git-formatted input. The pending
+// `diff --git` marker is the stronger boundary authority.
 
 const withU0Repo = (fn) =>
   withTempRepo((dir, git) => {
@@ -393,44 +389,47 @@ const withU0Repo = (fn) =>
     return fn(git);
   });
 
-test('band 4 (U0): a hunk-body pair plus the next `@@` mints a ghost file — pins current broken behaviour (issue 2280)', () => {
-  // These expectations pin the defect; they are not a correct expectation.
+test('band 4 (U0): a hunk-body pair plus the next `@@` stays on the real file (#2280)', () => {
   const files = withU0Repo(
     (git) => parseUnifiedDiff(git('diff', '--cached', '--unified=0', '--no-color')).files
   );
-  assert.deepEqual(
-    files.map((f) => f.path),
-    ['notes.md', 'new.md'],
-    'BROKEN: `new.md` does not exist in the repository'
-  );
-  assert.deepEqual(files[0].addedLines, [], 'BROKEN: the real file loses its added line 3');
-  assert.deepEqual(
-    files[1].addedLines,
-    [31],
-    'BROKEN: the real addition at line 31 is attributed to the ghost'
-  );
-  assert.equal(files[0].hunks.length, 1);
-  assert.equal(files[1].hunks.length, 1);
-});
-
-test('band 4 (U0 vs U3): the same edit parses correctly with three context lines (issue 2280)', () => {
-  // The contrast case: this is what the U0 band should have produced.
-  const files = withU0Repo(
-    (git) => parseUnifiedDiff(git('diff', '--cached', '--unified=3', '--no-color')).files
-  );
-  assert.deepEqual(
-    files.map((f) => f.path),
-    ['notes.md'],
-    'with context lines the pair is separated from the next `@@`, so no ghost is minted'
-  );
+  assert.deepEqual(files.map((f) => f.path), ['notes.md']);
   assert.deepEqual(files[0].addedLines, [3, 31]);
   assert.equal(files[0].hunks.length, 2);
 });
 
-test('band 4 (U0): the two parsers disagree on the same input — pins current broken behaviour (issue 2280)', () => {
-  // Pins the parser divergence: `collectAddedLineHints` (hunk-state based)
-  // mints no ghost, while `parseUnifiedDiff` (triple based) does. Neither
-  // result is asserted here as the correct one.
+test('band 4 (U0 vs U3): zero and three context lines resolve to the same file and additions', () => {
+  const { u0, u3 } = withU0Repo((git) => ({
+    u0: parseUnifiedDiff(git('diff', '--cached', '--unified=0', '--no-color')).files,
+    u3: parseUnifiedDiff(git('diff', '--cached', '--unified=3', '--no-color')).files,
+  }));
+  assert.deepEqual(u0.map((f) => f.path), ['notes.md']);
+  assert.deepEqual(u3.map((f) => f.path), ['notes.md']);
+  assert.deepEqual(u0[0].addedLines, [3, 31]);
+  assert.deepEqual(u3[0].addedLines, [3, 31]);
+  assert.equal(u0[0].hunks.length, 2);
+  assert.equal(u3[0].hunks.length, 2);
+});
+
+test('band 4 (U0): each real Git file boundary remains parseable in a multi-file diff', () => {
+  const files = withTempRepo((dir, git) => {
+    writeFileSync(join(dir, 'a.txt'), 'a\n');
+    writeFileSync(join(dir, 'b.txt'), 'b\n');
+    git('add', '-A');
+    git('commit', '-qm', 'seed');
+    writeFileSync(join(dir, 'a.txt'), 'A\n');
+    writeFileSync(join(dir, 'b.txt'), 'B\n');
+    git('add', '-A');
+    return parseUnifiedDiff(git('diff', '--cached', '--unified=0', '--no-color')).files;
+  });
+  assert.deepEqual(files.map((f) => f.path).sort(), ['a.txt', 'b.txt']);
+  assert.deepEqual(
+    files.map((f) => f.addedLines),
+    [[1], [1]]
+  );
+});
+
+test('band 4 (U0): parseUnifiedDiff and collectAddedLineHints agree on real file paths', () => {
   const { parsedPaths, hintPaths } = withU0Repo((git) => {
     const text = git('diff', '--cached', '--unified=0', '--no-color');
     return {
@@ -438,7 +437,7 @@ test('band 4 (U0): the two parsers disagree on the same input — pins current b
       hintPaths: [...collectAddedLineHints(text).keys()],
     };
   });
-  assert.deepEqual(parsedPaths, ['notes.md', 'new.md']);
+  assert.deepEqual(parsedPaths, ['notes.md']);
   assert.deepEqual(hintPaths, ['notes.md']);
-  assert.notDeepEqual(parsedPaths, hintPaths, 'BROKEN: two parsers, one diff, two answers');
+  assert.deepEqual(parsedPaths, hintPaths);
 });
