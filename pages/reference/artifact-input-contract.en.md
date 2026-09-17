@@ -213,25 +213,26 @@ An artifact that supplies the design document. A Flow's declared `design` input 
 
 "Input Channels" below is the resolution order for artifact _files_, not a list of every route by which a diff reaches River Review. The implementation has 8 entry points through which a diff enters the system (as of 2026-09-17; the fixture-evaluation-only paths `review-fixtures-eval.mjs` / `repo-wide-fixtures-eval.mjs` are excluded as non-production). This section specifies, per route, who produces the diff, the context width, and whether a combined diff (`diff --cc` / `@@@`) can enter.
 
-| #   | Route (implementation site)                                    | Surface                                        | Diff producer      | Context width         | Combined diff |
-| --- | -------------------------------------------------------------- | ---------------------------------------------- | ------------------ | --------------------- | ------------- |
-| 1   | `src/cli/commands/review.mjs:56` → `collectRepoDiff`           | `river review plan` / `river review exec`      | River Review (git) | 3                     | cannot enter  |
-| 2   | `src/cli/commands/skills.mjs:133` → `collectRepoDiff`          | `river skills`                                 | River Review (git) | 3                     | cannot enter  |
-| 3   | `src/lib/local-runner.mjs:269` `planLocalReview`               | `river run`                                    | River Review (git) | 3 (10 with `--debug`) | cannot enter  |
-| 4   | `src/lib/local-runner.mjs:767` `doctorLocalReview`             | `river doctor`                                 | River Review (git) | 0 (10 with `--debug`) | cannot enter  |
-| 5   | artifact file read at `src/lib/review-plan.mjs:484` / `:841`   | the `diff` artifact via tier 1 / 2 / 3         | Host               | unspecified           | unspecified   |
-| 6   | `src/lib/review-plan.mjs:481` / `:838` `diffOverride.diffText` | `--base <ref>` on `review plan` / `exec`       | River Review (git) | 3                     | cannot enter  |
-| 7   | `src/lib/local-runner.mjs:531` `runLocalReview({ context })`   | programmatic embedding                         | Host               | unspecified           | unspecified   |
-| 8   | the `diffText` option at `runners/node-api/src/index.ts:342`   | Node API (`review()` / `buildExecutionPlan()`) | Host               | unspecified           | unspecified   |
+| #   | Route (implementation site)                                           | Surface                                        | Diff producer                 | Context width         | Combined diff     |
+| --- | --------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------- | --------------------- | ----------------- |
+| 1   | `src/cli/commands/review.mjs:56` → `collectRepoDiff`                  | `river review plan` / `river review exec`      | River Review (git)            | 3                     | cannot enter      |
+| 2   | `src/cli/commands/skills.mjs:133` → `collectRepoDiff`                 | `river skills`                                 | River Review (git)            | 3                     | cannot enter      |
+| 3   | `src/lib/local-runner.mjs:269` `planLocalReview`                      | `river run`                                    | River Review (git)            | 3 (10 with `--debug`) | cannot enter      |
+| 4   | `src/lib/local-runner.mjs:767` `doctorLocalReview`                    | `river doctor`                                 | River Review (git)            | 0 (10 with `--debug`) | cannot enter      |
+| 5   | artifact file read at `src/lib/review-plan.mjs:484` / `:841`          | the `diff` artifact via tier 1 / 2 / 3         | Host (may be real git output) | unspecified           | undecided (#2294) |
+| 6   | `src/lib/review-plan.mjs:481` / `:838` `diffOverride.diffText`        | `--base <ref>` on `review plan` / `exec`       | River Review (git)            | 3                     | cannot enter      |
+| 7   | `src/lib/local-runner.mjs:533` `runLocalReview({ context })`          | programmatic embedding                         | Host                          | unspecified           | undecided (#2294) |
+| 8   | the `diffText` option at `runners/node-api/src/index.ts:342` / `:389` | Node API (`buildExecutionPlan()` / `review()`) | Host                          | unspecified           | undecided (#2294) |
 
 - **git-produced routes (1 / 2 / 3 / 4 / 6)**: all go through `git diff --unified=<N> --no-color <baseRef>` at `src/lib/git.mjs:520`. Because an explicit base ref makes this a two-tree diff, no combined diff is emitted. Even in a working tree with an unresolved merge conflict the output stays two-tree, with conflict markers appearing as ordinary added lines (measured in a throwaway repository on 2026-09-17).
 - **Context width**: the default is 3. Only `river doctor` (route 4) uses 0, and routes 3 / 4 use 10 when `--debug` is set. The width is an implementation choice inside River Review, not a value this contract promises externally. For diffs the host supplies through routes 5 / 7 / 8 the context width is **unspecified**.
-- **Combined diff**: `diff --cc` / `@@@` output is **not** part of the "`git diff` compatible" format this contract defines. Behavior when such a diff arrives through routes 5 / 7 / 8 is **unspecified** (the current parse layer drops the body of `@@@` hunks; see #2294).
+- **Combined diff**: how `diff --cc` / `@@@` output is treated is **undecided** (#2294). `git show --cc` and `git log -p --cc` are real git output, so such a diff can legitimately arrive through route 5. The current parse layer silently drops the body of `@@@` hunks, so do not pass a combined diff for now. Its standing under this contract will be settled by #2294.
 
 #### Ownership of diff supply
 
 - **Routes 1 / 2 / 3 / 4 / 6**: producing the diff is River Review's responsibility. Format, context width, and base resolution are all decided by the implementation.
-- **Routes 5 / 7 / 8**: supplying the diff is the **host's responsibility**. As with `reviewSignals`, no producer exists in this repository. River Review acts purely as a consumer and does not verify that what it receives came from real git, nor that it is a valid unified diff. Hosts should pass a two-tree unified diff equivalent to `git diff --unified=3`. Behavior for non-git-produced diffs, hand-written patches, or combined diffs is **unspecified**.
+- **Routes 5 / 7 / 8**: supplying the diff is the **host's responsibility**. As with `reviewSignals`, no producer exists in this repository. River Review acts purely as a consumer and does not verify that what it receives came from real git, nor that it is a valid unified diff. Host-supplied does not mean non-git-produced: route 5 includes the legitimate use case of passing real git output — such as `git show --cc` — as a file. Hosts should pass a two-tree unified diff equivalent to `git diff --unified=3`. Behavior for non-git-produced diffs and hand-written patches is **unspecified**.
+- **Beware fail-silent behavior**: "unspecified" does not mean "you will notice when it breaks". An invalid diff does not raise; it can come back as a **normal result with zero findings**. Confirm on the host side — by cross-checking output such as `changedFiles` — that the diff you supplied was interpreted as intended.
 
 ### `junit`
 
