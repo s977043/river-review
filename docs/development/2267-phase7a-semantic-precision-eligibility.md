@@ -4,7 +4,8 @@
 
 Phase 7A implementation note for #2297 / #2267.
 
-This phase connects the Phase 6 Evidence State contract to the input boundary of #1857 Semantic Precision without enabling the Semantic Precision Judge.
+This phase connects the Phase 6 Evidence State contract to the input boundary of #1857 Semantic Precision.
+It does not enable the Semantic Precision Judge.
 
 ## Decision
 
@@ -50,7 +51,8 @@ Issue #1857 remains the owner of disposition.
 
 `unresolved` means truth adjudication is incomplete.
 
-Running Semantic Precision first would reverse the intended responsibility order and could turn an unresolved claim into an apparently lower-risk advisory result.
+Running Semantic Precision first would reverse the intended responsibility order.
+It could turn an unresolved claim into an apparently lower-risk advisory result.
 
 The unresolved record keeps its explicit `blocker` and `validationPlan` from Phase 6.
 
@@ -129,7 +131,7 @@ All Phase 6 unresolved cases remain ineligible, including:
 - Critic timeout
 - `out-of-ask`
 
-Severity, confidence, scope, ask relevance, agreement, or a disposition-like field cannot override this result.
+Orthogonal finding metadata cannot override this result.
 
 ## Compatibility
 
@@ -156,7 +158,7 @@ Additional LLM calls: zero.
 - missing, malformed, and unknown validation fail safe to not eligible
 - Reviewer withdrawal remains not eligible
 - out-of-ask remains not eligible
-- severity, confidence, scope, ask relevance, agreement, and disposition-like input do not override unresolved state
+- orthogonal finding metadata cannot override unresolved eligibility
 - established metadata is not mutated
 - unresolved blocker and validation plan are retained without mutation
 
