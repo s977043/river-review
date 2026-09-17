@@ -19,13 +19,13 @@ export const EVIDENCE_STATE_REASON = Object.freeze({
   CONFIRMED: 'validation-confirmed',
   REFUTED: 'validation-refuted',
   UNRESOLVED: 'validation-unresolved',
+  REVIEWER_WITHDRAWAL: 'truth-not-established-reviewer-withdrawal',
   OUT_OF_ASK: 'truth-not-adjudicated-out-of-ask',
   STATUS_MISSING: 'validation-status-missing',
   STATUS_UNKNOWN: 'validation-status-unknown',
 });
 
 const REFUTED_FINAL_STATUSES = new Set([
-  FINAL_STATUS.WITHDRAWN_BY_REVIEWER,
   FINAL_STATUS.DISMISSED_BY_EVIDENCE,
   FINAL_STATUS.DISMISSED_HALLUCINATION,
 ]);
@@ -53,6 +53,10 @@ function normalizeText(value) {
  * a legacy/synthesis `validatedStatus`, finding lifecycle `status`, `scope`,
  * `disposition`, severity, confidence, or reviewer agreement MUST NOT establish
  * or refute a finding through this helper.
+ *
+ * Reviewer withdrawal is not evidence of falsity in #1978. A withdrawn claim is
+ * dropped from routing, but remains epistemically unresolved unless evidence or
+ * deterministic hallucination rejection actually refutes it.
  *
  * `out-of-ask` is relevance routing, not a truth rejection. Because #1978 can
  * terminate at the ask-relevance gate before truth adjudication completes, it
@@ -102,6 +106,18 @@ export function projectFindingEvidenceState(input = {}) {
       blocker: null,
       validationPlan: null,
       unresolvedContextComplete: null,
+    };
+  }
+
+  if (sourceStatus === FINAL_STATUS.WITHDRAWN_BY_REVIEWER) {
+    return {
+      state: EVIDENCE_STATE.UNRESOLVED,
+      source: 'validation.finalStatus',
+      sourceStatus,
+      reasonCode: EVIDENCE_STATE_REASON.REVIEWER_WITHDRAWAL,
+      blocker,
+      validationPlan,
+      unresolvedContextComplete: blocker !== null && validationPlan !== null,
     };
   }
 
