@@ -660,7 +660,7 @@
     {
       "id": "river-review-security-audit",
       "path": "skills/agent-skills/river-review-security-audit",
-      "checksum": "sha256:09d8d0a7b340fcae79f7c02e785624bcf00122016d3af832b1d7b0761b7ad589",
+      "checksum": "sha256:522f00f089cd72008978439515a8219f2a7fa99d95654c74443a437fea04d489",
       "files": 2
     },
     {
@@ -768,8 +768,8 @@
     {
       "id": "unknown-coverage-review",
       "path": "skills/agent-skills/unknown-coverage-review",
-      "checksum": "sha256:d0571b9aeaeff4d9b1376593843bc871b47e2b19456c470b37f71fdfec9503b1",
-      "files": 5
+      "checksum": "sha256:cd15fca818142b9c24f1e259de4920a6449ddf8f6d025aba2c9146d66d3151a3",
+      "files": 12
     },
     {
       "id": "vitest-mock-isolation",
