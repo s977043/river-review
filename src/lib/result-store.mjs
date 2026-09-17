@@ -266,10 +266,9 @@ export async function listRunRecords(storeDir) {
           reviewedTarget: rec.reviewedTarget,
           findingsCount: rec.finalSummary?.findingsCount ?? 0,
           suppressedCount: rec.finalSummary?.suppressedCount ?? 0,
-          // #1857: without this, `river runs list` prints a `suppressed=` that
-          // silently means one thing for pre-split records (dispositions plus
-          // cap overflow) and another for post-split ones (dispositions only),
-          // with nothing on screen to tell the two apart.
+          // #1857: without this, `river runs list` prints `suppressed=` from this metadata. It must
+          // also carry `overflowCount`, otherwise the printed line means one thing for
+          // pre-split records and another for post-split ones with nothing to say so.
           overflowCount: rec.finalSummary?.overflowCount ?? 0,
           overviewCount: rec.finalSummary?.overviewCount ?? 0,
           changedFilesCount: rec.finalSummary?.changedFilesCount ?? 0,
@@ -332,10 +331,17 @@ function computeReviewCoverageDashboard(runRecords) {
   let requiredFailedUnits = 0;
   let requiredTimedOutUnits = 0;
   let zeroFindingsPartialRuns = 0;
+  let unclassifiedRuns = 0;
 
   for (const record of observed) {
     const coverage = record.reviewCoverage;
-    const status = typeof coverage.status === 'string' ? coverage.status : 'unknown';
+    const status = coverage.status;
+    const classified = status === 'complete' || status === 'partial' || status === 'not_executed';
+    if (!classified) {
+      unclassifiedRuns += 1;
+      continue;
+    }
+
     statusDistribution[status] = (statusDistribution[status] ?? 0) + 1;
     requiredUnits += nonNegativeInteger(coverage.requiredUnits);
     completedRequiredUnits += nonNegativeInteger(coverage.completedRequiredUnits);
@@ -352,10 +358,13 @@ function computeReviewCoverageDashboard(runRecords) {
   }
 
   const partialRuns = statusDistribution.partial ?? 0;
+  const classifiedRuns = observed.length - unclassifiedRuns;
   const requiredIncompleteUnits = requiredFailedUnits + requiredTimedOutUnits;
 
   return {
     observedRuns: observed.length,
+    classifiedRuns,
+    unclassifiedRuns,
     statusDistribution,
     requiredUnits,
     completedRequiredUnits,
@@ -365,7 +374,7 @@ function computeReviewCoverageDashboard(runRecords) {
     requiredTimedOutUnits,
     requiredFailureOrTimeoutRate:
       requiredUnits > 0 ? requiredIncompleteUnits / requiredUnits : null,
-    partialReviewRate: observed.length > 0 ? partialRuns / observed.length : null,
+    partialReviewRate: classifiedRuns > 0 ? partialRuns / classifiedRuns : null,
     zeroFindingsPartialRuns,
   };
 }
@@ -504,8 +513,8 @@ export function formatDashboard(dashboard) {
     lines.push(`| Complete runs | ${coverage.statusDistribution.complete ?? 0} |`);
     lines.push(`| Partial runs | ${coverage.statusDistribution.partial ?? 0} |`);
     lines.push(`| Not executed runs | ${coverage.statusDistribution.not_executed ?? 0} |`);
-    if ((coverage.statusDistribution.unknown ?? 0) > 0) {
-      lines.push(`| Unknown status runs | ${coverage.statusDistribution.unknown} |`);
+    if (coverage.unclassifiedRuns > 0) {
+      lines.push(`| Unclassified coverage runs | ${coverage.unclassifiedRuns} |`);
     }
     lines.push(`| Required unit completion rate | ${requiredCompletion} |`);
     lines.push(`| Required failed units | ${coverage.requiredFailedUnits} |`);
