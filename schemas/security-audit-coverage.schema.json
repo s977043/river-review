@@ -134,7 +134,15 @@
           "uniqueItems": true
         },
         "validationPlan": { "$ref": "#/$defs/nullableString" },
-        "explanation": { "$ref": "#/$defs/nullableString" }
+        "explanation": { "$ref": "#/$defs/nullableString" },
+        "sourceRevision": {
+          "description": "Content digest of the reviewed source at the time this unit was covered. Optional and additive (#2267 Phase 9): repeat runs compare it against the current digest and return the unit to `planned` when it differs, so changed source is never reported as stale coverage.",
+          "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9a-f]{64}$" }]
+        },
+        "carriedOverFrom": {
+          "description": "Id of the prior-run unit this coverage was carried over from. Present only on repeat-run carry-over.",
+          "$ref": "#/$defs/nullableString"
+        }
       },
       "allOf": [
         {

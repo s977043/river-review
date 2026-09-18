@@ -11,6 +11,8 @@
  * Gate behavior is deliberately out of scope here.
  */
 
+import { canonicalJson, nonEmptyNfcString } from './promotion-candidates.mjs';
+
 export const SECURITY_AUDIT_UNIT_STATES = Object.freeze([
   'planned',
   'covered',
@@ -26,8 +28,30 @@ function unitsInState(units, state) {
   return units.filter((unit) => unit?.state === state);
 }
 
-function semanticKey(unit) {
-  return JSON.stringify([unit?.subsystem, unit?.trustBoundary, unit?.attackClassId]);
+/**
+ * The identity of a semantic coverage unit: `subsystem × trustBoundary × attackClassId`.
+ *
+ * Exported because more than one module needs it. Phase 3 uses it to detect
+ * duplicate units; Phase 9 repeat-run matching uses it to decide which prior
+ * unit a planned unit corresponds to. Those two must agree exactly — a key that
+ * folds differently on one side would let a repeat run carry coverage across a
+ * boundary Phase 3 considers distinct — so this module, which owns the unit
+ * contract, owns the key.
+ *
+ * Normalization goes through `nonEmptyNfcString`, the repo-wide trim+NFC
+ * normalizer, so two spellings of the same subsystem name cannot mint two
+ * identities. Serialization goes through `canonicalJson` for the same reason
+ * every other content-addressed surface here does.
+ *
+ * @param {object|null|undefined} unit
+ * @returns {string}
+ */
+export function securityAuditUnitSemanticKey(unit) {
+  return canonicalJson([
+    nonEmptyNfcString(unit?.subsystem),
+    nonEmptyNfcString(unit?.trustBoundary),
+    nonEmptyNfcString(unit?.attackClassId),
+  ]);
 }
 
 function sameStringArray(left, right) {
@@ -142,7 +166,7 @@ export function validateSecurityAuditCoverageSemantics(coverage, attackRegistry)
       seenIds.add(unit.id);
     }
 
-    const key = semanticKey(unit);
+    const key = securityAuditUnitSemanticKey(unit);
     if (seenSemanticKeys.has(key)) {
       issues.push({
         code: 'duplicate_semantic_unit',

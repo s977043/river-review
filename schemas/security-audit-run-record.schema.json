@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/security-audit-run-record.schema.json",
+  "title": "River Review Security Audit Run Record",
+  "description": "Machine-readable SSoT of one experimental security audit run (#2267 Phase 9). REPORT.md and NEEDS-VALIDATION.md are projections of this record; verdict and severity are never recomputed from the prose.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "status",
+    "executionPolicy",
+    "runId",
+    "generatedAt",
+    "target",
+    "coverage",
+    "repeatRun",
+    "candidates",
+    "findings",
+    "findingCountsByEvidenceState",
+    "architectureNotes",
+    "recordDigest"
+  ],
+  "properties": {
+    "kind": { "const": "SecurityAuditRunRecord" },
+    "schemaVersion": { "type": "string", "const": "1" },
+    "status": { "const": "experimental" },
+    "executionPolicy": { "const": "source-only" },
+    "runId": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "revision"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "coverage": {
+      "$ref": "https://river-review.the3396.com/schemas/security-audit-coverage.schema.json"
+    },
+    "repeatRun": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/repeatRun" }]
+    },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "findingCountsByEvidenceState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["established", "unresolved", "refuted"],
+      "properties": {
+        "established": { "type": "integer", "minimum": 0 },
+        "unresolved": { "type": "integer", "minimum": 0 },
+        "refuted": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "architectureNotes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "recordDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "nullableString": {
+      "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
+    },
+    "repeatRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "priorUnitCount",
+        "carriedOverUnitIds",
+        "revalidationRequired",
+        "freshUnitIds"
+      ],
+      "properties": {
+        "kind": { "const": "SecurityAuditRepeatRun" },
+        "priorUnitCount": { "type": "integer", "minimum": 0 },
+        "carriedOverUnitIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "freshUnitIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "revalidationRequired": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["unitId", "reason"],
+            "properties": {
+              "unitId": { "type": "string", "minLength": 1 },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "source_changed",
+                  "source_digest_unavailable",
+                  "reviewed_paths_changed",
+                  "no_prior_source_revision"
+                ]
+              },
+              "unknownPaths": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "attackClassId",
+        "subsystem",
+        "coverageUnitId",
+        "promotedFindingId"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "attackClassId": { "$ref": "#/$defs/nullableString" },
+        "subsystem": { "$ref": "#/$defs/nullableString" },
+        "coverageUnitId": { "$ref": "#/$defs/nullableString" },
+        "promotedFindingId": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "evidenceState",
+        "severity",
+        "attackClassId",
+        "subsystem",
+        "blocker",
+        "validationPlan",
+        "scope",
+        "askRelevance",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "evidenceState": {
+          "type": "string",
+          "enum": ["established", "unresolved", "refuted"]
+        },
+        "severity": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "enum": ["critical", "major", "minor", "info"] }
+          ]
+        },
+        "attackClassId": { "$ref": "#/$defs/nullableString" },
+        "subsystem": { "$ref": "#/$defs/nullableString" },
+        "blocker": { "$ref": "#/$defs/nullableString" },
+        "validationPlan": { "$ref": "#/$defs/nullableString" },
+        "scope": { "type": "string", "minLength": 1 },
+        "askRelevance": { "$ref": "#/$defs/nullableString" },
+        "evidenceRefs": { "type": "array" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "evidenceState": { "const": "unresolved" } },
+            "required": ["evidenceState"]
+          },
+          "then": {
+            "properties": {
+              "severity": { "type": "null" },
+              "blocker": { "type": "string", "minLength": 1 },
+              "validationPlan": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

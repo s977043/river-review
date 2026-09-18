@@ -98,7 +98,14 @@ describe('unknown-coverage-review security-audit profile contract', () => {
   });
 
   it('keeps the security audit source-only and avoids critic-pass safety inference', () => {
-    assert.match(securityAuditSkill, /Version 0\.4\.0 is source-only\./);
+    // Pinned to the frontmatter version rather than a literal, so the
+    // source-only sentence can never silently describe an older revision of the
+    // skill than the one being shipped (this assertion was a literal `0.4.0`
+    // until #2267 Phase 9 bumped the skill).
+    const frontmatterVersion = securityAuditSkill.match(/^version: (\d+\.\d+\.\d+)$/m)?.[1];
+    assert.ok(frontmatterVersion, 'SKILL.md must declare a semantic version');
+    const escapedVersion = frontmatterVersion.replaceAll('.', '\\.');
+    assert.match(securityAuditSkill, new RegExp(`Version ${escapedVersion} is source-only\\.`));
     assert.match(securityAuditSkill, /No critic `pass == safe` inference\./);
     assert.match(securityAuditSkill, /No target-controlled execution/);
   });
