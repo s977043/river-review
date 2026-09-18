@@ -296,27 +296,123 @@ index d0bd09c,44f47d8..21a014c
   );
 });
 
-test('--unified=0: a contract declared outside an api path is found in the hunk heading', () => {
-  const signals = detect(`diff --git a/src/models/checkout.ts b/src/models/checkout.ts
-index 88f17e5..a59193d 100644
---- a/src/models/checkout.ts
-+++ b/src/models/checkout.ts
-@@ -3 +2,0 @@ interface CheckoutResponse {
--  couponCode: string;
+// Real `git diff` output: `ttlSeconds` changes inside a `@Module({...})`
+// argument. git's funcname heuristic skips the `@`-prefixed opener and labels
+// the hunk with the already-closed interface above it.
+const STALE_HEADING_DEFAULT = `diff --git a/src/app/app.module.ts b/src/app/app.module.ts
+index a147f95..f97f6e2 100644
+--- a/src/app/app.module.ts
++++ b/src/app/app.module.ts
+@@ -4,6 +4,6 @@ export interface HealthResponse {
+ 
+ @Module({
+   providers: [],
+-  ttlSeconds: 30,
++  ttlSeconds: 60,
+ })
+ export class AppModule {}
+`;
+
+const STALE_HEADING_U0 = `diff --git a/src/app/app.module.ts b/src/app/app.module.ts
+index a147f95..f97f6e2 100644
+--- a/src/app/app.module.ts
++++ b/src/app/app.module.ts
+@@ -7 +7 @@ export interface HealthResponse {
+-  ttlSeconds: 30,
++  ttlSeconds: 60,
+`;
+
+test('a stale contract hunk heading does not activate: default band', () => {
+  assert.deepEqual(detect(STALE_HEADING_DEFAULT), []);
+});
+
+test('a stale contract hunk heading does not activate: --unified=0 band', () => {
+  // The same stale heading survives --unified=0, which is why trusting the
+  // heading only in that band would not have removed the false activation.
+  assert.deepEqual(detect(STALE_HEADING_U0), []);
+});
+
+test('a stale contract hunk heading does not activate: top-level IIFE opener', () => {
+  assert.deepEqual(
+    detect(`diff --git a/src/app/boot.ts b/src/app/boot.ts
+index 7fdbe0f..fcd923f 100644
+--- a/src/app/boot.ts
++++ b/src/app/boot.ts
+@@ -4,7 +4,7 @@ export interface BootResponse {
+ 
+ (function bootstrap() {
+   const cfg = {
+-    retries: 3,
++    retries: 5,
+   };
+   return cfg;
+ })();
+`),
+    []
+  );
+});
+
+// The `-`-before-`+` order inside classifyBodyLine is load-bearing, and the
+// cross-check above cannot pin it because real git never emits a line whose
+// columns mix the two. Pin it directly on a mixed-column line instead: reading
+// `-+` as added would invent a new-file line for a line that is absent from the
+// merge result and shift every anchor below it by one.
+test('combined diff: a mixed-column line is read as removed, not added', () => {
+  const signals = detect(`diff --cc src/api/order.ts
+index 1111111,2222222..3333333
+--- a/src/api/order.ts
++++ b/src/api/order.ts
+@@@ -1,5 -1,5 +1,4 @@@
+  interface OrderResponse {
+    id: string;
+-+  legacyTotal: string;
+    total: number;
+  }
 `);
   assert.deepEqual(
     signals.map((signal) => signal.kind),
     ['dto-field-removed']
   );
+  // Anchored on the line the removed property used to sit at. If the mixed
+  // column had been read as added, the counter would have advanced past it and
+  // `total` would have been anchored one line low.
+  assert.equal(signals[0].line, 3);
 });
 
-test('--unified=0: a non-contract heading outside an api path still emits nothing', () => {
-  const signals = detect(`diff --git a/src/models/cart.ts b/src/models/cart.ts
-index 88f17e5..a59193d 100644
---- a/src/models/cart.ts
-+++ b/src/models/cart.ts
-@@ -3 +2,0 @@ interface InternalCartState {
--  scratchValue: string;
+test('combined diff: the reversed mixed column is read as removed too', () => {
+  const signals = detect(`diff --cc src/api/order.ts
+index 1111111,2222222..3333333
+--- a/src/api/order.ts
++++ b/src/api/order.ts
+@@@ -1,5 -1,5 +1,4 @@@
+  interface OrderResponse {
+    id: string;
++-  legacyTotal: string;
+    total: number;
+  }
 `);
-  assert.deepEqual(signals, []);
+  assert.deepEqual(
+    signals.map((signal) => signal.kind),
+    ['dto-field-removed']
+  );
+  assert.equal(signals[0].line, 3);
+});
+
+test('combined diff: a `\\ No newline` marker does not advance the line counter', () => {
+  const signals = detect(`diff --cc src/api/tail.ts
+index 1111111,2222222..3333333
+--- a/src/api/tail.ts
++++ b/src/api/tail.ts
+@@@ -1,4 -1,4 +1,4 @@@
+  interface TailResponse {
+ -  id: string;
+\\ No newline at end of file
+ +  id: number;
+  }
+`);
+  assert.deepEqual(
+    signals.map((signal) => signal.kind),
+    ['dto-field-type-changed']
+  );
+  assert.equal(signals[0].line, 2);
 });

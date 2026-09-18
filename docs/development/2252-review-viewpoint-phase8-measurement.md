@@ -228,45 +228,71 @@ latency は最も重い fixture（`p08-mixed-diff-contract-plus-noise`）で測�
 
 ## Phase 8c: 検出器の帯域対応（PR #2314、2026-09-18）
 
-Phase 8b が示した 2 つの穴を `src/lib/api-compatibility-signals.mjs` 側で塞いだあとの再測定です。corpus は Phase 8b から 1 本も変えていません（46 fixture × viewpoint 3 = 138 ラベルペア）。base commit は `a7cb83ba` です。
+Phase 8b が示した 2 つの穴を `src/lib/api-compatibility-signals.mjs` 側で扱った記録です。1 つ目は解消し、2 つ目は**解消できないことが分かった**ため測定済みギャップとして残しました。base commit は `a7cb83ba` です。
 
-### 直した 2 点
+corpus は Phase 8b から 4 本増えて 50 fixture × viewpoint 3 = 150 ラベルペアです。増えた 4 本は下記の false activation を押さえるための negative であり、positive は 49 本のまま変えていません。
 
-- **combined diff の marker 列**: `line.startsWith('-')` / `line.startsWith('+')` を、hunk の `parentCount` 幅の列読みに置き換えた。`parentCount` は `parseUnifiedDiff`（`src/lib/diff-processor.mjs`）が決める値をそのまま使っており、列幅を検出器側で推測していない。判定規則は parse 層の `classifyCombinedBodyLine` と同じで、いずれかの列が `-` なら removed、いずれかが `+` なら added とする
-- **`--unified=0` の宣言スコープ**: hunk ヘッダ末尾に git が出す囲みの宣言（`@@ -3 +2,0 @@ interface CheckoutResponse {`）を宣言ベースフォールバックの探索対象に加えた。context 行が 1 行も無い `--unified=0` では、宣言はここにしか現れない。ヘッダはその hunk の囲みを指すので、フォールバックが hunk スコープである性質は変わっていない
+### 1. combined diff の marker 列（解消）
+
+`line.startsWith('-')` / `line.startsWith('+')` を、hunk の `parentCount` 幅の列読みに置き換えました。`parentCount` は `parseUnifiedDiff`（`src/lib/diff-processor.mjs`）が決める値をそのまま使っており、列幅を検出器側で推測していません。判定規則は parse 層と同じで、いずれかの列が `-` なら removed、いずれかが `+` なら added、`-` を先に見ます。
+
+### 2. `--unified=0` の宣言スコープ（解消せず、ギャップとして記録）
+
+当初は hunk ヘッダ末尾に git が出す囲みの宣言（`@@ -4,6 +4,6 @@ export interface HealthResponse {`）を宣言ベースフォールバックの探索対象に加え、`u0` recall を 55.6% から 77.8% へ上げていました。**この案はレビューで false activation を出し、取り下げました。**
+
+**hunk heading は git の funcname ヒューリスティクスによる推測であり、契約宣言がその行を囲んでいる証拠ではありません。** git は hunk の手前へ遡り、列 0 が識別子文字で始まる最も近い行を見出しにします。デコレータ（`@Module({`）やトップレベル IIFE（`(function ...`）のように列 0 が識別子でない行で開くブロックは、**すでに閉じた宣言**の見出しを引き継ぎます。その見出しが契約名だと、その下の無関係な変更が契約変更として発火します。
+
+実 `git diff` で再現した例です。
+
+```text
+@@ -4,6 +4,6 @@ export interface HealthResponse {
+
+ @Module({
+   providers: [],
+-  ttlSeconds: 30,
++  ttlSeconds: 60,
+ })
+ export class AppModule {}
+```
+
+重要なのは、**この見出しのずれが `default` 帯域でも `u0` 帯域でも同じように起きる**ことです。実測した `--unified=0` 版は `@@ -7 +7 @@ export interface HealthResponse {` で、見出しはそのまま残ります。したがって heading の利用を `u0` に限定しても false activation は消えません。diff テキストだけでは、生きた見出しと古い見出しを区別する情報がありません。
+
+そのため heading 経路は削除し、宣言ベースフォールバックの探索範囲は hunk 本体のみに戻しました。`u0` の recall はこの判断で 77.8% から 55.6% へ下がります。**precision が Phase 7 の前提なので、この recall は取り返しません。**
+
+負の証拠として、実 `git diff` 出力を negative fixture 4 本（`n07`〜`n10`、デコレータ形とトップレベル IIFE 形 × `default` / `u0`）で corpus に入れています。
 
 ### 再測定結果
 
 `node scripts/measure-review-viewpoints.mjs` の出力から転記しています。
 
 ```text
-overall: precision 100.0% recall 87.8% (tp=43 fp=0 fn=6 tn=89)
-  backward-compatibility: precision 100.0% recall 95.0% (tp=19 fp=0 fn=1 tn=26)
-  api-test-coverage: precision 100.0% recall 95.0% (tp=19 fp=0 fn=1 tn=26)
-  optional-field-consumer-handling: precision 100.0% recall 55.6% (tp=5 fp=0 fn=4 tn=37)
+overall: precision 100.0% recall 83.7% (tp=41 fp=0 fn=8 tn=101)
+  backward-compatibility: precision 100.0% recall 90.0% (tp=18 fp=0 fn=2 tn=30)
+  api-test-coverage: precision 100.0% recall 90.0% (tp=18 fp=0 fn=2 tn=30)
+  optional-field-consumer-handling: precision 100.0% recall 55.6% (tp=5 fp=0 fn=4 tn=41)
 
 ## Activation by input band
-  default: precision 100.0% recall 84.6% (tp=22 fp=0 fn=4 tn=49)
-  u0: precision 100.0% recall 77.8% (tp=7 fp=0 fn=2 tn=15)
+  default: precision 100.0% recall 84.6% (tp=22 fp=0 fn=4 tn=55)
+  u0: precision 100.0% recall 55.6% (tp=5 fp=0 fn=4 tn=21)
   cc: precision 100.0% recall 100.0% (tp=14 fp=0 fn=0 tn=25)
 
 ## Activation by corpus source
   handwritten: precision 100.0% recall 88.2% (tp=15 fp=0 fn=2 tn=28)
-  generated-git: precision 100.0% recall 100.0% (tp=28 fp=0 fn=0 tn=44)
+  generated-git: precision 100.0% recall 92.9% (tp=26 fp=0 fn=2 tn=56)
   repo-commit: precision n/a recall 0.0% (tp=0 fp=0 fn=4 tn=17)
 ```
 
-Phase 8b との差（いずれも上表とその前節の表からの転記であり、暗算ではありません）:
+Phase 8b との差（いずれも上表とその前節の表からの転記であり、暗算ではありません）。母数が 138 から 150 ペアへ増えているため、`tn` は比較できません。
 
 | 指標              | Phase 8b | Phase 8c |
 | ----------------- | -------- | -------- |
 | overall precision | 100.0%   | 100.0%   |
-| overall recall    | 69.4%    | 87.8%    |
+| overall recall    | 69.4%    | 83.7%    |
 | `default` recall  | 84.6%    | 84.6%    |
-| `u0` recall       | 55.6%    | 77.8%    |
+| `u0` recall       | 55.6%    | 55.6%    |
 | `cc` recall       | 50.0%    | 100.0%   |
 
-false activation は 138 ペア中 0 件のままです。`default` 帯域は 1 件も変わっていません。
+false activation は 150 ペア中 0 件です。改善は `cc` 帯域のみで、`default` と `u0` は 1 件も変わっていません。
 
 ### 親の順序への依存が消えたこと
 
@@ -282,31 +308,34 @@ false activation は 138 ペア中 0 件のままです。`default` 帯域は 1 
   AGREE    b06-internal-type-field-removed: firstParent=[] reverse=[]
 ```
 
-3 帯域の判定一致（`default` / `u0` / `cc`）も全 6 シナリオで AGREE になりました。
-
 一致するだけなら「何も発火しない検出器」でも満たせるため、回帰ピンでは positive 4 シナリオが**空でない同じ集合**で一致することも検査しています。
+
+3 帯域の判定一致は、`b04-contract-named-outside-api-path` のみ DISAGREE のままです（`u0` だけ落ちる）。これは上記 2 の記録済みギャップです。
 
 ### 自己整合でないことの確認（mutation、Phase 8c）
 
-| 変異                                      | 結果                                                                             |
-| ----------------------------------------- | -------------------------------------------------------------------------------- |
-| 列幅を `parentCount` 無視の 1 固定に戻す  | `cc` recall 100.0% → 50.0%、両方向比較が 4 シナリオで DISAGREE、テスト 6 本 fail |
-| hunk ヘッダの囲み宣言を読む分岐を削除する | `u0` recall 77.8% → 55.6%、テスト 3 本 fail                                      |
+| 変異                                                  | 結果                                                                             |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 列幅を `parentCount` 無視の 1 固定に戻す              | `cc` recall 100.0% → 50.0%、両方向比較が 4 件 DISAGREE、テスト 9 本 fail         |
+| hunk heading を信用する（取り下げた案の再投入）       | overall precision 100.0% → 84.3%（fp=8）、`u0` precision 63.6%、テスト 6 本 fail |
+| `classifyBodyLine` の `-` と `+` の判定順を入れ替える | テスト 2 本 fail（混在列 fixture が検知）                                        |
+| combined の `\ No newline` 規則を削除する             | テスト 1 本 fail                                                                 |
 
-どちらも検知できました。変異は測定後に復元済みです（`git diff` で確認）。
+いずれも検知できました。変異は測定後に復元済みです。2 番目は corpus に追加した `n07`〜`n10` だけが検知する変異であり、追加した negative が効いている証拠にあたります。
 
 ### Phase 8c で残した穴
 
-- **`repo-commit` 帯域の positive 0/4**: `ReviewOptions` / `SkillSelectionResult` は契約の形をしているが、検出器の名前条件（`Dto|Request|Response|Api|Contract|Schema`）とパス条件のどちらにも当たらない。#2314 の範囲外であり、`KNOWN_MISSES` として明示したまま残している
-- **`p09`（request DTO への必須フィールド追加）**: カタログに対応する kind が無い被覆漏れで、検出器側の問題ではない
-- **3 親以上の octopus merge（`@@@@` 以上）**: 列読みは `parentCount` 幅を使うため原理的には同じ規則で動くが、帯域として採取しておらず未測定である
-- **`\ No newline at end of file` の扱い**: combined と単一親で parse 層の扱いが非対称である（#2309）。本 PR では触っていない
+- **`u0` かつ api/dto/contract パス外の契約（`b04-contract-named-outside-api-path--u0`）**: 上記 2 のとおり、diff テキストだけでは解決できない。閉じるにはリビジョンのファイル本体を読む等、検出器が今持っていない情報が要る
+- **`repo-commit` 帯域の positive 0/4**: `ReviewOptions` / `SkillSelectionResult` は契約の形をしているが、検出器の名前条件（`Dto|Request|Response|Api|Contract|Schema`）とパス条件のどちらにも当たらない。#2314 の範囲外
+- **`p09`（request DTO への必須フィールド追加）**: カタログに対応する kind が無い被覆漏れで、検出器の問題ではない
+- **3 親以上の octopus merge**: レビュー時に 4 親の `@@@@@`（`parentCount=4`）を生成し、検出が正常に動くことを確認した。ただし帯域として corpus に採取していないため、回帰ピンは無い
+- **`\ No newline at end of file` の非対称性**: combined では行カウンタを進めず、単一親では context として進める。parse 層の既存挙動を意図的に写したもので、#2309 の担当範囲
 
 ## 判断
 
 ### Phase 7（2〜3 skill への展開）
 
-Phase 8a では「進めてよい」、Phase 8b では「検出器側の帯域対応を先に片付ける」と結論していました。Phase 8c でその前提条件を満たしたため、**進めてよい**に戻します。以下の Phase 8b 時点の根拠は、当時の判断の記録として残しています。
+Phase 8a では「進めてよい」、Phase 8b では「検出器側の帯域対応を先に片付ける」と結論していました。Phase 8c で順序依存は解消し、precision は 150 ペアで 100% を保っています。一方で `u0` の宣言スコープは解消できないギャップとして残るため、**展開先の corpus を 3 帯域で用意することを条件に進めてよい**とします。以下の Phase 8b 時点の根拠は、当時の判断の記録として残しています。
 
 - false activation は 138 ペア中 0 件で、展開時に最も懸念される「観点のノイズ増加」は広げた母集団でも観測されていない。combined diff 帯域でも 0 件である。precision は判断材料として据え置ける
 - 一方 recall は 88.2% から 69.4% へ下がり、`cc` 帯域は 50.0%、`u0` 帯域は 55.6% である。skill を 2〜3 本に増やすと、同じ帯域の穴が skill の本数だけ複製される
@@ -316,7 +345,7 @@ Phase 8a では「進めてよい」、Phase 8b では「検出器側の帯域�
 
 したがって次を条件としていました。1 つ目は Phase 8c で満たしています。
 
-- ~~横展開の前に、combined diff の prefix 列と `--unified=0` での宣言スコープを検出器側で扱えるようにする。少なくとも `cc` 帯域が親の順序に依存しなくなること~~ → Phase 8c で対応済み（`cc` recall 100.0%、両方向一致）
+- ~~横展開の前に、combined diff の prefix 列と `--unified=0` での宣言スコープを検出器側で扱えるようにする。少なくとも `cc` 帯域が親の順序に依存しなくなること~~ → `cc` は Phase 8c で対応済み（recall 100.0%、両方向一致）。`u0` の宣言スコープは解消せずギャップとして記録した
 - 展開する skill ごとに、同じ形式の人手ラベル corpus を先に用意する。カタログを足してから測るのでは、この測定の値が薄まるだけである
 - 新規 corpus は最初から 3 帯域で用意する。既定帯域だけで測ると、この 2 つの穴は最後まで見えない
 - `p09` と同型の「カタログに kind が無い」被覆漏れを、展開先でも negative ではなく knownMiss として明示する

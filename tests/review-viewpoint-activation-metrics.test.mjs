@@ -16,6 +16,10 @@
 //   4. (#2314) reverting the marker-column read to `line.startsWith('-')` /
 //      `line.startsWith('+')`: the cc band drops from 100.0% to 50.0% and the
 //      two directions of the same merge disagree again.
+//   5. (#2314 review) trusting the declaration git prints in the hunk heading:
+//      overall precision drops below 100% on the n07..n10 rows, in BOTH the
+//      default and the u0 band. Those four rows are real git output and exist
+//      only to hold that mutation down.
 // The measured figures are recorded in the Phase 8b/8c sections of the doc
 // above.
 
@@ -29,6 +33,12 @@ import { BANDS, corpus } from './fixtures/review-viewpoints/corpus.mjs';
 // recall gap in the catalog or the detector, not a weakened label.
 const KNOWN_MISSES = [
   'p09-request-dto-required-field-added',
+  // --unified=0 with the contract declared outside an api/dto/contract path:
+  // no context line carries the declaration, and the hunk heading that does
+  // carry it is a funcname heuristic that cannot be trusted (see
+  // hunkHasContractDeclaration). Closing this needs information the diff text
+  // does not contain, so it stays a measured recall gap rather than a guess.
+  'b04-contract-named-outside-api-path--u0',
   // real commits: `ReviewOptions` / `SkillSelectionResult` are contract-shaped
   // but neither the path nor the declaration name matches the detector's
   // conservative v1 allow-lists. Tracked separately from #2314, which fixed the
@@ -40,9 +50,12 @@ const KNOWN_MISSES = [
 ];
 
 // Scenarios whose activated set is NOT identical across the three bands.
-// Emptied by #2314: `default`, `u0` and `cc` now reach the same verdict for
-// every scenario in the corpus.
-const KNOWN_BAND_DISAGREEMENTS = [];
+// #2314 emptied this for the combined-diff scenarios. One entry remains: under
+// `--unified=0` a contract declared outside an api/dto/contract path has no
+// context line carrying the declaration, and the hunk heading that would carry
+// it is not trustworthy evidence (see hunkHasContractDeclaration). Recorded as
+// a measured gap, not endorsed.
+const KNOWN_BAND_DISAGREEMENTS = ['b04-contract-named-outside-api-path'];
 
 test('hand-labeled corpus covers both minimal and mixed diff shapes', () => {
   const shapes = new Set(corpus.map((fixture) => fixture.shape));
@@ -95,10 +108,25 @@ test('review viewpoint activation has no false activations on the labeled corpus
   );
   assert.deepEqual(fixedMisses, [], 'a known miss now activates; drop it from KNOWN_MISSES');
 
-  // 46 fixtures x 3 viewpoints = 138 labeled pairs; 49 of them are positive.
-  assert.equal(overall.tp + overall.fp + overall.fn + overall.tn, 138);
-  assert.equal(overall.tp, 43);
-  assert.equal(overall.fn, 6);
+  // 50 fixtures x 3 viewpoints = 150 labeled pairs; 49 of them are positive.
+  assert.equal(overall.tp + overall.fp + overall.fn + overall.tn, 150);
+  assert.equal(overall.tp, 41);
+  assert.equal(overall.fn, 8);
+});
+
+test('the stale-heading shapes stay negative in every band they appear in', async () => {
+  const { perFixture } = await measureActivation();
+  const staleHeadingRows = perFixture.filter((row) => /stale-heading/.test(row.id));
+
+  // Real `git diff` output where git labels the hunk with an already-closed
+  // contract declaration above the changed block. Reading that heading as
+  // evidence activated all four (#2314 review).
+  assert.equal(staleHeadingRows.length, 4);
+  assert.deepEqual(new Set(staleHeadingRows.map((row) => row.band)), new Set(['default', 'u0']));
+  for (const row of staleHeadingRows) {
+    assert.deepEqual(row.expected, [], `${row.id} must be labeled negative`);
+    assert.ok(row.match, `${row.id} false-activated`);
+  }
 });
 
 test('band disagreements are confined to the recorded scenarios', async () => {
@@ -120,7 +148,6 @@ test('band disagreements are confined to the recorded scenarios', async () => {
   // reaches every positive it carries, so it is pinned at full recall rather
   // than as a band that trails `default`.
   assert.equal(perBand.cc.recall, 1);
-  assert.equal(perBand.u0.fn, 2, 'only the two repo-commit naming gaps remain in u0');
 });
 
 test('combined-diff activation does not depend on parent order (#2314)', async () => {
