@@ -11,6 +11,7 @@ __webpack_require__.r(__webpack_exports__);
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
   ALLOWLIST_RELATIVE_PATH: () => (/* binding */ ALLOWLIST_RELATIVE_PATH),
+  STAGING_SKIP_REASON: () => (/* binding */ STAGING_SKIP_REASON),
   extractGateCommands: () => (/* binding */ extractGateCommands),
   loadTrustedAllowlistEntries: () => (/* binding */ loadTrustedAllowlistEntries),
   runDeterministicGates: () => (/* binding */ runDeterministicGates)
@@ -830,6 +831,17 @@ async function executeDeterministicCommand({ entry, sandboxDir, env, limits } = 
  * (action.yml) lands in (d). Tests inject a mock `execImpl` and `mkdtempImpl`
  * so no real process is spawned.
  *
+ * STAGING OUTCOME IS EVIDENCE (#2311). `copyReviewTargetToSandbox` refuses to
+ * stage a symlinked, escaping or `.git` path, and can fail to copy one. Before
+ * PR #2304 its return value was only gate-decision material and discarding it
+ * was harmless. It is not any more: the fast-verification checkpoint publishes
+ * `pass` as proof that a check ran on the changed files it names, and a checker
+ * handed an empty sandbox exits 0 on its own. Each `results[]` row therefore
+ * carries the `staging` summary of the sandbox it ran in, so the layer that
+ * publishes a verdict can see which subject files never arrived, and why. Gate
+ * aggregation (`strictBlock` / `deterministicUnrunnable`) is deliberately
+ * UNCHANGED: this is additive surfacing, not a new gate rule.
+ *
  * SAFE EVIDENCE METADATA (#2275 PR-3A). The executor already classifies one
  * command into a verdict plus bounded execution metadata. This orchestrator
  * preserves only an explicit allowlist of that metadata (`durationMs`,
@@ -903,6 +915,57 @@ function extractGateCommands(selected) {
   return gates;
 }
 
+/** Why a requested file did not reach the sandbox. One code per refusal kind. */
+const STAGING_SKIP_REASON = Object.freeze({
+  SYMLINK: 'symlink',
+  OUTSIDE_ROOT: 'outside-root',
+  GIT_PATH: 'git-path',
+  COPY_ERROR: 'copy-error',
+});
+
+/**
+ * Summarize one `copyReviewTargetToSandbox` result into bounded evidence.
+ *
+ * `complete` is the single question a consumer has to answer: did every file
+ * this gate was asked to stage actually reach the sandbox? It is computed from
+ * the presence of refusals, NOT from `copied.length === requested`, because the
+ * residual-symlink sweep can also report a path the request never named.
+ *
+ * Only repo-relative paths are carried. Copy-error messages are NOT copied:
+ * they can embed absolute host paths, and the reason code already says what
+ * happened.
+ *
+ * @param {number} requested how many files this gate asked to stage
+ * @param {object} staged the `copyReviewTargetToSandbox` return value
+ * @returns {{ requested: number, copied: number, complete: boolean,
+ *   skipped: Array<{ path: string, reason: string }> }}
+ */
+function summarizeStaging(requested, staged) {
+  const skipped = [];
+  const push = (list, reason) => {
+    for (const file of Array.isArray(list) ? list : []) {
+      if (typeof file === 'string' && file.length > 0) skipped.push({ path: file, reason });
+    }
+  };
+  push(staged?.skippedSymlinks, STAGING_SKIP_REASON.SYMLINK);
+  push(staged?.skippedOutside, STAGING_SKIP_REASON.OUTSIDE_ROOT);
+  push(staged?.skippedGit, STAGING_SKIP_REASON.GIT_PATH);
+  for (const err of Array.isArray(staged?.errors) ? staged.errors : []) {
+    if (typeof err?.file === 'string' && err.file.length > 0) {
+      skipped.push({ path: err.file, reason: STAGING_SKIP_REASON.COPY_ERROR });
+    }
+  }
+  const copied = Array.isArray(staged?.copied) ? staged.copied.length : 0;
+  return {
+    requested,
+    copied,
+    // Incomplete when anything was refused, or when fewer files arrived than
+    // were asked for (a staging impl that reports neither is still not trusted).
+    complete: skipped.length === 0 && copied >= requested,
+    skipped,
+  };
+}
+
 /**
  * Copy only executor fields that are safe to persist as deterministic evidence.
  * Unknown fields — especially raw stdout/stderr supplied by an injected executor
@@ -968,7 +1031,9 @@ function safeExecutionMetadata(result) {
  * @returns {Promise<{ strictBlock: boolean, deterministicUnrunnable: boolean,
  *   results: Array<{ gateIndex: number, skillId: string, status: string, reasonCode: string,
  *     durationMs?: number, exitCode?: number, stdoutBytes?: number,
- *     unrunnableCause?: 'spawn-error'|'timeout'|'invalid-entry' }> }>}
+ *     unrunnableCause?: 'spawn-error'|'timeout'|'invalid-entry',
+ *     staging: { requested: number, copied: number, complete: boolean,
+ *       skipped: Array<{ path: string, reason: string }> } }> }>}
  */
 async function runDeterministicGates({
   trustedTree,
@@ -1003,11 +1068,13 @@ async function runDeterministicGates({
     try {
       cleanCwd = await makeSandboxTempDir(mkdtempImpl);
       emptyHome = await makeSandboxTempDir(mkdtempImpl);
-      await copyReviewTargetToSandbox({
+      const filesToStage = Array.isArray(changedFiles) ? changedFiles : [];
+      const staged = await copyReviewTargetToSandbox({
         sourceDir: reviewSourceDir,
         destDir: cleanCwd,
-        files: Array.isArray(changedFiles) ? changedFiles : [],
+        files: filesToStage,
       });
+      const staging = summarizeStaging(filesToStage.length, staged);
       const env = buildSandboxEnv(processEnv, { home: emptyHome });
       const result = await exec({ entry, sandboxDir: cleanCwd, env });
 
@@ -1020,6 +1087,7 @@ async function runDeterministicGates({
         skillId: gate.skillId,
         status,
         reasonCode,
+        staging,
         ...safeExecutionMetadata(result),
       });
     } finally {
