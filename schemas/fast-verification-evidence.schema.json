@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/fast-verification-evidence.schema.json",
+  "title": "River Review fast-verification checkpoint evidence",
+  "description": "Evidence produced by one `after-change` fast-verification checkpoint (#2275 PR-3B, Epic #2054 Phase 3). It records what was verified about one subject revision and, just as importantly, what was NOT: `pass` is reserved for a deterministic check that really ran and really succeeded, and every other outcome keeps its own word (`fail`, `unrunnable`, `skipped`, `bypassed`, `stale`). This document carries no host vocabulary — hook names, tool names and invocation mechanics belong to the adapter — and no judgment: it starts no Flow, applies no severity, and changes no gate, decision or merge authority. It also carries no raw process output: only the bounded execution metadata the deterministic orchestrator preserves (#2275 PR-3A).",
+  "type": "object",
+  "required": [
+    "triggerId",
+    "occurrenceId",
+    "occurrenceKey",
+    "subjectRevision",
+    "profile",
+    "mode",
+    "changedFiles",
+    "checks",
+    "status",
+    "reasonCode",
+    "startedAt",
+    "completedAt",
+    "totalDurationMs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "triggerId": {
+      "description": "Neutral trigger id this checkpoint answers for. Only `after-change` starts no Flow and declares the fast-verification profile.",
+      "const": "after-change"
+    },
+    "occurrenceId": {
+      "description": "Idempotency key minted by `resolveTrigger` (`RR-TRG-` prefixed).",
+      "type": "string",
+      "pattern": "^RR-TRG-[0-9a-f]{16}$"
+    },
+    "occurrenceKey": {
+      "description": "`<occurrenceId>@<subjectRevision>`. An occurrence is the same occurrence only on the same subject revision; a re-send under this key is recorded as `skipped` / `duplicate-occurrence` rather than run again.",
+      "type": "string",
+      "minLength": 1
+    },
+    "subjectRevision": {
+      "description": "Commit SHA or content hash the checkpoint is about. A verdict that outlives this revision is `stale`, never `pass`.",
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "description": "Verification profile. `fast-verification` means changed-file-scoped deterministic checks with no network call, no model call and no full test suite.",
+      "const": "fast-verification"
+    },
+    "mode": {
+      "description": "Rollout mode. `observe` only: this evidence informs nobody's gate and blocks nothing.",
+      "const": "observe"
+    },
+    "changedFiles": {
+      "description": "Repo-relative paths the change touched, normalized and sorted. The scope the checks were run against; an empty list means there was nothing to verify.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "checks": {
+      "description": "One row per deterministic check this occurrence was accountable for — including the checks that did not run, which is what keeps a non-execution from reading as a success.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "status": {
+      "description": "Checkpoint-level roll-up: the worst outcome present, ordered stale > fail > unrunnable > bypassed > skipped > pass, so no non-verdict can be summarized as a pass.",
+      "$ref": "#/$defs/status"
+    },
+    "reasonCode": {
+      "description": "Why the checkpoint ended as it did.",
+      "$ref": "#/$defs/reasonCode"
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "totalDurationMs": {
+      "description": "Wall-clock duration of the checkpoint, used for the dogfood p50/p95 measurement in PR-3D.",
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": ["pass", "fail", "unrunnable", "skipped", "bypassed", "stale"]
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "check-executed",
+        "no-deterministic-check-selected",
+        "no-changed-files",
+        "duplicate-occurrence",
+        "trusted-allowlist-absent",
+        "trusted-allowlist-empty",
+        "allowlist-miss",
+        "executor-status-missing",
+        "result-correlation-failed",
+        "subject-revision-changed",
+        "subject-revision-unreadable",
+        "DETERMINISTIC_PASS",
+        "STRICT_BLOCK",
+        "DETERMINISTIC_UNRUNNABLE"
+      ]
+    },
+    "check": {
+      "type": "object",
+      "required": ["id", "status", "reasonCode"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Skill id that declared the deterministic check.",
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "description": "pass = ran and succeeded on this revision. fail = ran and reported failure. unrunnable = attempted, no verdict (spawn error, timeout, invalid entry, an executor status that cannot be read, or results that cannot be attributed to the gates that produced them). skipped = nothing to run (no check selected, no changed file, duplicate occurrence). bypassed = running was not permitted (no host-trusted allowlist, an unusable one, or this exact argv is not on it). stale = a verdict exists but may not be read as a verdict on the subject, because the subject revision moved or could not be confirmed afterwards.",
+          "$ref": "#/$defs/status"
+        },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" },
+        "supersededStatus": {
+          "description": "Present only on a `stale` row: the verdict that was produced before the subject moved. Kept so the run is auditable, and deliberately NOT promoted back into `status`.",
+          "type": "string",
+          "enum": ["pass", "fail"]
+        },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "exitCode": { "type": "integer", "minimum": 0 },
+        "stdoutBytes": {
+          "description": "Byte count only. Raw stdout / stderr is never persisted as evidence.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "unrunnableCause": {
+          "type": "string",
+          "enum": ["spawn-error", "timeout", "invalid-entry"]
+        }
+      }
+    }
+  }
+}

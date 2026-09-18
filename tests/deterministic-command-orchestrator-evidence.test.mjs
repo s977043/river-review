@@ -84,6 +84,7 @@ test('runDeterministicGates preserves only safe executor metadata for evidence',
     assert.equal(result.deterministicUnrunnable, true);
     assert.deepEqual(result.results, [
       {
+        gateIndex: 0,
         skillId: 'fail-check',
         status: 'fail',
         reasonCode: 'STRICT_BLOCK',
@@ -92,6 +93,7 @@ test('runDeterministicGates preserves only safe executor metadata for evidence',
         stdoutBytes: 31,
       },
       {
+        gateIndex: 1,
         skillId: 'timeout-check',
         status: 'unrunnable',
         reasonCode: 'DETERMINISTIC_UNRUNNABLE',
