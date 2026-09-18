@@ -13,8 +13,30 @@
 //   api-test-coverage               — is the contract change covered by tests?
 //   optional-field-consumer-handling— can consumers handle the new optional field?
 //
+//
+// ## Bands (#2252 Phase 8b)
+//
+// Every fixture declares the input band its diff text belongs to and where the
+// text came from:
+//
+//   band   'default' = 3 lines of context (the width every git-generated route
+//                      in pages/reference/artifact-input-contract.md uses)
+//          'u0'      = `git diff/show --unified=0`
+//          'cc'      = combined diff (`git show --cc`, `@@@` hunk headers)
+//   source 'handwritten'    = diff text typed by a human (the Phase 8a rows)
+//          'generated-git'  = real `git show` output captured from a disposable
+//                             repository by scripts/build-review-viewpoint-band-diffs.mjs
+//          'repo-commit'    = real `git show` output for a commit in THIS repository
+//
+// `bandOf` groups the generated rows that express the SAME semantic change in
+// all three bands, so a disagreement between bands is directly visible.
+//
 // `knownMiss` marks a label the current implementation is known not to reach.
 // It documents a recall gap; it does not weaken the label.
+
+import { bandDiffs, repoCommitDiffs } from './band-diffs.generated.mjs';
+
+export const BANDS = ['default', 'u0', 'cc'];
 
 export const VIEWPOINT_IDS = [
   'backward-compatibility',
@@ -22,10 +44,12 @@ export const VIEWPOINT_IDS = [
   'optional-field-consumer-handling',
 ];
 
-export const corpus = [
+const handwrittenCorpus = [
   {
     id: 'p01-response-dto-field-removed',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'A field disappears from a response DTO on an api/ path. Consumers reading it break, and the change needs contract test coverage.',
     expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
@@ -43,6 +67,8 @@ export const corpus = [
   {
     id: 'p02-dto-field-type-changed',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'An existing contract field changes type from string to number. Consumers parsing the old type break.',
     expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
@@ -60,6 +86,8 @@ export const corpus = [
   {
     id: 'p03-requiredness-tightened',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'An optional request field becomes required. Existing callers that omit it start failing validation.',
     expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
@@ -77,6 +105,8 @@ export const corpus = [
   {
     id: 'p04-optional-field-added',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'A new optional field appears on a contract. Not breaking, but consumers must handle its absence/presence safely.',
     expectedViewpointIds: ['optional-field-consumer-handling'],
@@ -93,6 +123,8 @@ export const corpus = [
   {
     id: 'p05-contract-named-outside-api-path',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'The file is not under api/, but the declaration is a *Response contract and loses a field. Same consumer breakage as p01.',
     expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
@@ -110,6 +142,8 @@ export const corpus = [
   {
     id: 'p06-zod-contract-field-removed',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'A zod-declared contract schema loses a field. The wire contract shrinks exactly as in p01.',
     expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
@@ -127,6 +161,8 @@ export const corpus = [
   {
     id: 'p07-field-renamed',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'A contract field is renamed. The old name is gone for consumers, so it is a breaking change plus a test-coverage question.',
     expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
@@ -144,6 +180,8 @@ export const corpus = [
   {
     id: 'p08-mixed-diff-contract-plus-noise',
     shape: 'mixed',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'The same removal as p01, buried in a diff that also touches docs, a stylesheet, an internal helper, and a test. File-level noise must not suppress the PR-level obligation.',
     expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
@@ -192,6 +230,8 @@ diff --git a/tests/user.test.ts b/tests/user.test.ts
   {
     id: 'p09-request-dto-required-field-added',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     knownMiss: true,
     rationale:
       'A new REQUIRED field is added to a request DTO. Existing callers that do not send it start failing, so backward compatibility and test coverage are both in question. Labeled from the obligation question, independent of whether the catalog has a matching activation kind.',
@@ -209,6 +249,8 @@ diff --git a/tests/user.test.ts b/tests/user.test.ts
   {
     id: 'n01-new-contract-file-only',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'A brand-new endpoint contract. There is no existing consumer to break, so no backward-compatibility obligation should fire.',
     expectedViewpointIds: [],
@@ -226,6 +268,8 @@ new file mode 100644
   {
     id: 'n02-test-fixture-only',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'The changed declaration lives in a test file. No production contract moves, so no obligation.',
     expectedViewpointIds: [],
@@ -243,6 +287,8 @@ new file mode 100644
   {
     id: 'n03-internal-type-field-removed',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'An internal, non-contract options type loses a field. Nothing crosses a published boundary.',
     expectedViewpointIds: [],
@@ -259,6 +305,8 @@ new file mode 100644
   {
     id: 'n04-docs-only',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale: 'Documentation-only change. No contract surface is touched.',
     expectedViewpointIds: [],
     diff: `diff --git a/docs/usage.md b/docs/usage.md
@@ -273,6 +321,8 @@ new file mode 100644
   {
     id: 'n05-contract-file-comment-only',
     shape: 'minimal',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'A contract file changes, but only a comment. The wire shape is identical, so raising an obligation would be a false activation.',
     expectedViewpointIds: [],
@@ -290,6 +340,8 @@ new file mode 100644
   {
     id: 'n06-mixed-diff-no-contract-change',
     shape: 'mixed',
+    band: 'default',
+    source: 'handwritten',
     rationale:
       'A multi-file diff touching an api/ directory file, a test, and docs, but no property of any contract declaration changes. Path proximity alone must not activate an obligation.',
     expectedViewpointIds: [],
@@ -319,3 +371,140 @@ diff --git a/docs/api.md b/docs/api.md
 `,
   },
 ];
+
+// --- Phase 8b: same semantic change expressed in three real-git input bands ---
+//
+// The label for each row is written from the obligation question against the
+// SEMANTIC change, not against what survives into the diff text. A band that
+// loses the information the detector needs therefore shows up as a recall gap
+// on that band, which is the measurement this corpus exists to produce.
+
+const BAND_SCENARIO_LABELS = [
+  {
+    bandOf: 'b01-response-dto-field-removed',
+    rationale:
+      'A field disappears from a response DTO on an api/ path (same semantics as p01). Consumers reading it break, and the change needs contract test coverage.',
+    expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
+  },
+  {
+    bandOf: 'b02-requiredness-tightened',
+    rationale:
+      'An optional request field becomes required (same semantics as p03). Existing callers that omit it start failing validation.',
+    expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
+  },
+  {
+    bandOf: 'b03-optional-field-added',
+    rationale:
+      'A new optional field appears on a response contract (same semantics as p04). Consumers must handle its absence safely.',
+    expectedViewpointIds: ['optional-field-consumer-handling'],
+  },
+  {
+    bandOf: 'b04-contract-named-outside-api-path',
+    rationale:
+      'A *Response contract outside api/ loses a field (same semantics as p05). The obligation follows the contract, not the directory, in every band.',
+    expectedViewpointIds: ['backward-compatibility', 'api-test-coverage'],
+  },
+  {
+    bandOf: 'b05-contract-file-comment-only',
+    rationale:
+      'Only a comment in a contract file changes (same semantics as n05). The wire shape is identical in every band.',
+    expectedViewpointIds: [],
+  },
+  {
+    bandOf: 'b06-internal-type-field-removed',
+    rationale:
+      'An internal options type loses a field (same semantics as n03). Nothing crosses a published boundary in any band.',
+    expectedViewpointIds: [],
+  },
+];
+
+const BAND_SHAPE = { default: 'minimal', u0: 'u0', cc: 'combined' };
+
+const bandFixtures = BAND_SCENARIO_LABELS.flatMap((scenario) => [
+  ...BANDS.map((band) => ({
+    id: `${scenario.bandOf}--${band}`,
+    bandOf: scenario.bandOf,
+    ccPairOf: band === 'cc' ? scenario.bandOf : null,
+    band,
+    source: 'generated-git',
+    shape: BAND_SHAPE[band],
+    rationale: scenario.rationale,
+    expectedViewpointIds: scenario.expectedViewpointIds,
+    diff: bandDiffs[scenario.bandOf][band],
+  })),
+  // Same merge, same resolution, opposite parent order. A combined diff's
+  // change marker moves between prefix COLUMNS depending on which parent is
+  // first, so this row carries the identical semantic change with the marker
+  // in column 1 instead of column 2. The label is therefore identical to the
+  // `--cc` row above; any difference in activation is an implementation
+  // artifact, not a difference in what should be raised.
+  {
+    id: `${scenario.bandOf}--cc-reverse`,
+    bandOf: null,
+    ccPairOf: scenario.bandOf,
+    band: 'cc',
+    source: 'generated-git',
+    shape: 'combined',
+    rationale: `${scenario.rationale} Captured from the opposite merge direction, so the change marker sits in combined-diff column 1.`,
+    expectedViewpointIds: scenario.expectedViewpointIds,
+    diff: bandDiffs[scenario.bandOf].ccReverse,
+  },
+]);
+
+// --- Phase 8b: real commits from this repository ---
+//
+// Labeled by reading `git show` for each commit and answering the obligation
+// question. The commit subjects and the exact capture command are recorded in
+// band-diffs.generated.mjs.
+
+const REPO_COMMIT_LABELS = {
+  'rc01-node-api-review-options-optional-field-default': {
+    rationale:
+      'dc238b88 adds an optional `concurrency?: number` to the published Node API `ReviewOptions` contract. The obligation question — can the consumer of the field handle it being absent — applies: every existing caller omits it, so the library must default it.',
+    expectedViewpointIds: ['optional-field-consumer-handling'],
+  },
+  'rc02-node-api-review-options-optional-field-u0': {
+    rationale: 'Same commit and same obligation as rc01, captured at --unified=0.',
+    expectedViewpointIds: ['optional-field-consumer-handling'],
+  },
+  'rc03-skill-selection-result-optional-field-default': {
+    rationale:
+      '91299986 adds an optional `reviewMode?` to `SkillSelectionResult`, a value returned to consumers. Consumers must handle its absence on results produced by older versions.',
+    expectedViewpointIds: ['optional-field-consumer-handling'],
+  },
+  'rc04-skill-selection-result-optional-field-u0': {
+    rationale: 'Same commit and same obligation as rc03, captured at --unified=0.',
+    expectedViewpointIds: ['optional-field-consumer-handling'],
+  },
+  'rc05-output-kind-union-widened-default': {
+    rationale:
+      '15594086 adds a member to the `OutputKind` string-union alias. No property is removed, retyped, or made required, and no existing value stops being accepted, so none of the three obligations is raised by this diff alone.',
+    expectedViewpointIds: [],
+  },
+  'rc06-docs-only-default': {
+    rationale: '0841e238 changes one Markdown document. No contract surface is touched.',
+    expectedViewpointIds: [],
+  },
+  'rc07-package-json-conflicted-merge-cc': {
+    rationale:
+      'A real combined diff (`git show --cc`) from this repository: 96b9821a resolves a package.json conflict. Dependency ranges move; no API/DTO declaration changes.',
+    expectedViewpointIds: [],
+  },
+};
+
+const repoCommitFixtures = Object.entries(repoCommitDiffs).map(([id, entry]) => {
+  const label = REPO_COMMIT_LABELS[id];
+  if (!label) throw new Error(`missing hand label for repo-commit fixture: ${id}`);
+  return {
+    id,
+    band: entry.band,
+    source: 'repo-commit',
+    shape: BAND_SHAPE[entry.band],
+    command: entry.command,
+    rationale: label.rationale,
+    expectedViewpointIds: label.expectedViewpointIds,
+    diff: entry.diff,
+  };
+});
+
+export const corpus = [...handwrittenCorpus, ...bandFixtures, ...repoCommitFixtures];

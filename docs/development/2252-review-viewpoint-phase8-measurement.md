@@ -7,6 +7,8 @@ Phase 6 までで導入した Review Viewpoint の効果を、Phase 7（2〜3 sk
 - 回帰ピン: `tests/review-viewpoint-activation-metrics.test.mjs`
 - 測定日: 2026-09-18 / base commit `13cd8ebb`
 
+> **この文書の前半（Phase 8a）の測定値は、production の入力分布を代表しません。** PR #2307 時点の corpus は手書きの unified diff 15 本のみで、`--unified=0` と combined diff（`@@@`）を含んでいませんでした。その後 PR #2308（#2294）が combined diff の hunk 本体を parse するようになり、同じ diff でも parse 結果が変わっています。現時点で有効な母集団と数値は後述の「Phase 8b」節です。前半は Phase 8a 当時の記録として残しています。
+
 ## 測定方法
 
 ラベルは `tests/fixtures/review-viewpoints/corpus.mjs` に人手で記述しています。各 fixture の diff を読み、obligation の question（「既存 consumer との後方互換性が維持されているか」など）に照らして、その obligation を提示すべきかどうかを判断した結果がラベルです。
@@ -81,22 +83,166 @@ off に対する増分は約 +0.6 ms です。なお同一プロセス内で測�
 - **UNKNOWN rate / human escalation rate**: いずれも LLM 出力に依存するため未測定
 - **Claude Code / Codex の cross-runtime parity**: 未測定
 - **skill selection**: 測定では `api-compatibility` を選択済みとして固定している。`selectSkills()` が実際にこの skill を選ぶかは別問題であり、この測定には含まれない
-- **diff の帯域**: corpus の diff は手書きの unified 形式のみである。`git diff --unified=0` と `diff --cc`（merge commit）は含んでいない
-- **実コミット由来の母集団**: 0 本。すべて手書き fixture である
+- **diff の帯域（Phase 8a 時点）**: corpus の diff は手書きの unified 形式のみであった。`git diff --unified=0` と `diff --cc`（merge commit）は含んでいない。この 2 帯域は後述の Phase 8b で追加した
+- **実コミット由来の母集団（Phase 8a 時点）**: 0 本であった。Phase 8b で 7 本追加した
+
+## Phase 8b: 入力帯域の拡張（2026-09-18）
+
+Phase 8a の corpus は手書きの unified diff 15 本だけでした。`pages/reference/artifact-input-contract.md` の差分供給 8 経路のうち、経路 5 / 7 / 8 は context 幅を規定せず、combined diff も正規の入力として受け取ります。そこで Phase 7 へ進む前に、母集団を次の 3 帯域へ広げて測り直しました。
+
+- 測定日: 2026-09-18 / base commit `cf69daed`
+- 追加した生成器: `scripts/build-review-viewpoint-band-diffs.mjs`
+- 生成物: `tests/fixtures/review-viewpoints/band-diffs.generated.mjs`（手で編集しない）
+
+### 母集団の内訳
+
+| 区分                                              | fixture 数 |
+| ------------------------------------------------- | ---------- |
+| 合計                                              | 40         |
+| source: handwritten（Phase 8a）                   | 15         |
+| source: generated-git（使い捨て repo）            | 18         |
+| source: repo-commit（本 repo の実コミット）       | 7          |
+| band: default（`-U3`）                            | 26         |
+| band: u0（`--unified=0`）                         | 9          |
+| band: cc（`--cc`）                                | 5          |
+| positive ラベル（発火すべき）を含む fixture       | 19         |
+| negative ラベル（発火すべきでない）のみの fixture | 21         |
+
+ラベルペアは 40 fixture × viewpoint 3 本 = 120 で、うち positive は 42 ペアです。
+
+帯域別の diff の出どころは次のとおりです。
+
+- `generated-git`: 使い捨ての git repository を `os.tmpdir()` に作り、同一の意味的変更を `git show -U3` / `git show -U0` / `git show --cc` の 3 通りで採取した実 git 出力である。6 シナリオ × 3 帯域 = 18 本
+- `generated-git` の `--cc` については、同じマージを逆方向（親の順序を入れ替え）からも採取して 6 本追加した。理由は後述の「combined diff は親の順序で結果が変わる」節に書いている
+- `repo-commit`: 本 repo の実コミット（`dc238b88` / `91299986` / `15594086` / `0841e238` / `96b9821a`）から `git show` で採取した。2026-04 から 2026-09 に散らしてあり、diff parse 層を変更した直近の作業に母集団が偏らないようにしている
+- `cc` 帯域には、本 repo の実マージ `96b9821a`（package.json の衝突解決）も 1 本含む
+
+ラベルは Phase 8a と同じ規律にもとづき、人手で付けています。「その帯域の diff テキストに何が残るか」ではなく「意味的にどの obligation を提示すべきか」で決めているため、帯域が情報を落とせばそれは recall 欠落として現れます。
+
+### PR #2308 前後での parse 挙動の実測
+
+Phase 8a の測定値が古くなった理由を、両方の実装に同じ入力を通して確かめました。入力は `b01-response-dto-field-removed` の `--cc`（第 1 親側）です。
+
+```text
+base(8eef8f4f) {"path":"src/api/user.ts","hunkCount":0,"hunkLineCount":0,"addedLines":[],"signals":[]}
+head(cf69daed) {"path":"src/api/user.ts","hunkCount":1,"hunkLineCount":7,"addedLines":[4],"signals":[]}
+```
+
+`8eef8f4f` は v1.116.0 のリリース commit で、`f63ed779`（#2308）がその直後にあたります。combined diff の hunk 本体は base では 0 件、head では 7 行に変わりました。この入力では `signals` は両方 0 件ですが、前節のとおりマージの向きが逆であれば head 側は発火します。つまり **#2308 の着地によって、同じ diff に対する viewpoint の発火結果が変わりうる状態になっています**。Phase 8a の corpus はこの帯域を 1 本も含んでいなかったため、この変化は測定値に現れませんでした。
+
+### 拡張後の測定結果
+
+`node scripts/measure-review-viewpoints.mjs` の出力から転記しています。
+
+```text
+overall: precision 100.0% recall 69.4% (tp=34 fp=0 fn=15 tn=89)
+  backward-compatibility: precision 100.0% recall 75.0% (tp=15 fp=0 fn=5 tn=26)
+  api-test-coverage: precision 100.0% recall 75.0% (tp=15 fp=0 fn=5 tn=26)
+  optional-field-consumer-handling: precision 100.0% recall 44.4% (tp=4 fp=0 fn=5 tn=37)
+
+## Activation by input band
+  default: precision 100.0% recall 84.6% (tp=22 fp=0 fn=4 tn=49)
+  u0: precision 100.0% recall 55.6% (tp=5 fp=0 fn=4 tn=15)
+  cc: precision 100.0% recall 50.0% (tp=7 fp=0 fn=7 tn=25)
+
+## Activation by corpus source
+  handwritten: precision 100.0% recall 88.2% (tp=15 fp=0 fn=2 tn=28)
+  generated-git: precision 100.0% recall 67.9% (tp=19 fp=0 fn=9 tn=44)
+  repo-commit: precision n/a recall 0.0% (tp=0 fp=0 fn=4 tn=17)
+```
+
+precision は全帯域で 100% のままで、false activation は 138 ペア中 0 件です。combined diff 帯域でも false activation は 0 件でした（#2308 で `@@@` の hunk 本体が matcher から見えるようになったことの主たるリスクはここにありますが、現時点では顕在化していません）。一方で recall は帯域を広げると 88.2% から 69.4% へ下がりました。
+
+### 3 帯域の判定一致
+
+同一の意味的変更を 3 帯域で表現し、発火した viewpoint 集合が一致するかを見た結果です。
+
+```text
+DISAGREE b01-response-dto-field-removed: default=[api-test-coverage,backward-compatibility] u0=[api-test-coverage,backward-compatibility] cc=[]
+DISAGREE b02-requiredness-tightened: default=[api-test-coverage,backward-compatibility] u0=[api-test-coverage,backward-compatibility] cc=[]
+DISAGREE b03-optional-field-added: default=[optional-field-consumer-handling] u0=[optional-field-consumer-handling] cc=[]
+DISAGREE b04-contract-named-outside-api-path: default=[api-test-coverage,backward-compatibility] u0=[] cc=[]
+AGREE    b05-contract-file-comment-only: default=[] u0=[] cc=[]
+AGREE    b06-internal-type-field-removed: default=[] u0=[] cc=[]
+```
+
+（上表の `cc` は親の順序が第 1 親側の採取です。逆方向は次節を参照してください。）
+
+positive 側の 4 シナリオがすべて不一致でした。どちらの層の問題かを切り分けた結果は次のとおりです。
+
+**`cc` 帯域の 0 件は viewpoint 層（signal 検出器）の問題であり、parse 層は正しく動いています**。`parseUnifiedDiff` に combined diff を通すと、`path` / `oldPath` / `addedLines` はいずれも正しく解決されました（`b01` の `--cc` で `addedLines` は `[4]`）。落ちているのは `src/lib/api-compatibility-signals.mjs` 側です。同モジュールは `hunk.lines` の先頭 1 文字だけを prefix とみなし、`line.startsWith('-')` と `line.slice(1)` で判定します。2 親の combined diff では prefix が 2 列になります。削除行は `" -  legacyName: string;"` の形で届くため先頭が空白と読まれ、変更として扱われません。
+
+**`u0` 帯域の `b04` の欠落も viewpoint 層の問題です**。同モジュールの宣言ベースのフォールバックは hunk 単位でスコープされており、`interface CheckoutResponse {` が hunk 内に含まれることを要求します。`--unified=0` では宣言行が context として運ばれないため、api / dto / contract 以外のパスにある契約は検出できません。パスで判定できる `b01` から `b03` は `u0` でも既定帯域と一致しました。
+
+いずれも本 PR の対象外（測定のみのスコープ）のため、検出器は変更していません。
+
+### combined diff は親の順序で結果が変わる
+
+combined diff は、変更マーカーをその変更が由来する親の列に置きます。したがって同じマージを逆方向から読むと、マーカーは列 1 と列 2 のあいだを移動します。同じマージ・同じ解決内容を両方向から採取して比較した結果です。
+
+```text
+DISAGREE b01-response-dto-field-removed: firstParent=[] reverse=[api-test-coverage,backward-compatibility]
+DISAGREE b02-requiredness-tightened: firstParent=[] reverse=[api-test-coverage,backward-compatibility]
+DISAGREE b03-optional-field-added: firstParent=[] reverse=[optional-field-consumer-handling]
+DISAGREE b04-contract-named-outside-api-path: firstParent=[] reverse=[api-test-coverage,backward-compatibility]
+AGREE    b05-contract-file-comment-only: firstParent=[] reverse=[]
+AGREE    b06-internal-type-field-removed: firstParent=[] reverse=[]
+```
+
+positive の 4 シナリオすべてで、**同一の意味的変更がマージの向き次第で発火したりしなかったりします**。マーカーが列 1 にあれば `line.startsWith('-')` が偶然成立して検出でき、列 2 にあれば context と読まれて落ちます。`cc` 帯域の recall 50.0% は、この当たり外れがちょうど半々になっているという意味であり、「半分は正しく動く」という意味ではありません。negative の 2 シナリオはどちらの向きでも 0 件で、false activation は発生していません。
+
+この挙動も parse 層ではなく検出器側に由来します。`parseUnifiedDiff` は両方向とも同じ内容を返しています。
+
+### 実コミット帯域が示したもの
+
+`repo-commit` の positive 4 ペアはすべて欠落しました。`runners/node-api/src/types.ts` の `ReviewOptions` と `SkillSelectionResult` へ optional field を追加した実コミットが対象です。検出器の v1 は、パスが `api` / `dto` / `contract` のいずれかで始まるセグメントを含むか、宣言名が `Dto` / `Request` / `Response` / `Api` / `Contract` / `Schema` で終わることを要求します。`node-api/` はセグメント頭が `api` ではなく、`ReviewOptions` / `SkillSelectionResult` はどの接尾辞にも当たりません。手書き fixture はこの 2 条件を満たす名前だけで書かれていたため、Phase 8a では見えていませんでした。
+
+### 自己整合でないことの確認（mutation、拡張後）
+
+拡張後の corpus に対して、3 方向の変異を注入しました。
+
+| 変異                                         | 結果                                                                               |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `dto-field-removed` の kind 名を改名         | overall recall 64.3% → 26.2%                                                       |
+| test パス除外（`TEST_PATH_RE`）を削除        | overall precision 100% → 93.1%                                                     |
+| `declarationScoped` を無条件に `true` へ固定 | default 帯域は 84.6% のまま、`u0` 帯域が 55.6% → 0.0%、handwritten は 88.2% のまま |
+
+3 番目は Phase 8b で追加した帯域だけが検知した変異です。Phase 8a の手書き corpus だけでは緑のままであったため、追加した帯域が実際に効いている証拠にあたります。変異はいずれも測定後に復元済みです。
+
+### mode 比較（拡張後）
+
+| 指標                                   | 実測                                        |
+| -------------------------------------- | ------------------------------------------- |
+| off / observe / active の comment 集合 | 全 46 fixture で完全一致                    |
+| observe の prompt 文字数差分           | 0（最大値）                                 |
+| active の prompt 文字数差分            | +512 〜 +775 文字（発火した 22/46 fixture） |
+
+latency は最も重い fixture（`p08-mixed-diff-contract-plus-noise`）で測っており、その fixture は Phase 8b で変えていないため再測定していません。
+
+### Phase 8b で測っていないもの
+
+- **`--cc` の 3 親以上（octopus merge）**: 帯域として採取していない。`@@@@` 以上のハンクヘッダは未測定である
+- **combined diff の positive を含む実コミット**: 本 repo の履歴に、TypeScript の契約変更を含む `--cc` 非空のマージが無い。`git log --merges` 上位 200 件のうち `--cc` が非空なのは 3 件で、いずれも package.json / package-lock.json の衝突である。`cc` 帯域の positive は使い捨て repo の実 git 出力で代替している
+- **`repo-commit` の negative 帯域の広さ**: docs のみ 1 本、union 拡張 1 本、package.json のマージ 1 本にとどまる
+- **意味的レビュー層**: Phase 8a と同じく API キー未登録のため未測定である
 
 ## 判断
 
 ### Phase 7（2〜3 skill への展開）
 
-**進めてよい**と考えます。根拠は次のとおりです。
+Phase 8a では「進めてよい」と結論していました。Phase 8b の測定を受けて、**検出器側の帯域対応を先に片付けることを推奨します**（Phase 7 を止める、ではなく順序を入れ替える）。根拠は次のとおりです。
 
-- false activation が 0/28 negative ペアであり、展開時に最も懸念される「観点のノイズ増加」が現時点の帯域では観測されていない
-- 混在 diff（`p08` / `n06`）でも最小 diff と同じ判定であり、PR 単位の走査で結論が反転していない
-- observe の prompt 差分が 0 のため、展開しても既定値のままなら利用者への影響が生じない
+- false activation は 138 ペア中 0 件で、展開時に最も懸念される「観点のノイズ増加」は広げた母集団でも観測されていない。combined diff 帯域でも 0 件である。precision は判断材料として据え置ける
+- 一方 recall は 88.2% から 69.4% へ下がり、`cc` 帯域は 50.0%、`u0` 帯域は 55.6% である。skill を 2〜3 本に増やすと、同じ帯域の穴が skill の本数だけ複製される
+- 穴は 2 か所に局在しており、いずれも `src/lib/api-compatibility-signals.mjs` の 1 ファイルにある。combined diff の prefix 列と、宣言ベースフォールバックの hunk スコープである
+- combined diff ではマージの向きで結果が変わる。同じ変更が再現性なく検出されたりされなかったりする状態を、skill の本数だけ増やすのは避けたい
+- 実コミット帯域で positive が 0/4 であったことは、検出器の名前・パス条件が実在のコードより狭いことを示す。横展開はこの狭さも複製する
 
-ただし次を条件とします。
+したがって次を条件とします。
 
+- 横展開の前に、combined diff の prefix 列と `--unified=0` での宣言スコープを検出器側で扱えるようにする。少なくとも `cc` 帯域が親の順序に依存しなくなること
 - 展開する skill ごとに、同じ形式の人手ラベル corpus を先に用意する。カタログを足してから測るのでは、この測定の値が薄まるだけである
+- 新規 corpus は最初から 3 帯域で用意する。既定帯域だけで測ると、この 2 つの穴は最後まで見えない
 - `p09` と同型の「カタログに kind が無い」被覆漏れを、展開先でも negative ではなく knownMiss として明示する
 
 ### `mode` の既定値

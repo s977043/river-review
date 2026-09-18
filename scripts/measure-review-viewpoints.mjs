@@ -31,7 +31,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { generateReview } from '../src/lib/review-engine.mjs';
 import { runReviewViewpointStage } from '../src/lib/review-viewpoint-stage.mjs';
-import { corpus, VIEWPOINT_IDS } from '../tests/fixtures/review-viewpoints/corpus.mjs';
+import { corpus, BANDS, VIEWPOINT_IDS } from '../tests/fixtures/review-viewpoints/corpus.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -95,6 +95,8 @@ function scoreFrom(counts) {
 
 export async function measureActivation() {
   const perViewpoint = new Map(VIEWPOINT_IDS.map((id) => [id, emptyCounts()]));
+  const perBand = new Map(BANDS.map((band) => [band, emptyCounts()]));
+  const perSource = new Map();
   const overall = emptyCounts();
   const perFixture = [];
 
@@ -108,12 +110,19 @@ export async function measureActivation() {
       const isActual = actual.includes(viewpointId);
       const bucket = isExpected && isActual ? 'tp' : isExpected ? 'fn' : isActual ? 'fp' : 'tn';
       perViewpoint.get(viewpointId)[bucket] += 1;
+      perBand.get(fixture.band)[bucket] += 1;
+      if (!perSource.has(fixture.source)) perSource.set(fixture.source, emptyCounts());
+      perSource.get(fixture.source)[bucket] += 1;
       overall[bucket] += 1;
     }
 
     perFixture.push({
       id: fixture.id,
       shape: fixture.shape,
+      band: fixture.band,
+      source: fixture.source,
+      bandOf: fixture.bandOf ?? null,
+      ccPairOf: fixture.ccPairOf ?? null,
       knownMiss: Boolean(fixture.knownMiss),
       expected,
       actual,
@@ -126,8 +135,47 @@ export async function measureActivation() {
     perViewpoint: Object.fromEntries(
       [...perViewpoint].map(([id, counts]) => [id, scoreFrom(counts)])
     ),
+    perBand: Object.fromEntries([...perBand].map(([id, counts]) => [id, scoreFrom(counts)])),
+    perSource: Object.fromEntries([...perSource].map(([id, counts]) => [id, scoreFrom(counts)])),
+    bandAgreement: bandAgreementFrom(perFixture),
+    ccColumnOrderAgreement: ccColumnOrderAgreementFrom(perFixture),
     perFixture,
   };
+}
+
+// A combined diff marks a change in the prefix column of the parent it came
+// from, so the same merge read from the other side moves the marker between
+// columns. This compares the two directions of the same merge.
+function ccColumnOrderAgreementFrom(perFixture) {
+  const groups = new Map();
+  for (const row of perFixture) {
+    if (!row.ccPairOf) continue;
+    if (!groups.has(row.ccPairOf)) groups.set(row.ccPairOf, {});
+    const direction = row.id.endsWith('--cc-reverse') ? 'reverse' : 'firstParent';
+    groups.get(row.ccPairOf)[direction] = row.actual.join(',');
+  }
+  return [...groups].map(([scenario, byDirection]) => ({
+    scenario,
+    byDirection,
+    agrees: byDirection.firstParent === byDirection.reverse,
+  }));
+}
+
+// For each semantic scenario expressed in all three bands, report whether the
+// ACTIVATED set is identical across bands. A disagreement is not scored as a
+// separate metric: it localizes where the recall gap in perBand comes from.
+function bandAgreementFrom(perFixture) {
+  const groups = new Map();
+  for (const row of perFixture) {
+    if (!row.bandOf) continue;
+    if (!groups.has(row.bandOf)) groups.set(row.bandOf, {});
+    groups.get(row.bandOf)[row.band] = row.actual.join(',');
+  }
+  return [...groups].map(([bandOf, byBand]) => ({
+    bandOf,
+    byBand,
+    agrees: new Set(Object.values(byBand)).size === 1,
+  }));
 }
 
 async function runMode(fixture, mode) {
@@ -256,10 +304,38 @@ async function main() {
     );
   }
   lines.push('');
+  lines.push('## Activation by input band');
+  for (const [band, score] of Object.entries(activation.perBand)) {
+    lines.push(
+      `  ${band}: precision ${formatRate(score.precision)} recall ${formatRate(score.recall)} (tp=${score.tp} fp=${score.fp} fn=${score.fn} tn=${score.tn})`
+    );
+  }
+  lines.push('');
+  lines.push('## Activation by corpus source');
+  for (const [source, score] of Object.entries(activation.perSource)) {
+    lines.push(
+      `  ${source}: precision ${formatRate(score.precision)} recall ${formatRate(score.recall)} (tp=${score.tp} fp=${score.fp} fn=${score.fn} tn=${score.tn})`
+    );
+  }
+  lines.push('');
+  lines.push('## Band agreement (same semantic change, three bands)');
+  for (const row of activation.bandAgreement) {
+    lines.push(
+      `  ${row.agrees ? 'AGREE   ' : 'DISAGREE'} ${row.bandOf}: ${BANDS.map((band) => `${band}=[${row.byBand[band]}]`).join(' ')}`
+    );
+  }
+  lines.push('');
+  lines.push('## Combined-diff parent order (same merge, both directions)');
+  for (const row of activation.ccColumnOrderAgreement) {
+    lines.push(
+      `  ${row.agrees ? 'AGREE   ' : 'DISAGREE'} ${row.scenario}: firstParent=[${row.byDirection.firstParent}] reverse=[${row.byDirection.reverse}]`
+    );
+  }
+  lines.push('');
   lines.push('## Per fixture');
   for (const row of activation.perFixture) {
     lines.push(
-      `  ${row.match ? 'OK  ' : 'MISS'} ${row.id} [${row.shape}] expected=[${row.expected.join(' ')}] actual=[${row.actual.join(' ')}]${row.knownMiss ? ' (labeled knownMiss)' : ''}`
+      `  ${row.match ? 'OK  ' : 'MISS'} ${row.id} [${row.band}/${row.source}] expected=[${row.expected.join(' ')}] actual=[${row.actual.join(' ')}]${row.knownMiss ? ' (labeled knownMiss)' : ''}`
     );
   }
   lines.push('');
