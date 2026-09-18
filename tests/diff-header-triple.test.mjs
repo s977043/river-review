@@ -526,10 +526,18 @@ test('band 5 (--cc): a combined section is not absorbed into the preceding file 
     'the one-line file must not absorb the combined section’s line numbers'
   );
 
-  // The combined section registers as its own entry rather than vanishing.
+  // The combined section registers as its own entry rather than vanishing, and
+  // since #2294 it also carries its hunks. This assertion read
+  // `f.hunks.length === 0` while the combined body was still being discarded;
+  // the body is now parsed, so no section in this stream may be empty.
   assert.ok(
-    files.length >= 2 && files.some((f) => f.path === 'shared.txt' && f.hunks.length === 0),
-    'the `diff --cc` section is a distinct file entry (zero hunks until #2294)'
+    files.length >= 2 && files.some((f) => f.path === 'shared.txt'),
+    'the `diff --cc` section is a distinct file entry'
+  );
+  assert.equal(
+    files.filter((f) => f.hunks.length === 0).length,
+    0,
+    'no section is left with an empty body (#2294)'
   );
 });
 

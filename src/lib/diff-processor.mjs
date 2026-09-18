@@ -215,6 +215,90 @@ export function renderDiffText(files) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Parse a hunk header, ordinary or combined.
+ *
+ * Ordinary unified diff uses two `@` and one old range:
+ *   `@@ -37,15 +37,15 @@`
+ * A combined diff (`git show --cc`, `git log -p --cc`) uses `parents + 1` `@`
+ * characters and one old range PER PARENT, with the new range last:
+ *   2 parents: `@@@ -37,15 -37,14 +37,15 @@@`
+ *   3 parents: `@@@@ -1,2 -1,2 -1,2 +1,2 @@@@`
+ * The marker widths on both sides are equal, and the old-range count is always
+ * `markerWidth - 1`, so the parent count is read off the marker rather than
+ * guessed from how many ranges happen to be present (#2294).
+ *
+ * `oldStart`/`oldLines` report the FIRST parent, which is what the ordinary
+ * form already reports and what every caller of `hunk.oldStart` expects.
+ *
+ * @param {string} line
+ * @returns {{oldStart: number, oldLines: number, newStart: number, newLines: number, parentCount: number} | null}
+ */
+function parseHunkHeader(line) {
+  // The marker widths are deliberately NOT tied to each other with a
+  // backreference, and nothing is asserted after the closing marker. Both would
+  // narrow acceptance below the pre-#2294 regexp, which was unanchored and so
+  // read any line merely CONTAINING `@@ -N,M +N,M @@`.
+  const match = /^@{2,}((?: -\d+(?:,\d+)?)+) \+(\d+)(?:,(\d+))? @{2,}/.exec(line);
+  if (!match) return null;
+  const oldRanges = match[1].trim().split(' ');
+  // Real git always emits `markerWidth === parents + 1` old ranges, so the two
+  // agree. When a hand-authored header disagrees, the RANGE COUNT wins: the
+  // body's prefix width is what actually has to be counted, and a body written
+  // against N ranges carries N columns whatever the marker says. Trusting the
+  // marker instead would refuse the header outright and re-open the very
+  // fail-silent drop this change closes — measured on `@@@ -1,1 +1,1 @@@` and
+  // `@@@@ -1,1 +1,1 @@`, both of which parse identically to pre-#2294 here.
+  const parentCount = oldRanges.length;
+  const [firstOldStart, firstOldLines] = oldRanges[0].slice(1).split(',');
+  return {
+    oldStart: Number.parseInt(firstOldStart, 10),
+    oldLines: firstOldLines === undefined ? 1 : Number.parseInt(firstOldLines, 10),
+    newStart: Number.parseInt(match[2], 10),
+    newLines: match[3] ? Number.parseInt(match[3], 10) : 1,
+    parentCount,
+  };
+}
+
+/**
+ * Classify one ordinary (single-parent) hunk body line.
+ * @param {string} line
+ * @returns {'added' | 'removed' | 'context'}
+ */
+function classifyUnifiedBodyLine(line) {
+  if (line.startsWith('+')) return 'added';
+  if (line.startsWith('-')) return 'removed';
+  return 'context';
+}
+
+/**
+ * Classify one combined hunk body line by its `parentCount` prefix columns.
+ *
+ * Column `i` describes the line's relationship to parent `i`:
+ *   `-` the line exists in that parent and NOT in the merge result
+ *   `+` the line exists in the merge result and NOT in that parent
+ *   ` ` the line exists in both
+ *
+ * Therefore the line is present in the result unless SOME column is `-`, and it
+ * is a change worth reviewing when SOME column is `+`. The common merge-
+ * resolution line (`++RESOLVED` for two parents) is present in the result and
+ * in neither parent, so it is exactly the line a reviewer needs.
+ *
+ * `\ No newline at end of file` is metadata rather than a body line and must
+ * not advance the line counter.
+ *
+ * @param {string} line
+ * @param {number} parentCount
+ * @returns {'added' | 'removed' | 'context'}
+ */
+function classifyCombinedBodyLine(line, parentCount) {
+  if (line.startsWith('\\')) return 'removed';
+  const columns = line.slice(0, parentCount);
+  if (columns.includes('-')) return 'removed';
+  if (columns.includes('+')) return 'added';
+  return 'context';
+}
+
+/**
  * Parse a unified diff into a structured representation.
  * Returns files with hunks and added line hints so downstream consumers
  * can locate where to attach review comments.
@@ -304,23 +388,20 @@ export function parseUnifiedDiff(diffText) {
     }
     if (!currentFile) continue;
     if (line.startsWith('@@')) {
-      const match = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
-      if (!match) continue;
-      const oldStart = Number.parseInt(match[1], 10);
-      const oldLines = match[2] ? Number.parseInt(match[2], 10) : 1;
-      const newStart = Number.parseInt(match[3], 10);
-      const newLines = match[4] ? Number.parseInt(match[4], 10) : 1;
+      const hunkHeader = parseHunkHeader(line);
+      if (!hunkHeader) continue;
       currentHunk = {
         header: line,
-        oldStart,
-        oldLines,
-        newStart,
-        newLines,
+        oldStart: hunkHeader.oldStart,
+        oldLines: hunkHeader.oldLines,
+        newStart: hunkHeader.newStart,
+        newLines: hunkHeader.newLines,
+        parentCount: hunkHeader.parentCount,
         lines: [],
         addedLines: [],
       };
       currentFile.hunks.push(currentHunk);
-      newLineNumber = newStart;
+      newLineNumber = hunkHeader.newStart;
       continue;
     }
     if (!currentHunk) continue;
@@ -330,11 +411,20 @@ export function parseUnifiedDiff(diffText) {
     // counter is hunk content. `+++ x` is the added line `++ x` and `--- x` is
     // the deleted line `-- x`; excluding either miscounts `newLineNumber`, and
     // a deleted line must not advance it at all (#2249 review).
-    if (line.startsWith('+')) {
+    //
+    // A combined hunk (`parentCount > 1`) carries one prefix COLUMN per parent
+    // instead of a single prefix character, so the one-character test above
+    // would read the second parent's column as file content. The column rules
+    // are counted instead — see `classifyCombinedBodyLine` (#2294).
+    const classified =
+      currentHunk.parentCount > 1
+        ? classifyCombinedBodyLine(line, currentHunk.parentCount)
+        : classifyUnifiedBodyLine(line);
+    if (classified === 'added') {
       currentFile.addedLines.push(newLineNumber);
       currentHunk.addedLines.push(newLineNumber);
       newLineNumber += 1;
-    } else if (line.startsWith('-')) {
+    } else if (classified === 'removed') {
       // deletion: do not advance new line number
     } else {
       newLineNumber += 1;

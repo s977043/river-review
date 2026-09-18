@@ -219,14 +219,14 @@ River Review が認識する入力アーティファクトは以下の通りで�
 | 2   | `src/cli/commands/skills.mjs:133` → `collectRepoDiff`                 | `river skills`                                  | River Review（git）               | 3                    | 入らない      |
 | 3   | `src/lib/local-runner.mjs:269` `planLocalReview`                      | `river run`（plan 相当）                        | River Review（git）               | 3（`--debug` 時 10） | 入らない      |
 | 4   | `src/lib/local-runner.mjs:767` `doctorLocalReview`                    | `river doctor`                                  | River Review（git）               | 0（`--debug` 時 10） | 入らない      |
-| 5   | `src/lib/review-plan.mjs:484` / `:841` の artifact ファイル読み       | tier 1 / 2 / 3 の `diff` artifact               | ホスト（実 git 出力の場合を含む） | 規定しない           | 未決（#2294） |
+| 5   | `src/lib/review-plan.mjs:484` / `:841` の artifact ファイル読み       | tier 1 / 2 / 3 の `diff` artifact               | ホスト（実 git 出力の場合を含む） | 規定しない           | 対応済み      |
 | 6   | `src/lib/review-plan.mjs:481` / `:838` `diffOverride.diffText`        | `review plan` / `exec` の `--base <ref>`        | River Review（git）               | 3                    | 入らない      |
-| 7   | `src/lib/local-runner.mjs:533` `runLocalReview({ context })`          | プログラム的な埋め込み                          | ホスト                            | 規定しない           | 未決（#2294） |
-| 8   | `runners/node-api/src/index.ts:342` / `:389` の `diffText` オプション | Node API（`buildExecutionPlan()` / `review()`） | ホスト                            | 規定しない           | 未決（#2294） |
+| 7   | `src/lib/local-runner.mjs:533` `runLocalReview({ context })`          | プログラム的な埋め込み                          | ホスト                            | 規定しない           | 対応済み      |
+| 8   | `runners/node-api/src/index.ts:342` / `:389` の `diffText` オプション | Node API（`buildExecutionPlan()` / `review()`） | ホスト                            | 規定しない           | 対応済み      |
 
 - **git 生成経路（1 / 2 / 3 / 4 / 6）**: いずれも `src/lib/git.mjs:520` の `git diff --unified=<N> --no-color <baseRef>` を通る。base ref を明示する 2 ツリー間の diff なので、combined diff は出力されない。マージ競合中の作業ツリーでも出力は 2 ツリー形式のままであり、競合マーカーは通常の追加行として現れる（2026-09-17 に使い捨ての repo で実測）。
 - **context 幅**: 既定は 3 である。`river doctor`（経路 4）だけが 0 を使い、`--debug` を付けた経路 3 / 4 は 10 を使う。context 幅を選ぶのは River Review 側の実装上の判断であり、本契約が外部へ約束する値ではない。ホストが経路 5 / 7 / 8 で供給する差分の context 幅は **規定しない**。
-- **combined diff**: `diff --cc` / `@@@` 形式の差分の扱いは **未決** である（#2294）。`git show --cc` / `git log -p --cc` は実 git の出力なので、経路 5 へ正規の入力として届きうる。しかし現行の parse 層は `@@@` ハンクの本体を黙って落とすため、当面 combined diff を渡さないこと。本契約における位置づけは #2294 の決着で確定する。
+- **combined diff**: `diff --cc` / `@@@` 形式の差分は **対応済み**である（#2294）。`git show --cc` / `git log -p --cc` は実 git の出力であり、経路 5 / 7 / 8 へ正規の入力として届く。parse 層は親の数だけ `@` が増えるハンクヘッダ（2 親なら `@@@`、3 親の octopus なら `@@@@`）を受理し、本体行を親ごとの 1 列ずつの prefix 列として数える。ある列が `-` なら該当行はマージ結果に存在せず行番号を消費しない。いずれかの列が `+` なら追加行として `addedLines` に載る。競合解決行（2 親なら `++`）はどちらの親にも無い行なので、レビュー対象として正しく届く。
 
 #### 差分供給の責務の所在
 
