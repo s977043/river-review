@@ -48946,10 +48946,32 @@ function parseHunkHeader(line) {
 
 /**
  * Classify one ordinary (single-parent) hunk body line.
+ *
+ * `\ No newline at end of file` is metadata about the PRECEDING line, not a
+ * line of the merge result, so it must consume no line number. Counting it as
+ * context (the behaviour before #2309) shifted every addition below it down by
+ * one: on the real `git diff` of a file with no trailing newline, `addedLines`
+ * read `[3, 4, 5]` where the file has those lines at 2, 3 and 4 (measured on
+ * `a7cb83ba` with the same fixture this change pins).
+ *
+ * It is classified as `removed` rather than given a fourth category because
+ * `removed` is exactly "present in neither the result's line numbering nor the
+ * added list" — the same reason `classifyCombinedBodyLine` returns `removed`
+ * for it. The asymmetry that docblock described (#2294) is now closed.
+ *
+ * The test is `startsWith('\\')` and not the English sentence: git localises
+ * the message, and other producers word it differently, but the `\ ` prefix is
+ * fixed. A hunk body line that is real content always carries a ` `/`+`/`-`
+ * prefix, so an unprefixed leading backslash can only be this marker in any
+ * producer-generated diff. Hand-written input that puts raw backslash-leading
+ * content in a hunk body is the one shape whose numbering changes, and it was
+ * already unrepresentable as diff content.
+ *
  * @param {string} line
  * @returns {'added' | 'removed' | 'context'}
  */
 function classifyUnifiedBodyLine(line) {
+  if (line.startsWith('\\')) return 'removed';
   if (line.startsWith('+')) return 'added';
   if (line.startsWith('-')) return 'removed';
   return 'context';
@@ -48976,10 +48998,9 @@ function classifyUnifiedBodyLine(line) {
  * every finding below. Pinned by the mixed-column test.
  *
  * `\ No newline at end of file` is metadata rather than a body line and must
- * not advance the line counter. NOTE the asymmetry: the ordinary single-parent
- * path in `parseUnifiedDiff` still counts that marker as a context line. That
- * is pre-existing behaviour, identical in the pre-#2294 parser, and is tracked
- * in #2309 rather than changed here.
+ * not advance the line counter. `classifyUnifiedBodyLine` applies the same rule
+ * on the ordinary single-parent path as of #2309; the asymmetry this docblock
+ * used to describe is gone, and both paths now agree.
  *
  * @param {string} line
  * @param {number} parentCount
