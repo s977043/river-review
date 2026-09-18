@@ -137,4 +137,4 @@ find runners/github-action/dist -maxdepth 1 -type d
 - CLAUDE.md § AI Misoperation Guards—"Match CI Node version for dist rebuilds"
 - `.nvmrc`—リポジトリ Node version の SSoT
 - `.github/workflows/test.yml`—`dist-check` ジョブ定義
-- `runners/github-action/package.json`—`build:action` スクリプト
+- `package.json`—`build:action` スクリプト（リポジトリ root。`runners/github-action/package.json` は存在しない）
