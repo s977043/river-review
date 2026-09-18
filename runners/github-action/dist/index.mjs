@@ -48959,10 +48959,22 @@ function parseHunkHeader(line) {
  * added list" — the same reason `classifyCombinedBodyLine` returns `removed`
  * for it. The asymmetry that docblock described (#2294) is now closed.
  *
- * The test is `startsWith('\\')` and not the English sentence: git localises
- * the message, and other producers word it differently, but the `\ ` prefix is
- * fixed. A hunk body line that is real content always carries a ` `/`+`/`-`
- * prefix, so an unprefixed leading backslash can only be this marker in any
+ * The test is the leading backslash and not the sentence after it, because the
+ * PREFIX is what the diff format fixes while the wording is the producer's.
+ * An earlier revision of this comment justified that by claiming git localises
+ * the message; it does not. Measured on git 2.52.0 with `LANG`/`LC_ALL`/
+ * `LC_MESSAGES` set to `de_DE` / `fr_FR` / `ja_JP` (and `C`), the marker read
+ * `\ No newline at end of file` in all four, and the msgid does not appear in
+ * the installed `git.mo` catalogues. So the reason to avoid the sentence is the
+ * OTHER producers — GNU/BSD `diff` and patch-producing tools are free to word
+ * it differently, and nothing in the format promises the English text — not a
+ * localisation behaviour of git that was never measured.
+ *
+ * The check is `startsWith('\\')`, which is deliberately wider than the `\ `
+ * (backslash-space) that every measured producer emits: a bare `\` line, or
+ * `\x`, is classified the same way. That width is pinned by test, not left to
+ * inference. A hunk body line that is real content always carries a ` `/`+`/`-`
+ * prefix, so an unprefixed leading backslash cannot be content in any
  * producer-generated diff. Hand-written input that puts raw backslash-leading
  * content in a hunk body is the one shape whose numbering changes, and it was
  * already unrepresentable as diff content.

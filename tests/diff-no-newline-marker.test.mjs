@@ -260,21 +260,37 @@ test('#2309: band 5 (hand-written) — declared counts that disagree with the bo
   assert.deepEqual(understate.files[0].addedLines, [1, 2]);
 });
 
-test('#2309: the marker test is the `\\ ` prefix, not the English sentence', () => {
-  // git localises the message; the prefix is what is stable. A hand-written body
-  // line whose content begins with a raw backslash is indistinguishable from the
-  // marker and is therefore treated as one — that shape is unrepresentable as
-  // real diff content, where every body line carries a ` `/`+`/`-` prefix.
-  const localised = parseUnifiedDiff(
+test('#2309: the marker is matched by its backslash prefix, not by the sentence', () => {
+  // The sentence is the PRODUCER's; the prefix is the format's. git does not
+  // localise this message — measured on git 2.52.0 with LANG/LC_ALL/LC_MESSAGES
+  // set to de_DE, fr_FR, ja_JP and C, all four emit
+  // `\ No newline at end of file` — so the reason not to match the English text
+  // is that other producers (GNU/BSD `diff`, patch tooling) may word it
+  // differently, not that git varies it.
+  const worded = parseUnifiedDiff(
     [
       '--- a/f.md',
       '+++ b/f.md',
       '@@ -1,2 +1,2 @@',
       ' a',
-      '\\ Kein Zeilenumbruch am Dateiende',
+      '\\ No newline at the end of the file',
       '+b',
       '',
     ].join('\n')
   );
-  assert.deepEqual(localised.files[0].addedLines, [2]);
+  assert.deepEqual(worded.files[0].addedLines, [2]);
+});
+
+test('#2309: the backslash check is wider than `\\ ` and that width is pinned', () => {
+  // The implementation tests `startsWith('\\')`, not `startsWith('\\ ')`. Every
+  // measured producer emits backslash-space, so narrowing would pass the other
+  // tests in this file — it was a surviving mutation until this test existed.
+  // Pinning the wider form keeps a producer that omits the space (or a future
+  // `\ No newline` variant) from silently reintroducing the off-by-one.
+  for (const marker of ['\\', '\\x', '\\No newline at end of file']) {
+    const parsed = parseUnifiedDiff(
+      ['--- a/f.md', '+++ b/f.md', '@@ -1,2 +1,2 @@', ' a', marker, '+b', ''].join('\n')
+    );
+    assert.deepEqual(parsed.files[0].addedLines, [2], `marker line ${JSON.stringify(marker)}`);
+  }
 });
