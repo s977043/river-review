@@ -35,6 +35,20 @@
  *              allowlist, or the check is not on it
  *   stale      a verdict exists but describes a revision that is no longer the
  *              subject, so it may not be read as a verdict on the subject
+ *
+ * STAGING IS PART OF "REALLY RAN ON THIS REVISION" (#2311). A check runs in a
+ * sandbox holding copies of the changed files. The sandbox refuses a symlinked,
+ * escaping or `.git` path, and a copy can fail. A checker handed a sandbox that
+ * is missing one of its subject files still exits 0 — an empty directory is a
+ * clean directory as far as a linter is concerned. So a `pass` whose subject
+ * files did not all arrive is not a verdict about those files, and this module
+ * downgrades it to `unrunnable`: the check WAS attempted, the process DID
+ * launch, and what came back cannot be read as a verdict. `bypassed` would be
+ * wrong (nothing refused permission) and `skipped` would be worse still (it
+ * reads as "nothing needed checking" and is ignored in triage). A `fail` is
+ * NOT downgraded: a checker that found a problem in a partial sandbox found a
+ * real problem, and hiding it would be the fail-open this module exists to
+ * prevent.
  */
 
 import { nonEmptyNfcString as nonEmptyString } from './promotion-candidates.mjs';
@@ -78,6 +92,8 @@ export const FAST_VERIFICATION_REASON = Object.freeze({
   ALLOWLIST_MISS: 'allowlist-miss',
   EXECUTOR_STATUS_MISSING: 'executor-status-missing',
   RESULT_CORRELATION_FAILED: 'result-correlation-failed',
+  STAGING_INCOMPLETE: 'staging-incomplete',
+  STAGING_EVIDENCE_MISSING: 'staging-evidence-missing',
   SUBJECT_REVISION_CHANGED: 'subject-revision-changed',
   SUBJECT_REVISION_UNREADABLE: 'subject-revision-unreadable',
 });
@@ -94,6 +110,40 @@ const SAFE_CHECK_METADATA_KEYS = Object.freeze([
   'stdoutBytes',
   'unrunnableCause',
 ]);
+
+/** Refusal reasons a staging row may carry (`STAGING_SKIP_REASON`, #2311). */
+const STAGING_SKIP_REASONS = Object.freeze(['symlink', 'outside-root', 'git-path', 'copy-error']);
+
+/**
+ * Re-validate the orchestrator's `staging` summary at this module's boundary.
+ * `runGatesImpl` is injectable, so nothing that arrives here is trusted to have
+ * the shape the real orchestrator produces: an unreadable summary is returned
+ * as `null`, which the caller treats as "no staging evidence", never as "fine".
+ *
+ * @param {unknown} staging
+ * @returns {{ requested: number, copied: number, complete: boolean,
+ *   skipped: Array<{ path: string, reason: string }> } | null}
+ */
+function normalizeStaging(staging) {
+  if (!isPlainObject(staging)) return null;
+  if (typeof staging.complete !== 'boolean') return null;
+  if (!Number.isInteger(staging.requested) || staging.requested < 0) return null;
+  if (!Number.isInteger(staging.copied) || staging.copied < 0) return null;
+  const skipped = [];
+  for (const row of Array.isArray(staging.skipped) ? staging.skipped : []) {
+    const filePath = nonEmptyString(row?.path);
+    if (filePath == null || !STAGING_SKIP_REASONS.includes(row?.reason)) return null;
+    skipped.push({ path: filePath, reason: row.reason });
+  }
+  return {
+    requested: staging.requested,
+    copied: staging.copied,
+    // A summary that claims completeness while reporting a refusal is not
+    // believed: the refusals decide.
+    complete: staging.complete && skipped.length === 0,
+    skipped,
+  };
+}
 
 function safeCheckMetadata(result) {
   const metadata = {};
@@ -359,15 +409,32 @@ export async function runFastVerification({
     }
     const { status, reasonCode } = result;
     const metadata = safeCheckMetadata(result);
+    const staging = normalizeStaging(result.staging);
+    const stagingEvidence = staging == null ? {} : { staging };
     if (status !== CHECK_STATUS.PASS && status !== CHECK_STATUS.FAIL) {
       // Anything the executor could not turn into a verdict is unrunnable —
       // including an absent or unrecognized status, which must not decay to pass.
       return checkEntry(id, CHECK_STATUS.UNRUNNABLE, resolveUnrunnableReason(status, reasonCode), {
         ...metadata,
+        ...stagingEvidence,
       });
+    }
+    // (d2) A `pass` is a verdict about the changed files only if the changed
+    // files were there. Absent staging evidence is not evidence of absence of a
+    // problem, so it is refused the same way an incomplete staging is (#2311).
+    if (status === CHECK_STATUS.PASS && (staging == null || !staging.complete)) {
+      return checkEntry(
+        id,
+        CHECK_STATUS.UNRUNNABLE,
+        staging == null
+          ? FAST_VERIFICATION_REASON.STAGING_EVIDENCE_MISSING
+          : FAST_VERIFICATION_REASON.STAGING_INCOMPLETE,
+        { ...metadata, ...stagingEvidence, supersededStatus: CHECK_STATUS.PASS }
+      );
     }
     return checkEntry(id, status, reasonCode ?? FAST_VERIFICATION_REASON.EXECUTED, {
       ...metadata,
+      ...stagingEvidence,
     });
   });
 

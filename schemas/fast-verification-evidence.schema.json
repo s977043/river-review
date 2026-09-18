@@ -92,6 +92,8 @@
         "allowlist-miss",
         "executor-status-missing",
         "result-correlation-failed",
+        "staging-incomplete",
+        "staging-evidence-missing",
         "subject-revision-changed",
         "subject-revision-unreadable",
         "DETERMINISTIC_PASS",
@@ -115,7 +117,7 @@
         },
         "reasonCode": { "$ref": "#/$defs/reasonCode" },
         "supersededStatus": {
-          "description": "Present only on a `stale` row: the verdict that was produced before the subject moved. Kept so the run is auditable, and deliberately NOT promoted back into `status`.",
+          "description": "The verdict that was produced before it was refused: on a `stale` row, before the subject moved; on an `unrunnable` / `staging-incomplete` / `staging-evidence-missing` row, the `pass` that could not be confirmed against the sandbox the check actually ran in. Kept so the run is auditable, and deliberately NOT promoted back into `status`.",
           "type": "string",
           "enum": ["pass", "fail"]
         },
@@ -129,6 +131,32 @@
         "unrunnableCause": {
           "type": "string",
           "enum": ["spawn-error", "timeout", "invalid-entry"]
+        },
+        "staging": {
+          "description": "What reached the sandbox this check ran in (#2311). A check runs against copies of the changed files, and the sandbox refuses a symlinked, escaping or `.git` path; a checker handed a sandbox missing one of its subject files still exits 0. `complete: false` therefore means the run says nothing about the files listed in `skipped`, and the row's `pass` is recorded as `unrunnable` instead. Repo-relative paths only; copy-error messages are never persisted.",
+          "type": "object",
+          "required": ["requested", "copied", "complete", "skipped"],
+          "additionalProperties": false,
+          "properties": {
+            "requested": { "type": "integer", "minimum": 0 },
+            "copied": { "type": "integer", "minimum": 0 },
+            "complete": { "type": "boolean" },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "reason"],
+                "additionalProperties": false,
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "reason": {
+                    "type": "string",
+                    "enum": ["symlink", "outside-root", "git-path", "copy-error"]
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

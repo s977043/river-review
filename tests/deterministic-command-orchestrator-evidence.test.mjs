@@ -91,6 +91,7 @@ test('runDeterministicGates preserves only safe executor metadata for evidence',
         durationMs: 17,
         exitCode: 2,
         stdoutBytes: 31,
+        staging: { requested: 1, copied: 1, complete: true, skipped: [] },
       },
       {
         gateIndex: 1,
@@ -100,6 +101,7 @@ test('runDeterministicGates preserves only safe executor metadata for evidence',
         durationMs: 30_000,
         stdoutBytes: 0,
         unrunnableCause: 'timeout',
+        staging: { requested: 1, copied: 1, complete: true, skipped: [] },
       },
     ]);
 
