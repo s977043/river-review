@@ -155,6 +155,12 @@
                   }
                 }
               }
+            },
+            "deleted": {
+              "description": "Changed files the caller DECLARED the change deleted. They are not staged and do not count towards `requested`, because a removed file is not in the review source tree and would otherwise make every deleting change permanently `unrunnable`. Declared by the caller only: absence from the source tree is never read as deletion, since an empty or wrong source tree would then read as a clean run.",
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
             }
           }
         }

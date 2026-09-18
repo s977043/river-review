@@ -132,7 +132,7 @@ test('an executed check reports pass with its safe metadata and nothing else', a
       durationMs: 12,
       exitCode: 0,
       stdoutBytes: 7,
-      staging: { requested: 1, copied: 1, complete: true, skipped: [] },
+      staging: { requested: 1, copied: 1, complete: true, skipped: [], deleted: [] },
     },
   ]);
   // Adversarial #4: no secret-like stdout/stderr anywhere in the evidence.
@@ -733,7 +733,7 @@ test('a check row copies only the allowlisted execution metadata', async () => {
           status: 'pass',
           reasonCode: 'DETERMINISTIC_PASS',
           durationMs: 2,
-          staging: { requested: 1, copied: 1, complete: true, skipped: [] },
+          staging: { requested: 1, copied: 1, complete: true, skipped: [], deleted: [] },
           stdout: 'AWS_SECRET_ACCESS_KEY=deadbeefdeadbeef',
           cwd: '/Users/someone/private/path',
           env: { TOKEN: 'ghp_deadbeef' },
@@ -748,7 +748,7 @@ test('a check row copies only the allowlisted execution metadata', async () => {
       status: 'pass',
       reasonCode: 'DETERMINISTIC_PASS',
       durationMs: 2,
-      staging: { requested: 1, copied: 1, complete: true, skipped: [] },
+      staging: { requested: 1, copied: 1, complete: true, skipped: [], deleted: [] },
     },
   ]);
   const serialized = JSON.stringify(evidence);

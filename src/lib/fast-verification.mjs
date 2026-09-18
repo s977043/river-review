@@ -49,6 +49,15 @@
  * NOT downgraded: a checker that found a problem in a partial sandbox found a
  * real problem, and hiding it would be the fail-open this module exists to
  * prevent.
+ *
+ * A DELETED file is not a staging failure, but it has to be DECLARED. A file
+ * the change removed is not in `reviewSourceDir`, so staging it always fails
+ * and every change that deletes a file would be permanently `unrunnable`.
+ * `deletedFiles` is how the caller says so; the orchestrator excludes those
+ * from what it asks for and lists them under `staging.deleted`. This module
+ * never infers deletion from the filesystem: an empty or wrong
+ * `reviewSourceDir` makes every path absent, and reading that as "all deleted"
+ * would manufacture the false green this checkpoint exists to prevent.
  */
 
 import { nonEmptyNfcString as nonEmptyString } from './promotion-candidates.mjs';
@@ -124,24 +133,50 @@ const STAGING_SKIP_REASONS = Object.freeze(['symlink', 'outside-root', 'git-path
  * @returns {{ requested: number, copied: number, complete: boolean,
  *   skipped: Array<{ path: string, reason: string }> } | null}
  */
-function normalizeStaging(staging) {
+function normalizeStaging(staging, { expectedFileCount } = {}) {
   if (!isPlainObject(staging)) return null;
   if (typeof staging.complete !== 'boolean') return null;
   if (!Number.isInteger(staging.requested) || staging.requested < 0) return null;
   if (!Number.isInteger(staging.copied) || staging.copied < 0) return null;
+  // `skipped` absent or not an array is an unreadable summary, not an empty
+  // one. Reading a non-array as `[]` would be the single fail-open left in
+  // this boundary (#2311 review).
+  if (!Array.isArray(staging.skipped)) return null;
   const skipped = [];
-  for (const row of Array.isArray(staging.skipped) ? staging.skipped : []) {
+  for (const row of staging.skipped) {
     const filePath = nonEmptyString(row?.path);
     if (filePath == null || !STAGING_SKIP_REASONS.includes(row?.reason)) return null;
     skipped.push({ path: filePath, reason: row.reason });
   }
+  // `deleted` may be absent (an older orchestrator shape), but a present-and-
+  // not-an-array value is unreadable, not empty.
+  if (staging.deleted !== undefined && !Array.isArray(staging.deleted)) return null;
+  const deleted = [];
+  for (const file of staging.deleted ?? []) {
+    const value = nonEmptyString(file);
+    if (value == null) return null;
+    deleted.push(value);
+  }
+  // The NUMBERS are checked too, not only the lists. A boundary that declares
+  // it does not trust an injectable impl cannot trust half of what that impl
+  // reports: every changed file must be accounted for as either asked-for or
+  // declared-deleted, and nothing can arrive that was never asked for.
+  if (
+    Number.isInteger(expectedFileCount) &&
+    staging.requested + deleted.length !== expectedFileCount
+  ) {
+    return null;
+  }
+  if (staging.copied > staging.requested) return null;
   return {
     requested: staging.requested,
     copied: staging.copied,
-    // A summary that claims completeness while reporting a refusal is not
-    // believed: the refusals decide.
-    complete: staging.complete && skipped.length === 0,
+    // A summary that claims completeness while reporting a refusal — or while
+    // reporting that fewer files arrived than were asked for — is not believed.
+    // The refusals and the counts decide, not the flag.
+    complete: staging.complete && skipped.length === 0 && staging.copied >= staging.requested,
     skipped,
+    deleted,
   };
 }
 
@@ -273,6 +308,9 @@ function aggregateStatus(checks) {
  * @param {object} input.resolution a `resolveTrigger` result for `after-change`
  * @param {string} input.subjectRevision commit SHA / content hash the checkpoint is about
  * @param {string[]} [input.changedFiles] repo-relative paths the change touched
+ * @param {string[]} [input.deletedFiles] subset of `changedFiles` the change DELETED.
+ *   Declared by the caller, never inferred: they are not staged and do not count
+ *   against staging completeness.
  * @param {Array<object>} [input.selected] selected skills (`metadata.deterministicGate`)
  * @param {string} [input.trustedTree] host-trusted base checkout (allowlist source)
  * @param {string} [input.reviewSourceDir] dir the changed files are staged FROM
@@ -290,6 +328,7 @@ export async function runFastVerification({
   resolution,
   subjectRevision,
   changedFiles,
+  deletedFiles,
   selected,
   trustedTree,
   reviewSourceDir,
@@ -306,6 +345,9 @@ export async function runFastVerification({
     throw new FastVerificationError('subjectRevision must be a non-empty string.');
   }
   const files = normalizeChangedFiles(changedFiles);
+  // Only declared deletions that are actually in scope are honoured: a path
+  // outside `changedFiles` must not be able to excuse anything.
+  const deleted = normalizeChangedFiles(deletedFiles).filter((file) => files.includes(file));
   const startedAtMs = now();
 
   const finish = (checks, reasonCode) => {
@@ -382,6 +424,7 @@ export async function runFastVerification({
     selected,
     reviewSourceDir,
     changedFiles: files,
+    deletedFiles: deleted,
     processEnv,
   });
   // Correlate results to gates BY POSITION, never by `skillId`. A skill
@@ -409,7 +452,7 @@ export async function runFastVerification({
     }
     const { status, reasonCode } = result;
     const metadata = safeCheckMetadata(result);
-    const staging = normalizeStaging(result.staging);
+    const staging = normalizeStaging(result.staging, { expectedFileCount: files.length });
     const stagingEvidence = staging == null ? {} : { staging };
     if (status !== CHECK_STATUS.PASS && status !== CHECK_STATUS.FAIL) {
       // Anything the executor could not turn into a verdict is unrunnable —

@@ -143,7 +143,7 @@ describe('runDeterministicGates — single matching command', () => {
         status: 'pass',
         reasonCode: 'DETERMINISTIC_PASS',
         // #2311: every row carries what actually reached its sandbox.
-        staging: { requested: 1, copied: 1, complete: true, skipped: [] },
+        staging: { requested: 1, copied: 1, complete: true, skipped: [], deleted: [] },
       },
     ]);
     assert.equal(calls.length, 1);

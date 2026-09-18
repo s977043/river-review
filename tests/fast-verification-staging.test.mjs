@@ -141,6 +141,7 @@ test('#2311 reproduction: a refused subject file does not produce a pass (defaul
     copied: 0,
     complete: false,
     skipped: [{ path: 'lnk/bad.js', reason: 'symlink' }],
+    deleted: [],
   });
   assert.equal(evidence.status, CHECK_STATUS.UNRUNNABLE);
   assertValidEvidence(evidence);
@@ -174,6 +175,7 @@ test('a fully staged subject file still passes through the default wiring', asyn
     copied: 1,
     complete: true,
     skipped: [],
+    deleted: [],
   });
   assertValidEvidence(evidence);
 });
@@ -235,6 +237,7 @@ test('the orchestrator surfaces staging per gate without changing gate aggregati
     copied: 0,
     complete: false,
     skipped: [{ path: 'lnk/bad.js', reason: 'symlink' }],
+    deleted: [],
   });
 });
 
@@ -410,4 +413,351 @@ test('a fail is NOT downgraded by incomplete staging — that would be the fail-
   assert.equal(evidence.checks[0].status, CHECK_STATUS.FAIL);
   assert.equal(evidence.checks[0].staging.complete, false, 'the refusal is still recorded');
   assertValidEvidence(evidence);
+});
+
+// ---------------------------------------------------------------------------
+// The COUNT side of the invariant (#2311 review M1).
+//
+// `copyReviewTargetToSandbox` drops a non-string / empty `files` entry without
+// recording it in ANY of its four skip lists ("Ignore non-string / empty
+// entries safely", src/lib/deterministic-command-sandbox.mjs). That path is the
+// only one that produces "no refusal reported, yet copied < requested", so
+// `copied >= requested` is the ONLY clause standing between it and a false
+// `complete: true`. Without this test that clause can be deleted and every
+// other test stays green.
+// ---------------------------------------------------------------------------
+
+test('a silently dropped file makes staging incomplete even with no refusal reported', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  const result = await runDeterministicGates({
+    trustedTree,
+    selected: [skill('s1', '/usr/bin/tool-ok')],
+    reviewSourceDir,
+    // '' is dropped by the sandbox without landing in any skip list.
+    changedFiles: ['real.js', ''],
+    execImpl: async () => ({ status: 'pass', reasonCode: 'DETERMINISTIC_PASS' }),
+  });
+
+  const { staging } = result.results[0];
+  assert.deepEqual(staging.skipped, [], 'the sandbox reports no refusal for this path');
+  assert.equal(staging.requested, 2);
+  assert.equal(staging.copied, 1, 'one file never arrived');
+  assert.equal(
+    staging.complete,
+    false,
+    'the count is the only evidence here; complete must still be false'
+  );
+});
+
+test('the checkpoint refuses a pass when the counts disagree and nothing was refused', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['real.js', 'other.js'],
+    selected: [skill('lint', '/usr/bin/tool-ok')],
+    trustedTree,
+    reviewSourceDir,
+    now: clock(),
+    runGatesImpl: async () => ({
+      results: [
+        {
+          gateIndex: 0,
+          skillId: 'lint',
+          status: 'pass',
+          reasonCode: 'DETERMINISTIC_PASS',
+          // Claims completeness, reports no refusal, but only staged one of two.
+          staging: { requested: 2, copied: 1, complete: true, skipped: [], deleted: [] },
+        },
+      ],
+    }),
+  });
+
+  assert.equal(evidence.checks[0].status, CHECK_STATUS.UNRUNNABLE);
+  assert.equal(evidence.checks[0].reasonCode, FAST_VERIFICATION_REASON.STAGING_INCOMPLETE);
+  assert.equal(evidence.checks[0].staging.complete, false);
+  assertValidEvidence(evidence);
+});
+
+// ---------------------------------------------------------------------------
+// Deleted files (#2311 review M2). A removed file cannot be staged; without a
+// declaration every deleting change would be permanently unrunnable.
+// ---------------------------------------------------------------------------
+
+test('an undeclared deleted file is still a staging failure (fail-closed default)', async (t) => {
+  const realCommand = '/bin/echo';
+  try {
+    await fs.access(realCommand);
+  } catch {
+    t.skip(`${realCommand} is not available on this platform`);
+    return;
+  }
+  const trustedTree = await makeTrustedTree([realCommand]);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['real.js', 'gone.js'],
+    selected: [skill('lint', realCommand)],
+    trustedTree,
+    reviewSourceDir,
+    processEnv: process.env,
+    now: clock(),
+  });
+
+  assert.equal(evidence.checks[0].status, CHECK_STATUS.UNRUNNABLE);
+  assert.deepEqual(evidence.checks[0].staging.skipped, [{ path: 'gone.js', reason: 'copy-error' }]);
+});
+
+test('a DECLARED deleted file does not make the run unrunnable', async (t) => {
+  const realCommand = '/bin/echo';
+  try {
+    await fs.access(realCommand);
+  } catch {
+    t.skip(`${realCommand} is not available on this platform`);
+    return;
+  }
+  const trustedTree = await makeTrustedTree([realCommand]);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['real.js', 'gone.js'],
+    deletedFiles: ['gone.js'],
+    selected: [skill('lint', realCommand)],
+    trustedTree,
+    reviewSourceDir,
+    processEnv: process.env,
+    now: clock(),
+  });
+
+  assert.equal(evidence.checks[0].status, CHECK_STATUS.PASS);
+  assert.deepEqual(evidence.checks[0].staging, {
+    requested: 1,
+    copied: 1,
+    complete: true,
+    skipped: [],
+    deleted: ['gone.js'],
+  });
+  // The deletion stays in scope for the reader: it is still a changed file.
+  assert.deepEqual(evidence.changedFiles, ['gone.js', 'real.js']);
+  assertValidEvidence(evidence);
+});
+
+test('declaring a file deleted cannot excuse a file that is not in scope', async (t) => {
+  const realCommand = '/bin/echo';
+  try {
+    await fs.access(realCommand);
+  } catch {
+    t.skip(`${realCommand} is not available on this platform`);
+    return;
+  }
+  const trustedTree = await makeTrustedTree([realCommand]);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['real.js', 'gone.js'],
+    // 'lnk/bad.js' is not a changed file, so declaring it deleted changes nothing.
+    deletedFiles: ['lnk/bad.js'],
+    selected: [skill('lint', realCommand)],
+    trustedTree,
+    reviewSourceDir,
+    processEnv: process.env,
+    now: clock(),
+  });
+
+  assert.equal(evidence.checks[0].status, CHECK_STATUS.UNRUNNABLE);
+  assert.deepEqual(evidence.checks[0].staging.deleted, []);
+});
+
+test('declaring EVERY changed file deleted still cannot mint a pass about them', async (t) => {
+  const realCommand = '/bin/echo';
+  try {
+    await fs.access(realCommand);
+  } catch {
+    t.skip(`${realCommand} is not available on this platform`);
+    return;
+  }
+  const trustedTree = await makeTrustedTree([realCommand]);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['gone-a.js', 'gone-b.js'],
+    deletedFiles: ['gone-a.js', 'gone-b.js'],
+    selected: [skill('lint', realCommand)],
+    trustedTree,
+    reviewSourceDir,
+    processEnv: process.env,
+    now: clock(),
+  });
+
+  // Nothing was staged, so the pass is about an empty subject — which is
+  // exactly what `staging.deleted` records. It is a pass over zero files, and
+  // the evidence says so rather than implying the files were checked.
+  assert.equal(evidence.checks[0].staging.requested, 0);
+  assert.equal(evidence.checks[0].staging.copied, 0);
+  assert.deepEqual(evidence.checks[0].staging.deleted, ['gone-a.js', 'gone-b.js']);
+  assertValidEvidence(evidence);
+});
+
+// ---------------------------------------------------------------------------
+// Boundary hardening (#2311 review, Minor 1 / Minor 2).
+// ---------------------------------------------------------------------------
+
+test('a non-array skipped list is unreadable, not empty', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  for (const skipped of [undefined, null, 'none', {}, 0]) {
+    const evidence = await runFastVerification({
+      resolution: await afterChangeResolution(),
+      subjectRevision: SUBJECT,
+      changedFiles: ['real.js'],
+      selected: [skill('lint', '/usr/bin/tool-ok')],
+      trustedTree,
+      reviewSourceDir,
+      now: clock(),
+      runGatesImpl: async () => ({
+        results: [
+          {
+            gateIndex: 0,
+            skillId: 'lint',
+            status: 'pass',
+            reasonCode: 'DETERMINISTIC_PASS',
+            staging: { requested: 1, copied: 1, complete: true, skipped },
+          },
+        ],
+      }),
+    });
+    assert.equal(
+      evidence.checks[0].reasonCode,
+      FAST_VERIFICATION_REASON.STAGING_EVIDENCE_MISSING,
+      `skipped ${JSON.stringify(skipped)} must read as unreadable`
+    );
+  }
+});
+
+test('a staging summary whose numbers do not account for every changed file is unreadable', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  for (const staging of [
+    // Reports one file asked for, but two were in scope.
+    { requested: 1, copied: 1, complete: true, skipped: [], deleted: [] },
+    // Claims more arrived than were asked for.
+    { requested: 2, copied: 3, complete: true, skipped: [], deleted: [] },
+    // `deleted` present but not an array.
+    { requested: 2, copied: 2, complete: true, skipped: [], deleted: 'gone.js' },
+  ]) {
+    const evidence = await runFastVerification({
+      resolution: await afterChangeResolution(),
+      subjectRevision: SUBJECT,
+      changedFiles: ['real.js', 'other.js'],
+      selected: [skill('lint', '/usr/bin/tool-ok')],
+      trustedTree,
+      reviewSourceDir,
+      now: clock(),
+      runGatesImpl: async () => ({
+        results: [
+          {
+            gateIndex: 0,
+            skillId: 'lint',
+            status: 'pass',
+            reasonCode: 'DETERMINISTIC_PASS',
+            staging,
+          },
+        ],
+      }),
+    });
+    assert.equal(
+      evidence.checks[0].reasonCode,
+      FAST_VERIFICATION_REASON.STAGING_EVIDENCE_MISSING,
+      `staging ${JSON.stringify(staging)} must read as unreadable`
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Minor 3: the observed interaction between a staging downgrade and staleness,
+// pinned so it cannot drift unnoticed. A row already downgraded to `unrunnable`
+// is not in EXECUTED_STATUSES, so it is not re-marked `stale`; the checkpoint
+// reasonCode still reports that the subject moved. This is the conservative
+// direction (no verdict is resurrected), and the test exists so that a future
+// change to either rule has to state which one it means.
+// ---------------------------------------------------------------------------
+
+test('a staging-downgraded row stays unrunnable when the subject also moves', async (t) => {
+  const realCommand = '/bin/echo';
+  try {
+    await fs.access(realCommand);
+  } catch {
+    t.skip(`${realCommand} is not available on this platform`);
+    return;
+  }
+  const trustedTree = await makeTrustedTree([realCommand]);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+
+  const evidence = await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['lnk/bad.js'],
+    selected: [skill('lint', realCommand)],
+    trustedTree,
+    reviewSourceDir,
+    processEnv: process.env,
+    now: clock(),
+    readSubjectRevision: () => 'c'.repeat(40),
+  });
+
+  assert.equal(evidence.checks[0].status, CHECK_STATUS.UNRUNNABLE);
+  assert.equal(evidence.checks[0].reasonCode, FAST_VERIFICATION_REASON.STAGING_INCOMPLETE);
+  // No pass is resurrected by the stale pass: supersededStatus is written once.
+  assert.equal(evidence.checks[0].supersededStatus, CHECK_STATUS.PASS);
+  assert.equal(evidence.status, CHECK_STATUS.UNRUNNABLE);
+  assert.equal(evidence.reasonCode, FAST_VERIFICATION_REASON.SUBJECT_REVISION_CHANGED);
+  assertValidEvidence(evidence);
+});
+
+test('only in-scope deletions are forwarded to the orchestrator', async () => {
+  const trustedTree = await makeTrustedTree(['/usr/bin/tool-ok']);
+  const reviewSourceDir = await makeSourceDirWithSymlink();
+  const calls = [];
+
+  await runFastVerification({
+    resolution: await afterChangeResolution(),
+    subjectRevision: SUBJECT,
+    changedFiles: ['real.js', 'gone.js'],
+    // 'not-in-scope.js' is not a changed file. Forwarding it would let a caller
+    // grow the excused set beyond what it declared as the subject.
+    deletedFiles: ['gone.js', 'not-in-scope.js', 'gone.js'],
+    selected: [skill('lint', '/usr/bin/tool-ok')],
+    trustedTree,
+    reviewSourceDir,
+    now: clock(),
+    runGatesImpl: (args) => {
+      calls.push(args);
+      return runDeterministicGates({
+        ...args,
+        execImpl: async () => ({ status: 'pass', reasonCode: 'DETERMINISTIC_PASS' }),
+      });
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(
+    calls[0].deletedFiles,
+    ['gone.js'],
+    'out-of-scope and duplicate declarations are dropped before they leave this module'
+  );
+  assert.deepEqual(calls[0].changedFiles, ['gone.js', 'real.js']);
 });

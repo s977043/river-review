@@ -35,6 +35,16 @@
  * aggregation (`strictBlock` / `deterministicUnrunnable`) is deliberately
  * UNCHANGED: this is additive surfacing, not a new gate rule.
  *
+ * DELETION IS DECLARED, NEVER INFERRED (#2311 review). A file the change
+ * DELETED cannot be staged: it is not in `reviewSourceDir` any more, so the
+ * copy fails and the gate would be permanently unrunnable for any change that
+ * removes a file. The caller therefore declares them in `deletedFiles`; they
+ * are not staged, are excluded from `requested`, and are listed under
+ * `staging.deleted` so the scope stays auditable. Absence from the source dir
+ * is deliberately NOT read as "deleted": a wrong or empty `reviewSourceDir`
+ * makes every path absent, and inferring deletion from it would turn that
+ * mistake into a clean bill of health — the exact false green #2311 is about.
+ *
  * SAFE EVIDENCE METADATA (#2275 PR-3A). The executor already classifies one
  * command into a verdict plus bounded execution metadata. This orchestrator
  * preserves only an explicit allowlist of that metadata (`durationMs`,
@@ -132,12 +142,16 @@ export const STAGING_SKIP_REASON = Object.freeze({
  * they can embed absolute host paths, and the reason code already says what
  * happened.
  *
+ * `requested` counts only the files that were actually asked for, i.e. the
+ * changed files MINUS the declared deletions, which are reported separately.
+ *
  * @param {number} requested how many files this gate asked to stage
  * @param {object} staged the `copyReviewTargetToSandbox` return value
+ * @param {string[]} [deleted] declared deletions, excluded from `requested`
  * @returns {{ requested: number, copied: number, complete: boolean,
- *   skipped: Array<{ path: string, reason: string }> }}
+ *   skipped: Array<{ path: string, reason: string }>, deleted: string[] }}
  */
-function summarizeStaging(requested, staged) {
+function summarizeStaging(requested, staged, deleted = []) {
   const skipped = [];
   const push = (list, reason) => {
     for (const file of Array.isArray(list) ? list : []) {
@@ -156,10 +170,15 @@ function summarizeStaging(requested, staged) {
   return {
     requested,
     copied,
-    // Incomplete when anything was refused, or when fewer files arrived than
-    // were asked for (a staging impl that reports neither is still not trusted).
+    // Incomplete when anything was refused, OR when fewer files arrived than
+    // were asked for. The second clause is not redundant: a non-string or empty
+    // `files` entry is dropped by `copyReviewTargetToSandbox` without being
+    // recorded in ANY of the four skip lists (deterministic-command-sandbox.mjs
+    // "Ignore non-string / empty entries safely"), so the count is the only
+    // evidence that something never arrived (#2311 review M1).
     complete: skipped.length === 0 && copied >= requested,
     skipped,
+    deleted: [...deleted],
   };
 }
 
@@ -221,6 +240,8 @@ function safeExecutionMetadata(result) {
  * @param {Array<object>} [opts.selected] selected skills (metadata.deterministicGate)
  * @param {string} [opts.reviewSourceDir] dir the changed files are copied FROM
  * @param {string[]} [opts.changedFiles] relative paths to stage into the clean cwd
+ * @param {string[]} [opts.deletedFiles] subset of `changedFiles` the change DELETED;
+ *   declared by the caller (never inferred), not staged, and excluded from `requested`
  * @param {Record<string, string | undefined>} [opts.processEnv] source env (e.g. process.env)
  * @param {(args: object) => Promise<{ status: string, reasonCode: string }>} [opts.execImpl]
  *   injected executor; defaults to `executeDeterministicCommand`
@@ -230,13 +251,14 @@ function safeExecutionMetadata(result) {
  *     durationMs?: number, exitCode?: number, stdoutBytes?: number,
  *     unrunnableCause?: 'spawn-error'|'timeout'|'invalid-entry',
  *     staging: { requested: number, copied: number, complete: boolean,
- *       skipped: Array<{ path: string, reason: string }> } }> }>}
+ *       skipped: Array<{ path: string, reason: string }>, deleted: string[] } }> }>}
  */
 export async function runDeterministicGates({
   trustedTree,
   selected,
   reviewSourceDir,
   changedFiles,
+  deletedFiles,
   processEnv,
   execImpl,
   mkdtempImpl,
@@ -248,6 +270,14 @@ export async function runDeterministicGates({
   if (gates.length === 0) return emptyResult();
 
   const exec = typeof execImpl === 'function' ? execImpl : executeDeterministicCommand;
+
+  // Declared deletions. Only non-empty strings count: a malformed entry must
+  // not silently excuse a file from being staged.
+  const deletedSet = new Set(
+    (Array.isArray(deletedFiles) ? deletedFiles : []).filter(
+      (file) => typeof file === 'string' && file.length > 0
+    )
+  );
 
   let strictBlock = false;
   let deterministicUnrunnable = false;
@@ -265,13 +295,18 @@ export async function runDeterministicGates({
     try {
       cleanCwd = await makeSandboxTempDir(mkdtempImpl);
       emptyHome = await makeSandboxTempDir(mkdtempImpl);
-      const filesToStage = Array.isArray(changedFiles) ? changedFiles : [];
+      const requestedFiles = Array.isArray(changedFiles) ? changedFiles : [];
+      const deleted = [];
+      const filesToStage = [];
+      for (const file of requestedFiles) {
+        (deletedSet.has(file) ? deleted : filesToStage).push(file);
+      }
       const staged = await copyReviewTargetToSandbox({
         sourceDir: reviewSourceDir,
         destDir: cleanCwd,
         files: filesToStage,
       });
-      const staging = summarizeStaging(filesToStage.length, staged);
+      const staging = summarizeStaging(filesToStage.length, staged, deleted);
       const env = buildSandboxEnv(processEnv, { home: emptyHome });
       const result = await exec({ entry, sandboxDir: cleanCwd, env });
 
