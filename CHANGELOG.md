@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.118.0](https://github.com/s977043/river-review/compare/v1.117.0...v1.118.0) (2026-09-18)
+
+
+### Features
+
+* **diff:** parse combined diff hunk bodies instead of dropping them ([#2308](https://github.com/s977043/river-review/issues/2308)) ([f63ed77](https://github.com/s977043/river-review/commit/f63ed779273c4e91031a8be6560a853550c4fa47))
+
 ## [1.117.0](https://github.com/s977043/river-review/compare/v1.116.0...v1.117.0) (2026-09-18)
 
 
