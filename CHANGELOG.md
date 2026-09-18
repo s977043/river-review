@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.117.0](https://github.com/s977043/river-review/compare/v1.116.0...v1.117.0) (2026-09-18)
+
+
+### Features
+
+* **security:** add structured audit artifacts and repeat-run coverage ([#2267](https://github.com/s977043/river-review/issues/2267)) ([#2306](https://github.com/s977043/river-review/issues/2306)) ([13cd8eb](https://github.com/s977043/river-review/commit/13cd8ebbeb5c8c6522ba88e2fb5ae691dda67e83))
+* **verify:** after-change fast-verification checkpoint core ([#2275](https://github.com/s977043/river-review/issues/2275) PR-3B) ([#2304](https://github.com/s977043/river-review/issues/2304)) ([7a33c67](https://github.com/s977043/river-review/commit/7a33c671da56324418bae8276a55e816b9316842))
+
+
+### Bug Fixes
+
+* **diff:** anchor Git file headers to explicit boundaries ([#2280](https://github.com/s977043/river-review/issues/2280)) ([#2288](https://github.com/s977043/river-review/issues/2288)) ([236e526](https://github.com/s977043/river-review/commit/236e5265fb8c6f0d4b2b3320ba23d0a2771e1e75))
+
 ## [1.116.0](https://github.com/s977043/river-review/compare/v1.115.0...v1.116.0) (2026-09-17)
 
 
