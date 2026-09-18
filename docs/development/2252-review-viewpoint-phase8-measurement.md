@@ -7,7 +7,7 @@ Phase 6 までで導入した Review Viewpoint の効果を、Phase 7（2〜3 sk
 - 回帰ピン: `tests/review-viewpoint-activation-metrics.test.mjs`
 - 測定日: 2026-09-18 / base commit `13cd8ebb`
 
-> **この文書の前半（Phase 8a）の測定値は、production の入力分布を代表しません。** PR #2307 時点の corpus は手書きの unified diff 15 本のみで、`--unified=0` と combined diff（`@@@`）を含んでいませんでした。その後 PR #2308（#2294）が combined diff の hunk 本体を parse するようになり、同じ diff でも parse 結果が変わっています。現時点で有効な母集団と数値は後述の「Phase 8b」節です。前半は Phase 8a 当時の記録として残しています。
+> **この文書の前半（Phase 8a）の測定値は、production の入力分布を代表しません。** PR #2307 時点の corpus は手書きの unified diff 15 本のみで、`--unified=0` と combined diff（`@@@`）を含んでいませんでした。その後 PR #2308（#2294）が combined diff の hunk 本体を parse するようになり、同じ diff でも parse 結果が変わっています。現時点で有効な母集団は後述の「Phase 8b」節、有効な数値は「Phase 8c」節です。前半は Phase 8a 当時の記録として残しています。
 
 ## 測定方法
 
@@ -226,11 +226,87 @@ latency は最も重い fixture（`p08-mixed-diff-contract-plus-noise`）で測�
 - **`repo-commit` の negative 帯域の広さ**: docs のみ 1 本、union 拡張 1 本、package.json のマージ 1 本にとどまる
 - **意味的レビュー層**: Phase 8a と同じく API キー未登録のため未測定である
 
+## Phase 8c: 検出器の帯域対応（PR #2314、2026-09-18）
+
+Phase 8b が示した 2 つの穴を `src/lib/api-compatibility-signals.mjs` 側で塞いだあとの再測定です。corpus は Phase 8b から 1 本も変えていません（46 fixture × viewpoint 3 = 138 ラベルペア）。base commit は `a7cb83ba` です。
+
+### 直した 2 点
+
+- **combined diff の marker 列**: `line.startsWith('-')` / `line.startsWith('+')` を、hunk の `parentCount` 幅の列読みに置き換えた。`parentCount` は `parseUnifiedDiff`（`src/lib/diff-processor.mjs`）が決める値をそのまま使っており、列幅を検出器側で推測していない。判定規則は parse 層の `classifyCombinedBodyLine` と同じで、いずれかの列が `-` なら removed、いずれかが `+` なら added とする
+- **`--unified=0` の宣言スコープ**: hunk ヘッダ末尾に git が出す囲みの宣言（`@@ -3 +2,0 @@ interface CheckoutResponse {`）を宣言ベースフォールバックの探索対象に加えた。context 行が 1 行も無い `--unified=0` では、宣言はここにしか現れない。ヘッダはその hunk の囲みを指すので、フォールバックが hunk スコープである性質は変わっていない
+
+### 再測定結果
+
+`node scripts/measure-review-viewpoints.mjs` の出力から転記しています。
+
+```text
+overall: precision 100.0% recall 87.8% (tp=43 fp=0 fn=6 tn=89)
+  backward-compatibility: precision 100.0% recall 95.0% (tp=19 fp=0 fn=1 tn=26)
+  api-test-coverage: precision 100.0% recall 95.0% (tp=19 fp=0 fn=1 tn=26)
+  optional-field-consumer-handling: precision 100.0% recall 55.6% (tp=5 fp=0 fn=4 tn=37)
+
+## Activation by input band
+  default: precision 100.0% recall 84.6% (tp=22 fp=0 fn=4 tn=49)
+  u0: precision 100.0% recall 77.8% (tp=7 fp=0 fn=2 tn=15)
+  cc: precision 100.0% recall 100.0% (tp=14 fp=0 fn=0 tn=25)
+
+## Activation by corpus source
+  handwritten: precision 100.0% recall 88.2% (tp=15 fp=0 fn=2 tn=28)
+  generated-git: precision 100.0% recall 100.0% (tp=28 fp=0 fn=0 tn=44)
+  repo-commit: precision n/a recall 0.0% (tp=0 fp=0 fn=4 tn=17)
+```
+
+Phase 8b との差（いずれも上表とその前節の表からの転記であり、暗算ではありません）:
+
+| 指標              | Phase 8b | Phase 8c |
+| ----------------- | -------- | -------- |
+| overall precision | 100.0%   | 100.0%   |
+| overall recall    | 69.4%    | 87.8%    |
+| `default` recall  | 84.6%    | 84.6%    |
+| `u0` recall       | 55.6%    | 77.8%    |
+| `cc` recall       | 50.0%    | 100.0%   |
+
+false activation は 138 ペア中 0 件のままです。`default` 帯域は 1 件も変わっていません。
+
+### 親の順序への依存が消えたこと
+
+同じマージを両方向から読ませた比較は、全 6 シナリオで一致しました。
+
+```text
+## Combined-diff parent order (same merge, both directions)
+  AGREE    b01-response-dto-field-removed: firstParent=[api-test-coverage,backward-compatibility] reverse=[api-test-coverage,backward-compatibility]
+  AGREE    b02-requiredness-tightened: firstParent=[api-test-coverage,backward-compatibility] reverse=[api-test-coverage,backward-compatibility]
+  AGREE    b03-optional-field-added: firstParent=[optional-field-consumer-handling] reverse=[optional-field-consumer-handling]
+  AGREE    b04-contract-named-outside-api-path: firstParent=[api-test-coverage,backward-compatibility] reverse=[api-test-coverage,backward-compatibility]
+  AGREE    b05-contract-file-comment-only: firstParent=[] reverse=[]
+  AGREE    b06-internal-type-field-removed: firstParent=[] reverse=[]
+```
+
+3 帯域の判定一致（`default` / `u0` / `cc`）も全 6 シナリオで AGREE になりました。
+
+一致するだけなら「何も発火しない検出器」でも満たせるため、回帰ピンでは positive 4 シナリオが**空でない同じ集合**で一致することも検査しています。
+
+### 自己整合でないことの確認（mutation、Phase 8c）
+
+| 変異                                      | 結果                                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------- |
+| 列幅を `parentCount` 無視の 1 固定に戻す  | `cc` recall 100.0% → 50.0%、両方向比較が 4 シナリオで DISAGREE、テスト 6 本 fail |
+| hunk ヘッダの囲み宣言を読む分岐を削除する | `u0` recall 77.8% → 55.6%、テスト 3 本 fail                                      |
+
+どちらも検知できました。変異は測定後に復元済みです（`git diff` で確認）。
+
+### Phase 8c で残した穴
+
+- **`repo-commit` 帯域の positive 0/4**: `ReviewOptions` / `SkillSelectionResult` は契約の形をしているが、検出器の名前条件（`Dto|Request|Response|Api|Contract|Schema`）とパス条件のどちらにも当たらない。#2314 の範囲外であり、`KNOWN_MISSES` として明示したまま残している
+- **`p09`（request DTO への必須フィールド追加）**: カタログに対応する kind が無い被覆漏れで、検出器側の問題ではない
+- **3 親以上の octopus merge（`@@@@` 以上）**: 列読みは `parentCount` 幅を使うため原理的には同じ規則で動くが、帯域として採取しておらず未測定である
+- **`\ No newline at end of file` の扱い**: combined と単一親で parse 層の扱いが非対称である（#2309）。本 PR では触っていない
+
 ## 判断
 
 ### Phase 7（2〜3 skill への展開）
 
-Phase 8a では「進めてよい」と結論していました。Phase 8b の測定を受けて、**検出器側の帯域対応を先に片付けることを推奨します**（Phase 7 を止める、ではなく順序を入れ替える）。根拠は次のとおりです。
+Phase 8a では「進めてよい」、Phase 8b では「検出器側の帯域対応を先に片付ける」と結論していました。Phase 8c でその前提条件を満たしたため、**進めてよい**に戻します。以下の Phase 8b 時点の根拠は、当時の判断の記録として残しています。
 
 - false activation は 138 ペア中 0 件で、展開時に最も懸念される「観点のノイズ増加」は広げた母集団でも観測されていない。combined diff 帯域でも 0 件である。precision は判断材料として据え置ける
 - 一方 recall は 88.2% から 69.4% へ下がり、`cc` 帯域は 50.0%、`u0` 帯域は 55.6% である。skill を 2〜3 本に増やすと、同じ帯域の穴が skill の本数だけ複製される
@@ -238,9 +314,9 @@ Phase 8a では「進めてよい」と結論していました。Phase 8b の�
 - combined diff ではマージの向きで結果が変わる。同じ変更が再現性なく検出されたりされなかったりする状態を、skill の本数だけ増やすのは避けたい
 - 実コミット帯域で positive が 0/4 であったことは、検出器の名前・パス条件が実在のコードより狭いことを示す。横展開はこの狭さも複製する
 
-したがって次を条件とします。
+したがって次を条件としていました。1 つ目は Phase 8c で満たしています。
 
-- 横展開の前に、combined diff の prefix 列と `--unified=0` での宣言スコープを検出器側で扱えるようにする。少なくとも `cc` 帯域が親の順序に依存しなくなること
+- ~~横展開の前に、combined diff の prefix 列と `--unified=0` での宣言スコープを検出器側で扱えるようにする。少なくとも `cc` 帯域が親の順序に依存しなくなること~~ → Phase 8c で対応済み（`cc` recall 100.0%、両方向一致）
 - 展開する skill ごとに、同じ形式の人手ラベル corpus を先に用意する。カタログを足してから測るのでは、この測定の値が薄まるだけである
 - 新規 corpus は最初から 3 帯域で用意する。既定帯域だけで測ると、この 2 つの穴は最後まで見えない
 - `p09` と同型の「カタログに kind が無い」被覆漏れを、展開先でも negative ではなく knownMiss として明示する

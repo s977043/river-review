@@ -203,3 +203,120 @@ test('does not treat an ordinary object property edit as an API contract signal'
 
   assert.deepEqual(signals, []);
 });
+
+// --- #2314: combined diff marker columns and the --unified=0 declaration scope
+
+const CC_FIRST_PARENT = `diff --cc src/api/user.ts
+index cf979c5,27481b2..c46f3ff
+--- a/src/api/user.ts
++++ b/src/api/user.ts
+@@@ -1,4 -1,6 +1,5 @@@
+  interface UserResponse {
+    id: string;
+ -  legacyName: string;
+    name: string;
++   locale: string;
+  }
+`;
+
+// The same merge read from the other parent. The semantic change is identical;
+// only which column carries the marker differs.
+const CC_REVERSE = `diff --cc src/api/user.ts
+index 27481b2,cf979c5..c46f3ff
+--- a/src/api/user.ts
++++ b/src/api/user.ts
+@@@ -1,6 -1,4 +1,5 @@@
+  interface UserResponse {
+    id: string;
+-   legacyName: string;
+    name: string;
+ +  locale: string;
+  }
+`;
+
+test('combined diff: a removal in the second parent column is not read as context', () => {
+  const signals = detect(CC_FIRST_PARENT);
+  assert.deepEqual(
+    signals.map((signal) => signal.kind),
+    ['dto-field-removed']
+  );
+});
+
+test('combined diff: the verdict does not depend on which parent the merge is read from', () => {
+  const first = detect(CC_FIRST_PARENT).map((signal) => signal.kind);
+  const reverse = detect(CC_REVERSE).map((signal) => signal.kind);
+  assert.deepEqual(first, reverse);
+  assert.deepEqual(first, ['dto-field-removed']);
+});
+
+test('combined diff: a merge that changes no contract property emits nothing', () => {
+  const signals = detect(`diff --cc src/api/user.ts
+index cf979c5,27481b2..c46f3ff
+--- a/src/api/user.ts
++++ b/src/api/user.ts
+@@@ -1,4 -1,4 +1,4 @@@
+  interface UserResponse {
+ -  // renamed in one parent
+ +  // renamed on this side
+    id: string;
+  }
+`);
+  assert.deepEqual(signals, []);
+});
+
+// Cross-check against the production parse path rather than against a second
+// copy of the column rules written inside this test (CLAUDE.md "Self-consistent
+// test traps"). `parseUnifiedDiff` records the new-file line number of every
+// line it classified as added; the detector must anchor its added-line signal
+// on one of those, which is only true if both read the same columns.
+test('combined diff: detector line anchors agree with parseUnifiedDiff addedLines', () => {
+  const diffText = `diff --cc src/api/profile.ts
+index d0bd09c,44f47d8..21a014c
+--- a/src/api/profile.ts
++++ b/src/api/profile.ts
+@@@ -1,4 -1,4 +1,5 @@@
+  interface ProfileResponse {
+    id: string;
+ +  nickname?: string;
++   avatarUrl: string;
+  }
+`;
+  const parsed = parseUnifiedDiff(diffText);
+  const addedLines = parsed.files[0].addedLines;
+  assert.deepEqual(addedLines, [3, 4]);
+
+  const signals = detectApiCompatibilitySignals({ diff: { files: parsed.files } });
+  assert.deepEqual(
+    signals.map((signal) => signal.kind),
+    ['dto-optional-field-added']
+  );
+  assert.ok(
+    addedLines.includes(signals[0].line),
+    'signal anchored on a line parseUnifiedDiff did not classify as added'
+  );
+});
+
+test('--unified=0: a contract declared outside an api path is found in the hunk heading', () => {
+  const signals = detect(`diff --git a/src/models/checkout.ts b/src/models/checkout.ts
+index 88f17e5..a59193d 100644
+--- a/src/models/checkout.ts
++++ b/src/models/checkout.ts
+@@ -3 +2,0 @@ interface CheckoutResponse {
+-  couponCode: string;
+`);
+  assert.deepEqual(
+    signals.map((signal) => signal.kind),
+    ['dto-field-removed']
+  );
+});
+
+test('--unified=0: a non-contract heading outside an api path still emits nothing', () => {
+  const signals = detect(`diff --git a/src/models/cart.ts b/src/models/cart.ts
+index 88f17e5..a59193d 100644
+--- a/src/models/cart.ts
++++ b/src/models/cart.ts
+@@ -3 +2,0 @@ interface InternalCartState {
+-  scratchValue: string;
+`);
+  assert.deepEqual(signals, []);
+});
