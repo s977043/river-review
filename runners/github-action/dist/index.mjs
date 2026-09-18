@@ -48897,10 +48897,32 @@ function renderDiffText(files) {
  * @returns {{oldStart: number, oldLines: number, newStart: number, newLines: number, parentCount: number} | null}
  */
 function parseHunkHeader(line) {
-  // The marker widths are deliberately NOT tied to each other with a
-  // backreference, and nothing is asserted after the closing marker. Both would
-  // narrow acceptance below the pre-#2294 regexp, which was unanchored and so
-  // read any line merely CONTAINING `@@ -N,M +N,M @@`.
+  // Three deliberate choices about the shape of this regexp, each MEASURED
+  // against the pre-#2294 regexp rather than asserted:
+  //
+  //  - The marker widths are NOT tied to each other with a backreference, and
+  //    nothing is asserted after the closing marker. Requiring either would
+  //    refuse `@@@ -1,1 +1,1 @@@` and `@@@@ -1,1 +1,1 @@`, which the old regexp
+  //    read as ordinary single-parent hunks — refusing them would re-open the
+  //    fail-silent drop this change closes.
+  //
+  //  - The `^` anchor NARROWS acceptance, and that is intentional. The pre-#2294
+  //    regexp was unanchored, so it read any line merely CONTAINING
+  //    `@@ -N,M +N,M @@`. The two disagree on a line that STARTS with `@@` but
+  //    carries its valid header mid-line — measured on
+  //    `@@ foo @@ -20,2 +20,2 @@` as the second header of a file: old gives
+  //    `hunks 2, addedLines [2, 21]`, this gives `hunks 1, addedLines [2, 4]`.
+  //    No `git` or GNU `diff` producer emits that shape (a body line always
+  //    carries a ` `/`+`/`-` prefix, so it cannot reach column 0), so the band is
+  //    hand-written input only; anchoring is the safer side of it, because the
+  //    unanchored form opens a hunk at a line number the file does not have.
+  //    Pinned by the mid-line-header test in `tests/diff-combined-hunk.test.mjs`
+  //    so the choice is fixed in BOTH directions.
+  //
+  // Do not restate any of the above from memory when editing: run the old
+  // parser (`git show <base>:src/lib/diff-processor.mjs`) against the input
+  // first. An earlier revision of this comment claimed the anchor preserved the
+  // old acceptance set, and it does not.
   const match = /^@{2,}((?: -\d+(?:,\d+)?)+) \+(\d+)(?:,(\d+))? @{2,}/.exec(line);
   if (!match) return null;
   const oldRanges = match[1].trim().split(' ');
@@ -48946,8 +48968,18 @@ function classifyUnifiedBodyLine(line) {
  * resolution line (`++RESOLVED` for two parents) is present in the result and
  * in neither parent, so it is exactly the line a reviewer needs.
  *
+ * The `-` test runs BEFORE the `+` test and the order is load-bearing. Real git
+ * never mixes the two in one line — a column reading `-` already says the line
+ * is absent from the result, which contradicts any `+` — but on hand-written
+ * input that mixes them, `-` has to win: classifying such a line as added would
+ * both invent a line number and advance the counter past it, mis-anchoring
+ * every finding below. Pinned by the mixed-column test.
+ *
  * `\ No newline at end of file` is metadata rather than a body line and must
- * not advance the line counter.
+ * not advance the line counter. NOTE the asymmetry: the ordinary single-parent
+ * path in `parseUnifiedDiff` still counts that marker as a context line. That
+ * is pre-existing behaviour, identical in the pre-#2294 parser, and is tracked
+ * in #2309 rather than changed here.
  *
  * @param {string} line
  * @param {number} parentCount
@@ -49027,7 +49059,17 @@ function parseUnifiedDiff(diffText) {
     // An earlier revision of this comment claimed the broader exemption and was
     // disproved by measurement (#2288 review) — the `diff -u -r` short-option
     // concatenation it declared impossible was injecting line numbers into a
-    // real file. Pinned by the band-4 and band-6 concatenation tests, both of
+    // real file.
+    //
+    // #2294 widens what that ghost carries WITHOUT widening when it appears: a
+    // hand-written combined section with no `diff ` line still mints the same
+    // ghost as before, but the ghost now has hunks and line numbers instead of
+    // being empty — the #2261 D3/D4 shape. It is unreachable from a producer,
+    // because real git always emits `diff --cc` for a combined section, and
+    // adding that one line to the same input makes the ghost disappear and
+    // gives `real.md` its correct `addedLines` (measured). So this stays inside
+    // the hand-authored exemption above rather than becoming a new rule.
+    // Pinned by the band-4 and band-6 concatenation tests, both of
     // which assert addedLines and not only paths.
     const canOpenFile = !gitFormatted || gitFileBoundaryPending;
     if (canOpenFile && line.startsWith('--- ') && (lines[index + 1] ?? '').startsWith('+++ ')) {

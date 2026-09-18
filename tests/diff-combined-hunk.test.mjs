@@ -296,6 +296,127 @@ test('#2294: a hand-written header whose marker width disagrees with its range c
   }
 });
 
+test('#2294: the hunk-header regexp is anchored, narrowing the pre-#2294 acceptance set', () => {
+  // MEASURED divergence from the pre-#2294 parser, pinned in both directions.
+  // The old regexp was unanchored and read any line merely CONTAINING
+  // `@@ -N,M +N,M @@`, so `@@ foo @@ -20,2 +20,2 @@` opened a second hunk at
+  // line 20; anchored, the line is hunk content instead.
+  //
+  // Old parser on this exact input: `hunks 2, addedLines [2, 21]`.
+  // Anchoring is the deliberate choice: no git or GNU diff producer can put an
+  // unprefixed `@@` at column 0 inside a hunk body, so this band is hand-written
+  // only, and the unanchored reading opens a hunk at a line the file lacks.
+  const diff = [
+    '--- a/f.md',
+    '+++ b/f.md',
+    '@@ -1,2 +1,2 @@',
+    ' ctx',
+    '+first',
+    '@@ foo @@ -20,2 +20,2 @@',
+    ' ctx2',
+    '+second',
+    '',
+  ].join('\n');
+  const parsed = parseUnifiedDiff(diff);
+  assert.equal(parsed.files.length, 1);
+  assert.equal(parsed.files[0].hunks.length, 1, 'the mid-line header does not open a hunk');
+  assert.deepEqual(
+    parsed.files[0].addedLines,
+    [2, 4],
+    'the mid-line header is counted as hunk content, not as a new hunk at line 20'
+  );
+});
+
+test('#2294: a combined hunk reports the FIRST parent in oldStart / oldLines', () => {
+  // The docblock promises this, and it is what every existing caller of
+  // `hunk.oldStart` expects from the single-parent form. Asserted for two and
+  // three parents so that reading a different range off the header is caught.
+  const twoParent = parseUnifiedDiff(
+    [
+      'diff --cc m.txt',
+      '--- a/m.txt',
+      '+++ b/m.txt',
+      '@@@ -27,7 -40,9 +22,7 @@@',
+      '  a',
+      '++merged',
+      '',
+    ].join('\n')
+  );
+  assert.equal(twoParent.files[0].hunks[0].parentCount, 2);
+  assert.equal(twoParent.files[0].hunks[0].oldStart, 27, 'first parent start');
+  assert.equal(twoParent.files[0].hunks[0].oldLines, 7, 'first parent length');
+  assert.equal(twoParent.files[0].hunks[0].newStart, 22);
+  assert.deepEqual(twoParent.files[0].addedLines, [23]);
+
+  const threeParent = parseUnifiedDiff(
+    [
+      'diff --cc m.txt',
+      '--- a/m.txt',
+      '+++ b/m.txt',
+      '@@@@ -5,3 -60,4 -70,5 +8,3 @@@@',
+      '   a',
+      '+++merged',
+      '',
+    ].join('\n')
+  );
+  assert.equal(threeParent.files[0].hunks[0].parentCount, 3);
+  assert.equal(threeParent.files[0].hunks[0].oldStart, 5, 'first parent start');
+  assert.equal(threeParent.files[0].hunks[0].oldLines, 3, 'first parent length');
+  assert.equal(threeParent.files[0].hunks[0].newStart, 8);
+  assert.deepEqual(threeParent.files[0].addedLines, [9]);
+});
+
+test('#2294: in a combined body a `-` column beats a `+` column', () => {
+  // Real git never mixes them — a `-` column already says the line is absent
+  // from the merge result, which contradicts `+` — so this is a defensive pin
+  // on hand-written input. If `+` won, the line would be recorded as added at a
+  // number the merge result does not have, and would push everything below it
+  // one line down.
+  const parsed = parseUnifiedDiff(
+    [
+      'diff --cc m.txt',
+      '--- a/m.txt',
+      '+++ b/m.txt',
+      '@@@ -1,3 -1,3 +1,2 @@@',
+      '  a',
+      '+-contradictory',
+      '-+contradictory2',
+      '++real',
+      '',
+    ].join('\n')
+  );
+  // `a` is line 1. Both contradictory lines carry a `-` column, so neither is
+  // added and neither consumes a line number. `++real` is therefore line 2.
+  assert.deepEqual(parsed.files[0].addedLines, [2]);
+});
+
+test('#2294: the single-parent `\\ No newline` asymmetry is pinned as pre-existing', () => {
+  // CHARACTERISATION, NOT A CONTRACT. In an ORDINARY hunk the marker still
+  // counts as a context line and advances the counter, so the additions below
+  // are reported at [3, 5] while the real file has them at 2 and 4. This is
+  // byte-identical to the pre-#2294 parser — it is not a regression from this
+  // change, and it is deliberately NOT fixed here because the combined-diff fix
+  // must not also change ordinary-path line numbering. Tracked in #2309; when
+  // that issue is fixed, this expectation is EXPECTED TO CHANGE.
+  //
+  // It is pinned because the asymmetry with `classifyCombinedBodyLine` is what
+  // makes "classify every body line as combined" an otherwise-invisible change.
+  const parsed = parseUnifiedDiff(
+    [
+      '--- a/f.md',
+      '+++ b/f.md',
+      '@@ -1,3 +1,4 @@',
+      ' a',
+      '\\ No newline at end of file',
+      '+b2',
+      ' c',
+      '+d',
+      '',
+    ].join('\n')
+  );
+  assert.deepEqual(parsed.files[0].addedLines, [3, 5], 'pre-existing off-by-one, not a regression');
+});
+
 test('#2294: ordinary single-parent parsing is untouched', () => {
   // The single-parent path must be byte-identical to pre-#2294 behaviour: every
   // non-combined band (git default, git --unified=0, non-git `diff -u -r`,
