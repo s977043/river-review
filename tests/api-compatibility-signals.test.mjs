@@ -416,3 +416,34 @@ index 1111111,2222222..3333333
   );
   assert.equal(signals[0].line, 2);
 });
+
+// #2309 made the single-parent path stop counting `\ No newline at end of file`
+// as a context line, so the two parse-layer classifiers now agree. This
+// consumer has to follow, or its signal anchors drift one line below every
+// such marker. Cross-checked against parseUnifiedDiff's own addedLines rather
+// than against a hand-computed number.
+test('single-parent diff: a `\\ No newline` marker does not advance the line counter', () => {
+  const diffText = `diff --git a/src/api/tail.ts b/src/api/tail.ts
+--- a/src/api/tail.ts
++++ b/src/api/tail.ts
+@@ -1,4 +1,4 @@
+ interface TailResponse {
+   id: string;
+-  total: string;
+\\ No newline at end of file
++  total: number;
+ }
+`;
+  const parsed = parseUnifiedDiff(diffText);
+  assert.deepEqual(parsed.files[0].addedLines, [3]);
+
+  const signals = detectApiCompatibilitySignals({ diff: { files: parsed.files } });
+  assert.deepEqual(
+    signals.map((signal) => signal.kind),
+    ['dto-field-type-changed']
+  );
+  assert.ok(
+    parsed.files[0].addedLines.includes(signals[0].line),
+    'signal anchored on a line parseUnifiedDiff did not classify as added'
+  );
+});

@@ -62,9 +62,12 @@ function markerWidth(hunk) {
  * cross-check against the parse layer.
  *
  * `\ No newline at end of file` is metadata, not a body line, and must not
- * advance the counter — in COMBINED hunks only. The single-parent path in
- * `parseUnifiedDiff` still counts it as context, and this function mirrors that
- * asymmetry deliberately rather than improving on it (tracked in #2309).
+ * advance the counter. Both parse-layer classifiers apply that rule as of
+ * #2309; before it only the combined one did, and this function mirrored the
+ * asymmetry. It now applies the rule on both paths, matching the parse layer
+ * again. Getting this wrong does not change WHICH signals are emitted, only the
+ * line they are anchored on, which is why it is pinned against
+ * `parseUnifiedDiff`'s own `addedLines` rather than by eye.
  *
  * This mirrors `classifyCombinedBodyLine` / `classifyUnifiedBodyLine` in
  * src/lib/diff-processor.mjs. Those are module-private, so the agreement is
@@ -76,12 +79,12 @@ function markerWidth(hunk) {
  * @returns {'added' | 'removed' | 'context'}
  */
 function classifyBodyLine(line, width) {
+  if (line.startsWith('\\')) return 'removed';
   if (width === 1) {
     if (line.startsWith('+')) return 'added';
     if (line.startsWith('-')) return 'removed';
     return 'context';
   }
-  if (line.startsWith('\\')) return 'removed';
   const columns = line.slice(0, width);
   if (columns.includes('-')) return 'removed';
   if (columns.includes('+')) return 'added';

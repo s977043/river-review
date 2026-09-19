@@ -48946,10 +48946,44 @@ function parseHunkHeader(line) {
 
 /**
  * Classify one ordinary (single-parent) hunk body line.
+ *
+ * `\ No newline at end of file` is metadata about the PRECEDING line, not a
+ * line of the merge result, so it must consume no line number. Counting it as
+ * context (the behaviour before #2309) shifted every addition below it down by
+ * one: on the real `git diff` of a file with no trailing newline, `addedLines`
+ * read `[3, 4, 5]` where the file has those lines at 2, 3 and 4 (measured on
+ * `a7cb83ba` with the same fixture this change pins).
+ *
+ * It is classified as `removed` rather than given a fourth category because
+ * `removed` is exactly "present in neither the result's line numbering nor the
+ * added list" — the same reason `classifyCombinedBodyLine` returns `removed`
+ * for it. The asymmetry that docblock described (#2294) is now closed.
+ *
+ * The test is the leading backslash and not the sentence after it, because the
+ * PREFIX is what the diff format fixes while the wording is the producer's.
+ * An earlier revision of this comment justified that by claiming git localises
+ * the message; it does not. Measured on git 2.52.0 with `LANG`/`LC_ALL`/
+ * `LC_MESSAGES` set to `de_DE` / `fr_FR` / `ja_JP` (and `C`), the marker read
+ * `\ No newline at end of file` in all four, and the msgid does not appear in
+ * the installed `git.mo` catalogues. So the reason to avoid the sentence is the
+ * OTHER producers — GNU/BSD `diff` and patch-producing tools are free to word
+ * it differently, and nothing in the format promises the English text — not a
+ * localisation behaviour of git that was never measured.
+ *
+ * The check is `startsWith('\\')`, which is deliberately wider than the `\ `
+ * (backslash-space) that every measured producer emits: a bare `\` line, or
+ * `\x`, is classified the same way. That width is pinned by test, not left to
+ * inference. A hunk body line that is real content always carries a ` `/`+`/`-`
+ * prefix, so an unprefixed leading backslash cannot be content in any
+ * producer-generated diff. Hand-written input that puts raw backslash-leading
+ * content in a hunk body is the one shape whose numbering changes, and it was
+ * already unrepresentable as diff content.
+ *
  * @param {string} line
  * @returns {'added' | 'removed' | 'context'}
  */
 function classifyUnifiedBodyLine(line) {
+  if (line.startsWith('\\')) return 'removed';
   if (line.startsWith('+')) return 'added';
   if (line.startsWith('-')) return 'removed';
   return 'context';
@@ -48976,10 +49010,9 @@ function classifyUnifiedBodyLine(line) {
  * every finding below. Pinned by the mixed-column test.
  *
  * `\ No newline at end of file` is metadata rather than a body line and must
- * not advance the line counter. NOTE the asymmetry: the ordinary single-parent
- * path in `parseUnifiedDiff` still counts that marker as a context line. That
- * is pre-existing behaviour, identical in the pre-#2294 parser, and is tracked
- * in #2309 rather than changed here.
+ * not advance the line counter. `classifyUnifiedBodyLine` applies the same rule
+ * on the ordinary single-parent path as of #2309; the asymmetry this docblock
+ * used to describe is gone, and both paths now agree.
  *
  * @param {string} line
  * @param {number} parentCount
@@ -58297,9 +58330,12 @@ function markerWidth(hunk) {
  * cross-check against the parse layer.
  *
  * `\ No newline at end of file` is metadata, not a body line, and must not
- * advance the counter — in COMBINED hunks only. The single-parent path in
- * `parseUnifiedDiff` still counts it as context, and this function mirrors that
- * asymmetry deliberately rather than improving on it (tracked in #2309).
+ * advance the counter. Both parse-layer classifiers apply that rule as of
+ * #2309; before it only the combined one did, and this function mirrored the
+ * asymmetry. It now applies the rule on both paths, matching the parse layer
+ * again. Getting this wrong does not change WHICH signals are emitted, only the
+ * line they are anchored on, which is why it is pinned against
+ * `parseUnifiedDiff`'s own `addedLines` rather than by eye.
  *
  * This mirrors `classifyCombinedBodyLine` / `classifyUnifiedBodyLine` in
  * src/lib/diff-processor.mjs. Those are module-private, so the agreement is
@@ -58311,12 +58347,12 @@ function markerWidth(hunk) {
  * @returns {'added' | 'removed' | 'context'}
  */
 function classifyBodyLine(line, width) {
+  if (line.startsWith('\\')) return 'removed';
   if (width === 1) {
     if (line.startsWith('+')) return 'added';
     if (line.startsWith('-')) return 'removed';
     return 'context';
   }
-  if (line.startsWith('\\')) return 'removed';
   const columns = line.slice(0, width);
   if (columns.includes('-')) return 'removed';
   if (columns.includes('+')) return 'added';

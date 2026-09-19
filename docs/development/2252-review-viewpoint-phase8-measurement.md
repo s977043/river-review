@@ -329,7 +329,7 @@ false activation は 150 ペア中 0 件です。改善は `cc` 帯域のみで�
 - **`repo-commit` 帯域の positive 0/4**: `ReviewOptions` / `SkillSelectionResult` は契約の形をしているが、検出器の名前条件（`Dto|Request|Response|Api|Contract|Schema`）とパス条件のどちらにも当たらない。#2314 の範囲外
 - **`p09`（request DTO への必須フィールド追加）**: カタログに対応する kind が無い被覆漏れで、検出器の問題ではない
 - **3 親以上の octopus merge**: レビュー時に 4 親の `@@@@@`（`parentCount=4`）を生成し、検出が正常に動くことを確認した。ただし帯域として corpus に採取していないため、回帰ピンは無い
-- **`\ No newline at end of file` の非対称性**: combined では行カウンタを進めず、単一親では context として進める。parse 層の既存挙動を意図的に写したもので、#2309 の担当範囲
+- **`\ No newline at end of file`**: PR #2319（#2309）が parse 層の単一親パスでも行カウンタを進めないよう直したため、combined / 単一親の非対称性は解消した。本 PR の consumer 側も両パスに同じ規則を適用して追随している（この帯域は corpus に 1 本も無く、専用のユニットテストで押さえている）
 
 ## 判断
 
