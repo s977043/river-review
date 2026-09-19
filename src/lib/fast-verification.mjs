@@ -65,6 +65,7 @@ import {
   extractGateCommands,
   loadTrustedAllowlistEntries,
   runDeterministicGates,
+  STAGING_SKIP_REASON,
 } from './deterministic-command-orchestrator.mjs';
 
 /** The only profile this checkpoint implements (`schemas/flow-entry-map.schema.json`). */
@@ -120,8 +121,13 @@ const SAFE_CHECK_METADATA_KEYS = Object.freeze([
   'unrunnableCause',
 ]);
 
-/** Refusal reasons a staging row may carry (`STAGING_SKIP_REASON`, #2311). */
-const STAGING_SKIP_REASONS = Object.freeze(['symlink', 'outside-root', 'git-path', 'copy-error']);
+/**
+ * Refusal reasons a staging row may carry. DERIVED from the orchestrator's
+ * `STAGING_SKIP_REASON` rather than restated here: a second literal list would
+ * silently accept a reason the producer no longer emits, or reject one it just
+ * started emitting (CLAUDE.md "Import the SSoT, never re-derive it").
+ */
+const STAGING_SKIP_REASONS = Object.freeze(Object.values(STAGING_SKIP_REASON));
 
 /**
  * Re-validate the orchestrator's `staging` summary at this module's boundary.
