@@ -390,17 +390,17 @@ test('#2294: in a combined body a `-` column beats a `+` column', () => {
   assert.deepEqual(parsed.files[0].addedLines, [2]);
 });
 
-test('#2294: the single-parent `\\ No newline` asymmetry is pinned as pre-existing', () => {
-  // CHARACTERISATION, NOT A CONTRACT. In an ORDINARY hunk the marker still
-  // counts as a context line and advances the counter, so the additions below
-  // are reported at [3, 5] while the real file has them at 2 and 4. This is
-  // byte-identical to the pre-#2294 parser — it is not a regression from this
-  // change, and it is deliberately NOT fixed here because the combined-diff fix
-  // must not also change ordinary-path line numbering. Tracked in #2309; when
-  // that issue is fixed, this expectation is EXPECTED TO CHANGE.
+test('#2309: the single-parent `\\ No newline` marker consumes no line number', () => {
+  // DELIBERATE EXPECTATION UPDATE (#2309). This test previously pinned the
+  // opposite value as a CHARACTERISATION: the marker counted as a context line
+  // and the additions were reported at [3, 5] while the real file has them at
+  // 2 and 4. That characterisation comment said in so many words that the
+  // expectation was EXPECTED TO CHANGE once #2309 was fixed, and this is that
+  // change — the old value is the defect, not a contract being broken.
   //
-  // It is pinned because the asymmetry with `classifyCombinedBodyLine` is what
-  // makes "classify every body line as combined" an otherwise-invisible change.
+  // It stays in this file because the asymmetry with `classifyCombinedBodyLine`
+  // is what made "classify every body line as combined" an otherwise-invisible
+  // change; now that both paths agree, the pin is that they keep agreeing.
   const parsed = parseUnifiedDiff(
     [
       '--- a/f.md',
@@ -414,7 +414,7 @@ test('#2294: the single-parent `\\ No newline` asymmetry is pinned as pre-existi
       '',
     ].join('\n')
   );
-  assert.deepEqual(parsed.files[0].addedLines, [3, 5], 'pre-existing off-by-one, not a regression');
+  assert.deepEqual(parsed.files[0].addedLines, [2, 4], 'marker advances no line number (#2309)');
 });
 
 test('#2294: ordinary single-parent parsing is untouched', () => {
