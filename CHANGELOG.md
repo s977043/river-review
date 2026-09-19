@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.118.1](https://github.com/s977043/river-review/compare/v1.118.0...v1.118.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **diff:** stop the ordinary-path no-newline marker from consuming a line number ([#2319](https://github.com/s977043/river-review/issues/2319)) ([c932ccc](https://github.com/s977043/river-review/commit/c932cccacb33bdba3fd22bb489dad59b65ce2263))
+
 ## [1.118.0](https://github.com/s977043/river-review/compare/v1.117.0...v1.118.0) (2026-09-18)
 
 
