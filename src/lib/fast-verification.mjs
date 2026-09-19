@@ -35,6 +35,29 @@
  *              allowlist, or the check is not on it
  *   stale      a verdict exists but describes a revision that is no longer the
  *              subject, so it may not be read as a verdict on the subject
+ *
+ * STAGING IS PART OF "REALLY RAN ON THIS REVISION" (#2311). A check runs in a
+ * sandbox holding copies of the changed files. The sandbox refuses a symlinked,
+ * escaping or `.git` path, and a copy can fail. A checker handed a sandbox that
+ * is missing one of its subject files still exits 0 — an empty directory is a
+ * clean directory as far as a linter is concerned. So a `pass` whose subject
+ * files did not all arrive is not a verdict about those files, and this module
+ * downgrades it to `unrunnable`: the check WAS attempted, the process DID
+ * launch, and what came back cannot be read as a verdict. `bypassed` would be
+ * wrong (nothing refused permission) and `skipped` would be worse still (it
+ * reads as "nothing needed checking" and is ignored in triage). A `fail` is
+ * NOT downgraded: a checker that found a problem in a partial sandbox found a
+ * real problem, and hiding it would be the fail-open this module exists to
+ * prevent.
+ *
+ * A DELETED file is not a staging failure, but it has to be DECLARED. A file
+ * the change removed is not in `reviewSourceDir`, so staging it always fails
+ * and every change that deletes a file would be permanently `unrunnable`.
+ * `deletedFiles` is how the caller says so; the orchestrator excludes those
+ * from what it asks for and lists them under `staging.deleted`. This module
+ * never infers deletion from the filesystem: an empty or wrong
+ * `reviewSourceDir` makes every path absent, and reading that as "all deleted"
+ * would manufacture the false green this checkpoint exists to prevent.
  */
 
 import { nonEmptyNfcString as nonEmptyString } from './promotion-candidates.mjs';
@@ -42,6 +65,7 @@ import {
   extractGateCommands,
   loadTrustedAllowlistEntries,
   runDeterministicGates,
+  STAGING_SKIP_REASON,
 } from './deterministic-command-orchestrator.mjs';
 
 /** The only profile this checkpoint implements (`schemas/flow-entry-map.schema.json`). */
@@ -78,6 +102,8 @@ export const FAST_VERIFICATION_REASON = Object.freeze({
   ALLOWLIST_MISS: 'allowlist-miss',
   EXECUTOR_STATUS_MISSING: 'executor-status-missing',
   RESULT_CORRELATION_FAILED: 'result-correlation-failed',
+  STAGING_INCOMPLETE: 'staging-incomplete',
+  STAGING_EVIDENCE_MISSING: 'staging-evidence-missing',
   SUBJECT_REVISION_CHANGED: 'subject-revision-changed',
   SUBJECT_REVISION_UNREADABLE: 'subject-revision-unreadable',
 });
@@ -94,6 +120,71 @@ const SAFE_CHECK_METADATA_KEYS = Object.freeze([
   'stdoutBytes',
   'unrunnableCause',
 ]);
+
+/**
+ * Refusal reasons a staging row may carry. DERIVED from the orchestrator's
+ * `STAGING_SKIP_REASON` rather than restated here: a second literal list would
+ * silently accept a reason the producer no longer emits, or reject one it just
+ * started emitting (CLAUDE.md "Import the SSoT, never re-derive it").
+ */
+const STAGING_SKIP_REASONS = Object.freeze(Object.values(STAGING_SKIP_REASON));
+
+/**
+ * Re-validate the orchestrator's `staging` summary at this module's boundary.
+ * `runGatesImpl` is injectable, so nothing that arrives here is trusted to have
+ * the shape the real orchestrator produces: an unreadable summary is returned
+ * as `null`, which the caller treats as "no staging evidence", never as "fine".
+ *
+ * @param {unknown} staging
+ * @returns {{ requested: number, copied: number, complete: boolean,
+ *   skipped: Array<{ path: string, reason: string }> } | null}
+ */
+function normalizeStaging(staging, { expectedFileCount } = {}) {
+  if (!isPlainObject(staging)) return null;
+  if (typeof staging.complete !== 'boolean') return null;
+  if (!Number.isInteger(staging.requested) || staging.requested < 0) return null;
+  if (!Number.isInteger(staging.copied) || staging.copied < 0) return null;
+  // `skipped` absent or not an array is an unreadable summary, not an empty
+  // one. Reading a non-array as `[]` would be the single fail-open left in
+  // this boundary (#2311 review).
+  if (!Array.isArray(staging.skipped)) return null;
+  const skipped = [];
+  for (const row of staging.skipped) {
+    const filePath = nonEmptyString(row?.path);
+    if (filePath == null || !STAGING_SKIP_REASONS.includes(row?.reason)) return null;
+    skipped.push({ path: filePath, reason: row.reason });
+  }
+  // `deleted` may be absent (an older orchestrator shape), but a present-and-
+  // not-an-array value is unreadable, not empty.
+  if (staging.deleted !== undefined && !Array.isArray(staging.deleted)) return null;
+  const deleted = [];
+  for (const file of staging.deleted ?? []) {
+    const value = nonEmptyString(file);
+    if (value == null) return null;
+    deleted.push(value);
+  }
+  // The NUMBERS are checked too, not only the lists. A boundary that declares
+  // it does not trust an injectable impl cannot trust half of what that impl
+  // reports: every changed file must be accounted for as either asked-for or
+  // declared-deleted, and nothing can arrive that was never asked for.
+  if (
+    Number.isInteger(expectedFileCount) &&
+    staging.requested + deleted.length !== expectedFileCount
+  ) {
+    return null;
+  }
+  if (staging.copied > staging.requested) return null;
+  return {
+    requested: staging.requested,
+    copied: staging.copied,
+    // A summary that claims completeness while reporting a refusal — or while
+    // reporting that fewer files arrived than were asked for — is not believed.
+    // The refusals and the counts decide, not the flag.
+    complete: staging.complete && skipped.length === 0 && staging.copied >= staging.requested,
+    skipped,
+    deleted,
+  };
+}
 
 function safeCheckMetadata(result) {
   const metadata = {};
@@ -223,6 +314,9 @@ function aggregateStatus(checks) {
  * @param {object} input.resolution a `resolveTrigger` result for `after-change`
  * @param {string} input.subjectRevision commit SHA / content hash the checkpoint is about
  * @param {string[]} [input.changedFiles] repo-relative paths the change touched
+ * @param {string[]} [input.deletedFiles] subset of `changedFiles` the change DELETED.
+ *   Declared by the caller, never inferred: they are not staged and do not count
+ *   against staging completeness.
  * @param {Array<object>} [input.selected] selected skills (`metadata.deterministicGate`)
  * @param {string} [input.trustedTree] host-trusted base checkout (allowlist source)
  * @param {string} [input.reviewSourceDir] dir the changed files are staged FROM
@@ -240,6 +334,7 @@ export async function runFastVerification({
   resolution,
   subjectRevision,
   changedFiles,
+  deletedFiles,
   selected,
   trustedTree,
   reviewSourceDir,
@@ -256,6 +351,9 @@ export async function runFastVerification({
     throw new FastVerificationError('subjectRevision must be a non-empty string.');
   }
   const files = normalizeChangedFiles(changedFiles);
+  // Only declared deletions that are actually in scope are honoured: a path
+  // outside `changedFiles` must not be able to excuse anything.
+  const deleted = normalizeChangedFiles(deletedFiles).filter((file) => files.includes(file));
   const startedAtMs = now();
 
   const finish = (checks, reasonCode) => {
@@ -332,6 +430,7 @@ export async function runFastVerification({
     selected,
     reviewSourceDir,
     changedFiles: files,
+    deletedFiles: deleted,
     processEnv,
   });
   // Correlate results to gates BY POSITION, never by `skillId`. A skill
@@ -359,15 +458,32 @@ export async function runFastVerification({
     }
     const { status, reasonCode } = result;
     const metadata = safeCheckMetadata(result);
+    const staging = normalizeStaging(result.staging, { expectedFileCount: files.length });
+    const stagingEvidence = staging == null ? {} : { staging };
     if (status !== CHECK_STATUS.PASS && status !== CHECK_STATUS.FAIL) {
       // Anything the executor could not turn into a verdict is unrunnable —
       // including an absent or unrecognized status, which must not decay to pass.
       return checkEntry(id, CHECK_STATUS.UNRUNNABLE, resolveUnrunnableReason(status, reasonCode), {
         ...metadata,
+        ...stagingEvidence,
       });
+    }
+    // (d2) A `pass` is a verdict about the changed files only if the changed
+    // files were there. Absent staging evidence is not evidence of absence of a
+    // problem, so it is refused the same way an incomplete staging is (#2311).
+    if (status === CHECK_STATUS.PASS && (staging == null || !staging.complete)) {
+      return checkEntry(
+        id,
+        CHECK_STATUS.UNRUNNABLE,
+        staging == null
+          ? FAST_VERIFICATION_REASON.STAGING_EVIDENCE_MISSING
+          : FAST_VERIFICATION_REASON.STAGING_INCOMPLETE,
+        { ...metadata, ...stagingEvidence, supersededStatus: CHECK_STATUS.PASS }
+      );
     }
     return checkEntry(id, status, reasonCode ?? FAST_VERIFICATION_REASON.EXECUTED, {
       ...metadata,
+      ...stagingEvidence,
     });
   });
 
