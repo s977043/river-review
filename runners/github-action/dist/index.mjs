@@ -82048,7 +82048,10 @@ async function runRunsCommand(parsed, targetPath) {
         loadRunRecord(storeDir, parsed.runsId1),
         loadRunRecord(storeDir, parsed.runsId2),
       ]);
-      const diff = diffReviews(run1.findings ?? [], run2.findings ?? []);
+      const diff = diffReviews(run1.findings ?? [], run2.findings ?? [], {
+        // run2 is the current side: its coverage qualifies the absences (#2325).
+        currentCoverage: run2.reviewCoverage ?? null,
+      });
       const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.v)(diff, run2);
       if (parsed.output === 'json') {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
@@ -86568,7 +86571,10 @@ Dependencies: ${
       const prevFindings = Array.isArray(baselineFindings)
         ? baselineFindings
         : (baselineFindings.findings ?? baselineFindings.issues ?? []);
-      const diff = diffReviews(prevFindings, result.findings ?? []);
+      const diff = diffReviews(prevFindings, result.findings ?? [], {
+        // The current run's coverage qualifies its absences (#2325).
+        currentCoverage: result.reviewCoverage ?? null,
+      });
       const regSummary = formatRegressionSummary(diff);
       // #1706: the summary is a Markdown block printed BEFORE the structured
       // output, so on stdout it corrupts every machine-readable format —

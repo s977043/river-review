@@ -394,6 +394,21 @@ function formatLoopDashboardHtml(diff, meta = {}) {
   };
   findingList('New findings', newF, false);
   findingList('Resolved findings', resolvedF, true);
+  if (resolvedF.length) {
+    // #2325: the green "resolved" chip and this table are presence data, not
+    // proof of a fix. Say so next to the table, and say it louder when the
+    // current run did not complete every required review unit.
+    parts.push(
+      '<p class="meta">Measured as: the fingerprint was present in the previous run and is absent from the current one. Absence is not by itself evidence of a fix.</p>'
+    );
+    if (diff?.summary?.absenceMayBeUnexecuted) {
+      parts.push(
+        `<p class="meta"><strong>Current run coverage: ${escHtml(
+          diff.summary.currentCoverageStatus ?? 'unknown'
+        )}</strong> — some of these may be review work that did not complete rather than problems that were fixed.</p>`
+      );
+    }
+  }
 
   parts.push('</body>');
   parts.push('</html>');
