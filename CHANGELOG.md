@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.119.0](https://github.com/s977043/river-review/compare/v1.118.1...v1.119.0) (2026-09-20)
+
+
+### Features
+
+* **after-change:** add the Claude Code PostToolUse observe adapter ([#2275](https://github.com/s977043/river-review/issues/2275) PR-3C) ([#2328](https://github.com/s977043/river-review/issues/2328)) ([a453be4](https://github.com/s977043/river-review/commit/a453be48f7b96e5526aa3f0839cf20b7fbeb7488))
+
+
+### Bug Fixes
+
+* **action:** collapse the PR comment marker to the documented one ([#2323](https://github.com/s977043/river-review/issues/2323)) ([#2326](https://github.com/s977043/river-review/issues/2326)) ([395201b](https://github.com/s977043/river-review/commit/395201b2e2e5fb2c46044b314763ccc944432b6b))
+* **review-differ:** qualify absence instead of claiming resolution ([#2325](https://github.com/s977043/river-review/issues/2325)) ([#2327](https://github.com/s977043/river-review/issues/2327)) ([73e70f8](https://github.com/s977043/river-review/commit/73e70f869695c9a6b7d5d3d6e478ea0cf5101d13))
+
 ## [1.118.1](https://github.com/s977043/river-review/compare/v1.118.0...v1.118.1) (2026-09-20)
 
 
