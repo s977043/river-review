@@ -123,7 +123,9 @@ See `runners/github-action/action.yml` for definition.
 
 ### PR Comment Contract (Idempotent)
 
+- `<!-- river-review -->` is the only contractual marker. Every comment body the Action posts starts with it (#2323).
 - **Updates** comment containing `<!-- river-review -->` marker; creates new if missing.
+- When searching for an existing comment only, the legacy marker `<!-- river-reviewer -->` is also accepted. That is a migration allowance so a comment posted by v1.118.1 or earlier keeps being updated in place instead of duplicated; nothing writes the legacy marker any more. It is not part of the contract, so consumers should match `<!-- river-review -->` alone.
 - Truncates tail if comment body is too long (limit exists).
 
 ## Claude Code plugin hooks (Beta)

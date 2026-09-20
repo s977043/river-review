@@ -1,6 +1,21 @@
 const fs = require('fs');
 
-const COMMENT_MARKER = '<!-- river-reviewer -->';
+/**
+ * #2323: the canonical PR-comment marker.
+ *
+ * `pages/reference/stable-interfaces.md` (ja / en) declares
+ * `<!-- river-review -->` as the PR comment contract, and `src/cli/render.mjs`
+ * already emits it at the top of the body this runner receives. This file used
+ * to prepend a second, differently spelled marker (`<!-- river-reviewer -->`),
+ * so every comment carried both and any consumer reading the documented marker
+ * matched the renderer's copy rather than the one the dedup search used.
+ *
+ * Writes now use the canonical marker only. Reads still accept the legacy
+ * spelling so a comment posted by an earlier release keeps being updated in
+ * place instead of being duplicated.
+ */
+const COMMENT_MARKER = '<!-- river-review -->';
+const LEGACY_COMMENT_MARKER = '<!-- river-reviewer -->';
 const MAX_COMMENT_LENGTH = 65000;
 
 module.exports = async function postComment({ github, context, core }) {
@@ -33,7 +48,9 @@ module.exports = async function postComment({ github, context, core }) {
   });
 
   const existing = comments.find(
-    (c) => typeof c.body === 'string' && c.body.includes(COMMENT_MARKER)
+    (c) =>
+      typeof c.body === 'string' &&
+      (c.body.includes(COMMENT_MARKER) || c.body.includes(LEGACY_COMMENT_MARKER))
   );
   if (existing) {
     await github.rest.issues.updateComment({
@@ -54,3 +71,6 @@ module.exports = async function postComment({ github, context, core }) {
   });
   core.info('Created new River Reviewer comment.');
 };
+
+module.exports.COMMENT_MARKER = COMMENT_MARKER;
+module.exports.LEGACY_COMMENT_MARKER = LEGACY_COMMENT_MARKER;

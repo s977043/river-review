@@ -133,7 +133,9 @@ usage error の終了コードはレビュー結果を含みません。表す�
 
 ### PR コメントの契約（idempotent）
 
+- 契約上の marker は `<!-- river-review -->` の 1 種のみである。Action が投稿するコメント本文は必ずこの marker で始まる（#2323）。
 - `<!-- river-review -->` marker を含むコメントを **更新** し、なければ新規作成する。
+- 既存コメントの探索に限り、旧 marker `<!-- river-reviewer -->` も受理する。v1.118.1 以前の Action が投稿したコメントを重複させず更新し続けるための移行措置であり、書き込み側が旧 marker を出すことはない。旧 marker は契約ではないため、consumer は `<!-- river-review -->` だけを見ること。
 - コメント本文が長すぎる場合は末尾を切り詰める（上限あり）。
 
 ## Claude Code プラグインの hook（Beta）

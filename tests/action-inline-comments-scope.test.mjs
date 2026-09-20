@@ -368,7 +368,7 @@ describe('#1644: a zero severity count must not swallow the folded block', () =>
 
     assert.equal(
       posted.summaryBody,
-      '<!-- river-reviewer -->\n## River Reviewer\n\n✅ No issues found.'
+      '<!-- river-review -->\n## River Reviewer\n\n✅ No issues found.'
     );
   });
 });
@@ -443,7 +443,7 @@ describe('#1915: the summary decides from the findings it holds, not from counts
 
     assert.equal(
       posted.summaryBody,
-      '<!-- river-reviewer -->\n## River Reviewer\n\n✅ No issues found.'
+      '<!-- river-review -->\n## River Reviewer\n\n✅ No issues found.'
     );
   });
 
