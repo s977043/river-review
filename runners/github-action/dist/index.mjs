@@ -14224,6 +14224,49 @@ module.exports = {
 
 /***/ }),
 
+/***/ 4894:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+/* module decorator */ module = __nccwpck_require__.nmd(module);
+ if ( true && module !== globalThis.module && typeof exports !== 'undefined' && module.exports === exports) {
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.findX509Credential = exports.rememberX509Credential = exports.findX509OAuthError = exports.rememberX509OAuthError = exports.isApprovedX509Client = exports.markApprovedX509Client = exports.isRetryableX509IssuerError = exports.markRetryableX509IssuerError = exports.isTransientX509ConnectionError = exports.markTransientX509ConnectionError = exports.rememberRegisteredX509Transport = exports.findRegisteredX509Transport = void 0;
+/** One lexical capability registry remains authoritative across mixed module formats. */
+const registeredX509Transports = new WeakMap();
+const transientX509ConnectionErrors = new WeakSet();
+const retryableX509IssuerErrors = new WeakSet();
+const approvedX509Clients = new WeakSet();
+const approvedX509OAuthErrors = new WeakMap();
+const approvedX509Credentials = new WeakMap();
+/** Looks up an opaque capability without exposing the registry itself. */
+exports.findRegisteredX509Transport = WeakMap.prototype.get.bind(registeredX509Transports);
+/** Records a capability only after the Node-only factory verifies its genuine private dispatcher. */
+exports.rememberRegisteredX509Transport = WeakMap.prototype.set.bind(registeredX509Transports);
+/** Privately brands sanitized connection errors shared across CommonJS and ESM clients. */
+exports.markTransientX509ConnectionError = WeakSet.prototype.add.bind(transientX509ConnectionErrors);
+/** Recognizes a transient connection without trusting public error properties. */
+exports.isTransientX509ConnectionError = WeakSet.prototype.has.bind(transientX509ConnectionErrors);
+/** Privately brands issuer-generated retryable HTTP failures across module formats. */
+exports.markRetryableX509IssuerError = WeakSet.prototype.add.bind(retryableX509IssuerErrors);
+/** Recognizes only retryable HTTP errors produced by the trusted certificate exchange. */
+exports.isRetryableX509IssuerError = WeakSet.prototype.has.bind(retryableX509IssuerErrors);
+/** Brands only clients whose transport capability was successfully validated. */
+exports.markApprovedX509Client = WeakSet.prototype.add.bind(approvedX509Clients);
+/** Recognizes immutable client ownership across mixed CommonJS and ESM helpers. */
+exports.isApprovedX509Client = WeakSet.prototype.has.bind(approvedX509Clients);
+/** Records the sanitized OAuth response without trusting mutable public error properties. */
+exports.rememberX509OAuthError = WeakMap.prototype.set.bind(approvedX509OAuthErrors);
+/** Retrieves trusted OAuth metadata for public cross-module error normalization. */
+exports.findX509OAuthError = WeakMap.prototype.get.bind(approvedX509OAuthErrors);
+/** Privately binds SDK-owned credentials to their immutable identity and approved transport. */
+exports.rememberX509Credential = WeakMap.prototype.set.bind(approvedX509Credentials);
+/** Resolves only first-class credentials created by the optional Node transport helper. */
+exports.findX509Credential = WeakMap.prototype.get.bind(approvedX509Credentials);
+}
+//# sourceMappingURL=x509-transport-state.cjs.map
+
+/***/ }),
+
 /***/ 5487:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -63806,8 +63849,8 @@ module.exports = /*#__PURE__*/JSON.parse('{"$schema":"http://json-schema.org/dra
 /******/ 	}
 /******/ 	// Create a new module (and put it into the cache)
 /******/ 	var module = __webpack_module_cache__[moduleId] = {
-/******/ 		// no module.id needed
-/******/ 		// no module.loaded needed
+/******/ 		id: moduleId,
+/******/ 		loaded: false,
 /******/ 		exports: {}
 /******/ 	};
 /******/ 
@@ -63819,6 +63862,9 @@ module.exports = /*#__PURE__*/JSON.parse('{"$schema":"http://json-schema.org/dra
 /******/ 	} finally {
 /******/ 		if(threw) delete __webpack_module_cache__[moduleId];
 /******/ 	}
+/******/ 
+/******/ 	// Flag the module as loaded
+/******/ 	module.loaded = true;
 /******/ 
 /******/ 	// Return the exports of the module
 /******/ 	return module.exports;
@@ -63911,6 +63957,15 @@ module.exports = /*#__PURE__*/JSON.parse('{"$schema":"http://json-schema.org/dra
 /******/ 	};
 /******/ })();
 /******/ 
+/******/ /* webpack/runtime/node module decorator */
+/******/ (() => {
+/******/ 	__nccwpck_require__.nmd = (module) => {
+/******/ 		module.paths = [];
+/******/ 		if (!module.children) module.children = [];
+/******/ 		return module;
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/publicPath */
 /******/ (() => {
 /******/ 	var scriptUrl;
@@ -63987,6 +64042,24 @@ module.exports = /*#__PURE__*/JSON.parse('{"$schema":"http://json-schema.org/dra
 /******/ 
 /************************************************************************/
 var __webpack_exports__ = {};
+
+// NAMESPACE OBJECT: ./node_modules/openai/internal/auth/x509-transport-state-browser.mjs
+var x509_transport_state_browser_namespaceObject = {};
+__nccwpck_require__.r(x509_transport_state_browser_namespaceObject);
+__nccwpck_require__.d(x509_transport_state_browser_namespaceObject, {
+  findRegisteredX509Transport: () => (findRegisteredX509Transport),
+  findX509Credential: () => (findX509Credential),
+  findX509OAuthError: () => (findX509OAuthError),
+  isApprovedX509Client: () => (x509_transport_state_browser_isApprovedX509Client),
+  isRetryableX509IssuerError: () => (isRetryableX509IssuerError),
+  isTransientX509ConnectionError: () => (isTransientX509ConnectionError),
+  markApprovedX509Client: () => (markApprovedX509Client),
+  markRetryableX509IssuerError: () => (markRetryableX509IssuerError),
+  markTransientX509ConnectionError: () => (markTransientX509ConnectionError),
+  rememberRegisteredX509Transport: () => (rememberRegisteredX509Transport),
+  rememberX509Credential: () => (rememberX509Credential),
+  rememberX509OAuthError: () => (rememberX509OAuthError)
+});
 
 // EXTERNAL MODULE: external "node:fs"
 var external_node_fs_ = __nccwpck_require__(3024);
@@ -67058,6 +67131,11 @@ function __classPrivateFieldGet(receiver, state, kind, f) {
         throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 }
+function __classPrivateFieldIn(state, receiver) {
+    if (receiver === null || (typeof receiver !== "object" && typeof receiver !== "function"))
+        throw new TypeError("Cannot use 'in' operator on non-object");
+    return typeof state === "function" ? receiver === state : state.has(receiver);
+}
 
 
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/utils/uuid.mjs
@@ -67090,12 +67168,13 @@ const castToError = (err) => {
     if (typeof err === 'object' && err !== null) {
         try {
             if (Object.prototype.toString.call(err) === '[object Error]') {
+                const hasCause = 'cause' in err;
                 // @ts-ignore - not all envs have native support for cause yet
-                const error = new Error(err.message, err.cause ? { cause: err.cause } : {});
+                const error = new Error(err.message, hasCause ? { cause: err.cause } : {});
                 if (err.stack)
                     error.stack = err.stack;
                 // @ts-ignore - not all envs have native support for cause yet
-                if (err.cause && !error.cause)
+                if (hasCause && !Object.prototype.hasOwnProperty.call(error, 'cause'))
                     error.cause = err.cause;
                 if (err.name)
                     error.name = err.name;
@@ -67355,8 +67434,149 @@ const src_safeJSON = (text) => {
 };
 //# sourceMappingURL=values.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/utils/sleep.mjs
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms, ...signals) => new Promise((resolve, reject) => {
+    const activeSignals = [...new Set(signals.filter((signal) => signal != null))];
+    let timeout;
+    let settled = false;
+    const cleanup = () => {
+        for (const signal of activeSignals) {
+            try {
+                signal.removeEventListener('abort', abort);
+            }
+            catch {
+                // Structural signal cleanup must not prevent the promise from settling.
+            }
+        }
+    };
+    const settle = (callback) => {
+        if (settled) {
+            return;
+        }
+        settled = true;
+        if (timeout !== undefined) {
+            clearTimeout(timeout);
+            timeout = undefined;
+        }
+        cleanup();
+        callback();
+    };
+    const abort = () => {
+        settle(() => reject());
+    };
+    if (activeSignals.some((signal) => signal.aborted)) {
+        abort();
+        return;
+    }
+    timeout = setTimeout(() => {
+        settle(resolve);
+    }, ms);
+    for (const signal of activeSignals) {
+        if (settled) {
+            break;
+        }
+        try {
+            signal.addEventListener('abort', abort, { once: true });
+        }
+        catch (error) {
+            settle(() => reject(error));
+        }
+    }
+    if (activeSignals.some((signal) => signal.aborted)) {
+        abort();
+    }
+});
 //# sourceMappingURL=sleep.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/utils/abort.mjs
+// Keep these optional runtime features out of the SDK's ES2020 type requirements.
+// SAFETY: These host features are optional and checked before use; the structural view avoids requiring newer ambient library declarations.
+const weakGlobals = globalThis;
+const finalizer = 
+// oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
+typeof weakGlobals.FinalizationRegistry === 'function'
+    ? new weakGlobals.FinalizationRegistry((cleanup) => {
+        try {
+            cleanup();
+        }
+        catch {
+            // Caller-provided signal methods must not throw out of a GC callback.
+        }
+    })
+    : undefined;
+const callbackOwners = new WeakMap();
+const subscriptions = new WeakMap();
+// This scope receives only a weak reference, so its closures cannot retain the callback.
+function subscribeWeakly(signal, reference, registry) {
+    let subscription = subscriptions.get(signal);
+    if (!subscription) {
+        const callbacks = new Set();
+        const abort = () => {
+            subscriptions.delete(signal);
+            for (const callback of callbacks) {
+                registry.unregister(callback);
+                callback.deref()?.();
+            }
+            callbacks.clear();
+        };
+        subscription = { callbacks, abort };
+        signal.addEventListener('abort', abort, { once: true });
+        subscriptions.set(signal, subscription);
+    }
+    const owner = subscription;
+    owner.callbacks.add(reference);
+    return () => {
+        owner.callbacks.delete(reference);
+        registry.unregister(reference);
+        if (owner.callbacks.size === 0) {
+            if (subscriptions.get(signal) === owner) {
+                subscriptions.delete(signal);
+            }
+            signal.removeEventListener('abort', owner.abort);
+        }
+    };
+}
+// The listener must not retain the shared owner or its other request callbacks.
+function releaseOnAbort(signal, callbacks, abort) {
+    signal.addEventListener('abort', () => callbacks.deref()?.delete(abort), { once: true });
+}
+/** Keep cancellation alive until abort or collection of the response body or bodyless custom response. */
+function retainRequestAbortCallback(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Abort callbacks are retained by any response-body or custom-response owner identity.
+owner, abort, requestSignal) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
+    if (typeof weakGlobals.WeakRef === 'function' && finalizer && !requestSignal.aborted) {
+        let callbacks = callbackOwners.get(owner);
+        if (!callbacks) {
+            callbacks = new Set();
+            callbackOwners.set(owner, callbacks);
+        }
+        callbacks.add(abort);
+        releaseOnAbort(requestSignal, new weakGlobals.WeakRef(callbacks), abort);
+    }
+}
+/**
+ * Share one caller listener without it retaining completed requests. Collection removes
+ * weak subscriptions eventually; a live response body or custom response retains its callback.
+ * Runtimes without weak references keep the existing listener-based behavior.
+ */
+function addRequestAbortListener(signal, abort, requestSignal) {
+    if (signal.aborted) {
+        abort();
+        return () => {
+            // No listener was installed for an already aborted signal.
+        };
+    }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
+    if (typeof weakGlobals.WeakRef !== 'function' || !finalizer) {
+        signal.addEventListener('abort', abort, { once: true });
+        return () => signal.removeEventListener('abort', abort);
+    }
+    const reference = new weakGlobals.WeakRef(abort);
+    const cleanup = subscribeWeakly(signal, reference, finalizer);
+    finalizer.register(abort, cleanup, reference);
+    retainRequestAbortCallback(requestSignal, abort, requestSignal);
+    return cleanup;
+}
+//# sourceMappingURL=abort.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/shims.mjs
 /**
  * This module provides internal shims and utility functions for environments where certain Node.js or global types may not be available.
@@ -67467,6 +67687,7 @@ let encodeUTF8_;
 /** Encodes text as UTF-8 bytes, reusing the platform encoder after its first call. */
 function bytes_encodeUTF8(str) {
     let encoder;
+    // SAFETY: Supported runtimes provide the standard TextEncoder/TextDecoder globals; the cast keeps their ambient DOM declarations optional.
     return (encodeUTF8_ ??
         ((encoder = new globalThis.TextEncoder()), (encodeUTF8_ = encoder.encode.bind(encoder))))(str);
 }
@@ -67474,6 +67695,7 @@ let decodeUTF8_;
 /** Decodes UTF-8 bytes as text, reusing the platform decoder after its first call. */
 function decodeUTF8(bytes) {
     let decoder;
+    // SAFETY: Supported runtimes provide the standard TextEncoder/TextDecoder globals; the cast keeps their ambient DOM declarations optional.
     return (decodeUTF8_ ??
         ((decoder = new globalThis.TextDecoder()), (decodeUTF8_ = decoder.decode.bind(decoder))))(bytes);
 }
@@ -67524,6 +67746,7 @@ class LineDecoder {
         let binaryChunk;
         if (chunk instanceof ArrayBuffer) {
             binaryChunk = new Uint8Array(chunk);
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The line decoder accepts both text and binary chunks and must select the matching decoding path.
         }
         else if (typeof chunk === 'string') {
             binaryChunk = bytes_encodeUTF8(chunk);
@@ -67727,23 +67950,81 @@ function loggerFor(client) {
     cachedLoggers.set(logger, [logLevel, levelLogger]);
     return levelLogger;
 }
+const sensitiveQueryNames = new Set([
+    'apikey',
+    'accesstoken',
+    'refreshtoken',
+    'sessiontoken',
+    'sessionid',
+    'idtoken',
+    'authtoken',
+    'authorization',
+    'token',
+    'password',
+    'clientsecret',
+    'xamzsecuritytoken',
+    'xamzsignature',
+    'xamzcredential',
+]);
+/** Recognizes credential-bearing query names across ordinary and provider authentication. */
+function isSensitiveQueryParameter(name) {
+    const normalized = name.toLowerCase().replace(/[-_]/gu, '');
+    return sensitiveQueryNames.has(normalized) || sensitiveQueryNames.has(normalized.replace(/^x/u, ''));
+}
+const sensitiveHeaderNames = new Set([
+    'authorization',
+    'proxy-authorization',
+    'api-key',
+    'x-api-key',
+    'x-amz-security-token',
+    'cookie',
+    'set-cookie',
+    'x-session-token',
+    'x-session-id',
+    'x-auth-token',
+    'x-id-token',
+]);
+/** Recognizes credential-bearing request headers across provider and workload authentication. */
+function isSensitiveHeader(name) {
+    return sensitiveHeaderNames.has(name.toLowerCase().replace(/_/gu, '-')) || isSensitiveQueryParameter(name);
+}
+/** Removes credential-valued query parameters before a request URL reaches any logger. */
+function redactURL(value) {
+    const url = new URL(value);
+    url.username = '';
+    url.password = '';
+    url.hash = '';
+    for (const name of url.searchParams.keys()) {
+        if (isSensitiveQueryParameter(name)) {
+            url.searchParams.set(name, '***');
+        }
+    }
+    return url.href;
+}
 const formatRequestDetails = (details) => {
     if (details.options) {
         details.options = { ...details.options };
         delete details.options['headers']; // redundant + leaks internals
+        if (details.options.path) {
+            const path = details.options.path;
+            const redacted = new URL(redactURL(new URL(path, 'https://redacted.invalid').href));
+            details.options.path =
+                redacted.origin === 'https://redacted.invalid'
+                    ? `${path.startsWith('/') ? '/' : ''}${redacted.pathname.slice(1)}${redacted.search}`
+                    : redacted.href;
+        }
+        if (details.options.query) {
+            details.options.query = Object.fromEntries(Object.entries(details.options.query).map(([name, value]) => [
+                name,
+                isSensitiveQueryParameter(name) ? '***' : value,
+            ]));
+        }
+    }
+    if (details.url) {
+        details.url = redactURL(details.url);
     }
     if (details.headers) {
-        details.headers = Object.fromEntries((details.headers instanceof Headers ? [...details.headers] : Object.entries(details.headers)).map(([name, value]) => [
-            name,
-            name.toLowerCase() === 'authorization' ||
-                name.toLowerCase() === 'api-key' ||
-                name.toLowerCase() === 'x-api-key' ||
-                name.toLowerCase() === 'x-amz-security-token' ||
-                name.toLowerCase() === 'cookie' ||
-                name.toLowerCase() === 'set-cookie'
-                ? '***'
-                : value,
-        ]));
+        details.headers = Object.fromEntries((details.headers instanceof Headers ? [...details.headers] : Object.entries(details.headers)).map(([name, value]) => [name, isSensitiveHeader(name) ? '***' : value]));
     }
     if ('retryOfRequestLogID' in details) {
         if (details.retryOfRequestLogID) {
@@ -67755,7 +68036,7 @@ const formatRequestDetails = (details) => {
 };
 //# sourceMappingURL=log.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/core/streaming.mjs
-var _Stream_client;
+var _Stream_instances, _Stream_client, _Stream_isTeeBranch, _Stream_cancelIterator;
 
 
 
@@ -67763,6 +68044,49 @@ var _Stream_client;
 
 
 
+function isTransportAbortError(error) {
+    return !(error instanceof APIError) && src_isAbortError(error);
+}
+function createStreamTeeQueue() {
+    let entries = [];
+    let head = 0;
+    let canceled = false;
+    return {
+        get length() {
+            return entries.length - head;
+        },
+        get canceled() {
+            return canceled;
+        },
+        enqueue(value) {
+            if (!canceled) {
+                entries.push(value);
+            }
+        },
+        dequeue() {
+            if (head === entries.length) {
+                return undefined;
+            }
+            const value = entries[head];
+            entries[head] = undefined;
+            head += 1;
+            if (head === entries.length) {
+                entries = [];
+                head = 0;
+            }
+            else if (head >= 1024 && head * 2 >= entries.length) {
+                entries = entries.slice(head);
+                head = 0;
+            }
+            return value;
+        },
+        cancel() {
+            canceled = true;
+            entries.length = 0;
+            head = 0;
+        },
+    };
+}
 /**
  * A single-consumption asynchronous API response stream.
  *
@@ -67773,7 +68097,9 @@ var _Stream_client;
 class src_Stream {
     /** Wraps an asynchronous event iterator and the controller that owns its request. */
     constructor(iterator, controller, client) {
+        _Stream_instances.add(this);
         _Stream_client.set(this, void 0);
+        _Stream_isTeeBranch.set(this, false);
         this.iterator = iterator;
         this.controller = controller;
         __classPrivateFieldSet(this, _Stream_client, client, "f");
@@ -67795,9 +68121,18 @@ class src_Stream {
             consumed = true;
             let done = false;
             let receivedCompletionSentinel = false;
+            const messages = _iterSSEMessages(response, controller);
+            const closeMessages = messages.return.bind(messages);
+            messages.return = (value) => {
+                // Abort before nested iterator cleanup can wait on the response body's cancellation.
+                if (!receivedCompletionSentinel) {
+                    controller.abort();
+                }
+                return closeMessages(value);
+            };
             try {
-                for await (const sse of _iterSSEMessages(response, controller)) {
-                    if (sse.data.startsWith('[DONE]')) {
+                for await (const sse of messages) {
+                    if (sse.data === '[DONE]') {
                         receivedCompletionSentinel = true;
                         break;
                     }
@@ -67806,10 +68141,13 @@ class src_Stream {
                         try {
                             data = JSON.parse(sse.data);
                         }
-                        catch (e) {
-                            logger.error(`Could not parse message into JSON:`, sse.data);
-                            logger.error(`From chunk:`, sse.raw);
-                            throw e;
+                        catch {
+                            logger.error(`Could not parse message into JSON:`);
+                            logger.error(`From chunk:`);
+                            throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
+                        }
+                        if (sse.event === 'error') {
+                            throw new APIError(undefined, data?.error ?? data, undefined, response.headers);
                         }
                         if (data && data.error) {
                             throw new APIError(undefined, data.error, undefined, response.headers);
@@ -67821,15 +68159,12 @@ class src_Stream {
                         try {
                             data = JSON.parse(sse.data);
                         }
-                        catch (e) {
-                            console.error(`Could not parse message into JSON:`, sse.data);
-                            console.error(`From chunk:`, sse.raw);
-                            throw e;
+                        catch {
+                            logger.error(`Could not parse message into JSON:`);
+                            logger.error(`From chunk:`);
+                            throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
                         }
-                        // SSE error events surface as APIError instances.
-                        if (sse.event === 'error') {
-                            throw new APIError(undefined, data.error, data.message, undefined);
-                        }
+                        // SAFETY: Named SSE events use the public stream's event/data envelope; Item is the caller-selected API event contract.
                         yield { event: sse.event, data };
                     }
                 }
@@ -67838,7 +68173,7 @@ class src_Stream {
             catch (e) {
                 // Abort errors and cleanup failures after the completion sentinel are non-fatal.
                 if (receivedCompletionSentinel ||
-                    src_isAbortError(e) ||
+                    isTransportAbortError(e) ||
                     (controller.signal.aborted && e === controller.signal.reason)) {
                     return;
                 }
@@ -67916,11 +68251,19 @@ class src_Stream {
             let done = false;
             try {
                 for await (const line of iterLines()) {
-                    if (done) {
-                        continue;
-                    }
                     if (line) {
-                        yield JSON.parse(line);
+                        let data;
+                        try {
+                            // SAFETY: Item is the caller's NDJSON response contract; JSON syntax is parsed here without a per-resource runtime schema.
+                            data = JSON.parse(line);
+                        }
+                        catch (error) {
+                            if (error instanceof SyntaxError) {
+                                throw new SyntaxError('Error reading response: malformed newline-delimited JSON.');
+                            }
+                            throw error;
+                        }
+                        yield data;
                     }
                 }
                 done = true;
@@ -67942,39 +68285,66 @@ class src_Stream {
         return new src_Stream(iterator, controller, client);
     }
     /** Starts consuming this stream; attempting to consume it again throws. */
-    [(_Stream_client = new WeakMap(), Symbol.asyncIterator)]() {
+    [(_Stream_client = new WeakMap(), _Stream_isTeeBranch = new WeakMap(), _Stream_instances = new WeakSet(), Symbol.asyncIterator)]() {
         return this.iterator();
     }
     /**
      * Splits the stream into two streams which can be
      * independently read from at different speeds.
+     * Closing a branch discards its buffered events without stopping its sibling.
+     * Future reads on that branch finish immediately; previously issued `next()`
+     * promises remain shared with its sibling and may still resolve with events.
+     * Closing both branches invokes the source iterator's `return()` when available.
+     * For {@link Stream.fromReadableStream}, closing both branches before iteration
+     * starts does not cancel the supplied readable; cancel that readable directly.
      */
     tee() {
-        const left = [];
-        const right = [];
+        const { controller } = this;
+        const left = createStreamTeeQueue();
+        const right = createStreamTeeQueue();
         const iterator = this.iterator();
         const teeIterator = (queue) => ({
             next: () => {
+                if (queue.canceled) {
+                    return Promise.resolve({ value: undefined, done: true });
+                }
                 if (queue.length === 0) {
                     const result = iterator.next();
-                    left.push(result);
-                    right.push(result);
+                    left.enqueue(result);
+                    right.enqueue(result);
                 }
-                return queue.shift();
+                return queue.dequeue();
+            },
+            return: async () => {
+                if (!queue.canceled) {
+                    queue.cancel();
+                    if (left.canceled && right.canceled) {
+                        await __classPrivateFieldGet(this, _Stream_instances, "m", _Stream_cancelIterator).call(this, iterator, controller);
+                    }
+                }
+                return { value: undefined, done: true };
             },
         });
-        return [
-            new src_Stream(() => teeIterator(left), this.controller, __classPrivateFieldGet(this, _Stream_client, "f")),
-            new src_Stream(() => teeIterator(right), this.controller, __classPrivateFieldGet(this, _Stream_client, "f")),
-        ];
+        const branch = (queue) => {
+            const stream = new src_Stream(() => teeIterator(queue), controller, __classPrivateFieldGet(this, _Stream_client, "f"));
+            __classPrivateFieldSet(stream, _Stream_isTeeBranch, true, "f");
+            return stream;
+        };
+        return [branch(left), branch(right)];
     }
     /**
      * Converts this stream to a newline-separated ReadableStream of
      * JSON stringified values in the stream
      * which can be turned back into a Stream with `Stream.fromReadableStream()`.
+     * Canceling a response-backed readable aborts its request. Canceling a tee
+     * branch discards its buffered events and leaves sibling consumers running.
+     * Read or serialization failures also release the iterator without replacing the original error.
      */
     toReadableStream() {
+        const { controller } = this;
         let iter;
+        let cancellation;
+        const cancel = () => (cancellation ?? (cancellation = __classPrivateFieldGet(this, _Stream_instances, "m", _Stream_cancelIterator).call(this, iter, controller)));
         return makeReadableStream({
             start: async () => {
                 iter = this[Symbol.asyncIterator]();
@@ -67990,22 +68360,160 @@ class src_Stream {
                 }
                 catch (err) {
                     ctrl.error(err);
+                    // An errored readable never invokes its cancel hook. Release the source ourselves,
+                    // without letting failed or stalled cleanup replace the read/serialization error.
+                    void cancel().catch(() => undefined);
                 }
             },
-            async cancel() {
-                await iter.return?.();
-            },
+            cancel,
         });
     }
 }
+_Stream_cancelIterator = async function _Stream_cancelIterator(iterator, controller) {
+    const returnMethod = iterator.return;
+    if (returnMethod) {
+        if (!__classPrivateFieldGet(this, _Stream_isTeeBranch, "f")) {
+            controller.abort();
+        }
+        // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured iterator method with its receiver even if a caller-supplied function shadows call.
+        await Reflect.apply(returnMethod, iterator, []);
+    }
+};
+function createAbortableSSESource(body, signal) {
+    const reader = typeof body.getReader === 'function' ? body.getReader() : undefined;
+    const source = reader
+        ? {
+            next: () => reader.read(),
+            return: () => reader.cancel(),
+        }
+        : ReadableStreamToAsyncIterable(body)[Symbol.asyncIterator]();
+    const ended = { value: undefined, done: true };
+    let closed = false;
+    let canceled = false;
+    let cancellation;
+    let interrupt;
+    const waitForAbort = () => 
+    // oxlint-disable-next-line promise/avoid-new -- AbortSignal callbacks need a portable Promise bridge.
+    new Promise((resolve) => {
+        interrupt = resolve;
+    });
+    const cancel = () => {
+        if (canceled || closed) {
+            return cancellation;
+        }
+        canceled = true;
+        try {
+            cancellation = Promise.resolve(source.return?.());
+        }
+        catch (error) {
+            cancellation = Promise.reject(error);
+        }
+        cancellation.catch(() => undefined);
+        return cancellation;
+    };
+    const abort = () => {
+        queueMicrotask(() => {
+            interrupt?.();
+            cancel();
+        });
+    };
+    const iterator = {
+        async next() {
+            if (signal.aborted) {
+                return ended;
+            }
+            const aborted = waitForAbort().then(() => ended);
+            try {
+                const result = await Promise.race([source.next(), aborted]);
+                if (signal.aborted) {
+                    return ended;
+                }
+                if (result.done) {
+                    closed = true;
+                    return ended;
+                }
+                return { value: result.value, done: false };
+            }
+            catch (error) {
+                if (signal.aborted && (src_isAbortError(error) || error === signal.reason)) {
+                    return ended;
+                }
+                throw error;
+            }
+            finally {
+                interrupt = undefined;
+            }
+        },
+        async return() {
+            const pending = cancel();
+            if (pending && !signal.aborted) {
+                const aborted = waitForAbort();
+                try {
+                    if (!signal.aborted) {
+                        await Promise.race([pending, aborted]);
+                    }
+                }
+                finally {
+                    interrupt = undefined;
+                }
+            }
+            return ended;
+        },
+        [Symbol.asyncIterator]() {
+            return this;
+        },
+    };
+    return {
+        iterator,
+        start() {
+            signal.addEventListener('abort', abort, { once: true });
+            if (signal.aborted) {
+                abort();
+            }
+        },
+        async cleanup(failed) {
+            let cleanupError;
+            try {
+                signal.removeEventListener('abort', abort);
+            }
+            catch (error) {
+                cleanupError = error;
+            }
+            if (!closed) {
+                const pending = cancel();
+                if (pending && !failed && !signal.aborted) {
+                    try {
+                        await pending;
+                    }
+                    catch (error) {
+                        cleanupError ?? (cleanupError = error);
+                    }
+                }
+            }
+            if (reader) {
+                try {
+                    reader.releaseLock();
+                }
+                catch (error) {
+                    cleanupError ?? (cleanupError = error);
+                }
+            }
+            if (cleanupError !== undefined && !failed && !signal.aborted) {
+                throw cleanupError;
+            }
+        },
+    };
+}
 /**
  * Decodes complete SSE records from a response and aborts when its body is absent.
+ * Complete events are decoded on demand without imposing a line or event size limit.
  *
  * @yields {ServerSentEvent} Each decoded server-sent event in wire order.
  */
 async function* _iterSSEMessages(response, controller) {
     if (!response.body) {
         controller.abort();
+        // SAFETY: navigator is optional across SDK runtimes; this compatibility branch checks its presence before identifying React Native.
         if (globalThis.navigator !== undefined &&
             globalThis.navigator.product === 'ReactNative') {
             throw new error_OpenAIError(`The default react-native fetch implementation does not support streaming. Please use expo/fetch: https://docs.expo.dev/versions/latest/sdk/expo/#expofetch-api`);
@@ -68014,20 +68522,55 @@ async function* _iterSSEMessages(response, controller) {
     }
     const sseDecoder = new SSEDecoder();
     const lineDecoder = new LineDecoder();
-    const iter = ReadableStreamToAsyncIterable(response.body);
-    for await (const sseChunk of iterSSEChunks(iter)) {
-        for (const line of lineDecoder.decode(sseChunk)) {
+    const { signal } = controller;
+    const source = createAbortableSSESource(response.body, signal);
+    let failed = false;
+    try {
+        source.start();
+        for await (const sseChunk of iterSSEChunks(source.iterator)) {
+            if (signal.aborted) {
+                return;
+            }
+            for (const line of lineDecoder.decode(sseChunk)) {
+                if (signal.aborted) {
+                    return;
+                }
+                const sse = sseDecoder.decode(line);
+                if (sse) {
+                    yield sse;
+                }
+            }
+        }
+        if (signal.aborted) {
+            return;
+        }
+        for (const line of lineDecoder.flush()) {
+            if (signal.aborted) {
+                return;
+            }
             const sse = sseDecoder.decode(line);
             if (sse) {
                 yield sse;
             }
         }
-    }
-    for (const line of lineDecoder.flush()) {
-        const sse = sseDecoder.decode(line);
-        if (sse) {
-            yield sse;
+        // Servers sometimes omit the trailing blank line that normally
+        // terminates the last event. Flush any in-progress event exactly once.
+        if (signal.aborted) {
+            return;
         }
+        const pending = sseDecoder.flush();
+        if (pending) {
+            yield pending;
+        }
+    }
+    catch (error) {
+        failed = true;
+        if (!signal.aborted || (!src_isAbortError(error) && error !== signal.reason)) {
+            throw error;
+        }
+    }
+    finally {
+        await source.cleanup(failed);
     }
 }
 // A `\r\n\r\n` separator may retain up to three bytes from the previous chunk.
@@ -68129,6 +68672,14 @@ class SSEDecoder {
         }
         return null;
     }
+    /**
+     * Emits a pending event at EOF when the stream omitted the trailing blank
+     * line. Returns `null` when no event is in progress so a record that already
+     * ended with a blank line is not delivered twice.
+     */
+    flush() {
+        return this.decode('');
+    }
 }
 function partition(str, delimiter) {
     const index = str.indexOf(delimiter);
@@ -68162,7 +68713,7 @@ async function defaultParseResponse(client, props) {
             return response;
         }
         const contentType = response.headers.get('content-type');
-        const mediaType = contentType?.split(';')[0]?.trim();
+        const mediaType = contentType?.split(';')[0]?.trim().toLowerCase();
         const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
         if (isJSON) {
             const contentLength = response.headers.get('content-length');
@@ -68217,7 +68768,7 @@ function addRequestID(value, response) {
 //# sourceMappingURL=parse.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/version.mjs
 /** Version of the installed OpenAI SDK package. */
-const VERSION = '7.5.0'; // x-release-please-version
+const VERSION = '7.17.0'; // x-release-please-version
 //# sourceMappingURL=version.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/detect-platform.mjs
 
@@ -68264,7 +68815,7 @@ const getPlatformProperties = () => {
             'X-Stainless-OS': 'Unknown',
             'X-Stainless-Arch': `other:${EdgeRuntime}`,
             'X-Stainless-Runtime': 'edge',
-            'X-Stainless-Runtime-Version': globalThis.process.version,
+            'X-Stainless-Runtime-Version': globalThis.process?.version ?? 'unknown',
         };
     }
     // Check if Node.js
@@ -68306,7 +68857,7 @@ function getBrowserInfo() {
     }
     // NOTE: The order matters here!
     const browserPatterns = [
-        { key: 'edge', pattern: /Edge(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+        { key: 'edge', pattern: /\bEdg(?:e|A|iOS)?\b(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
         { key: 'ie', pattern: /MSIE(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
         { key: 'ie', pattern: /Trident(?:.*rv\:(\d+)\.(\d+)(?:\.(\d+))?)?/ },
         { key: 'chrome', pattern: /Chrome(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
@@ -68377,12 +68928,53 @@ const getPlatformHeaders = () => {
 };
 //# sourceMappingURL=detect-platform.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/request-options.mjs
+const jsonRequestBodyObservers = new WeakMap();
+/** Observes values produced by the actual JSON request serializer without changing them. */
+function observeJSONRequestBody(body, observer) {
+    let observers = jsonRequestBodyObservers.get(body);
+    if (!observers) {
+        observers = new Set();
+        jsonRequestBodyObservers.set(body, observers);
+    }
+    observers.add(observer);
+    return () => {
+        const active = jsonRequestBodyObservers.get(body);
+        if (!active) {
+            return;
+        }
+        active.delete(observer);
+        if (active.size === 0) {
+            jsonRequestBodyObservers.delete(body);
+        }
+    };
+}
 const FallbackEncoder = ({ headers, body }) => {
+    const observers = typeof body === 'object' && body !== null ? jsonRequestBodyObservers.get(body) : undefined;
+    let encoded;
+    if (!observers || observers.size === 0) {
+        encoded = JSON.stringify(body);
+    }
+    else {
+        const active = [...observers];
+        encoded = JSON.stringify(body, function (key, value) {
+            let observed = value;
+            for (const observer of active) {
+                const replacement = observer.value(this, key, observed);
+                if (replacement !== undefined) {
+                    observed = replacement;
+                }
+            }
+            return observed;
+        });
+        for (const observer of active) {
+            observer.complete();
+        }
+    }
     return {
         bodyHeaders: {
             'content-type': 'application/json',
         },
-        body: JSON.stringify(body),
+        body: encoded,
     };
 };
 //# sourceMappingURL=request-options.mjs.map
@@ -68399,12 +68991,286 @@ const RFC3986 = 'RFC3986';
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/qs/utils.mjs
 
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The cached own-property predicate accepts arrays, callable objects, and records.
 let cachedHas;
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Own-property lookup is a generic object primitive and must preserve array and callable inputs.
 const has = (obj, key) => {
+    // SAFETY: Object.hasOwn is an optional native capability; older runtimes use the bound hasOwnProperty fallback with the same own-key semantics.
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The native or compatibility own-property predicate has the same generic object contract.
     const resolvedHas = cachedHas ?? Object.hasOwn ?? Function.prototype.call.bind(Object.prototype.hasOwnProperty);
     cachedHas = resolvedHas;
     return resolvedHas(obj, key);
 };
+function isUnsafePropertyKey(key) {
+    return key === '__proto__' || key === 'constructor' || key === 'prototype';
+}
+const maxAdoptedRecords = 10000;
+function isIntrinsicFunctionPrototype(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Prototype descriptors are inspected before deciding whether an arbitrary adopted value is callable.
+value, key, descriptor) {
+    return (typeof value === 'function' && key === 'prototype' && !descriptor.enumerable && !descriptor.configurable);
+}
+function isObjectLike(value) {
+    return value !== null && (typeof value === 'object' || typeof value === 'function');
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Adoption records retain arbitrary merge-target identities for later descriptor validation.
+function rememberAdoption(state, target, key, value) {
+    if (!isObjectLike(value)) {
+        return;
+    }
+    if (state.adopted.length >= maxAdoptedRecords) {
+        throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    }
+    state.adopted.push({ target, key });
+}
+function sanitizeAdoptions(state) {
+    if (state.adopted.length === 0) {
+        return;
+    }
+    const records = new WeakMap();
+    const visited = [];
+    const locations = [];
+    let inspectedProperties = 0;
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- Adoption validation inspects arbitrary objects, including arrays and functions, before trusting their structure.
+    function inspect(value) {
+        const known = records.get(value);
+        if (known) {
+            return known;
+        }
+        if (visited.length >= maxAdoptedRecords) {
+            throw new Error('Adopted record traversal exceeds the supported safety limit.');
+        }
+        const keys = Reflect.ownKeys(value);
+        if (keys.length > maxAdoptedRecords - inspectedProperties) {
+            throw new Error('Adopted record traversal exceeds the supported safety limit.');
+        }
+        inspectedProperties += keys.length;
+        const descriptors = Object.create(null);
+        for (const key of keys) {
+            const descriptor = Object.getOwnPropertyDescriptor(value, key);
+            if (descriptor) {
+                Reflect.set(descriptors, key, descriptor);
+            }
+        }
+        const prototype = Object.getPrototypeOf(value);
+        const array = isArray(value);
+        const extensible = Object.isExtensible(value);
+        const ordinary = typeof value !== 'function' &&
+            (array ? prototype === Array.prototype : prototype === Object.prototype || prototype === null);
+        const record = {
+            value,
+            descriptors,
+            keys,
+            prototype,
+            parents: new Set(),
+            ordinary,
+            array,
+            detached: ordinary && (extensible || !Object.isFrozen(value)),
+            unsafe: false,
+            extensible,
+        };
+        records.set(value, record);
+        visited.push(record);
+        return record;
+    }
+    for (const { target, key } of state.adopted) {
+        const descriptor = Object.getOwnPropertyDescriptor(target, key);
+        if (descriptor && 'value' in descriptor && isObjectLike(descriptor.value)) {
+            locations.push({ target, key, descriptor, record: inspect(descriptor.value) });
+        }
+    }
+    const detached = [];
+    for (const record of visited) {
+        for (const key of record.keys) {
+            const descriptor = record.descriptors[key];
+            if (!descriptor) {
+                continue;
+            }
+            if (isUnsafePropertyKey(key)) {
+                if (record.ordinary) {
+                    record.detached = true;
+                    record.unsafe = true;
+                }
+                else if (!isIntrinsicFunctionPrototype(record.value, key, descriptor)) {
+                    throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+                }
+                continue;
+            }
+            if (!record.ordinary && !descriptor.enumerable) {
+                continue;
+            }
+            if ('value' in descriptor && isObjectLike(descriptor.value)) {
+                inspect(descriptor.value).parents.add(record);
+            }
+        }
+        if (record.detached) {
+            detached.push(record);
+        }
+    }
+    for (let index = visited.length - 1; index >= 0; index -= 1) {
+        const record = visited[index];
+        if (record.ordinary) {
+            continue;
+        }
+        for (const key of ['__proto__', 'constructor', 'prototype']) {
+            const descriptor = Object.getOwnPropertyDescriptor(record.value, key);
+            if (descriptor && !isIntrinsicFunctionPrototype(record.value, key, descriptor)) {
+                throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+            }
+        }
+    }
+    const unsafe = visited.filter((record) => record.unsafe);
+    for (const record of unsafe) {
+        for (const parent of record.parents) {
+            if (!parent.ordinary) {
+                throw new TypeError('Cannot safely sanitize an adopted callable or unsupported prototype.');
+            }
+            if (!parent.unsafe) {
+                parent.unsafe = true;
+                unsafe.push(parent);
+            }
+        }
+    }
+    for (const record of detached) {
+        for (const parent of record.parents) {
+            if (!parent.ordinary) {
+                continue;
+            }
+            if (!parent.detached) {
+                parent.detached = true;
+                detached.push(parent);
+            }
+        }
+    }
+    const copies = new WeakMap();
+    for (const record of detached) {
+        copies.set(record.value, record.array ? [] : Object.create(record.prototype));
+    }
+    for (const record of detached) {
+        const copy = copies.get(record.value);
+        for (const key of record.keys) {
+            if (isUnsafePropertyKey(key)) {
+                continue;
+            }
+            const descriptor = record.descriptors[key];
+            if (!descriptor) {
+                continue;
+            }
+            if ('value' in descriptor && isObjectLike(descriptor.value) && copies.has(descriptor.value)) {
+                descriptor.value = copies.get(descriptor.value);
+            }
+            Object.defineProperty(copy, key, descriptor);
+        }
+    }
+    for (const { target, key, descriptor, record } of locations) {
+        const value = copies.get(record.value) ?? record.value;
+        if (value !== descriptor.value) {
+            Object.defineProperty(copies.get(target) ?? target, key, { ...descriptor, value });
+        }
+    }
+    for (const record of detached) {
+        if (!record.extensible) {
+            Object.preventExtensions(copies.get(record.value));
+        }
+    }
+}
+function readPreparedTarget(state, target, key) {
+    const prepared = state.preparedTargets.get(target);
+    if (prepared?.has(key)) {
+        const value = prepared.get(key);
+        prepared.delete(key);
+        return value;
+    }
+    return target[key];
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Merge targets may contain accessors or custom prototypes, so the preview preserves the generic object boundary.
+function previewTarget(state, target, key) {
+    const descriptor = Object.getOwnPropertyDescriptor(target, key);
+    if (descriptor && 'value' in descriptor) {
+        return descriptor.value;
+    }
+    // oxlint-disable-next-line anti-slop/no-reflect-get -- Generic query merging snapshots arbitrary inherited/accessor keys before mutation.
+    const value = Reflect.get(target, key, target);
+    let prepared = state.preparedTargets.get(target);
+    if (!prepared) {
+        prepared = new Map();
+        state.preparedTargets.set(target, prepared);
+    }
+    prepared.set(key, value);
+    return value;
+}
+function prepareMergeSource(target, source, state, assign = false) {
+    if (!source || typeof source !== 'object' || !target || typeof target !== 'object') {
+        return source;
+    }
+    let preparedTargets = state.preparedSources.get(source);
+    if (!preparedTargets) {
+        preparedTargets = new WeakMap();
+        state.preparedSources.set(source, preparedTargets);
+    }
+    const existing = preparedTargets.get(target);
+    if (existing) {
+        return existing;
+    }
+    state.inspectedSources += 1;
+    if (state.inspectedSources > maxAdoptedRecords) {
+        throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    }
+    const sourceKeys = Reflect.ownKeys(source);
+    if (sourceKeys.length > maxAdoptedRecords - state.inspectedSourceProperties) {
+        throw new Error('Adopted record traversal exceeds the supported safety limit.');
+    }
+    state.inspectedSourceProperties += sourceKeys.length;
+    const sourceIsArray = isArray(source);
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The query merge graph preserves heterogeneous scalar, array, and object values under its existing merge contract.
+    const prepared = sourceIsArray ? [] : Object.create(null);
+    preparedTargets.set(target, prepared);
+    if (isArray(target) && sourceIsArray && !assign) {
+        const sourceLength = source.length;
+        // SAFETY: prepared was constructed as an array when sourceIsArray is true, which this branch requires.
+        prepared.length = sourceLength;
+        for (let index = 0; index < sourceLength; index += 1) {
+            if (!(index in source)) {
+                continue;
+            }
+            const value = source[index];
+            if (has(target, index)) {
+                const targetValue = previewTarget(state, target, index);
+                prepared[index] =
+                    targetValue && typeof targetValue === 'object' && value && typeof value === 'object'
+                        ? prepareMergeSource(targetValue, value, state)
+                        : value;
+            }
+            else {
+                prepared[index] = value;
+            }
+        }
+        return prepared;
+    }
+    const enumerableKeys = [];
+    for (const key of sourceKeys) {
+        if (typeof key === 'string' && Object.getOwnPropertyDescriptor(source, key)?.enumerable) {
+            enumerableKeys.push(key);
+        }
+    }
+    for (const key of enumerableKeys) {
+        if (isUnsafePropertyKey(key)) {
+            continue;
+        }
+        const value = source[key];
+        prepared[key] =
+            !assign && has(target, key) && value && typeof value === 'object'
+                ? prepareMergeSource(previewTarget(state, target, key), value, state)
+                : value;
+    }
+    return prepared;
+}
+function prepareSource(target, source, state, assign = false) {
+    const holder = { value: prepareMergeSource(target, source, state, assign) };
+    rememberAdoption(state, holder, 'value', holder.value);
+    sanitizeAdoptions(state);
+    return holder.value;
+}
 const hex_table = /* @__PURE__ */ (() => {
     const array = [];
     for (let i = 0; i < 256; ++i) {
@@ -68440,7 +69306,7 @@ function array_to_object(source, options) {
     }
     return obj;
 }
-function merge(target, source, options = {}) {
+function mergeWithState(target, source, options, state) {
     if (!source) {
         return target;
     }
@@ -68449,8 +69315,13 @@ function merge(target, source, options = {}) {
             target.push(source);
         }
         else if (target && typeof target === 'object') {
-            if ((options && (options.plainObjects || options.allowPrototypes)) || !has(Object.prototype, source)) {
-                target[source] = true;
+            const propertyKey = typeof source === 'string' || typeof source === 'symbol'
+                ? source
+                : Reflect.ownKeys({ [source]: true })[0];
+            if (!isUnsafePropertyKey(propertyKey) &&
+                ((options && (options.plainObjects || options.allowPrototypes)) ||
+                    !has(Object.prototype, propertyKey))) {
+                target[propertyKey] = true;
             }
         }
         else {
@@ -68473,30 +69344,60 @@ function merge(target, source, options = {}) {
             if (i in source) {
                 const item = source[i];
                 if (has(target, i)) {
-                    const targetItem = target[i];
+                    const targetItem = readPreparedTarget(state, target, i);
                     if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
-                        target[i] = merge(targetItem, item, options);
+                        const merged = mergeWithState(targetItem, item, options, state);
+                        target[i] = merged;
                     }
                     else {
-                        target.push(item);
+                        const adopted = item;
+                        target.push(adopted);
                     }
                 }
                 else {
-                    target[i] = item;
+                    const adopted = item;
+                    target[i] = adopted;
                 }
             }
         }
         return target;
     }
     for (const key of Object.keys(source)) {
+        if (isUnsafePropertyKey(key)) {
+            continue;
+        }
         const value = source[key];
-        mergeTarget[key] = has(mergeTarget, key) ? merge(mergeTarget[key], value, options) : value;
+        const adopted = has(mergeTarget, key)
+            ? mergeWithState(readPreparedTarget(state, mergeTarget, key), value, options, state)
+            : value;
+        mergeTarget[key] = adopted;
     }
     return mergeTarget;
 }
+function merge(target, source, options = {}) {
+    const state = {
+        adopted: [],
+        preparedTargets: new WeakMap(),
+        preparedSources: new WeakMap(),
+        inspectedSources: 0,
+        inspectedSourceProperties: 0,
+    };
+    return mergeWithState(target, prepareSource(target, source, state), options, state);
+}
 function assign_single_source(target, source) {
-    for (const key of Object.keys(source)) {
-        target[key] = source[key];
+    const state = {
+        adopted: [],
+        preparedTargets: new WeakMap(),
+        preparedSources: new WeakMap(),
+        inspectedSources: 0,
+        inspectedSourceProperties: 0,
+    };
+    const prepared = prepareSource(target, source, state, true);
+    for (const key of Object.keys(prepared)) {
+        if (isUnsafePropertyKey(key)) {
+            continue;
+        }
+        target[key] = prepared[key];
     }
     return target;
 }
@@ -68643,6 +69544,7 @@ const push_to_array = function push_to_array(arr, value_or_array) {
     Array.prototype.push.apply(arr, values_isArray(value_or_array) ? value_or_array : [value_or_array]);
 };
 let toISOString;
+// SAFETY: The defaults object supplies the serializer's established non-null option values and RFC formatter; callers still merge their overrides separately.
 const defaults = {
     addQueryPrefix: false,
     allowDots: false,
@@ -68761,12 +69663,14 @@ function inner_stringify(object, prefix, generateArrayPrefix, commaRoundTrip, al
         return adjusted_prefix + '[]';
     }
     for (const key of obj_keys) {
+        // SAFETY: The serializer supports its existing encoded-key wrapper or property key; the branch selects the wrapper value before indexing the object.
         const value = 
         // @ts-ignore
         typeof key === 'object' && key.value !== undefined ? key.value : obj[key];
         if (skipNulls && value === null) {
             continue;
         }
+        // SAFETY: Dot encoding applies the serializer's existing string-key protocol; this cast preserves its legacy mixed key representation.
         // @ts-ignore
         const encoded_key = allowDots && encodeDotInKeys ? key.replace(/\./g, '%2E') : key;
         let key_prefix;
@@ -68910,6 +69814,37 @@ function stringifyQuery(query) {
     return stringify(query, { arrayFormat: 'brackets' });
 }
 //# sourceMappingURL=query.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/data-residency.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+const endpoints = new Map([
+    ['global', 'https://api.openai.com/v1'],
+    ['us', 'https://us.api.openai.com/v1'],
+    ['eu', 'https://eu.api.openai.com/v1'],
+    ['ae', 'https://ae.api.openai.com/v1'],
+]);
+/** Resolves an explicit residency selection before client options are inherited. */
+function resolveDataResidency(options) {
+    if (options.dataResidency === null || options.dataResidency === undefined) {
+        return undefined;
+    }
+    if (hasOwn(options, 'baseURL')) {
+        throw new error_OpenAIError('The `dataResidency` and `baseURL` options are mutually exclusive.');
+    }
+    const endpoint = endpoints.get(options.dataResidency);
+    if (endpoint === undefined) {
+        throw new error_OpenAIError('Invalid `dataResidency`; expected one of: global, us, eu, ae.');
+    }
+    return endpoint;
+}
+/** Prevents legacy provider clients from selecting an OpenAI endpoint. */
+function assertNoDataResidency(dataResidency, clientName) {
+    if (dataResidency !== null && dataResidency !== undefined) {
+        throw new error_OpenAIError(`${clientName} does not support \`dataResidency\`.`);
+    }
+}
+//# sourceMappingURL=data-residency.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/core/api-promise.mjs
 var _APIPromise_client;
 
@@ -69143,7 +70078,7 @@ class NextCursorPage extends AbstractPage {
         if (this.has_more === false) {
             return false;
         }
-        return super.hasNextPage();
+        return this.nextPageRequestOptions() != null;
     }
     nextPageRequestOptions() {
         const cursor = this.next;
@@ -69159,6 +70094,36 @@ class NextCursorPage extends AbstractPage {
         };
     }
 }
+class TokenPage extends AbstractPage {
+    constructor(client, response, body, options) {
+        super(client, response, body, options);
+        this.data = body.data || [];
+        this.has_more = body.has_more || false;
+        this.next = body.next || null;
+    }
+    getPaginatedItems() {
+        return this.data ?? [];
+    }
+    hasNextPage() {
+        if (this.has_more === false) {
+            return false;
+        }
+        return this.nextPageRequestOptions() != null;
+    }
+    nextPageRequestOptions() {
+        const cursor = this.next;
+        if (!cursor) {
+            return null;
+        }
+        return {
+            ...this.options,
+            query: {
+                ...maybeObj(this.options.query),
+                page: cursor,
+            },
+        };
+    }
+}
 //# sourceMappingURL=pagination.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/auth/workload-identity-auth.mjs
 
@@ -69168,6 +70133,107 @@ const SUBJECT_TOKEN_TYPES = {
     id: 'urn:ietf:params:oauth:token-type:id_token',
 };
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+// Cap the refresh buffer at half the actual token lifetime, matching the X.509
+// workload-identity path, so short-lived tokens keep a usable cache window.
+const MAX_REFRESH_BUFFER_FRACTION = 0.5;
+function calculateExpiresAt(expiresIn, exchangeStartedAt) {
+    if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+        throw new error_OpenAIError("Token exchange response has invalid 'expires_in' field");
+    }
+    const now = Date.now();
+    const fullLifetimeDeadline = now + expiresIn * 1000;
+    if (!Number.isSafeInteger(fullLifetimeDeadline) || fullLifetimeDeadline <= now) {
+        throw new error_OpenAIError("Token exchange response has invalid 'expires_in' field");
+    }
+    const expiresAt = fullLifetimeDeadline - (performance.now() - exchangeStartedAt);
+    if (expiresAt <= now) {
+        throw new error_OpenAIError('Workload identity token expired before its exchange completed.');
+    }
+    return expiresAt;
+}
+function calculateRefreshAt(expiresAt, lifetimeSeconds, refreshBufferSeconds) {
+    const configuredBufferMs = (refreshBufferSeconds ?? 1200) * 1000;
+    const effectiveBufferMs = Math.min(configuredBufferMs, lifetimeSeconds * 1000 * MAX_REFRESH_BUFFER_FRACTION);
+    return expiresAt - effectiveBufferMs;
+}
+const NATIVE_RESPONSE_PROTOTYPE = Response.prototype;
+const READ_NATIVE_RESPONSE_BODY = NATIVE_RESPONSE_PROTOTYPE.arrayBuffer;
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Custom fetch response prototypes are verified through descriptors before trusting their native contract.
+function isResponsePrototype(response, prototype) {
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    if (prototype === response ||
+        typeof constructor !== 'function' ||
+        Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Response' ||
+        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype) {
+        return false;
+    }
+    const tag = Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag);
+    return ((tag?.value === 'Response' || typeof tag?.get === 'function') &&
+        typeof Object.getOwnPropertyDescriptor(prototype, 'headers')?.get === 'function' &&
+        typeof Object.getOwnPropertyDescriptor(prototype, 'ok')?.get === 'function' &&
+        typeof Object.getOwnPropertyDescriptor(prototype, 'status')?.get === 'function');
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The prototype walk compares untrusted cross-realm objects by identity and descriptor metadata.
+function isResponseBodyPrototype(prototype, responsePrototype) {
+    if (prototype === responsePrototype) {
+        return true;
+    }
+    const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+    return (responsePrototype !== null &&
+        Object.getPrototypeOf(responsePrototype) === prototype &&
+        typeof constructor === 'function' &&
+        Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Body' &&
+        Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype);
+}
+function decodeNativeResponseBody(body) {
+    // SAFETY: Bun is an optional runtime global; its version is checked before selecting Bun-specific decoding behavior.
+    const scope = globalThis;
+    return new TextDecoder('utf-8', { ignoreBOM: typeof scope.Bun?.version === 'string' }).decode(body);
+}
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Decoded token JSON remains untrusted until the caller validates its fields.
+async function parseOAuthTokenResponse(response) {
+    let readText;
+    let responsePrototype = null;
+    for (let depth = 0, prototype = response; prototype !== null && depth < 16; prototype = Object.getPrototypeOf(prototype), depth += 1) {
+        if (prototype === NATIVE_RESPONSE_PROTOTYPE) {
+            break;
+        }
+        if (isResponsePrototype(response, prototype)) {
+            responsePrototype = prototype;
+        }
+        const parser = Object.getOwnPropertyDescriptor(prototype, 'json');
+        if (!parser) {
+            continue;
+        }
+        if (typeof parser.value !== 'function') {
+            break;
+        }
+        const bodyReader = Object.getOwnPropertyDescriptor(prototype, 'text')?.value;
+        if (typeof bodyReader === 'function' && isResponseBodyPrototype(prototype, responsePrototype)) {
+            readText = bodyReader;
+            break;
+        }
+        // Custom parsers own their results and failures; rejection provenance cannot be inferred.
+        return parser.value.call(response);
+    }
+    const body = readText === undefined
+        ? decodeNativeResponseBody(await READ_NATIVE_RESPONSE_BODY.call(response))
+        : await readText.call(response);
+    try {
+        return JSON.parse(body);
+    }
+    catch {
+        throw new SyntaxError('Token exchange response contains invalid JSON');
+    }
+}
+function isUnsafeAccessToken(accessToken) {
+    // SAFETY: Bun is an optional runtime global; its version is checked before selecting Bun-specific decoding behavior.
+    const scope = globalThis;
+    if (typeof scope.Bun?.version === 'string') {
+        return /[^\t\u0020-\u007E]|^[\t ]|[\t ]$/u.test(accessToken);
+    }
+    return /[^\t\u0020-\u007E\u0080-\u00FF]|^[\t ]|[\t ]$/u.test(accessToken);
+}
 /**
  * Exchanges external workload-identity tokens for cached OpenAI access tokens.
  *
@@ -69187,7 +70253,19 @@ class WorkloadIdentityAuth {
         this.refreshPromise = null;
         this.tokenGeneration = 0;
         this.tokenExchangeUrl = 'https://auth.openai.com/oauth/token';
-        this.config = config;
+        const { identityProviderId, serviceAccountId, clientId, refreshBufferSeconds, provider } = config;
+        this.config = {
+            identityProviderId,
+            serviceAccountId,
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(clientId === undefined ? {} : { clientId }),
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(refreshBufferSeconds === undefined ? {} : { refreshBufferSeconds }),
+            provider: {
+                tokenType: provider.tokenType,
+                getToken: provider.getToken.bind(provider),
+            },
+        };
         this.fetch = fetch ?? getDefaultFetch();
     }
     /**
@@ -69216,7 +70294,7 @@ class WorkloadIdentityAuth {
                 }
             }
         }
-        if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
+        if (WorkloadIdentityAuth.needsRefresh(this.cachedToken) && !this.refreshPromise) {
             const refreshPromise = this.refreshToken(this.tokenGeneration).finally(() => {
                 if (this.refreshPromise === refreshPromise) {
                     this.refreshPromise = null;
@@ -69229,6 +70307,7 @@ class WorkloadIdentityAuth {
     }
     async refreshToken(generation) {
         const subjectToken = await this.config.provider.getToken();
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The token-exchange field dictionary gains an optional client_id after its required fields are initialized.
         const body = {
             grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
             subject_token: subjectToken,
@@ -69239,6 +70318,8 @@ class WorkloadIdentityAuth {
         if (this.config.clientId) {
             body['client_id'] = this.config.clientId;
         }
+        // Exclude provider acquisition and measure delivery time independently of wall-clock changes.
+        const exchangeStartedAt = performance.now();
         const response = await this.fetch(this.tokenExchangeUrl, {
             method: 'POST',
             headers: {
@@ -69261,28 +70342,23 @@ class WorkloadIdentityAuth {
             }
             throw APIError.generate(response.status, body, `Token exchange failed with status ${response.status}`, response.headers);
         }
-        const tokenResponse = await response.json();
-        if (typeof tokenResponse !== 'object' ||
-            tokenResponse === null ||
-            !('access_token' in tokenResponse) ||
-            typeof tokenResponse.access_token !== 'string' ||
-            tokenResponse.access_token.trim().length === 0) {
+        const tokenResponse = await parseOAuthTokenResponse(response);
+        const accessToken = typeof tokenResponse === 'object' && tokenResponse !== null && 'access_token' in tokenResponse
+            ? tokenResponse.access_token
+            : undefined;
+        if (typeof accessToken !== 'string' ||
+            accessToken.trim().length === 0 ||
+            isUnsafeAccessToken(accessToken)) {
             throw new error_OpenAIError("Token exchange response missing 'access_token' field");
         }
-        const accessToken = tokenResponse.access_token;
+        // SAFETY: The token response was checked as an object with a valid access token; expires_in is still validated by calculateExpiresAt.
         const expiresIn = tokenResponse.expires_in ?? 3600;
-        if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
-            throw new error_OpenAIError("Token exchange response has invalid 'expires_in' field");
-        }
-        const now = Date.now();
-        const expiresAt = now + expiresIn * 1000;
-        if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
-            throw new error_OpenAIError("Token exchange response has invalid 'expires_in' field");
-        }
+        const expiresAt = calculateExpiresAt(expiresIn, exchangeStartedAt);
         if (this.tokenGeneration === generation) {
             this.cachedToken = {
                 token: accessToken,
                 expiresAt,
+                refreshAt: calculateRefreshAt(expiresAt, expiresIn, this.config.refreshBufferSeconds),
             };
         }
         return accessToken;
@@ -69290,10 +70366,8 @@ class WorkloadIdentityAuth {
     static isTokenExpired(cachedToken) {
         return Date.now() >= cachedToken.expiresAt;
     }
-    needsRefresh(cachedToken) {
-        const bufferSeconds = this.config.refreshBufferSeconds ?? 1200;
-        const bufferMs = bufferSeconds * 1000;
-        return Date.now() >= cachedToken.expiresAt - bufferMs;
+    static needsRefresh(cachedToken) {
+        return Date.now() >= cachedToken.refreshAt;
     }
     /** Discards the cached access token so the next request performs a fresh exchange. */
     invalidateToken() {
@@ -69303,6 +70377,31 @@ class WorkloadIdentityAuth {
     }
 }
 //# sourceMappingURL=workload-identity-auth.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/auth/x509-api-origin.mjs
+
+
+/** Sole API authority approved for OpenAI X.509 workload-identity federation. */
+const X509_API_BASE_URL = 'https://mtls.api.openai.com/v1';
+/** Validates the enrolled API authority and rejects credential-bearing query parameters. */
+function assertX509APIOrigin(value) {
+    let target;
+    try {
+        target = new URL(value);
+    }
+    catch {
+        throw new error_OpenAIError('X.509 workload identity requires the approved global mTLS API origin.');
+    }
+    if (target.origin !== 'https://mtls.api.openai.com' || target.username || target.password) {
+        throw new error_OpenAIError('X.509 workload identity requires the approved global mTLS API origin.');
+    }
+    for (const name of target.searchParams.keys()) {
+        if (isSensitiveQueryParameter(name)) {
+            throw new error_OpenAIError('X.509 workload identity cannot send conflicting query authentication credentials.');
+        }
+    }
+    return target;
+}
+//# sourceMappingURL=x509-api-origin.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/headers.mjs
 
 const brand_privateNullableHeaders = /* @__PURE__ */ Symbol('brand.privateNullableHeaders');
@@ -69320,11 +70419,10 @@ function* iterateHeaders(headers) {
     }
     let shouldClear = false;
     let iter;
-    if (headers instanceof Headers) {
-        iter = headers.entries();
-    }
-    else if (isReadonlyArray(headers)) {
-        iter = headers;
+    // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
+    const iterator = Symbol.iterator in headers ? headers[Symbol.iterator] : undefined;
+    if (typeof iterator === 'function') {
+        iter = { [Symbol.iterator]: () => iterator.call(headers) };
     }
     else {
         shouldClear = true;
@@ -69381,6 +70479,1014 @@ const isEmptyHeaders = (headers) => {
     return true;
 };
 //# sourceMappingURL=headers.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/auth/x509-transport-state-browser.mjs
+/** Browser-safe capability state keeps CommonJS outside the ordinary SDK ESM graph. */
+const registeredX509Transports = new WeakMap();
+const transientX509ConnectionErrors = new WeakSet();
+const retryableX509IssuerErrors = new WeakSet();
+const approvedX509Clients = new WeakSet();
+const approvedX509OAuthErrors = new WeakMap();
+const approvedX509Credentials = new WeakMap();
+/** Looks up an opaque capability without exposing the registry itself. */
+const findRegisteredX509Transport = WeakMap.prototype.get.bind(registeredX509Transports);
+/** Records a capability only after its Node-only factory validates the private dispatcher. */
+const rememberRegisteredX509Transport = WeakMap.prototype.set.bind(registeredX509Transports);
+/** Privately classifies sanitized issuer errors without exposing transport details. */
+const markTransientX509ConnectionError = WeakSet.prototype.add.bind(transientX509ConnectionErrors);
+/** Checks the private transient classification without retaining caller-owned errors. */
+const isTransientX509ConnectionError = WeakSet.prototype.has.bind(transientX509ConnectionErrors);
+/** Privately brands retryable issuer failures without exposing classification state. */
+const markRetryableX509IssuerError = WeakSet.prototype.add.bind(retryableX509IssuerErrors);
+/** Recognizes trusted issuer failures without evaluating caller-controlled properties. */
+const isRetryableX509IssuerError = WeakSet.prototype.has.bind(retryableX509IssuerErrors);
+/** Brands validated clients without exposing their mutable options or authentication fields. */
+const markApprovedX509Client = WeakSet.prototype.add.bind(approvedX509Clients);
+/** Recognizes private client ownership without caller-visible markers. */
+const x509_transport_state_browser_isApprovedX509Client = WeakSet.prototype.has.bind(approvedX509Clients);
+/** Stores trusted OAuth metadata without exposing it to unrelated callers. */
+const rememberX509OAuthError = WeakMap.prototype.set.bind(approvedX509OAuthErrors);
+/** Retrieves trusted metadata when public OAuth errors cross module formats. */
+const findX509OAuthError = WeakMap.prototype.get.bind(approvedX509OAuthErrors);
+/** Privately binds SDK-owned credentials without importing Node or optional transport peers. */
+const rememberX509Credential = WeakMap.prototype.set.bind(approvedX509Credentials);
+/** Resolves only credentials registered by the optional Node authentication helper. */
+const findX509Credential = WeakMap.prototype.get.bind(approvedX509Credentials);
+//# sourceMappingURL=x509-transport-state-browser.mjs.map
+// EXTERNAL MODULE: ./node_modules/openai/internal/auth/x509-transport-state.js
+var x509_transport_state = __nccwpck_require__(4894);
+var x509_transport_state_namespaceObject = /*#__PURE__*/__nccwpck_require__.t(x509_transport_state, 2);
+;// CONCATENATED MODULE: ./node_modules/openai/internal/auth/x509-transport-state.mjs
+
+
+
+// oxlint-disable-next-line anti-slop/no-runtime-typeof -- The package adapter probes the Node-only registry export before selecting the browser fallback.
+const state = typeof x509_transport_state.findRegisteredX509Transport === 'function' ? x509_transport_state_namespaceObject : x509_transport_state_browser_namespaceObject;
+
+const {
+  findRegisteredX509Transport: x509_transport_state_findRegisteredX509Transport,
+  rememberRegisteredX509Transport: x509_transport_state_rememberRegisteredX509Transport,
+  markTransientX509ConnectionError: x509_transport_state_markTransientX509ConnectionError,
+  isTransientX509ConnectionError: x509_transport_state_isTransientX509ConnectionError,
+  markRetryableX509IssuerError: x509_transport_state_markRetryableX509IssuerError,
+  isRetryableX509IssuerError: x509_transport_state_isRetryableX509IssuerError,
+  markApprovedX509Client: x509_transport_state_markApprovedX509Client,
+  isApprovedX509Client: x509_transport_state_isApprovedX509Client,
+  rememberX509OAuthError: x509_transport_state_rememberX509OAuthError,
+  findX509OAuthError: x509_transport_state_findX509OAuthError,
+  rememberX509Credential: x509_transport_state_rememberX509Credential,
+  findX509Credential: x509_transport_state_findX509Credential,
+} = state;
+
+;// CONCATENATED MODULE: ./node_modules/openai/internal/auth/x509-transport-registry.mjs
+
+
+const transientX509TransportCodes = new Set([
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'ENETUNREACH',
+    'EHOSTUNREACH',
+    'ENETDOWN',
+    'EPIPE',
+    'ETIMEDOUT',
+    'EAI_AGAIN',
+    'UND_ERR_CONNECT_TIMEOUT',
+    'UND_ERR_HEADERS_TIMEOUT',
+    'UND_ERR_BODY_TIMEOUT',
+    'UND_ERR_SOCKET',
+]);
+/** Retries only known temporary failures when neither error layer reports a permanent code. */
+function isRetryableX509TransportFailure(failure) {
+    const cause = typeof failure === 'object' && failure !== null
+        ? Object.getOwnPropertyDescriptor(failure, 'cause')?.value
+        : undefined;
+    let retryable = false;
+    for (const candidate of [failure, cause]) {
+        const code = typeof candidate === 'object' && candidate !== null
+            ? Object.getOwnPropertyDescriptor(candidate, 'code')?.value
+            : undefined;
+        if (typeof code === 'string') {
+            if (!transientX509TransportCodes.has(code)) {
+                return false;
+            }
+            retryable = true;
+        }
+    }
+    return retryable;
+}
+const x509TransportBrand = Symbol('X.509 transport capability');
+/** Resolves a previously registered opaque capability without importing an optional transport peer. */
+function resolveX509Transport(value) {
+    if (!value || typeof value !== 'object') {
+        throw new error_OpenAIError('X.509 workload identity requires an approved X.509 transport capability.');
+    }
+    const registered = x509_transport_state_findRegisteredX509Transport(value);
+    if (!registered) {
+        throw new error_OpenAIError('X.509 workload identity requires an approved X.509 transport capability.');
+    }
+    return registered;
+}
+//# sourceMappingURL=x509-transport-registry.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/auth/x509-workload-identity-auth.mjs
+var _X509WorkloadIdentityAuth_instances, _a, _X509WorkloadIdentityAuth_identityProviderId, _X509WorkloadIdentityAuth_serviceAccountId, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, _X509WorkloadIdentityAuth_organization, _X509WorkloadIdentityAuth_project, _X509WorkloadIdentityAuth_transport, _X509WorkloadIdentityAuth_refreshBufferMs, _X509WorkloadIdentityAuth_cachedToken, _X509WorkloadIdentityAuth_refresh, _X509WorkloadIdentityAuth_tokenGeneration, _X509WorkloadIdentityAuth_cancelRequestBody, _X509WorkloadIdentityAuth_assignToken, _X509WorkloadIdentityAuth_recoverRefreshFailure, _X509WorkloadIdentityAuth_fallbackToken, _X509WorkloadIdentityAuth_retireRefresh, _X509WorkloadIdentityAuth_beginRefresh, _X509WorkloadIdentityAuth_refreshToken, _X509WorkloadIdentityAuth_preflight, _X509WorkloadIdentityAuth_scope, _X509WorkloadIdentityAuth_assertTenantHeaders;
+
+
+
+
+
+
+
+
+
+const FORBIDDEN_TRANSPORT_OPTIONS = ['dispatcher', 'agent', 'client', 'tls', 'proxy'];
+const headerValue = (headers, name) => Headers.prototype.get.call(headers, name);
+const DEFAULT_REFRESH_BUFFER_MS = 20 * 60 * 1000;
+const FAILED_REFRESH_COOLDOWN_MS = 1000;
+const userAbortError = (signal) => {
+    const error = new APIUserAbortError();
+    Object.defineProperty(error, 'cause', { value: signal.reason, writable: true, configurable: true });
+    return error;
+};
+function assertSafeHeaders(headers) {
+    for (const name of Headers.prototype.keys.call(headers)) {
+        const canonical = name.toLowerCase().split('_').join('-');
+        if ((canonical !== 'authorization' && isSensitiveHeader(canonical)) || canonical === 'host') {
+            throw new error_OpenAIError('X.509 workload identity cannot send conflicting authentication credentials.');
+        }
+    }
+}
+function exchangeDeadline(timeout, callerSignal) {
+    const deadline = new AbortController();
+    const timer = timeout === undefined
+        ? undefined
+        : setTimeout(() => deadline.abort(new APIConnectionTimeoutError()), timeout);
+    const timerHandle = timer;
+    if (typeof timerHandle === 'object' &&
+        timerHandle !== null &&
+        'unref' in timerHandle &&
+        typeof timerHandle.unref === 'function') {
+        timerHandle.unref();
+    }
+    const cancel = () => deadline.abort(callerSignal?.reason);
+    callerSignal?.addEventListener('abort', cancel, { once: true });
+    if (callerSignal?.aborted) {
+        cancel();
+    }
+    return {
+        signal: deadline.signal,
+        dispose: () => {
+            callerSignal?.removeEventListener('abort', cancel);
+            if (timer) {
+                clearTimeout(timer);
+            }
+        },
+    };
+}
+function waitForRefresh(attempt, signal) {
+    let abort;
+    // AbortSignal remains callback-only on supported TypeScript/runtime combinations.
+    // oxlint-disable-next-line promise/avoid-new -- A callback-only AbortSignal must race a shared refresh.
+    const canceled = new Promise((_resolve, reject) => {
+        abort = () => reject(signal.reason);
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) {
+            abort();
+        }
+    });
+    return {
+        result: Promise.race([attempt.promise, canceled]),
+        dispose: () => {
+            if (abort) {
+                signal.removeEventListener('abort', abort);
+            }
+        },
+    };
+}
+/** Distinguishes true certificate identities from extensible legacy subject-token identities. */
+function isX509WorkloadIdentity(identity) {
+    if (!identity || typeof identity !== 'object') {
+        return false;
+    }
+    let providerOwner = identity;
+    while (providerOwner !== null && providerOwner !== Object.prototype) {
+        const provider = Object.getOwnPropertyDescriptor(providerOwner, 'provider');
+        if (provider) {
+            if (!('value' in provider) || provider.value !== undefined) {
+                return false;
+            }
+            break;
+        }
+        // SAFETY: Object.getPrototypeOf returns an object or null; the traversal checks descriptors rather than assuming a credential-provider subtype.
+        providerOwner = Object.getPrototypeOf(providerOwner);
+    }
+    let current = identity;
+    while (current !== null && current !== Object.prototype) {
+        const discriminator = Object.getOwnPropertyDescriptor(current, 'type');
+        if (discriminator) {
+            if (!('value' in discriminator)) {
+                throw new error_OpenAIError('X.509 workload identity type must be a plain data property.');
+            }
+            return discriminator.value === 'x509';
+        }
+        // SAFETY: Object.getPrototypeOf returns an object or null; the traversal checks descriptors rather than assuming a credential-provider subtype.
+        current = Object.getPrototypeOf(current);
+    }
+    return false;
+}
+/** Rejects unsupported WebSocket authentication before any connection or credential side effect. */
+function assertX509WebSocketSupported(client) {
+    if (!client || typeof client !== 'object') {
+        return;
+    }
+    if (isApprovedX509Client(client)) {
+        throw new OpenAIError('X.509 workload identity does not support WebSocket connections.');
+    }
+}
+/** Prevents caller options from replacing the immutable transport selected at construction. */
+function assertX509FetchOptions(options) {
+    if (!options) {
+        return;
+    }
+    for (const name of FORBIDDEN_TRANSPORT_OPTIONS) {
+        if (hasOwn(options, name)) {
+            throw new error_OpenAIError('X.509 workload identity cannot override its approved transport capability.');
+        }
+    }
+    const redirect = Object.getOwnPropertyDescriptor(options, 'redirect')?.value;
+    if (redirect !== undefined && redirect !== 'manual') {
+        throw new error_OpenAIError('X.509 workload identity requests require manual redirects.');
+    }
+}
+/** Rejects caller overrides while allowing the SDK-owned fields on the final RequestInit. */
+function assertX509RequestOptions(options) {
+    assertX509FetchOptions(options);
+    if (options && ['body', 'headers', 'method', 'signal'].some((name) => hasOwn(options, name))) {
+        throw new error_OpenAIError('X.509 workload identity cannot override its request body, headers, method, or signal through fetch options.');
+    }
+}
+/** Validates and snapshots the exact caller options that will reach authenticated dispatch. */
+function snapshotX509RequestOptions(options) {
+    assertX509RequestOptions(options);
+    const snapshot = { ...options };
+    assertX509RequestOptions(snapshot);
+    return snapshot;
+}
+/** Bridges certificate authentication into existing OpenAI auth and fetch hooks without optional peers. */
+class X509WorkloadIdentityAuth {
+    /** Captures one registered, immutable certificate identity and its enrolled selectors. */
+    constructor(identity, transport, organization, project) {
+        _X509WorkloadIdentityAuth_instances.add(this);
+        _X509WorkloadIdentityAuth_identityProviderId.set(this, void 0);
+        _X509WorkloadIdentityAuth_serviceAccountId.set(this, void 0);
+        _X509WorkloadIdentityAuth_configuredRefreshBufferMs.set(this, void 0);
+        _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds.set(this, void 0);
+        _X509WorkloadIdentityAuth_organization.set(this, void 0);
+        _X509WorkloadIdentityAuth_project.set(this, void 0);
+        _X509WorkloadIdentityAuth_transport.set(this, void 0);
+        _X509WorkloadIdentityAuth_refreshBufferMs.set(this, void 0);
+        _X509WorkloadIdentityAuth_cachedToken.set(this, void 0);
+        _X509WorkloadIdentityAuth_refresh.set(this, void 0);
+        _X509WorkloadIdentityAuth_tokenGeneration.set(this, 0);
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_transport, resolveX509Transport(transport), "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_identityProviderId, identity.identityProviderId, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_serviceAccountId, identity.serviceAccountId, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, identity.refreshBufferMs, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, identity.refreshBufferSeconds, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_organization, organization, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_project, project, "f");
+        if (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, "f") !== undefined && __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") !== undefined) {
+            throw new error_OpenAIError('X.509 workload identity cannot combine refreshBufferSeconds and refreshBufferMs.');
+        }
+        if (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, "f") !== undefined &&
+            (!Number.isSafeInteger(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, "f")) || __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, "f") < 0)) {
+            throw new error_OpenAIError('X.509 workload identity requires a nonnegative integer refreshBufferMs.');
+        }
+        if (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") !== undefined &&
+            (!Number.isSafeInteger(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f")) ||
+                __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") < 0 ||
+                !Number.isSafeInteger(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") * 1000))) {
+            throw new error_OpenAIError('X.509 workload identity requires a nonnegative integer refreshBufferSeconds.');
+        }
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_refreshBufferMs, __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") === undefined
+            ? (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, "f") ?? DEFAULT_REFRESH_BUFFER_MS)
+            : __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") * 1000, "f");
+    }
+    /** Reconstructs the immutable selectors captured before caller-owned identity mutation. */
+    identitySnapshot() {
+        return {
+            type: 'x509',
+            identityProviderId: __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_identityProviderId, "f"),
+            serviceAccountId: __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_serviceAccountId, "f"),
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, "f") === undefined
+                ? {}
+                : { refreshBufferMs: __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferMs, "f") }),
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") === undefined
+                ? {}
+                : { refreshBufferSeconds: __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds, "f") }),
+        };
+    }
+    /** Preserves explicitly headerless requests without presenting a certificate to the issuer. */
+    static shouldAuthenticate(options, defaultHeaders, requestHeaders = options.headers) {
+        return !buildHeaders([defaultHeaders, requestHeaders]).nulls.has('authorization');
+    }
+    /** Snapshots each caller-owned header layer once while preserving nulls and precedence. */
+    snapshotHeaders(defaultHeaders, requestHeaders) {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        scope.defaultHeaders ?? (scope.defaultHeaders = buildHeaders([defaultHeaders]));
+        scope.requestHeaders ?? (scope.requestHeaders = buildHeaders([requestHeaders]));
+        return this.headerSnapshots();
+    }
+    /** Returns the already rendered caller headers without touching mutable inputs again. */
+    headerSnapshots() {
+        const { defaultHeaders, requestHeaders } = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        if (!defaultHeaders || !requestHeaders) {
+            throw new error_OpenAIError('X.509 workload identity requires snapshotted request headers.');
+        }
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The exposed snapshot contract deliberately hides the private request-scope representation.
+        return { defaultHeaders, requestHeaders };
+    }
+    /** Captures enrolled public tenant selectors once before certificate presentation. */
+    snapshotTenant(organization, project) {
+        if (organization !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_organization, "f") || project !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_project, "f")) {
+            throw new error_OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+        }
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        scope.tenant = { organization, project };
+        return scope.tenant;
+    }
+    /** Returns the tenant selectors already approved for this logical request. */
+    tenantSnapshot() {
+        const { tenant } = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        if (!tenant) {
+            throw new error_OpenAIError('X.509 workload identity requires snapshotted tenant selectors.');
+        }
+        return tenant;
+    }
+    /** Validates and retains the exact destination that authenticated dispatch will use. */
+    snapshotAPIURL(value) {
+        assertX509APIOrigin(value);
+        __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this).apiURL = value;
+    }
+    /** Reads the already-approved destination without rerendering caller-owned request options. */
+    requestAPIURL() {
+        const { apiURL } = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        if (apiURL === undefined) {
+            throw new error_OpenAIError('X.509 workload identity requires a snapshotted API destination.');
+        }
+        return apiURL;
+    }
+    /** Captures the exact caller settings approved for authenticated dispatch. */
+    snapshotRequest(signal, timeout, fetchOptions) {
+        var _b;
+        (_b = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this)).request ?? (_b.request = { signal, timeout, fetchOptions });
+    }
+    /** Returns immutable request settings without invoking caller-owned accessors again. */
+    requestSnapshot() {
+        const { request } = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        if (!request) {
+            throw new error_OpenAIError('X.509 workload identity requires snapshotted request settings.');
+        }
+        return request;
+    }
+    /** Suspends an already-running network budget during retry-local asynchronous preparation. */
+    beginRequestPreparation() {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        if (scope.deadlineArmed && scope.preparationStartedAt === undefined) {
+            scope.preparationStartedAt = performance.now();
+            scope.preparationWallStartedAt = Date.now();
+        }
+    }
+    /** Begins local request construction without charging protected hook latency to the network. */
+    beginRequestPlanning() {
+        __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this).phase = 'planning';
+    }
+    /** Arms one absolute network deadline only after all local request preparation completes. */
+    beginRequestNetwork() {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        if (!scope.deadlineArmed) {
+            scope.wallStartedAt = Date.now();
+            scope.monotonicStartedAt = performance.now();
+            scope.deadlineArmed = true;
+        }
+        else if (scope.preparationStartedAt !== undefined) {
+            scope.monotonicStartedAt += performance.now() - scope.preparationStartedAt;
+            scope.wallStartedAt += Date.now() - (scope.preparationWallStartedAt ?? Date.now());
+            delete scope.preparationStartedAt;
+            delete scope.preparationWallStartedAt;
+        }
+    }
+    /** Keeps certificate authentication outside overridable request construction. */
+    isPlanningRequest() {
+        return __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this).phase === 'planning';
+    }
+    /** Approves the final overridden destination and transport before minting a bearer. */
+    authorizePlannedRequest(url, request, timeout, allowHookSignal = false) {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        const headers = Object.getOwnPropertyDescriptor(request, 'headers');
+        const body = Object.getOwnPropertyDescriptor(request, 'body');
+        const signal = Object.getOwnPropertyDescriptor(request, 'signal');
+        const redirect = Object.getOwnPropertyDescriptor(request, 'redirect');
+        if (scope.phase !== 'planning' ||
+            !headers ||
+            !(headers.value instanceof Headers) ||
+            (!body && 'body' in request) ||
+            [body, signal, redirect].some((descriptor) => descriptor && !('value' in descriptor))) {
+            throw new error_OpenAIError('X.509 workload identity requires an approved final request.');
+        }
+        this.snapshotAPIURL(url);
+        assertX509FetchOptions(request);
+        try {
+            assertSafeHeaders(headers.value);
+        }
+        catch {
+            throw new error_OpenAIError('X.509 workload identity cannot use caller-supplied authentication credentials.');
+        }
+        if (headerValue(headers.value, 'Authorization') !== null) {
+            throw new error_OpenAIError('X.509 workload identity cannot use caller-supplied authorization credentials.');
+        }
+        __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_assertTenantHeaders).call(this, headers.value);
+        if (!allowHookSignal && (signal?.value ?? undefined) !== (this.requestSnapshot().signal ?? undefined)) {
+            throw new error_OpenAIError('X.509 workload identity must preserve its approved request signal.');
+        }
+        const approved = this.requestSnapshot();
+        scope.request = { ...approved, timeout: Math.min(approved.timeout, timeout) };
+        scope.phase = 'authorizing';
+    }
+    /** Owns only SDK-created iterator adapters until authenticated dispatch takes responsibility. */
+    ownRequestBody(body, source) {
+        if (body instanceof ReadableStream && body !== source) {
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this).materializedBody = body;
+        }
+    }
+    /** Recognizes every one-shot upload before issuer authentication or request replay. */
+    static isStreamingRequestBody(body) {
+        return ((globalThis.ReadableStream !== undefined && body instanceof globalThis.ReadableStream) ||
+            (typeof body === 'object' &&
+                body !== null &&
+                (Symbol.asyncIterator in body ||
+                    (Symbol.iterator in body && 'next' in body && typeof body.next === 'function'))));
+    }
+    /** Retires abandoned upload adapters without masking or blocking their authentication failure. */
+    retireRequestBody() {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        const body = scope.materializedBody;
+        delete scope.materializedBody;
+        if (body) {
+            void __classPrivateFieldGet(_a, _a, "m", _X509WorkloadIdentityAuth_cancelRequestBody).call(_a, body);
+        }
+    }
+    /** Transfers the dispatched upload while retiring any SDK-owned body replaced by a hook. */
+    releaseRequestBody(body) {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        if (scope.materializedBody === body) {
+            delete scope.materializedBody;
+        }
+        else {
+            this.retireRequestBody();
+        }
+    }
+    /** Retains caller-only cancellation separately from SDK-created deadline controllers. */
+    setEffectiveSignal(signal) {
+        if (signal) {
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this).effectiveSignal = signal;
+        }
+        else {
+            delete __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this).effectiveSignal;
+        }
+    }
+    /** Uses protected-hook cancellation when an authenticated attempt enters retry backoff. */
+    effectiveSignal() {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        return scope.effectiveSignal ?? scope.request?.signal;
+    }
+    /** Establishes an independent scope even when concurrent requests share caller options. */
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- Logical request owners are opaque identity tokens; their properties are never read.
+    runRequest(operation, requestOwner) {
+        return __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").run(async () => {
+            const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current();
+            if (!scope) {
+                throw new error_OpenAIError('X.509 workload identity requires an active certificate request scope.');
+            }
+            scope.owner = this;
+            scope.requestOwner = requestOwner;
+            try {
+                return await operation();
+            }
+            finally {
+                this.retireRequestBody();
+                this.releaseRequestCredentials();
+                delete scope.requestOwner;
+                delete scope.owner;
+            }
+        });
+    }
+    /** Reports whether a public request-building call already belongs to an active logical operation. */
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- Request scope membership compares the opaque caller token by identity only.
+    inRequest(requestOwner) {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current();
+        return scope?.owner === this && scope.requestOwner === requestOwner && scope.phase !== 'authorizing';
+    }
+    /** Shares a cache only when the complete, privately snapshotted credential identity matches. */
+    matches(other) {
+        return (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f") === __classPrivateFieldGet(other, _X509WorkloadIdentityAuth_transport, "f") &&
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_identityProviderId, "f") === __classPrivateFieldGet(other, _X509WorkloadIdentityAuth_identityProviderId, "f") &&
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_serviceAccountId, "f") === __classPrivateFieldGet(other, _X509WorkloadIdentityAuth_serviceAccountId, "f") &&
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_organization, "f") === __classPrivateFieldGet(other, _X509WorkloadIdentityAuth_organization, "f") &&
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_project, "f") === __classPrivateFieldGet(other, _X509WorkloadIdentityAuth_project, "f") &&
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refreshBufferMs, "f") === __classPrivateFieldGet(other, _X509WorkloadIdentityAuth_refreshBufferMs, "f"));
+    }
+    /** Binds deferred response parsing to the original logical request and its unchanged deadline. */
+    continuation() {
+        const { wallStartedAt, monotonicStartedAt, deadlineArmed, request, requestOwner, effectiveSignal } = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        const scope = {
+            wallStartedAt,
+            monotonicStartedAt,
+            owner: this,
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(deadlineArmed ? { deadlineArmed } : {}),
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(request ? { request } : {}),
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(effectiveSignal ? { effectiveSignal } : {}),
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(requestOwner ? { requestOwner } : {}),
+        };
+        return (operation) => __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").resume(scope, async () => {
+            try {
+                return await operation();
+            }
+            finally {
+                this.releaseRequestCredentials();
+                delete scope.requestOwner;
+                delete scope.owner;
+            }
+        });
+    }
+    /** Removes dispatched bearer material before settled request promises can retain their scope. */
+    releaseRequestCredentials() {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        delete scope.request;
+        delete scope.phase;
+        delete scope.deadlineArmed;
+        delete scope.preparationStartedAt;
+        delete scope.preparationWallStartedAt;
+        delete scope.effectiveSignal;
+        delete scope.materializedBody;
+        delete scope.apiURL;
+        delete scope.tenant;
+        delete scope.token;
+        delete scope.defaultHeaders;
+        delete scope.requestHeaders;
+        delete scope.tokenGeneration;
+        delete scope.headers;
+        delete scope.authorization;
+    }
+    /** Returns the original authentication start so response consumption shares its request deadline. */
+    requestStartedAt(_options) {
+        return __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current()?.wallStartedAt;
+    }
+    /** Distinguishes issued workload credentials from independent admin or headerless requests. */
+    usedWorkloadToken(_options) {
+        return __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current()?.token !== undefined;
+    }
+    /** Returns the budget left after certificate authentication without starting another timeout. */
+    remainingTimeout(_options, timeout) {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current();
+        if (scope === undefined) {
+            return timeout;
+        }
+        const remaining = timeout - (performance.now() - scope.monotonicStartedAt);
+        if (remaining <= 0) {
+            throw new APIConnectionTimeoutError();
+        }
+        return remaining;
+    }
+    /** Cancels active retry timers promptly without changing public caller-abort semantics. */
+    async waitForRetry(duration, signal) {
+        try {
+            await __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").sleep(duration, signal);
+        }
+        catch (error) {
+            if (signal?.aborted) {
+                throw userAbortError(signal);
+            }
+            throw error;
+        }
+    }
+    /** Trusts only issuer or connection failures privately branded by the approved transport. */
+    static isRetryableFailure(error) {
+        return (typeof error === 'object' &&
+            error !== null &&
+            (x509_transport_state_isTransientX509ConnectionError(error) || x509_transport_state_isRetryableX509IssuerError(error)));
+    }
+    /** Reads safe retry hints only from a privately branded, sanitized issuer response. */
+    static retryHeaders(error) {
+        if (!error || typeof error !== 'object' || !x509_transport_state_isRetryableX509IssuerError(error)) {
+            return undefined;
+        }
+        const headers = Object.getOwnPropertyDescriptor(error, 'headers')?.value;
+        return headers instanceof Headers ? headers : undefined;
+    }
+    /** Exchanges the exact certificate capability selected for the matching API dispatch. */
+    async getToken(options, context) {
+        const callerSignal = context ? context.signal : options?.signal;
+        if (callerSignal?.aborted) {
+            throw userAbortError(callerSignal);
+        }
+        if (options) {
+            assertX509RequestOptions(context ? context.fetchOptions : options.fetchOptions);
+        }
+        __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_preflight).call(this, context);
+        const scope = options ? __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this) : undefined;
+        const cached = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_cachedToken, "f");
+        if (cached && performance.now() < cached.refreshAt && Date.now() < cached.wallRefreshAt) {
+            return __classPrivateFieldGet(_a, _a, "m", _X509WorkloadIdentityAuth_assignToken).call(_a, scope, cached);
+        }
+        const remaining = context && options ? this.remainingTimeout(options, context.timeout) : context?.timeout;
+        const { signal, dispose } = exchangeDeadline(remaining, callerSignal);
+        if (callerSignal?.aborted) {
+            dispose();
+            throw userAbortError(callerSignal);
+        }
+        const attempt = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refresh, "f") ?? __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_beginRefresh).call(this);
+        attempt.waiters += 1;
+        const waiter = waitForRefresh(attempt, signal);
+        try {
+            const exchanged = await waiter.result;
+            const refreshed = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_cachedToken, "f");
+            if (!refreshed || refreshed.accessToken !== exchanged.accessToken) {
+                throw new APIUserAbortError();
+            }
+            return __classPrivateFieldGet(_a, _a, "m", _X509WorkloadIdentityAuth_assignToken).call(_a, scope, refreshed);
+        }
+        catch (error) {
+            return await __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_recoverRefreshFailure).call(this, error, attempt, cached, scope, options, context);
+        }
+        finally {
+            waiter.dispose();
+            dispose();
+            attempt.waiters -= 1;
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_retireRefresh).call(this, attempt);
+        }
+    }
+    /** Invalidates only the workload-token generation actually rejected by the current request. */
+    invalidateToken() {
+        const rejected = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current();
+        if (!rejected?.token ||
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_cachedToken, "f")?.accessToken !== rejected.token ||
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_cachedToken, "f").generation !== rejected.tokenGeneration) {
+            return;
+        }
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_tokenGeneration, __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_tokenGeneration, "f") + 1, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_cachedToken, undefined, "f");
+        const refresh = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refresh, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_refresh, undefined, "f");
+        refresh?.controller.abort(new APIUserAbortError());
+    }
+    /** Binds the minted credential to the original headers before protected request hooks run. */
+    bindRequest(options, request, adminAPIKey) {
+        if (!(request.headers instanceof Headers)) {
+            throw new error_OpenAIError('X.509 workload identity requires the original workload authorization headers.');
+        }
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        const { token } = scope;
+        const security = options.__security ?? { bearerAuth: true };
+        let approvedAuthorization = token ? `Bearer ${token}` : null;
+        if (!token &&
+            security.adminAPIKeyAuth &&
+            adminAPIKey !== null &&
+            headerValue(request.headers, 'Authorization') !== null) {
+            approvedAuthorization = new Headers({ Authorization: `Bearer ${adminAPIKey}` }).get('Authorization');
+        }
+        scope.headers = request.headers;
+        scope.authorization = approvedAuthorization;
+        this.assertRequest(request);
+    }
+    /** Rebinds an equivalent protected-hook container without relaxing final dispatch identity checks. */
+    adoptRequestHeaders(request) {
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_scope).call(this);
+        const original = scope.headers;
+        if (!(original instanceof Headers) || !(request.headers instanceof Headers)) {
+            throw new error_OpenAIError('X.509 workload identity must preserve its issued workload authorization.');
+        }
+        scope.headers = request.headers;
+        try {
+            this.assertRequest(request);
+        }
+        catch (error) {
+            scope.headers = original;
+            throw error;
+        }
+    }
+    /** Rejects request hooks that replace the selected bearer or its approved header identity. */
+    assertRequest(request) {
+        const { headers } = request;
+        if (!(headers instanceof Headers)) {
+            throw new error_OpenAIError('X.509 workload identity must preserve its issued workload authorization.');
+        }
+        const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current();
+        if (!scope ||
+            scope.headers !== headers ||
+            scope.authorization === undefined ||
+            headerValue(headers, 'Authorization') !== scope.authorization) {
+            throw new error_OpenAIError('X.509 workload identity must preserve its issued workload authorization.');
+        }
+        __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_assertTenantHeaders).call(this, headers);
+        assertSafeHeaders(headers);
+    }
+    /** Returns a guarded final dispatcher while preserving all existing request hook object identities. */
+    fetch() {
+        return async (input, init = {}) => {
+            const target = assertX509APIOrigin(typeof input === 'string' || input instanceof URL ? input : input.url);
+            assertX509FetchOptions(init);
+            this.assertRequest(init);
+            const approved = init.headers;
+            if (!(approved instanceof Headers)) {
+                throw new error_OpenAIError('X.509 workload identity must preserve its issued workload authorization.');
+            }
+            const headers = new Headers([...Headers.prototype.entries.call(approved)]);
+            assertSafeHeaders(headers);
+            init.headers = headers;
+            init.redirect = 'manual';
+            return await __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").dispatch(target, init);
+        };
+    }
+}
+_a = X509WorkloadIdentityAuth, _X509WorkloadIdentityAuth_identityProviderId = new WeakMap(), _X509WorkloadIdentityAuth_serviceAccountId = new WeakMap(), _X509WorkloadIdentityAuth_configuredRefreshBufferMs = new WeakMap(), _X509WorkloadIdentityAuth_configuredRefreshBufferSeconds = new WeakMap(), _X509WorkloadIdentityAuth_organization = new WeakMap(), _X509WorkloadIdentityAuth_project = new WeakMap(), _X509WorkloadIdentityAuth_transport = new WeakMap(), _X509WorkloadIdentityAuth_refreshBufferMs = new WeakMap(), _X509WorkloadIdentityAuth_cachedToken = new WeakMap(), _X509WorkloadIdentityAuth_refresh = new WeakMap(), _X509WorkloadIdentityAuth_tokenGeneration = new WeakMap(), _X509WorkloadIdentityAuth_instances = new WeakSet(), _X509WorkloadIdentityAuth_cancelRequestBody = async function _X509WorkloadIdentityAuth_cancelRequestBody(body) {
+    try {
+        await CancelReadableStream(body);
+    }
+    catch {
+        // Upload retirement must never replace the original authentication failure.
+    }
+}, _X509WorkloadIdentityAuth_assignToken = function _X509WorkloadIdentityAuth_assignToken(scope, token) {
+    if (scope) {
+        scope.token = token.accessToken;
+        scope.tokenGeneration = token.generation;
+    }
+    return token.accessToken;
+}, _X509WorkloadIdentityAuth_recoverRefreshFailure = async function _X509WorkloadIdentityAuth_recoverRefreshFailure(error, attempt, cached, scope, options, context) {
+    const callerSignal = context ? context.signal : options?.signal;
+    if (callerSignal?.aborted) {
+        throw userAbortError(callerSignal);
+    }
+    if (attempt.controller.signal.aborted && attempt.generation !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_tokenGeneration, "f")) {
+        return await this.getToken(options, context);
+    }
+    const fallback = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_fallbackToken).call(this, error, cached, scope);
+    if (fallback !== undefined) {
+        return fallback;
+    }
+    if (error && typeof error === 'object' && !(error instanceof OAuthError)) {
+        const oauth = x509_transport_state_findX509OAuthError(error);
+        if (oauth) {
+            throw new OAuthError(oauth.status, oauth.error, oauth.headers);
+        }
+    }
+    throw error;
+}, _X509WorkloadIdentityAuth_fallbackToken = function _X509WorkloadIdentityAuth_fallbackToken(error, cached, scope) {
+    if (!cached ||
+        cached !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_cachedToken, "f") ||
+        performance.now() >= cached.expiresAt ||
+        Date.now() >= cached.wallExpiresAt ||
+        !_a.isRetryableFailure(error)) {
+        return undefined;
+    }
+    const headers = _a.retryHeaders(error);
+    const milliseconds = headers?.get('retry-after-ms');
+    let requested = milliseconds ? Number(milliseconds) : undefined;
+    const retryAfter = headers?.get('retry-after');
+    if (retryAfter && (requested === undefined || Number.isNaN(requested))) {
+        const seconds = Number(retryAfter);
+        requested = Number.isNaN(seconds) ? Date.parse(retryAfter) - Date.now() : seconds * 1000;
+    }
+    const cooldown = requested !== undefined && Number.isFinite(requested) && requested >= 0 && requested <= 60000
+        ? Math.max(FAILED_REFRESH_COOLDOWN_MS, requested)
+        : FAILED_REFRESH_COOLDOWN_MS;
+    cached.refreshAt = Math.min(cached.expiresAt, performance.now() + cooldown);
+    cached.wallRefreshAt = Math.min(cached.wallExpiresAt, Date.now() + cooldown);
+    return __classPrivateFieldGet(_a, _a, "m", _X509WorkloadIdentityAuth_assignToken).call(_a, scope, cached);
+}, _X509WorkloadIdentityAuth_retireRefresh = function _X509WorkloadIdentityAuth_retireRefresh(attempt) {
+    if (attempt.waiters !== 0 || __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refresh, "f") !== attempt) {
+        return;
+    }
+    queueMicrotask(() => {
+        if (attempt.waiters === 0 && __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refresh, "f") === attempt) {
+            __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_refresh, undefined, "f");
+            __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_tokenGeneration, __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_tokenGeneration, "f") + 1, "f");
+            attempt.controller.abort(new APIUserAbortError());
+        }
+    });
+}, _X509WorkloadIdentityAuth_beginRefresh = function _X509WorkloadIdentityAuth_beginRefresh() {
+    const controller = new AbortController();
+    const generation = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_tokenGeneration, "f");
+    const attempt = {
+        controller,
+        generation,
+        waiters: 0,
+        promise: __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_instances, "m", _X509WorkloadIdentityAuth_refreshToken).call(this, controller, generation),
+    };
+    __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_refresh, attempt, "f");
+    return attempt;
+}, _X509WorkloadIdentityAuth_refreshToken = async function _X509WorkloadIdentityAuth_refreshToken(controller, generation) {
+    const startedAt = performance.now();
+    const wallStartedAt = Date.now();
+    try {
+        const token = await __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").exchange(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_identityProviderId, "f"), __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_serviceAccountId, "f"), controller.signal);
+        const lifetime = token.expiresIn * 1000;
+        const expiresAt = startedAt + lifetime;
+        const wallExpiresAt = wallStartedAt + lifetime;
+        if (performance.now() >= expiresAt || Date.now() >= wallExpiresAt) {
+            throw new error_OpenAIError('X.509 workload identity token expired before its exchange completed.');
+        }
+        if (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_tokenGeneration, "f") !== generation ||
+            controller.signal.aborted ||
+            __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refresh, "f")?.controller !== controller) {
+            throw new APIUserAbortError();
+        }
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_tokenGeneration, __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_tokenGeneration, "f") + 1, "f");
+        __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_cachedToken, {
+            accessToken: token.accessToken,
+            generation: __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_tokenGeneration, "f"),
+            expiresAt,
+            refreshAt: expiresAt - Math.min(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refreshBufferMs, "f"), lifetime / 2),
+            wallExpiresAt,
+            wallRefreshAt: wallExpiresAt - Math.min(__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refreshBufferMs, "f"), lifetime / 2),
+        }, "f");
+        return token;
+    }
+    finally {
+        if (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_refresh, "f")?.controller === controller) {
+            __classPrivateFieldSet(this, _X509WorkloadIdentityAuth_refresh, undefined, "f");
+        }
+    }
+}, _X509WorkloadIdentityAuth_preflight = function _X509WorkloadIdentityAuth_preflight(context) {
+    if (!context) {
+        return;
+    }
+    if (context.organization !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_organization, "f") || context.project !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_project, "f")) {
+        throw new error_OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+    }
+    assertX509APIOrigin(context.apiURL);
+    const supplied = buildHeaders([context.defaultHeaders, context.requestHeaders]);
+    if ((__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_organization, "f") !== null && supplied.nulls.has('openai-organization')) ||
+        (__classPrivateFieldGet(this, _X509WorkloadIdentityAuth_project, "f") !== null && supplied.nulls.has('openai-project'))) {
+        throw new error_OpenAIError('X.509 workload identity cannot omit its enrolled organization or project.');
+    }
+    for (const name of supplied.values.keys()) {
+        const canonical = name.toLowerCase().split('_').join('-');
+        if ((canonical === 'openai-organization' || canonical === 'openai-project') &&
+            (name !== canonical ||
+                headerValue(supplied.values, name) !==
+                    (canonical === 'openai-organization' ? context.organization : context.project))) {
+            throw new error_OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+        }
+        if (isSensitiveHeader(canonical) || canonical === 'host') {
+            throw new error_OpenAIError('X.509 workload identity cannot use caller-supplied authentication credentials.');
+        }
+    }
+}, _X509WorkloadIdentityAuth_scope = function _X509WorkloadIdentityAuth_scope() {
+    const scope = __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_transport, "f").current();
+    if (!scope || scope.owner !== this) {
+        throw new error_OpenAIError('X.509 workload identity requires an active certificate request scope.');
+    }
+    return scope;
+}, _X509WorkloadIdentityAuth_assertTenantHeaders = function _X509WorkloadIdentityAuth_assertTenantHeaders(headers) {
+    if (headerValue(headers, 'OpenAI-Organization') !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_organization, "f") ||
+        headerValue(headers, 'OpenAI-Project') !== __classPrivateFieldGet(this, _X509WorkloadIdentityAuth_project, "f")) {
+        throw new error_OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+    }
+    for (const name of Headers.prototype.keys.call(headers)) {
+        const canonical = name.toLowerCase().split('_').join('-');
+        if ((canonical === 'openai-organization' || canonical === 'openai-project') && name !== canonical) {
+            throw new error_OpenAIError('X.509 workload identity cannot override its enrolled organization or project.');
+        }
+    }
+};
+//# sourceMappingURL=x509-workload-identity-auth.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/auth/x509-credential-options.mjs
+
+
+
+
+/** Validates one privately registered credential and suppresses ambient legacy authentication. */
+function normalizeX509CredentialOptions(options) {
+    const { credential } = options;
+    if (credential === undefined) {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the exported normalization contract when no X.509 credential is configured.
+        return { credential, options };
+    }
+    const registered = x509_transport_state_findX509Credential(credential);
+    if (!registered) {
+        throw new error_OpenAIError('An X.509 credential must be created by the SDK authentication helper.');
+    }
+    const conflicting = ['apiKey', 'adminAPIKey', 'workloadIdentity', 'x509Transport'].filter((name) => {
+        const value = options[name];
+        return value !== null && value !== undefined;
+    });
+    if (conflicting.length > 0) {
+        throw new error_OpenAIError(`The \`credential\` option cannot be combined with ${conflicting.map((name) => `\`${name}\``).join(', ')}.`);
+    }
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared ClientOptions return contract supports both normalized and unchanged client options.
+    return {
+        credential,
+        options: {
+            ...options,
+            apiKey: null,
+            adminAPIKey: null,
+            baseURL: options.baseURL ?? null,
+            organization: options.organization ?? null,
+            project: options.project ?? null,
+            workloadIdentity: registered.identity,
+            x509Transport: registered.transport,
+        },
+    };
+}
+/** Distinguishes explicitly supplied ordinary credentials from nullish inheritance. */
+function overridesOrdinaryAuthentication({ apiKey, adminAPIKey }) {
+    return (apiKey !== null && apiKey !== undefined) || (adminAPIKey !== null && adminAPIKey !== undefined);
+}
+/** Keeps origin-bound configuration with its owning provider during a client clone. */
+function prepareProviderClone(inherited, overrides) {
+    const inheritedProvider = inherited.provider;
+    const replacingProvider = overrides.credential ?? overrides.workloadIdentity;
+    const provider = overrides.provider ?? (replacingProvider ? undefined : inheritedProvider);
+    if (provider !== inheritedProvider) {
+        delete inherited.baseURL;
+        delete inherited.organization;
+        delete inherited.project;
+        delete inherited.defaultHeaders;
+        delete inherited.defaultQuery;
+        delete inherited.fetchOptions;
+        delete inherited.fetch;
+    }
+    if (provider) {
+        delete inherited.apiKey;
+        delete inherited.adminAPIKey;
+        delete inherited.credential;
+        delete inherited.workloadIdentity;
+        delete inherited.x509Transport;
+        delete inherited.baseURL;
+    }
+    return provider;
+}
+/** Reconciles one client's credential and provider ownership before cloning its options. */
+function prepareX509ClientClone(inherited, overrides, credential, currentlyX509) {
+    const nextIdentity = hasOwn(overrides, 'workloadIdentity')
+        ? overrides.workloadIdentity
+        : inherited.workloadIdentity;
+    const dropping = credential !== undefined &&
+        ((overridesOrdinaryAuthentication(overrides) && overrides.workloadIdentity === undefined) ||
+            overrides.provider !== undefined);
+    if (credential !== undefined && hasOwn(overrides, 'workloadIdentity')) {
+        delete inherited.x509Transport;
+    }
+    const inheritedCredential = credential !== undefined &&
+        !dropping &&
+        overrides.credential === undefined &&
+        !hasOwn(overrides, 'workloadIdentity') &&
+        !hasOwn(overrides, 'x509Transport')
+        ? credential
+        : undefined;
+    const nextCredential = overrides.credential === undefined ? inheritedCredential : overrides.credential;
+    const nextX509 = nextCredential !== undefined || (!dropping && isX509WorkloadIdentity(nextIdentity));
+    if (currentlyX509 !== nextX509) {
+        delete inherited.fetch;
+        delete inherited.baseURL;
+        delete inherited.organization;
+        delete inherited.project;
+        delete inherited.defaultHeaders;
+        delete inherited.defaultQuery;
+        delete inherited.fetchOptions;
+        if (nextX509) {
+            inherited.apiKey = null;
+        }
+        else {
+            delete inherited.x509Transport;
+            if (dropping) {
+                delete inherited.workloadIdentity;
+            }
+        }
+    }
+    if (nextCredential !== undefined) {
+        delete inherited.apiKey;
+        delete inherited.adminAPIKey;
+        delete inherited.workloadIdentity;
+        delete inherited.x509Transport;
+        inherited.credential = nextCredential;
+        if (overrides.credential !== undefined) {
+            delete inherited.organization;
+            delete inherited.project;
+            delete inherited.defaultHeaders;
+            delete inherited.defaultQuery;
+            delete inherited.fetchOptions;
+        }
+    }
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the exported clone contract across inherited and replaced credentials and providers.
+    return { credential: nextCredential, provider: prepareProviderClone(inherited, overrides) };
+}
+//# sourceMappingURL=x509-credential-options.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/uploads.mjs
 
 
@@ -69394,7 +71500,8 @@ const brand_privateStreamingFile = /* @__PURE__ */ Symbol('brand.privateStreamin
  * form data when the request is sent.
  *
  * @param data Async-iterable or readable-stream chunks containing text, binary data, or blobs.
- * @param name Non-empty filename sent in the multipart request.
+ * @param name Non-empty logical/source filename. Ordinary uploads send only its basename; Skills
+ * uploads may preserve a validated relative path with normalized forward slashes.
  * @param options Optional MIME type for the streaming file.
  * @throws {TypeError} If `name` is empty or the content type contains control characters.
  */
@@ -69421,6 +71528,7 @@ function toStreamingFile(data, name, options) {
  */
 const checkFileSupport = () => {
     if (typeof File === 'undefined') {
+        // SAFETY: This optional Node global is inspected only to improve the missing-File diagnostic in runtimes without process.
         const { process } = globalThis;
         const isOldNode = typeof process?.versions?.node === 'string' &&
             Number.parseInt(process.versions.node.split('.'), 10) < 20;
@@ -69438,6 +71546,7 @@ const checkFileSupport = () => {
  */
 function makeFile(fileBits, fileName, options) {
     checkFileSupport();
+    // SAFETY: The SDK BlobPart union supports Node and web binary inputs; the native File constructor handles those parts across their differing ambient types.
     return new File(fileBits, fileName ?? 'unknown_file', options);
 }
 /**
@@ -69445,15 +71554,15 @@ function makeFile(fileBits, fileName, options) {
  *
  * Directory components separated by either `/` or `\\` are discarded unless an
  * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
- * paths use forward slashes. Paths inferred from URLs and filesystem streams always
+ * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
  * discard their directories.
  */
 function getName(value, options) {
     if (typeof value !== 'object' || value === null) {
         return undefined;
     }
-    const explicitName = ('name' in value && value.name && String(value.name)) ||
-        ('filename' in value && value.filename && String(value.filename));
+    const name = 'name' in value ? value.name : undefined;
+    const explicitName = (name && String(name)) || ('filename' in value && value.filename && String(value.filename));
     if (explicitName) {
         return options?.stripFilename === false ? normalizeFilenamePath(explicitName) : basename(explicitName);
     }
@@ -69473,14 +71582,28 @@ function basename(value) {
     return value.split(/[\\/]/).pop() || undefined;
 }
 function normalizeFilenamePath(value) {
-    return value.replace(/\\/g, '/');
+    const normalized = value.replace(/\\/g, '/');
+    if (normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) || normalized.split('/').includes('..')) {
+        throw new TypeError('Upload file name must be a safe relative path without parent directory segments');
+    }
+    return normalized;
+}
+const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
+/** Recognizes native ArrayBuffers across realms without trusting their prototype or string tag. */
+function isArrayBuffer(value) {
+    try {
+        return arrayBufferByteLengthGetter?.call(value) !== undefined;
+    }
+    catch {
+        return false;
+    }
 }
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
 const isAsyncIterable = (value) => value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
 /**
  * Converts a request to multipart form data when its body contains an upload.
  *
- * Uploads include files, named blobs, responses, async iterables, readable
+ * Uploads include files, blobs, responses, async iterables, readable
  * streams, and {@link StreamingFile} values anywhere in a nested body. Bodies
  * containing streaming values are encoded lazily; other uploads use `FormData`.
  * Requests without uploads are returned unchanged.
@@ -69514,6 +71637,7 @@ const supportsFormDataMap = /* @__PURE__ */ new WeakMap();
  * confusing error messages later on.
  */
 function supportsFormData(fetchObject) {
+    // SAFETY: The union has already excluded callable fetch values; the remaining OpenAI client owns the fetch implementation used by this probe.
     const fetch = typeof fetchObject === 'function' ? fetchObject : fetchObject.fetch;
     const cached = supportsFormDataMap.get(fetch);
     if (cached) {
@@ -69523,11 +71647,13 @@ function supportsFormData(fetchObject) {
         try {
             let FetchResponse;
             if ('Response' in fetch) {
+                // SAFETY: Custom fetch implementations may expose their matching Response constructor; the enclosing probe catches incompatible constructors.
                 FetchResponse = fetch.Response;
             }
             else {
                 const response = await fetch('data:,');
                 await response.arrayBuffer();
+                // SAFETY: The successful fetch response supplies the constructor used to test its own FormData support; failures remain inside the probe's catch.
                 FetchResponse = response.constructor;
             }
             const data = new FormData();
@@ -69547,7 +71673,7 @@ function supportsFormData(fetchObject) {
 /**
  * Materializes an object into platform `FormData` after verifying fetch support.
  *
- * Strings, numbers, and booleans become text fields; responses, named blobs,
+ * Strings, numbers, and booleans become text fields; responses, blobs,
  * and async byte sources become file fields. Arrays and nested objects use
  * bracketed field names, while `undefined` values are omitted.
  *
@@ -69562,9 +71688,8 @@ const createForm = async (body, fetch, options = {}) => {
     await Promise.all(Object.entries(body || {}).map(([key, value]) => addFormValue(form, key, value, options)));
     return form;
 };
-// We check for Blob not File because Bun.File doesn't inherit from File,
-// but they both inherit from Blob and have a `name` property at runtime.
-const isNamedBlob = (value) => value instanceof Blob && 'name' in value;
+// Native files, Bun files, and unnamed upload values all inherit from Blob.
+const isBlob = (value) => value instanceof Blob;
 const isReadableStream = (value) => typeof value === 'object' &&
     value !== null &&
     'getReader' in value &&
@@ -69576,7 +71701,8 @@ const isUploadable = (value) => typeof value === 'object' &&
         isAsyncIterable(value) ||
         isReadableStream(value) ||
         isStreamingFile(value) ||
-        isNamedBlob(value));
+        isBlob(value));
+// SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
 const hasStreamingUploadableValue = (value) => {
     if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
         return true;
@@ -69584,8 +71710,9 @@ const hasStreamingUploadableValue = (value) => {
     if (Array.isArray(value)) {
         return value.some(hasStreamingUploadableValue);
     }
-    if (value && typeof value === 'object' && !isNamedBlob(value) && !(value instanceof Response)) {
-        for (const k in value) {
+    if (value && typeof value === 'object' && !isBlob(value) && !(value instanceof Response)) {
+        // Own properties only, matching what form encoding serializes; inherited values are never encoded.
+        for (const k of Object.keys(value)) {
             if (hasStreamingUploadableValue(value[k])) {
                 return true;
             }
@@ -69593,6 +71720,7 @@ const hasStreamingUploadableValue = (value) => {
     }
     return false;
 };
+// SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
 const hasUploadableValue = (value) => {
     if (isUploadable(value)) {
         return true;
@@ -69601,7 +71729,8 @@ const hasUploadableValue = (value) => {
         return value.some(hasUploadableValue);
     }
     if (value && typeof value === 'object') {
-        for (const k in value) {
+        // Own properties only, matching what form encoding serializes; inherited values are never encoded.
+        for (const k of Object.keys(value)) {
             if (hasUploadableValue(value[k])) {
                 return true;
             }
@@ -69609,19 +71738,34 @@ const hasUploadableValue = (value) => {
     }
     return false;
 };
+const snapshotPreservedUploadEntries = (entries, filenames) => {
+    const snapshot = [];
+    for (const entry of entries) {
+        if (isUploadable(entry.value) && !filenames.has(entry.value)) {
+            filenames.set(entry.value, getStreamingFileName(entry.value, { stripFilenames: false }));
+        }
+        snapshot.push(entry);
+    }
+    return snapshot;
+};
 const createStreamingFormRequestOptions = (opts, options = {}) => {
+    const entries = iterateFormEntries(opts.body);
+    const preservedFilenames = options.stripFilenames === false ? new WeakMap() : undefined;
+    const multipartEntries = preservedFilenames
+        ? snapshotPreservedUploadEntries(entries, preservedFilenames)
+        : entries;
     const boundary = `openai-${Math.random().toString(36).slice(2)}`;
-    const body = ReadableStreamFrom(iterateMultipartBody(opts.body, boundary, options));
+    const body = ReadableStreamFrom(iterateMultipartBody(multipartEntries, boundary, options, preservedFilenames));
     return {
         ...opts,
         body,
         headers: buildHeaders([{ 'content-type': `multipart/form-data; boundary=${boundary}` }, opts.headers]),
     };
 };
-async function* iterateMultipartBody(body, boundary, options) {
-    for await (const { key, value } of iterateFormEntries(body)) {
+async function* iterateMultipartBody(entries, boundary, options, preservedFilenames) {
+    for await (const { key, value } of entries) {
         if (isUploadable(value)) {
-            const filename = getStreamingFileName(value, options);
+            const filename = preservedFilenames?.get(value) ?? getStreamingFileName(value, options);
             const type = getStreamingFileType(value);
             yield bytes_encodeUTF8(`--${boundary}\r\n`);
             yield bytes_encodeUTF8(`Content-Disposition: form-data; name="${escapeHeaderValue(key)}"; filename="${escapeHeaderValue(filename)}"\r\nContent-Type: ${type}\r\n\r\n`);
@@ -69635,7 +71779,7 @@ async function* iterateMultipartBody(body, boundary, options) {
     }
     yield bytes_encodeUTF8(`--${boundary}--\r\n`);
 }
-async function* iterateFormEntries(body) {
+function* iterateFormEntries(body) {
     if (!body || typeof body !== 'object') {
         return;
     }
@@ -69643,7 +71787,7 @@ async function* iterateFormEntries(body) {
         yield* iterateFormValue(key, value);
     }
 }
-async function* iterateFormValue(key, value) {
+function* iterateFormValue(key, value) {
     if (value === undefined) {
         return;
     }
@@ -69671,18 +71815,22 @@ async function* iterateFormValue(key, value) {
     }
 }
 function getStreamingFileName(value, options) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The runtime guard validates JavaScript and custom upload values before trusting the StreamingFile brand.
     if (isStreamingFile(value)) {
         const { name } = value;
         if (typeof name !== 'string' || !name) {
             throw new TypeError('Streaming upload file name must be a non-empty string');
         }
-        return options.stripFilenames === false ? normalizeFilenamePath(name) : name;
+        return options.stripFilenames === false
+            ? normalizeFilenamePath(name)
+            : (basename(name) ?? 'unknown_file');
     }
     return getName(value, { stripFilename: options.stripFilenames }) ?? 'unknown_file';
 }
 function getStreamingFileType(value) {
     let type;
-    if (isStreamingFile(value) || isNamedBlob(value)) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Runtime upload-brand checks intentionally accept unknown inputs despite the static Uploadable annotation.
+    if (isStreamingFile(value) || isBlob(value)) {
         ({ type } = value);
     }
     else if (value instanceof Response) {
@@ -69703,6 +71851,7 @@ function validateStreamingFileType(type) {
     return type;
 }
 function getStreamingFileData(value) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The runtime guard validates the streaming wrapper before accessing its potentially custom data.
     if (isStreamingFile(value)) {
         return value.data;
     }
@@ -69715,7 +71864,7 @@ async function* iterateBytes(value) {
     else if (ArrayBuffer.isView(value)) {
         yield new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
     }
-    else if (value instanceof ArrayBuffer) {
+    else if (isArrayBuffer(value)) {
         yield new Uint8Array(value);
     }
     else if (value instanceof Response) {
@@ -69763,16 +71912,36 @@ const addFormValue = async (form, key, value, options) => {
         form.append(key, String(value));
     }
     else if (value instanceof Response) {
-        form.append(key, makeFile([await value.blob()], getName(value, { stripFilename: options.stripFilenames })));
+        const blob = await value.blob();
+        form.append(key, makeFile([blob], getName(value, { stripFilename: options.stripFilenames }), { type: blob.type }));
     }
     else if (isAsyncIterable(value)) {
         form.append(key, makeFile([await new Response(ReadableStreamFrom(value)).blob()], getName(value, { stripFilename: options.stripFilenames })));
     }
-    else if (isNamedBlob(value)) {
-        form.append(key, value, getName(value, { stripFilename: options.stripFilenames }));
+    else if (isBlob(value)) {
+        const filename = getName(value, { stripFilename: options.stripFilenames });
+        if (filename === undefined) {
+            form.append(key, value);
+        }
+        else {
+            form.append(key, value, filename);
+        }
     }
     else if (Array.isArray(value)) {
-        await Promise.all(value.map((entry) => addFormValue(form, key + '[]', entry, options)));
+        // Prepare array elements concurrently, then preserve their repeated-field order.
+        const entries = await Promise.all(value.map(async (entry) => {
+            const entryForm = new FormData();
+            await addFormValue(entryForm, key + '[]', entry, options);
+            return entryForm;
+        }));
+        for (const entryForm of entries) {
+            if (!entryForm) {
+                continue;
+            }
+            for (const [entryKey, entryValue] of entryForm.entries()) {
+                form.append(entryKey, entryValue);
+            }
+        }
     }
     else if (typeof value === 'object') {
         await Promise.all(Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop, options)));
@@ -69817,7 +71986,8 @@ const canReuseNativeFile = (value, name, options) => (name == null || name === v
  * filename and metadata are unchanged. Renamed native files reuse the original
  * file contents without buffering and retain their MIME type and modification
  * time unless explicitly overridden. Other filenames are inferred from response
- * URLs or input metadata when omitted, falling back to `unknown_file`. Responses,
+ * URLs or input metadata when omitted or null, falling back to `unknown_file`.
+ * An explicit empty filename is preserved. Responses,
  * native or compatible `Blob` values, and compatible non-native files supply
  * their MIME type unless `options.type` provides an explicit override.
  *
@@ -69849,12 +72019,12 @@ async function toFile(value, name, options) {
     }
     if (isResponseLike(value)) {
         const blob = await value.blob();
-        name || (name = getName(value));
+        name ?? (name = getName(value));
         const responseOptions = options?.type === undefined && blob.type ? { ...options, type: blob.type } : options;
         return makeFile(await getBytes(blob), name, responseOptions);
     }
     const parts = await getBytes(value);
-    name || (name = getName(value));
+    name ?? (name = getName(value));
     if (options?.type === undefined) {
         const typedPart = parts.find((part) => typeof part === 'object' && 'type' in part && !!part.type);
         if (typedPart) {
@@ -69867,7 +72037,7 @@ async function getBytes(value) {
     const parts = [];
     if (typeof value === 'string' ||
         ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.
-        value instanceof ArrayBuffer) {
+        isArrayBuffer(value)) {
         parts.push(value);
     }
     else if (isBlobLike(value)) {
@@ -69928,6 +72098,7 @@ const EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null))
  * `encodeURIComponent`. Nullish values, ordinary objects, and literal or
  * percent-encoded `.`/`..` path segments are rejected with an SDK error.
  */
+// SAFETY: This branch compares prototype methods to recognize cross-realm plain values; it does not call the optional hasOwnProperty member.
 const createPathTagFunction = (pathEncoder = encodeURIPath) => function path(statics, ...params) {
     // If there are no params, no processing is needed.
     if (statics.length === 1) {
@@ -69946,6 +72117,7 @@ const createPathTagFunction = (pathEncoder = encodeURIPath) => function path(sta
             let encoded = (postPath ? encodeURIComponent : pathEncoder)('' + value);
             if (index !== params.length &&
                 (value == null ||
+                    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Path parameters may arrive from JavaScript callers and require runtime validation before URL encoding.
                     (typeof value === 'object' &&
                         // handle values from other realms
                         value.toString ===
@@ -70037,7 +72209,12 @@ function isChatCompletionFunctionTool(tool) {
 }
 /** Copies a JSON Schema response format and attaches a non-enumerable structured-output parser. */
 function makeParseableResponseFormat(response_format, parser) {
-    const obj = { ...response_format };
+    const obj = { ...response_format, type: 'json_schema' };
+    obj.json_schema = { ...obj.json_schema };
+    // SAFETY: The fresh copy may retain a caller-provided toJSON property; deleting it prevents serialization from replacing the validated schema.
+    delete obj.toJSON;
+    // SAFETY: The fresh copy may retain a caller-provided toJSON property; deleting it prevents serialization from replacing the validated schema.
+    delete obj.json_schema.toJSON;
     Object.defineProperties(obj, {
         $brand: {
             value: 'auto-parseable-response-format',
@@ -70048,11 +72225,14 @@ function makeParseableResponseFormat(response_format, parser) {
             enumerable: false,
         },
     });
+    // SAFETY: Object.defineProperties installed the parser brand and callbacks required by the returned helper type.
     return obj;
 }
 /** Copies a Responses API text format and attaches a non-enumerable structured-output parser. */
 function makeParseableTextFormat(response_format, parser) {
-    const obj = { ...response_format };
+    const obj = { ...response_format, type: 'json_schema' };
+    // SAFETY: The fresh copy may retain a caller-provided toJSON property; deleting it prevents serialization from replacing the validated schema.
+    delete obj.toJSON;
     Object.defineProperties(obj, {
         $brand: {
             value: 'auto-parseable-response-format',
@@ -70063,6 +72243,7 @@ function makeParseableTextFormat(response_format, parser) {
             enumerable: false,
         },
     });
+    // SAFETY: Object.defineProperties installed the parser brand and callbacks required by the returned helper type.
     return obj;
 }
 /**
@@ -70085,6 +72266,7 @@ function isAutoParsableResponseFormat(response_format) {
  * {@link ExtractParsedContentFromParams} cannot drift apart.
  */
 function isParseableResponseFormat(format) {
+    // SAFETY: Only the optional discriminator is read; arbitrary input is not treated as a validated response-format schema.
     return isAutoParsableResponseFormat(format) || format?.type === 'json_schema';
 }
 /**
@@ -70101,12 +72283,22 @@ function parseResponseFormatContent(format, content) {
         format !== null &&
         '$parseRaw' in format &&
         typeof format.$parseRaw === 'function') {
+        // SAFETY: The format's captured parser owns the ParsedT output contract; this function forwards its result without coercion.
         return format.$parseRaw(content);
     }
-    return JSON.parse(content);
+    try {
+        // SAFETY: ParsedT represents the caller's response schema; JSON syntax is checked here and schema validation remains with the configured format.
+        return JSON.parse(content);
+    }
+    catch (error) {
+        if (error instanceof SyntaxError) {
+            throw new SyntaxError('Error reading response: invalid structured output JSON.');
+        }
+        throw error;
+    }
 }
 /** Copies a function tool and attaches non-enumerable parsing and callback metadata. */
-function makeParseableTool(tool, { parser, callback, }) {
+function makeParseableTool(tool, { parser, callback }) {
     const obj = { ...tool };
     Object.defineProperties(obj, {
         $brand: {
@@ -70122,6 +72314,7 @@ function makeParseableTool(tool, { parser, callback, }) {
             enumerable: false,
         },
     });
+    // SAFETY: Object.defineProperties installed the parser brand and callbacks required by the returned helper type.
     return obj;
 }
 /** Returns whether a Chat Completions tool carries the SDK's argument-parser marker. */
@@ -70196,16 +72389,19 @@ function parseToolCall(params, toolCall) {
         return toolCall;
     }
     if (toolCall.type !== 'function') {
+        // SAFETY: This branch handles unsupported JavaScript discriminators that the current TypeScript union excludes; the value is only used in the error.
         const unsupportedType = toolCall.type;
         throw new error_OpenAIError(`Currently only \`function\` and \`custom\` tool calls are supported; Received \`${unsupportedType}\``);
     }
+    // SAFETY: The find predicate checks the function-tool discriminator before matching its name; the cast retains that narrowing through find.
     const inputTool = params.tools?.find((inputTool) => isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name); // TS doesn't narrow based on isChatCompletionTool
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The parser callback may return any value; null only represents an unparsed tool call.
     let parsedArguments = null;
     if (isAutoParsableTool(inputTool)) {
         parsedArguments = inputTool.$parseRaw(toolCall.function.arguments);
     }
     else if (inputTool?.function.strict) {
-        parsedArguments = JSON.parse(toolCall.function.arguments);
+        parsedArguments = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, toolCall.function.arguments);
     }
     return {
         ...toolCall,
@@ -70256,6 +72452,7 @@ function validateInputTools(tools) {
             continue;
         }
         if (tool.type !== 'function') {
+            // SAFETY: This branch handles unsupported JavaScript discriminators that the current TypeScript union excludes; the value is only used in the error.
             const unsupportedType = tool.type;
             throw new error_OpenAIError(`Currently only \`function\` and \`custom\` tool types are supported; Received \`${unsupportedType}\``);
         }
@@ -70276,9 +72473,374 @@ function isPresent(obj) {
 }
 //# sourceMappingURL=chatCompletionUtils.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/EventStream.mjs
-var _EventStream_instances, _EventStream_connectedPromise, _EventStream_resolveConnectedPromise, _EventStream_rejectConnectedPromise, _EventStream_endPromise, _EventStream_resolveEndPromise, _EventStream_rejectEndPromise, _EventStream_listeners, _EventStream_abortListeners, _EventStream_ended, _EventStream_errored, _EventStream_aborted, _EventStream_catchingPromiseCreated, _EventStream_removeAbortListeners, _EventStream_handleError;
+var _EventStream_instances, _EventStream_connectedPromise, _EventStream_resolveConnectedPromise, _EventStream_rejectConnectedPromise, _EventStream_endPromise, _EventStream_resolveEndPromise, _EventStream_rejectEndPromise, _EventStream_listeners, _EventStream_abortListeners, _EventStream_emittedListenerRegistrations, _EventStream_pendingListenerCleanup, _EventStream_pendingBufferedEventChecks, _EventStream_listenerDispatchDepth, _EventStream_ended, _EventStream_errored, _EventStream_aborted, _EventStream_catchingPromiseCreated, _EventStream_terminalFailure, _EventStream_abortFromSignal, _EventStream_removeAbortListeners, _EventStream_onceForEmitted, _EventStream_removeEmittedListener, _EventStream_cleanupEmittedListeners, _EventStream_handleError, _EventStream_settleTerminalEvent;
 
 
+const MAX_BUFFERED_ITERATOR_EVENTS = 4096;
+const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
+// Typed-array own-key enumeration materializes every dense index before custom keys.
+const MAX_INSPECTABLE_TYPED_ARRAY_ELEMENTS = 4096;
+// Structured JSON may nest 128 levels before stream-event wrappers are added.
+const MAX_BUFFERED_EVENT_DEPTH = 256;
+const bufferedJSONStringify = JSON.stringify;
+const bufferedJSONParse = JSON.parse;
+const sdkOwnedBufferedEventArguments = new WeakSet();
+// SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+const typedArrayBufferGetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'buffer')?.get;
+// SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+const typedArrayLengthGetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'length')?.get;
+const dataViewBufferGetter = Object.getOwnPropertyDescriptor(DataView.prototype, 'buffer')?.get;
+const symbolDescriptionGetter = Object.getOwnPropertyDescriptor(Symbol.prototype, 'description')?.get;
+const dateTimestampGetter = Date.prototype.getTime;
+const EventStream_arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
+const sharedArrayBufferByteLengthGetter = typeof SharedArrayBuffer === 'function'
+    ? Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get
+    : undefined;
+// V8 uses the same trusted lazy-stack accessor pair for native Error instances.
+const errorStackDescriptor = Object.getOwnPropertyDescriptor(new Error('native stack descriptor'), 'stack');
+const functionToString = Function.prototype.toString;
+const objectToString = Object.prototype.toString;
+const errorBrandDescriptor = Object.getOwnPropertyDescriptor(Error, 'isError');
+// The native Error.isError predicate brands arbitrary values before an Error contract can be assumed.
+// SAFETY: The captured native Error.isError property was checked to be a function before it is used as a brand predicate.
+const nativeErrorBrand = errorBrandDescriptor && 'value' in errorBrandDescriptor && typeof errorBrandDescriptor.value === 'function'
+    ? errorBrandDescriptor.value
+    : undefined;
+const nativeErrorConstructorSource = functionToString.call(Error);
+const nativeDateConstructorSource = functionToString.call(Date);
+const nativeFunctionConstructorSource = functionToString.call(Function);
+const trustedIntrinsicPrototypes = new Set([
+    APIConnectionError.prototype,
+    APIConnectionTimeoutError.prototype,
+    APIError.prototype,
+    error_OpenAIError.prototype,
+    APIUserAbortError.prototype,
+    AuthenticationError.prototype,
+    BadRequestError.prototype,
+    ConflictError.prototype,
+    ContentFilterFinishReasonError.prototype,
+    InternalServerError.prototype,
+    InvalidWebhookSignatureError.prototype,
+    LengthFinishReasonError.prototype,
+    NotFoundError.prototype,
+    OAuthError.prototype,
+    PermissionDeniedError.prototype,
+    RateLimitError.prototype,
+    SubjectTokenProviderError.prototype,
+    UnprocessableEntityError.prototype,
+]);
+const trustedNativeConstructorSources = new Set();
+const canonicalIntrinsicDescriptors = new Map();
+const foreignErrorStackDescriptors = new WeakMap();
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The native proxy predicate accepts arbitrary object identities without invoking their handlers.
+function captureNativeProxyDetector() {
+    if (typeof process === 'undefined') {
+        return undefined;
+    }
+    try {
+        const loader = Object.getOwnPropertyDescriptor(process, 'getBuiltinModule');
+        if (!loader || !('value' in loader) || typeof loader.value !== 'function') {
+            return undefined;
+        }
+        // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the descriptor value without reading a potentially overridden call property.
+        const util = Reflect.apply(loader.value, process, ['node:util']);
+        if (typeof util !== 'object' || util === null) {
+            return undefined;
+        }
+        const types = Object.getOwnPropertyDescriptor(util, 'types');
+        if (!types || !('value' in types) || typeof types.value !== 'object' || types.value === null) {
+            return undefined;
+        }
+        const detector = Object.getOwnPropertyDescriptor(types.value, 'isProxy');
+        if (!detector || !('value' in detector) || typeof detector.value !== 'function') {
+            return undefined;
+        }
+        // SAFETY: The native detector data property was checked to be callable; it is invoked only to test the corresponding intrinsic object brand.
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- The captured native predicate is called only for objects, before their properties are inspected.
+        return detector.value;
+    }
+    catch {
+        return undefined;
+    }
+}
+// Transparent proxies have no portable ECMAScript brand. Newer Node runtimes
+// expose one without adding a Node-only import to browser-compatible bundles.
+const nativeProxyDetector = captureNativeProxyDetector();
+function rememberTrustedIntrinsic(constructor) {
+    if (typeof constructor !== 'function') {
+        return;
+    }
+    const prototypeDescriptor = Object.getOwnPropertyDescriptor(constructor, 'prototype');
+    if (!prototypeDescriptor ||
+        !('value' in prototypeDescriptor) ||
+        (typeof prototypeDescriptor.value !== 'object' && typeof prototypeDescriptor.value !== 'function')) {
+        return;
+    }
+    // SAFETY: The prototype data descriptor was checked as a non-null object before adding its identity to the trusted-intrinsic set.
+    trustedIntrinsicPrototypes.add(prototypeDescriptor.value);
+    const source = functionToString.call(constructor);
+    if (/^function [A-Za-z_$][\w$]*\(\) \{ \[native code\] \}$/u.test(source) &&
+        prototypeDescriptor.configurable === false &&
+        prototypeDescriptor.writable === false) {
+        trustedNativeConstructorSources.add(source);
+        const descriptors = new Map();
+        for (const key of Reflect.ownKeys(prototypeDescriptor.value)) {
+            const descriptor = Object.getOwnPropertyDescriptor(prototypeDescriptor.value, key);
+            if (descriptor) {
+                descriptors.set(key, descriptor);
+            }
+        }
+        canonicalIntrinsicDescriptors.set(source, descriptors);
+    }
+}
+for (const constructor of [
+    Object,
+    Function,
+    Array,
+    Date,
+    Map,
+    Set,
+    ArrayBuffer,
+    DataView,
+    Error,
+    EvalError,
+    RangeError,
+    ReferenceError,
+    SyntaxError,
+    TypeError,
+    URIError,
+    Uint8Array,
+    Uint8ClampedArray,
+    Uint16Array,
+    Uint32Array,
+    Int8Array,
+    Int16Array,
+    Int32Array,
+    Float32Array,
+    Float64Array,
+]) {
+    rememberTrustedIntrinsic(constructor);
+}
+for (const name of [
+    'SharedArrayBuffer',
+    'AggregateError',
+    'Float16Array',
+    'BigInt64Array',
+    'BigUint64Array',
+    'Blob',
+    'File',
+    'Headers',
+]) {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
+    if (descriptor && 'value' in descriptor) {
+        rememberTrustedIntrinsic(descriptor.value);
+    }
+}
+// SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+const typedArrayConstructorDescriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'constructor');
+if (typedArrayConstructorDescriptor && 'value' in typedArrayConstructorDescriptor) {
+    rememberTrustedIntrinsic(typedArrayConstructorDescriptor.value);
+}
+if (typeof Buffer === 'function') {
+    rememberTrustedIntrinsic(Buffer);
+}
+const blobInternalHandlePrototype = (() => {
+    if (typeof Blob !== 'function') {
+        return undefined;
+    }
+    try {
+        const blob = new Blob([]);
+        for (const key of Object.getOwnPropertySymbols(blob)) {
+            const descriptor = Object.getOwnPropertyDescriptor(blob, key);
+            if (descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value) {
+                // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+                return Object.getPrototypeOf(descriptor.value);
+            }
+        }
+    }
+    catch {
+        return undefined;
+    }
+    return undefined;
+})();
+const mapEntries = Map.prototype.entries;
+const setValues = Set.prototype.values;
+const headersEntriesDescriptor = typeof Headers === 'function' ? Object.getOwnPropertyDescriptor(Headers.prototype, 'entries') : undefined;
+// SAFETY: The own Headers entries data property was checked to be callable and retains the native method signature.
+const headersEntries = headersEntriesDescriptor &&
+    'value' in headersEntriesDescriptor &&
+    typeof headersEntriesDescriptor.value === 'function'
+    ? headersEntriesDescriptor.value
+    : undefined;
+const retainedStorageBrands = new Set([
+    'ArrayBuffer',
+    'SharedArrayBuffer',
+    'Blob',
+    'File',
+    'Map',
+    'Date',
+    'Set',
+    'Headers',
+]);
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Foreign prototypes are untrusted objects until their constructor descriptors are verified.
+function getTrustedForeignIntrinsic(prototype) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+    if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
+        return undefined;
+    }
+    // SAFETY: The descriptor contains a function; the following native-source and prototype checks verify the Error constructor before use.
+    const constructor = descriptor.value;
+    const source = functionToString.call(constructor);
+    const descriptors = canonicalIntrinsicDescriptors.get(source);
+    if (!trustedNativeConstructorSources.has(source) || !descriptors) {
+        return undefined;
+    }
+    const constructorPrototype = Object.getOwnPropertyDescriptor(constructor, 'prototype');
+    if (!constructorPrototype ||
+        !('value' in constructorPrototype) ||
+        constructorPrototype.value !== prototype ||
+        constructorPrototype.configurable !== false ||
+        constructorPrototype.writable !== false) {
+        return undefined;
+    }
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+    return { constructor, descriptors, functionPrototype: Object.getPrototypeOf(constructor) };
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Intrinsic trust is established by object identity or verified cross-realm descriptors.
+function isTrustedIntrinsicPrototype(prototype) {
+    return trustedIntrinsicPrototypes.has(prototype) || getTrustedForeignIntrinsic(prototype) !== undefined;
+}
+function isCanonicalIntrinsicFunction(value, canonical, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Cross-realm function prototypes are compared by identity without trusting a callable signature.
+functionPrototype) {
+    if (canonical === undefined) {
+        return value === undefined;
+    }
+    if (typeof value !== 'function' || typeof canonical !== 'function') {
+        return false;
+    }
+    const source = functionToString.call(canonical);
+    if (functionToString.call(value) !== source) {
+        return false;
+    }
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+    const actualFunctionPrototype = Object.getPrototypeOf(value);
+    if (actualFunctionPrototype === functionPrototype) {
+        return true;
+    }
+    if (!/^function [A-Za-z_$][\w$]*\(\) \{ \[native code\] \}$/u.test(source)) {
+        return false;
+    }
+    const intrinsic = getTrustedForeignIntrinsic(actualFunctionPrototype);
+    return (intrinsic !== undefined &&
+        functionToString.call(intrinsic.constructor) === nativeFunctionConstructorSource);
+}
+function isCanonicalIntrinsicDescriptor(descriptor, canonical, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Descriptor validation compares the verified function-prototype identity without reading its fields.
+functionPrototype) {
+    if (!canonical ||
+        descriptor.configurable !== canonical.configurable ||
+        descriptor.enumerable !== canonical.enumerable ||
+        'value' in descriptor !== 'value' in canonical) {
+        return false;
+    }
+    if ('value' in descriptor && 'value' in canonical) {
+        if (descriptor.writable !== canonical.writable) {
+            return false;
+        }
+        if (typeof canonical.value === 'function') {
+            return isCanonicalIntrinsicFunction(descriptor.value, canonical.value, functionPrototype);
+        }
+        if (canonical.value !== null && typeof canonical.value === 'object') {
+            return false;
+        }
+        return Object.is(descriptor.value, canonical.value);
+    }
+    return (isCanonicalIntrinsicFunction(descriptor.get, canonical.get, functionPrototype) &&
+        isCanonicalIntrinsicFunction(descriptor.set, canonical.set, functionPrototype));
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Native error branding must inspect arbitrary objects before assuming an Error contract.
+function hasNativeErrorBrand(current) {
+    if (nativeErrorBrand) {
+        return nativeErrorBrand.call(Error, current);
+    }
+    let prototype = current;
+    for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
+        if (Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)) {
+            return false;
+        }
+        // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+        prototype = Object.getPrototypeOf(prototype);
+    }
+    return prototype === null && objectToString.call(current) === '[object Error]';
+}
+function getVerifiedForeignErrorConstructor(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Foreign error constructors are verified from descriptors of an otherwise untrusted object.
+current, stackDescriptor) {
+    if (typeof stackDescriptor.get !== 'function' || typeof stackDescriptor.set !== 'function') {
+        return undefined;
+    }
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+    let prototype = Object.getPrototypeOf(current);
+    for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+        if (descriptor && 'value' in descriptor && typeof descriptor.value === 'function') {
+            // SAFETY: The descriptor contains a function; the following intrinsic and constructor-prototype checks decide whether it is a trusted Error constructor.
+            const constructor = descriptor.value;
+            if (functionToString.call(constructor) === nativeErrorConstructorSource &&
+                isTrustedIntrinsicPrototype(prototype)) {
+                // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+                const functionPrototype = Object.getPrototypeOf(constructor);
+                if (Object.getPrototypeOf(stackDescriptor.get) === functionPrototype &&
+                    Object.getPrototypeOf(stackDescriptor.set) === functionPrototype) {
+                    return { constructor, prototype };
+                }
+                return undefined;
+            }
+        }
+        // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+        prototype = Object.getPrototypeOf(prototype);
+    }
+    return undefined;
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Stack accessors are trusted only after the object passes native error branding.
+function isTrustedNativeErrorStack(current, descriptor) {
+    if (!hasNativeErrorBrand(current)) {
+        return false;
+    }
+    if (errorStackDescriptor &&
+        !('value' in errorStackDescriptor) &&
+        typeof errorStackDescriptor.get === 'function' &&
+        Object.prototype.isPrototypeOf.call(Error.prototype, current) &&
+        descriptor.get === errorStackDescriptor.get &&
+        descriptor.set === errorStackDescriptor.set) {
+        return true;
+    }
+    const verified = getVerifiedForeignErrorConstructor(current, descriptor);
+    if (!verified) {
+        return false;
+    }
+    let canonicalDescriptor = foreignErrorStackDescriptors.get(verified.prototype);
+    if (!canonicalDescriptor) {
+        // SAFETY: Reflect.construct returns an untyped value; unknown preserves that uncertainty for the descriptor checks below.
+        const canonical = Reflect.construct(verified.constructor, []);
+        if (typeof canonical !== 'object' ||
+            canonical === null ||
+            !hasNativeErrorBrand(canonical) ||
+            Object.getPrototypeOf(canonical) !== verified.prototype) {
+            return false;
+        }
+        canonicalDescriptor = Object.getOwnPropertyDescriptor(canonical, 'stack');
+        if (!canonicalDescriptor ||
+            'value' in canonicalDescriptor ||
+            typeof canonicalDescriptor.get !== 'function' ||
+            typeof canonicalDescriptor.set !== 'function') {
+            return false;
+        }
+        foreignErrorStackDescriptors.set(verified.prototype, canonicalDescriptor);
+    }
+    return descriptor.get === canonicalDescriptor.get && descriptor.set === canonicalDescriptor.set;
+}
 function createEventQueue() {
     let entries = [];
     let head = 0;
@@ -70312,6 +72874,634 @@ function createEventQueue() {
         },
     };
 }
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Retained storage branding walks arbitrary object prototypes without assuming their native type.
+function getRetainedStorageBrand(current) {
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+    let prototype = Object.getPrototypeOf(current);
+    for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
+        if (prototype === Date.prototype) {
+            return 'Date';
+        }
+        if (!trustedIntrinsicPrototypes.has(prototype)) {
+            const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+            if (constructor &&
+                'value' in constructor &&
+                typeof constructor.value === 'function' &&
+                functionToString.call(constructor.value) === nativeDateConstructorSource &&
+                getTrustedForeignIntrinsic(prototype)) {
+                return 'Date';
+            }
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag);
+        if (descriptor &&
+            'value' in descriptor &&
+            typeof descriptor.value === 'string' &&
+            retainedStorageBrands.has(descriptor.value)) {
+            return descriptor.value;
+        }
+        // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+        prototype = Object.getPrototypeOf(prototype);
+    }
+    return undefined;
+}
+function estimateRetainedBufferBytes(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Memory accounting inspects arbitrary retained objects and detects native backing storage at runtime.
+current, visit, depth) {
+    if (ArrayBuffer.isView(current)) {
+        let buffer;
+        let kind = 'typed-array';
+        try {
+            // SAFETY: The captured intrinsic getter performs its own receiver brand check; its result stays unknown until the ArrayBuffer validation below.
+            buffer = typedArrayBufferGetter?.call(current);
+        }
+        catch {
+            kind = 'data-view';
+            // SAFETY: The DataView intrinsic getter performs its receiver brand check; its result stays unknown until the ArrayBuffer validation below.
+            buffer = dataViewBufferGetter?.call(current);
+        }
+        if (typeof buffer !== 'object' || buffer === null) {
+            return { bytes: Number.POSITIVE_INFINITY, kind };
+        }
+        // Even a one-byte cross-realm view retains its complete backing allocation.
+        visit(buffer, depth + 1);
+        return { bytes: 0, kind };
+    }
+    const brand = getRetainedStorageBrand(current);
+    if (!brand) {
+        return undefined;
+    }
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Captured native accessors are checked for a finite numeric result before retained-size accounting.
+    let getter;
+    const kind = 'buffer';
+    switch (brand) {
+        case 'ArrayBuffer': {
+            getter = EventStream_arrayBufferByteLengthGetter;
+            break;
+        }
+        case 'SharedArrayBuffer': {
+            getter = sharedArrayBufferByteLengthGetter;
+            break;
+        }
+        case 'Blob':
+        case 'File': {
+            // Blob slices can retain an arbitrarily larger native backing allocation,
+            // and neither browser nor Node exposes its extent or ownership. Detached
+            // queues must fail closed; waiting readers bypass retained-size inspection.
+            return { bytes: Number.POSITIVE_INFINITY, kind: 'blob' };
+        }
+        case 'Map': {
+            return { bytes: 0, kind: 'map' };
+        }
+        case 'Date': {
+            // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured intrinsic without reading its mutable call property.
+            Reflect.apply(dateTimestampGetter, current, []);
+            return { bytes: 8, kind: 'date' };
+        }
+        case 'Set': {
+            return { bytes: 0, kind: 'set' };
+        }
+        case 'Headers': {
+            return { bytes: 0, kind: 'headers' };
+        }
+        default: {
+            return undefined;
+        }
+    }
+    const bytes = getter?.call(current);
+    return {
+        bytes: typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
+            ? bytes
+            : Number.POSITIVE_INFINITY,
+        kind,
+    };
+}
+function visitHiddenEventValues(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Native collection contents are inspected only after storage branding, without trusting structural fields.
+current, kind, visit) {
+    if (kind === 'map') {
+        for (const [key, entry] of mapEntries.call(current)) {
+            if (!visit(key, 8) || !visit(entry, 8)) {
+                return false;
+            }
+        }
+    }
+    if (kind === 'set') {
+        for (const entry of setValues.call(current)) {
+            if (!visit(entry, 8)) {
+                return false;
+            }
+        }
+    }
+    if (kind === 'headers') {
+        if (!headersEntries) {
+            return false;
+        }
+        // SAFETY: The captured native Headers.entries method performs its receiver brand check inside the enclosing try/catch.
+        for (const [name, value] of headersEntries.call(current)) {
+            if (!visit(name, 8) || !visit(value, 8)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+function getInspectableEventKeys(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Event key inspection must accept arbitrary retained objects, arrays, and native storage views.
+current, kind, availableBytes) {
+    if (Array.isArray(current)) {
+        const descriptor = Object.getOwnPropertyDescriptor(current, 'length');
+        const length = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+        if (typeof length !== 'number' ||
+            !Number.isSafeInteger(length) ||
+            length < 0 ||
+            length > Math.floor(availableBytes / 16)) {
+            return undefined;
+        }
+    }
+    if (kind !== 'typed-array') {
+        return Reflect.ownKeys(current);
+    }
+    const length = typedArrayLengthGetter?.call(current);
+    if (typeof length !== 'number' ||
+        !Number.isSafeInteger(length) ||
+        length < 0 ||
+        length > MAX_INSPECTABLE_TYPED_ARRAY_ELEMENTS) {
+        return undefined;
+    }
+    return Reflect.ownKeys(current).filter((key) => {
+        if (typeof key !== 'string') {
+            return true;
+        }
+        const index = Number(key);
+        return !Number.isInteger(index) || index < 0 || index >= length || String(index) !== key;
+    });
+}
+function visitInspectableEventProperties(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Retained event properties are inspected through descriptors on arbitrary object identities.
+current, kind, depth, availableBytes, charge, visit) {
+    const keys = getInspectableEventKeys(current, kind, availableBytes());
+    if (keys === undefined) {
+        return false;
+    }
+    for (const key of keys) {
+        if (!charge(typeof key === 'string' ? key.length * 2 + 8 : 8)) {
+            return false;
+        }
+        if (typeof key === 'symbol') {
+            visit(key, depth + 1);
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(current, key);
+        if (!descriptor) {
+            return false;
+        }
+        if (!('value' in descriptor)) {
+            if (key === 'stack' && isTrustedNativeErrorStack(current, descriptor)) {
+                continue;
+            }
+            return false;
+        }
+        visit(descriptor.value, depth + 1, kind === 'blob');
+    }
+    return true;
+}
+function visitRetainedEventPrototypes(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Retention accounting follows arbitrary object prototypes without assuming their properties.
+current, depth, isBlobInternalHandle, visited, availableBytes, charge, visit, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The retention callback records prototype identity before inspecting its descriptors.
+retainPrototype) {
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+    let prototype = Object.getPrototypeOf(current);
+    for (let prototypeDepth = depth + 1; prototype !== null; prototypeDepth += 1) {
+        if (prototypeDepth >= MAX_BUFFERED_EVENT_DEPTH) {
+            return false;
+        }
+        if (trustedIntrinsicPrototypes.has(prototype) ||
+            (isBlobInternalHandle && prototype === blobInternalHandlePrototype)) {
+            return true;
+        }
+        if (visited.has(prototype)) {
+            visit(prototype, prototypeDepth);
+            return availableBytes() >= 0;
+        }
+        visited.add(prototype);
+        const retainedPrototype = prototype;
+        const retained = retainPrototype(retainedPrototype, () => {
+            if (!charge(16)) {
+                return false;
+            }
+            const intrinsic = getTrustedForeignIntrinsic(retainedPrototype);
+            if (!intrinsic) {
+                return visitInspectableEventProperties(retainedPrototype, undefined, prototypeDepth, availableBytes, charge, visit);
+            }
+            for (const key of Reflect.ownKeys(retainedPrototype)) {
+                const descriptor = Object.getOwnPropertyDescriptor(retainedPrototype, key);
+                if (!descriptor) {
+                    return false;
+                }
+                if (isCanonicalIntrinsicDescriptor(descriptor, intrinsic.descriptors.get(key), intrinsic.functionPrototype)) {
+                    continue;
+                }
+                if (!charge(typeof key === 'string' ? key.length * 2 + 8 : 8) || !('value' in descriptor)) {
+                    return false;
+                }
+                if (typeof key === 'symbol') {
+                    visit(key, prototypeDepth + 1);
+                }
+                visit(descriptor.value, prototypeDepth + 1);
+            }
+            return availableBytes() >= 0;
+        });
+        if (!retained) {
+            return false;
+        }
+        // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
+        prototype = Object.getPrototypeOf(retainedPrototype);
+    }
+    return true;
+}
+const BUFFERED_LEDGER_ENTRY_BYTES = 32;
+const BUFFERED_LEDGER_NODE_BYTES = 32;
+const BUFFERED_LEDGER_EDGE_BYTES = 8;
+const BUFFERED_LEDGER_OWNER_BYTES = 16;
+const MAX_BUFFERED_LEDGER_RECONCILIATION_WORK = 128 * 1024;
+function inspectBufferedEventGraph(value, remainingBytes) {
+    let bytes = 0;
+    let scalarBytes = 0;
+    const visited = new WeakSet();
+    const visitedSymbols = new Set();
+    const roots = new Set();
+    const nodes = new Map();
+    let activeNode;
+    const availableBytes = () => remainingBytes - bytes;
+    const charge = (amount) => {
+        if (!Number.isSafeInteger(amount) || amount < 0) {
+            bytes = remainingBytes + 1;
+            return false;
+        }
+        bytes += amount;
+        if (activeNode) {
+            activeNode.bytes += amount;
+        }
+        else {
+            scalarBytes += amount;
+        }
+        return bytes <= remainingBytes;
+    };
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The ledger records object and symbol identities, which have no shared structural contract.
+    const addIdentity = (identity) => {
+        if (activeNode) {
+            activeNode.edges.add(identity);
+        }
+        else {
+            roots.add(identity);
+        }
+    };
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- Retained graph nodes are identified by object or symbol identity independently of their fields.
+    const retainIdentity = (identity, inspect) => {
+        addIdentity(identity);
+        const node = { bytes: 0, edges: new Set() };
+        nodes.set(identity, node);
+        const previous = activeNode;
+        activeNode = node;
+        try {
+            return inspect();
+        }
+        finally {
+            activeNode = previous;
+        }
+    };
+    const visitSymbol = (current) => {
+        if (visitedSymbols.has(current)) {
+            addIdentity(current);
+            charge(8);
+            return;
+        }
+        visitedSymbols.add(current);
+        if (!retainIdentity(current, () => {
+            if (!symbolDescriptionGetter) {
+                return false;
+            }
+            // SAFETY: The captured Symbol description getter is called after the symbol branch and returns a string or undefined by its native contract.
+            // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured intrinsic without reading its mutable call property.
+            const description = Reflect.apply(symbolDescriptionGetter, current, []);
+            return charge(8 + (description?.length ?? 0) * 2);
+        })) {
+            bytes = remainingBytes + 1;
+        }
+    };
+    const visit = (current, depth, isBlobInternalHandle = false) => {
+        if (bytes > remainingBytes) {
+            return;
+        }
+        if (typeof current === 'string') {
+            charge(current.length * 2);
+            return;
+        }
+        if (typeof current === 'symbol') {
+            visitSymbol(current);
+            return;
+        }
+        if (typeof current === 'function') {
+            bytes = remainingBytes + 1;
+            return;
+        }
+        if (current === null || typeof current !== 'object') {
+            charge(8);
+            return;
+        }
+        if (nativeProxyDetector?.(current)) {
+            bytes = remainingBytes + 1;
+            return;
+        }
+        if (depth >= MAX_BUFFERED_EVENT_DEPTH) {
+            bytes = remainingBytes + 1;
+            return;
+        }
+        if (visited.has(current)) {
+            addIdentity(current);
+            charge(8);
+            return;
+        }
+        visited.add(current);
+        if (!retainIdentity(current, () => {
+            if (!charge(16)) {
+                return false;
+            }
+            const retainedStorage = estimateRetainedBufferBytes(current, visit, depth);
+            if (!visitRetainedEventPrototypes(current, depth, isBlobInternalHandle, visited, availableBytes, charge, visit, retainIdentity)) {
+                return false;
+            }
+            if (retainedStorage !== undefined && !charge(retainedStorage.bytes)) {
+                return false;
+            }
+            if (!visitHiddenEventValues(current, retainedStorage?.kind, (hiddenValue, overhead) => {
+                if (!charge(overhead)) {
+                    return false;
+                }
+                visit(hiddenValue, depth + 1);
+                return bytes <= remainingBytes;
+            })) {
+                return false;
+            }
+            return visitInspectableEventProperties(current, retainedStorage?.kind, depth, availableBytes, charge, visit);
+        })) {
+            bytes = remainingBytes + 1;
+        }
+    };
+    try {
+        visit(value, 0);
+    }
+    catch {
+        return undefined;
+    }
+    return bytes <= remainingBytes ? { scalarBytes, roots, nodes } : undefined;
+}
+function areBufferedRetainedEdgesEqual(first, second) {
+    if (first.size !== second.size) {
+        return false;
+    }
+    for (const identity of first) {
+        if (!second.has(identity)) {
+            return false;
+        }
+    }
+    return true;
+}
+function getBufferedLedgerNodeBytes(node, owners) {
+    return (node.bytes +
+        BUFFERED_LEDGER_NODE_BYTES +
+        node.edges.size * BUFFERED_LEDGER_EDGE_BYTES +
+        owners * BUFFERED_LEDGER_OWNER_BYTES);
+}
+function getBufferedLedgerEntryBytes(entry) {
+    return BUFFERED_LEDGER_ENTRY_BYTES + entry.scalarBytes + entry.roots.size * BUFFERED_LEDGER_EDGE_BYTES;
+}
+function collectBufferedLedgerIdentities(roots, candidate, records, work) {
+    const identities = new Set();
+    const pending = [...roots];
+    while (pending.length) {
+        work.remaining -= 1;
+        if (work.remaining < 0) {
+            return undefined;
+        }
+        const identity = pending.pop();
+        if (identities.has(identity)) {
+            continue;
+        }
+        const node = candidate.get(identity) ?? records.get(identity);
+        if (!node) {
+            return undefined;
+        }
+        identities.add(identity);
+        for (const edge of node.edges) {
+            pending.push(edge);
+        }
+    }
+    return identities;
+}
+function getBufferedLedgerChange(
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Ledger changes are keyed by object or symbol identity, not a structural event type.
+identity, graph, records, changes, node) {
+    const existing = changes.get(identity);
+    if (existing) {
+        if (node) {
+            existing.node = node;
+        }
+        return existing;
+    }
+    const current = node ?? graph.nodes.get(identity) ?? records.get(identity);
+    if (!current) {
+        return undefined;
+    }
+    const update = { node: current, ownerDelta: 0 };
+    changes.set(identity, update);
+    return update;
+}
+function findBufferedLedgerAffectedOwners(entry, graph, records, changes, work) {
+    const affected = new Set([entry]);
+    for (const [identity, node] of graph.nodes) {
+        work.remaining -= 1;
+        if (work.remaining < 0) {
+            return undefined;
+        }
+        const previous = records.get(identity);
+        if (!previous) {
+            continue;
+        }
+        const changedEdges = !areBufferedRetainedEdgesEqual(previous.edges, node.edges);
+        if (previous.bytes !== node.bytes || changedEdges) {
+            getBufferedLedgerChange(identity, graph, records, changes, node);
+        }
+        if (!changedEdges) {
+            continue;
+        }
+        for (const owner of previous.owners) {
+            work.remaining -= 1;
+            if (work.remaining < 0) {
+                return undefined;
+            }
+            affected.add(owner);
+        }
+    }
+    return affected;
+}
+function updateBufferedLedgerMembershipChanges(owner, next, graph, records, changes, work) {
+    for (const identity of owner.identities) {
+        work.remaining -= 1;
+        if (work.remaining < 0) {
+            return false;
+        }
+        if (!next.has(identity)) {
+            const update = getBufferedLedgerChange(identity, graph, records, changes);
+            if (!update) {
+                return false;
+            }
+            update.ownerDelta -= 1;
+        }
+    }
+    for (const identity of next) {
+        work.remaining -= 1;
+        if (work.remaining < 0) {
+            return false;
+        }
+        if (!owner.identities.has(identity)) {
+            const update = getBufferedLedgerChange(identity, graph, records, changes);
+            if (!update) {
+                return false;
+            }
+            update.ownerDelta += 1;
+        }
+    }
+    return true;
+}
+function collectBufferedLedgerMemberships(entry, graph, affected, records, changes, work) {
+    const memberships = new Map();
+    for (const owner of affected) {
+        const roots = owner === entry ? graph.roots : owner.roots;
+        const next = collectBufferedLedgerIdentities(roots, graph.nodes, records, work);
+        if (!next || !updateBufferedLedgerMembershipChanges(owner, next, graph, records, changes, work)) {
+            return undefined;
+        }
+        memberships.set(owner, next);
+    }
+    return memberships;
+}
+function projectBufferedLedgerBytes(currentBytes, entry, graph, isNew, changes, records) {
+    let projected = currentBytes - (isNew ? 0 : getBufferedLedgerEntryBytes(entry)) + getBufferedLedgerEntryBytes(graph);
+    for (const [identity, update] of changes) {
+        const previous = records.get(identity);
+        const owners = (previous?.owners.size ?? 0) + update.ownerDelta;
+        if (owners < 0) {
+            return undefined;
+        }
+        if (previous) {
+            projected -= getBufferedLedgerNodeBytes(previous, previous.owners.size);
+        }
+        if (owners) {
+            projected += getBufferedLedgerNodeBytes(update.node, owners);
+        }
+    }
+    return Number.isSafeInteger(projected) && projected >= 0 && projected <= MAX_BUFFERED_ITERATOR_BYTES
+        ? projected
+        : undefined;
+}
+function applyBufferedLedgerChanges(records, changes, memberships) {
+    for (const [identity, update] of changes) {
+        const previous = records.get(identity);
+        const owners = (previous?.owners.size ?? 0) + update.ownerDelta;
+        if (!owners) {
+            continue;
+        }
+        if (previous) {
+            previous.bytes = update.node.bytes;
+            previous.edges = update.node.edges;
+        }
+        else {
+            records.set(identity, {
+                bytes: update.node.bytes,
+                edges: update.node.edges,
+                owners: new Set(),
+            });
+        }
+    }
+    for (const [owner, next] of memberships) {
+        for (const identity of owner.identities) {
+            if (!next.has(identity)) {
+                records.get(identity)?.owners.delete(owner);
+            }
+        }
+        for (const identity of next) {
+            if (!owner.identities.has(identity)) {
+                records.get(identity).owners.add(owner);
+            }
+        }
+        owner.identities = next;
+    }
+    for (const identity of changes.keys()) {
+        if (records.get(identity)?.owners.size === 0) {
+            records.delete(identity);
+        }
+    }
+}
+/**
+ * Account for queue-owned identities once while charging bounded ownership and
+ * edge metadata. Shared topology changes are reconciled for every queued owner.
+ */
+function createBufferedEventLedger() {
+    const records = new Map();
+    let bytes = 0;
+    const reconcile = (entry, graph, isNew) => {
+        const work = { remaining: MAX_BUFFERED_LEDGER_RECONCILIATION_WORK };
+        const changes = new Map();
+        const affected = findBufferedLedgerAffectedOwners(entry, graph, records, changes, work);
+        if (!affected) {
+            return false;
+        }
+        const memberships = collectBufferedLedgerMemberships(entry, graph, affected, records, changes, work);
+        if (!memberships) {
+            return false;
+        }
+        const projectedBytes = projectBufferedLedgerBytes(bytes, entry, graph, isNew, changes, records);
+        if (projectedBytes === undefined) {
+            return false;
+        }
+        applyBufferedLedgerChanges(records, changes, memberships);
+        entry.scalarBytes = graph.scalarBytes;
+        entry.roots = graph.roots;
+        bytes = projectedBytes;
+        return true;
+    };
+    const release = (entry) => {
+        bytes -= getBufferedLedgerEntryBytes(entry);
+        for (const identity of entry.identities) {
+            const record = records.get(identity);
+            if (!record?.owners.delete(entry)) {
+                continue;
+            }
+            bytes -= BUFFERED_LEDGER_OWNER_BYTES;
+            if (record.owners.size === 0) {
+                bytes -= getBufferedLedgerNodeBytes(record, 0);
+                records.delete(identity);
+            }
+        }
+        entry.identities.clear();
+    };
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The ledger contract contextually types its callbacks and keeps retained-identity internals private.
+    return {
+        retain(graph) {
+            const entry = { scalarBytes: 0, roots: new Set(), identities: new Set() };
+            return reconcile(entry, graph, true) ? entry : undefined;
+        },
+        refresh(entry, graph) {
+            return reconcile(entry, graph, false);
+        },
+        release,
+        clear() {
+            records.clear();
+            bytes = 0;
+        },
+    };
+}
 /** An abortable event stream with typed listeners, asynchronous iteration, and lifecycle state. */
 class EventStream {
     /** Creates an unstarted stream with independent connection and completion lifecycle promises. */
@@ -70329,10 +73519,18 @@ class EventStream {
         // oxlint-enable class-methods-use-this
         _EventStream_listeners.set(this, Object.create(null));
         _EventStream_abortListeners.set(this, []);
+        _EventStream_emittedListenerRegistrations.set(this, new WeakMap());
+        _EventStream_pendingListenerCleanup.set(this, new Set());
+        _EventStream_pendingBufferedEventChecks.set(this, new Set());
+        _EventStream_listenerDispatchDepth.set(this, 0);
         _EventStream_ended.set(this, false);
         _EventStream_errored.set(this, false);
         _EventStream_aborted.set(this, false);
         _EventStream_catchingPromiseCreated.set(this, false);
+        // Terminal failure recorded during settlement, before `end` is emitted, so
+        // iterators can surface it even when a throwing user listener prevented
+        // their internal failure listeners from running.
+        _EventStream_terminalFailure.set(this, void 0);
         __classPrivateFieldSet(this, _EventStream_connectedPromise, new Promise((resolve, reject) => {
             __classPrivateFieldSet(this, _EventStream_resolveConnectedPromise, resolve, "f");
             __classPrivateFieldSet(this, _EventStream_rejectConnectedPromise, reject, "f");
@@ -70400,15 +73598,28 @@ class EventStream {
     abort() {
         this.controller.abort();
     }
+    /** Creates a user-abort error retaining this runner's cancellation reason. */
+    _userAbortError() {
+        const error = new APIUserAbortError();
+        Object.defineProperty(error, 'cause', {
+            value: this.controller.signal.reason,
+            writable: true,
+            configurable: true,
+        });
+        return error;
+    }
     _listenForAbort(signal) {
         if (!signal || this.ended) {
             return;
         }
         if (signal.aborted) {
-            this.controller.abort();
+            __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_abortFromSignal).call(this, signal);
             return;
         }
-        const listener = () => this.controller.abort();
+        if (__classPrivateFieldGet(this, _EventStream_abortListeners, "f").some((registration) => registration.signal === signal)) {
+            return;
+        }
+        const listener = () => __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_abortFromSignal).call(this, signal);
         signal.addEventListener('abort', listener, { once: true });
         __classPrivateFieldGet(this, _EventStream_abortListeners, "f").push({ signal, listener });
     }
@@ -70437,7 +73648,16 @@ class EventStream {
         if (!listeners) {
             return this;
         }
-        const index = listeners.findIndex((l) => l.listener === listener);
+        // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
+        const emittedRegistration = __classPrivateFieldGet(this, _EventStream_emittedListenerRegistrations, "f").get(listener);
+        if (emittedRegistration?.event === event &&
+            !emittedRegistration.registration.removed &&
+            !emittedRegistration.registration.detached) {
+            // SAFETY: The stored registration event was compared with this event above, preserving the event/listener type correlation.
+            __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_removeEmittedListener).call(this, event, emittedRegistration.registration);
+            return this;
+        }
+        const index = listeners.findIndex((l) => !l.removed && l.listener === listener);
         if (index !== -1) {
             listeners.splice(index, 1);
         }
@@ -70471,6 +73691,7 @@ class EventStream {
         return new Promise((resolve, reject) => {
             __classPrivateFieldSet(this, _EventStream_catchingPromiseCreated, true, "f");
             const onError = (error) => {
+                // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
                 this.off(event, onEvent);
                 reject(error);
             };
@@ -70478,12 +73699,15 @@ class EventStream {
                 if (event !== 'error') {
                     this.off('error', onError);
                 }
+                // SAFETY: The emitted API returns the sole argument or the full tuple according to its existing EventTypes-dependent result contract.
                 resolve((values.length > 1 ? values : values[0]));
             };
             if (event !== 'error') {
-                this.once('error', onError);
+                // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
+                __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_onceForEmitted).call(this, 'error', onError);
             }
-            this.once(event, onEvent);
+            // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
+            __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_onceForEmitted).call(this, event, onEvent);
         });
     }
     /**
@@ -70500,8 +73724,18 @@ class EventStream {
      */
     events(event) {
         return this._createIterator((push) => {
-            const onEvent = (...args) => push(args);
+            const onEvent = (...args) => {
+                sdkOwnedBufferedEventArguments.add(args);
+                try {
+                    push(args);
+                }
+                finally {
+                    sdkOwnedBufferedEventArguments.delete(args);
+                }
+            };
+            // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
             this.on(event, onEvent);
+            // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
             return () => this.off(event, onEvent);
         }, {
             // When iterating the 'error' or 'abort' event itself, yield it as a
@@ -70518,14 +73752,21 @@ class EventStream {
      * here: the iterator ends when the stream ends, listeners are removed on
      * end/return, and a terminal error is retained until buffered values have
      * drained so it is surfaced even when no reader was waiting when it fired.
+     * Detached consumers have bounded event and byte queues; exceeding either
+     * limit fails the stream and aborts its underlying request. Detached queues
+     * also reject accessor-backed payloads because getter closures cannot be
+     * safely sized without executing untrusted code.
      */
     _createIterator(attach, { rejectOnError = true, rejectOnAbort = true, onReturn, } = {}) {
         const pushQueue = createEventQueue();
+        const bufferedEventSizes = createEventQueue();
         const readQueue = createEventQueue();
+        const bufferedLedger = createBufferedEventLedger();
         let ended = this.ended;
         let failure;
         let failureDelivered = false;
         let detach = () => undefined;
+        // SAFETY: A completed iterator result has no yielded value; never preserves the iterator public result type for done: true.
         const doneResult = () => ({ value: undefined, done: true });
         const finishReaders = () => {
             while (readQueue.length) {
@@ -70549,6 +73790,39 @@ class EventStream {
                 this.off('abort', onFailure);
             }
         };
+        const deactivateBufferedEvent = (entry) => {
+            entry.active = false;
+            if (entry.check) {
+                __classPrivateFieldGet(this, _EventStream_pendingBufferedEventChecks, "f").delete(entry.check);
+                entry.check = undefined;
+            }
+        };
+        const failBufferedEvents = (discardRetained = false) => {
+            if (discardRetained) {
+                while (bufferedEventSizes.length) {
+                    deactivateBufferedEvent(bufferedEventSizes.dequeue());
+                }
+                pushQueue.clear();
+                bufferedLedger.clear();
+            }
+            const error = new error_OpenAIError(`Event stream iterator buffer limit exceeded (${MAX_BUFFERED_ITERATOR_EVENTS} events or ${MAX_BUFFERED_ITERATOR_BYTES} bytes); consume events as they arrive.`);
+            try {
+                __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_handleError).call(this, error);
+            }
+            finally {
+                this.controller.abort();
+            }
+            return error;
+        };
+        const revalidateBufferedEvent = (value, entry) => {
+            if (!entry.active || __classPrivateFieldGet(this, _EventStream_ended, "f")) {
+                return;
+            }
+            const graph = inspectBufferedEventGraph(value, MAX_BUFFERED_ITERATOR_BYTES);
+            if (!graph || !bufferedLedger.refresh(entry.retention, graph)) {
+                failBufferedEvents(true);
+            }
+        };
         const push = (value) => {
             if (ended) {
                 return;
@@ -70558,7 +73832,36 @@ class EventStream {
                 reader.resolve({ value, done: false });
             }
             else {
+                if (pushQueue.length >= MAX_BUFFERED_ITERATOR_EVENTS) {
+                    failBufferedEvents();
+                    return;
+                }
+                const graph = inspectBufferedEventGraph(value, MAX_BUFFERED_ITERATOR_BYTES);
+                const retention = graph && bufferedLedger.retain(graph);
+                if (!retention) {
+                    failBufferedEvents();
+                    return;
+                }
+                if (typeof value === 'object' && value !== null && sdkOwnedBufferedEventArguments.has(value)) {
+                    // SAFETY: Only SDK-created argument tuples are inserted into this private WeakSet, so membership establishes the array identity.
+                    const argumentsTuple = value;
+                    for (let index = 0; index < argumentsTuple.length; index += 1) {
+                        const argument = argumentsTuple[index];
+                        if (typeof argument === 'string') {
+                            // SAFETY: The branch checked argument is a string; JSON stringify/parse returns that same string value while detaching retained storage.
+                            argumentsTuple[index] = bufferedJSONParse(bufferedJSONStringify(argument));
+                        }
+                    }
+                }
+                const entry = { retention, active: true, check: undefined };
                 pushQueue.enqueue(value);
+                bufferedEventSizes.enqueue(entry);
+                const check = () => {
+                    entry.check = undefined;
+                    revalidateBufferedEvent(value, entry);
+                };
+                entry.check = check;
+                __classPrivateFieldGet(this, _EventStream_pendingBufferedEventChecks, "f").add(check);
             }
         };
         const onFailure = (error) => {
@@ -70567,8 +73870,24 @@ class EventStream {
                 rejectReader();
             }
         };
+        // A throwing user listener registered before this iterator stops dispatch
+        // before onFailure runs; adopt the failure the stream recorded during
+        // settlement so terminal errors are never converted into clean completion.
+        const adoptTerminalFailure = () => {
+            if (failure) {
+                return;
+            }
+            const terminal = __classPrivateFieldGet(this, _EventStream_terminalFailure, "f");
+            if (!terminal) {
+                return;
+            }
+            if (terminal.kind === 'error' ? rejectOnError : rejectOnAbort) {
+                failure = terminal.error;
+            }
+        };
         const onEnd = () => {
             ended = true;
+            adoptTerminalFailure();
             cleanup();
             if (!pushQueue.length) {
                 rejectReader();
@@ -70588,7 +73907,20 @@ class EventStream {
         return {
             next: () => {
                 if (pushQueue.length) {
-                    return Promise.resolve({ value: pushQueue.dequeue(), done: false });
+                    const value = pushQueue.dequeue();
+                    const entry = bufferedEventSizes.dequeue();
+                    deactivateBufferedEvent(entry);
+                    const graph = inspectBufferedEventGraph(value, MAX_BUFFERED_ITERATOR_BYTES);
+                    if (!graph || !bufferedLedger.refresh(entry.retention, graph)) {
+                        const error = failBufferedEvents(true);
+                        failureDelivered = true;
+                        return Promise.reject(error);
+                    }
+                    bufferedLedger.release(entry.retention);
+                    return Promise.resolve({ value, done: false });
+                }
+                if (ended || this.ended) {
+                    adoptTerminalFailure();
                 }
                 if (failure && !failureDelivered) {
                     failureDelivered = true;
@@ -70603,7 +73935,14 @@ class EventStream {
             },
             return: () => {
                 ended = true;
+                // The consumer walked away; terminal failures recorded later must not
+                // resurface through this iterator.
+                failureDelivered = true;
+                while (bufferedEventSizes.length) {
+                    deactivateBufferedEvent(bufferedEventSizes.dequeue());
+                }
                 pushQueue.clear();
+                bufferedLedger.clear();
                 cleanup();
                 finishReaders();
                 if (onReturn) {
@@ -70628,7 +73967,7 @@ class EventStream {
     }
     /** Returns whether an event currently has one or more registered listeners. */
     _hasListeners(event) {
-        return Boolean(__classPrivateFieldGet(this, _EventStream_listeners, "f")[event]?.length);
+        return Boolean(__classPrivateFieldGet(this, _EventStream_listeners, "f")[event]?.some((listener) => !listener.removed));
     }
     /** Dispatches a stream event and performs the associated lifecycle transitions. */
     _emit(event, ...args) {
@@ -70642,37 +73981,57 @@ class EventStream {
             __classPrivateFieldGet(this, _EventStream_resolveEndPromise, "f").call(this);
         }
         const listeners = __classPrivateFieldGet(this, _EventStream_listeners, "f")[event];
-        if (listeners) {
-            __classPrivateFieldGet(this, _EventStream_listeners, "f")[event] = listeners.filter((l) => !l.once);
-            for (const { listener } of listeners) {
-                listener(...args);
+        let dispatchError;
+        let dispatchThrew = false;
+        try {
+            if (listeners) {
+                // SAFETY: Filtering only removes registrations from the same event bucket and preserves the listener signatures for that event.
+                __classPrivateFieldGet(this, _EventStream_listeners, "f")[event] = listeners.filter((listener) => {
+                    if (listener.once) {
+                        listener.detached = true;
+                    }
+                    return !listener.once && !listener.removed;
+                });
+                __classPrivateFieldSet(this, _EventStream_listenerDispatchDepth, __classPrivateFieldGet(this, _EventStream_listenerDispatchDepth, "f") + 1, "f");
+                try {
+                    // SAFETY: The listener bucket and argument tuple come from the same EventTypes key; this bridges TypeScript generic indexed-access correlation.
+                    for (const registration of listeners) {
+                        if (!registration.removed) {
+                            const { listener } = registration;
+                            // SAFETY: The listener bucket and argument tuple come from the same EventTypes key; this bridges TypeScript generic indexed-access correlation.
+                            listener(...args);
+                        }
+                    }
+                }
+                finally {
+                    __classPrivateFieldSet(this, _EventStream_listenerDispatchDepth, __classPrivateFieldGet(this, _EventStream_listenerDispatchDepth, "f") - 1, "f");
+                    if (__classPrivateFieldGet(this, _EventStream_listenerDispatchDepth, "f") === 0) {
+                        __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_cleanupEmittedListeners).call(this);
+                        for (const check of __classPrivateFieldGet(this, _EventStream_pendingBufferedEventChecks, "f")) {
+                            __classPrivateFieldGet(this, _EventStream_pendingBufferedEventChecks, "f").delete(check);
+                            if (!__classPrivateFieldGet(this, _EventStream_ended, "f")) {
+                                check();
+                            }
+                        }
+                    }
+                }
             }
         }
-        if (event === 'abort') {
-            const error = args[0];
-            if (!__classPrivateFieldGet(this, _EventStream_catchingPromiseCreated, "f") && !listeners?.length) {
-                Promise.reject(error);
-            }
-            __classPrivateFieldGet(this, _EventStream_rejectConnectedPromise, "f").call(this, error);
-            __classPrivateFieldGet(this, _EventStream_rejectEndPromise, "f").call(this, error);
-            this._emit('end');
-            return;
+        catch (error) {
+            dispatchError = error;
+            dispatchThrew = true;
         }
-        if (event === 'error') {
-            // NOTE: _emit('error', error) should only be called from #handleError().
-            const error = args[0];
-            if (!__classPrivateFieldGet(this, _EventStream_catchingPromiseCreated, "f") && !listeners?.length) {
-                // Trigger an unhandled rejection if the user hasn't registered any error handlers.
-                // If you are seeing stack traces here, make sure to handle errors via either:
-                // - runner.on('error', () => ...)
-                // - await runner.done()
-                // - await runner.finalChatCompletion()
-                // - etc.
-                Promise.reject(error);
+        try {
+            __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_settleTerminalEvent).call(this, event, args, Boolean(listeners?.length));
+        }
+        catch (error) {
+            if (!dispatchThrew) {
+                dispatchError = error;
+                dispatchThrew = true;
             }
-            __classPrivateFieldGet(this, _EventStream_rejectConnectedPromise, "f").call(this, error);
-            __classPrivateFieldGet(this, _EventStream_rejectEndPromise, "f").call(this, error);
-            this._emit('end');
+        }
+        if (dispatchThrew) {
+            throw dispatchError;
         }
     }
     // oxlint-disable-next-line class-methods-use-this -- Subclasses override this instance hook.
@@ -70680,14 +74039,56 @@ class EventStream {
         // Hook for subclasses.
     }
 }
-_EventStream_connectedPromise = new WeakMap(), _EventStream_resolveConnectedPromise = new WeakMap(), _EventStream_rejectConnectedPromise = new WeakMap(), _EventStream_endPromise = new WeakMap(), _EventStream_resolveEndPromise = new WeakMap(), _EventStream_rejectEndPromise = new WeakMap(), _EventStream_listeners = new WeakMap(), _EventStream_abortListeners = new WeakMap(), _EventStream_ended = new WeakMap(), _EventStream_errored = new WeakMap(), _EventStream_aborted = new WeakMap(), _EventStream_catchingPromiseCreated = new WeakMap(), _EventStream_instances = new WeakSet(), _EventStream_removeAbortListeners = function _EventStream_removeAbortListeners() {
+_EventStream_connectedPromise = new WeakMap(), _EventStream_resolveConnectedPromise = new WeakMap(), _EventStream_rejectConnectedPromise = new WeakMap(), _EventStream_endPromise = new WeakMap(), _EventStream_resolveEndPromise = new WeakMap(), _EventStream_rejectEndPromise = new WeakMap(), _EventStream_listeners = new WeakMap(), _EventStream_abortListeners = new WeakMap(), _EventStream_emittedListenerRegistrations = new WeakMap(), _EventStream_pendingListenerCleanup = new WeakMap(), _EventStream_pendingBufferedEventChecks = new WeakMap(), _EventStream_listenerDispatchDepth = new WeakMap(), _EventStream_ended = new WeakMap(), _EventStream_errored = new WeakMap(), _EventStream_aborted = new WeakMap(), _EventStream_catchingPromiseCreated = new WeakMap(), _EventStream_terminalFailure = new WeakMap(), _EventStream_instances = new WeakSet(), _EventStream_abortFromSignal = function _EventStream_abortFromSignal(signal) {
+    try {
+        this.controller.abort(signal.reason);
+    }
+    catch {
+        this.controller.abort();
+    }
+}, _EventStream_removeAbortListeners = function _EventStream_removeAbortListeners() {
     for (const { signal, listener } of __classPrivateFieldGet(this, _EventStream_abortListeners, "f").splice(0)) {
         signal.removeEventListener('abort', listener);
     }
+}, _EventStream_onceForEmitted = function _EventStream_onceForEmitted(event, listener) {
+    const previousListeners = __classPrivateFieldGet(this, _EventStream_listeners, "f")[event];
+    const previousLength = previousListeners?.length ?? 0;
+    this.once(event, listener);
+    const listeners = __classPrivateFieldGet(this, _EventStream_listeners, "f")[event];
+    const [registration] = listeners?.slice(-1) ?? [];
+    if ((previousListeners === undefined || listeners === previousListeners) &&
+        listeners?.length === previousLength + 1 &&
+        registration?.listener === listener &&
+        registration.once) {
+        // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
+        __classPrivateFieldGet(this, _EventStream_emittedListenerRegistrations, "f").set(listener, { event, registration });
+    }
+}, _EventStream_removeEmittedListener = function _EventStream_removeEmittedListener(event, registration) {
+    if (registration.removed) {
+        return;
+    }
+    registration.removed = true;
+    // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
+    __classPrivateFieldGet(this, _EventStream_emittedListenerRegistrations, "f").delete(registration.listener);
+    __classPrivateFieldGet(this, _EventStream_pendingListenerCleanup, "f").add(event);
+    if (__classPrivateFieldGet(this, _EventStream_listenerDispatchDepth, "f") === 0) {
+        __classPrivateFieldGet(this, _EventStream_instances, "m", _EventStream_cleanupEmittedListeners).call(this);
+    }
+}, _EventStream_cleanupEmittedListeners = function _EventStream_cleanupEmittedListeners() {
+    for (const event of __classPrivateFieldGet(this, _EventStream_pendingListenerCleanup, "f")) {
+        // SAFETY: Pending cleanup keys are added only from registered EventTypes events; the key retains its event-map membership.
+        const eventType = event;
+        const listeners = __classPrivateFieldGet(this, _EventStream_listeners, "f")[eventType];
+        if (listeners) {
+            // SAFETY: Filtering only removes registrations from the same event bucket and preserves the listener signatures for that event.
+            __classPrivateFieldGet(this, _EventStream_listeners, "f")[eventType] = listeners.filter((listener) => !listener.removed);
+        }
+    }
+    __classPrivateFieldGet(this, _EventStream_pendingListenerCleanup, "f").clear();
 }, _EventStream_handleError = function _EventStream_handleError(error) {
     __classPrivateFieldSet(this, _EventStream_errored, true, "f");
     if (error instanceof Error && error.name === 'AbortError') {
-        error = new APIUserAbortError();
+        error = this._userAbortError();
     }
     if (error instanceof APIUserAbortError) {
         __classPrivateFieldSet(this, _EventStream_aborted, true, "f");
@@ -70703,6 +74104,37 @@ _EventStream_connectedPromise = new WeakMap(), _EventStream_resolveConnectedProm
         return this._emit('error', openAIError);
     }
     return this._emit('error', new error_OpenAIError(String(error)));
+}, _EventStream_settleTerminalEvent = function _EventStream_settleTerminalEvent(event, args, hasListeners) {
+    if (event === 'abort') {
+        // SAFETY: The abort event key selects the APIUserAbortError argument tuple established by the typed emit contract.
+        const error = args[0];
+        __classPrivateFieldSet(this, _EventStream_terminalFailure, __classPrivateFieldGet(this, _EventStream_terminalFailure, "f") ?? { kind: 'abort', error }, "f");
+        if (!__classPrivateFieldGet(this, _EventStream_catchingPromiseCreated, "f") && !hasListeners) {
+            Promise.reject(error);
+        }
+        __classPrivateFieldGet(this, _EventStream_rejectConnectedPromise, "f").call(this, error);
+        __classPrivateFieldGet(this, _EventStream_rejectEndPromise, "f").call(this, error);
+        this._emit('end');
+        return;
+    }
+    if (event === 'error') {
+        // NOTE: _emit('error', error) should only be called from #handleError().
+        // SAFETY: The error event is emitted by the error-normalization path, which supplies an OpenAIError as its first argument.
+        const error = args[0];
+        __classPrivateFieldSet(this, _EventStream_terminalFailure, __classPrivateFieldGet(this, _EventStream_terminalFailure, "f") ?? { kind: 'error', error }, "f");
+        if (!__classPrivateFieldGet(this, _EventStream_catchingPromiseCreated, "f") && !hasListeners) {
+            // Trigger an unhandled rejection if the user hasn't registered any error handlers.
+            // If you are seeing stack traces here, make sure to handle errors via either:
+            // - runner.on('error', () => ...)
+            // - await runner.done()
+            // - await runner.finalChatCompletion()
+            // - etc.
+            Promise.reject(error);
+        }
+        __classPrivateFieldGet(this, _EventStream_rejectConnectedPromise, "f").call(this, error);
+        __classPrivateFieldGet(this, _EventStream_rejectEndPromise, "f").call(this, error);
+        this._emit('end');
+    }
 };
 //# sourceMappingURL=EventStream.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/RunnableFunction.mjs
@@ -70724,7 +74156,7 @@ class ParsingToolFunction {
 }
 //# sourceMappingURL=RunnableFunction.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/AbstractChatCompletionRunner.mjs
-var _AbstractChatCompletionRunner_instances, _a, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionToolCall, _AbstractChatCompletionRunner_getFinalFunctionToolCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult;
+var _AbstractChatCompletionRunner_instances, AbstractChatCompletionRunner_a, _AbstractChatCompletionRunner_completionArrivedBeforeAbort, _AbstractChatCompletionRunner_afterCompletionInvoked, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionToolCall, _AbstractChatCompletionRunner_getFinalFunctionToolCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_throwIfAborted, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult;
 
 
 
@@ -70799,21 +74231,25 @@ class AbstractChatCompletionRunner extends EventStream {
         super(...arguments);
         _AbstractChatCompletionRunner_instances.add(this);
         this._chatCompletions = [];
+        _AbstractChatCompletionRunner_completionArrivedBeforeAbort.set(this, false);
+        _AbstractChatCompletionRunner_afterCompletionInvoked.set(this, false);
         /** Mutable conversation history, including initial input, assistant replies, and tool results. */
         this.messages = [];
     }
     _addChatCompletion(chatCompletion) {
+        __classPrivateFieldSet(this, _AbstractChatCompletionRunner_completionArrivedBeforeAbort, !this.controller.signal.aborted, "f");
         normalizeToolCallIds(chatCompletion);
         this._chatCompletions.push(chatCompletion);
         this._emit('chatCompletion', chatCompletion);
         const message = chatCompletion.choices[0]?.message;
         if (message) {
+            // SAFETY: An API assistant message is also accepted as a subsequent conversation message; this preserves that existing input/output bridge.
             this._addMessage(message);
         }
         return chatCompletion;
     }
-    _addMessage(message, emit = true) {
-        if (!('content' in message)) {
+    _addMessage(message, emit = true, normalizeContent = true) {
+        if (normalizeContent && !('content' in message)) {
             message.content = null;
         }
         this.messages.push(message);
@@ -70821,6 +74257,7 @@ class AbstractChatCompletionRunner extends EventStream {
             this._emit('message', message);
             if (isToolMessage(message) && message.content) {
                 // Note, this assumes that {role: 'tool', content: …} is always the result of a call of tool of type=function.
+                // SAFETY: The legacy function-tool result event assumes textual tool output, as documented by the adjacent compatibility comment.
                 this._emit('functionToolCallResult', message.content);
             }
             else if (isAssistantMessage(message) && message.tool_calls) {
@@ -70883,6 +74320,9 @@ class AbstractChatCompletionRunner extends EventStream {
         return [...this._chatCompletions];
     }
     _emitFinal() {
+        if (__classPrivateFieldGet(this, _AbstractChatCompletionRunner_afterCompletionInvoked, "f")) {
+            __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_throwIfAborted).call(this);
+        }
         const completion = this._chatCompletions[this._chatCompletions.length - 1];
         if (completion) {
             this._emit('finalChatCompletion', completion);
@@ -70909,29 +74349,41 @@ class AbstractChatCompletionRunner extends EventStream {
     }
     async _createChatCompletion(client, params, options) {
         this._listenForAbort(options?.signal);
-        __classPrivateFieldGet(_a, _a, "m", _AbstractChatCompletionRunner_validateParams).call(_a, params);
+        __classPrivateFieldGet(AbstractChatCompletionRunner_a, AbstractChatCompletionRunner_a, "m", _AbstractChatCompletionRunner_validateParams).call(AbstractChatCompletionRunner_a, params);
         const chatCompletion = await client.chat.completions.create({ ...params, stream: false }, { ...options, signal: this.controller.signal });
         this._connected();
         return this._addChatCompletion(parseChatCompletion(chatCompletion, params));
     }
     async _runChatCompletion(client, params, options) {
         for (const message of params.messages) {
-            this._addMessage(message, false);
+            this._addMessage(message, false, false);
         }
         return await this._createChatCompletion(client, params, options);
     }
     async _runTools(client, params, runner, options) {
         const role = 'tool';
         const { tool_choice = 'auto', stream, toolContext: inputToolContext, ...restParams } = params;
+        // SAFETY: The generic runner parameters tie toolContext to ToolContext; undefined remains valid when the caller omits it under that contract.
         const toolContext = inputToolContext;
-        const singleFunctionToCall = typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
+        const singleFunctionToCall = 
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
+        typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
         const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
+        const runAfterCompletion = async (completion) => {
+            if (afterCompletion == null) {
+                return;
+            }
+            __classPrivateFieldSet(this, _AbstractChatCompletionRunner_afterCompletionInvoked, true, "f");
+            await afterCompletion(completion, runner);
+            __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_throwIfAborted).call(this);
+        };
         // Normalize tool definitions before invoking callbacks.
         const inputTools = params.tools.map((tool) => {
             if (isAutoParsableTool(tool)) {
                 if (!tool.$callback) {
                     throw new error_OpenAIError('Tool given to `.runTools()` that does not have an associated function');
                 }
+                // SAFETY: The auto-parseable tool supplies its own validated parameter schema and parser; this bridges the legacy runnable-tool parameter type.
                 return {
                     type: 'function',
                     function: {
@@ -70944,6 +74396,7 @@ class AbstractChatCompletionRunner extends EventStream {
                     },
                 };
             }
+            // SAFETY: Unbranded tools follow the existing runnable-tool contract; the function-tool branch below performs its normal dispatch.
             return tool;
         });
         const functionsByName = Object.create(null);
@@ -70952,23 +74405,31 @@ class AbstractChatCompletionRunner extends EventStream {
                 functionsByName[f.function.name || f.function.function.name] = f.function;
             }
         }
+        // SAFETY: The runnable function's parameter schema is forwarded as JSON keyword properties without changing or inspecting its values.
+        // SAFETY: This is the intentional non-function tool pass-through; the runnable and wire types differ in index signatures, not the forwarded value.
+        // SAFETY: Omitting the tools list preserves the optional wire field; the existing conditional result type is broader than the runnable helper's declaration.
         const tools = 'tools' in params
             ? inputTools.map((t) => t.type === 'function'
                 ? {
                     type: 'function',
                     function: {
                         name: t.function.name || t.function.function.name,
+                        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool parameter schemas use the published open JSON Schema dictionary contract, including arbitrary extensions.
                         parameters: t.function.parameters,
                         description: t.function.description,
                         strict: t.function.strict,
                     },
                 }
-                : t)
+                : // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Preserve the existing non-function tool pass-through; runnable and wire schema interfaces have incompatible index signatures.
+                    t)
             : undefined;
         for (const message of params.messages) {
-            this._addMessage(message, false);
+            this._addMessage(message, false, false);
         }
+        let allowBufferedToolCall = false;
         const runToolCall = async (toolCall) => {
+            const bufferedToolCall = allowBufferedToolCall;
+            allowBufferedToolCall = false;
             if (toolCall.type !== 'function') {
                 return { message: undefined, functionCalled: false };
             }
@@ -70992,15 +74453,40 @@ class AbstractChatCompletionRunner extends EventStream {
                     parsed = await fn.parse(args);
                 }
                 catch (error) {
+                    if (this.controller.signal.aborted) {
+                        throw this._userAbortError();
+                    }
                     const content = error instanceof Error ? error.message : String(error);
                     return { message: { role, tool_call_id, content }, functionCalled: false };
                 }
-                rawContent = await fn.function(parsed, runner, toolContext);
+                if (this.controller.signal.aborted) {
+                    throw this._userAbortError();
+                }
+                try {
+                    rawContent = await fn.function(parsed, runner, toolContext);
+                }
+                catch (error) {
+                    if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+                        throw this._userAbortError();
+                    }
+                    throw error;
+                }
             }
             else {
-                rawContent = await fn.function(args, runner, toolContext);
+                if (this.controller.signal.aborted && !bufferedToolCall) {
+                    throw this._userAbortError();
+                }
+                try {
+                    rawContent = await fn.function(args, runner, toolContext);
+                }
+                catch (error) {
+                    if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+                        throw this._userAbortError();
+                    }
+                    throw error;
+                }
             }
-            const content = __classPrivateFieldGet(_a, _a, "m", _AbstractChatCompletionRunner_stringifyFunctionCallResult).call(_a, rawContent);
+            const content = __classPrivateFieldGet(AbstractChatCompletionRunner_a, AbstractChatCompletionRunner_a, "m", _AbstractChatCompletionRunner_stringifyFunctionCallResult).call(AbstractChatCompletionRunner_a, rawContent);
             return { message: { role, tool_call_id, content }, functionCalled: true };
         };
         for (let i = 0; i < maxChatCompletions; ++i) {
@@ -71010,12 +74496,15 @@ class AbstractChatCompletionRunner extends EventStream {
                 tools,
                 messages: this.messages.map(toRequestMessage),
             }, options);
+            // A completed buffered turn retains its first immediate callback for
+            // compatibility; delayed parsed callbacks never inherit this exception.
+            allowBufferedToolCall = this.controller.signal.aborted && __classPrivateFieldGet(this, _AbstractChatCompletionRunner_completionArrivedBeforeAbort, "f");
             const message = chatCompletion.choices[0]?.message;
             if (!message) {
                 throw new error_OpenAIError(`missing message in ChatCompletion response`);
             }
             if (!message.tool_calls?.length) {
-                await afterCompletion?.(chatCompletion, runner);
+                await runAfterCompletion(chatCompletion);
                 return;
             }
             if (singleFunctionToCall || params.parallel_tool_calls === false) {
@@ -71024,19 +74513,24 @@ class AbstractChatCompletionRunner extends EventStream {
                     if (result.message) {
                         this._addMessage(result.message);
                     }
+                    if (this.controller.signal.aborted) {
+                        throw this._userAbortError();
+                    }
                     if (singleFunctionToCall && result.functionCalled) {
-                        await afterCompletion?.(chatCompletion, runner);
+                        await runAfterCompletion(chatCompletion);
                         return;
                     }
                 }
             }
             else {
                 const results = await Promise.allSettled(message.tool_calls.map(runToolCall));
-                // Wait for every concurrently running tool to settle before surfacing an
-                // error so tool side effects cannot continue after the runner has ended.
-                for (const result of results) {
-                    if (result.status === 'rejected') {
-                        throw result.reason;
+                // Wait for all side effects. Ordinary failures retain their existing
+                // behavior; cancellation preserves every callback that already finished.
+                if (!this.controller.signal.aborted) {
+                    for (const result of results) {
+                        if (result.status === 'rejected') {
+                            throw result.reason;
+                        }
                     }
                 }
                 // Promise.allSettled preserves input order, so the next request receives
@@ -71046,12 +74540,15 @@ class AbstractChatCompletionRunner extends EventStream {
                         this._addMessage(result.value.message);
                     }
                 }
+                if (this.controller.signal.aborted) {
+                    throw this._userAbortError();
+                }
             }
-            await afterCompletion?.(chatCompletion, runner);
+            await runAfterCompletion(chatCompletion);
         }
     }
 }
-_a = AbstractChatCompletionRunner, _AbstractChatCompletionRunner_instances = new WeakSet(), _AbstractChatCompletionRunner_getFinalContent = function _AbstractChatCompletionRunner_getFinalContent() {
+AbstractChatCompletionRunner_a = AbstractChatCompletionRunner, _AbstractChatCompletionRunner_completionArrivedBeforeAbort = new WeakMap(), _AbstractChatCompletionRunner_afterCompletionInvoked = new WeakMap(), _AbstractChatCompletionRunner_instances = new WeakSet(), _AbstractChatCompletionRunner_getFinalContent = function _AbstractChatCompletionRunner_getFinalContent() {
     return __classPrivateFieldGet(this, _AbstractChatCompletionRunner_instances, "m", _AbstractChatCompletionRunner_getFinalMessage).call(this).content ?? null;
 }, _AbstractChatCompletionRunner_getFinalMessage = function _AbstractChatCompletionRunner_getFinalMessage() {
     let i = this.messages.length;
@@ -71059,6 +74556,7 @@ _a = AbstractChatCompletionRunner, _AbstractChatCompletionRunner_instances = new
         const message = this.messages[i];
         if (isAssistantMessage(message)) {
             // Audio is intentionally omitted from the final message snapshot.
+            // SAFETY: The assistant-message branch normalizes missing content and refusal to null when constructing the completed message.
             const ret = {
                 ...message,
                 content: message.content ?? null,
@@ -71086,6 +74584,7 @@ _a = AbstractChatCompletionRunner, _AbstractChatCompletionRunner_instances = new
         const message = this.messages[i];
         if (isToolMessage(message) &&
             message.content != null &&
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
             typeof message.content === 'string' &&
             this.messages.some((x) => x.role === 'assistant' &&
                 x.tool_calls?.some((y) => y.type === 'function' && y.id === message.tool_call_id))) {
@@ -71107,11 +74606,16 @@ _a = AbstractChatCompletionRunner, _AbstractChatCompletionRunner_instances = new
         }
     }
     return total;
+}, _AbstractChatCompletionRunner_throwIfAborted = function _AbstractChatCompletionRunner_throwIfAborted() {
+    if (this.controller.signal.aborted) {
+        throw this._userAbortError();
+    }
 }, _AbstractChatCompletionRunner_validateParams = function _AbstractChatCompletionRunner_validateParams(params) {
     if (params.n != null && params.n > 1) {
         throw new error_OpenAIError('ChatCompletion convenience helpers only support n=1 at this time. To use n>1, please use chat.completions.create() directly.');
     }
 }, _AbstractChatCompletionRunner_stringifyFunctionCallResult = function _AbstractChatCompletionRunner_stringifyFunctionCallResult(rawContent) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
     if (typeof rawContent === 'string') {
         return rawContent;
     }
@@ -71136,10 +74640,14 @@ class ChatCompletionRunner extends AbstractChatCompletionRunner {
         runner._run(() => runner._runTools(client, params, runner, opts));
         return runner;
     }
-    /** Appends a conversation message and emits text content for assistant replies. */
-    _addMessage(message, emit = true) {
-        super._addMessage(message, emit);
-        if (isAssistantMessage(message) && message.content) {
+    /**
+     * Appends a conversation message and emits text content for assistant replies.
+     * @param normalizeContent Defaults to true; initial history passes false to preserve caller-owned messages.
+     */
+    _addMessage(message, emit = true, normalizeContent = true) {
+        super._addMessage(message, emit, normalizeContent);
+        if (emit && isAssistantMessage(message) && message.content) {
+            // SAFETY: The runner's content event preserves the existing string-content contract for assistant messages supplied by the API or caller.
             this._emit('content', message.content);
         }
     }
@@ -71377,15 +74885,16 @@ const _parseJSON = (jsonString, allow) => {
         if (index === length && !(Allow.NUM & allow)) {
             markPartialJSON('Unterminated number literal');
         }
+        const number = jsonString.substring(start, index);
         try {
-            return JSON.parse(jsonString.substring(start, index));
+            return JSON.parse(number);
         }
         catch {
-            if (jsonString.substring(start, index) === '-' && Allow.NUM & allow) {
+            if (number === '-' && Allow.NUM & allow) {
                 markPartialJSON("Not sure what '-' is");
             }
             try {
-                return JSON.parse(jsonString.substring(start, jsonString.lastIndexOf('e')));
+                return JSON.parse(number.substring(0, number.lastIndexOf('e')));
             }
             catch (e) {
                 throwMalformedError(String(e));
@@ -71408,7 +74917,7 @@ const partialParse = (input) => parseJSON(input, Allow.ALL ^ Allow.NUM);
 
 //# sourceMappingURL=streaming.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/ChatCompletionStream.mjs
-var _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompletionStream_audioDoneChoiceIndexes, _ChatCompletionStream_choiceEventStates, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_beginRequest, _ChatCompletionStream_getChoiceEventState, _ChatCompletionStream_addChunk, _ChatCompletionStream_emitToolCallDoneEvent, _ChatCompletionStream_emitContentDoneEvents, _ChatCompletionStream_endRequest, _ChatCompletionStream_accumulateChatCompletion;
+var _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompletionStream_rejectsUnfinishedTurns, _ChatCompletionStream_audioDoneChoiceIndexes, _ChatCompletionStream_choiceEventStates, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_hasAutoParseableTool, _ChatCompletionStream_partialJSONParseBudget, _ChatCompletionStream_beginRequest, _ChatCompletionStream_getChoiceEventState, _ChatCompletionStream_addChunk, _ChatCompletionStream_emitToolCallDoneEvent, _ChatCompletionStream_emitContentDoneEvents, _ChatCompletionStream_validateStructuredSnapshots, _ChatCompletionStream_endRequest, _ChatCompletionStream_accumulateChatCompletion;
 
 
 
@@ -71417,6 +74926,19 @@ var _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompleti
 
 
 
+
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Partial JSON may have any shape; callers validate or parse it against their response schema.
+function parseStructuredStreamingJSON(content) {
+    try {
+        return partialParse(content);
+    }
+    catch (error) {
+        if (error instanceof MalformedJSON || error instanceof SyntaxError) {
+            return parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
+        }
+        throw error;
+    }
+}
 // Keep message records readable as empty chunks by older SDKs. Their finalizer
 // overwrites `object`, so the encoded payload does not leak into completions.
 const CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX = 'chat.completion.chunk.message:';
@@ -71425,6 +74947,7 @@ function makeChatCompletionReadableStreamMessageChunk(chunk, message, toolCallId
     const payload = {
         type: 'message',
         message,
+        // Spread creates an own data property without invoking inherited setters or changing the object prototype.
         ...(toolCallIds ? { tool_call_ids: toolCallIds } : {}),
     };
     return {
@@ -71445,6 +74968,7 @@ function getChatCompletionReadableStreamMessage(item) {
     if ('type' in item) {
         return item;
     }
+    // SAFETY: This decoder reads the SDK's tagged readable-stream envelope; JSON parsing restores its serialized message fields for the stream accumulator.
     return JSON.parse(item.object.slice(CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX.length));
 }
 // The Chat Completions schema limits n to 128. Replayed streams do not retain
@@ -71452,6 +74976,242 @@ function getChatCompletionReadableStreamMessage(item) {
 // conservative ceiling to prevent sparse tool-call arrays from growing unbounded.
 const MAX_STREAM_CHOICES = 128;
 const MAX_STREAM_TOOL_CALLS = 128;
+const MAX_PARTIAL_JSON_BYTES = 16 * 1024 * 1024;
+const MAX_PARTIAL_JSON_FRAGMENTS = 65536;
+const MAX_PARTIAL_JSON_DEPTH = 128;
+const MAX_PARTIAL_JSON_PARSE_WORK = 64 * 1024 * 1024;
+const EAGER_PARTIAL_JSON_BYTES = 1024;
+function createPartialJSONParseState() {
+    return {
+        bytes: 0,
+        depth: 0,
+        fragments: 0,
+        work: 0,
+        escaped: false,
+        has_non_whitespace: false,
+        in_string: false,
+        last_parsed_bytes: 0,
+        pending_high_surrogate: false,
+    };
+}
+function recordPartialJSONFragment(state, budget, fragment, validationWorkBudget) {
+    if (budget.fragments >= MAX_PARTIAL_JSON_FRAGMENTS) {
+        throw new error_OpenAIError('Chat completion stream exceeded its structured JSON fragment limit');
+    }
+    let bytes = 0;
+    let { depth, escaped, has_non_whitespace: hasNonWhitespace, in_string: inString } = state;
+    let completed = false;
+    let firstCharacter = true;
+    for (const character of fragment) {
+        const previousBytes = bytes;
+        const codePoint = character.codePointAt(0);
+        if (firstCharacter && state.pending_high_surrogate && codePoint >= 56320 && codePoint <= 57343) {
+            bytes += 1;
+        }
+        else if (codePoint <= 0x7f) {
+            bytes += 1;
+        }
+        else if (codePoint <= 2047) {
+            bytes += 2;
+        }
+        else if (codePoint <= 65535) {
+            bytes += 3;
+        }
+        else {
+            bytes += 4;
+        }
+        firstCharacter = false;
+        if (budget.bytes + bytes > MAX_PARTIAL_JSON_BYTES) {
+            throw new error_OpenAIError('Chat completion stream exceeded its structured JSON byte limit');
+        }
+        if (validationWorkBudget && validationWorkBudget.work + bytes > MAX_PARTIAL_JSON_PARSE_WORK) {
+            validationWorkBudget.work += previousBytes;
+            throw new error_OpenAIError('Chat completion stream exceeded its structured JSON parse-work limit');
+        }
+        if (character !== ' ' && character !== '\n' && character !== '\r' && character !== '\t') {
+            hasNonWhitespace = true;
+        }
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            }
+            else if (character === '\\') {
+                escaped = true;
+            }
+            else if (character === '"') {
+                inString = false;
+                completed || (completed = depth === 0);
+            }
+            continue;
+        }
+        if (character === '"') {
+            inString = true;
+        }
+        else if (character === '{' || character === '[') {
+            depth += 1;
+            if (depth > MAX_PARTIAL_JSON_DEPTH) {
+                throw new error_OpenAIError('Chat completion stream exceeded its structured JSON nesting depth limit');
+            }
+        }
+        else if ((character === '}' || character === ']') && depth > 0) {
+            depth -= 1;
+            completed || (completed = depth === 0);
+        }
+    }
+    state.bytes += bytes;
+    state.fragments += 1;
+    state.depth = depth;
+    state.escaped = escaped;
+    state.has_non_whitespace = hasNonWhitespace;
+    state.in_string = inString;
+    if (fragment.length > 0) {
+        const finalCodeUnit = fragment.codePointAt(fragment.length - 1) ?? 0;
+        state.pending_high_surrogate = finalCodeUnit >= 55296 && finalCodeUnit <= 56319;
+    }
+    budget.bytes += bytes;
+    budget.fragments += 1;
+    if (validationWorkBudget) {
+        validationWorkBudget.work += bytes;
+    }
+    if (!hasNonWhitespace || bytes === 0) {
+        return false;
+    }
+    const minimumGrowth = Math.max(EAGER_PARTIAL_JSON_BYTES, Math.floor(state.last_parsed_bytes / 2));
+    if (state.bytes > EAGER_PARTIAL_JSON_BYTES &&
+        !completed &&
+        state.bytes - state.last_parsed_bytes < minimumGrowth) {
+        return false;
+    }
+    return true;
+}
+function reservePartialJSONParse(state, budget) {
+    if (budget.work + state.bytes > MAX_PARTIAL_JSON_PARSE_WORK) {
+        return false;
+    }
+    budget.work += state.bytes;
+    state.work += state.bytes;
+    state.last_parsed_bytes = state.bytes;
+    return true;
+}
+function captureStructuredJSONSnapshot(snapshot, property) {
+    const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
+    if (!descriptor) {
+        // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
+        let prototype = Object.getPrototypeOf(snapshot);
+        for (let depth = 0; prototype !== null; depth += 1) {
+            if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
+                throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+            }
+            // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
+            prototype = Object.getPrototypeOf(prototype);
+        }
+        return undefined;
+    }
+    if (!('value' in descriptor) ||
+        (typeof descriptor.value !== 'string' && descriptor.value !== null && descriptor.value !== undefined)) {
+        throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+    }
+    // SAFETY: The own data descriptor was explicitly checked to contain only a string, null, or undefined.
+    return descriptor.value;
+}
+function captureStructuredMessageSnapshot(choice) {
+    const descriptor = Object.getOwnPropertyDescriptor(choice, 'message');
+    if (!descriptor ||
+        !('value' in descriptor) ||
+        typeof descriptor.value !== 'object' ||
+        descriptor.value === null) {
+        throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+    }
+    // SAFETY: The choice contract supplies a message; the own data descriptor check prevents getters from changing which object is captured.
+    return descriptor.value;
+}
+function captureSnapshotArray(snapshot, property, maximum, kind) {
+    const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
+    if (!descriptor) {
+        // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
+        let prototype = Object.getPrototypeOf(snapshot);
+        for (let depth = 0; prototype !== null; depth += 1) {
+            if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
+                throw new error_OpenAIError(`Chat completion stream contains an unsafe snapshot ${kind} collection`);
+            }
+            // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
+            prototype = Object.getPrototypeOf(prototype);
+        }
+        return undefined;
+    }
+    if (!('value' in descriptor) || !Array.isArray(descriptor.value)) {
+        throw new error_OpenAIError(`Chat completion stream contains an unsafe snapshot ${kind} collection`);
+    }
+    const length = Object.getOwnPropertyDescriptor(descriptor.value, 'length');
+    if (!length || !('value' in length) || !Number.isSafeInteger(length.value) || length.value > maximum) {
+        throw new error_OpenAIError(`Chat completion stream exceeded its snapshot ${kind} limit`);
+    }
+    // SAFETY: The captured data property is an array with a checked bounded length; Item comes from the owning snapshot collection's contract.
+    return descriptor.value;
+}
+function captureSnapshotArrayItem(array, index) {
+    const descriptor = Object.getOwnPropertyDescriptor(array, index);
+    if (!descriptor) {
+        return undefined;
+    }
+    if (!('value' in descriptor)) {
+        throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+    }
+    // SAFETY: The descriptor is a data property of the typed Item array, so its value retains that array's element contract.
+    return descriptor.value;
+}
+function mapCapturedSnapshotArray(array, maximum, kind, map) {
+    const descriptor = Object.getOwnPropertyDescriptor(array, 'length');
+    const length = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0 || length > maximum) {
+        throw new error_OpenAIError(`Chat completion stream exceeded its snapshot ${kind} limit`);
+    }
+    const mapped = [];
+    mapped.length = length;
+    for (let index = 0; index < length; index += 1) {
+        const item = Object.getOwnPropertyDescriptor(array, index);
+        if (!item) {
+            continue;
+        }
+        if (!('value' in item)) {
+            throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+        }
+        // SAFETY: The descriptor is a data property of the typed Item array, so its value retains that array's element contract.
+        mapped[index] = map(item.value, index);
+    }
+    return mapped;
+}
+function validateStructuredJSONSnapshot(value, budget, validationWorkBudget) {
+    const state = createPartialJSONParseState();
+    const parseBudget = budget ?? { bytes: 0, fragments: 0, work: 0 };
+    recordPartialJSONFragment(state, parseBudget, value, validationWorkBudget);
+    if (!reservePartialJSONParse(state, parseBudget)) {
+        throw new error_OpenAIError('Chat completion stream exceeded its structured JSON parse-work limit');
+    }
+    return value;
+}
+function ownFunctionToolIdentity(toolCall) {
+    const type = Object.getOwnPropertyDescriptor(toolCall, 'type');
+    const fn = Object.getOwnPropertyDescriptor(toolCall, 'function');
+    if (!type || !('value' in type) || type.value !== 'function' || !fn || !('value' in fn)) {
+        return undefined;
+    }
+    if (typeof fn.value !== 'object' || fn.value === null) {
+        return undefined;
+    }
+    const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
+    if (!name || !('value' in name) || typeof name.value !== 'string' || name.value.length === 0) {
+        return undefined;
+    }
+    return { type: 'function', name: name.value };
+}
+function assertBoundToolCallIdentity(toolCall, identity) {
+    const current = ownFunctionToolIdentity(toolCall);
+    if (!current || current.name !== identity.name || current.type !== identity.type) {
+        throw new error_OpenAIError('Chat completion stream contains a changed tool call identity');
+    }
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- This assignment primitive copies own properties from heterogeneous snapshot and delta objects.
 function assignOwnProperties(target, source) {
     if (Object.prototype.propertyIsEnumerable.call(source, '__proto__') && !hasOwn(target, '__proto__')) {
         Object.defineProperty(target, '__proto__', {
@@ -71463,6 +75223,497 @@ function assignOwnProperties(target, source) {
     }
     return Object.assign(target, source);
 }
+function cloneParserConfigObject(value, stableFields = []) {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    for (const field of stableFields) {
+        const descriptor = descriptors[field];
+        if (!descriptor && !(field in value)) {
+            continue;
+        }
+        descriptors[field] = {
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Generic config cloning must resolve inherited/accessor keys outside the declared config shape.
+            value: descriptor && 'value' in descriptor ? descriptor.value : Reflect.get(value, field, value),
+            enumerable: descriptor?.enumerable ?? false,
+            configurable: descriptor?.configurable ?? true,
+            writable: descriptor && 'writable' in descriptor ? descriptor.writable : false,
+        };
+    }
+    // SAFETY: The clone preserves the original prototype and descriptors, replacing only the parser metadata captured from that same value.
+    return Object.create(Object.getPrototypeOf(value), descriptors);
+}
+function snapshotChatCompletionParserParams(params) {
+    const snapshot = cloneParserConfigObject(params);
+    if (params.tools) {
+        const stableTools = [];
+        const lengthDescriptor = Object.getOwnPropertyDescriptor(params.tools, 'length');
+        const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+        const toolCount = typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
+            ? Math.min(length, MAX_STREAM_TOOL_CALLS)
+            : 0;
+        for (let index = 0; index < toolCount; index += 1) {
+            const item = Object.getOwnPropertyDescriptor(params.tools, String(index));
+            if (!item || !('value' in item)) {
+                stableTools.length = index + 1;
+                continue;
+            }
+            // SAFETY: This own data descriptor comes from the request's typed tools array; the following code captures its parser metadata.
+            const tool = item.value;
+            const stableTool = cloneParserConfigObject(tool, [
+                'type',
+                '$brand',
+                '$parseRaw',
+                '$callback',
+                'function',
+            ]);
+            const descriptors = Object.getOwnPropertyDescriptors(stableTool);
+            if (isChatCompletionFunctionTool(stableTool)) {
+                const descriptor = descriptors.function;
+                descriptors.function = {
+                    ...(descriptor && 'value' in descriptor
+                        ? descriptor
+                        : { configurable: true, enumerable: true, writable: true }),
+                    value: cloneParserConfigObject(stableTool.function, ['name', 'strict']),
+                };
+            }
+            // SAFETY: The cloned tool retains the original prototype and descriptors while substituting its captured parser configuration.
+            stableTools[index] = Object.create(Object.getPrototypeOf(tool), descriptors);
+        }
+        snapshot.tools = stableTools;
+    }
+    if (params.response_format) {
+        snapshot.response_format = cloneParserConfigObject(params.response_format, [
+            'type',
+            '$brand',
+            '$parseRaw',
+        ]);
+    }
+    return snapshot;
+}
+const MAX_SERIALIZED_PARSER_SCHEMA_NODES = 4096;
+const stringifyParserSchemaValue = JSON.stringify;
+const MAX_SERIALIZED_PARSER_SCHEMA_BYTES = 1024 * 1024;
+const MAX_SERIALIZED_PARSER_SCHEMA_DEPTH = 64;
+const OMITTED_SERIALIZED_PARSER_VALUE = Symbol('omitted serialized parser value');
+const UNSAFE_SERIALIZED_PARSER_VALUE = Symbol('unsafe serialized parser value');
+function canonicalSerializedParserSchema(value, budget) {
+    const ancestors = new WeakSet();
+    const charge = (bytes) => {
+        if (!Number.isSafeInteger(bytes) ||
+            bytes < 0 ||
+            budget.bytes + bytes > MAX_SERIALIZED_PARSER_SCHEMA_BYTES) {
+            return false;
+        }
+        budget.bytes += bytes;
+        return true;
+    };
+    // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
+    const visit = (current, depth) => {
+        if (depth > MAX_SERIALIZED_PARSER_SCHEMA_DEPTH || budget.nodes >= MAX_SERIALIZED_PARSER_SCHEMA_NODES) {
+            return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        budget.nodes += 1;
+        if (current === undefined || typeof current === 'function' || typeof current === 'symbol') {
+            return OMITTED_SERIALIZED_PARSER_VALUE;
+        }
+        if (typeof current === 'bigint') {
+            return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        if (current === null || typeof current === 'boolean' || typeof current === 'number') {
+            const serialized = stringifyParserSchemaValue(current);
+            return typeof serialized === 'string' && charge(serialized.length)
+                ? serialized
+                : UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        if (typeof current === 'string') {
+            if (!charge(current.length * 6 + 2)) {
+                return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            return stringifyParserSchemaValue(current);
+        }
+        if (typeof current !== 'object' || ancestors.has(current)) {
+            return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        const array = Array.isArray(current);
+        // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
+        const prototype = Object.getPrototypeOf(current);
+        if ((array && prototype !== Array.prototype) ||
+            (!array && prototype !== null && prototype !== Object.prototype)) {
+            return UNSAFE_SERIALIZED_PARSER_VALUE;
+        }
+        for (let owner = current; owner !== null; owner = Object.getPrototypeOf(owner)) {
+            const serializer = Object.getOwnPropertyDescriptor(owner, 'toJSON');
+            if (!serializer) {
+                continue;
+            }
+            if (!('value' in serializer) || typeof serializer.value === 'function') {
+                return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            break;
+        }
+        ancestors.add(current);
+        try {
+            if (!charge(2)) {
+                return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            if (array) {
+                const lengthDescriptor = Object.getOwnPropertyDescriptor(current, 'length');
+                const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+                if (typeof length !== 'number' ||
+                    !Number.isSafeInteger(length) ||
+                    length < 0 ||
+                    length > MAX_SERIALIZED_PARSER_SCHEMA_NODES - budget.nodes) {
+                    return UNSAFE_SERIALIZED_PARSER_VALUE;
+                }
+                const items = [];
+                for (let index = 0; index < length; index += 1) {
+                    const key = String(index);
+                    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+                    if (!descriptor) {
+                        if (Object.getOwnPropertyDescriptor(Array.prototype, key) ||
+                            Object.getOwnPropertyDescriptor(Object.prototype, key)) {
+                            return UNSAFE_SERIALIZED_PARSER_VALUE;
+                        }
+                        budget.nodes += 1;
+                        if (!charge(4)) {
+                            return UNSAFE_SERIALIZED_PARSER_VALUE;
+                        }
+                        items.push('null');
+                        continue;
+                    }
+                    if (!('value' in descriptor)) {
+                        return UNSAFE_SERIALIZED_PARSER_VALUE;
+                    }
+                    const item = visit(descriptor.value, depth + 1);
+                    if (item === UNSAFE_SERIALIZED_PARSER_VALUE) {
+                        return item;
+                    }
+                    items.push(item === OMITTED_SERIALIZED_PARSER_VALUE ? 'null' : item);
+                }
+                return `[${items.join(',')}]`;
+            }
+            const keys = Reflect.ownKeys(current);
+            if (keys.length > MAX_SERIALIZED_PARSER_SCHEMA_NODES - budget.nodes) {
+                return UNSAFE_SERIALIZED_PARSER_VALUE;
+            }
+            const entries = [];
+            for (const key of keys) {
+                if (typeof key !== 'string') {
+                    continue;
+                }
+                const descriptor = Object.getOwnPropertyDescriptor(current, key);
+                if (!descriptor) {
+                    return UNSAFE_SERIALIZED_PARSER_VALUE;
+                }
+                if (!descriptor.enumerable) {
+                    continue;
+                }
+                if (!('value' in descriptor)) {
+                    return UNSAFE_SERIALIZED_PARSER_VALUE;
+                }
+                entries.push([key, descriptor.value]);
+            }
+            entries.sort(([left], [right]) => {
+                if (left === right) {
+                    return 0;
+                }
+                return left < right ? -1 : 1;
+            });
+            const fields = [];
+            for (const [key, entry] of entries) {
+                const normalized = visit(entry, depth + 1);
+                if (normalized === UNSAFE_SERIALIZED_PARSER_VALUE) {
+                    return normalized;
+                }
+                if (normalized === OMITTED_SERIALIZED_PARSER_VALUE) {
+                    continue;
+                }
+                if (!charge(key.length * 6 + 3)) {
+                    return UNSAFE_SERIALIZED_PARSER_VALUE;
+                }
+                fields.push(`${stringifyParserSchemaValue(key)}:${normalized}`);
+            }
+            return `{${fields.join(',')}}`;
+        }
+        finally {
+            ancestors.delete(current);
+        }
+    };
+    try {
+        const normalized = visit(value, 0);
+        return typeof normalized === 'string' ? normalized : undefined;
+    }
+    catch {
+        return undefined;
+    }
+}
+function rememberSerializedParserSchema(signatures, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Parser owners are tracked by identity before their metadata descriptors are validated.
+source, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Serialized schema holders may be arbitrary objects with hostile accessors or prototypes.
+holder, key) {
+    const parser = Object.getOwnPropertyDescriptor(source, '$parseRaw');
+    const schema = Object.getOwnPropertyDescriptor(holder, key);
+    if (!parser ||
+        !('value' in parser) ||
+        typeof parser.value !== 'function' ||
+        !schema ||
+        !('value' in schema)) {
+        return;
+    }
+    const normalized = canonicalSerializedParserSchema(schema.value, { nodes: 0, bytes: 0 });
+    if (normalized !== undefined) {
+        signatures.set(source, normalized);
+    }
+}
+function hasMatchingSerializedParserSchema(signatures, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Parser signatures belong to the original object identity, independent of its fields.
+source, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The schema holder is inspected through own descriptors before its contents are trusted.
+holder, key, value) {
+    const expected = source && signatures.get(source);
+    const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+    return (expected !== undefined &&
+        descriptor !== undefined &&
+        'value' in descriptor &&
+        canonicalSerializedParserSchema(value, { nodes: 0, bytes: 0 }) === expected);
+}
+function serializedParserDescriptor(descriptor, value) {
+    return descriptor && 'value' in descriptor
+        ? { ...descriptor, value }
+        : { configurable: true, enumerable: true, writable: true, value };
+}
+function shadowSerializedParserMetadata(descriptors, source, fields) {
+    for (const field of fields) {
+        const descriptor = descriptors[field];
+        if (!descriptor && !(field in source)) {
+            continue;
+        }
+        descriptors[field] =
+            descriptor && 'value' in descriptor
+                ? { ...descriptor, value: undefined }
+                : {
+                    configurable: descriptor?.configurable ?? true,
+                    enumerable: descriptor?.enumerable ?? false,
+                    writable: false,
+                    value: undefined,
+                };
+    }
+}
+function snapshotSerializedParserTool(serialized) {
+    // SAFETY: The fallback is a serialization scaffold: the code below installs the captured wire fields before the tool is returned.
+    const source = serialized.source ??
+        {
+            type: serialized.type,
+            ...(serialized.type === 'function' ? { function: {} } : {}),
+        };
+    const descriptors = Object.getOwnPropertyDescriptors(source);
+    descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
+    if (serialized.type !== 'function' || !serialized.function) {
+        if (descriptors.function) {
+            descriptors.function = serializedParserDescriptor(descriptors.function, undefined);
+        }
+        shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
+        // SAFETY: The descriptors reconstruct the tool's captured serialized fields and shadow parser metadata while retaining its original prototype.
+        return Object.create(Object.getPrototypeOf(source), descriptors);
+    }
+    const descriptor = descriptors.function;
+    // SAFETY: The preceding guard proves this data descriptor contains a non-null object; no more specific type is assumed.
+    const original = descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value !== null
+        ? descriptor.value
+        : {};
+    const functionDescriptors = Object.getOwnPropertyDescriptors(original);
+    functionDescriptors['name'] = serializedParserDescriptor(functionDescriptors['name'], serialized.function.name);
+    functionDescriptors['strict'] = serializedParserDescriptor(functionDescriptors['strict'], serialized.function.strict);
+    descriptors.function = serializedParserDescriptor(descriptor, Object.create(Object.getPrototypeOf(original), functionDescriptors));
+    if (!serialized.function.schemaMatches) {
+        shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
+    }
+    // SAFETY: The descriptors reconstruct the tool's captured serialized fields and shadow parser metadata while retaining its original prototype.
+    return Object.create(Object.getPrototypeOf(source), descriptors);
+}
+function snapshotSerializedResponseFormat(serialized) {
+    // SAFETY: The fallback seeds only the discriminator; the captured response-format fields are installed below before returning it.
+    const source = serialized.source ?? { type: serialized.type };
+    const descriptors = Object.getOwnPropertyDescriptors(source);
+    descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
+    if (serialized.type !== 'json_schema' || !serialized.source || !serialized.schemaMatches) {
+        shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw']);
+    }
+    // SAFETY: The descriptors restore the captured response-format fields and parser metadata on the original prototype.
+    return Object.create(Object.getPrototypeOf(source), descriptors);
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The serialization visitor accepts arbitrary object and array holders, inspecting own descriptors only.
+function ownSerializedParserObject(holder, key) {
+    const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+    if (!descriptor || !('value' in descriptor)) {
+        return undefined;
+    }
+    const { value } = descriptor;
+    return typeof value === 'object' && value !== null ? value : undefined;
+}
+function observeSerializedChatCompletionParserParams(body, initial, update) {
+    const originalToolOwners = new WeakMap();
+    const originalSchemaSignatures = new WeakMap();
+    // At most 128 tools plus one response format each receive an independent
+    // 4,096-node/1 MiB source and wire allowance (129 MiB maximum per pass).
+    if (body.tools) {
+        for (let index = 0; index < body.tools.length && index < MAX_STREAM_TOOL_CALLS; index += 1) {
+            const owner = ownSerializedParserObject(body.tools, String(index));
+            const source = initial.tools?.[index];
+            if (owner && source) {
+                originalToolOwners.set(owner, source);
+                const originalFunction = ownSerializedParserObject(source, 'function');
+                if (originalFunction) {
+                    rememberSerializedParserSchema(originalSchemaSignatures, source, originalFunction, 'parameters');
+                }
+            }
+        }
+    }
+    if (initial.response_format) {
+        rememberSerializedParserSchema(originalSchemaSignatures, initial.response_format, initial.response_format, 'json_schema');
+    }
+    let root;
+    let tools;
+    let responseFormat;
+    let responseFrame;
+    let frames = [];
+    let toolFrames = new WeakMap();
+    let actualToolOwners = new Map();
+    let functionFrames = new WeakMap();
+    return observeJSONRequestBody(body, {
+        value(holder, key, value) {
+            if (!root && key === '' && typeof value === 'object' && value !== null) {
+                root = value;
+                tools = undefined;
+                responseFormat = undefined;
+                responseFrame = undefined;
+                frames = [];
+                toolFrames = new WeakMap();
+                actualToolOwners = new Map();
+                functionFrames = new WeakMap();
+                return;
+            }
+            if (holder === root && key === 'response_format') {
+                if (typeof value === 'object' && value !== null) {
+                    responseFormat = value;
+                    const owner = ownSerializedParserObject(holder, key);
+                    responseFrame = {
+                        source: owner === body.response_format ? initial.response_format : undefined,
+                        schemaMatches: false,
+                    };
+                }
+                return;
+            }
+            if (holder === root && key === 'tools') {
+                if (Array.isArray(value)) {
+                    tools = new Proxy(value, {
+                        get(target, property) {
+                            // SAFETY: Proxy property values may be arbitrary; unknown preserves that uncertainty before the property-specific checks below.
+                            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
+                            const actual = Reflect.get(target, property, target);
+                            if (typeof property === 'string') {
+                                const index = Number(property);
+                                if (Number.isSafeInteger(index) &&
+                                    index >= 0 &&
+                                    index < MAX_STREAM_TOOL_CALLS &&
+                                    String(index) === property) {
+                                    actualToolOwners.set(index, typeof actual === 'object' && actual !== null ? actual : undefined);
+                                }
+                            }
+                            return actual;
+                        },
+                    });
+                    return tools;
+                }
+                return;
+            }
+            if (holder === tools) {
+                const index = Number(key);
+                if (!Number.isSafeInteger(index) ||
+                    index < 0 ||
+                    index >= MAX_STREAM_TOOL_CALLS ||
+                    typeof value !== 'object' ||
+                    value === null) {
+                    return;
+                }
+                const owner = actualToolOwners.get(index);
+                const source = owner ? originalToolOwners.get(owner) : undefined;
+                const frame = { source };
+                frames[index] = frame;
+                toolFrames.set(value, frame);
+                return;
+            }
+            const tool = toolFrames.get(holder);
+            if (tool) {
+                if (key === 'type' && typeof value === 'string') {
+                    tool.type = value;
+                }
+                else if (key === 'function' && typeof value === 'object' && value !== null) {
+                    const fn = { source: tool.source, schemaMatches: false };
+                    tool.function = fn;
+                    functionFrames.set(value, fn);
+                }
+                return;
+            }
+            if (holder === responseFormat && responseFrame) {
+                if (key === 'type' && typeof value === 'string') {
+                    responseFrame.type = value;
+                }
+                else if (key === 'json_schema') {
+                    responseFrame.schemaMatches = hasMatchingSerializedParserSchema(originalSchemaSignatures, responseFrame.source, holder, key, value);
+                }
+                return;
+            }
+            const fn = functionFrames.get(holder);
+            if (fn) {
+                if (key === 'name' && typeof value === 'string') {
+                    fn.name = value;
+                }
+                else if (key === 'strict' && typeof value === 'boolean') {
+                    fn.strict = value;
+                }
+                else if (key === 'parameters') {
+                    fn.schemaMatches = hasMatchingSerializedParserSchema(originalSchemaSignatures, fn.source, holder, key, value);
+                }
+            }
+            return undefined;
+        },
+        complete() {
+            if (!root) {
+                return;
+            }
+            const snapshot = cloneParserConfigObject(initial);
+            if (tools) {
+                const serializedTools = [];
+                for (let index = 0; index < frames.length; index += 1) {
+                    const frame = frames[index];
+                    if (frame) {
+                        serializedTools[index] = snapshotSerializedParserTool(frame);
+                    }
+                }
+                snapshot.tools = serializedTools;
+            }
+            else {
+                delete snapshot.tools;
+            }
+            if (responseFrame) {
+                snapshot.response_format = snapshotSerializedResponseFormat(responseFrame);
+            }
+            else {
+                delete snapshot.response_format;
+            }
+            update(snapshot);
+            root = undefined;
+            tools = undefined;
+            responseFormat = undefined;
+            responseFrame = undefined;
+            frames = [];
+            toolFrames = new WeakMap();
+            actualToolOwners = new Map();
+            functionFrames = new WeakMap();
+        },
+    });
+}
 /** Streams chat completion chunks while accumulating snapshots, parsed output, and events. */
 class ChatCompletionStream extends AbstractChatCompletionRunner {
     /** Creates an unstarted stream, retaining request parameters for structured-output parsing. */
@@ -71470,12 +75721,35 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         super();
         _ChatCompletionStream_instances.add(this);
         _ChatCompletionStream_params.set(this, void 0);
+        _ChatCompletionStream_rejectsUnfinishedTurns.set(this, false);
         _ChatCompletionStream_audioDoneChoiceIndexes.set(this, void 0);
         _ChatCompletionStream_choiceEventStates.set(this, void 0);
         _ChatCompletionStream_currentChatCompletionSnapshot.set(this, void 0);
+        _ChatCompletionStream_hasAutoParseableTool.set(this, void 0);
+        _ChatCompletionStream_partialJSONParseBudget.set(this, void 0);
         __classPrivateFieldSet(this, _ChatCompletionStream_params, params, "f");
         __classPrivateFieldSet(this, _ChatCompletionStream_audioDoneChoiceIndexes, new Set(), "f");
         __classPrivateFieldSet(this, _ChatCompletionStream_choiceEventStates, [], "f");
+        __classPrivateFieldSet(this, _ChatCompletionStream_hasAutoParseableTool, false, "f");
+        const tools = params?.tools;
+        const lengthDescriptor = tools && Object.getOwnPropertyDescriptor(tools, 'length');
+        const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
+        if (tools && typeof length === 'number' && Number.isSafeInteger(length) && length >= 0) {
+            for (let index = 0; index < Math.min(length, MAX_STREAM_TOOL_CALLS); index += 1) {
+                const descriptor = Object.getOwnPropertyDescriptor(tools, String(index));
+                if (!descriptor || !('value' in descriptor)) {
+                    continue;
+                }
+                // SAFETY: The descriptor is read from the typed request tools array and checked as an own data property before accessing the tool.
+                const tool = descriptor.value;
+                if (isChatCompletionFunctionTool(tool) &&
+                    (isAutoParsableTool(tool) || tool.function.strict === true)) {
+                    __classPrivateFieldSet(this, _ChatCompletionStream_hasAutoParseableTool, true, "f");
+                    break;
+                }
+            }
+        }
+        __classPrivateFieldSet(this, _ChatCompletionStream_partialJSONParseBudget, { bytes: 0, fragments: 0, work: 0 }, "f");
     }
     /** The latest accumulated completion, or `undefined` before a chunk arrives or after finalization. */
     get currentChatCompletionSnapshot() {
@@ -71495,20 +75769,43 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
     }
     /** Starts a streaming chat completion request and returns its event-driven helper. */
     static createChatCompletion(client, params, options) {
+        // SAFETY: The runner forces stream: true when sending this request; the same parameters retain the caller's parsing configuration.
         const runner = new ChatCompletionStream(params);
         runner._run(() => runner._runChatCompletion(client, { ...params, stream: true }, { ...options, __metadata: { ...options?.__metadata, helperMethod: 'stream' } }));
         return runner;
     }
+    /** Rejects unfinished turns before tool callbacks while preserving ordinary stream and replay behavior. */
+    _runTools(client, params, runner, options) {
+        __classPrivateFieldSet(this, _ChatCompletionStream_rejectsUnfinishedTurns, true, "f");
+        return super._runTools(client, params, runner, options);
+    }
     async _createChatCompletion(client, params, options) {
         this._listenForAbort(options?.signal);
+        const requestParams = { ...params, stream: true };
+        __classPrivateFieldSet(this, _ChatCompletionStream_params, requestParams, "f");
         __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_beginRequest).call(this);
-        const stream = await client.chat.completions.create({ ...params, stream: true }, { ...options, signal: this.controller.signal });
+        const parserParams = snapshotChatCompletionParserParams(requestParams);
+        __classPrivateFieldSet(this, _ChatCompletionStream_params, parserParams, "f");
+        __classPrivateFieldSet(this, _ChatCompletionStream_hasAutoParseableTool, parserParams.tools?.some((tool) => isChatCompletionFunctionTool(tool) && (isAutoParsableTool(tool) || tool.function.strict === true)) ?? false, "f");
+        const stopObserving = requestParams.tools || requestParams.response_format
+            ? observeSerializedChatCompletionParserParams(requestParams, parserParams, (serialized) => {
+                __classPrivateFieldSet(this, _ChatCompletionStream_params, serialized, "f");
+                __classPrivateFieldSet(this, _ChatCompletionStream_hasAutoParseableTool, serialized.tools?.some((tool) => isChatCompletionFunctionTool(tool) &&
+                    (isAutoParsableTool(tool) || tool.function.strict === true)) ?? false, "f");
+            })
+            : undefined;
+        const stream = await client.chat.completions
+            .create(requestParams, {
+            ...options,
+            signal: this.controller.signal,
+        })
+            .finally(stopObserving);
         this._connected();
         for await (const chunk of stream) {
             __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_addChunk).call(this, chunk);
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         return this._addChatCompletion(__classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_endRequest).call(this));
     }
@@ -71519,6 +75816,9 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         const stream = src_Stream.fromReadableStream(readableStream, this.controller);
         let chatId;
         for await (const item of stream) {
+            if ('error' in item && hasOwn(item, 'error') && typeof item.error === 'object' && item.error !== null) {
+                throw new APIError(undefined, item.error, undefined, undefined);
+            }
             if (isChatCompletionReadableStreamMessage(item)) {
                 const message = getChatCompletionReadableStreamMessage(item);
                 if (__classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f")) {
@@ -71546,7 +75846,7 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
             }
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         if (__classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f")) {
             return this._addChatCompletion(__classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_endRequest).call(this));
@@ -71558,12 +75858,13 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         throw new error_OpenAIError(`request ended without sending any chunks`);
     }
     /** Iterates over raw API chunks; stopping iteration early aborts the underlying request. */
-    [(_ChatCompletionStream_params = new WeakMap(), _ChatCompletionStream_audioDoneChoiceIndexes = new WeakMap(), _ChatCompletionStream_choiceEventStates = new WeakMap(), _ChatCompletionStream_currentChatCompletionSnapshot = new WeakMap(), _ChatCompletionStream_instances = new WeakSet(), _ChatCompletionStream_beginRequest = function _ChatCompletionStream_beginRequest() {
+    [(_ChatCompletionStream_params = new WeakMap(), _ChatCompletionStream_rejectsUnfinishedTurns = new WeakMap(), _ChatCompletionStream_audioDoneChoiceIndexes = new WeakMap(), _ChatCompletionStream_choiceEventStates = new WeakMap(), _ChatCompletionStream_currentChatCompletionSnapshot = new WeakMap(), _ChatCompletionStream_hasAutoParseableTool = new WeakMap(), _ChatCompletionStream_partialJSONParseBudget = new WeakMap(), _ChatCompletionStream_instances = new WeakSet(), _ChatCompletionStream_beginRequest = function _ChatCompletionStream_beginRequest() {
         if (this.ended) {
             return;
         }
         __classPrivateFieldSet(this, _ChatCompletionStream_audioDoneChoiceIndexes, new Set(), "f");
         __classPrivateFieldSet(this, _ChatCompletionStream_currentChatCompletionSnapshot, undefined, "f");
+        __classPrivateFieldSet(this, _ChatCompletionStream_partialJSONParseBudget, { bytes: 0, fragments: 0, work: 0 }, "f");
     }, _ChatCompletionStream_getChoiceEventState = function _ChatCompletionStream_getChoiceEventState(choice) {
         let state = __classPrivateFieldGet(this, _ChatCompletionStream_choiceEventStates, "f")[choice.index];
         if (state) {
@@ -71571,11 +75872,14 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         }
         state = {
             content_done: false,
+            content_parse_state: undefined,
             refusal_done: false,
             logprobs_content_done: false,
             logprobs_refusal_done: false,
             done_tool_calls: new Set(),
             current_tool_call_index: null,
+            tool_call_parse_states: new Map(),
+            tool_call_identities: new Map(),
         };
         __classPrivateFieldGet(this, _ChatCompletionStream_choiceEventStates, "f")[choice.index] = state;
         return state;
@@ -71583,36 +75887,47 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         if (this.ended) {
             return;
         }
-        const completion = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_accumulateChatCompletion).call(this, chunk);
+        const capturedChoiceFrames = new WeakMap();
+        const completion = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_accumulateChatCompletion).call(this, chunk, capturedChoiceFrames);
         this._emit('chunk', chunk, completion);
         for (const choice of chunk.choices) {
-            const choiceSnapshot = completion.choices[choice.index];
+            const capturedChoice = capturedChoiceFrames.get(choice);
+            const choiceSnapshot = completion.choices[capturedChoice?.index ?? choice.index];
+            const capturedToolCalls = capturedChoice?.tool_calls ?? [];
             const { delta } = choice;
-            if (delta?.content != null &&
-                choiceSnapshot.message?.role === 'assistant' &&
-                choiceSnapshot.message?.content) {
-                this._emit('content', delta.content, choiceSnapshot.message.content);
+            const structuredResponse = isParseableResponseFormat(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format);
+            const boundedSnapshot = structuredResponse || __classPrivateFieldGet(this, _ChatCompletionStream_hasAutoParseableTool, "f");
+            const messageSnapshot = boundedSnapshot
+                ? captureStructuredMessageSnapshot(choiceSnapshot)
+                : choiceSnapshot.message;
+            const refusal = boundedSnapshot
+                ? captureStructuredJSONSnapshot(messageSnapshot, 'refusal')
+                : messageSnapshot.refusal;
+            const parseableContent = !refusal && structuredResponse;
+            const messageContent = parseableContent
+                ? captureStructuredJSONSnapshot(messageSnapshot, 'content')
+                : messageSnapshot.content;
+            if (delta?.content != null && messageSnapshot.role === 'assistant' && messageContent) {
+                this._emit('content', delta.content, messageContent);
                 this._emit('content.delta', {
                     delta: delta.content,
-                    snapshot: choiceSnapshot.message.content,
-                    parsed: choiceSnapshot.message.parsed,
+                    snapshot: messageContent,
+                    parsed: messageSnapshot.parsed,
                 });
             }
-            if (delta?.refusal != null &&
-                choiceSnapshot.message?.role === 'assistant' &&
-                choiceSnapshot.message?.refusal) {
+            if (delta?.refusal != null && messageSnapshot.role === 'assistant' && refusal) {
                 this._emit('refusal.delta', {
                     delta: delta.refusal,
-                    snapshot: choiceSnapshot.message.refusal,
+                    snapshot: refusal,
                 });
             }
-            if (choice.logprobs?.content != null && choiceSnapshot.message?.role === 'assistant') {
+            if (choice.logprobs?.content != null && messageSnapshot.role === 'assistant') {
                 this._emit('logprobs.content.delta', {
                     content: choice.logprobs?.content,
                     snapshot: choiceSnapshot.logprobs?.content ?? [],
                 });
             }
-            if (choice.logprobs?.refusal != null && choiceSnapshot.message?.role === 'assistant') {
+            if (choice.logprobs?.refusal != null && messageSnapshot.role === 'assistant') {
                 this._emit('logprobs.refusal.delta', {
                     refusal: choice.logprobs?.refusal,
                     snapshot: choiceSnapshot.logprobs?.refusal ?? [],
@@ -71625,7 +75940,7 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
                     __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_emitToolCallDoneEvent).call(this, choiceSnapshot, state.current_tool_call_index);
                 }
             }
-            for (const toolCall of delta?.tool_calls ?? []) {
+            for (const toolCall of capturedToolCalls) {
                 if (state.current_tool_call_index !== toolCall.index) {
                     __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_emitContentDoneEvents).call(this, choiceSnapshot);
                     // new tool call started, the previous one is done
@@ -71635,18 +75950,30 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
                 }
                 state.current_tool_call_index = toolCall.index;
             }
-            for (const toolCallDelta of delta?.tool_calls ?? []) {
-                const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallDelta.index];
+            for (const toolCallDelta of capturedToolCalls) {
+                const toolCallSnapshot = messageSnapshot.tool_calls?.[toolCallDelta.index];
                 if (!toolCallSnapshot?.type) {
                     continue;
                 }
                 if (toolCallSnapshot.type === 'function') {
+                    const boundIdentity = state.tool_call_identities.get(toolCallDelta.index);
+                    let argumentsSnapshot;
+                    if (boundIdentity?.parseable) {
+                        const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
+                        if (typeof capturedArguments !== 'string') {
+                            throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                        }
+                        argumentsSnapshot = capturedArguments;
+                    }
+                    else {
+                        argumentsSnapshot = toolCallSnapshot.function.arguments;
+                    }
                     this._emit('tool_calls.function.arguments.delta', {
                         name: toolCallSnapshot.function.name,
                         index: toolCallDelta.index,
-                        arguments: toolCallSnapshot.function.arguments,
+                        arguments: argumentsSnapshot,
                         parsed_arguments: toolCallSnapshot.function.parsed_arguments,
-                        arguments_delta: toolCallDelta.function?.arguments ?? '',
+                        arguments_delta: toolCallDelta.arguments_delta,
                     });
                 }
                 else if (toolCallSnapshot.type !== 'custom') {
@@ -71660,26 +75987,53 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
             // we've already fired the done event
             return;
         }
-        const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallIndex];
+        const messageSnapshot = __classPrivateFieldGet(this, _ChatCompletionStream_hasAutoParseableTool, "f")
+            ? captureStructuredMessageSnapshot(choiceSnapshot)
+            : choiceSnapshot.message;
+        const toolCallSnapshot = messageSnapshot.tool_calls?.[toolCallIndex];
         if (!toolCallSnapshot) {
             throw new Error('no tool call snapshot');
+        }
+        const boundIdentity = state.tool_call_identities.get(toolCallIndex);
+        if (boundIdentity) {
+            assertBoundToolCallIdentity(toolCallSnapshot, boundIdentity);
         }
         if (!toolCallSnapshot.type) {
             throw new Error('tool call snapshot missing `type`');
         }
         if (toolCallSnapshot.type === 'function') {
+            // SAFETY: The find predicate verifies the function-tool discriminator before matching its name; the cast carries that refinement through find.
             const inputTool = __classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.tools?.find((tool) => isChatCompletionFunctionTool(tool) && tool.function.name === toolCallSnapshot.function.name); // TS doesn't narrow based on isChatCompletionTool
+            // oxlint-disable-next-line anti-slop/no-known-value-widening -- The initial null is replaced with an arbitrary tool-parser result after snapshot validation.
             let parsedArguments = null;
+            const parseable = isAutoParsableTool(inputTool) || inputTool?.function.strict === true;
+            let argumentsSnapshot;
+            if (parseable) {
+                if (__classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f")) {
+                    __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_validateStructuredSnapshots).call(this, __classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f"));
+                }
+                const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
+                if (typeof capturedArguments !== 'string') {
+                    throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                }
+                argumentsSnapshot = capturedArguments;
+            }
+            else {
+                argumentsSnapshot = toolCallSnapshot.function.arguments;
+            }
             if (isAutoParsableTool(inputTool)) {
-                parsedArguments = inputTool.$parseRaw(toolCallSnapshot.function.arguments);
+                parsedArguments = inputTool.$parseRaw(validateStructuredJSONSnapshot(argumentsSnapshot));
             }
             else if (inputTool?.function.strict) {
-                parsedArguments = JSON.parse(toolCallSnapshot.function.arguments);
+                parsedArguments = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, validateStructuredJSONSnapshot(argumentsSnapshot));
+            }
+            if (choiceSnapshot.finish_reason) {
+                state.done_tool_calls.add(toolCallIndex);
             }
             this._emit('tool_calls.function.arguments.done', {
                 name: toolCallSnapshot.function.name,
                 index: toolCallIndex,
-                arguments: toolCallSnapshot.function.arguments,
+                arguments: argumentsSnapshot,
                 parsed_arguments: parsedArguments,
             });
         }
@@ -71688,23 +76042,36 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         }
     }, _ChatCompletionStream_emitContentDoneEvents = function _ChatCompletionStream_emitContentDoneEvents(choiceSnapshot) {
         const state = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_getChoiceEventState).call(this, choiceSnapshot);
-        if (choiceSnapshot.message.content != null &&
-            (choiceSnapshot.message.content !== '' ||
-                (!choiceSnapshot.message.refusal &&
-                    !choiceSnapshot.message.tool_calls?.length &&
-                    !choiceSnapshot.message.function_call)) &&
+        const structuredResponse = isParseableResponseFormat(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format);
+        const boundedSnapshot = structuredResponse || __classPrivateFieldGet(this, _ChatCompletionStream_hasAutoParseableTool, "f");
+        const messageSnapshot = boundedSnapshot
+            ? captureStructuredMessageSnapshot(choiceSnapshot)
+            : choiceSnapshot.message;
+        const refusal = boundedSnapshot
+            ? captureStructuredJSONSnapshot(messageSnapshot, 'refusal')
+            : messageSnapshot.refusal;
+        const parseableContent = !refusal && structuredResponse;
+        const content = parseableContent
+            ? captureStructuredJSONSnapshot(messageSnapshot, 'content')
+            : messageSnapshot.content;
+        if (content != null &&
+            (content !== '' ||
+                (!refusal && !messageSnapshot.tool_calls?.length && !messageSnapshot.function_call)) &&
             !state.content_done) {
+            if (parseableContent && __classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f")) {
+                __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_validateStructuredSnapshots).call(this, __classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f"));
+            }
             state.content_done = true;
             this._emit('content.done', {
-                content: choiceSnapshot.message.content,
-                parsed: choiceSnapshot.message.refusal
+                content,
+                parsed: refusal
                     ? null
-                    : parseResponseFormatContent(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format, choiceSnapshot.message.content),
+                    : parseResponseFormatContent(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format, parseableContent ? validateStructuredJSONSnapshot(content) : content),
             });
         }
-        if (choiceSnapshot.message.refusal && !state.refusal_done) {
+        if (refusal && !state.refusal_done) {
             state.refusal_done = true;
-            this._emit('refusal.done', { refusal: choiceSnapshot.message.refusal });
+            this._emit('refusal.done', { refusal });
         }
         if (choiceSnapshot.logprobs?.content && !state.logprobs_content_done) {
             state.logprobs_content_done = true;
@@ -71714,6 +76081,98 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
             state.logprobs_refusal_done = true;
             this._emit('logprobs.refusal.done', { refusal: choiceSnapshot.logprobs.refusal });
         }
+    }, _ChatCompletionStream_validateStructuredSnapshots = function _ChatCompletionStream_validateStructuredSnapshots(snapshot) {
+        const finalJSONBudget = { bytes: 0, fragments: 0, work: 0 };
+        const parseableContent = isParseableResponseFormat(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format);
+        const validatedMessages = new WeakMap();
+        const choices = captureSnapshotArray(snapshot, 'choices', MAX_STREAM_CHOICES, 'choice');
+        if (!choices) {
+            throw new error_OpenAIError('Chat completion stream contains an unsafe snapshot choice collection');
+        }
+        for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex += 1) {
+            const choice = captureSnapshotArrayItem(choices, choiceIndex);
+            if (!choice) {
+                continue;
+            }
+            const message = captureStructuredMessageSnapshot(choice);
+            const refusal = captureStructuredJSONSnapshot(message, 'refusal');
+            const content = captureStructuredJSONSnapshot(message, 'content');
+            const validatedTools = new Map();
+            const toolCalls = captureSnapshotArray(message, 'tool_calls', MAX_STREAM_TOOL_CALLS, 'tool-call');
+            validatedMessages.set(choice, Object.freeze({
+                message,
+                content,
+                refusal,
+                toolCallCollection: toolCalls,
+                toolCalls: validatedTools,
+            }));
+            const state = __classPrivateFieldGet(this, _ChatCompletionStream_choiceEventStates, "f")[choice.index];
+            if (parseableContent && !refusal && typeof content === 'string') {
+                validateStructuredJSONSnapshot(content, finalJSONBudget, __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f"));
+            }
+            for (const [index, identity] of state?.tool_call_identities ?? []) {
+                const toolCall = toolCalls && captureSnapshotArrayItem(toolCalls, index);
+                if (!toolCall) {
+                    throw new error_OpenAIError('Chat completion stream contains a changed tool call identity');
+                }
+                assertBoundToolCallIdentity(toolCall, identity);
+            }
+            if (!__classPrivateFieldGet(this, _ChatCompletionStream_hasAutoParseableTool, "f")) {
+                continue;
+            }
+            for (let toolCallIndex = 0; toolCallIndex < (toolCalls?.length ?? 0); toolCallIndex += 1) {
+                const toolCall = captureSnapshotArrayItem(toolCalls, toolCallIndex);
+                if (!toolCall) {
+                    continue;
+                }
+                const identity = ownFunctionToolIdentity(toolCall);
+                if (!identity) {
+                    const type = Object.getOwnPropertyDescriptor(toolCall, 'type');
+                    if (type && !('value' in type)) {
+                        throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                    }
+                    if (type?.value !== 'function') {
+                        continue;
+                    }
+                    const fn = Object.getOwnPropertyDescriptor(toolCall, 'function');
+                    if (fn && !('value' in fn)) {
+                        throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                    }
+                    if (fn && typeof fn.value === 'object' && fn.value !== null) {
+                        const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
+                        if (name && !('value' in name)) {
+                            throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                        }
+                    }
+                    continue;
+                }
+                if (!shouldParseToolCall(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f"), {
+                    type: identity.type,
+                    function: { name: identity.name },
+                })) {
+                    continue;
+                }
+                const descriptor = Object.getOwnPropertyDescriptor(toolCall, 'function');
+                if (!descriptor || !('value' in descriptor)) {
+                    throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                }
+                // SAFETY: The tool-call function is captured through an own data descriptor; its fields are subsequently checked by the structured snapshot reader.
+                const fn = descriptor.value;
+                const argumentsSnapshot = captureStructuredJSONSnapshot(fn, 'arguments');
+                if (typeof argumentsSnapshot !== 'string') {
+                    throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                }
+                validateStructuredJSONSnapshot(argumentsSnapshot, finalJSONBudget, __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f"));
+                validatedTools.set(toolCallIndex, Object.freeze({
+                    tool: toolCall,
+                    function: fn,
+                    type: identity.type,
+                    name: identity.name,
+                    arguments: argumentsSnapshot,
+                }));
+            }
+        }
+        return validatedMessages;
     }, _ChatCompletionStream_endRequest = function _ChatCompletionStream_endRequest() {
         if (this.ended) {
             throw new error_OpenAIError(`stream has ended, this shouldn't happen`);
@@ -71722,15 +76181,16 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         if (!snapshot) {
             throw new error_OpenAIError(`request ended without sending any chunks`);
         }
+        const validatedMessages = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_validateStructuredSnapshots).call(this, snapshot);
         const audioDoneChoiceIndexes = __classPrivateFieldGet(this, _ChatCompletionStream_audioDoneChoiceIndexes, "f");
         __classPrivateFieldSet(this, _ChatCompletionStream_audioDoneChoiceIndexes, new Set(), "f");
         __classPrivateFieldSet(this, _ChatCompletionStream_currentChatCompletionSnapshot, undefined, "f");
         __classPrivateFieldSet(this, _ChatCompletionStream_choiceEventStates, [], "f");
-        return finalizeChatCompletion(snapshot, __classPrivateFieldGet(this, _ChatCompletionStream_params, "f"), audioDoneChoiceIndexes);
-    }, _ChatCompletionStream_accumulateChatCompletion = function _ChatCompletionStream_accumulateChatCompletion(chunk) {
+        return finalizeChatCompletion(snapshot, __classPrivateFieldGet(this, _ChatCompletionStream_params, "f"), audioDoneChoiceIndexes, validatedMessages);
+    }, _ChatCompletionStream_accumulateChatCompletion = function _ChatCompletionStream_accumulateChatCompletion(chunk, capturedChoiceFrames) {
         var _a, _b, _c, _d, _e;
         let snapshot = __classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f");
-        const { choices, ...rest } = chunk;
+        const { choices, obfuscation: _obfuscation, ...rest } = chunk;
         if (!snapshot) {
             const newSnapshot = {
                 ...rest,
@@ -71748,15 +76208,21 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
             requestedChoiceCount > 0
             ? Math.min(requestedChoiceCount, MAX_STREAM_CHOICES)
             : MAX_STREAM_CHOICES;
-        for (const { delta, finish_reason, index, logprobs = null, ...other } of chunk.choices) {
+        for (const chunkChoice of chunk.choices) {
+            const { delta, finish_reason, index, logprobs = null, ...other } = chunkChoice;
+            const capturedToolCalls = [];
+            capturedChoiceFrames.set(chunkChoice, Object.freeze({ index, tool_calls: capturedToolCalls }));
             if (!Number.isSafeInteger(index) || index < 0 || index >= maxChoices) {
                 throw new error_OpenAIError(`Chat completion stream contains an invalid choice index: ${index}`);
             }
             let choice = snapshot.choices[index];
             if (!choice) {
-                const newChoice = { finish_reason, index, message: {}, logprobs, ...other };
+                const newChoice = { finish_reason, index, message: {}, logprobs: null, ...other };
                 snapshot.choices[index] = newChoice;
                 choice = newChoice;
+            }
+            if (isParseableResponseFormat(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format) || __classPrivateFieldGet(this, _ChatCompletionStream_hasAutoParseableTool, "f")) {
+                captureStructuredJSONSnapshot(captureStructuredMessageSnapshot(choice), 'refusal');
             }
             if (logprobs) {
                 if (choice.logprobs) {
@@ -71774,11 +76240,17 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
                 }
                 else {
                     choice.logprobs = { ...logprobs };
+                    if (logprobs.content) {
+                        choice.logprobs.content = [...logprobs.content];
+                    }
+                    if (logprobs.refusal) {
+                        choice.logprobs.refusal = [...logprobs.refusal];
+                    }
                 }
             }
             if (finish_reason) {
                 choice.finish_reason = finish_reason;
-                if (__classPrivateFieldGet(this, _ChatCompletionStream_params, "f") && hasAutoParseableInput(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f"))) {
+                if (__classPrivateFieldGet(this, _ChatCompletionStream_params, "f") && (__classPrivateFieldGet(this, _ChatCompletionStream_rejectsUnfinishedTurns, "f") || hasAutoParseableInput(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")))) {
                     if (finish_reason === 'length') {
                         throw new LengthFinishReasonError();
                     }
@@ -71789,10 +76261,14 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
             }
             assignOwnProperties(choice, other);
             if (!delta) {
+                Object.freeze(capturedToolCalls);
                 continue;
             } // Shouldn't happen; just in case.
             __classPrivateFieldGet(this, _ChatCompletionStream_audioDoneChoiceIndexes, "f").delete(index);
-            const { audio, content, refusal, function_call, role, tool_calls, ...rest } = delta;
+            // SAFETY: Streaming audio fields arrive incrementally even though the generated delta type omits them; each present field is merged below.
+            const { audio, content, refusal, function_call, role, ...capturedDeltaFields } = delta;
+            const { tool_calls: capturedToolCallDelta, ...rest } = capturedDeltaFields;
+            const tool_calls = hasOwn(capturedDeltaFields, 'tool_calls') ? capturedToolCallDelta : delta.tool_calls;
             assertIsEmpty(rest);
             assignOwnProperties(choice.message, rest);
             if (audio?.expires_at != null &&
@@ -71843,22 +76319,51 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
                 }
             }
             if (content != null) {
-                choice.message.content = (choice.message.content || '') + content;
                 if (!choice.message.refusal && isParseableResponseFormat(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format)) {
-                    // The partial parser does not accept whitespace-only input.
-                    choice.message.parsed = choice.message.content.trim() ? partialParse(choice.message.content) : null;
+                    const eventState = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_getChoiceEventState).call(this, choice);
+                    const parseState = (eventState.content_parse_state ?? (eventState.content_parse_state = createPartialJSONParseState()));
+                    const shouldParse = recordPartialJSONFragment(parseState, __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f"), content);
+                    choice.message.content = (captureStructuredJSONSnapshot(choice.message, 'content') || '') + content;
+                    // The partial parser does not accept whitespace-only input. Once output
+                    // grows, coalesce prefix reparses while preserving every raw snapshot.
+                    if (!parseState.has_non_whitespace) {
+                        choice.message.parsed = null;
+                    }
+                    else if (shouldParse && reservePartialJSONParse(parseState, __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f"))) {
+                        __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_validateStructuredSnapshots).call(this, snapshot);
+                        choice.message.parsed = parseStructuredStreamingJSON(validateStructuredJSONSnapshot(choice.message.content));
+                    }
+                    else if (content.length > 0) {
+                        choice.message.parsed = null;
+                    }
+                }
+                else {
+                    choice.message.content = (choice.message.content || '') + content;
                 }
             }
             if (tool_calls) {
                 // Tool calls are built up across chunks, so while the stream is in progress the
                 // entries are only partially filled in; they match `ChatCompletionSnapshot.Choice.Message.ToolCall`
                 // once every delta for them has been accumulated.
+                // SAFETY: This SDK-owned collection holds partial tool calls during accumulation; finalization checks required fields before exposing completed calls.
                 const toolCallSnapshots = ((_e = choice.message).tool_calls ?? (_e.tool_calls = []));
-                for (const { index, id, type, function: fn, custom, ...rest } of tool_calls) {
+                for (const toolCallDelta of tool_calls) {
+                    const { index, id, type, function: fn, custom, ...rest } = toolCallDelta;
                     if (!Number.isSafeInteger(index) || index < 0 || index >= MAX_STREAM_TOOL_CALLS) {
                         throw new error_OpenAIError(`Chat completion stream contains an invalid tool call index: ${index}`);
                     }
+                    let argumentsDelta = '';
                     const tool_call = (toolCallSnapshots[index] ?? (toolCallSnapshots[index] = {}));
+                    const functionName = fn?.name;
+                    const eventState = __classPrivateFieldGet(this, _ChatCompletionStream_hasAutoParseableTool, "f") ? __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_getChoiceEventState).call(this, choice) : undefined;
+                    let boundIdentity = eventState?.tool_call_identities.get(index);
+                    if (boundIdentity) {
+                        assertBoundToolCallIdentity(tool_call, boundIdentity);
+                        if ((type !== undefined && type !== boundIdentity.type) ||
+                            (functionName !== undefined && functionName !== boundIdentity.name)) {
+                            throw new error_OpenAIError('Chat completion stream contains a changed tool call identity');
+                        }
+                    }
                     assignOwnProperties(tool_call, rest);
                     if (id) {
                         tool_call.id = id;
@@ -71876,19 +76381,69 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
                         }
                     }
                     if (fn) {
-                        const functionSnapshot = (tool_call.function ?? (tool_call.function = { name: fn.name ?? '', arguments: '' }));
-                        if (fn.name) {
-                            functionSnapshot.name = fn.name;
+                        const functionSnapshot = (tool_call.function ?? (tool_call.function = { name: functionName ?? '', arguments: '' }));
+                        if (functionName) {
+                            functionSnapshot.name = functionName;
                         }
-                        if (fn.arguments) {
-                            functionSnapshot.arguments += fn.arguments;
-                            if (shouldParseToolCall(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f"), tool_call)) {
-                                functionSnapshot.parsed_arguments = partialParse(functionSnapshot.arguments);
+                        if (eventState && !boundIdentity) {
+                            const identity = ownFunctionToolIdentity(tool_call);
+                            const configuredTool = identity &&
+                                __classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.tools?.find((tool) => isChatCompletionFunctionTool(tool) && tool.function.name === identity.name);
+                            if (identity) {
+                                boundIdentity = {
+                                    ...identity,
+                                    parseable: configuredTool !== undefined &&
+                                        shouldParseToolCall(__classPrivateFieldGet(this, _ChatCompletionStream_params, "f"), {
+                                            type: identity.type,
+                                            function: { name: identity.name },
+                                        }),
+                                };
+                                eventState.tool_call_identities.set(index, boundIdentity);
+                                if (!boundIdentity.parseable) {
+                                    const provisionalState = eventState.tool_call_parse_states.get(index);
+                                    if (provisionalState) {
+                                        __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f").bytes -= provisionalState.bytes;
+                                        __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f").fragments -= provisionalState.fragments;
+                                        __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f").work -= provisionalState.work;
+                                        eventState.tool_call_parse_states.delete(index);
+                                    }
+                                }
+                            }
+                        }
+                        const argumentFragment = fn.arguments;
+                        if (argumentFragment != null) {
+                            argumentsDelta = argumentFragment;
+                            if (eventState && boundIdentity?.parseable !== false) {
+                                let parseState = eventState.tool_call_parse_states.get(index);
+                                if (!parseState) {
+                                    parseState = createPartialJSONParseState();
+                                    eventState.tool_call_parse_states.set(index, parseState);
+                                }
+                                const shouldParse = recordPartialJSONFragment(parseState, __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f"), argumentFragment);
+                                const previousArguments = captureStructuredJSONSnapshot(functionSnapshot, 'arguments');
+                                if (typeof previousArguments !== 'string') {
+                                    throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                                }
+                                functionSnapshot.arguments = previousArguments + argumentFragment;
+                                if (shouldParse &&
+                                    boundIdentity?.parseable === true &&
+                                    reservePartialJSONParse(parseState, __classPrivateFieldGet(this, _ChatCompletionStream_partialJSONParseBudget, "f"))) {
+                                    __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_validateStructuredSnapshots).call(this, snapshot);
+                                    functionSnapshot.parsed_arguments = parseStructuredStreamingJSON(validateStructuredJSONSnapshot(functionSnapshot.arguments));
+                                }
+                                else if (argumentFragment.length > 0 && hasOwn(functionSnapshot, 'parsed_arguments')) {
+                                    functionSnapshot.parsed_arguments = undefined;
+                                }
+                            }
+                            else {
+                                functionSnapshot.arguments += argumentFragment;
                             }
                         }
                     }
+                    capturedToolCalls.push(Object.freeze({ index, arguments_delta: argumentsDelta }));
                 }
             }
+            Object.freeze(capturedToolCalls);
         }
         return snapshot;
     }, Symbol.asyncIterator)]() {
@@ -71904,12 +76459,38 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
         return stream.toReadableStream();
     }
 }
-function finalizeChatCompletion(snapshot, params, audioDoneChoiceIndexes) {
+function finalizeChatCompletion(snapshot, params, audioDoneChoiceIndexes, validatedMessages) {
     const { id, choices, created, model, system_fingerprint, ...rest } = snapshot;
     const completion = {
         ...rest,
         id,
-        choices: choices.map(({ message, finish_reason, index, logprobs, ...choiceRest }) => {
+        choices: mapCapturedSnapshotArray(choices, MAX_STREAM_CHOICES, 'choice', (choice) => {
+            const validated = validatedMessages.get(choice);
+            if (!validated) {
+                throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+            }
+            const stableChoice = new Proxy(choice, {
+                get(target, property, receiver) {
+                    // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
+                    return property === 'message' ? validated.message : Reflect.get(target, property, receiver);
+                },
+            });
+            const { message: sourceMessage, finish_reason, index, logprobs, ...choiceRest } = stableChoice;
+            const message = new Proxy(sourceMessage, {
+                get(target, property, receiver) {
+                    if (property === 'content') {
+                        return validated.content;
+                    }
+                    if (property === 'refusal') {
+                        return validated.refusal;
+                    }
+                    if (property === 'tool_calls') {
+                        return validated.toolCallCollection;
+                    }
+                    // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
+                    return Reflect.get(target, property, receiver);
+                },
+            });
             const { content = null, function_call, tool_calls, audio, ...messageRest } = message;
             // Audio streams can end with an expires_at-only chunk after the
             // generated audio, without a separate finish_reason.
@@ -71917,7 +76498,9 @@ function finalizeChatCompletion(snapshot, params, audioDoneChoiceIndexes) {
             if (!finishReason) {
                 throw new error_OpenAIError(`missing finish_reason for choice ${index}`);
             }
+            // SAFETY: The completed API response contract supplies the audio fields; this preserves the existing pass-through behavior at finalization.
             const audioResponse = audio ? { audio: audio } : {};
+            // SAFETY: The API completion contract uses assistant role; retaining the wire role preserves existing behavior without adding runtime rejection.
             const role = message.role; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
             if (!role) {
                 throw new error_OpenAIError(`missing role for choice ${index}`);
@@ -71956,15 +76539,56 @@ function finalizeChatCompletion(snapshot, params, audioDoneChoiceIndexes) {
                         role,
                         content,
                         refusal: message.refusal ?? null,
-                        tool_calls: tool_calls.map((tool_call, i) => {
-                            if (tool_call.type == null) {
-                                throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].type\n${str(snapshot)}`);
+                        tool_calls: mapCapturedSnapshotArray(tool_calls, MAX_STREAM_TOOL_CALLS, 'tool-call', (tool_call, i) => {
+                            const captured = validated.toolCalls.get(i);
+                            if (!captured) {
+                                const identity = ownFunctionToolIdentity(tool_call);
+                                if (identity &&
+                                    shouldParseToolCall(params, {
+                                        type: identity.type,
+                                        function: { name: identity.name },
+                                    })) {
+                                    throw new error_OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
+                                }
                             }
-                            if (tool_call.type === 'custom') {
-                                const { custom, type, id, ...toolRest } = tool_call;
+                            if (captured && captured.tool !== tool_call) {
+                                throw new error_OpenAIError('Chat completion stream contains a changed tool call identity');
+                            }
+                            const stableFunction = captured &&
+                                new Proxy(captured.function, {
+                                    get(target, property, receiver) {
+                                        if (property === 'arguments') {
+                                            return captured.arguments;
+                                        }
+                                        if (property === 'name') {
+                                            return captured.name;
+                                        }
+                                        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
+                                        return Reflect.get(target, property, receiver);
+                                    },
+                                });
+                            const stableTool = captured && stableFunction
+                                ? new Proxy(tool_call, {
+                                    get(target, property, receiver) {
+                                        if (property === 'type') {
+                                            return captured.type;
+                                        }
+                                        if (property === 'function') {
+                                            return stableFunction;
+                                        }
+                                        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
+                                        return Reflect.get(target, property, receiver);
+                                    },
+                                })
+                                : tool_call;
+                            if (stableTool.type == null) {
+                                throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].type`);
+                            }
+                            if (stableTool.type === 'custom') {
+                                const { custom, type, id, ...toolRest } = stableTool;
                                 const { input = '', name, ...customRest } = custom || {};
                                 if (name == null) {
-                                    throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name\n${str(snapshot)}`);
+                                    throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].custom.name`);
                                 }
                                 return {
                                     ...toolRest,
@@ -71973,13 +76597,13 @@ function finalizeChatCompletion(snapshot, params, audioDoneChoiceIndexes) {
                                     custom: { ...customRest, name, input },
                                 };
                             }
-                            const { function: fn, type, id, ...toolRest } = tool_call;
+                            const { function: fn, type, id, ...toolRest } = stableTool;
                             const { arguments: args, name, ...fnRest } = fn || {};
                             if (name == null) {
-                                throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name\n${str(snapshot)}`);
+                                throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].function.name`);
                             }
                             if (args == null) {
-                                throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments\n${str(snapshot)}`);
+                                throw new error_OpenAIError(`missing choices[${index}].tool_calls[${i}].function.arguments`);
                             }
                             return {
                                 ...toolRest,
@@ -72002,15 +76626,13 @@ function finalizeChatCompletion(snapshot, params, audioDoneChoiceIndexes) {
         created,
         model,
         object: 'chat.completion',
+        // Spread creates an own data property without invoking inherited setters or changing the object prototype.
         ...(system_fingerprint ? { system_fingerprint } : {}),
     };
     return maybeParseChatCompletion(completion, params);
 }
 function isCompleteAudio(audio) {
     return audio?.id != null && audio.data != null && audio.transcript != null && audio.expires_at != null;
-}
-function str(x) {
-    return JSON.stringify(x);
 }
 /**
  * Ensures the given argument is an empty object, useful for
@@ -72056,6 +76678,7 @@ class ChatCompletionStreamingRunner extends ChatCompletionStream {
                         throw new error_OpenAIError('cannot serialize a tool message before receiving any chunks');
                     }
                     push(makeChatCompletionReadableStreamMessageChunk(lastChunk, message, toolCallIds));
+                    toolCallIds = undefined;
                 }
             };
             this.on('chunk', onChunk);
@@ -75089,12 +79712,1451 @@ class Realtime extends APIResource {
 Realtime.Sessions = Sessions;
 Realtime.TranscriptionSessions = TranscriptionSessions;
 //# sourceMappingURL=realtime.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/environments/files.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class Files extends APIResource {
+    /**
+     * Copies inline bytes or a Files API file into a connected execution environment.
+     * See
+     * [environment files](https://developers.openai.com/api/docs/guides/agents-api/environments/files).
+     *
+     * @example
+     * ```ts
+     * const environmentFile =
+     *   await client.beta.agents.environments.files.create(
+     *     'environment_id',
+     *     {
+     *       type: 'inline',
+     *       path: '/workspace/example.txt',
+     *       data: 'SGVsbG8K',
+     *     },
+     *   );
+     * ```
+     */
+    create(environmentID, body, options) {
+        return this._client.post(src_path `/agents/environments/${environmentID}/files`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists live files on a connected execution environment with optional directory
+     * filtering and opaque cursor pagination. See
+     * [environment files](https://developers.openai.com/api/docs/guides/agents-api/environments/files).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const environmentFile of client.beta.agents.environments.files.list(
+     *   'environment_id',
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(environmentID, query = {}, options) {
+        return this._client.getAPIList(src_path `/agents/environments/${environmentID}/files`, (TokenPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=files.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/environments/templates.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class Templates extends APIResource {
+    /**
+     * Creates reusable environment configuration without returning confidential setup
+     * commands or environment values. See
+     * [reusing a hosted setup](https://developers.openai.com/api/docs/guides/agents-api/tools#reuse-a-hosted-plugin-setup).
+     *
+     * @example
+     * ```ts
+     * const environmentTemplate =
+     *   await client.beta.agents.environments.templates.create();
+     * ```
+     */
+    create(body = {}, options) {
+        return this._client.post('/agents/environments/templates', {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Retrieves reusable environment configuration without returning confidential
+     * values. See
+     * [reusing a hosted setup](https://developers.openai.com/api/docs/guides/agents-api/tools#reuse-a-hosted-plugin-setup).
+     *
+     * @example
+     * ```ts
+     * const environmentTemplate =
+     *   await client.beta.agents.environments.templates.retrieve(
+     *     'environment_template_id',
+     *   );
+     * ```
+     */
+    retrieve(environmentTemplateID, options) {
+        return this._client.get(src_path `/agents/environments/templates/${environmentTemplateID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Updates reusable environment configuration without returning confidential
+     * values. See
+     * [reusing a hosted setup](https://developers.openai.com/api/docs/guides/agents-api/tools#reuse-a-hosted-plugin-setup).
+     *
+     * @example
+     * ```ts
+     * const environmentTemplate =
+     *   await client.beta.agents.environments.templates.update(
+     *     'environment_template_id',
+     *   );
+     * ```
+     */
+    update(environmentTemplateID, body = {}, options) {
+        return this._client.post(src_path `/agents/environments/templates/${environmentTemplateID}`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists reusable environment templates without returning confidential values. See
+     * [reusing a hosted setup](https://developers.openai.com/api/docs/guides/agents-api/tools#reuse-a-hosted-plugin-setup).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const environmentTemplate of client.beta.agents.environments.templates.list()) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(query = {}, options) {
+        return this._client.getAPIList('/agents/environments/templates', (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Deletes reusable environment configuration and all confidential template inputs.
+     * See
+     * [reusing a hosted setup](https://developers.openai.com/api/docs/guides/agents-api/tools#reuse-a-hosted-plugin-setup).
+     *
+     * @example
+     * ```ts
+     * const environmentTemplateDeleted =
+     *   await client.beta.agents.environments.templates.delete(
+     *     'environment_template_id',
+     *   );
+     * ```
+     */
+    delete(environmentTemplateID, options) {
+        return this._client.delete(src_path `/agents/environments/templates/${environmentTemplateID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=templates.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/environments/environments.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+
+class Environments extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.files = new Files(this._client);
+        this.templates = new Templates(this._client);
+    }
+    /**
+     * Retrieves an execution environment's connection status and safe installed
+     * metadata. See
+     * [environment lifecycle](https://developers.openai.com/api/docs/guides/agents-api/environments/lifecycle).
+     *
+     * @example
+     * ```ts
+     * const environmentInfo =
+     *   await client.beta.agents.environments.retrieve(
+     *     'environment_id',
+     *   );
+     * ```
+     */
+    retrieve(environmentID, options) {
+        return this._client.get(src_path `/agents/environments/${environmentID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+Environments.Files = Files;
+Environments.Templates = Templates;
+//# sourceMappingURL=environments.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/agents/turn-state.mjs
+var _TurnState_turnID, _TurnState_turnEnded, _TurnState_eventIDs, _TurnState_calls;
+
+/** Tracks one helper invocation's coordinator turn and duplicate deliveries.
+ * @internal
+ */
+class TurnState {
+    constructor() {
+        _TurnState_turnID.set(this, void 0);
+        _TurnState_turnEnded.set(this, false);
+        _TurnState_eventIDs.set(this, new Set());
+        _TurnState_calls.set(this, new Set());
+    }
+    /** Records a delivery unless its event ID is in the bounded recent window. */
+    accept(event) {
+        if (__classPrivateFieldGet(this, _TurnState_eventIDs, "f").has(event.event_id)) {
+            return false;
+        }
+        if (__classPrivateFieldGet(this, _TurnState_eventIDs, "f").size === 1024) {
+            const oldest = __classPrivateFieldGet(this, _TurnState_eventIDs, "f").values().next();
+            if (!oldest.done) {
+                __classPrivateFieldGet(this, _TurnState_eventIDs, "f").delete(oldest.value);
+            }
+        }
+        __classPrivateFieldGet(this, _TurnState_eventIDs, "f").add(event.event_id);
+        if (event.type === 'agent.session.turn.created' &&
+            event.turn.subagent_id === null &&
+            __classPrivateFieldGet(this, _TurnState_turnID, "f") === undefined) {
+            __classPrivateFieldSet(this, _TurnState_turnID, event.turn_id, "f");
+        }
+        if ((event.type === 'agent.session.turn.completed' ||
+            event.type === 'agent.session.turn.failed' ||
+            event.type === 'agent.session.turn.cancelled') &&
+            __classPrivateFieldGet(this, _TurnState_turnID, "f") !== undefined &&
+            event.turn_id === __classPrivateFieldGet(this, _TurnState_turnID, "f")) {
+            __classPrivateFieldSet(this, _TurnState_turnEnded, true, "f");
+        }
+        return true;
+    }
+    /** Checks session termination after updating the selected turn state. */
+    terminal(event) {
+        return event.type === 'agent.session.failed' || (event.type === 'agent.session.idle' && __classPrivateFieldGet(this, _TurnState_turnEnded, "f"));
+    }
+    /** Returns each tool call once for the full invocation, including subagent turns. */
+    call(event) {
+        if (event.type !== 'agent.session.turn.item.added' || event.item.type !== 'function_call') {
+            return;
+        }
+        const call = event.item;
+        const key = JSON.stringify([call.turn_id, call.call_id]);
+        if (__classPrivateFieldGet(this, _TurnState_calls, "f").has(key)) {
+            return;
+        }
+        __classPrivateFieldGet(this, _TurnState_calls, "f").add(key);
+        return call;
+    }
+}
+_TurnState_turnID = new WeakMap(), _TurnState_turnEnded = new WeakMap(), _TurnState_eventIDs = new WeakMap(), _TurnState_calls = new WeakMap();
+//# sourceMappingURL=turn-state.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/agents/agent-session-stream.mjs
+var _AgentSessionStream_instances, _AgentSessionStream_consumed, _AgentSessionStream_stream, _AgentSessionStream_response, _AgentSessionStream_reading, _AgentSessionStream_sessions, _AgentSessionStream_sessionID, _AgentSessionStream_input, _AgentSessionStream_handlers, _AgentSessionStream_inputKey, _AgentSessionStream_options, _AgentSessionStream_iterate, _AgentSessionStream_result, _AgentSessionStream_checkAbort, _AgentSessionStream_abortError, _AgentSessionStream_wait, _AgentSessionStream_submit;
+
+
+
+
+
+
+function isInputContent(value) {
+    if (!isObj(value)) {
+        return false;
+    }
+    const content = value;
+    let field;
+    if (content['type'] === 'input_text') {
+        field = 'text';
+    }
+    else if (content['type'] === 'input_image') {
+        field = 'image_url';
+    }
+    else {
+        return false;
+    }
+    return hasOwn(content, 'type') && hasOwn(content, field) && typeof content[field] === 'string';
+}
+function normalizedOutput(value) {
+    if (value === null) {
+        return null;
+    }
+    if (typeof value === 'string' || (Array.isArray(value) && value.every(isInputContent))) {
+        return value;
+    }
+    throw new error_OpenAIError('Tool output must be text, content, a JSON object, or null');
+}
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The public AgentToolOutput contract accepts arbitrary JSON-serializable object results.
+function toolResult(call, value) {
+    const output = isObj(value) ? JSON.stringify(value) : value;
+    // Detect unserializable callback results inside the redacted failure boundary.
+    const serialized = JSON.stringify(output);
+    if (serialized === undefined) {
+        throw new error_OpenAIError('Tool output must be JSON serializable');
+    }
+    return {
+        type: 'agent.session.input.tool_result',
+        turn_id: call.turn_id,
+        call_id: call.call_id,
+        success: true,
+        output: normalizedOutput(typeof output === 'string' ? output : JSON.parse(serialized)),
+    };
+}
+async function cancelBody(response) {
+    try {
+        await response?.body?.cancel();
+    }
+    catch {
+        // The response may already be cancelled or owned by its stream reader.
+    }
+}
+/**
+ * A single-use, lazy async iterable of original session events for one turn.
+ * Requires an idle session and a single input writer: the input endpoint does not
+ * return a turn ID. Subscribe-before-input avoids losing events; the first
+ * coordinator turn selects the turn to follow. Initial idle events and subagent
+ * completion do not end iteration. A selected turn's terminal event followed by
+ * session.idle, or session.failed, ends iteration. Unexpected EOF throws.
+ *
+ * Tool handlers run sequentially during iteration. Handler failures submit a
+ * generic error without exception text. Each submission has a distinct retry-safe
+ * idempotency key. Breaking iteration or calling abort closes local requests;
+ * neither cancels the backend turn. No work starts until iteration begins.
+ */
+class AgentSessionStream {
+    /** Creates an unstarted helper. Prefer client.beta.agents.sessions.stream(). */
+    constructor(sessions, sessionID, params, options) {
+        _AgentSessionStream_instances.add(this);
+        /** Aborts local requests and iteration without cancelling the backend turn. */
+        this.controller = new AbortController();
+        _AgentSessionStream_consumed.set(this, false);
+        _AgentSessionStream_stream.set(this, void 0);
+        _AgentSessionStream_response.set(this, void 0);
+        _AgentSessionStream_reading.set(this, false);
+        _AgentSessionStream_sessions.set(this, void 0);
+        _AgentSessionStream_sessionID.set(this, void 0);
+        _AgentSessionStream_input.set(this, void 0);
+        _AgentSessionStream_handlers.set(this, void 0);
+        _AgentSessionStream_inputKey.set(this, void 0);
+        _AgentSessionStream_options.set(this, void 0);
+        const input = typeof params.input === 'string'
+            ? [{ role: 'user', content: [{ type: 'input_text', text: params.input }] }]
+            : params.input;
+        if (params.input.length === 0) {
+            throw new error_OpenAIError('input must not be empty');
+        }
+        __classPrivateFieldSet(this, _AgentSessionStream_sessions, sessions, "f");
+        __classPrivateFieldSet(this, _AgentSessionStream_sessionID, sessionID, "f");
+        __classPrivateFieldSet(this, _AgentSessionStream_input, { type: 'agent.session.input.message', input }, "f");
+        __classPrivateFieldSet(this, _AgentSessionStream_handlers, new Map(Object.entries(params.toolHandlers ?? {})), "f");
+        const headers = buildHeaders([options?.headers]);
+        __classPrivateFieldSet(this, _AgentSessionStream_inputKey, headers.nulls.has('idempotency-key')
+            ? undefined
+            : (headers.values.get('idempotency-key') ??
+                params.idempotencyKey ??
+                options?.idempotencyKey ??
+                uuid4()), "f");
+        headers.values.delete('idempotency-key');
+        headers.nulls.delete('idempotency-key');
+        const { idempotencyKey: _key, ...rest } = options ?? {};
+        __classPrivateFieldSet(this, _AgentSessionStream_options, { ...rest, headers }, "f");
+    }
+    /** Closes local requests without cancelling the turn; an optional reason becomes the abort error's cause. */
+    abort(reason) {
+        this.controller.abort(reason);
+        __classPrivateFieldGet(this, _AgentSessionStream_stream, "f")?.controller.abort(this.controller.signal.reason);
+        if (!__classPrivateFieldGet(this, _AgentSessionStream_reading, "f")) {
+            void cancelBody(__classPrivateFieldGet(this, _AgentSessionStream_response, "f"));
+        }
+    }
+    /** Starts iteration once; use for await to ensure early exits close the connection. */
+    [(_AgentSessionStream_consumed = new WeakMap(), _AgentSessionStream_stream = new WeakMap(), _AgentSessionStream_response = new WeakMap(), _AgentSessionStream_reading = new WeakMap(), _AgentSessionStream_sessions = new WeakMap(), _AgentSessionStream_sessionID = new WeakMap(), _AgentSessionStream_input = new WeakMap(), _AgentSessionStream_handlers = new WeakMap(), _AgentSessionStream_inputKey = new WeakMap(), _AgentSessionStream_options = new WeakMap(), _AgentSessionStream_instances = new WeakSet(), Symbol.asyncIterator)]() {
+        if (__classPrivateFieldGet(this, _AgentSessionStream_consumed, "f")) {
+            throw new error_OpenAIError('An AgentSessionStream can only be consumed once');
+        }
+        __classPrivateFieldSet(this, _AgentSessionStream_consumed, true, "f");
+        return __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_iterate).call(this);
+    }
+}
+_AgentSessionStream_iterate = async function* _AgentSessionStream_iterate() {
+    const externalSignal = __classPrivateFieldGet(this, _AgentSessionStream_options, "f").signal;
+    const abort = () => this.abort(externalSignal?.aborted ? externalSignal.reason : this.controller.signal.reason);
+    externalSignal?.addEventListener('abort', abort, { once: true });
+    this.controller.signal.addEventListener('abort', abort, { once: true });
+    const options = { ...__classPrivateFieldGet(this, _AgentSessionStream_options, "f"), signal: this.controller.signal };
+    const state = new TurnState();
+    try {
+        if (externalSignal?.aborted) {
+            this.abort(externalSignal.reason);
+        }
+        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+        const session = await __classPrivateFieldGet(this, _AgentSessionStream_sessions, "f").retrieve(__classPrivateFieldGet(this, _AgentSessionStream_sessionID, "f"), options);
+        if (session.status !== 'idle') {
+            throw new error_OpenAIError('sessions.stream requires an idle session; use sessions.events.stream for active sessions');
+        }
+        const subscription = await __classPrivateFieldGet(this, _AgentSessionStream_sessions, "f").events.stream(__classPrivateFieldGet(this, _AgentSessionStream_sessionID, "f"), options).withResponse();
+        __classPrivateFieldSet(this, _AgentSessionStream_stream, subscription.data, "f");
+        __classPrivateFieldSet(this, _AgentSessionStream_response, subscription.response, "f");
+        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+        await __classPrivateFieldGet(this, _AgentSessionStream_sessions, "f").events.create(__classPrivateFieldGet(this, _AgentSessionStream_sessionID, "f"), {
+            events: [__classPrivateFieldGet(this, _AgentSessionStream_input, "f")],
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+            ...(__classPrivateFieldGet(this, _AgentSessionStream_inputKey, "f") === undefined ? {} : { 'Idempotency-Key': __classPrivateFieldGet(this, _AgentSessionStream_inputKey, "f") }),
+        }, {
+            ...options,
+            headers: buildHeaders([options.headers, { 'Idempotency-Key': __classPrivateFieldGet(this, _AgentSessionStream_inputKey, "f") ?? null }]),
+        });
+        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+        __classPrivateFieldSet(this, _AgentSessionStream_reading, true, "f");
+        for await (const event of __classPrivateFieldGet(this, _AgentSessionStream_stream, "f")) {
+            __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+            if (!state.accept(event)) {
+                continue;
+            }
+            const terminal = state.terminal(event);
+            const pendingCall = state.call(event);
+            const handler = pendingCall && __classPrivateFieldGet(this, _AgentSessionStream_handlers, "f").get(pendingCall.name);
+            // Freeze dispatch identity and arguments before exposing the original event.
+            const call = pendingCall && handler ? structuredClone(pendingCall) : undefined;
+            if (terminal) {
+                __classPrivateFieldGet(this, _AgentSessionStream_stream, "f").controller.abort();
+            }
+            yield event;
+            if (terminal) {
+                return;
+            }
+            __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+            if (!call || !handler) {
+                continue;
+            }
+            const result = await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_result).call(this, call, handler);
+            __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+            await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_submit).call(this, result, options);
+        }
+        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+        throw new error_OpenAIError('Session event stream ended before the turn reached idle or failed');
+    }
+    finally {
+        externalSignal?.removeEventListener('abort', abort);
+        this.controller.signal.removeEventListener('abort', abort);
+        this.abort();
+    }
+}, _AgentSessionStream_result = async function _AgentSessionStream_result(call, handler) {
+    try {
+        const args = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
+        if (!isObj(args)) {
+            throw new error_OpenAIError('Function arguments must be a JSON object');
+        }
+        // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
+        return toolResult(call, await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_wait).call(this, () => handler(args)));
+    }
+    catch {
+        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+        return {
+            type: 'agent.session.input.tool_result',
+            turn_id: call.turn_id,
+            call_id: call.call_id,
+            success: false,
+            error: 'Tool handler failed.',
+        };
+    }
+}, _AgentSessionStream_checkAbort = function _AgentSessionStream_checkAbort() {
+    if (this.controller.signal.aborted) {
+        throw __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_abortError).call(this);
+    }
+}, _AgentSessionStream_abortError = function _AgentSessionStream_abortError() {
+    const error = new APIUserAbortError();
+    Object.defineProperty(error, 'cause', {
+        value: this.controller.signal.reason,
+        writable: true,
+        configurable: true,
+    });
+    return error;
+}, _AgentSessionStream_wait = async function _AgentSessionStream_wait(action) {
+    let onAbort;
+    // oxlint-disable-next-line promise/avoid-new -- Bridge the caller's AbortSignal while a handler or registration delay is pending.
+    const aborted = new Promise((_resolve, reject) => {
+        onAbort = () => reject(__classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_abortError).call(this));
+        this.controller.signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+        // Capture synchronous throws before racing cancellation, so both promises
+        // always have rejection handlers even if the callback aborts and throws.
+        const invoke = async () => await action();
+        return await Promise.race([invoke(), aborted]);
+    }
+    finally {
+        if (onAbort) {
+            this.controller.signal.removeEventListener('abort', onAbort);
+        }
+    }
+}, _AgentSessionStream_submit = async function _AgentSessionStream_submit(result, options, key = uuid4(), attempt = 0) {
+    __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
+    try {
+        await __classPrivateFieldGet(this, _AgentSessionStream_sessions, "f").events.create(__classPrivateFieldGet(this, _AgentSessionStream_sessionID, "f"), { events: [result], 'Idempotency-Key': key }, options);
+    }
+    catch (error) {
+        const delay = [100, 300, 600][attempt];
+        if (delay === undefined ||
+            !(error instanceof BadRequestError) ||
+            error.code !== 'invalid_request_error' ||
+            !error.error ||
+            !('message' in error.error) ||
+            error.error.message !== `Unknown pending tool call: ${result.call_id}`) {
+            throw error;
+        }
+        let timer;
+        try {
+            await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_wait).call(this, () => 
+            // oxlint-disable-next-line promise/avoid-new -- Own the registration timer so cancellation clears it promptly.
+            new Promise((resolve) => {
+                timer = setTimeout(resolve, delay);
+            }));
+        }
+        finally {
+            if (timer !== undefined) {
+                clearTimeout(timer);
+            }
+        }
+        await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_submit).call(this, result, options, key, attempt + 1);
+    }
+};
+//# sourceMappingURL=agent-session-stream.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/artifacts.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class Artifacts extends APIResource {
+    /**
+     * Retrieves immutable metadata for one durable session artifact. See
+     * [session artifacts](https://developers.openai.com/api/docs/guides/agents-api/environments/files#openai-hosted-artifacts).
+     *
+     * @example
+     * ```ts
+     * const sessionArtifact =
+     *   await client.beta.agents.sessions.artifacts.retrieve(
+     *     'artifact_id',
+     *     { session_id: 'session_id' },
+     *   );
+     * ```
+     */
+    retrieve(artifactID, params, options) {
+        const { session_id } = params;
+        return this._client.get(src_path `/agents/sessions/${session_id}/artifacts/${artifactID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists immutable artifacts published by completed hosted session turns. See
+     * [session artifacts](https://developers.openai.com/api/docs/guides/agents-api/environments/files#openai-hosted-artifacts).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const sessionArtifact of client.beta.agents.sessions.artifacts.list(
+     *   'session_id',
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(sessionID, query = {}, options) {
+        return this._client.getAPIList(src_path `/agents/sessions/${sessionID}/artifacts`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Deletes an immutable session artifact without deleting its live environment file
+     * or original Files API object. See
+     * [session artifacts](https://developers.openai.com/api/docs/guides/agents-api/environments/files#openai-hosted-artifacts).
+     *
+     * @example
+     * ```ts
+     * const sessionArtifactDeleted =
+     *   await client.beta.agents.sessions.artifacts.delete(
+     *     'artifact_id',
+     *     { session_id: 'session_id' },
+     *   );
+     * ```
+     */
+    delete(artifactID, params, options) {
+        const { session_id } = params;
+        return this._client.delete(src_path `/agents/sessions/${session_id}/artifacts/${artifactID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Downloads immutable session artifact bytes after the execution environment
+     * expires. See
+     * [session artifacts](https://developers.openai.com/api/docs/guides/agents-api/environments/files#openai-hosted-artifacts).
+     *
+     * @example
+     * ```ts
+     * const response =
+     *   await client.beta.agents.sessions.artifacts.content(
+     *     'artifact_id',
+     *     { session_id: 'session_id' },
+     *   );
+     *
+     * const content = await response.blob();
+     * console.log(content);
+     * ```
+     */
+    content(artifactID, params, options) {
+        const { session_id } = params;
+        return this._client.get(src_path `/agents/sessions/${session_id}/artifacts/${artifactID}/content`, {
+            ...options,
+            headers: buildHeaders([
+                { 'OpenAI-Beta': 'agents=v1', Accept: 'application/octet-stream' },
+                options?.headers,
+            ]),
+            __security: { bearerAuth: true },
+            __binaryResponse: true,
+        });
+    }
+}
+//# sourceMappingURL=artifacts.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/events.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+class Events extends APIResource {
+    /**
+     * Submits message, cancellation, or tool-result events to a managed agent session.
+     * See
+     * [session events](https://developers.openai.com/api/docs/guides/agents-api/sessions/events).
+     *
+     * @example
+     * ```ts
+     * await client.beta.agents.sessions.events.create(
+     *   'session_id',
+     *   {
+     *     events: [
+     *       {
+     *         input: [
+     *           {
+     *             content: [{ text: 'text', type: 'input_text' }],
+     *             role: 'user',
+     *           },
+     *         ],
+     *         type: 'agent.session.input.message',
+     *       },
+     *     ],
+     *   },
+     * );
+     * ```
+     */
+    create(sessionID, params, options) {
+        const { 'Idempotency-Key': idempotencyKey, ...body } = params;
+        return this._client.post(src_path `/agents/sessions/${sessionID}/events`, {
+            body,
+            ...options,
+            headers: buildHeaders([
+                {
+                    'OpenAI-Beta': 'agents=v1',
+                    Accept: '*/*',
+                    ...(idempotencyKey != null ? { 'Idempotency-Key': idempotencyKey } : undefined),
+                },
+                options?.headers,
+            ]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Streams live events for an agent session. See
+     * [session events](https://developers.openai.com/api/docs/guides/agents-api/sessions/events).
+     *
+     * @example
+     * ```ts
+     * const agentSessionEvent =
+     *   await client.beta.agents.sessions.events.stream(
+     *     'session_id',
+     *   );
+     * ```
+     */
+    stream(sessionID, options) {
+        return this._client.get(src_path `/agents/sessions/${sessionID}/events`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1', Accept: 'text/event-stream' }, options?.headers]),
+            stream: true,
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=events.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/items.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class Items extends APIResource {
+    /**
+     * Lists items produced by the session's root agent, including its interactions
+     * with subagents. Each subagent has its own item history. See
+     * [inspecting agent output](https://developers.openai.com/api/docs/guides/agents-api/observability).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const agentSessionItem of client.beta.agents.sessions.items.list(
+     *   'session_id',
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(sessionID, query = {}, options) {
+        return this._client.getAPIList(src_path `/agents/sessions/${sessionID}/items`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=items.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/turns.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class Turns extends APIResource {
+    /**
+     * Retrieves a turn's current status, timestamps, usage, and error. Returns 404 if
+     * the turn does not belong to the session. See
+     * [session turns](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage#inspect-session-turns).
+     *
+     * @example
+     * ```ts
+     * const turn =
+     *   await client.beta.agents.sessions.turns.retrieve(
+     *     'turn_id',
+     *     { session_id: 'session_id' },
+     *   );
+     * ```
+     */
+    retrieve(turnID, params, options) {
+        const { session_id } = params;
+        return this._client.get(src_path `/agents/sessions/${session_id}/turns/${turnID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists turns by creation time and turn ID. The after cursor is exclusive in the
+     * selected order. See
+     * [session turns](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage#inspect-session-turns).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const turn of client.beta.agents.sessions.turns.list(
+     *   'session_id',
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(sessionID, query = {}, options) {
+        return this._client.getAPIList(src_path `/agents/sessions/${sessionID}/turns`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=turns.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/subagents/items.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class items_Items extends APIResource {
+    /**
+     * Lists this subagent's own items across all of its turns. See
+     * [subagent workflows](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const agentSessionItem of client.beta.agents.sessions.subagents.items.list(
+     *   'subagent_id',
+     *   { session_id: 'session_id' },
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(subagentID, params, options) {
+        const { session_id, ...query } = params;
+        return this._client.getAPIList(src_path `/agents/sessions/${session_id}/subagents/${subagentID}/items`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=items.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/subagents/turns/items.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class turns_items_Items extends APIResource {
+    /**
+     * Lists items belonging to one turn of this subagent. See
+     * [subagent workflows](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const agentSessionItem of client.beta.agents.sessions.subagents.turns.items.list(
+     *   'turn_id',
+     *   { session_id: 'session_id', subagent_id: 'subagent_id' },
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(turnID, params, options) {
+        const { session_id, subagent_id, ...query } = params;
+        return this._client.getAPIList(src_path `/agents/sessions/${session_id}/subagents/${subagent_id}/turns/${turnID}/items`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=items.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/subagents/turns/turns.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+class turns_Turns extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.items = new turns_items_Items(this._client);
+    }
+    /**
+     * Retrieves a turn belonging to this subagent. See
+     * [subagent workflows](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
+     *
+     * @example
+     * ```ts
+     * const turn =
+     *   await client.beta.agents.sessions.subagents.turns.retrieve(
+     *     'turn_id',
+     *     {
+     *       session_id: 'session_id',
+     *       subagent_id: 'subagent_id',
+     *     },
+     *   );
+     * ```
+     */
+    retrieve(turnID, params, options) {
+        const { session_id, subagent_id } = params;
+        return this._client.get(src_path `/agents/sessions/${session_id}/subagents/${subagent_id}/turns/${turnID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists all turns of this subagent, including turns after a resume. See
+     * [subagent workflows](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const turn of client.beta.agents.sessions.subagents.turns.list(
+     *   'subagent_id',
+     *   { session_id: 'session_id' },
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(subagentID, params, options) {
+        const { session_id, ...query } = params;
+        return this._client.getAPIList(src_path `/agents/sessions/${session_id}/subagents/${subagentID}/turns`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+turns_Turns.Items = turns_items_Items;
+//# sourceMappingURL=turns.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/subagents/subagents.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+
+
+class Subagents extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.items = new items_Items(this._client);
+        this.turns = new turns_Turns(this._client);
+    }
+    /**
+     * Retrieves a subagent belonging to this session. See
+     * [subagent workflows](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
+     *
+     * @example
+     * ```ts
+     * const subagent =
+     *   await client.beta.agents.sessions.subagents.retrieve(
+     *     'subagent_id',
+     *     { session_id: 'session_id' },
+     *   );
+     * ```
+     */
+    retrieve(subagentID, params, options) {
+        const { session_id } = params;
+        return this._client.get(src_path `/agents/sessions/${session_id}/subagents/${subagentID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists subagents in a session, including nested and closed subagents. See
+     * [subagent workflows](https://developers.openai.com/api/docs/guides/agents-api/multi-agent).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const subagent of client.beta.agents.sessions.subagents.list(
+     *   'session_id',
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(sessionID, query = {}, options) {
+        return this._client.getAPIList(src_path `/agents/sessions/${sessionID}/subagents`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+Subagents.Items = items_Items;
+Subagents.Turns = turns_Turns;
+//# sourceMappingURL=subagents.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/sessions.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class sessions_Sessions extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.subagents = new Subagents(this._client);
+        this.artifacts = new Artifacts(this._client);
+        this.items = new Items(this._client);
+        this.events = new Events(this._client);
+        this.turns = new Turns(this._client);
+    }
+    /** Stream one turn on an idle session with a single input writer. See AgentSessionStream for lifecycle and tool handling. */
+    stream(sessionID, params, options) {
+        return new AgentSessionStream(this, sessionID, params, options);
+    }
+    create(body, options) {
+        return this._client.post('/agents/sessions', {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            stream: body.stream ?? false,
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Retrieves the current state of a managed agent session. See
+     * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
+     *
+     * @example
+     * ```ts
+     * const agentSession =
+     *   await client.beta.agents.sessions.retrieve('session_id');
+     * ```
+     */
+    retrieve(sessionID, options) {
+        return this._client.get(src_path `/agents/sessions/${sessionID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Updates session metadata. Omitted fields are unchanged. See
+     * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
+     *
+     * @example
+     * ```ts
+     * const agentSession =
+     *   await client.beta.agents.sessions.update('session_id');
+     * ```
+     */
+    update(sessionID, body = {}, options) {
+        return this._client.post(src_path `/agents/sessions/${sessionID}`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists managed agent sessions using ID-based pagination and the requested sort
+     * order. See
+     * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const agentSession of client.beta.agents.sessions.list()) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(query = {}, options) {
+        return this._client.getAPIList('/agents/sessions', (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Removes a managed agent session from the public API and returns a deletion
+     * confirmation. Physical cleanup may continue asynchronously. See
+     * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
+     *
+     * @example
+     * ```ts
+     * const agentSessionDeleted =
+     *   await client.beta.agents.sessions.delete('session_id');
+     * ```
+     */
+    delete(sessionID, options) {
+        return this._client.delete(src_path `/agents/sessions/${sessionID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+sessions_Sessions.Subagents = Subagents;
+sessions_Sessions.Artifacts = Artifacts;
+sessions_Sessions.Items = Items;
+sessions_Sessions.Events = Events;
+sessions_Sessions.Turns = Turns;
+//# sourceMappingURL=sessions.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/vaults/credentials.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+class Credentials extends APIResource {
+    /**
+     * Creates a vault credential. Secret values are write-only and are never returned.
+     * See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * const credential =
+     *   await client.beta.agents.vaults.credentials.create(
+     *     'vault_id',
+     *     {
+     *       auth: {
+     *         access_token: 'access_token',
+     *         mcp_server_url: 'mcp_server_url',
+     *         type: 'mcp_oauth',
+     *       },
+     *       name: 'x',
+     *     },
+     *   );
+     * ```
+     */
+    create(vaultID, body, options) {
+        return this._client.post(src_path `/vaults/${vaultID}/credentials`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Retrieves vault credential metadata without returning secret values. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * const credential =
+     *   await client.beta.agents.vaults.credentials.retrieve(
+     *     'credential_id',
+     *     { vault_id: 'vault_id' },
+     *   );
+     * ```
+     */
+    retrieve(credentialID, params, options) {
+        const { vault_id } = params;
+        return this._client.get(src_path `/vaults/${vault_id}/credentials/${credentialID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Rotates a vault credential's write-only secret and returns only credential
+     * metadata. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * const credential =
+     *   await client.beta.agents.vaults.credentials.update(
+     *     'credential_id',
+     *     {
+     *       vault_id: 'vault_id',
+     *       auth: { type: 'mcp_oauth' },
+     *     },
+     *   );
+     * ```
+     */
+    update(credentialID, params, options) {
+        const { vault_id, ...body } = params;
+        return this._client.post(src_path `/vaults/${vault_id}/credentials/${credentialID}`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists a vault's credentials using ID-based pagination without returning secret
+     * values. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const credential of client.beta.agents.vaults.credentials.list(
+     *   'vault_id',
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(vaultID, query = {}, options) {
+        return this._client.getAPIList(src_path `/vaults/${vaultID}/credentials`, (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Deletes a vault credential. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * const credentialDeleted =
+     *   await client.beta.agents.vaults.credentials.delete(
+     *     'credential_id',
+     *     { vault_id: 'vault_id' },
+     *   );
+     * ```
+     */
+    delete(credentialID, params, options) {
+        const { vault_id } = params;
+        return this._client.delete(src_path `/vaults/${vault_id}/credentials/${credentialID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=credentials.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/vaults/vaults.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+class Vaults extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.credentials = new Credentials(this._client);
+    }
+    /**
+     * Creates a vault for the current project. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * const vault = await client.beta.agents.vaults.create();
+     * ```
+     */
+    create(body = {}, options) {
+        return this._client.post('/vaults', {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Retrieves a vault by its ID. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * const vault = await client.beta.agents.vaults.retrieve(
+     *   'vault_id',
+     * );
+     * ```
+     */
+    retrieve(vaultID, options) {
+        return this._client.get(src_path `/vaults/${vaultID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists vaults using ID-based pagination. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const vault of client.beta.agents.vaults.list()) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(query = {}, options) {
+        return this._client.getAPIList('/vaults', (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Deletes a vault and all its credentials. See
+     * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+     *
+     * @example
+     * ```ts
+     * const vaultDeleted = await client.beta.agents.vaults.delete(
+     *   'vault_id',
+     * );
+     * ```
+     */
+    delete(vaultID, options) {
+        return this._client.delete(src_path `/vaults/${vaultID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+Vaults.Credentials = Credentials;
+//# sourceMappingURL=vaults.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/agents.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+
+
+
+
+class Agents extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.environments = new Environments(this._client);
+        this.vaults = new Vaults(this._client);
+        this.sessions = new sessions_Sessions(this._client);
+    }
+    /**
+     * Creates a reusable agent without storing credentials. See
+     * [agent configuration](https://developers.openai.com/api/docs/guides/agents-api/configuration).
+     *
+     * @example
+     * ```ts
+     * const agent = await client.beta.agents.create({
+     *   model: 'model',
+     * });
+     * ```
+     */
+    create(body, options) {
+        return this._client.post('/agents', {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Retrieves a reusable agent by ID. See
+     * [agent configuration](https://developers.openai.com/api/docs/guides/agents-api/configuration).
+     *
+     * @example
+     * ```ts
+     * const agent = await client.beta.agents.retrieve('agent_id');
+     * ```
+     */
+    retrieve(agentID, options) {
+        return this._client.get(src_path `/agents/${agentID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Updates a reusable agent. See
+     * [agent configuration](https://developers.openai.com/api/docs/guides/agents-api/configuration).
+     *
+     * @example
+     * ```ts
+     * const agent = await client.beta.agents.update('agent_id');
+     * ```
+     */
+    update(agentID, body = {}, options) {
+        return this._client.post(src_path `/agents/${agentID}`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Lists reusable agents in the current project. See
+     * [agent configuration](https://developers.openai.com/api/docs/guides/agents-api/configuration).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const agent of client.beta.agents.list()) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(query = {}, options) {
+        return this._client.getAPIList('/agents', (CursorPage), {
+            query,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Deletes a reusable agent. See
+     * [agent configuration](https://developers.openai.com/api/docs/guides/agents-api/configuration).
+     *
+     * @example
+     * ```ts
+     * const agentDeleted = await client.beta.agents.delete(
+     *   'agent_id',
+     * );
+     * ```
+     */
+    delete(agentID, options) {
+        return this._client.delete(src_path `/agents/${agentID}`, {
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+Agents.Environments = Environments;
+Agents.Vaults = Vaults;
+Agents.Sessions = sessions_Sessions;
+//# sourceMappingURL=agents.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/chatkit/sessions.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 
 
-class sessions_Sessions extends APIResource {
+class chatkit_sessions_Sessions extends APIResource {
     /**
      * Create a ChatKit session.
      *
@@ -75227,11 +81289,11 @@ class Threads extends APIResource {
 class ChatKit extends APIResource {
     constructor() {
         super(...arguments);
-        this.sessions = new sessions_Sessions(this._client);
+        this.sessions = new chatkit_sessions_Sessions(this._client);
         this.threads = new Threads(this._client);
     }
 }
-ChatKit.Sessions = sessions_Sessions;
+ChatKit.Sessions = chatkit_sessions_Sessions;
 ChatKit.Threads = Threads;
 //# sourceMappingURL=chatkit.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/responses/input-items.mjs
@@ -75364,7 +81426,7 @@ class Responses extends APIResource {
     /**
      * Cancels a model response with the given ID. Only responses created with the
      * `background` parameter set to `true` can be cancelled.
-     * [Learn more](https://platform.openai.com/docs/guides/background).
+     * [Learn more](https://developers.openai.com/api/docs/guides/background).
      *
      * @example
      * ```ts
@@ -75388,15 +81450,15 @@ class Responses extends APIResource {
      * Compact a conversation. Returns a compacted response object.
      *
      * Learn when and how to compact long-running conversations in the
-     * [conversation state guide](https://platform.openai.com/docs/guides/conversation-state#managing-the-context-window).
+     * [conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window).
      * For ZDR-compatible compaction details, see
-     * [Compaction (advanced)](https://platform.openai.com/docs/guides/conversation-state#compaction-advanced).
+     * [Compaction (advanced)](https://developers.openai.com/api/docs/guides/conversation-state#compaction-advanced).
      *
      * @example
      * ```ts
      * const betaCompactedResponse =
      *   await client.beta.responses.compact({
-     *     model: 'gpt-5.6-sol',
+     *     model: 'gpt-6-astra',
      *   });
      * ```
      */
@@ -75579,6 +81641,9 @@ const toFloat32Array = (base64Str) => {
     if (typeof Buffer !== 'undefined') {
         // for Node.js environment
         const buf = Buffer.from(base64Str, 'base64');
+        if (buf.length % Float32Array.BYTES_PER_ELEMENT !== 0) {
+            throw new RangeError('Invalid base64-encoded float32 array: byte length must be a multiple of 4');
+        }
         return Array.from(new Float32Array(buf.buffer, buf.byteOffset, buf.length / Float32Array.BYTES_PER_ELEMENT));
     }
     else {
@@ -75602,11 +81667,16 @@ const toFloat32Array = (base64Str) => {
  * Will return undefined if the environment variable doesn't exist or cannot be accessed.
  */
 const env_readEnv = (env) => {
-    if (typeof globalThis.process !== 'undefined') {
-        return globalThis.process.env?.[env]?.trim() || undefined;
+    try {
+        if (typeof globalThis.process !== 'undefined') {
+            return globalThis.process.env?.[env]?.trim() || undefined;
+        }
+        if (typeof globalThis.Deno !== 'undefined') {
+            return globalThis.Deno.env?.get?.(env)?.trim() || undefined;
+        }
     }
-    if (typeof globalThis.Deno !== 'undefined') {
-        return globalThis.Deno.env?.get?.(env)?.trim() || undefined;
+    catch {
+        return undefined;
     }
     return undefined;
 };
@@ -75625,6 +81695,27 @@ const env_readEnv = (env) => {
 
 const MAX_ASSISTANT_STREAM_ARRAY_GROWTH = 1024;
 const MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH = 65536;
+function getAssistantStreamDiagnosticProperty(property) {
+    switch (property) {
+        case 'value':
+        case 'arguments':
+        case 'input':
+        case 'text':
+        case 'content':
+        case 'annotations':
+        case 'metadata':
+        case 'name':
+        case 'role':
+        case 'status':
+        case 'tool_calls':
+        case 'step_details': {
+            return property;
+        }
+        default: {
+            return 'unknown';
+        }
+    }
+}
 const assistantStreamArrayStates = new WeakMap();
 const externallyMutableAssistantStreamValues = new WeakSet();
 function createAssistantStreamDeltaProjection(cacheArrays) {
@@ -75671,18 +81762,20 @@ function getAssistantStreamArrayOwnEntryCount(accumulator, enforceSparseHoleBudg
 function getAssistantStreamDeltaIndex(deltaEntry, kind, baselineLength) {
     const { index } = deltaEntry;
     if (kind === 'array' && (index === null || index === undefined)) {
-        console.error(deltaEntry);
         throw new Error('Expected array delta entry to have an `index` property');
     }
     if (kind === 'array' && typeof index !== 'number') {
-        throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+        throw new TypeError('Expected array delta entry `index` property to be a number but got an invalid value');
     }
+    // SAFETY: Number.isSafeInteger rejects non-numbers before numeric comparisons; the remaining checks enforce the permitted index range.
     if (!Number.isSafeInteger(index) ||
         index < 0 ||
         index >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH ||
         index >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH) {
-        throw new error_OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${index}`);
+        const safeIndex = typeof index === 'number' ? index : 'unknown';
+        throw new error_OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${safeIndex}`);
     }
+    // SAFETY: Number.isSafeInteger rejects non-numbers before numeric comparisons; the remaining checks enforce the permitted index range.
     return index;
 }
 function assertValidAssistantStreamArrayDelta(accumulator, delta, kind, projection, validateRecord) {
@@ -75702,7 +81795,7 @@ function assertValidAssistantStreamArrayDelta(accumulator, delta, kind, projecti
     }
     for (const deltaEntry of delta) {
         if (!isObj(deltaEntry)) {
-            throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+            throw new Error('Expected array delta entry to be an object but got an invalid value');
         }
         const validatedIndex = getAssistantStreamDeltaIndex(deltaEntry, kind, projectedArray.baselineLength);
         let accumulatedEntry;
@@ -75793,11 +81886,10 @@ function defineAssistantStreamArrayEntry(accumulator, index, value) {
 function getRequiredAssistantStreamArrayIndex(deltaEntry) {
     const { index } = deltaEntry;
     if (index === null || index === undefined) {
-        console.error(deltaEntry);
         throw new Error('Expected array delta entry to have an `index` property');
     }
     if (typeof index !== 'number') {
-        throw new TypeError(`Expected array delta entry \`index\` property to be a number but got ${index}`);
+        throw new TypeError('Expected array delta entry `index` property to be a number but got an invalid value');
     }
     return index;
 }
@@ -75809,7 +81901,7 @@ function applyAssistantStreamArrayDelta(accumulator, delta, applyRecord) {
     }
     for (const deltaEntry of delta) {
         if (!isObj(deltaEntry)) {
-            throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+            throw new Error('Expected array delta entry to be an object but got an invalid value');
         }
         const index = getRequiredAssistantStreamArrayIndex(deltaEntry);
         if (hasOwn(accumulator, index)) {
@@ -75821,6 +81913,7 @@ function applyAssistantStreamArrayDelta(accumulator, delta, applyRecord) {
                 accumulator[index] = deltaEntry;
             }
             else {
+                // SAFETY: The preceding validation accepts this accumulated record before recursively merging the matching delta entry.
                 accumulator[index] = applyRecord(accumulatedEntry, deltaEntry);
             }
         }
@@ -75868,7 +81961,7 @@ function applyAssistantStreamDelta(accumulator, delta) {
             continue;
         }
         else {
-            throw new TypeError(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accumulatedValue}`);
+            throw new TypeError(`Unhandled record type: ${getAssistantStreamDiagnosticProperty(key)}`);
         }
         accumulator[key] = accumulatedValue;
     }
@@ -75885,9 +81978,13 @@ function assertSafeAssistantStreamDelta(value) {
         assertSafeAssistantStreamDelta(nestedValue);
     }
 }
-function accumulateAssistantStreamDelta(accumulator, delta, cacheArrays = false) {
+function accumulateAssistantStreamDelta(accumulator, 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- This exported accumulator accepts heterogeneous partial SDK deltas and validates their properties at runtime.
+delta, cacheArrays = false) {
     assertSafeAssistantStreamDelta(delta);
+    // SAFETY: The generic accumulator uses record entries after delta validation; recursive merge retains the original accumulator's public type.
     const accumulatorRecord = accumulator;
+    // SAFETY: The generic accumulator uses record entries after delta validation; recursive merge retains the original accumulator's public type.
     const deltaRecord = delta;
     const projection = createAssistantStreamDeltaProjection(cacheArrays && !isAssistantStreamValueExternallyMutable(accumulator));
     assertValidAssistantStreamDeltaIndices(accumulatorRecord, deltaRecord, projection);
@@ -75903,25 +82000,78 @@ function createAssistantStreamArrayDeltaCommit(accumulator, delta, kind, cacheAr
 }
 //# sourceMappingURL=assistant-stream-delta.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/AssistantStream.mjs
-var _AssistantStream_instances, _AssistantStream_events, _AssistantStream_runStepSnapshots, _AssistantStream_messageSnapshots, _AssistantStream_messageSnapshot, _AssistantStream_finalRun, _AssistantStream_currentContentIndex, _AssistantStream_currentContent, _AssistantStream_currentToolCallIndex, _AssistantStream_currentToolCall, _AssistantStream_currentEvent, _AssistantStream_currentRunSnapshot, _AssistantStream_currentRunStepSnapshot, _AssistantStream_addEvent, _AssistantStream_endRequest, _AssistantStream_handleMessage, _AssistantStream_handleRunStep, _AssistantStream_emitExposed, _AssistantStream_handleEvent, _AssistantStream_accumulateRunStep, _AssistantStream_accumulateMessage, _AssistantStream_accumulateContent, _AssistantStream_handleRun;
+var _AssistantStream_instances, _AssistantStream_runStepSnapshots, _AssistantStream_runStepIDOwners, _AssistantStream_activeRunStepID, _AssistantStream_messageSnapshots, _AssistantStream_messageIDOwners, _AssistantStream_messageSnapshot, _AssistantStream_activeMessageID, _AssistantStream_finalRun, _AssistantStream_currentContentIndex, _AssistantStream_currentContent, _AssistantStream_currentToolCallIndex, _AssistantStream_currentToolCall, _AssistantStream_currentEvent, _AssistantStream_currentRunSnapshot, _AssistantStream_currentRunStepSnapshot, _AssistantStream_addEvent, _AssistantStream_endRequest, _AssistantStream_validateRunStepEvent, _AssistantStream_reserveRunStepAlias, _AssistantStream_validateMessageEvent, _AssistantStream_reserveMessageAlias, _AssistantStream_handleMessage, _AssistantStream_handleRunStep, _AssistantStream_emitExposed, _AssistantStream_handleEvent, _AssistantStream_accumulateRunStep, _AssistantStream_accumulateMessage, _AssistantStream_accumulateContent, _AssistantStream_handleRun;
 
 
 
 
 
 
+function stabilizeAssistantStreamEvent(event) {
+    const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
+    const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
+    // oxlint-disable-next-line anti-slop/no-reflect-get -- Reflective wire reads reject primitive frames and preserve the original event receiver.
+    const eventType = Reflect.get(event, 'event', event);
+    // oxlint-disable-next-line anti-slop/no-reflect-get -- Keep the paired wire-data read on the original receiver after reading the event discriminator.
+    const data = Reflect.get(event, 'data', event);
+    let stableData = data;
+    if (eventType === 'thread.message.created' ||
+        eventType === 'thread.message.in_progress' ||
+        eventType === 'thread.message.delta' ||
+        eventType === 'thread.message.completed' ||
+        eventType === 'thread.message.incomplete' ||
+        eventType === 'thread.run.step.created' ||
+        eventType === 'thread.run.step.in_progress' ||
+        eventType === 'thread.run.step.delta' ||
+        eventType === 'thread.run.step.completed' ||
+        eventType === 'thread.run.step.failed' ||
+        eventType === 'thread.run.step.cancelled' ||
+        eventType === 'thread.run.step.expired') {
+        const messageID = Object.getOwnPropertyDescriptor(data, 'id');
+        if (messageID &&
+            'value' in messageID &&
+            // SAFETY: The own id descriptor was found above; keep its live read unknown while comparing it with the captured descriptor value.
+            data.id !== messageID.value) {
+            // SAFETY: Descriptor values are untyped; retaining this value as unknown avoids trusting a mutable message identifier.
+            const canonicalID = messageID.value;
+            // SAFETY: The proxy retains the event data and substitutes only its captured own id; all other properties forward to the original receiver.
+            stableData = new Proxy(data, {
+                get(target, property) {
+                    // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
+                    return property === 'id' ? canonicalID : Reflect.get(target, property, target);
+                },
+            });
+        }
+    }
+    // SAFETY: The captured event discriminator and data originate from the same event; TypeScript loses their correlation when constructing the stabilized copy.
+    const stableEvent = Object.freeze({ event: eventType, data: stableData });
+    const ordinaryEvent = eventDescriptor !== undefined &&
+        'value' in eventDescriptor &&
+        eventDescriptor.value === eventType &&
+        dataDescriptor !== undefined &&
+        'value' in dataDescriptor &&
+        dataDescriptor.value === data &&
+        stableData === data;
+    // SAFETY: The captured event discriminator and data originate from the same event; TypeScript loses their correlation when constructing the stabilized copy.
+    return {
+        event: stableEvent,
+        exposedEvent: ordinaryEvent ? event : { event: eventType, data: stableData },
+    };
+}
 /** Streams assistant-run events while accumulating messages, run steps, and tool-call snapshots. */
 class AssistantStream extends EventStream {
     constructor() {
         super(...arguments);
         _AssistantStream_instances.add(this);
-        //Track all events in a single list for reference
-        _AssistantStream_events.set(this, []);
         //Used to accumulate deltas
         //We are accumulating many types so the value here is not strict
         _AssistantStream_runStepSnapshots.set(this, Object.create(null));
+        _AssistantStream_runStepIDOwners.set(this, new Map());
+        _AssistantStream_activeRunStepID.set(this, void 0);
         _AssistantStream_messageSnapshots.set(this, Object.create(null));
+        _AssistantStream_messageIDOwners.set(this, new Map());
         _AssistantStream_messageSnapshot.set(this, void 0);
+        _AssistantStream_activeMessageID.set(this, void 0);
         _AssistantStream_finalRun.set(this, void 0);
         _AssistantStream_currentContentIndex.set(this, void 0);
         _AssistantStream_currentContent.set(this, void 0);
@@ -75933,7 +82083,7 @@ class AssistantStream extends EventStream {
         _AssistantStream_currentRunStepSnapshot.set(this, void 0);
     }
     /** Iterates over cloned raw assistant events; stopping early aborts the underlying request. */
-    [(_AssistantStream_events = new WeakMap(), _AssistantStream_runStepSnapshots = new WeakMap(), _AssistantStream_messageSnapshots = new WeakMap(), _AssistantStream_messageSnapshot = new WeakMap(), _AssistantStream_finalRun = new WeakMap(), _AssistantStream_currentContentIndex = new WeakMap(), _AssistantStream_currentContent = new WeakMap(), _AssistantStream_currentToolCallIndex = new WeakMap(), _AssistantStream_currentToolCall = new WeakMap(), _AssistantStream_currentEvent = new WeakMap(), _AssistantStream_currentRunSnapshot = new WeakMap(), _AssistantStream_currentRunStepSnapshot = new WeakMap(), _AssistantStream_instances = new WeakSet(), Symbol.asyncIterator)]() {
+    [(_AssistantStream_runStepSnapshots = new WeakMap(), _AssistantStream_runStepIDOwners = new WeakMap(), _AssistantStream_activeRunStepID = new WeakMap(), _AssistantStream_messageSnapshots = new WeakMap(), _AssistantStream_messageIDOwners = new WeakMap(), _AssistantStream_messageSnapshot = new WeakMap(), _AssistantStream_activeMessageID = new WeakMap(), _AssistantStream_finalRun = new WeakMap(), _AssistantStream_currentContentIndex = new WeakMap(), _AssistantStream_currentContent = new WeakMap(), _AssistantStream_currentToolCallIndex = new WeakMap(), _AssistantStream_currentToolCall = new WeakMap(), _AssistantStream_currentEvent = new WeakMap(), _AssistantStream_currentRunSnapshot = new WeakMap(), _AssistantStream_currentRunStepSnapshot = new WeakMap(), _AssistantStream_instances = new WeakSet(), Symbol.asyncIterator)]() {
         return this._createIterator((push) => {
             //Catch all for passing along all events
             const onEvent = (event) => push(structuredClone(event));
@@ -75955,7 +82105,7 @@ class AssistantStream extends EventStream {
             __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_addEvent).call(this, event);
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         return this._addRun(__classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_endRequest).call(this));
     }
@@ -75985,7 +82135,7 @@ class AssistantStream extends EventStream {
             __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_addEvent).call(this, event);
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         return this._addRun(__classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_endRequest).call(this));
     }
@@ -76032,7 +82182,10 @@ class AssistantStream extends EventStream {
         await this.done();
         return Object.values(__classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f"));
     }
-    /** Waits for successful completion and returns the final snapshot of every observed message. */
+    /**
+     * Waits for successful completion and returns the final snapshot of every observed message.
+     * Terminal message events replace accumulated snapshots without mutating earlier snapshots.
+     */
     async finalMessages() {
         await this.done();
         return Object.values(__classPrivateFieldGet(this, _AssistantStream_messageSnapshots, "f"));
@@ -76054,7 +82207,7 @@ class AssistantStream extends EventStream {
             __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_addEvent).call(this, event);
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         return this._addRun(__classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_endRequest).call(this));
     }
@@ -76067,7 +82220,7 @@ class AssistantStream extends EventStream {
             __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_addEvent).call(this, event);
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         return this._addRun(__classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_endRequest).call(this));
     }
@@ -76096,9 +82249,45 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
     if (this.ended) {
         return;
     }
-    __classPrivateFieldSet(this, _AssistantStream_currentEvent, event, "f");
-    __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleEvent).call(this, event);
-    switch (event.event) {
+    const { event: stableEvent, exposedEvent } = stabilizeAssistantStreamEvent(event);
+    let messageID;
+    let messageData;
+    let runStepID;
+    let runStepData;
+    switch (stableEvent.event) {
+        case 'thread.message.created':
+        case 'thread.message.in_progress':
+        case 'thread.message.delta':
+        case 'thread.message.completed':
+        case 'thread.message.incomplete': {
+            messageID = __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_validateMessageEvent).call(this, stableEvent);
+            messageData = stableEvent.data;
+            break;
+        }
+        case 'thread.run.step.created':
+        case 'thread.run.step.in_progress':
+        case 'thread.run.step.delta':
+        case 'thread.run.step.completed':
+        case 'thread.run.step.failed':
+        case 'thread.run.step.cancelled':
+        case 'thread.run.step.expired': {
+            runStepID = __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_validateRunStepEvent).call(this, stableEvent);
+            runStepData = stableEvent.data;
+            break;
+        }
+    }
+    __classPrivateFieldSet(this, _AssistantStream_currentEvent, exposedEvent, "f");
+    __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleEvent).call(this, exposedEvent);
+    if (messageID !== undefined && messageData !== undefined) {
+        __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveMessageAlias).call(this, messageData, messageID);
+    }
+    if (runStepID !== undefined && runStepData !== undefined) {
+        __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveRunStepAlias).call(this, runStepData, runStepID);
+    }
+    if (runStepID === undefined && __classPrivateFieldGet(this, _AssistantStream_activeRunStepID, "f") !== undefined && __classPrivateFieldGet(this, _AssistantStream_currentRunStepSnapshot, "f")) {
+        __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveRunStepAlias).call(this, __classPrivateFieldGet(this, _AssistantStream_currentRunStepSnapshot, "f"), __classPrivateFieldGet(this, _AssistantStream_activeRunStepID, "f"));
+    }
+    switch (stableEvent.event) {
         case 'thread.created': {
             //No action on this event.
             break;
@@ -76113,7 +82302,7 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
         case 'thread.run.cancelling':
         case 'thread.run.cancelled':
         case 'thread.run.expired': {
-            __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleRun).call(this, event);
+            __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleRun).call(this, stableEvent);
             break;
         }
         case 'thread.run.step.created':
@@ -76123,7 +82312,19 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
         case 'thread.run.step.failed':
         case 'thread.run.step.cancelled':
         case 'thread.run.step.expired': {
-            __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleRunStep).call(this, event);
+            if (runStepID === undefined) {
+                throw new error_OpenAIError('Received assistant run-step event without a canonical run-step ID');
+            }
+            const activeRunStep = __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID];
+            if (activeRunStep) {
+                __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveRunStepAlias).call(this, activeRunStep, runStepID);
+            }
+            __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleRunStep).call(this, stableEvent, runStepID);
+            __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveRunStepAlias).call(this, stableEvent.data, runStepID);
+            const retainedRunStep = __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID];
+            if (retainedRunStep) {
+                __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveRunStepAlias).call(this, retainedRunStep, runStepID);
+            }
             break;
         }
         case 'thread.message.created':
@@ -76131,15 +82332,24 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
         case 'thread.message.delta':
         case 'thread.message.completed':
         case 'thread.message.incomplete': {
-            __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleMessage).call(this, event);
+            if (messageID !== undefined && __classPrivateFieldGet(this, _AssistantStream_messageSnapshot, "f")) {
+                __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveMessageAlias).call(this, __classPrivateFieldGet(this, _AssistantStream_messageSnapshot, "f"), messageID);
+            }
+            __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_handleMessage).call(this, stableEvent);
+            if (messageID !== undefined) {
+                __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveMessageAlias).call(this, stableEvent.data, messageID);
+                const retainedMessage = __classPrivateFieldGet(this, _AssistantStream_messageSnapshots, "f")[messageID];
+                if (retainedMessage) {
+                    __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_reserveMessageAlias).call(this, retainedMessage, messageID);
+                }
+            }
             break;
         }
         case 'error': {
-            //This is included for completeness, but errors are processed in the SSE event processing so this should not occur
-            throw new Error('Encountered an error event in event processing - errors should be processed earlier');
+            throw new APIError(undefined, stableEvent.data, undefined, undefined);
         }
         default: {
-            AssistantStream_assertNever(event);
+            AssistantStream_assertNever(stableEvent);
         }
     }
 }, _AssistantStream_endRequest = function _AssistantStream_endRequest() {
@@ -76150,10 +82360,105 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
         throw new Error('Final run has not been received');
     }
     return __classPrivateFieldGet(this, _AssistantStream_finalRun, "f");
+}, _AssistantStream_validateRunStepEvent = function _AssistantStream_validateRunStepEvent(event) {
+    const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
+    const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof runStepID !== 'string' || runStepID.length === 0) {
+        throw new error_OpenAIError('Received assistant run-step event with an invalid run-step ID');
+    }
+    if (event.event === 'thread.run.step.delta') {
+        const delta = event.data.delta;
+        if (delta && hasOwn(delta, 'id')) {
+            throw new error_OpenAIError('Run-step deltas must not contain an id field');
+        }
+    }
+    if (event.event === 'thread.run.step.created') {
+        if (__classPrivateFieldGet(this, _AssistantStream_activeRunStepID, "f") !== undefined) {
+            throw new error_OpenAIError(`Received run-step creation for "${runStepID}" before the active run step "${__classPrivateFieldGet(this, _AssistantStream_activeRunStepID, "f")}" reached a terminal state`);
+        }
+        if (hasOwn(__classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f"), runStepID) || __classPrivateFieldGet(this, _AssistantStream_runStepIDOwners, "f").has(runStepID)) {
+            throw new error_OpenAIError(`Received run-step creation for run step "${runStepID}", which has already been created`);
+        }
+        __classPrivateFieldSet(this, _AssistantStream_activeRunStepID, runStepID, "f");
+        __classPrivateFieldGet(this, _AssistantStream_runStepIDOwners, "f").set(runStepID, runStepID);
+        return runStepID;
+    }
+    if (__classPrivateFieldGet(this, _AssistantStream_activeRunStepID, "f") !== undefined) {
+        if (runStepID !== __classPrivateFieldGet(this, _AssistantStream_activeRunStepID, "f")) {
+            throw new error_OpenAIError(`Received ${event.event} for run step "${runStepID}", which does not match the active run step "${__classPrivateFieldGet(this, _AssistantStream_activeRunStepID, "f")}"`);
+        }
+        return runStepID;
+    }
+    if (event.event === 'thread.run.step.delta') {
+        if (!hasOwn(__classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f"), runStepID)) {
+            throw new error_OpenAIError('Received a RunStepDelta before creation of a snapshot');
+        }
+        throw new error_OpenAIError(`Received run-step delta for "${runStepID}" with no active run step`);
+    }
+    if (hasOwn(__classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f"), runStepID) || __classPrivateFieldGet(this, _AssistantStream_runStepIDOwners, "f").has(runStepID)) {
+        throw new error_OpenAIError(`Received run-step event for run step "${runStepID}", which has already been created`);
+    }
+    __classPrivateFieldGet(this, _AssistantStream_runStepIDOwners, "f").set(runStepID, runStepID);
+    if (event.event === 'thread.run.step.in_progress') {
+        __classPrivateFieldSet(this, _AssistantStream_activeRunStepID, runStepID, "f");
+    }
+    return runStepID;
+}, _AssistantStream_reserveRunStepAlias = function _AssistantStream_reserveRunStepAlias(data, canonicalID) {
+    const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
+    const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof runStepID !== 'string' || runStepID.length === 0) {
+        throw new error_OpenAIError('Received assistant run-step event with an invalid run-step ID');
+    }
+    const owner = __classPrivateFieldGet(this, _AssistantStream_runStepIDOwners, "f").get(runStepID);
+    if (owner !== undefined && owner !== canonicalID) {
+        throw new error_OpenAIError(`Received run-step creation for run step "${runStepID}", which has already been created`);
+    }
+    __classPrivateFieldGet(this, _AssistantStream_runStepIDOwners, "f").set(runStepID, canonicalID);
+}, _AssistantStream_validateMessageEvent = function _AssistantStream_validateMessageEvent(event) {
+    const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
+    const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof messageID !== 'string' || messageID.length === 0) {
+        throw new error_OpenAIError('Received assistant message event with an invalid message ID');
+    }
+    if (event.event === 'thread.message.created') {
+        if (__classPrivateFieldGet(this, _AssistantStream_messageSnapshot, "f")) {
+            throw new error_OpenAIError(`Received message creation for "${messageID}" before the active message "${__classPrivateFieldGet(this, _AssistantStream_activeMessageID, "f")}" reached a terminal state`);
+        }
+        if (hasOwn(__classPrivateFieldGet(this, _AssistantStream_messageSnapshots, "f"), messageID) || __classPrivateFieldGet(this, _AssistantStream_messageIDOwners, "f").has(messageID)) {
+            throw new error_OpenAIError(`Received message creation for message "${messageID}", which has already been created`);
+        }
+        __classPrivateFieldSet(this, _AssistantStream_activeMessageID, messageID, "f");
+        __classPrivateFieldGet(this, _AssistantStream_messageIDOwners, "f").set(messageID, messageID);
+        return messageID;
+    }
+    if (!__classPrivateFieldGet(this, _AssistantStream_messageSnapshot, "f")) {
+        if (event.event === 'thread.message.delta') {
+            throw new error_OpenAIError('Received a delta with no existing snapshot (there should be one from message creation)');
+        }
+        throw new error_OpenAIError('Received thread message event with no existing snapshot');
+    }
+    if (messageID !== __classPrivateFieldGet(this, _AssistantStream_activeMessageID, "f")) {
+        throw new error_OpenAIError(`Received ${event.event} for message "${messageID}", which does not match the active message "${__classPrivateFieldGet(this, _AssistantStream_activeMessageID, "f")}"`);
+    }
+    return messageID;
+}, _AssistantStream_reserveMessageAlias = function _AssistantStream_reserveMessageAlias(data, canonicalID) {
+    const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
+    const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (typeof messageID !== 'string' || messageID.length === 0) {
+        throw new error_OpenAIError('Received assistant message event with an invalid message ID');
+    }
+    const owner = __classPrivateFieldGet(this, _AssistantStream_messageIDOwners, "f").get(messageID);
+    if (owner !== undefined && owner !== canonicalID) {
+        throw new error_OpenAIError(`Received message creation for message "${messageID}", which has already been created`);
+    }
+    __classPrivateFieldGet(this, _AssistantStream_messageIDOwners, "f").set(messageID, canonicalID);
 }, _AssistantStream_handleMessage = function _AssistantStream_handleMessage(event) {
     const [accumulatedMessage, newContent] = __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_accumulateMessage).call(this, event, __classPrivateFieldGet(this, _AssistantStream_messageSnapshot, "f"));
     __classPrivateFieldSet(this, _AssistantStream_messageSnapshot, accumulatedMessage, "f");
-    __classPrivateFieldGet(this, _AssistantStream_messageSnapshots, "f")[accumulatedMessage.id] = accumulatedMessage;
+    if (!__classPrivateFieldGet(this, _AssistantStream_activeMessageID, "f")) {
+        throw new error_OpenAIError('Received thread message event with no active message ID');
+    }
+    __classPrivateFieldGet(this, _AssistantStream_messageSnapshots, "f")[__classPrivateFieldGet(this, _AssistantStream_activeMessageID, "f")] = accumulatedMessage;
     for (const content of newContent) {
         const snapshotContent = accumulatedMessage.content[content.index];
         if (snapshotContent?.type === 'text') {
@@ -76230,10 +82535,11 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
             __classPrivateFieldSet(this, _AssistantStream_currentContentIndex, undefined, "f");
             __classPrivateFieldSet(this, _AssistantStream_currentContent, undefined, "f");
             __classPrivateFieldSet(this, _AssistantStream_messageSnapshot, undefined, "f");
+            __classPrivateFieldSet(this, _AssistantStream_activeMessageID, undefined, "f");
         }
     }
-}, _AssistantStream_handleRunStep = function _AssistantStream_handleRunStep(event) {
-    const accumulatedRunStep = __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_accumulateRunStep).call(this, event);
+}, _AssistantStream_handleRunStep = function _AssistantStream_handleRunStep(event, runStepID) {
+    const accumulatedRunStep = __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_accumulateRunStep).call(this, event, runStepID);
     __classPrivateFieldSet(this, _AssistantStream_currentRunStepSnapshot, accumulatedRunStep, "f");
     switch (event.event) {
         case 'thread.run.step.created': {
@@ -76250,6 +82556,7 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
                 accumulatedRunStep.step_details.type === 'tool_calls') {
                 for (const toolCall of delta.step_details.tool_calls) {
                     if (toolCall.index === __classPrivateFieldGet(this, _AssistantStream_currentToolCallIndex, "f")) {
+                        // SAFETY: The indexed tool call comes from this run-step snapshot after applying the delta for the same tool-call index.
                         __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_emitExposed).call(this, 'toolCallDelta', toolCall, accumulatedRunStep.step_details.tool_calls[toolCall.index]);
                     }
                     else {
@@ -76272,6 +82579,7 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
         case 'thread.run.step.cancelled':
         case 'thread.run.step.expired': {
             __classPrivateFieldSet(this, _AssistantStream_currentRunStepSnapshot, undefined, "f");
+            __classPrivateFieldSet(this, _AssistantStream_activeRunStepID, undefined, "f");
             const details = event.data.step_details;
             if (details.type === 'tool_calls' && __classPrivateFieldGet(this, _AssistantStream_currentToolCall, "f")) {
                 __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_emitExposed).call(this, 'toolCallDone', __classPrivateFieldGet(this, _AssistantStream_currentToolCall, "f"));
@@ -76293,37 +82601,42 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
     }
     this._emit(event, ...args);
 }, _AssistantStream_handleEvent = function _AssistantStream_handleEvent(event) {
-    __classPrivateFieldGet(this, _AssistantStream_events, "f").push(event);
     __classPrivateFieldGet(this, _AssistantStream_instances, "m", _AssistantStream_emitExposed).call(this, 'event', event);
-}, _AssistantStream_accumulateRunStep = function _AssistantStream_accumulateRunStep(event) {
+}, _AssistantStream_accumulateRunStep = function _AssistantStream_accumulateRunStep(event, runStepID) {
     switch (event.event) {
         case 'thread.run.step.created': {
-            __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[event.data.id] = event.data;
+            __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID] = event.data;
             return event.data;
         }
         case 'thread.run.step.delta': {
-            const snapshot = __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[event.data.id];
+            // SAFETY: Run-step snapshots are stored by their canonical run-step id; the delta path checks that the snapshot exists before updating it.
+            const snapshot = __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID];
             if (!snapshot) {
                 throw new Error('Received a RunStepDelta before creation of a snapshot');
             }
-            const data = event.data;
-            if (data.delta) {
-                const accumulated = accumulateAssistantStreamDelta(snapshot, data.delta, true);
-                __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[event.data.id] = accumulated;
+            const delta = event.data.delta;
+            if (delta) {
+                // Raw-event listeners can replace or modify the delta after initial validation.
+                if (hasOwn(delta, 'id')) {
+                    throw new error_OpenAIError('Run-step deltas must not contain an id field');
+                }
+                const accumulated = accumulateAssistantStreamDelta(snapshot, delta, true);
+                __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID] = accumulated;
             }
-            return __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[event.data.id];
+            // SAFETY: Run-step snapshots are stored by their canonical run-step id; the delta path checks that the snapshot exists before updating it.
+            return __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID];
         }
         case 'thread.run.step.completed':
         case 'thread.run.step.failed':
         case 'thread.run.step.cancelled':
         case 'thread.run.step.expired':
         case 'thread.run.step.in_progress': {
-            __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[event.data.id] = event.data;
+            __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID] = event.data;
             break;
         }
     }
-    if (__classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[event.data.id]) {
-        return __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[event.data.id];
+    if (__classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID]) {
+        return __classPrivateFieldGet(this, _AssistantStream_runStepSnapshots, "f")[runStepID];
     }
     throw new Error('No snapshot available');
 }, _AssistantStream_accumulateMessage = function _AssistantStream_accumulateMessage(event, snapshot) {
@@ -76361,15 +82674,16 @@ _AssistantStream_addEvent = function _AssistantStream_addEvent(event) {
         case 'thread.message.in_progress':
         case 'thread.message.completed':
         case 'thread.message.incomplete': {
-            //No changes on other thread events
+            //Terminal events provide the authoritative message snapshot.
             if (snapshot) {
-                return [snapshot, newContent];
+                return [event.event === 'thread.message.in_progress' ? snapshot : event.data, newContent];
             }
             throw new Error('Received thread message event with no existing snapshot');
         }
     }
     throw new Error('Tried to accumulate a non-message event');
 }, _AssistantStream_accumulateContent = function _AssistantStream_accumulateContent(contentElement, currentContent, cacheArrays) {
+    // SAFETY: The accumulator merges the matching message-content delta into its existing block; the public return remains the text/image block union.
     return accumulateAssistantStreamDelta(currentContent, contentElement, cacheArrays);
 }, _AssistantStream_handleRun = function _AssistantStream_handleRun(event) {
     __classPrivateFieldSet(this, _AssistantStream_currentRunSnapshot, event.data, "f");
@@ -76406,6 +82720,150 @@ function AssistantStream_assertNever(_x) {
     return _x;
 }
 //# sourceMappingURL=AssistantStream.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/polling.mjs
+
+
+
+function sleepUntilAborted(milliseconds, signal) {
+    // oxlint-disable-next-line promise/avoid-new -- Timer and abort callbacks need a portable Promise bridge.
+    return new Promise((resolve, reject) => {
+        let timer;
+        let registered;
+        let settled = false;
+        const removeAbortListener = (listener) => {
+            try {
+                signal.removeEventListener('abort', listener);
+            }
+            catch {
+                // Caller-controlled cleanup must never prevent the polling promise from settling.
+            }
+        };
+        const cleanup = () => {
+            if (timer !== undefined) {
+                clearTimeout(timer);
+                timer = undefined;
+            }
+            if (registered) {
+                const listener = registered;
+                registered = undefined;
+                removeAbortListener(listener);
+            }
+        };
+        const abort = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            try {
+                const error = new APIUserAbortError();
+                Object.defineProperty(error, 'cause', {
+                    value: signal.reason,
+                    writable: true,
+                    configurable: true,
+                });
+                reject(error);
+            }
+            catch (error) {
+                reject(error);
+            }
+        };
+        if (signal.aborted) {
+            abort();
+            return;
+        }
+        timer = setTimeout(() => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            resolve();
+        }, milliseconds);
+        registered = abort;
+        try {
+            signal.addEventListener('abort', abort, { once: true });
+            if (settled) {
+                removeAbortListener(abort);
+            }
+            else if (signal.aborted) {
+                abort();
+            }
+        }
+        catch (error) {
+            if (settled) {
+                removeAbortListener(abort);
+            }
+            else {
+                settled = true;
+                cleanup();
+                reject(error);
+            }
+        }
+    });
+}
+/**
+ * Repeatedly retrieves a lifecycle resource using the existing polling-helper
+ * headers. Intermediate states wait for the explicit interval (including zero),
+ * the server interval, or five-second default; terminal states return the same parsed object.
+ * The caller's signal interrupts intermediate waits, unknown states retry
+ * immediately, and retrieval errors propagate unchanged.
+ *
+ * @internal
+ */
+async function pollWithResponse(retrieve, intermediateStatuses, terminalStatuses, options) {
+    const headers = buildHeaders([
+        options?.headers,
+        {
+            'X-Stainless-Poll-Helper': 'true',
+            'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
+        },
+    ]);
+    while (true) {
+        // oxlint-disable-next-line no-await-in-loop -- Each poll depends on the previous response.
+        const { data, response } = await retrieve(headers).withResponse();
+        const { status } = data;
+        if (intermediateStatuses.includes(status)) {
+            let sleepInterval = 5000;
+            const pollIntervalMs = options?.pollIntervalMs;
+            if (pollIntervalMs || pollIntervalMs === 0) {
+                sleepInterval = pollIntervalMs;
+            }
+            else {
+                const headerInterval = response.headers.get('openai-poll-after-ms');
+                if (headerInterval) {
+                    // oxlint-disable-next-line radix -- Preserve the existing decimal and hexadecimal header parsing.
+                    const headerIntervalMs = Number.parseInt(headerInterval);
+                    if (!Number.isNaN(headerIntervalMs)) {
+                        sleepInterval = headerIntervalMs;
+                    }
+                }
+            }
+            const signal = options && Object.prototype.propertyIsEnumerable.call(options, 'signal') ? options.signal : undefined;
+            // oxlint-disable-next-line no-await-in-loop -- Each poll waits or aborts before the next request.
+            await (signal ? sleepUntilAborted(sleepInterval, signal) : sleep(sleepInterval));
+        }
+        else if (terminalStatuses.includes(status)) {
+            return data;
+        }
+    }
+}
+//# sourceMappingURL=polling.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/assistant-run-polling.mjs
+
+/**
+ * Polls an assistant run through the resource's retrieve method, preserving the
+ * original params object, request-header merge, and terminal run states.
+ *
+ * @internal
+ */
+function pollAssistantRun(resource, runID, params, options) {
+    return pollWithResponse((headers) => resource.retrieve(runID, params, {
+        ...options,
+        headers: { ...options?.headers, ...headers },
+    }), ['queued', 'in_progress', 'cancelling'], ['requires_action', 'incomplete', 'cancelled', 'completed', 'failed', 'expired'], options);
+}
+//# sourceMappingURL=assistant-run-polling.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/threads/runs/runs.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
@@ -76514,48 +82972,7 @@ class Runs extends APIResource {
      * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
      */
     async poll(runId, params, options) {
-        const headers = buildHeaders([
-            options?.headers,
-            {
-                'X-Stainless-Poll-Helper': 'true',
-                'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-            },
-        ]);
-        while (true) {
-            const { data: run, response } = await this.retrieve(runId, params, {
-                ...options,
-                headers: { ...options?.headers, ...headers },
-            }).withResponse();
-            switch (run.status) {
-                //If we are in any sort of intermediate state we poll
-                case 'queued':
-                case 'in_progress':
-                case 'cancelling':
-                    let sleepInterval = 5000;
-                    if (options?.pollIntervalMs) {
-                        sleepInterval = options.pollIntervalMs;
-                    }
-                    else {
-                        const headerInterval = response.headers.get('openai-poll-after-ms');
-                        if (headerInterval) {
-                            const headerIntervalMs = parseInt(headerInterval);
-                            if (!isNaN(headerIntervalMs)) {
-                                sleepInterval = headerIntervalMs;
-                            }
-                        }
-                    }
-                    await sleep(sleepInterval);
-                    break;
-                //We return the run in any terminal state.
-                case 'requires_action':
-                case 'incomplete':
-                case 'cancelled':
-                case 'completed':
-                case 'failed':
-                case 'expired':
-                    return run;
-            }
-        }
+        return await pollAssistantRun(this, runId, params, options);
     }
     /**
      * Create a Run stream
@@ -76707,10 +83124,13 @@ threads_Threads.Messages = messages_Messages;
 
 
 
+
+
 class Beta extends APIResource {
     constructor() {
         super(...arguments);
         this.realtime = new Realtime(this._client);
+        this.agents = new Agents(this._client);
         this.responses = new Responses(this._client);
         this.chatkit = new ChatKit(this._client);
         this.assistants = new Assistants(this._client);
@@ -76718,6 +83138,7 @@ class Beta extends APIResource {
     }
 }
 Beta.Realtime = Realtime;
+Beta.Agents = Agents;
 Beta.Responses = Responses;
 Beta.ChatKit = ChatKit;
 Beta.Assistants = Assistants;
@@ -76769,7 +83190,7 @@ class Content extends APIResource {
 
 
 
-class Files extends APIResource {
+class files_Files extends APIResource {
     constructor() {
         super(...arguments);
         this.content = new Content(this._client);
@@ -76815,7 +83236,7 @@ class Files extends APIResource {
         });
     }
 }
-Files.Content = Content;
+files_Files.Content = Content;
 //# sourceMappingURL=files.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/containers/containers.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -76828,7 +83249,7 @@ Files.Content = Content;
 class Containers extends APIResource {
     constructor() {
         super(...arguments);
-        this.files = new Files(this._client);
+        this.files = new files_Files(this._client);
     }
     /**
      * Create Container
@@ -76866,7 +83287,7 @@ class Containers extends APIResource {
         });
     }
 }
-Containers.Files = Files;
+Containers.Files = files_Files;
 //# sourceMappingURL=containers.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/content-provenance-checks.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -76875,7 +83296,7 @@ Containers.Files = Files;
 class ContentProvenanceChecks extends APIResource {
     /**
      * Check whether an image or audio file contains known OpenAI provenance signals.
-     * [Learn more about content provenance](/api/docs/guides/content-provenance).
+     * [Learn more about content provenance](https://developers.openai.com/api/docs/guides/content-provenance).
      *
      * If `not_detected`, it means the tool did not find supported signals in the
      * uploaded file. The content could still have been generated by OpenAI if the
@@ -76897,7 +83318,7 @@ class ContentProvenanceChecks extends APIResource {
 /**
  * Manage conversations and conversation items.
  */
-class Items extends APIResource {
+class conversations_items_Items extends APIResource {
     /**
      * Create items in a conversation with the given ID.
      */
@@ -76951,7 +83372,7 @@ class Items extends APIResource {
 class Conversations extends APIResource {
     constructor() {
         super(...arguments);
-        this.items = new Items(this._client);
+        this.items = new conversations_items_Items(this._client);
     }
     /**
      * Create a conversation.
@@ -76988,8 +83409,64 @@ class Conversations extends APIResource {
         });
     }
 }
-Conversations.Items = Items;
+Conversations.Items = conversations_items_Items;
 //# sourceMappingURL=conversations.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/embeddings.mjs
+
+/**
+ * Sends the optimized embeddings request while preserving explicit encodings and
+ * the original APIPromise response accessors.
+ *
+ * @internal
+ */
+function createEmbedding(client, body, options) {
+    const hasUserProvidedEncodingFormat = !!body.encoding_format;
+    // No encoding_format specified, defaulting to base64 for performance reasons.
+    // See https://github.com/openai/openai-node/pull/1312.
+    const encodingFormat = hasUserProvidedEncodingFormat ? body.encoding_format : 'base64';
+    if (hasUserProvidedEncodingFormat) {
+        loggerFor(client).debug('embeddings/user defined encoding_format:', body.encoding_format);
+    }
+    const optimizedBody = { ...body, encoding_format: encodingFormat };
+    const requestOptions = {
+        body: optimizedBody,
+        ...options,
+        __security: { bearerAuth: true },
+    };
+    const response = client.post('/embeddings', requestOptions);
+    // Explicit encodings return the original response promise unchanged.
+    if (hasUserProvidedEncodingFormat) {
+        return response;
+    }
+    // Preserve numeric output for default requests, including body overrides that
+    // change the encoding used on the wire.
+    loggerFor(client).debug('embeddings/decoding base64 embeddings from base64');
+    return response._thenUnwrap((data) => {
+        const embeddings = data?.data;
+        if (embeddings !== undefined) {
+            if (!Array.isArray(embeddings)) {
+                throw new TypeError('Expected embeddings response data to be an array');
+            }
+            const { length } = embeddings;
+            // Preserve the original iteration length and skip sparse-array holes.
+            for (let index = 0; index < length; index += 1) {
+                if (index in embeddings) {
+                    // SAFETY: This indexed entry belongs to the API embedding data array; sparse entries are skipped by the preceding membership check.
+                    const embeddingBase64Obj = embeddings[index];
+                    const { embedding } = embeddingBase64Obj;
+                    // Request hooks and serialization can also select float embeddings.
+                    if (Array.isArray(embedding)) {
+                        continue;
+                    }
+                    // SAFETY: The Array.isArray branch already handled decoded vectors; this request explicitly asked the server for base64 encoding.
+                    embeddingBase64Obj.embedding = toFloat32Array(embedding);
+                }
+            }
+        }
+        return data;
+    });
+}
+//# sourceMappingURL=embeddings.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/embeddings.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
@@ -76999,41 +83476,7 @@ Conversations.Items = Items;
  */
 class Embeddings extends APIResource {
     create(body, options) {
-        const hasUserProvidedEncodingFormat = !!body.encoding_format;
-        // No encoding_format specified, defaulting to base64 for performance reasons
-        // See https://github.com/openai/openai-node/pull/1312
-        let encoding_format = hasUserProvidedEncodingFormat
-            ? body.encoding_format
-            : 'base64';
-        if (hasUserProvidedEncodingFormat) {
-            loggerFor(this._client).debug('embeddings/user defined encoding_format:', body.encoding_format);
-        }
-        const response = this._client.post('/embeddings', {
-            body: {
-                ...body,
-                encoding_format: encoding_format,
-            },
-            ...options,
-            __security: { bearerAuth: true },
-        });
-        // if the user specified an encoding_format, return the response as-is
-        if (hasUserProvidedEncodingFormat) {
-            return response;
-        }
-        // in this stage, we are sure the user did not specify an encoding_format
-        // and we defaulted to base64 for performance reasons
-        // we are sure then that the response is base64 encoded, let's decode it
-        // the returned result will be a float32 array since this is OpenAI API's default encoding
-        loggerFor(this._client).debug('embeddings/decoding base64 embeddings from base64');
-        return response._thenUnwrap((response) => {
-            if (response && response.data) {
-                response.data.forEach((embeddingBase64Obj) => {
-                    const embeddingBase64Str = embeddingBase64Obj.embedding;
-                    embeddingBase64Obj.embedding = toFloat32Array(embeddingBase64Str);
-                });
-            }
-            return response;
-        });
+        return createEmbedding(this._client, body, options);
     }
 }
 //# sourceMappingURL=embeddings.mjs.map
@@ -77156,7 +83599,7 @@ class Evals extends APIResource {
      * data source, which dictates the schema of the data used in the evaluation. After
      * creating an evaluation, you can run it on different models and model parameters.
      * We support several types of graders and datasources. For more information, see
-     * the [Evals guide](https://platform.openai.com/docs/guides/evals).
+     * the [Evals guide](https://developers.openai.com/api/docs/guides/evals).
      */
     create(body, options) {
         return this._client.post('/evals', { body, ...options, __security: { bearerAuth: true } });
@@ -77192,9 +83635,37 @@ class Evals extends APIResource {
 }
 Evals.Runs = runs_Runs;
 //# sourceMappingURL=evals.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/file-processing.mjs
+
+
+/**
+ * Waits for file processing through the resource's retrieve method. Elapsed time
+ * uses a monotonic clock so system clock changes do not affect the timeout,
+ * which is checked after each subsequent retrieval, preserving the existing behavior
+ * for an initially terminal file and for a terminal response received too late.
+ *
+ * @internal
+ */
+async function waitForFileProcessing(resource, id, pollInterval, maxWait) {
+    const terminalStates = new Set(['processed', 'error', 'deleted']);
+    const start = performance.now();
+    let file = await resource.retrieve(id);
+    while (!file.status || !terminalStates.has(file.status)) {
+        // oxlint-disable-next-line no-await-in-loop -- Wait before issuing the next processing-status request.
+        await sleep(pollInterval);
+        // oxlint-disable-next-line no-await-in-loop -- The timeout and next iteration depend on this response.
+        file = await resource.retrieve(id);
+        if (performance.now() - start > maxWait) {
+            throw new APIConnectionTimeoutError({
+                message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
+            });
+        }
+    }
+    return file;
+}
+//# sourceMappingURL=file-processing.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/files.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
-
 
 
 
@@ -77204,7 +83675,7 @@ Evals.Runs = runs_Runs;
 /**
  * Files are used to upload documents that can be used with features like Assistants and Fine-tuning.
  */
-class files_Files extends APIResource {
+class resources_files_Files extends APIResource {
     /**
      * Upload a file that can be used across various endpoints. Individual files can be
      * up to 512 MB, and each project can store up to 2.5 TB of files in total. There
@@ -77213,20 +83684,20 @@ class files_Files extends APIResource {
      *
      * - The Assistants API supports files up to 2 million tokens and of specific file
      *   types. See the
-     *   [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools)
+     *   [Assistants Tools guide](https://developers.openai.com/api/docs/guides/tools)
      *   for details.
      * - The Fine-tuning API only supports `.jsonl` files. The input also has certain
      *   required formats for fine-tuning
-     *   [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input)
+     *   [chat](https://developers.openai.com/api/docs/guides/supervised-fine-tuning#formatting-your-data)
      *   or
-     *   [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+     *   [completions](https://developers.openai.com/api/docs/guides/supervised-fine-tuning#formatting-your-data)
      *   models.
      * - The Batch API only supports `.jsonl` files up to 200 MB in size. The input
      *   also has a specific required
-     *   [format](https://platform.openai.com/docs/api-reference/batch/request-input).
+     *   [format](https://developers.openai.com/api/docs/guides/batch#1-prepare-your-batch-file).
      * - For Retrieval or `file_search` ingestion, upload files here first. If you need
      *   to attach multiple uploaded files to the same vector store, use
-     *   [`/vector_stores/{vector_store_id}/file_batches`](https://platform.openai.com/docs/api-reference/vector-stores-file-batches/createBatch)
+     *   [`/vector_stores/{vector_store_id}/file_batches`](https://developers.openai.com/api/reference/resources/vector_stores/subresources/file_batches/methods/create)
      *   instead of attaching them one by one. Vector store attachment has separate
      *   limits from file upload, including 2,000 attached files per minute per
      *   organization.
@@ -77274,19 +83745,7 @@ class files_Files extends APIResource {
      * Waits for the given file to be processed, default timeout is 30 mins.
      */
     async waitForProcessing(id, { pollInterval = 5000, maxWait = 30 * 60 * 1000 } = {}) {
-        const TERMINAL_STATES = new Set(['processed', 'error', 'deleted']);
-        const start = Date.now();
-        let file = await this.retrieve(id);
-        while (!file.status || !TERMINAL_STATES.has(file.status)) {
-            await sleep(pollInterval);
-            file = await this.retrieve(id);
-            if (Date.now() - start > maxWait) {
-                throw new APIConnectionTimeoutError({
-                    message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`,
-                });
-            }
-        }
-        return file;
+        return await waitForFileProcessing(this, id, pollInterval, maxWait);
     }
 }
 //# sourceMappingURL=files.mjs.map
@@ -77376,7 +83835,8 @@ Alpha.Graders = Graders;
  */
 class Permissions extends APIResource {
     /**
-     * **NOTE:** Calling this endpoint requires an [admin API key](../admin-api-keys).
+     * **NOTE:** Calling this endpoint requires an
+     * [admin API key](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/admin_api_keys).
      *
      * This enables organization owners to share fine-tuned models with other projects
      * in their organization.
@@ -77396,7 +83856,8 @@ class Permissions extends APIResource {
         return this._client.getAPIList(src_path `/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, (Page), { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } });
     }
     /**
-     * **NOTE:** This endpoint requires an [admin API key](../admin-api-keys).
+     * **NOTE:** This endpoint requires an
+     * [admin API key](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/admin_api_keys).
      *
      * Organization owners can use this endpoint to view all permissions for a
      * fine-tuned model checkpoint.
@@ -77411,7 +83872,8 @@ class Permissions extends APIResource {
         });
     }
     /**
-     * **NOTE:** This endpoint requires an [admin API key](../admin-api-keys).
+     * **NOTE:** This endpoint requires an
+     * [admin API key](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/admin_api_keys).
      *
      * Organization owners can use this endpoint to view all permissions for a
      * fine-tuned model checkpoint.
@@ -77430,7 +83892,8 @@ class Permissions extends APIResource {
         return this._client.getAPIList(src_path `/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, (ConversationCursorPage), { query, ...options, __security: { adminAPIKeyAuth: true } });
     }
     /**
-     * **NOTE:** This endpoint requires an [admin API key](../admin-api-keys).
+     * **NOTE:** This endpoint requires an
+     * [admin API key](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/admin_api_keys).
      *
      * Organization owners can use this endpoint to delete a permission for a
      * fine-tuned model checkpoint.
@@ -77515,7 +83978,7 @@ class Jobs extends APIResource {
      * Response includes details of the enqueued job including job status and the name
      * of the fine-tuned models once complete.
      *
-     * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+     * [Learn more about fine-tuning](https://developers.openai.com/api/docs/guides/model-optimization)
      *
      * @example
      * ```ts
@@ -77531,7 +83994,7 @@ class Jobs extends APIResource {
     /**
      * Get info about a fine-tuning job.
      *
-     * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+     * [Learn more about fine-tuning](https://developers.openai.com/api/docs/guides/model-optimization)
      *
      * @example
      * ```ts
@@ -77715,6 +84178,175 @@ class Images extends APIResource {
     }
 }
 //# sourceMappingURL=images.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/live/sessions.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+class live_sessions_Sessions extends APIResource {
+    /**
+     * Accept an incoming SIP call. Supply session with type live, the model, and
+     * startup configuration. Before accepting calls, follow the
+     * [Live prompting guide](https://developers.openai.com/api/docs/guides/live-prompting)
+     * to write frontend conversation instructions and a separate backend prompt. SIP
+     * media format is negotiated; omit audio.format.
+     *
+     * @example
+     * ```ts
+     * await client.live.sessions.accept('session_id', {
+     *   session: { model: 'gpt-live-1', type: 'live' },
+     * });
+     * ```
+     */
+    accept(sessionID, body, options) {
+        return this._client.post(src_path `/live/sessions/${sessionID}/accept`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Get Live session content
+     *
+     * @example
+     * ```ts
+     * const response =
+     *   await client.live.sessions.downloadRecording('live_SQ');
+     *
+     * const content = await response.blob();
+     * console.log(content);
+     * ```
+     */
+    downloadRecording(sessionID, options) {
+        return this._client.get(src_path `/live/sessions/${sessionID}/content`, {
+            ...options,
+            headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+            __security: { bearerAuth: true },
+            __binaryResponse: true,
+        });
+    }
+    /**
+     * Fork a stored Live session onto a new WebRTC connection.
+     *
+     * @example
+     * ```ts
+     * const response = await client.live.sessions.fork(
+     *   'session_id',
+     *   { transport: { sdp: 'x', type: 'webrtc' } },
+     * );
+     * ```
+     */
+    fork(sessionID, body, options) {
+        return this._client.post(src_path `/live/sessions/${sessionID}/fork`, {
+            body,
+            ...options,
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * End a SIP call identified by session_id.
+     *
+     * @example
+     * ```ts
+     * await client.live.sessions.hangup('session_id');
+     * ```
+     */
+    hangup(sessionID, options) {
+        return this._client.post(src_path `/live/sessions/${sessionID}/hangup`, {
+            ...options,
+            headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Transfer a SIP call to another destination. Supply a nonblank target_uri for the
+     * SIP Refer-To header.
+     *
+     * @example
+     * ```ts
+     * await client.live.sessions.refer('session_id', {
+     *   target_uri: 'tel:+14155550123',
+     * });
+     * ```
+     */
+    refer(sessionID, body, options) {
+        return this._client.post(src_path `/live/sessions/${sessionID}/refer`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+    /**
+     * Reject an incoming SIP call. Send a required SIP rejection status_code between
+     * 300 and 699.
+     *
+     * @example
+     * ```ts
+     * await client.live.sessions.reject('session_id', {
+     *   status_code: 486,
+     * });
+     * ```
+     */
+    reject(sessionID, body, options) {
+        return this._client.post(src_path `/live/sessions/${sessionID}/reject`, {
+            body,
+            ...options,
+            headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+            __security: { bearerAuth: true },
+        });
+    }
+}
+//# sourceMappingURL=sessions.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/live/forks/forks.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+class Forks extends APIResource {
+}
+//# sourceMappingURL=forks.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/live/sideband/sideband.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+class Sideband extends APIResource {
+}
+//# sourceMappingURL=sideband.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/live/live.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+
+class Live extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.sideband = new Sideband(this._client);
+        this.forks = new Forks(this._client);
+        this.sessions = new live_sessions_Sessions(this._client);
+    }
+    /**
+     * Create a Live WebRTC session. Start with the
+     * [Live prompting guide](https://developers.openai.com/api/docs/guides/live-prompting).
+     *
+     * @example
+     * ```ts
+     * const live = await client.live.create({
+     *   session: { model: 'gpt-live-1' },
+     *   transport: { sdp: 'x', type: 'webrtc' },
+     * });
+     * ```
+     */
+    create(body, options) {
+        return this._client.post('/live/sessions', { body, ...options, __security: { bearerAuth: true } });
+    }
+}
+Live.Sideband = Sideband;
+Live.Forks = Forks;
+Live.Sessions = live_sessions_Sessions;
+//# sourceMappingURL=live.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/models.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
@@ -77756,19 +84388,93 @@ class Models extends APIResource {
 class Moderations extends APIResource {
     /**
      * Classifies if text and/or image inputs are potentially harmful. Learn more in
-     * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
+     * the
+     * [moderation guide](https://developers.openai.com/api/docs/guides/moderation).
      */
     create(body, options) {
         return this._client.post('/moderations', { body, ...options, __security: { bearerAuth: true } });
     }
 }
 //# sourceMappingURL=moderations.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/multipart-encoding.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+/** Encode explicitly typed fields as single, filename-less multipart parts. */
+async function encodedMultipartFormRequestOptions(options, client, encodings, rawBodyField = null) {
+    if (options.body === null || typeof options.body !== 'object' || Array.isArray(options.body)) {
+        throw new TypeError('Multipart request body must be an object');
+    }
+    const body = Object.fromEntries(Object.entries(options.body).filter(([, value]) => value !== undefined));
+    if (rawBodyField !== null &&
+        Object.keys(body).length === 1 &&
+        Object.prototype.hasOwnProperty.call(body, rawBodyField)) {
+        const value = body[rawBodyField];
+        if (typeof value !== 'string')
+            throw new TypeError('Raw multipart alternative must be a string');
+        return {
+            ...options,
+            body: value,
+            headers: buildHeaders([options.headers, { 'content-type': encodings[rawBodyField].content_type }]),
+        };
+    }
+    const encoded = [];
+    for (const [name, encoding] of Object.entries(encodings)) {
+        if (!Object.prototype.hasOwnProperty.call(body, name))
+            continue;
+        const value = body[name];
+        const data = encoding.json ? JSON.stringify(value) : value;
+        if (typeof data !== 'string')
+            throw new TypeError(`Multipart field ${name} must encode as a string`);
+        encoded.push([name, makeFile([data], '', { type: encoding.content_type })]);
+        delete body[name];
+    }
+    const multipart = await multipartFormRequestOptions({ ...options, body }, client);
+    const form = multipart.body;
+    // Declared upload fields are rejected during code generation. Defend against untyped body overrides.
+    if (!(form instanceof FormData)) {
+        await form.cancel();
+        throw new TypeError('Unexpected streaming upload in typed multipart request body');
+    }
+    for (const [name, part] of encoded)
+        form.append(name, part, '');
+    return {
+        ...options,
+        body: form,
+        headers: buildHeaders([options.headers, { 'content-type': null }]),
+    };
+}
+//# sourceMappingURL=multipart-encoding.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/realtime/calls.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 
 
+
 class Calls extends APIResource {
+    /**
+     * Create a new Realtime API call over WebRTC and receive the SDP answer needed to
+     * complete the peer connection.
+     *
+     * @example
+     * ```ts
+     * await client.realtime.calls.create({
+     *   sdp: 'sdp',
+     * });
+     * ```
+     */
+    create(body, options) {
+        return this._client.post('/realtime/calls', encodedMultipartFormRequestOptions({
+            body,
+            ...options,
+            headers: buildHeaders([{ Accept: 'application/sdp' }, options?.headers]),
+            __security: { bearerAuth: true },
+            __binaryResponse: true,
+        }, this._client, {
+            sdp: { content_type: 'application/sdp', json: false },
+            session: { content_type: 'application/json', json: true },
+        }, 'sdp'));
+    }
     /**
      * Accept an incoming SIP call and configure the realtime session that will handle
      * it.
@@ -77855,7 +84561,7 @@ class ClientSecrets extends APIResource {
      * will be applied to any sessions created using that client secret, but these can
      * also be overridden by the client connection.
      *
-     * [Learn more about authentication with client secrets over WebRTC](https://platform.openai.com/docs/guides/realtime-webrtc).
+     * [Learn more about authentication with client secrets over WebRTC](https://developers.openai.com/api/docs/guides/realtime-webrtc).
      *
      * Returns the created client secret and the effective session object. The client
      * secret is a string that looks like `ek_1234`.
@@ -77924,6 +84630,7 @@ function maybeParseResponse(response, params) {
             }),
         };
         if (needsOutputText(response, parsed)) {
+            // SAFETY: The copy retains every response field and only adds parsed metadata; addOutputText accepts that original response structure.
             addOutputText(parsed);
         }
         return parsed;
@@ -77931,7 +84638,8 @@ function maybeParseResponse(response, params) {
     return parseResponse(response, params);
 }
 /**
- * Parses completed response text and strict function-tool arguments.
+ * Parses completed response text and strict function-tool arguments, matching
+ * namespaced functions by both namespace and name.
  *
  * Incomplete or nonterminal responses keep their parsed values as `null`, and
  * `output_parsed` returns the first successfully parsed output-text item.
@@ -77979,6 +84687,7 @@ function parseResponse(response, params) {
             return null;
         },
     });
+    // SAFETY: The output_parsed getter was installed immediately above and returns the first parsed content or null.
     return parsed;
 }
 function parseTextFormat(params, content) {
@@ -77990,7 +84699,10 @@ function ResponsesParser_hasAutoParseableInput(params) {
         return true;
     }
     return (Array.isArray(params.tools) &&
-        params.tools.some((tool) => ResponsesParser_isAutoParsableTool(tool) || (tool.type === 'function' && tool.strict === true)));
+        params.tools.some((tool) => ResponsesParser_isAutoParsableTool(tool) ||
+            (tool.type === 'function' && tool.strict === true) ||
+            (tool.type === 'namespace' &&
+                tool.tools.some((nested) => nested.type === 'function' && (ResponsesParser_isAutoParsableTool(nested) || nested.strict === true)))));
 }
 /** Copies a Responses API function tool and attaches non-enumerable parser and callback metadata. */
 function makeParseableResponseTool(tool, { parser, callback, }) {
@@ -78009,35 +84721,47 @@ function makeParseableResponseTool(tool, { parser, callback, }) {
             enumerable: false,
         },
     });
+    // SAFETY: The non-enumerable parser brand and callbacks were installed on this copied tool immediately above.
     return obj;
 }
 /** Returns whether a Responses API tool carries the SDK's argument-parser marker. */
 function ResponsesParser_isAutoParsableTool(tool) {
     return tool?.['$brand'] === 'auto-parseable-tool';
 }
-function getInputToolByName(input_tools, name) {
-    return input_tools.find((tool) => tool.type === 'function' && tool.name === name);
+function getInputToolByName(input_tools, name, namespace) {
+    for (const tool of input_tools) {
+        if (namespace == null) {
+            if (tool.type === 'function' && tool.name === name) {
+                return tool;
+            }
+        }
+        else if (tool.type === 'namespace' && tool.name === namespace) {
+            return tool.tools.find((nested) => nested.type === 'function' && nested.name === name);
+        }
+    }
+    return undefined;
 }
 function ResponsesParser_parseToolCall(params, toolCall) {
-    const inputTool = getInputToolByName(params.tools ?? [], toolCall.name);
+    const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Parsing replaces the initial null with an arbitrary caller-parser result, so unknown is required.
     let parsedArguments = null;
     if (ResponsesParser_isAutoParsableTool(inputTool)) {
         parsedArguments = inputTool.$parseRaw(toolCall.arguments);
     }
     else if (inputTool?.strict) {
-        parsedArguments = JSON.parse(toolCall.arguments);
+        parsedArguments = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, toolCall.arguments);
     }
     return {
         ...toolCall,
         parsed_arguments: parsedArguments,
     };
 }
-/** Returns whether a response function call matches a strict or auto-parseable request tool. */
+/** Matches a response function call to a strict or auto-parseable tool by namespace and name. */
 function ResponsesParser_shouldParseToolCall(params, toolCall) {
     if (!params) {
         return false;
     }
-    const inputTool = getInputToolByName(params.tools ?? [], toolCall.name);
+    const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
     return ResponsesParser_isAutoParsableTool(inputTool) || inputTool?.strict || false;
 }
 /**
@@ -78181,9 +84905,9 @@ function ensureCanonicalOutputText(context, snapshot) {
         text += outputText;
         outputTextIndex.append(outputText.length);
     }
-    if (snapshot.output_text !== text) {
-        snapshot.output_text = text;
-    }
+    // Comparing independently accumulated strings can scan all preceding text on
+    // every delta. The recount is authoritative, so assign it without comparing.
+    snapshot.output_text = text;
     context.outputTextIndex = outputTextIndex;
     context.canonicalSnapshot = snapshot;
 }
@@ -78268,8 +84992,10 @@ function updateOutputText(context, snapshot, outputIndex, previousText, nextText
 
 
 
+const responseOutputIdentityIndexes = new WeakMap();
 function validateArrayIndex(collection, index, kind, allowAppend = false) {
-    if (!Number.isSafeInteger(index) ||
+    if (!Array.isArray(collection) ||
+        !Number.isSafeInteger(index) ||
         index < 0 ||
         index > collection.length ||
         (index === collection.length ? !allowAppend || index in collection : !hasOwn(collection, index))) {
@@ -78289,6 +85015,190 @@ function getOutput(snapshot, outputIndex) {
         throw new error_OpenAIError(`missing output at index ${outputIndex}`);
     }
     return output;
+}
+function hasRoutedOutputCallIdentity(output) {
+    return (output.type === 'function_call' ||
+        output.type === 'custom_tool_call' ||
+        output.type === 'shell_call' ||
+        output.type === 'shell_call_output');
+}
+function getOutputItemIdentityKeys(output, eventType) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
+    if (!hasOwn(output, 'type') || typeof output.type !== 'string') {
+        throw new error_OpenAIError(`expected an own output item type for ${eventType}`);
+    }
+    const optionalPlatformID = output.type === 'function_call' || output.type === 'custom_tool_call';
+    const identities = [];
+    if (hasOwn(output, 'id')) {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
+        if (typeof output.id !== 'string' || output.id.length === 0) {
+            throw new error_OpenAIError(`expected a non-empty output item id for ${eventType}`);
+        }
+        identities.push(`id:${output.id}`);
+    }
+    else if (!optionalPlatformID) {
+        throw new error_OpenAIError(`expected a non-empty output item id for ${eventType}`);
+    }
+    if (hasRoutedOutputCallIdentity(output)) {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
+        if (!hasOwn(output, 'call_id') || typeof output.call_id !== 'string' || output.call_id.length === 0) {
+            throw new error_OpenAIError(`expected a non-empty output item call_id for ${eventType}`);
+        }
+        identities.push(`call:${output.type}:${output.call_id}`);
+    }
+    return identities;
+}
+function assertOutputItemIdentitiesAvailable(identities, keys) {
+    for (const key of keys) {
+        if (identities.has(key)) {
+            throw new error_OpenAIError(`duplicate output item identity '${key}'`);
+        }
+    }
+}
+function addOutputItemIdentities(identities, keys) {
+    assertOutputItemIdentitiesAvailable(identities, keys);
+    for (const key of keys) {
+        identities.add(key);
+    }
+}
+function createResponseOutputIdentityIndex(snapshot) {
+    const identityIndex = {
+        snapshot,
+        output: snapshot.output,
+        length: snapshot.output.length,
+        identities: new Set(),
+    };
+    for (let index = 0; index < snapshot.output.length; index += 1) {
+        const output = getOutput(snapshot, index);
+        addOutputItemIdentities(identityIndex.identities, getOutputItemIdentityKeys(output, 'response snapshot'));
+    }
+    return identityIndex;
+}
+function getResponseOutputIdentityIndex(context, snapshot) {
+    const cached = responseOutputIdentityIndexes.get(context);
+    if (cached &&
+        cached.snapshot === snapshot &&
+        cached.output === snapshot.output &&
+        cached.length === snapshot.output.length) {
+        return cached;
+    }
+    const identityIndex = createResponseOutputIdentityIndex(snapshot);
+    responseOutputIdentityIndexes.set(context, identityIndex);
+    return identityIndex;
+}
+function cloneValidatedResponse(context, response) {
+    const nextContext = createCanonicalResponseContext();
+    const snapshot = cloneResponse(nextContext, response);
+    const identityIndex = createResponseOutputIdentityIndex(snapshot);
+    context.canonicalSnapshot = nextContext.canonicalSnapshot;
+    context.outputTextLengths = nextContext.outputTextLengths;
+    context.outputTextIndex = nextContext.outputTextIndex;
+    responseOutputIdentityIndexes.set(context, identityIndex);
+    return snapshot;
+}
+const expectedOutputItemTypes = {
+    'response.output_text.delta': 'message',
+    'response.output_text.done': 'message',
+    'response.output_text.annotation.added': 'message',
+    'response.refusal.delta': 'message',
+    'response.refusal.done': 'message',
+    'response.function_call_arguments.delta': 'function_call',
+    'response.function_call_arguments.done': 'function_call',
+    'response.custom_tool_call_input.delta': 'custom_tool_call',
+    'response.custom_tool_call_input.done': 'custom_tool_call',
+    'response.mcp_call_arguments.delta': 'mcp_call',
+    'response.mcp_call_arguments.done': 'mcp_call',
+    'response.mcp_call.in_progress': 'mcp_call',
+    'response.mcp_call.completed': 'mcp_call',
+    'response.mcp_call.failed': 'mcp_call',
+    'response.shell_call_output_content.delta': 'shell_call_output',
+    'response.shell_call_output_content.done': 'shell_call_output',
+    'response.reasoning_text.delta': 'reasoning',
+    'response.reasoning_text.done': 'reasoning',
+    'response.reasoning_summary_part.added': 'reasoning',
+    'response.reasoning_summary_part.done': 'reasoning',
+    'response.reasoning_summary_text.delta': 'reasoning',
+    'response.reasoning_summary_text.done': 'reasoning',
+    'response.code_interpreter_call_code.delta': 'code_interpreter_call',
+    'response.code_interpreter_call_code.done': 'code_interpreter_call',
+    'response.code_interpreter_call.in_progress': 'code_interpreter_call',
+    'response.code_interpreter_call.interpreting': 'code_interpreter_call',
+    'response.code_interpreter_call.completed': 'code_interpreter_call',
+    'response.file_search_call.in_progress': 'file_search_call',
+    'response.file_search_call.searching': 'file_search_call',
+    'response.file_search_call.completed': 'file_search_call',
+    'response.web_search_call.in_progress': 'web_search_call',
+    'response.web_search_call.searching': 'web_search_call',
+    'response.web_search_call.completed': 'web_search_call',
+    'response.image_generation_call.in_progress': 'image_generation_call',
+    'response.image_generation_call.generating': 'image_generation_call',
+    'response.image_generation_call.completed': 'image_generation_call',
+    'response.image_generation_call.partial_image': 'image_generation_call',
+    'response.mcp_list_tools.in_progress': 'mcp_list_tools',
+    'response.mcp_list_tools.completed': 'mcp_list_tools',
+    'response.mcp_list_tools.failed': 'mcp_list_tools',
+    'response.compaction.compacting': 'compaction',
+};
+function getExpectedOutputItemType(event) {
+    if (event.type === 'response.content_part.added' || event.type === 'response.content_part.done') {
+        return event.part.type === 'reasoning_text' ? 'reasoning' : 'message';
+    }
+    return expectedOutputItemTypes[event.type];
+}
+function validateCompletedOutputItemIdentity(event, snapshot) {
+    const output = getOutput(snapshot, event.output_index);
+    const replacement = event.item;
+    getOutputItemIdentityKeys(output, event.type);
+    getOutputItemIdentityKeys(replacement, event.type);
+    if (!hasOwn(replacement, 'type') || output.type !== replacement.type) {
+        throw new error_OpenAIError(`expected output item type '${output.type}', got '${replacement.type}'`);
+    }
+    const outputID = hasOwn(output, 'id') ? output.id : undefined;
+    const replacementID = hasOwn(replacement, 'id') ? replacement.id : undefined;
+    if (outputID !== replacementID) {
+        throw new error_OpenAIError(`expected output item id '${outputID}', got '${replacementID}'`);
+    }
+    if (hasRoutedOutputCallIdentity(output) &&
+        hasRoutedOutputCallIdentity(replacement) &&
+        output.call_id !== replacement.call_id) {
+        throw new error_OpenAIError(`expected output item call_id '${output.call_id}', got '${replacement.call_id}'`);
+    }
+}
+function validateOutputItemIdentity(event, snapshot, rejectInvalidShellTargets) {
+    if (event.type === 'response.output_item.done') {
+        validateCompletedOutputItemIdentity(event, snapshot);
+        return;
+    }
+    if (rejectInvalidShellTargets &&
+        (event.type === 'response.shell_call_command.added' ||
+            event.type === 'response.shell_call_command.delta' ||
+            event.type === 'response.shell_call_command.done')) {
+        const output = getOutput(snapshot, event.output_index);
+        if (!hasOwn(output, 'type') || output.type !== 'shell_call') {
+            throw new error_OpenAIError(`expected output item type 'shell_call', got '${output.type}'`);
+        }
+        return;
+    }
+    if (event.type !== 'response.content_part.added' &&
+        event.type !== 'response.content_part.done' &&
+        !hasOwn(expectedOutputItemTypes, event.type)) {
+        return;
+    }
+    // SAFETY: The event type was classified as item-scoped; the following checks validate its own item_id before use.
+    const itemEvent = event;
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
+    if (!hasOwn(event, 'item_id') || typeof itemEvent.item_id !== 'string' || itemEvent.item_id.length === 0) {
+        throw new error_OpenAIError(`expected a non-empty item_id for ${event.type}`);
+    }
+    const output = getOutput(snapshot, itemEvent.output_index);
+    const outputID = hasOwn(output, 'id') ? output.id : undefined;
+    if (outputID !== itemEvent.item_id) {
+        throw new error_OpenAIError(`expected item_id '${outputID}', got '${itemEvent.item_id}'`);
+    }
+    const expectedType = getExpectedOutputItemType(itemEvent);
+    if (output.type !== expectedType) {
+        throw new error_OpenAIError(`expected output item type '${expectedType}', got '${output.type}'`);
+    }
 }
 function getContent(content, contentIndex) {
     validateArrayIndex(content, contentIndex, 'content');
@@ -78315,18 +85225,148 @@ function getShellOutputContent(snapshot, output, commandIndex) {
     }
     return getContent(output.output, commandIndex);
 }
-function response_accumulator_assertNever(value) {
-    throw new error_OpenAIError(`Unhandled response stream event: ${JSON.stringify(value)}`);
+function createSupportedResponseEventTypes(eventTypes) {
+    return new Set(eventTypes);
+}
+const supportedResponseEventTypes = createSupportedResponseEventTypes([
+    'response.output_item.added',
+    'response.output_item.done',
+    'response.content_part.added',
+    'response.content_part.done',
+    'response.output_text.delta',
+    'response.output_text.done',
+    'response.output_text.annotation.added',
+    'response.refusal.delta',
+    'response.refusal.done',
+    'response.function_call_arguments.delta',
+    'response.function_call_arguments.done',
+    'response.custom_tool_call_input.delta',
+    'response.custom_tool_call_input.done',
+    'response.mcp_call_arguments.delta',
+    'response.mcp_call_arguments.done',
+    'response.shell_call_command.added',
+    'response.shell_call_command.done',
+    'response.shell_call_command.delta',
+    'response.shell_call_output_content.delta',
+    'response.shell_call_output_content.done',
+    'response.reasoning_text.delta',
+    'response.reasoning_text.done',
+    'response.reasoning_summary_part.added',
+    'response.reasoning_summary_part.done',
+    'response.reasoning_summary_text.delta',
+    'response.reasoning_summary_text.done',
+    'response.code_interpreter_call_code.delta',
+    'response.code_interpreter_call_code.done',
+    'response.code_interpreter_call.in_progress',
+    'response.code_interpreter_call.interpreting',
+    'response.code_interpreter_call.completed',
+    'response.file_search_call.in_progress',
+    'response.file_search_call.searching',
+    'response.file_search_call.completed',
+    'response.web_search_call.in_progress',
+    'response.web_search_call.searching',
+    'response.web_search_call.completed',
+    'response.image_generation_call.in_progress',
+    'response.image_generation_call.generating',
+    'response.image_generation_call.completed',
+    'response.mcp_call.in_progress',
+    'response.mcp_call.completed',
+    'response.mcp_call.failed',
+    'response.created',
+    'response.queued',
+    'response.in_progress',
+    'response.completed',
+    'response.failed',
+    'response.incomplete',
+    'response.audio.delta',
+    'response.audio.done',
+    'response.audio.transcript.delta',
+    'response.audio.transcript.done',
+    'response.compaction.compacting',
+    'response.image_generation_call.partial_image',
+    'response.mcp_list_tools.in_progress',
+    'response.mcp_list_tools.completed',
+    'response.mcp_list_tools.failed',
+    'keepalive',
+    'error',
+]);
+function response_accumulator_assertNever(_value) {
+    throw new error_OpenAIError('Unhandled response stream event: unknown');
+}
+const responseEventRoutingFields = [
+    'item_id',
+    'output_index',
+    'content_index',
+    'annotation_index',
+    'command_index',
+    'summary_index',
+];
+function sanitizeResponseEvent(event) {
+    let descriptor;
+    try {
+        descriptor = Object.getOwnPropertyDescriptor(event, 'type');
+    }
+    catch {
+        // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
+        return response_accumulator_assertNever(event);
+    }
+    const type = descriptor?.value;
+    // SAFETY: The string is used only as a Set lookup key; membership performs the supported-event check.
+    if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
+    typeof type !== 'string' ||
+        !supportedResponseEventTypes.has(type)) {
+        // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
+        return response_accumulator_assertNever(event);
+    }
+    const stableValues = new Map([['type', type]]);
+    const itemScoped = type === 'response.output_item.added' ||
+        type === 'response.output_item.done' ||
+        type === 'response.content_part.added' ||
+        type === 'response.content_part.done' ||
+        type === 'response.shell_call_command.added' ||
+        type === 'response.shell_call_command.delta' ||
+        type === 'response.shell_call_command.done' ||
+        hasOwn(expectedOutputItemTypes, type);
+    if (itemScoped) {
+        try {
+            for (const field of responseEventRoutingFields) {
+                const routingDescriptor = Object.getOwnPropertyDescriptor(event, field);
+                stableValues.set(field, routingDescriptor ? event[field] : undefined);
+            }
+            if (type === 'response.output_item.done') {
+                stableValues.set('item', structuredClone(event.item));
+            }
+            else if (type === 'response.content_part.added' || type === 'response.content_part.done') {
+                stableValues.set('part', structuredClone(event.part));
+            }
+        }
+        catch {
+            // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
+            return response_accumulator_assertNever(event);
+        }
+    }
+    return new Proxy(event, {
+        get(target, property) {
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
+            return stableValues.has(property) ? stableValues.get(property) : Reflect.get(target, property, target);
+        },
+    });
 }
 function accumulateOutputItemEvent(event, snapshot, context) {
     switch (event.type) {
         case 'response.output_item.added': {
             validateArrayAppend(snapshot.output, event.output_index, 'output');
+            const identityIndex = getResponseOutputIdentityIndex(context, snapshot);
             const output = structuredClone(event.item);
+            const identities = getOutputItemIdentityKeys(output, event.type);
+            assertOutputItemIdentitiesAvailable(identityIndex.identities, identities);
             if (output.type === 'message') {
                 ensureCanonicalOutputText(context, snapshot);
             }
             snapshot.output.push(output);
+            addOutputItemIdentities(identityIndex.identities, identities);
+            identityIndex.length = snapshot.output.length;
             const text = getOutputText(context, output);
             if (context.canonicalSnapshot === snapshot) {
                 context.outputTextIndex.append(text.length);
@@ -78339,7 +85379,7 @@ function accumulateOutputItemEvent(event, snapshot, context) {
         case 'response.output_item.done': {
             const output = getOutput(snapshot, event.output_index);
             const previousText = getOutputText(context, output);
-            const replacement = structuredClone(event.item);
+            const replacement = event.item;
             if (output.type === 'message' || replacement.type === 'message') {
                 ensureCanonicalOutputText(context, snapshot);
             }
@@ -78364,7 +85404,7 @@ function accumulateContentPartAddedEvent(event, snapshot, context) {
             const { part } = event;
             if (type === 'message' && part.type !== 'reasoning_text') {
                 validateArrayAppend(output.content, event.content_index, 'content');
-                const content = structuredClone(part);
+                const content = part;
                 if (content.type === 'output_text') {
                     ensureCanonicalOutputText(context, snapshot);
                 }
@@ -78380,7 +85420,7 @@ function accumulateContentPartAddedEvent(event, snapshot, context) {
                 if (!output.content) {
                     output.content = content;
                 }
-                content.push(structuredClone(part));
+                content.push(part);
             }
             return true;
         }
@@ -78397,7 +85437,7 @@ function accumulateContentPartDoneEvent(event, snapshot, context) {
             if (output.type === 'message' && part.type !== 'reasoning_text') {
                 const content = getContent(output.content, event.content_index);
                 const previousText = content.type === 'output_text' ? content.text : '';
-                const replacement = structuredClone(part);
+                const replacement = part;
                 if (content.type === 'output_text' || replacement.type === 'output_text') {
                     ensureCanonicalOutputText(context, snapshot);
                 }
@@ -78412,7 +85452,7 @@ function accumulateContentPartDoneEvent(event, snapshot, context) {
                     throw new error_OpenAIError(`missing content at index ${event.content_index}`);
                 }
                 getContent(content, event.content_index);
-                content[event.content_index] = structuredClone(part);
+                content[event.content_index] = part;
             }
             return true;
         }
@@ -78467,6 +85507,7 @@ function accumulateOutputTextEvent(event, snapshot, context) {
                     throw new error_OpenAIError(`expected content to be 'output_text', got ${content.type}`);
                 }
                 validateArrayIndex(content.annotations, event.annotation_index, 'annotation', true);
+                // SAFETY: The output_text discriminator and annotation index were checked; the annotation is cloned from the corresponding API event contract.
                 content.annotations[event.annotation_index] = structuredClone(event.annotation);
             }
             return true;
@@ -78818,6 +85859,7 @@ function isIgnoredResponseEvent(event) {
         case 'response.audio.done':
         case 'response.audio.transcript.delta':
         case 'response.audio.transcript.done':
+        case 'response.compaction.compacting':
         case 'response.image_generation_call.partial_image':
         case 'response.mcp_list_tools.in_progress':
         case 'response.mcp_list_tools.completed':
@@ -78834,50 +85876,55 @@ function isIgnoredResponseEvent(event) {
 function createResponseContext() {
     return createCanonicalResponseContext();
 }
-function accumulateResponseWithContext(event, snapshot, context) {
+function accumulateResponseWithContext(event, snapshot, context, rejectInvalidShellTargets = false, onSanitizedEvent) {
+    const dispatchEvent = sanitizeResponseEvent(event);
+    if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
+        onSanitizedEvent(dispatchEvent);
+    }
     if (!snapshot) {
-        if (event.type !== 'response.created') {
-            throw new error_OpenAIError(`When snapshot hasn't been set yet, expected 'response.created' event, got ${event.type}`);
+        if (dispatchEvent.type !== 'response.created') {
+            throw new error_OpenAIError(`When snapshot hasn't been set yet, expected 'response.created' event, got ${dispatchEvent.type}`);
         }
-        return cloneResponse(context, event.response);
+        return cloneValidatedResponse(context, dispatchEvent.response);
     }
-    if (accumulateOutputItemEvent(event, snapshot, context)) {
+    validateOutputItemIdentity(dispatchEvent, snapshot, rejectInvalidShellTargets);
+    if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
         return snapshot;
     }
-    if (accumulateContentPartAddedEvent(event, snapshot, context)) {
+    if (accumulateContentPartAddedEvent(dispatchEvent, snapshot, context)) {
         return snapshot;
     }
-    if (accumulateContentPartDoneEvent(event, snapshot, context)) {
+    if (accumulateContentPartDoneEvent(dispatchEvent, snapshot, context)) {
         return snapshot;
     }
-    if (accumulateOutputTextEvent(event, snapshot, context)) {
+    if (accumulateOutputTextEvent(dispatchEvent, snapshot, context)) {
         return snapshot;
     }
-    if (accumulateRefusalAndArgumentsEvent(event, snapshot)) {
+    if (accumulateRefusalAndArgumentsEvent(dispatchEvent, snapshot)) {
         return snapshot;
     }
-    if (accumulateShellEvent(event, snapshot)) {
+    if (accumulateShellEvent(dispatchEvent, snapshot)) {
         return snapshot;
     }
-    if (accumulateReasoningEvent(event, snapshot)) {
+    if (accumulateReasoningEvent(dispatchEvent, snapshot)) {
         return snapshot;
     }
-    if (accumulateCodeInterpreterEvent(event, snapshot)) {
+    if (accumulateCodeInterpreterEvent(dispatchEvent, snapshot)) {
         return snapshot;
     }
-    if (accumulateSearchStatusEvent(event, snapshot)) {
+    if (accumulateSearchStatusEvent(dispatchEvent, snapshot)) {
         return snapshot;
     }
-    if (accumulateImageAndMcpStatusEvent(event, snapshot)) {
+    if (accumulateImageAndMcpStatusEvent(dispatchEvent, snapshot)) {
         return snapshot;
     }
-    if (isResponseLifecycleEvent(event)) {
-        return cloneResponse(context, event.response);
+    if (isResponseLifecycleEvent(dispatchEvent)) {
+        return cloneValidatedResponse(context, dispatchEvent.response);
     }
-    if (isIgnoredResponseEvent(event)) {
+    if (isIgnoredResponseEvent(dispatchEvent)) {
         return snapshot;
     }
-    return response_accumulator_assertNever(event);
+    return response_accumulator_assertNever(dispatchEvent);
 }
 //# sourceMappingURL=response-accumulator.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/responses/ResponseStream.mjs
@@ -78902,6 +85949,7 @@ class ResponseStream extends EventStream {
     }
     /** Starts a new response stream or replays an existing response by its identifier. */
     static createResponse(client, params, options) {
+        // SAFETY: The runner's request path forces stream: true; the constructor retains the same caller parameters for parsing metadata.
         const runner = new ResponseStream(params);
         runner._run(() => runner._createOrRetrieveResponse(client, params, {
             ...options,
@@ -78934,7 +85982,7 @@ class ResponseStream extends EventStream {
             __classPrivateFieldGet(this, _ResponseStream_instances, "m", _ResponseStream_addEvent).call(this, event, starting_after);
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         return __classPrivateFieldGet(this, _ResponseStream_instances, "m", _ResponseStream_endRequest).call(this);
     }
@@ -78947,7 +85995,7 @@ class ResponseStream extends EventStream {
             __classPrivateFieldGet(this, _ResponseStream_instances, "m", _ResponseStream_addEvent).call(this, event, null);
         }
         if (stream.controller.signal?.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
         }
         return __classPrivateFieldGet(this, _ResponseStream_instances, "m", _ResponseStream_endRequest).call(this);
     }
@@ -78964,54 +86012,67 @@ class ResponseStream extends EventStream {
         }
         const maybeEmit = (name, event) => {
             if (starting_after == null || event.sequence_number > starting_after) {
+                // SAFETY: The caller derives the event name from the dispatched event discriminator; this bridge preserves the corresponding payload.
                 this._emit(name, event);
             }
         };
         if (event.type === 'error') {
             // First-party providers nest their error payload; retain flat compatibility for
             // serialized events matching the currently published event schema.
-            const error = 'error' in event && typeof event.error === 'object' && event.error !== null ? event.error : event;
+            const error = 
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- An error event can contain malformed server data; validate its container before extracting error details.
+            'error' in event && typeof event.error === 'object' && event.error !== null ? event.error : event;
             throw new APIError(undefined, error, event.message, undefined);
         }
-        const response = accumulateResponseWithContext(event, __classPrivateFieldGet(this, _ResponseStream_currentResponseSnapshot, "f"), __classPrivateFieldGet(this, _ResponseStream_accumulatorContext, "f"));
+        let dispatchEvent = event;
+        const response = accumulateResponseWithContext(event, __classPrivateFieldGet(this, _ResponseStream_currentResponseSnapshot, "f"), __classPrivateFieldGet(this, _ResponseStream_accumulatorContext, "f"), true, (sanitizedEvent) => {
+            dispatchEvent = sanitizedEvent;
+        });
         __classPrivateFieldSet(this, _ResponseStream_currentResponseSnapshot, response, "f");
         maybeEmit('event', event);
-        switch (event.type) {
+        switch (dispatchEvent.type) {
             case 'response.output_text.delta': {
-                const output = response.output[event.output_index];
+                const output = response.output[dispatchEvent.output_index];
                 if (!output) {
-                    throw new error_OpenAIError(`missing output at index ${event.output_index}`);
+                    throw new error_OpenAIError(`missing output at index ${dispatchEvent.output_index}`);
                 }
                 if (output.type === 'message') {
-                    const content = output.content[event.content_index];
+                    const content = output.content[dispatchEvent.content_index];
                     if (!content) {
-                        throw new error_OpenAIError(`missing content at index ${event.content_index}`);
+                        throw new error_OpenAIError(`missing content at index ${dispatchEvent.content_index}`);
                     }
                     if (content.type !== 'output_text') {
                         throw new error_OpenAIError(`expected content to be 'output_text', got ${content.type}`);
                     }
                     maybeEmit('response.output_text.delta', {
-                        ...event,
+                        ...dispatchEvent,
+                        type: dispatchEvent.type,
+                        item_id: dispatchEvent.item_id,
+                        output_index: dispatchEvent.output_index,
+                        content_index: dispatchEvent.content_index,
                         snapshot: content.text,
                     });
                 }
                 break;
             }
             case 'response.function_call_arguments.delta': {
-                const output = response.output[event.output_index];
+                const output = response.output[dispatchEvent.output_index];
                 if (!output) {
-                    throw new error_OpenAIError(`missing output at index ${event.output_index}`);
+                    throw new error_OpenAIError(`missing output at index ${dispatchEvent.output_index}`);
                 }
                 if (output.type === 'function_call') {
                     maybeEmit('response.function_call_arguments.delta', {
-                        ...event,
+                        ...dispatchEvent,
+                        type: dispatchEvent.type,
+                        item_id: dispatchEvent.item_id,
+                        output_index: dispatchEvent.output_index,
                         snapshot: output.arguments,
                     });
                 }
                 break;
             }
             default: {
-                maybeEmit(event.type, event);
+                maybeEmit(dispatchEvent.type, event);
                 break;
             }
         }
@@ -79176,7 +86237,7 @@ class responses_Responses extends APIResource {
     /**
      * Cancels a model response with the given ID. Only responses created with the
      * `background` parameter set to `true` can be cancelled.
-     * [Learn more](https://platform.openai.com/docs/guides/background).
+     * [Learn more](https://developers.openai.com/api/docs/guides/background).
      *
      * @example
      * ```ts
@@ -79195,14 +86256,14 @@ class responses_Responses extends APIResource {
      * Compact a conversation. Returns a compacted response object.
      *
      * Learn when and how to compact long-running conversations in the
-     * [conversation state guide](https://platform.openai.com/docs/guides/conversation-state#managing-the-context-window).
+     * [conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window).
      * For ZDR-compatible compaction details, see
-     * [Compaction (advanced)](https://platform.openai.com/docs/guides/conversation-state#compaction-advanced).
+     * [Compaction (advanced)](https://developers.openai.com/api/docs/guides/conversation-state#compaction-advanced).
      *
      * @example
      * ```ts
      * const compactedResponse = await client.responses.compact({
-     *   model: 'gpt-5.6-sol',
+     *   model: 'gpt-6-astra',
      * });
      * ```
      */
@@ -79213,6 +86274,32 @@ class responses_Responses extends APIResource {
 responses_Responses.InputItems = input_items_InputItems;
 responses_Responses.InputTokens = input_tokens_InputTokens;
 //# sourceMappingURL=responses.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/safety/alerts.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+class Alerts extends APIResource {
+    /**
+     * Get a safety alert belonging to the authenticated API project.
+     */
+    retrieve(id, options) {
+        return this._client.get(src_path `/safety/alerts/${id}`, { ...options, __security: { bearerAuth: true } });
+    }
+}
+//# sourceMappingURL=alerts.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/safety/safety.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+class Safety extends APIResource {
+    constructor() {
+        super(...arguments);
+        this.alerts = new Alerts(this._client);
+    }
+}
+Safety.Alerts = Alerts;
+//# sourceMappingURL=safety.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/skills/content.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
@@ -79377,16 +86464,17 @@ Skills.Versions = Versions;
 class Parts extends APIResource {
     /**
      * Adds a
-     * [Part](https://platform.openai.com/docs/api-reference/uploads/part-object) to an
-     * [Upload](https://platform.openai.com/docs/api-reference/uploads/object) object.
-     * A Part represents a chunk of bytes from the file you are trying to upload.
+     * [Part](https://developers.openai.com/api/reference/resources/uploads/subresources/parts)
+     * to an [Upload](https://developers.openai.com/api/reference/resources/uploads)
+     * object. A Part represents a chunk of bytes from the file you are trying to
+     * upload.
      *
      * Each Part can be at most 64 MB, and you can add Parts until you hit the Upload
      * maximum of 8 GB.
      *
      * It is possible to add multiple Parts in parallel. You can decide the intended
      * order of the Parts when you
-     * [complete the Upload](https://platform.openai.com/docs/api-reference/uploads/complete).
+     * [complete the Upload](https://developers.openai.com/api/reference/resources/uploads/methods/complete).
      */
     create(uploadID, body, options) {
         return this._client.post(src_path `/uploads/${uploadID}/parts`, multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client));
@@ -79409,24 +86497,24 @@ class Uploads extends APIResource {
     }
     /**
      * Creates an intermediate
-     * [Upload](https://platform.openai.com/docs/api-reference/uploads/object) object
+     * [Upload](https://developers.openai.com/api/reference/resources/uploads) object
      * that you can add
-     * [Parts](https://platform.openai.com/docs/api-reference/uploads/part-object) to.
-     * Currently, an Upload can accept at most 8 GB in total and expires after an hour
-     * after you create it.
+     * [Parts](https://developers.openai.com/api/reference/resources/uploads/subresources/parts)
+     * to. Currently, an Upload can accept at most 8 GB in total and expires after an
+     * hour after you create it.
      *
      * Once you complete the Upload, we will create a
-     * [File](https://platform.openai.com/docs/api-reference/files/object) object that
+     * [File](https://developers.openai.com/api/reference/resources/files) object that
      * contains all the parts you uploaded. This File is usable in the rest of our
      * platform as a regular File object.
      *
      * For certain `purpose` values, the correct `mime_type` must be specified. Please
      * refer to documentation for the
-     * [supported MIME types for your use case](https://platform.openai.com/docs/assistants/tools/file-search#supported-files).
+     * [supported MIME types for your use case](https://developers.openai.com/api/docs/guides/tools-file-search#supported-files).
      *
      * For guidance on the proper filename extensions for each purpose, please follow
      * the documentation on
-     * [creating a File](https://platform.openai.com/docs/api-reference/files/create).
+     * [creating a File](https://developers.openai.com/api/reference/resources/files/methods/create).
      *
      * Returns the Upload object with status `pending`.
      */
@@ -79446,10 +86534,10 @@ class Uploads extends APIResource {
     }
     /**
      * Completes the
-     * [Upload](https://platform.openai.com/docs/api-reference/uploads/object).
+     * [Upload](https://developers.openai.com/api/reference/resources/uploads).
      *
      * Within the returned Upload object, there is a nested
-     * [File](https://platform.openai.com/docs/api-reference/files/object) object that
+     * [File](https://developers.openai.com/api/reference/resources/files) object that
      * is ready to use in the rest of the platform.
      *
      * You can specify the order of the Parts by passing in an ordered list of the Part
@@ -79471,18 +86559,42 @@ class Uploads extends APIResource {
 }
 Uploads.Parts = Parts;
 //# sourceMappingURL=uploads.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/vector-store-polling.mjs
+
+/**
+ * Polls an attached file through the resource's retrieve method until it completes,
+ * fails, or is cancelled. Retrieval errors are propagated unchanged.
+ *
+ * @internal
+ */
+function pollVectorStoreFile(resource, vectorStoreID, fileID, options) {
+    return pollWithResponse((headers) => resource.retrieve(fileID, { vector_store_id: vectorStoreID }, { ...options, headers }), ['in_progress'], ['failed', 'cancelled', 'completed'], options);
+}
+/**
+ * Polls a file batch through the resource's retrieve method until it completes,
+ * fails, or is cancelled. Retrieval errors are propagated unchanged.
+ *
+ * @internal
+ */
+function pollVectorStoreFileBatch(resource, vectorStoreID, batchID, options) {
+    return pollWithResponse((headers) => resource.retrieve(batchID, { vector_store_id: vectorStoreID }, { ...options, headers }), ['in_progress'], ['failed', 'cancelled', 'completed'], options);
+}
+//# sourceMappingURL=vector-store-polling.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/Util.mjs
 /**
  * Like `Promise.allSettled()` but throws an error if any promises are rejected.
+ * Rejection reasons remain available on the thrown error's non-enumerable `rejections`
+ * property without being written to the global console.
  */
 const allSettledWithThrow = async (promises) => {
     const results = await Promise.allSettled(promises);
     const rejected = results.filter((result) => result.status === 'rejected');
     if (rejected.length) {
-        for (const result of rejected) {
-            console.error(result.reason);
-        }
-        throw new Error(`${rejected.length} promise(s) failed - see the above errors`);
+        throw Object.defineProperty(new Error(`${rejected.length} promise(s) failed`), 'rejections', {
+            configurable: true,
+            value: rejected.map(({ reason }) => reason),
+            writable: true,
+        });
     }
     // Note: TS was complaining about using `.filter().map()` here for some reason
     const values = [];
@@ -79494,6 +86606,45 @@ const allSettledWithThrow = async (promises) => {
     return values;
 };
 //# sourceMappingURL=Util.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/vector-store-upload.mjs
+
+/**
+ * Uploads files with a shared iterator, then creates and polls the batch. Every
+ * worker settles before upload failures are propagated. Zero concurrency is
+ * rejected before any upload or batch-creation request.
+ *
+ * @internal
+ */
+async function uploadAndPollVectorStoreFileBatch(resource, client, vectorStoreId, files, fileIds, options) {
+    if (files === null || files === undefined || files.length === 0) {
+        throw new Error("No `files` provided to process. If you've already uploaded files you should use `.createAndPoll()` instead");
+    }
+    const configuredConcurrency = options?.maxConcurrency ?? 5;
+    const concurrencyLimit = Math.min(configuredConcurrency, files.length);
+    if (concurrencyLimit === 0) {
+        throw new RangeError('maxConcurrency must be greater than 0');
+    }
+    const fileIterator = files.values();
+    const allFileIds = [...fileIds];
+    // This code is based on this design. The libraries don't accommodate our environment limits.
+    // https://stackoverflow.com/questions/40639432/what-is-the-best-way-to-limit-concurrency-when-using-es6s-promise-all
+    async function processFiles(iterator) {
+        for (const item of iterator) {
+            // oxlint-disable-next-line no-await-in-loop -- Each worker uploads one file at a time.
+            const fileObj = await client.files.create({ file: item, purpose: 'assistants' }, options);
+            allFileIds.push(fileObj.id);
+        }
+    }
+    // Assigning length preserves native validation of invalid concurrency values.
+    const workers = [];
+    workers.length = concurrencyLimit;
+    for (let index = 0; index < workers.length; index += 1) {
+        workers[index] = processFiles(fileIterator);
+    }
+    await allSettledWithThrow(workers);
+    return await resource.createAndPoll(vectorStoreId, { file_ids: allFileIds }, options);
+}
+//# sourceMappingURL=vector-store-upload.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/vector-stores/file-batches.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
@@ -79563,41 +86714,7 @@ class FileBatches extends APIResource {
      * check batch.file_counts.failed_count to handle this case.
      */
     async poll(vectorStoreID, batchID, options) {
-        const headers = buildHeaders([
-            options?.headers,
-            {
-                'X-Stainless-Poll-Helper': 'true',
-                'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-            },
-        ]);
-        while (true) {
-            const { data: batch, response } = await this.retrieve(batchID, { vector_store_id: vectorStoreID }, {
-                ...options,
-                headers,
-            }).withResponse();
-            switch (batch.status) {
-                case 'in_progress':
-                    let sleepInterval = 5000;
-                    if (options?.pollIntervalMs) {
-                        sleepInterval = options.pollIntervalMs;
-                    }
-                    else {
-                        const headerInterval = response.headers.get('openai-poll-after-ms');
-                        if (headerInterval) {
-                            const headerIntervalMs = parseInt(headerInterval);
-                            if (!isNaN(headerIntervalMs)) {
-                                sleepInterval = headerIntervalMs;
-                            }
-                        }
-                    }
-                    await sleep(sleepInterval);
-                    break;
-                case 'failed':
-                case 'cancelled':
-                case 'completed':
-                    return batch;
-            }
-        }
+        return await pollVectorStoreFileBatch(this, vectorStoreID, batchID, options);
     }
     /**
      * Uploads the given files concurrently and then creates a vector store file batch.
@@ -79605,30 +86722,7 @@ class FileBatches extends APIResource {
      * The concurrency limit is configurable using the `maxConcurrency` parameter.
      */
     async uploadAndPoll(vectorStoreId, { files, fileIds = [] }, options) {
-        if (files == null || files.length == 0) {
-            throw new Error(`No \`files\` provided to process. If you've already uploaded files you should use \`.createAndPoll()\` instead`);
-        }
-        const configuredConcurrency = options?.maxConcurrency ?? 5;
-        // We cap the number of workers at the number of files (so we don't start any unnecessary workers)
-        const concurrencyLimit = Math.min(configuredConcurrency, files.length);
-        const client = this._client;
-        const fileIterator = files.values();
-        const allFileIds = [...fileIds];
-        // This code is based on this design. The libraries don't accommodate our environment limits.
-        // https://stackoverflow.com/questions/40639432/what-is-the-best-way-to-limit-concurrency-when-using-es6s-promise-all
-        async function processFiles(iterator) {
-            for (let item of iterator) {
-                const fileObj = await client.files.create({ file: item, purpose: 'assistants' }, options);
-                allFileIds.push(fileObj.id);
-            }
-        }
-        // Start workers to process results
-        const workers = Array(concurrencyLimit).fill(fileIterator).map(processFiles);
-        // Wait for all processing to complete.
-        await allSettledWithThrow(workers);
-        return await this.createAndPoll(vectorStoreId, {
-            file_ids: allFileIds,
-        }, options);
+        return await uploadAndPollVectorStoreFileBatch(this, this._client, vectorStoreId, files, fileIds, options);
     }
 }
 //# sourceMappingURL=file-batches.mjs.map
@@ -79642,8 +86736,8 @@ class FileBatches extends APIResource {
 class vector_stores_files_Files extends APIResource {
     /**
      * Create a vector store file by attaching a
-     * [File](https://platform.openai.com/docs/api-reference/files) to a
-     * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object).
+     * [File](https://developers.openai.com/api/reference/resources/files) to a
+     * [vector store](https://developers.openai.com/api/reference/resources/vector_stores).
      */
     create(vectorStoreID, body, options) {
         return this._client.post(src_path `/vector_stores/${vectorStoreID}/files`, {
@@ -79690,7 +86784,7 @@ class vector_stores_files_Files extends APIResource {
     /**
      * Delete a vector store file. This will remove the file from the vector store but
      * the file itself will not be deleted. To delete the file, use the
-     * [delete file](https://platform.openai.com/docs/api-reference/files/delete)
+     * [delete file](https://developers.openai.com/api/reference/resources/files/methods/delete)
      * endpoint.
      */
     delete(fileID, params, options) {
@@ -79715,40 +86809,7 @@ class vector_stores_files_Files extends APIResource {
      * file.last_error and file.status to handle these cases
      */
     async poll(vectorStoreID, fileID, options) {
-        const headers = buildHeaders([
-            options?.headers,
-            {
-                'X-Stainless-Poll-Helper': 'true',
-                'X-Stainless-Custom-Poll-Interval': options?.pollIntervalMs?.toString() ?? undefined,
-            },
-        ]);
-        while (true) {
-            const fileResponse = await this.retrieve(fileID, {
-                vector_store_id: vectorStoreID,
-            }, { ...options, headers }).withResponse();
-            const file = fileResponse.data;
-            switch (file.status) {
-                case 'in_progress':
-                    let sleepInterval = 5000;
-                    if (options?.pollIntervalMs) {
-                        sleepInterval = options.pollIntervalMs;
-                    }
-                    else {
-                        const headerInterval = fileResponse.response.headers.get('openai-poll-after-ms');
-                        if (headerInterval) {
-                            const headerIntervalMs = parseInt(headerInterval);
-                            if (!isNaN(headerIntervalMs)) {
-                                sleepInterval = headerIntervalMs;
-                            }
-                        }
-                    }
-                    await sleep(sleepInterval);
-                    break;
-                case 'failed':
-                case 'completed':
-                    return file;
-            }
-        }
+        return await pollVectorStoreFile(this, vectorStoreID, fileID, options);
     }
     /**
      * Upload a file to the `files` API and then attach it to the given vector store.
@@ -79975,11 +87036,131 @@ class Videos extends APIResource {
     }
 }
 //# sourceMappingURL=videos.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/webhook-signature.mjs
+
+
+
+const MAX_DIRECT_WEBHOOK_VERIFICATIONS = 32;
+const SHA256_SIGNATURE_LENGTH = 32;
+/**
+ * Checks whether a webhook header requires constant-work HMAC signing without
+ * retaining an unbounded number of signature candidates.
+ *
+ * @internal
+ */
+function webhookSignatureRequiresSigning(signatureHeader) {
+    return (signatureHeader.split(' ', MAX_DIRECT_WEBHOOK_VERIFICATIONS + 1).length > MAX_DIRECT_WEBHOOK_VERIFICATIONS);
+}
+function* signatureCandidates(signatureHeader) {
+    let start = 0;
+    while (start <= signatureHeader.length) {
+        const separator = signatureHeader.indexOf(' ', start);
+        const candidate = signatureHeader.slice(start, separator === -1 ? undefined : separator);
+        yield candidate.startsWith('v1,') ? candidate.slice(3) : candidate;
+        if (separator === -1) {
+            break;
+        }
+        start = separator + 1;
+    }
+}
+function decodeSignature(signature) {
+    try {
+        const signatureBytes = fromBase64(signature);
+        return signatureBytes.byteLength === SHA256_SIGNATURE_LENGTH ? signatureBytes : undefined;
+    }
+    catch {
+        // Invalid base64 does not prevent trying the next value.
+        return undefined;
+    }
+}
+function firstValidLengthSignature(signatureHeader) {
+    for (const signature of signatureCandidates(signatureHeader)) {
+        const signatureBytes = decodeSignature(signature);
+        if (signatureBytes) {
+            return signatureBytes;
+        }
+    }
+    return undefined;
+}
+function selectMatchingSignature(signatureHeader, expectedSignature, firstSignature) {
+    let matchingSignature = firstSignature;
+    for (const signature of signatureCandidates(signatureHeader)) {
+        const signatureBytes = decodeSignature(signature);
+        if (!signatureBytes) {
+            continue;
+        }
+        let difference = 0;
+        for (const [index, byte] of signatureBytes.entries()) {
+            // oxlint-disable-next-line no-bitwise -- Compare every HMAC byte without short-circuiting on shared prefixes.
+            difference |= byte ^ (expectedSignature[index] ?? 0);
+        }
+        if (difference === 0) {
+            matchingSignature = signatureBytes;
+        }
+    }
+    return matchingSignature;
+}
+/**
+ * Checks the timestamp and HMAC signatures after the resource has validated its
+ * crypto capabilities, secret, and required headers.
+ *
+ * @internal
+ */
+async function verifyWebhookSignature(payload, signatureHeader, timestamp, webhookId, secret, tolerance) {
+    // oxlint-disable-next-line unicorn/prefer-number-coercion -- Preserve numeric-prefix parsing while signing the original timestamp text.
+    const timestampSeconds = Number.parseInt(timestamp, 10);
+    if (Number.isNaN(timestampSeconds)) {
+        throw new InvalidWebhookSignatureError('Invalid webhook timestamp format');
+    }
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (nowSeconds - timestampSeconds > tolerance) {
+        throw new InvalidWebhookSignatureError('Webhook timestamp is too old');
+    }
+    if (timestampSeconds > nowSeconds + tolerance) {
+        throw new InvalidWebhookSignatureError('Webhook timestamp is too new');
+    }
+    // Multiple signatures are space-separated; accept a matching value at any position.
+    const useBoundedVerification = webhookSignatureRequiresSigning(signatureHeader);
+    const firstSignature = useBoundedVerification ? firstValidLengthSignature(signatureHeader) : undefined;
+    if (useBoundedVerification && !firstSignature) {
+        throw new InvalidWebhookSignatureError('The given webhook signature does not match the expected signature');
+    }
+    const decodedSecret = Uint8Array.from(secret.startsWith('whsec_') ? fromBase64(secret.slice('whsec_'.length)) : bytes_encodeUTF8(secret));
+    const signedPayload = webhookId ? `${webhookId}.${timestamp}.${payload}` : `${timestamp}.${payload}`;
+    const signedPayloadBytes = Uint8Array.from(bytes_encodeUTF8(signedPayload));
+    const key = await crypto.subtle.importKey('raw', decodedSecret, { name: 'HMAC', hash: 'SHA-256' }, false, useBoundedVerification ? ['sign', 'verify'] : ['verify']);
+    if (useBoundedVerification && firstSignature) {
+        const expectedSignature = new Uint8Array(await crypto.subtle.sign('HMAC', key, signedPayloadBytes));
+        const signatureToVerify = selectMatchingSignature(signatureHeader, expectedSignature, firstSignature);
+        try {
+            if (await crypto.subtle.verify('HMAC', key, Uint8Array.from(signatureToVerify), signedPayloadBytes)) {
+                return;
+            }
+        }
+        catch {
+            // Provider verification failures have the same typed mismatch as the direct path.
+        }
+        throw new InvalidWebhookSignatureError('The given webhook signature does not match the expected signature');
+    }
+    for (const signature of signatureCandidates(signatureHeader)) {
+        try {
+            const signatureBytes = Uint8Array.from(fromBase64(signature));
+            // oxlint-disable-next-line no-await-in-loop -- Check signatures in order and stop at the first match.
+            const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, signedPayloadBytes);
+            if (isValid) {
+                return;
+            }
+        }
+        catch {
+            // Invalid base64 or signature format does not prevent trying the next value.
+        }
+    }
+    throw new InvalidWebhookSignatureError('The given webhook signature does not match the expected signature');
+}
+//# sourceMappingURL=webhook-signature.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/webhooks/webhooks.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 var _Webhooks_instances, _Webhooks_validateSecret, _Webhooks_getRequiredHeader;
-
-
 
 
 
@@ -80008,7 +87189,7 @@ class Webhooks extends APIResource {
      */
     async verifySignature(payload, headers, secret = this._client.webhookSecret, tolerance = 300) {
         if (typeof crypto === 'undefined' ||
-            typeof crypto.subtle.importKey !== 'function' ||
+            typeof crypto.subtle?.importKey !== 'function' ||
             typeof crypto.subtle.verify !== 'function') {
             throw new Error('Webhook signature verification is only supported when the `crypto` global is defined');
         }
@@ -80017,46 +87198,10 @@ class Webhooks extends APIResource {
         const signatureHeader = __classPrivateFieldGet(this, _Webhooks_instances, "m", _Webhooks_getRequiredHeader).call(this, headersObj, 'webhook-signature');
         const timestamp = __classPrivateFieldGet(this, _Webhooks_instances, "m", _Webhooks_getRequiredHeader).call(this, headersObj, 'webhook-timestamp');
         const webhookId = __classPrivateFieldGet(this, _Webhooks_instances, "m", _Webhooks_getRequiredHeader).call(this, headersObj, 'webhook-id');
-        // Validate timestamp to prevent replay attacks
-        const timestampSeconds = parseInt(timestamp, 10);
-        if (isNaN(timestampSeconds)) {
-            throw new InvalidWebhookSignatureError('Invalid webhook timestamp format');
+        if (webhookSignatureRequiresSigning(signatureHeader) && typeof crypto.subtle.sign !== 'function') {
+            throw new Error('Webhook signature verification is only supported when the `crypto` global is defined');
         }
-        const nowSeconds = Math.floor(Date.now() / 1000);
-        if (nowSeconds - timestampSeconds > tolerance) {
-            throw new InvalidWebhookSignatureError('Webhook timestamp is too old');
-        }
-        if (timestampSeconds > nowSeconds + tolerance) {
-            throw new InvalidWebhookSignatureError('Webhook timestamp is too new');
-        }
-        // Extract signatures from v1,<base64> format
-        // The signature header can have multiple values, separated by spaces.
-        // Each value is in the format v1,<base64>. We should accept if any match.
-        const signatures = signatureHeader
-            .split(' ')
-            .map((part) => (part.startsWith('v1,') ? part.substring(3) : part));
-        // Decode the secret if it starts with whsec_
-        const decodedSecret = Uint8Array.from(secret.startsWith('whsec_') ? fromBase64(secret.slice('whsec_'.length)) : bytes_encodeUTF8(secret));
-        // Create the signed payload: {webhook_id}.{timestamp}.{payload}
-        const signedPayload = webhookId ? `${webhookId}.${timestamp}.${payload}` : `${timestamp}.${payload}`;
-        const signedPayloadBytes = Uint8Array.from(bytes_encodeUTF8(signedPayload));
-        // Import the secret as a cryptographic key for HMAC
-        const key = await crypto.subtle.importKey('raw', decodedSecret, { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-        // Check if any signature matches using timing-safe WebCrypto verify
-        for (const signature of signatures) {
-            try {
-                const signatureBytes = Uint8Array.from(fromBase64(signature));
-                const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, signedPayloadBytes);
-                if (isValid) {
-                    return; // Valid signature found
-                }
-            }
-            catch {
-                // Invalid base64 or signature format, continue to next signature
-                continue;
-            }
-        }
-        throw new InvalidWebhookSignatureError('The given webhook signature does not match the expected signature');
+        return await verifyWebhookSignature(payload, signatureHeader, timestamp, webhookId, secret, tolerance);
     }
 }
 _Webhooks_instances = new WeakSet(), _Webhooks_validateSecret = function _Webhooks_validateSecret(secret) {
@@ -80109,7 +87254,29 @@ _Webhooks_instances = new WeakSet(), _Webhooks_validateSecret = function _Webhoo
 
 
 
+
+
 //# sourceMappingURL=index.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/realtime-credentials.mjs
+/** Selects a captured credential without treating an explicit null as absent. @internal */
+function getRealtimeAPIKey(client, captured) {
+    return captured === undefined ? client?.apiKey : captured;
+}
+/**
+ * Captures the key belonging to this request or factory invocation while retaining the
+ * existing boolean credential-hook contract. Legacy overrides that do not
+ * capture a key keep their shared-property behavior and remain responsible for
+ * synchronizing concurrent credential updates.
+ * @internal
+ */
+async function resolveRealtimeAPIKey(client) {
+    let apiKey;
+    const isProvider = await client._callApiKey((resolved) => {
+        apiKey = resolved;
+    });
+    return { apiKey: apiKey === undefined ? client.apiKey : apiKey, isProvider };
+}
+//# sourceMappingURL=realtime-credentials.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/provider.mjs
 /**
  * A provider factory such as `bedrock(options)` captures configuration in a
@@ -80124,7 +87291,9 @@ _Webhooks_instances = new WeakSet(), _Webhooks_validateSecret = function _Webhoo
  * provider configurations.
  */
 const providerDefinitionsKey = Symbol.for('openai.node.providerDefinitions.v1');
+// SAFETY: This versioned global symbol is the SDK-owned cross-copy WeakMap registry; no provider object fields are trusted through it.
 const providerGlobal = globalThis;
+// SAFETY: This versioned global symbol is the SDK-owned cross-copy WeakMap registry; no provider object fields are trusted through it.
 const existingProviderDefinitions = providerGlobal[providerDefinitionsKey];
 const providerDefinitions = existingProviderDefinitions ?? new WeakMap();
 if (!existingProviderDefinitions) {
@@ -80137,6 +87306,7 @@ if (!existingProviderDefinitions) {
  * installed copy of the SDK in the same JavaScript realm.
  */
 function createProvider(definition) {
+    // SAFETY: This function creates the opaque handle and immediately registers its identity in the private WeakMap, which is the runtime brand check.
     const provider = Object.freeze({});
     providerDefinitions.set(provider, definition);
     return provider;
@@ -80156,7 +87326,16 @@ function configureProvider(provider) {
 //# sourceMappingURL=provider.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/client.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
-var _OpenAI_instances, client_a, _OpenAI_encoder, _OpenAI_responseAttempts, _OpenAI_baseURLOverridden;
+var _OpenAI_instances, client_a, _OpenAI_encoder, _OpenAI_x509Authentication, _OpenAI_x509Credential, _OpenAI_x509Fetch, _OpenAI_explicitDataResidency, _OpenAI_responseAttempts, _OpenAI_baseURLOverridden;
+
+
+
+
+
+
+
+
+
 
 
 
@@ -80222,6 +87401,7 @@ function isRunningInBrowserOrBrowserWorker() {
         scope.WebSocketPair === undefined);
 }
 const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
+const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 /**
  * API Client for interfacing with the OpenAI API.
  */
@@ -80247,6 +87427,11 @@ class OpenAI {
     constructor(clientOptions = {}) {
         _OpenAI_instances.add(this);
         _OpenAI_encoder.set(this, void 0);
+        _OpenAI_x509Authentication.set(this, void 0);
+        _OpenAI_x509Credential.set(this, void 0);
+        _OpenAI_x509Fetch.set(this, void 0);
+        // Preserve an explicit global selection without storing a second routing URL.
+        _OpenAI_explicitDataResidency.set(this, false);
         _OpenAI_responseAttempts.set(this, new WeakMap());
         /**
          * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
@@ -80260,7 +87445,7 @@ class OpenAI {
         /**
          * Files are used to upload documents that can be used with features like Assistants and Fine-tuning.
          */
-        this.files = new files_Files(this);
+        this.files = new resources_files_Files(this);
         /**
          * Given a prompt and/or an input image, the model will generate a new image.
          */
@@ -80278,6 +87463,7 @@ class OpenAI {
         this.fineTuning = new FineTuning(this);
         this.graders = new graders_Graders(this);
         this.vectorStores = new VectorStores(this);
+        this.safety = new Safety(this);
         this.webhooks = new Webhooks(this);
         this.beta = new Beta(this);
         /**
@@ -80290,6 +87476,7 @@ class OpenAI {
         this.uploads = new Uploads(this);
         this.admin = new Admin(this);
         this.responses = new responses_Responses(this);
+        this.live = new Live(this);
         this.realtime = new realtime_Realtime(this);
         /**
          * Manage conversations and conversation items.
@@ -80305,16 +87492,24 @@ class OpenAI {
          * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
          */
         this.videos = new Videos(this);
+        const { credential, options: normalizedOptions } = normalizeX509CredentialOptions(clientOptions);
+        clientOptions = normalizedOptions;
+        const residencyBaseURL = resolveDataResidency(clientOptions);
         const provider = clientOptions.provider;
+        const { baseURL = provider ? null : env_readEnv('OPENAI_BASE_URL'), dataResidency: _dataResidency, [inheritedDataResidencySelection]: inheritedResidencySelection = false, apiKey = provider ? null : (env_readEnv('OPENAI_API_KEY') ?? null), adminAPIKey = provider ? null : (env_readEnv('OPENAI_ADMIN_KEY') ?? null), organization = provider ? null : (env_readEnv('OPENAI_ORG_ID') ?? null), project = provider ? null : (env_readEnv('OPENAI_PROJECT_ID') ?? null), webhookSecret = env_readEnv('OPENAI_WEBHOOK_SECRET') ?? null, workloadIdentity, x509Transport, credential: _credential, ...opts } = clientOptions;
         if (provider) {
-            const conflictingOptions = ['apiKey', 'adminAPIKey', 'workloadIdentity', 'baseURL'].filter((key) => clientOptions[key] != null);
+            const conflictingOptions = ['apiKey', 'adminAPIKey', 'workloadIdentity', 'x509Transport', 'baseURL', 'dataResidency'].filter((key) => (key === 'workloadIdentity' ? workloadIdentity : clientOptions[key]) != null);
             if (conflictingOptions.length) {
                 throw new error_OpenAIError(`The \`provider\` option cannot be used with ${conflictingOptions
                     .map((key) => `\`${key}\``)
                     .join(', ')}. Configure authentication and the base URL through the provider instead.`);
             }
         }
-        const { baseURL = provider ? null : env_readEnv('OPENAI_BASE_URL'), apiKey = provider ? null : (env_readEnv('OPENAI_API_KEY') ?? null), adminAPIKey = provider ? null : (env_readEnv('OPENAI_ADMIN_KEY') ?? null), organization = provider ? null : (env_readEnv('OPENAI_ORG_ID') ?? null), project = provider ? null : (env_readEnv('OPENAI_PROJECT_ID') ?? null), webhookSecret = env_readEnv('OPENAI_WEBHOOK_SECRET') ?? null, workloadIdentity, ...opts } = clientOptions;
+        const identity = isX509WorkloadIdentity(workloadIdentity)
+            ? { x509: workloadIdentity, legacy: undefined }
+            : { x509: undefined, legacy: workloadIdentity };
+        const x509Identity = identity.x509;
+        const usesX509Identity = x509Identity !== undefined;
         const providerRuntime = provider ? configureProvider(provider) : undefined;
         const options = {
             apiKey,
@@ -80323,10 +87518,30 @@ class OpenAI {
             project,
             webhookSecret,
             workloadIdentity,
+            x509Transport,
             provider,
             ...opts,
-            baseURL: providerRuntime?.baseURL ?? (baseURL || `https://api.openai.com/v1`),
+            baseURL: providerRuntime?.baseURL ??
+                residencyBaseURL ??
+                (baseURL || (usesX509Identity ? X509_API_BASE_URL : `https://api.openai.com/v1`)),
         };
+        if (x509Transport && !usesX509Identity) {
+            throw new error_OpenAIError('An X.509 transport requires an X.509 workload identity.');
+        }
+        if (usesX509Identity) {
+            if (residencyBaseURL !== undefined || inheritedResidencySelection) {
+                throw new error_OpenAIError('X.509 workload identity does not support data residency selection.');
+            }
+            if (clientOptions.fetch !== undefined) {
+                throw new error_OpenAIError('X.509 workload identity does not support a custom fetch implementation.');
+            }
+            assertX509APIOrigin(options.baseURL);
+            assertX509RequestOptions(options.fetchOptions);
+            if (this.fetchWithAuth !== client_a.prototype.fetchWithAuth ||
+                this.fetchWithTimeout !== client_a.prototype.fetchWithTimeout) {
+                throw new error_OpenAIError('X.509 workload identity does not support overridden fetch dispatch hooks.');
+            }
+        }
         if (apiKey && workloadIdentity) {
             throw new error_OpenAIError('The `apiKey` and `workloadIdentity` options are mutually exclusive');
         }
@@ -80337,6 +87552,7 @@ class OpenAI {
             throw new error_OpenAIError("It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\nIf you understand the risks and have appropriate mitigations in place,\nyou can set the `dangerouslyAllowBrowser` option to `true`, e.g.,\n\nnew OpenAI({ apiKey, dangerouslyAllowBrowser: true });\n\nhttps://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety\n");
         }
         this.baseURL = options.baseURL;
+        __classPrivateFieldSet(this, _OpenAI_explicitDataResidency, residencyBaseURL !== undefined || inheritedResidencySelection, "f");
         this.timeout = options.timeout ?? client_a.DEFAULT_TIMEOUT; /* 10 minutes */
         this.logger = options.logger ?? console;
         const defaultLogLevel = 'warn';
@@ -80350,7 +87566,7 @@ class OpenAI {
         this.maxRetries = options.maxRetries ?? 2;
         this.fetch = options.fetch ?? getDefaultFetch();
         __classPrivateFieldSet(this, _OpenAI_encoder, FallbackEncoder, "f");
-        const customHeadersEnv = provider ? undefined : env_readEnv('OPENAI_CUSTOM_HEADERS');
+        const customHeadersEnv = provider || credential ? undefined : env_readEnv('OPENAI_CUSTOM_HEADERS');
         if (customHeadersEnv) {
             const parsed = {};
             for (const line of customHeadersEnv.split('\n')) {
@@ -80363,8 +87579,17 @@ class OpenAI {
         }
         this._options = options;
         this._provider = providerRuntime;
-        if (workloadIdentity) {
-            this._workloadIdentityAuth = new WorkloadIdentityAuth(workloadIdentity, this.fetch);
+        if (x509Identity) {
+            const authentication = new X509WorkloadIdentityAuth(x509Identity, x509Transport, organization, project);
+            this._workloadIdentityAuth = authentication;
+            __classPrivateFieldSet(this, _OpenAI_x509Authentication, authentication, "f");
+            __classPrivateFieldSet(this, _OpenAI_x509Credential, credential, "f");
+            __classPrivateFieldSet(this, _OpenAI_x509Fetch, authentication.fetch(), "f");
+            this.fetch = __classPrivateFieldGet(this, _OpenAI_x509Fetch, "f");
+            x509_transport_state_markApprovedX509Client(this);
+        }
+        else if (identity.legacy) {
+            this._workloadIdentityAuth = new WorkloadIdentityAuth(identity.legacy, this.fetch);
         }
         this.apiKey = typeof apiKey === 'string' ? apiKey : null;
         this.adminAPIKey = adminAPIKey;
@@ -80376,8 +87601,8 @@ class OpenAI {
      * Create a new client instance re-using the same options given to the current client with optional overriding.
      */
     withOptions(options) {
-        const inheritedProvider = this._options.provider;
-        const provider = options.provider ?? inheritedProvider;
+        const residencyBaseURL = resolveDataResidency(options);
+        const x509Authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f");
         const inheritedOptions = {
             ...this._options,
             baseURL: this.baseURL,
@@ -80385,31 +87610,52 @@ class OpenAI {
             timeout: this.timeout,
             logger: this.logger,
             logLevel: this.logLevel,
-            fetch: this.fetch,
+            fetch: __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") ? undefined : this.fetch,
             fetchOptions: this.fetchOptions,
             apiKey: this._options.apiKey,
             adminAPIKey: this.adminAPIKey,
-            workloadIdentity: this._options.workloadIdentity,
+            workloadIdentity: x509Authentication?.identitySnapshot() ?? this._options.workloadIdentity,
+            x509Transport: this._options.x509Transport,
             organization: this.organization,
             project: this.project,
             webhookSecret: this.webhookSecret,
         };
-        if (provider) {
-            delete inheritedOptions.apiKey;
-            delete inheritedOptions.adminAPIKey;
-            delete inheritedOptions.workloadIdentity;
+        const { credential, provider } = prepareX509ClientClone(inheritedOptions, options, __classPrivateFieldGet(this, _OpenAI_x509Credential, "f"), x509Authentication !== undefined);
+        if (residencyBaseURL !== undefined) {
             delete inheritedOptions.baseURL;
-            if (provider !== inheritedProvider) {
-                delete inheritedOptions.organization;
-                delete inheritedOptions.project;
-                delete inheritedOptions.defaultHeaders;
-            }
         }
-        const client = new this.constructor({
+        const clientOptions = {
             ...inheritedOptions,
             ...options,
+            credential,
             provider,
-        });
+            [inheritedDataResidencySelection]: __classPrivateFieldGet(this, _OpenAI_explicitDataResidency, "f") &&
+                residencyBaseURL === undefined &&
+                !hasOwn(options, 'baseURL') &&
+                options.credential === undefined &&
+                !provider,
+        };
+        const client = new this.constructor(clientOptions);
+        if (provider && new URL(client.baseURL).origin !== new URL(this.baseURL).origin) {
+            Object.assign(client._options, {
+                defaultHeaders: options.defaultHeaders,
+                defaultQuery: options.defaultQuery,
+                fetchOptions: options.fetchOptions,
+                fetch: options.fetch,
+            });
+            client.fetchOptions = options.fetchOptions;
+            client.fetch = options.fetch ?? getDefaultFetch();
+            client.organization = options.organization ?? null;
+            client.project = options.project ?? null;
+        }
+        if (__classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") &&
+            __classPrivateFieldGet(client, _OpenAI_x509Authentication, "f") &&
+            this.baseURL === client.baseURL &&
+            __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f").matches(__classPrivateFieldGet(client, _OpenAI_x509Authentication, "f"))) {
+            client._workloadIdentityAuth = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f");
+            __classPrivateFieldSet(client, _OpenAI_x509Authentication, __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f"), "f");
+            __classPrivateFieldSet(client, _OpenAI_x509Fetch, __classPrivateFieldGet(this, _OpenAI_x509Fetch, "f"), "f");
+        }
         return client;
     }
     defaultQuery() {
@@ -80434,19 +87680,47 @@ class OpenAI {
         bearerAuth: true,
         adminAPIKeyAuth: true,
     }) {
+        const authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") ?? this._workloadIdentityAuth;
+        if (authentication instanceof X509WorkloadIdentityAuth &&
+            schemes.adminAPIKeyAuth &&
+            this.adminAPIKey !== null) {
+            return await this.adminAPIKeyAuth(opts);
+        }
         return buildHeaders([
             schemes.bearerAuth ? await this.bearerAuth(opts) : null,
             schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
         ]);
     }
     async bearerAuth(opts) {
-        if (this._workloadIdentityAuth) {
-            return buildHeaders([{ Authorization: `Bearer ${await this._workloadIdentityAuth.getToken()}` }]);
+        const authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") ?? this._workloadIdentityAuth;
+        if (authentication) {
+            if (authentication instanceof X509WorkloadIdentityAuth) {
+                if (authentication === this._workloadIdentityAuth &&
+                    (this.fetchWithAuth !== client_a.prototype.fetchWithAuth ||
+                        this.fetchWithTimeout !== client_a.prototype.fetchWithTimeout)) {
+                    throw new error_OpenAIError('X.509 workload identity does not support overridden fetch dispatch hooks.');
+                }
+                const snapshots = authentication.headerSnapshots();
+                if (!X509WorkloadIdentityAuth.shouldAuthenticate(opts, snapshots.defaultHeaders, snapshots.requestHeaders)) {
+                    return undefined;
+                }
+            }
+            const token = authentication instanceof X509WorkloadIdentityAuth
+                ? await authentication.getToken(opts, {
+                    apiURL: authentication.requestAPIURL(),
+                    ...authentication.headerSnapshots(),
+                    ...authentication.requestSnapshot(),
+                    signal: authentication.effectiveSignal(),
+                    ...authentication.tenantSnapshot(),
+                })
+                : await authentication.getToken();
+            return buildHeaders([{ Authorization: `Bearer ${token}` }]);
         }
-        if (this.apiKey == null) {
+        const { apiKey } = await resolveRealtimeAPIKey(this);
+        if (apiKey == null) {
             return undefined;
         }
-        return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+        return buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
     }
     async adminAPIKeyAuth(opts) {
         if (this.adminAPIKey == null) {
@@ -80467,12 +87741,27 @@ class OpenAI {
         const normalizedError = error && typeof error === 'object' && error.error == null ? { error } : error;
         return APIError.generate(status, normalizedError, message, headers);
     }
-    async _callApiKey() {
-        if (this._provider)
+    _hasApiKeyProvider() {
+        return typeof this._options.apiKey === 'function';
+    }
+    /**
+     * Resolves a function-based API key and retains the resolved value on this client.
+     * Returns whether a provider was invoked. Internal callers can capture this
+     * invocation's key before another request updates the shared `apiKey` property.
+     * Overrides should forward `capture` or invoke it with their own resolved key
+     * to preserve invocation-local credentials in concurrent requests and Realtime factories.
+     * @internal
+     */
+    async _callApiKey(capture) {
+        if (this._provider) {
+            capture?.(this.apiKey);
             return false;
+        }
         const apiKey = this._options.apiKey;
-        if (typeof apiKey !== 'function')
+        if (typeof apiKey !== 'function') {
+            capture?.(this.apiKey);
             return false;
+        }
         let token;
         try {
             token = await apiKey();
@@ -80488,6 +87777,7 @@ class OpenAI {
             throw new error_OpenAIError(`Expected 'apiKey' function argument to return a string but it returned ${token}`);
         }
         this.apiKey = token;
+        capture?.(this.apiKey);
         return true;
     }
     buildURL(path, query, defaultBaseURL) {
@@ -80507,15 +87797,11 @@ class OpenAI {
     }
     /**
      * Used as a callback for mutating the given `FinalRequestOptions` object.
+     * Function-based credentials are resolved later, when building authentication
+     * headers, including for direct `buildRequest()` calls. Overriding this hook
+     * does not bypass that resolution.
      */
-    async prepareOptions(options) {
-        if (this._provider)
-            return;
-        const security = options.__security ?? { bearerAuth: true };
-        if (security.bearerAuth) {
-            await this._callApiKey();
-        }
-    }
+    async prepareOptions(options) { }
     /**
      * Used as a callback for mutating the given `RequestInit` object.
      *
@@ -80544,10 +87830,17 @@ class OpenAI {
         }));
     }
     request(options, remainingRetries = null) {
-        return this.responsePromise(this.makeRequest(options, remainingRetries, undefined));
+        const authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") ?? this._workloadIdentityAuth;
+        const request = authentication instanceof X509WorkloadIdentityAuth
+            ? Promise.resolve(options).then((resolved) => authentication.runRequest(() => this.makeRequest(resolved, remainingRetries, undefined), this))
+            : this.makeRequest(options, remainingRetries, undefined);
+        return this.responsePromise(request);
     }
     responsePromise(request, parse = (client, props) => this.parseResponseWithTimeout(client, props)) {
-        const promise = new APIPromise(this, request, parse);
+        const promise = new APIPromise(this, request, (client, props) => {
+            const resume = __classPrivateFieldGet(this, _OpenAI_responseAttempts, "f").get(props.controller)?.continueRequest;
+            return resume ? resume(() => parse(client, props)) : parse(client, props);
+        });
         // A body timeout can retry after the original raw response has arrived. Wait for
         // parsing before selecting the response so withResponse() reports the retry.
         promise.withResponse = async () => {
@@ -80568,15 +87861,30 @@ class OpenAI {
         while (true) {
             const attempt = __classPrivateFieldGet(this, _OpenAI_responseAttempts, "f").get(props.controller);
             const timeout = attempt?.timeout ?? props.options.timeout ?? this.timeout;
-            const remaining = Math.max(0, props.startTime + timeout - Date.now());
-            const callerSignal = props.options.signal;
+            const x509Authentication = attempt?.authentication;
+            const callerSignal = x509Authentication ? props.controller.signal : props.options.signal;
+            const abortError = () => x509Authentication && callerSignal
+                ? this._makeUserAbortError(callerSignal)
+                : new APIUserAbortError();
+            let remaining;
+            try {
+                remaining =
+                    x509Authentication?.remainingTimeout(props.options, timeout) ??
+                        Math.max(0, props.startTime + timeout - Date.now());
+            }
+            catch (error) {
+                const cancellation = callerSignal?.aborted ? abortError() : undefined;
+                props.controller.abort();
+                void CancelReadableStream(props.response.body).catch(() => undefined);
+                throw cancellation ?? error;
+            }
             let timer;
             let abortListener;
             let timedOut = false;
             try {
                 // Tool runners preserve a completed buffered turn before cancellation stops the next request.
-                if (callerSignal?.aborted && props.options.__metadata?.['helperMethod'] !== 'runTools') {
-                    throw new APIUserAbortError();
+                if (callerSignal?.aborted && attempt?.helperMethod !== 'runTools') {
+                    throw abortError();
                 }
                 const timeoutPromise = new Promise((_, reject) => {
                     timer = setTimeout(() => {
@@ -80585,21 +87893,33 @@ class OpenAI {
                         reject(new APIConnectionTimeoutError());
                     }, remaining);
                     if (callerSignal) {
-                        abortListener = () => reject(new APIUserAbortError());
+                        abortListener = () => {
+                            if (!timedOut)
+                                reject(abortError());
+                        };
                         callerSignal.addEventListener('abort', abortListener, { once: true });
                     }
                 });
                 return await Promise.race([defaultParseResponse(client, props), timeoutPromise]);
             }
             catch (error) {
-                if (callerSignal?.aborted) {
-                    throw new APIUserAbortError();
+                if (callerSignal?.aborted && !timedOut) {
+                    throw abortError();
                 }
                 if (!timedOut) {
+                    if (x509Authentication && error instanceof SyntaxError) {
+                        throw new SyntaxError('X.509 workload identity API response contains invalid JSON.');
+                    }
+                    if (x509Authentication && !(error instanceof error_OpenAIError)) {
+                        throw new APIConnectionError({
+                            message: 'X.509 workload identity API response body could not be read.',
+                        });
+                    }
                     throw error;
                 }
                 const retriesRemaining = attempt?.retriesRemaining ?? 0;
                 if (!retriesRemaining ||
+                    attempt?.hasStreamingBody ||
                     props.options.__metadata?.['hasStreamingBody'] ||
                     (globalThis.ReadableStream &&
                         props.options.body instanceof globalThis.ReadableStream) ||
@@ -80616,7 +87936,7 @@ class OpenAI {
                 if (abortListener)
                     callerSignal?.removeEventListener('abort', abortListener);
                 abortListener = undefined;
-                const next = await this.retryRequest(props.options, retriesRemaining, props.retryOfRequestLogID ?? props.requestLogID);
+                const next = await this.retryRequest(props.options, retriesRemaining, props.retryOfRequestLogID ?? props.requestLogID, undefined, props.requestSignal);
                 Object.assign(props, next);
             }
             finally {
@@ -80627,44 +87947,150 @@ class OpenAI {
             }
         }
     }
+    /** Keeps terminal X.509 error-body consumption inside the original logical request deadline. */
+    async readX509ResponseError(response, options, timeout, controller, authentication) {
+        const deadline = new AbortController();
+        const callerSignal = controller.signal;
+        let timedOut = false;
+        const cancel = () => deadline.abort(callerSignal.reason);
+        callerSignal.addEventListener('abort', cancel, { once: true });
+        if (callerSignal.aborted) {
+            cancel();
+        }
+        try {
+            const remaining = authentication.remainingTimeout(options, timeout);
+            const expiration = authentication.waitForRetry(remaining, deadline.signal).then(() => {
+                throw new APIConnectionTimeoutError();
+            });
+            const body = await Promise.race([
+                response.text().catch(() => 'X.509 workload identity API response body could not be read.'),
+                expiration,
+            ]);
+            if (callerSignal.aborted) {
+                throw this._makeUserAbortError(callerSignal);
+            }
+            return body;
+        }
+        catch (error) {
+            if (error instanceof APIConnectionTimeoutError) {
+                timedOut = !callerSignal.aborted;
+                controller.abort();
+                void CancelReadableStream(response.body).catch(() => undefined);
+            }
+            if (callerSignal.aborted && !timedOut) {
+                throw this._makeUserAbortError(callerSignal);
+            }
+            throw error;
+        }
+        finally {
+            callerSignal.removeEventListener('abort', cancel);
+            deadline.abort();
+        }
+    }
     async makeRequest(optionsInput, retriesRemaining, retryOfRequestLogID) {
         const options = await optionsInput;
         const maxRetries = options.maxRetries ?? this.maxRetries;
         if (retriesRemaining == null) {
             retriesRemaining = maxRetries;
         }
+        const x509Authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f");
+        x509Authentication?.beginRequestPreparation();
         await this.prepareOptions(options);
-        const { req, url, timeout } = await this.buildRequest(options, {
-            retryCount: maxRetries - retriesRemaining,
-        });
-        const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
-        await this.prepareRequest(req, { url, options });
-        await this._provider?.prepareRequest?.(req, { url, options });
+        x509Authentication?.beginRequestPlanning();
+        let built;
+        try {
+            const candidate = await this.buildRequest(options, {
+                retryCount: maxRetries - retriesRemaining,
+            });
+            built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
+            if (x509Authentication) {
+                validatePositiveInteger('timeout', built.timeout);
+                x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout);
+                if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
+                    options.__metadata = { ...options.__metadata, hasStreamingBody: true };
+                }
+                await this.prepareRequest(built.req, { url: built.url, options });
+                await this._provider?.prepareRequest?.(built.req, { url: built.url, options });
+                x509Authentication.beginRequestPlanning();
+                x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout, true);
+                if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
+                    options.__metadata = { ...options.__metadata, hasStreamingBody: true };
+                }
+                const callerSignal = x509Authentication.requestSnapshot().signal;
+                if (callerSignal?.aborted || built.req.signal?.aborted) {
+                    throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : built.req.signal);
+                }
+                x509Authentication.setEffectiveSignal(built.req.signal || callerSignal
+                    ? createRequestController(built.req.signal ?? callerSignal, callerSignal).signal
+                    : undefined);
+                x509Authentication.beginRequestNetwork();
+                const security = options.__security ?? { bearerAuth: true };
+                const authenticationHeaders = await this.authHeaders(options, security);
+                const suppliedHeaders = x509Authentication.headerSnapshots();
+                const supplied = buildHeaders([suppliedHeaders.defaultHeaders, suppliedHeaders.requestHeaders]);
+                for (const [name, value] of authenticationHeaders?.values ?? []) {
+                    if (!supplied.nulls.has(name) && !built.req.headers.has(name)) {
+                        built.req.headers.set(name, value);
+                    }
+                }
+                this.validateHeaders(buildHeaders([supplied, built.req.headers]), security);
+            }
+        }
+        catch (error) {
+            x509Authentication?.retireRequestBody();
+            if (x509Authentication &&
+                retriesRemaining &&
+                !options.__metadata?.['hasStreamingBody'] &&
+                X509WorkloadIdentityAuth.isRetryableFailure(error)) {
+                return await this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? 'x509-token-exchange', X509WorkloadIdentityAuth.retryHeaders(error));
+            }
+            throw error;
+        }
+        const { req, url } = built;
+        const timeout = x509Authentication
+            ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
+            : built.timeout;
+        x509Authentication?.bindRequest(options, req, this.adminAPIKey);
+        let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
+        if (!x509Authentication) {
+            await this.prepareRequest(req, { url, options });
+            await this._provider?.prepareRequest?.(req, { url, options });
+        }
+        x509Authentication?.adoptRequestHeaders(req);
+        if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
+            hasStreamingBody = true;
+        }
         /** Not an API request ID, just for correlating local log entries. */
         const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
         const retryLogStr = retryOfRequestLogID === undefined ? '' : `, retryOf: ${retryOfRequestLogID}`;
-        const startTime = Date.now();
+        const startTime = x509Authentication?.requestStartedAt(options) ?? Date.now();
         loggerFor(this).debug(`[${requestLogID}] sending request`, formatRequestDetails({
             retryOfRequestLogID,
             method: options.method,
             url,
-            options,
+            options: x509Authentication ? { body: req.body, ...x509Authentication.requestSnapshot() } : options,
             headers: req.headers,
         }));
-        if (options.signal?.aborted || req.signal?.aborted) {
-            throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal);
+        const callerSignal = x509Authentication ? x509Authentication.requestSnapshot().signal : options.signal;
+        if (callerSignal?.aborted || req.signal?.aborted) {
+            throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal);
         }
         const security = options.__security ?? { bearerAuth: true };
         // Request hooks may replace the caller signal before it reaches fetch.
-        const controller = this.fetchWithTimeout === client_a.prototype.fetchWithTimeout
-            ? createRequestController(req.signal)
+        const controller = x509Authentication || this.fetchWithTimeout === client_a.prototype.fetchWithTimeout
+            ? createRequestController(req.signal ?? (x509Authentication ? callerSignal : undefined), x509Authentication ? callerSignal : undefined)
             : new AbortController();
-        const response = await this.fetchWithAuth(url, req, timeout, controller, security).catch(castToError);
+        const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
+        const fetchWithAuth = x509Authentication ? client_a.prototype.fetchWithAuth : this.fetchWithAuth;
+        x509Authentication?.releaseRequestBody(req.body);
+        const response = await fetchWithAuth
+            .call(this, url, req, remainingTimeout, controller, security)
+            .catch(castToError);
         const headersTime = Date.now();
         if (response instanceof globalThis.Error) {
             const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
-            if (options.signal?.aborted || req.signal?.aborted) {
-                throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal);
+            if (callerSignal?.aborted || req.signal?.aborted) {
+                throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal);
             }
             // detect native connection timeout errors
             // deno throws "TypeError: error sending request for url (https://example/): client error (Connect): tcp connect error: Operation timed out (os error 60): Operation timed out (os error 60)"
@@ -80672,15 +88098,17 @@ class OpenAI {
             // others do not provide enough information to distinguish timeouts from other connection errors
             const isTimeout = src_isAbortError(response) ||
                 /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
-            if (retriesRemaining && !hasStreamingBody) {
+            if (retriesRemaining &&
+                !hasStreamingBody &&
+                (!x509Authentication || x509_transport_state_isTransientX509ConnectionError(response))) {
                 loggerFor(this).info(`[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`);
                 loggerFor(this).debug(`[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} (${retryMessage})`, formatRequestDetails({
                     retryOfRequestLogID,
                     url,
                     durationMs: headersTime - startTime,
-                    message: response.message,
+                    message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
                 }));
-                return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+                return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID, undefined, req.signal);
             }
             const terminalMessage = hasStreamingBody
                 ? 'error; streaming body cannot be retried'
@@ -80690,7 +88118,7 @@ class OpenAI {
                 retryOfRequestLogID,
                 url,
                 durationMs: headersTime - startTime,
-                message: response.message,
+                message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
             }));
             if (response instanceof OAuthError || response instanceof SubjectTokenProviderError) {
                 throw response;
@@ -80707,7 +88135,13 @@ class OpenAI {
                             'configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.',
                     })
                     : new APIConnectionTimeoutError();
+                if (x509Authentication) {
+                    throw new APIConnectionTimeoutError();
+                }
                 throw Object.assign(timeoutError, { cause: response });
+            }
+            if (x509Authentication) {
+                throw new APIConnectionError({ message: 'X.509 workload identity API connection failed.' });
             }
             throw new APIConnectionError({
                 message: getConnectionErrorMessage(response),
@@ -80718,28 +88152,50 @@ class OpenAI {
             .filter(([name]) => name === 'x-request-id')
             .map(([name, value]) => ', ' + name + ': ' + JSON.stringify(value))
             .join('');
-        const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${url} ${response.ok ? 'succeeded' : 'failed'} with status ${response.status} in ${headersTime - startTime}ms`;
+        const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${redactURL(url)} ${response.ok ? 'succeeded' : 'failed'} with status ${response.status} in ${headersTime - startTime}ms`;
         if (!response.ok) {
-            if (response.status === 401 &&
-                this._workloadIdentityAuth &&
+            const rejectedX509Credential = response.status === 401 &&
+                x509Authentication &&
                 security.bearerAuth &&
-                !options.__metadata?.['hasStreamingBody'] &&
+                x509Authentication.usedWorkloadToken(options);
+            if (rejectedX509Credential) {
+                x509Authentication.invalidateToken();
+            }
+            if (response.status === 401 &&
+                (x509Authentication || this._workloadIdentityAuth) &&
+                security.bearerAuth &&
+                (!x509Authentication || x509Authentication.usedWorkloadToken(options)) &&
+                (!x509Authentication || retriesRemaining > 0) &&
+                !hasStreamingBody &&
                 !options.__metadata?.['workloadIdentityTokenRefreshed']) {
-                await CancelReadableStream(response.body);
-                this._workloadIdentityAuth.invalidateToken();
-                return this.makeRequest({
+                if (x509Authentication) {
+                    void CancelReadableStream(response.body).catch(() => undefined);
+                }
+                else {
+                    await CancelReadableStream(response.body);
+                    this._workloadIdentityAuth?.invalidateToken();
+                }
+                const replayOptions = {
                     ...options,
                     __metadata: {
                         ...options.__metadata,
                         workloadIdentityTokenRefreshed: true,
                     },
-                }, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+                };
+                return this.makeRequest(replayOptions, x509Authentication ? retriesRemaining - 1 : retriesRemaining, retryOfRequestLogID ?? requestLogID);
             }
-            const shouldRetry = await this.shouldRetry(response);
+            const shouldRetry = rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
+                ? false
+                : await this.shouldRetry(response);
             if (retriesRemaining && shouldRetry && !hasStreamingBody) {
                 const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
                 // We don't need the body of this response.
-                await CancelReadableStream(response.body);
+                if (x509Authentication) {
+                    void CancelReadableStream(response.body).catch(() => undefined);
+                }
+                else {
+                    await CancelReadableStream(response.body);
+                }
                 loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
                 loggerFor(this).debug(`[${requestLogID}] response error (${retryMessage})`, formatRequestDetails({
                     retryOfRequestLogID,
@@ -80748,7 +88204,7 @@ class OpenAI {
                     headers: response.headers,
                     durationMs: headersTime - startTime,
                 }));
-                return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID, response.headers);
+                return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID, response.headers, req.signal);
             }
             const retryMessage = shouldRetry
                 ? hasStreamingBody
@@ -80756,7 +88212,9 @@ class OpenAI {
                     : `error; no more retries left`
                 : `error; not retryable`;
             loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
-            const errText = await response.text().catch((err) => castToError(err).message);
+            const errText = x509Authentication
+                ? await this.readX509ResponseError(response, options, timeout, controller, x509Authentication)
+                : await response.text().catch((err) => castToError(err).message);
             const errJSON = src_safeJSON(errText);
             const errMessage = errJSON ? undefined : errText;
             loggerFor(this).debug(`[${requestLogID}] response error (${retryMessage})`, formatRequestDetails({
@@ -80778,8 +88236,25 @@ class OpenAI {
             headers: response.headers,
             durationMs: headersTime - startTime,
         }));
-        __classPrivateFieldGet(this, _OpenAI_responseAttempts, "f").set(controller, { timeout, retriesRemaining });
-        return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+        const continueRequest = x509Authentication?.continuation();
+        x509Authentication?.releaseRequestCredentials();
+        __classPrivateFieldGet(this, _OpenAI_responseAttempts, "f").set(controller, {
+            timeout,
+            retriesRemaining,
+            hasStreamingBody,
+            ...(x509Authentication ? { authentication: x509Authentication } : {}),
+            helperMethod: options.__metadata?.['helperMethod'],
+            ...(continueRequest ? { continueRequest } : {}),
+        });
+        return {
+            response,
+            options,
+            controller,
+            requestSignal: req.signal,
+            requestLogID,
+            retryOfRequestLogID,
+            startTime,
+        };
     }
     getAPIList(path, Page, opts) {
         return this.requestAPIList(Page, opts && 'then' in opts
@@ -80787,7 +88262,10 @@ class OpenAI {
             : { method: 'get', path, ...opts });
     }
     requestAPIList(Page, options) {
-        const request = this.makeRequest(options, null, undefined);
+        const authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") ?? this._workloadIdentityAuth;
+        const request = authentication instanceof X509WorkloadIdentityAuth
+            ? Promise.resolve(options).then((resolved) => authentication.runRequest(() => this.makeRequest(resolved, null, undefined), this))
+            : this.makeRequest(options, null, undefined);
         const page = new PagePromise(this, request, Page);
         const guarded = this.responsePromise(request, async (client, props) => {
             const body = await this.parseResponseWithTimeout(client, props);
@@ -80804,23 +88282,23 @@ class OpenAI {
         bearerAuth: true,
         adminAPIKeyAuth: true,
     }) {
-        if (this._workloadIdentityAuth && schemes.bearerAuth) {
+        if (this._workloadIdentityAuth && !__classPrivateFieldGet(this, _OpenAI_x509Fetch, "f") && schemes.bearerAuth) {
             const headers = init.headers;
             const authHeader = headers.get('Authorization');
-            if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
+            if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
                 const token = await this._workloadIdentityAuth.getToken();
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        const response = await this.fetchWithTimeout(url, init, timeout, controller);
+        const fetchWithTimeout = __classPrivateFieldGet(this, _OpenAI_x509Fetch, "f") ? client_a.prototype.fetchWithTimeout : this.fetchWithTimeout;
+        const response = await fetchWithTimeout.call(this, url, init, timeout, controller);
         return response;
     }
     async fetchWithTimeout(url, init, ms, controller) {
         const { signal, method, ...options } = init || {};
         const abort = this._makeAbort(controller);
         const composed = !!signal && composedCallerSignals.get(controller) === signal;
-        if (signal && !composed)
-            signal.addEventListener('abort', abort, { once: true });
+        const cleanup = signal && !composed ? addRequestAbortListener(signal, abort, controller.signal) : undefined;
         const timeout = setTimeout(abort, ms);
         const isReadableBody = (globalThis.ReadableStream && options.body instanceof globalThis.ReadableStream) ||
             (typeof options.body === 'object' && options.body !== null && Symbol.asyncIterator in options.body);
@@ -80837,11 +88315,14 @@ class OpenAI {
         }
         try {
             // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-            return await this.fetch.call(undefined, url, fetchOptions);
+            const response = await (__classPrivateFieldGet(this, _OpenAI_x509Fetch, "f") ?? this.fetch).call(undefined, url, fetchOptions);
+            if (cleanup) {
+                retainRequestAbortCallback(response.body ?? response, abort, controller.signal);
+            }
+            return response;
         }
         catch (err) {
-            if (signal && !composed)
-                signal.removeEventListener('abort', abort);
+            cleanup?.();
             throw err;
         }
         finally {
@@ -80870,7 +88351,7 @@ class OpenAI {
             return true;
         return false;
     }
-    async retryRequest(options, retriesRemaining, requestLogID, responseHeaders) {
+    async retryRequest(options, retriesRemaining, requestLogID, responseHeaders, requestSignal = options.signal) {
         let timeoutMillis;
         // Note the `retry-after-ms` header may not be standard, but is a good idea and we'd like proactive support for it.
         const retryAfterMillisHeader = responseHeaders?.get('retry-after-ms');
@@ -80900,7 +88381,29 @@ class OpenAI {
             const maxRetries = options.maxRetries ?? this.maxRetries;
             timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
         }
-        await sleep(timeoutMillis);
+        const x509Authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f");
+        if (x509Authentication) {
+            const remaining = x509Authentication.remainingTimeout(options, x509Authentication.requestSnapshot().timeout);
+            if (timeoutMillis >= remaining) {
+                throw new APIConnectionTimeoutError();
+            }
+        }
+        if (x509Authentication) {
+            await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
+        }
+        else {
+            const retrySignals = requestSignal === options.signal ? [requestSignal] : [requestSignal, options.signal];
+            try {
+                await sleep(timeoutMillis, ...retrySignals);
+            }
+            catch (error) {
+                const abortedSignal = retrySignals.find((signal) => signal?.aborted);
+                if (abortedSignal) {
+                    throw this._makeUserAbortError(abortedSignal);
+                }
+                throw error;
+            }
+        }
         return this.makeRequest(options, retriesRemaining - 1, requestLogID);
     }
     calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries) {
@@ -80913,21 +88416,75 @@ class OpenAI {
         const jitter = 1 - Math.random() * 0.25;
         return sleepSeconds * jitter * 1000;
     }
+    /**
+     * Builds a request, resolving callback credentials when constructing authentication
+     * headers, after any subclass request-option rewrites. Calling this method directly
+     * also resolves credentials. Complete replacement builders own authentication and
+     * can call `this.authHeaders()` to resolve headers with request-local credentials.
+     */
     async buildRequest(inputOptions, { retryCount = 0 } = {}) {
+        if (__classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") && !__classPrivateFieldGet(this, _OpenAI_x509Authentication, "f").inRequest(this)) {
+            const authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f");
+            return await authentication.runRequest(async () => {
+                const built = await client_a.prototype.buildRequest.call(this, inputOptions, { retryCount });
+                authentication.releaseRequestBody(built.req.body);
+                return built;
+            }, this);
+        }
         const options = { ...inputOptions };
+        const x509Authentication = __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f");
+        const x509Tenant = x509Authentication?.snapshotTenant(this.organization, this.project);
+        const x509Headers = x509Authentication?.snapshotHeaders(this._options.defaultHeaders, options.headers);
+        if (x509Headers) {
+            options.headers = x509Headers.requestHeaders;
+        }
+        const x509ClientFetchOptions = x509Authentication
+            ? snapshotX509RequestOptions(this.fetchOptions)
+            : undefined;
+        const x509RequestFetchOptions = x509Authentication
+            ? snapshotX509RequestOptions(options.fetchOptions)
+            : undefined;
         const { method, path, query, defaultBaseURL } = options;
         const url = this.buildURL(path, query, defaultBaseURL);
-        if ('timeout' in options)
+        x509Authentication?.snapshotAPIURL(url);
+        const explicitTimeout = 'timeout' in options;
+        if (explicitTimeout)
             validatePositiveInteger('timeout', options.timeout);
         options.timeout = options.timeout ?? this.timeout;
+        if (x509Authentication && x509RequestFetchOptions) {
+            x509Authentication.snapshotRequest(options.signal, options.timeout, x509RequestFetchOptions);
+        }
+        if (x509Authentication) {
+            const snapshot = x509Authentication.requestSnapshot();
+            options.timeout = snapshot.timeout;
+            if (snapshot.signal === undefined) {
+                delete options.signal;
+            }
+            else {
+                options.signal = snapshot.signal;
+            }
+        }
+        const authenticationHeaders = this._provider || x509Authentication
+            ? undefined
+            : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
         const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
         if (isStreamingBody) {
             inputOptions.__metadata = {
                 ...inputOptions.__metadata,
                 hasStreamingBody: true,
             };
+            x509Authentication?.ownRequestBody(body, options.body);
         }
-        const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
+        const reqHeaders = await this.buildHeaders({
+            options: inputOptions,
+            method,
+            bodyHeaders,
+            authenticationHeaders,
+            retryCount,
+            x509Headers,
+            x509Timeout: explicitTimeout ? options.timeout : undefined,
+            x509Tenant,
+        });
         const req = {
             method,
             headers: reqHeaders,
@@ -80935,12 +88492,12 @@ class OpenAI {
             ...(globalThis.ReadableStream &&
                 body instanceof globalThis.ReadableStream && { duplex: 'half' }),
             ...(body && { body }),
-            ...(this.fetchOptions ?? {}),
-            ...(options.fetchOptions ?? {}),
+            ...((x509Authentication ? x509ClientFetchOptions : this.fetchOptions) ?? {}),
+            ...((x509Authentication ? x509RequestFetchOptions : options.fetchOptions) ?? {}),
         };
         return { req, url, timeout: options.timeout };
     }
-    async buildHeaders({ options, method, bodyHeaders, retryCount, }) {
+    async buildHeaders({ options, method, bodyHeaders, authenticationHeaders, retryCount, x509Headers, x509Timeout, x509Tenant, }) {
         let idempotencyHeaders = {};
         if (this.idempotencyHeader && method !== 'get') {
             if (!options.idempotencyKey)
@@ -80948,26 +88505,28 @@ class OpenAI {
             idempotencyHeaders[this.idempotencyHeader] = options.idempotencyKey;
         }
         const helperMethod = options.__metadata?.['helperMethod'];
+        const timeout = x509Headers ? x509Timeout : options.timeout;
         const headers = buildHeaders([
             idempotencyHeaders,
             {
                 Accept: 'application/json',
                 ...(!isRunningInBrowserOrBrowserWorker() ? { 'User-Agent': this.getUserAgent() } : undefined),
                 'X-Stainless-Retry-Count': String(retryCount),
-                ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
+                ...(timeout ? { 'X-Stainless-Timeout': String(Math.trunc(timeout / 1000)) } : {}),
                 ...getPlatformHeaders(),
                 ...(typeof helperMethod === 'string' ? { 'X-Stainless-Helper-Method': helperMethod } : {}),
-                'OpenAI-Organization': this.organization,
-                'OpenAI-Project': this.project,
+                'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
+                'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
             },
-            this._provider
-                ? undefined
-                : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
-            this._options.defaultHeaders,
+            // X.509 owns streaming uploads before authentication so it can retire them on failure.
+            __classPrivateFieldGet(this, _OpenAI_x509Authentication, "f") && !__classPrivateFieldGet(this, _OpenAI_x509Authentication, "f").isPlanningRequest()
+                ? await this.authHeaders(options, options.__security ?? { bearerAuth: true })
+                : authenticationHeaders,
+            x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
             bodyHeaders,
-            options.headers,
+            x509Headers?.requestHeaders ?? options.headers,
         ]);
-        if (!this._provider) {
+        if (!this._provider && !__classPrivateFieldGet(this, _OpenAI_x509Authentication, "f")?.isPlanningRequest()) {
             this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
         }
         return headers.values;
@@ -81044,8 +88603,10 @@ class OpenAI {
         }
     }
 }
-client_a = OpenAI, _OpenAI_encoder = new WeakMap(), _OpenAI_responseAttempts = new WeakMap(), _OpenAI_instances = new WeakSet(), _OpenAI_baseURLOverridden = function _OpenAI_baseURLOverridden() {
-    return this._provider !== undefined || this.baseURL !== 'https://api.openai.com/v1';
+client_a = OpenAI, _OpenAI_encoder = new WeakMap(), _OpenAI_x509Authentication = new WeakMap(), _OpenAI_x509Credential = new WeakMap(), _OpenAI_x509Fetch = new WeakMap(), _OpenAI_explicitDataResidency = new WeakMap(), _OpenAI_responseAttempts = new WeakMap(), _OpenAI_instances = new WeakSet(), _OpenAI_baseURLOverridden = function _OpenAI_baseURLOverridden() {
+    return (__classPrivateFieldGet(this, _OpenAI_explicitDataResidency, "f") ||
+        this._provider !== undefined ||
+        this.baseURL !== 'https://api.openai.com/v1');
 };
 OpenAI.OpenAI = client_a;
 OpenAI.DEFAULT_TIMEOUT = 600000; // 10 minutes
@@ -81068,7 +88629,7 @@ OpenAI.toStreamingFile = toStreamingFile;
 OpenAI.Completions = completions_Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
-OpenAI.Files = files_Files;
+OpenAI.Files = resources_files_Files;
 OpenAI.Images = Images;
 OpenAI.ContentProvenanceChecks = ContentProvenanceChecks;
 OpenAI.Audio = Audio;
@@ -81077,20 +88638,27 @@ OpenAI.Models = Models;
 OpenAI.FineTuning = FineTuning;
 OpenAI.Graders = graders_Graders;
 OpenAI.VectorStores = VectorStores;
+OpenAI.Safety = Safety;
 OpenAI.Webhooks = Webhooks;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = Uploads;
 OpenAI.Admin = Admin;
 OpenAI.Responses = responses_Responses;
+OpenAI.Live = Live;
 OpenAI.Realtime = realtime_Realtime;
 OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
+OpenAI.ConversationCursorPage = ConversationCursorPage;
+OpenAI.CursorPage = CursorPage;
+OpenAI.NextCursorPage = NextCursorPage;
+OpenAI.Page = Page;
+OpenAI.TokenPage = TokenPage;
 const composedCallerSignals = new WeakMap();
-function createRequestController(callerSignal) {
+function createRequestController(callerSignal, originalSignal) {
     const controller = new AbortController();
     if (!callerSignal)
         return controller;
@@ -81101,7 +88669,11 @@ function createRequestController(callerSignal) {
     try {
         // Native composition keeps cancellation active after response headers without
         // retaining an abort listener on the caller's signal or changing its reason.
-        const composed = nativeAbortSignal.any([controller.signal, callerSignal]);
+        const signals = [controller.signal, callerSignal];
+        if (originalSignal && originalSignal !== callerSignal) {
+            signals.push(originalSignal);
+        }
+        const composed = nativeAbortSignal.any(signals);
         Object.defineProperty(controller, 'signal', { value: composed, configurable: true });
         composedCallerSignals.set(controller, callerSignal);
     }
@@ -81136,6 +88708,7 @@ function isUndiciDispatcherVersionMismatchError(error) {
 
 
 
+
 /** API Client for interfacing with the Azure OpenAI API. */
 class AzureOpenAI extends OpenAI {
     /**
@@ -81155,10 +88728,12 @@ class AzureOpenAI extends OpenAI {
      * @param {DefaultQuery} opts.defaultQuery - Default query parameters to include with every request to the API.
      * @param {boolean} [opts.dangerouslyAllowBrowser] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers. Defaults to `false`.
      */
-    constructor({ baseURL = env_readEnv('OPENAI_BASE_URL'), apiKey = env_readEnv('AZURE_OPENAI_API_KEY'), apiVersion = env_readEnv('OPENAI_API_VERSION'), endpoint, deployment, azureADTokenProvider, dangerouslyAllowBrowser, ...opts } = {}) {
+    constructor({ baseURL = env_readEnv('OPENAI_BASE_URL'), apiKey = env_readEnv('AZURE_OPENAI_API_KEY'), apiVersion = env_readEnv('OPENAI_API_VERSION'), endpoint, deployment, azureADTokenProvider, dangerouslyAllowBrowser, dataResidency, ...opts } = {}) {
+        assertNoDataResidency(dataResidency, 'AzureOpenAI');
         if (!apiVersion) {
             throw new error_OpenAIError("The OPENAI_API_VERSION environment variable is missing or empty; either provide it, or instantiate the AzureOpenAI client with an apiVersion option, like new AzureOpenAI({ apiVersion: 'My API Version' }).");
         }
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Azure accepts JavaScript credential configuration; distinguish static keys from callable token providers.
         if (typeof azureADTokenProvider === 'function') {
             dangerouslyAllowBrowser ?? (dangerouslyAllowBrowser = true);
         }
@@ -81189,12 +88764,31 @@ class AzureOpenAI extends OpenAI {
             apiKey: azureADTokenProvider ?? apiKey,
             baseURL,
             ...opts,
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
             ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
         });
         /** Azure OpenAI API version included in requests made by this client. */
         this.apiVersion = '';
         this.apiVersion = apiVersion;
         this.deploymentName = deployment;
+    }
+    /** Clones this client with Azure options; OpenAI data residency remains unsupported. */
+    withOptions(options) {
+        // `OpenAI.withOptions` rebuilds the clone from `this._options`, which never holds the
+        // Azure-only construction options, so they are re-injected here the same way the Bedrock
+        // client re-injects its own subclass-only field.
+        const azureOptions = {
+            apiVersion: this.apiVersion,
+            deployment: this.deploymentName,
+            ...options,
+        };
+        // The inherited base URL is always carried into the clone, so an `endpoint` override would
+        // otherwise collide with it; let the endpoint rebuild the base URL instead. Both tests read
+        // own properties, so an option bag that passed neither field keeps the inherited base URL.
+        if (hasOwn(options, 'endpoint') && options.endpoint !== undefined && !hasOwn(options, 'baseURL')) {
+            azureOptions.baseURL = undefined;
+        }
+        return super.withOptions(azureOptions);
     }
     /** Builds an Azure request and inserts its deployment into model-scoped endpoint paths. */
     async buildRequest(options, props = {}) {
@@ -81203,7 +88797,7 @@ class AzureOpenAI extends OpenAI {
                 throw new Error('Expected request body to be an object');
             }
             const model = this.deploymentName || options.body['model'] || options.__metadata?.['model'];
-            if (model !== undefined && !this.baseURL.includes('/deployments')) {
+            if (model !== undefined && !hasDeploymentPathSegment(this.baseURL)) {
                 options.path = src_path `/deployments/${model}` + options.path;
             }
         }
@@ -81221,10 +88815,26 @@ class AzureOpenAI extends OpenAI {
     }
     async authHeaders(opts, schemes) {
         const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Azure accepts JavaScript credential configuration; distinguish static keys from callable token providers.
         if (security.bearerAuth && typeof this._options.apiKey === 'string') {
             return buildHeaders([{ 'api-key': this.apiKey }]);
         }
         return super.authHeaders(opts, security);
+    }
+}
+/**
+ * Reports whether the base URL already routes through a `/deployments` path segment, so the
+ * deployment must not be inserted again. A substring test would also match an unrelated segment
+ * such as `/deployments-proxy/`, or a host like `deployments.example.com`.
+ */
+function hasDeploymentPathSegment(baseURL) {
+    try {
+        return new URL(baseURL).pathname.split('/').includes('deployments');
+    }
+    catch {
+        // A base URL that is not an absolute URL has no path segments to read. Report none, the way
+        // the previous substring test did, and let joining the request path reject it as it did before.
+        return false;
     }
 }
 const _deployments_endpoints = new Set([
@@ -81246,12 +88856,14 @@ const _deployments_endpoints = new Set([
 const brand_privateBedrockClient = Symbol.for('openai.privateBedrockClient');
 /** Wraps a provider failure in an SDK error while preserving its original cause. */
 function errorWithCause(message, cause) {
+    // SAFETY: This SDK error is created locally and receives its optional cause immediately below; no existing error shape is trusted.
     const error = new Errors.OpenAIError(message);
     error.cause = cause;
     return error;
 }
 /** Trims a configuration string, treating missing and whitespace-only values as absent. */
 function normalizeOptionalString(value) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
     const normalized = typeof value === 'string' ? value.trim() : undefined;
     return normalized || undefined;
 }
@@ -81355,6 +88967,7 @@ function resolveBedrockEndpoint(options) {
         const baseURL = normalizeBaseURL(configuredBaseURL);
         const endpoint = options.endpoint ?? parseBedrockEndpointHostname(new URL(baseURL).hostname)?.endpoint ?? 'mantle';
         validateCanonicalBedrockEndpoint(baseURL, endpoint, region);
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the declared endpoint resolver contract across configured URLs and inferred regions.
         return { endpoint, region, baseURL };
     }
     const endpoint = options.endpoint ?? 'mantle';
@@ -81364,6 +88977,7 @@ function resolveBedrockEndpoint(options) {
     const hostname = endpoint === 'runtime'
         ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffixes(region)[0]}`
         : `bedrock-mantle.${region}.api.aws`;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The resolver intentionally returns its declared endpoint contract across all configuration paths.
     return { endpoint, region, baseURL: `https://${hostname}/openai/v1` };
 }
 /**
@@ -81383,7 +88997,9 @@ function assertBedrockRequestOrigin(baseURL, requestURL) {
     }
 }
 /** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The WebSocket authentication boundary verifies the caller client at runtime before trusting provider metadata.
 function assertBedrockWebSocketOrigin(client, requestURL) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
     if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
         return;
     }
@@ -81394,7 +89010,10 @@ function assertBedrockWebSocketOrigin(client, requestURL) {
     else if (normalizedRequestURL.protocol === 'ws:') {
         normalizedRequestURL.protocol = 'http:';
     }
-    assertBedrockRequestOrigin(client.baseURL, normalizedRequestURL.toString());
+    // SAFETY: The private Bedrock brand checked above identifies the client whose baseURL is validated against the finalized request origin.
+    assertBedrockRequestOrigin(
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The private Bedrock client brand checked above identifies the client baseURL contract.
+    client.baseURL, normalizedRequestURL.toString());
 }
 /**
  * Rejects caller-provided authorization headers that conflict with provider authentication.
@@ -81406,26 +89025,206 @@ function assertProviderOwnsAuthorization(headers) {
         throw new Errors.OpenAIError('Bedrock provider authentication cannot be combined with a custom `Authorization` header.');
     }
 }
+/** Rejects non-HTTP field bytes without retaining or exposing a bearer credential. */
+function assertValidBedrockBearerCredential(credential) {
+    if (/^[\t ]|[\t ]$/.test(credential)) {
+        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+    }
+    for (const character of credential) {
+        const value = character.codePointAt(0) ?? 0;
+        if ((value < 0x20 && value !== 0x09) || value === 0x7f || value > 0xff) {
+            throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+        }
+    }
+}
+function createBedrockUserAbortError(signal) {
+    const error = new Errors.APIUserAbortError();
+    Object.defineProperty(error, 'cause', {
+        value: signal.reason,
+        writable: true,
+        configurable: true,
+    });
+    return error;
+}
+function removeBedrockAbortListener(signal, listener) {
+    try {
+        signal.removeEventListener('abort', listener);
+    }
+    catch {
+        // A nonstandard AbortSignal must not replace the actual request outcome.
+    }
+}
+function resolveAbortableBedrockAuth(operation, signals, failure) {
+    // oxlint-disable-next-line promise/avoid-new -- AbortSignal events require a Promise callback bridge.
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const listeners = [];
+        const removeListeners = () => {
+            while (listeners.length > 0) {
+                const registered = listeners.pop();
+                if (registered) {
+                    removeBedrockAbortListener(registered.signal, registered.listener);
+                }
+            }
+        };
+        failure.removeListeners = removeListeners;
+        const settle = (result) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            if ('value' in result) {
+                resolve(result.value);
+            }
+            else {
+                removeListeners();
+                reject(result.error);
+            }
+        };
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
+        const rejectSignalFailure = (error) => {
+            if (failure.error) {
+                return;
+            }
+            failure.error = { value: error };
+            settle({ error });
+        };
+        const registerAbortListener = (signal) => {
+            const onAbort = () => {
+                if (failure.error) {
+                    return;
+                }
+                try {
+                    rejectSignalFailure(createBedrockUserAbortError(signal));
+                }
+                catch (error) {
+                    rejectSignalFailure(error);
+                }
+            };
+            try {
+                if (signal.aborted) {
+                    onAbort();
+                    return false;
+                }
+                listeners.push({ signal, listener: onAbort });
+                signal.addEventListener('abort', onAbort, { once: true });
+                if (settled) {
+                    removeBedrockAbortListener(signal, onAbort);
+                    return false;
+                }
+                if (signal.aborted) {
+                    onAbort();
+                    return false;
+                }
+            }
+            catch (error) {
+                if (settled) {
+                    removeBedrockAbortListener(signal, onAbort);
+                }
+                else {
+                    rejectSignalFailure(error);
+                }
+                return false;
+            }
+            return true;
+        };
+        for (const signal of signals) {
+            if (!registerAbortListener(signal)) {
+                return;
+            }
+        }
+        let pending;
+        try {
+            pending = operation();
+        }
+        catch (error) {
+            settle({ error });
+            return;
+        }
+        const observeResult = async () => {
+            try {
+                settle({ value: await pending });
+            }
+            catch (error) {
+                settle({ error });
+            }
+        };
+        // Observe the result even if the provider synchronously triggered cancellation.
+        void observeResult();
+    });
+}
+/**
+ * Resolves Bedrock authentication work with caller cancellation, then applies
+ * its result synchronously after the final cancellation checks.
+ *
+ * @internal
+ */
+async function prepareBedrockAuth(request, context, operation) {
+    const signals = [];
+    for (const signal of [context.options.signal, request.signal]) {
+        if (signal != null && !signals.includes(signal)) {
+            signals.push(signal);
+        }
+    }
+    const signalFailure = {};
+    let value;
+    try {
+        try {
+            value =
+                signals.length > 0
+                    ? await resolveAbortableBedrockAuth(operation.resolve, signals, signalFailure)
+                    : await operation.resolve();
+        }
+        catch (cause) {
+            if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
+                throw cause;
+            }
+            throw errorWithCause(operation.failureMessage, cause);
+        }
+        if (signalFailure.error) {
+            throw signalFailure.error.value;
+        }
+        for (const signal of signals) {
+            if (signal.aborted) {
+                throw createBedrockUserAbortError(signal);
+            }
+        }
+    }
+    finally {
+        signalFailure.removeListeners?.();
+    }
+    operation.apply(value);
+}
 class BedrockBearerAuth {
     constructor(tokenProvider) {
         this.tokenProvider = tokenProvider;
     }
-    async prepareRequest(request, _context) {
+    async prepareRequest(request, context) {
         const headers = new Headers(request.headers);
         assertProviderOwnsAuthorization(headers);
-        let token;
-        try {
-            token = await this.tokenProvider();
-        }
-        catch (cause) {
-            throw errorWithCause('Failed to resolve a bearer credential for Bedrock.', cause);
-        }
-        if (typeof token !== 'string' || !token.trim()) {
-            throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
-        }
-        headers.set('authorization', `Bearer ${token}`);
-        request.redirect = 'manual';
-        request.headers = headers;
+        await prepareBedrockAuth(request, context, {
+            resolve: () => this.tokenProvider(),
+            failureMessage: 'Failed to resolve a bearer credential for Bedrock.',
+            apply: (token) => {
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
+                if (typeof token !== 'string' || !token.trim()) {
+                    throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
+                }
+                assertValidBedrockBearerCredential(token);
+                try {
+                    headers.set('authorization', `Bearer ${token}`);
+                }
+                catch (error) {
+                    if (error instanceof TypeError) {
+                        // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
+                        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+                    }
+                    throw error;
+                }
+                request.redirect = 'manual';
+                request.headers = headers;
+            },
+        });
     }
 }
 /**
@@ -81441,6 +89240,7 @@ class BedrockBearerAuth {
 function resolveBedrockBearerAuth(options, { allowEnvironment = true, } = {}) {
     if (options.apiKey !== undefined &&
         options.apiKey !== null &&
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
         (typeof options.apiKey !== 'string' || !options.apiKey.trim())) {
         throw new Errors.OpenAIError('The Bedrock bearer credential must not be empty.');
     }
@@ -81449,13 +89249,16 @@ function resolveBedrockBearerAuth(options, { allowEnvironment = true, } = {}) {
     }
     if (options.tokenProvider) {
         const tokenProvider = options.tokenProvider;
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared bearer-auth contract hides concrete authenticator implementations behind their factory.
         return { factory: () => new BedrockBearerAuth(tokenProvider), explicit: true };
     }
     if (options.apiKey != null) {
         const apiKey = options.apiKey;
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Explicit API keys use the same declared auth-factory contract as token providers.
         return { factory: () => new BedrockBearerAuth(async () => apiKey), explicit: true };
     }
     if (allowEnvironment && options.apiKey !== null && readEnv('AWS_BEARER_TOKEN_BEDROCK')) {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Environment credentials must preserve the same declared auth-factory contract as explicit options.
         return {
             explicit: false,
             factory: () => new BedrockBearerAuth(async () => {
@@ -81467,6 +89270,7 @@ function resolveBedrockBearerAuth(options, { allowEnvironment = true, } = {}) {
             }),
         };
     }
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared optional factory contract also represents the absence of bearer credentials.
     return { factory: undefined, explicit: false };
 }
 //# sourceMappingURL=bedrock.mjs.map
@@ -81479,11 +89283,16 @@ var bedrock_a;
 
 
 
+
+
 /** Resolve the default Bedrock Mantle API root from the configured AWS region. */
 function deriveBedrockBaseURL(awsRegion) {
     const region = awsRegion?.trim();
     if (!region) {
         throw new error_OpenAIError('Must provide one of the `baseURL` or `awsRegion` arguments, or set the `AWS_BEDROCK_BASE_URL`, `AWS_REGION`, or `AWS_DEFAULT_REGION` environment variable.');
+    }
+    if (!/^[a-z]{2,8}(?:-[a-z0-9]+)+-\d+$/u.test(region)) {
+        throw new error_OpenAIError('The Bedrock AWS `region` is invalid. Use a standard AWS region such as `us-east-1`.');
     }
     return `https://bedrock-mantle.${region}.api.aws/openai/v1`;
 }
@@ -81506,6 +89315,7 @@ function addBedrockOutputText(response) {
 /** Keep the standard Responses surface while repairing Bedrock streamed final responses. */
 function restoreBedrockStreamOutputText(responses) {
     const stream = responses.stream.bind(responses);
+    // SAFETY: The wrapper forwards the original stream parameters and preserves its generic result, only repairing the final response's output_text property.
     responses.stream = ((body, options) => {
         const responseStream = stream(body, options);
         const finalResponse = responseStream.finalResponse.bind(responseStream);
@@ -81524,13 +89334,16 @@ class BedrockOpenAI extends OpenAI {
      * @param {string | undefined} [opts.awsRegion] - Defaults to `process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'] ?? undefined`.
      * @param {ApiKeySetter | undefined} opts.bedrockTokenProvider - A function that returns a Bedrock bearer token and is invoked before each request.
      */
-    constructor({ baseURL = env_readEnv('AWS_BEDROCK_BASE_URL'), apiKey, awsRegion = env_readEnv('AWS_REGION') ?? env_readEnv('AWS_DEFAULT_REGION'), bedrockTokenProvider, adminAPIKey, workloadIdentity, ...opts } = {}) {
-        if (adminAPIKey || workloadIdentity) {
+    constructor({ baseURL = env_readEnv('AWS_BEDROCK_BASE_URL'), apiKey, awsRegion = env_readEnv('AWS_REGION') ?? env_readEnv('AWS_DEFAULT_REGION'), bedrockTokenProvider, adminAPIKey, workloadIdentity, x509Transport, dataResidency, ...opts } = {}) {
+        assertNoDataResidency(dataResidency, 'BedrockOpenAI');
+        if (adminAPIKey || workloadIdentity || x509Transport) {
             throw new error_OpenAIError('BedrockOpenAI only supports Bedrock bearer token authentication.');
         }
         if (apiKey === undefined && !bedrockTokenProvider) {
             apiKey = env_readEnv('AWS_BEARER_TOKEN_BEDROCK') ?? null;
         }
+        // SAFETY: The widening keeps a runtime guard for JavaScript callers that supply an API-key function despite the declared string contract.
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject a JavaScript function supplied as a static Bedrock API key before it can become a credential.
         if (typeof apiKey === 'function') {
             throw new error_OpenAIError('Pass refreshable Bedrock credentials via `bedrockTokenProvider`, not `apiKey`.');
         }
@@ -81553,6 +89366,20 @@ class BedrockOpenAI extends OpenAI {
          * @internal
          */
         this[bedrock_a] = true;
+        let currentApiKey = this.apiKey;
+        Object.defineProperty(this, 'apiKey', {
+            enumerable: true,
+            configurable: true,
+            get() {
+                if (currentApiKey !== null) {
+                    assertValidBedrockBearerCredential(currentApiKey);
+                }
+                return currentApiKey;
+            },
+            set(nextApiKey) {
+                currentApiKey = nextApiKey;
+            },
+        });
         const trustedBaseURL = this.baseURL;
         let currentBaseURL = trustedBaseURL;
         Object.defineProperty(this, 'baseURL', {
@@ -81572,30 +89399,45 @@ class BedrockOpenAI extends OpenAI {
     async prepareOptions(options) {
         const configuredBaseURL = this._options.baseURL ?? this.baseURL;
         assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
-        const security = options.__security ?? { bearerAuth: true };
-        if (security.adminAPIKeyAuth && !security.bearerAuth) {
-            await this._callApiKey();
-        }
         await super.prepareOptions(options);
         assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
     }
     async prepareRequest(request, context) {
         assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, context.url);
         await super.prepareRequest(request, context);
+        assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, this.buildURL(context.options.path, null, context.options.defaultBaseURL));
         request.redirect = 'manual';
     }
     async authHeaders(opts, schemes) {
         const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-        if ((security.bearerAuth || security.adminAPIKeyAuth) && this.apiKey !== null) {
-            return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+        if (security.bearerAuth || security.adminAPIKeyAuth) {
+            assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, this.buildURL(opts.path, null, opts.defaultBaseURL));
+            const { apiKey: credential } = await resolveRealtimeAPIKey(this);
+            assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, this.buildURL(opts.path, null, opts.defaultBaseURL));
+            if (credential === null) {
+                return undefined;
+            }
+            assertValidBedrockBearerCredential(credential);
+            try {
+                return buildHeaders([{ Authorization: `Bearer ${credential}` }]);
+            }
+            catch (error) {
+                if (error instanceof TypeError) {
+                    // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
+                    throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+                }
+                throw error;
+            }
         }
         return super.authHeaders(opts, security);
     }
     /** Clones this client while preserving its refreshable Bedrock token provider when appropriate. */
     withOptions(options) {
         const bedrockTokenProvider = options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
+        // SAFETY: Bedrock options extend the base client options; forwarding them preserves the subclass's existing withOptions construction behavior.
         return super.withOptions({
             ...options,
+            // Spread creates an own data property without invoking inherited setters or changing the object prototype.
             ...(bedrockTokenProvider ? { apiKey: undefined, bedrockTokenProvider } : {}),
         });
     }
