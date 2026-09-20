@@ -30,7 +30,16 @@ const fs = require('fs');
  */
 const { stripSelfReportedScope } = require('../../src/lib/finding-factory.mjs');
 
-const COMMENT_MARKER = '<!-- river-reviewer -->';
+/**
+ * #2323: the canonical PR-comment marker, shared with post-comment.cjs.
+ *
+ * `pages/reference/stable-interfaces.md` (ja / en) declares
+ * `<!-- river-review -->` as the PR comment contract. The legacy spelling is
+ * still accepted when searching for an existing summary comment, so a comment
+ * written by an earlier release is updated in place rather than duplicated.
+ */
+const COMMENT_MARKER = '<!-- river-review -->';
+const LEGACY_COMMENT_MARKER = '<!-- river-reviewer -->';
 const SEVERITY_EMOJI = { critical: '🔴', major: '🟠', minor: '🟡', info: 'ℹ️' };
 const MAX_INLINE_BODY = 65000;
 // GitHub rejects an issue comment body over 65536 characters. The summary is a
@@ -485,7 +494,9 @@ module.exports = async function postInlineComments({ github, context, core }) {
   });
 
   const existing = comments.find(
-    (c) => typeof c.body === 'string' && c.body.includes(COMMENT_MARKER)
+    (c) =>
+      typeof c.body === 'string' &&
+      (c.body.includes(COMMENT_MARKER) || c.body.includes(LEGACY_COMMENT_MARKER))
   );
 
   if (existing) {
@@ -509,3 +520,6 @@ module.exports = async function postInlineComments({ github, context, core }) {
 
 // Exposed for tests only; the action entry point is the default export above.
 module.exports.MAX_SUMMARY_BODY = MAX_SUMMARY_BODY;
+
+module.exports.COMMENT_MARKER = COMMENT_MARKER;
+module.exports.LEGACY_COMMENT_MARKER = LEGACY_COMMENT_MARKER;
