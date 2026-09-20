@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { diffReviews, diffRunHistory, formatRegressionSummary } from '../src/lib/review-differ.mjs';
+import {
+  diffReviews,
+  diffRunHistory,
+  formatRegressionSummary,
+  RESOLVED_BASIS,
+} from '../src/lib/review-differ.mjs';
+import { deriveReviewCoverage } from '../src/lib/review-coverage.mjs';
 
 function makeFinding(overrides = {}) {
   return {
@@ -271,5 +277,89 @@ describe('formatRegressionSummary', () => {
     const diff = diffReviews([makeFinding()], []);
     const md = formatRegressionSummary(diff);
     assert.ok(md.includes('~~'));
+  });
+});
+
+// #2325: `changeStatus: 'resolved'` measures absence, not resolution. These
+// tests pin the qualifying data that lets a consumer tell a fix apart from a
+// review unit that never completed. Before this change, a run where the
+// reviewer timed out and a run where the finding was genuinely fixed produced
+// byte-identical diffs.
+describe('diffReviews absence qualification (#2325)', () => {
+  const completeCoverage = deriveReviewCoverage([
+    { id: 'u-a', status: 'completed' },
+    { id: 'u-b', status: 'completed' },
+  ]);
+  const makeRecord = (runId, timestamp, findings) => ({ runId, timestamp, findings });
+  const partialCoverage = deriveReviewCoverage([
+    { id: 'u-a', status: 'timed_out' },
+    { id: 'u-b', status: 'completed' },
+  ]);
+
+  it('labels every resolved entry with the basis of the judgement', () => {
+    const diff = diffReviews([makeFinding()], [], { currentCoverage: completeCoverage });
+    assert.equal(diff.resolved.length, 1);
+    assert.equal(diff.resolved[0].changeStatus, 'resolved');
+    assert.equal(diff.resolved[0].basis, RESOLVED_BASIS);
+    assert.equal(diff.resolved[0].basis, 'absent_from_current_run');
+    assert.equal(diff.summary.resolvedBasis, 'absent_from_current_run');
+  });
+
+  it('distinguishes a genuine fix from an incomplete run', () => {
+    const fixed = diffReviews([makeFinding()], [], { currentCoverage: completeCoverage });
+    const timedOut = diffReviews([makeFinding()], [], { currentCoverage: partialCoverage });
+
+    // Both still report one absence: presence data is unchanged.
+    assert.equal(fixed.summary.resolvedCount, 1);
+    assert.equal(timedOut.summary.resolvedCount, 1);
+
+    // The qualifier is what separates them.
+    assert.equal(fixed.summary.currentCoverageStatus, 'complete');
+    assert.equal(fixed.summary.absenceMayBeUnexecuted, false);
+    assert.equal(fixed.resolved[0].coverageStatus, 'complete');
+
+    assert.equal(timedOut.summary.currentCoverageStatus, 'partial');
+    assert.equal(timedOut.summary.absenceMayBeUnexecuted, true);
+    assert.equal(timedOut.resolved[0].coverageStatus, 'partial');
+  });
+
+  it('treats missing or malformed coverage as unknown, never as complete', () => {
+    for (const coverage of [undefined, null, {}, { status: 'nonsense' }]) {
+      const diff = diffReviews([makeFinding()], [], { currentCoverage: coverage });
+      assert.equal(diff.summary.currentCoverageStatus, 'unknown');
+      assert.equal(diff.summary.absenceMayBeUnexecuted, true);
+      assert.equal(diff.resolved[0].coverageStatus, 'unknown');
+    }
+    // Callers that pass no options at all get the same fail-safe.
+    const bare = diffReviews([makeFinding()], []);
+    assert.equal(bare.summary.currentCoverageStatus, 'unknown');
+    assert.equal(bare.summary.absenceMayBeUnexecuted, true);
+  });
+
+  it('diffRunHistory qualifies absences with the latest run coverage', () => {
+    const f = makeFinding();
+    const run1 = makeRecord('run-1', '2024-01-01T00:00:00Z', [f]);
+    const run2 = {
+      ...makeRecord('run-2', '2024-01-02T00:00:00Z', []),
+      reviewCoverage: partialCoverage,
+    };
+    const result = diffRunHistory([run1, run2]);
+    assert.equal(result.summary.resolvedCount, 1);
+    assert.equal(result.summary.currentCoverageStatus, 'partial');
+    assert.equal(result.resolved[0].coverageStatus, 'partial');
+  });
+
+  it('formatRegressionSummary states the basis and warns on incomplete coverage', () => {
+    const complete = formatRegressionSummary(
+      diffReviews([makeFinding()], [], { currentCoverage: completeCoverage })
+    );
+    assert.ok(complete.includes('Absence is not by itself evidence of a fix.'));
+    assert.ok(!complete.includes('Current run coverage is'));
+
+    const partial = formatRegressionSummary(
+      diffReviews([makeFinding()], [], { currentCoverage: partialCoverage })
+    );
+    assert.ok(partial.includes('Absence is not by itself evidence of a fix.'));
+    assert.ok(partial.includes('Current run coverage is `partial`'));
   });
 });

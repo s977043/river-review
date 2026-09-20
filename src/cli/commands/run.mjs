@@ -383,7 +383,10 @@ Dependencies: ${
       const prevFindings = Array.isArray(baselineFindings)
         ? baselineFindings
         : (baselineFindings.findings ?? baselineFindings.issues ?? []);
-      const diff = diffReviews(prevFindings, result.findings ?? []);
+      const diff = diffReviews(prevFindings, result.findings ?? [], {
+        // The current run's coverage qualifies its absences (#2325).
+        currentCoverage: result.reviewCoverage ?? null,
+      });
       const regSummary = formatRegressionSummary(diff);
       // #1706: the summary is a Markdown block printed BEFORE the structured
       // output, so on stdout it corrupts every machine-readable format —
