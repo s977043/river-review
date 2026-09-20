@@ -47803,6 +47803,10 @@ const defaultConfig = Object.freeze({
     // #2252: Review Viewpoint Catalog is opt-in. observe records activation
     // without changing prompts; active injects matched Review Obligations.
     viewpoints: { mode: 'off' },
+    // #2334 / #1978 Phase 3: Finding Critic の既定は off。off のとき
+    // reviewer-orchestrator / review-engine は runFindingCritic を呼ばず、
+    // findings は導入前と同一のまま下流へ渡る。
+    findingCritic: { mode: 'off' },
   },
   exclude: {
     files: [],
@@ -47900,8 +47904,18 @@ const reviewViewpointsConfigSchema = schemas/* object */.Ikc({
   mode: schemas/* enum */.k5n(['off', 'observe', 'active']).optional(),
 });
 
+// #2334 / #1978 Phase 3: Finding Critic の runtime mode。`off` が既定で、
+// そのとき配線段は runner を import すらしない。`observe` を持たないのは、
+// Critic の生成物が findings 集合そのもの（retain / drop / validation）であり、
+// 「作るが使わない」という中間状態が定義できないためである。
+// env `RIVER_FINDING_CRITIC=1` はこの設定より優先される。
+const findingCriticConfigSchema = schemas/* object */.Ikc({
+  mode: schemas/* enum */.k5n(['off', 'active']).optional(),
+});
+
 const reviewConfigSchema = schemas/* object */.Ikc({
   promptCompiler: promptCompilerConfigSchema.optional(),
+  findingCritic: findingCriticConfigSchema.optional(),
   viewpoints: reviewViewpointsConfigSchema.optional(),
   language: schemas/* enum */.k5n(['ja', 'en']).optional(),
   severity: schemas/* enum */.k5n(['strict', 'normal', 'relaxed']).optional(),
@@ -50686,6 +50700,1070 @@ function isDocs(file, basename) {
 
 function isApp(file) {
   return file.startsWith('src/') || file.startsWith('runners/');
+}
+
+
+/***/ }),
+
+/***/ 2954:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   X4: () => (/* binding */ runFindingCriticStage),
+/* harmony export */   xL: () => (/* binding */ resolveFindingCriticMode)
+/* harmony export */ });
+/* unused harmony exports FINDING_CRITIC_OPT_IN_ENV, FINDING_CRITIC_MODE */
+/* harmony import */ var _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(5863);
+// Finding Critic の配線段（#2334 / #1978 Phase 3）。
+//
+// 位置づけ:
+//   #1978 は状態機械（src/lib/finding-critic.mjs）と LLM 境界つき runner
+//   （src/lib/finding-critic-runner.mjs）まで着地していたが、製品のどの経路も
+//   runFindingCritic を呼んでいなかった。この段がその 1 箇所である。
+//
+// 既定は off。off のとき runFindingCriticStage は即 null を返し、runner も
+// 状態機械もプロンプト生成も一切呼ばれない。findings 配列は同一参照のまま
+// 呼び出し側へ戻るので、導入前と挙動は 1 ビットも変わらない。
+//
+// この段が持たないもの（すべて import する。再実装しない）:
+//   - 終端状態・fail-safe・振り分けの判定 → finding-critic.mjs
+//   - プロンプト生成 → LLM 呼び出し → パース → 状態機械の往復 →
+//     finding-critic-runner.mjs（runFindingCritic）
+//   - 決定論の検証（verifyFinding）→ preVerifyFinding 経由で finding-critic.mjs
+//   FINAL_STATUS / FAILSAFE_REASON / ASK_RELEVANCE の語彙もここでは作らない。
+//
+// fail-safe の向き:
+//   Critic が走らなかった / タイムアウトした / 応答を読めなかった、のいずれも
+//   「clean」にしない。段の内部で例外が出た場合も同じで、finding は retain し
+//   humanReview を立てる。finding を落とすのは result.retainFinding === false
+//   が明示的に返ったときだけである。
+
+
+
+/**
+ * Opt-in 用の環境変数。値がちょうど `'1'` のときだけ有効になる。
+ *
+ * `true` / `yes` / 空文字は無効のままにする。truthiness 判定にしないのは、
+ * シェルに紛れ込んだ任意の値で評価前の Critic が production へ昇格することを
+ * 防ぐためである（#2267 の No-Go 条件）。src/lib/after-change-adapter.mjs の
+ * AFTER_CHANGE_OPT_IN_ENV と同じ作法に揃えてある。
+ */
+const FINDING_CRITIC_OPT_IN_ENV = 'RIVER_FINDING_CRITIC';
+
+/** 段のモード語彙。`observe` は持たない（Critic は生成物を必ず消費するため）。 */
+const FINDING_CRITIC_MODE = Object.freeze({
+  OFF: 'off',
+  ACTIVE: 'active',
+});
+
+/**
+ * 段を走らせるかどうかを決める。
+ *
+ * 優先順位は env > config。config 側は Prompt Compiler と同じく
+ * `review.findingCritic.mode` に置く。`'active'` 以外の値（未設定・不明な値を
+ * 含む）はすべて off へ倒す。
+ *
+ * @param {{ reviewConfig?: object, env?: Record<string, string|undefined> }} [params]
+ * @returns {'off'|'active'}
+ */
+function resolveFindingCriticMode({ reviewConfig, env = process.env } = {}) {
+  const raw = env?.[FINDING_CRITIC_OPT_IN_ENV];
+  // `1` enables and `0` disables, both as exact literals; `0` also overrides a
+  // config that says `active`, so the env var works as a kill switch in both
+  // directions. Without that branch an operator who exports `…=0` to turn the
+  // Critic off would silently keep the config's `active` (#2339 review, Minor 1).
+  // Every other value — `true`, `yes`, an empty string — is not an answer, so
+  // it defers to the config rather than deciding anything.
+  if (raw === '1') return FINDING_CRITIC_MODE.ACTIVE;
+  if (raw === '0') return FINDING_CRITIC_MODE.OFF;
+  return reviewConfig?.findingCritic?.mode === FINDING_CRITIC_MODE.ACTIVE
+    ? FINDING_CRITIC_MODE.ACTIVE
+    : FINDING_CRITIC_MODE.OFF;
+}
+
+/**
+ * Critic が一度も答えなかったときの結果。
+ *
+ * 語彙は finding-critic.mjs のものをそのまま使う。evaluateExchange の
+ * 「Fail-safe 1: the Critic never answered」と同じ終端状態・同じ reason code に
+ * 揃えてあり、ここで新しい状態を作らない。
+ *
+ * @param {string} detail
+ */
+function criticUnreachedResult(detail) {
+  return {
+    status: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FINAL_STATUS */ .aD.CRITIC_TIMEOUT,
+    terminal: true,
+    humanReview: true,
+    retainFinding: true,
+    reasons: [_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FAILSAFE_REASON */ .nH.CRITIC_TIMEOUT, detail],
+    rounds: 0,
+    askRelevance: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.UNCERTAIN,
+  };
+}
+
+/**
+ * 段の観測値。debug へ載せるのは件数と内訳だけで、プロンプト原文も Critic の
+ * 応答本文もここからは出さない。
+ *
+ * @param {Array<{ result: object }>} entries
+ * @param {number} dropped
+ */
+function buildObservation(entries, dropped, language) {
+  /** @type {Record<string, number>} */
+  const byFinalStatus = {};
+  let humanReview = 0;
+  for (const { result } of entries) {
+    byFinalStatus[result.status] = (byFinalStatus[result.status] ?? 0) + 1;
+    if (result.humanReview === true) humanReview += 1;
+  }
+  return {
+    mode: FINDING_CRITIC_MODE.ACTIVE,
+    protocol: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .PROTOCOL_ID */ .rK,
+    // #2339 review (Minor 4): recorded so the two call sites' language
+    // resolution is observable in the artifact instead of only in the source.
+    // Without this the orchestrator could silently fall back to the default
+    // while review-engine used the configured one, and nothing would show it.
+    language,
+    evaluated: entries.length,
+    dropped,
+    humanReview,
+    byFinalStatus,
+  };
+}
+
+/**
+ * Critic を 1 回走らせ、`validation` を付けた findings を返す。
+ *
+ * 既定（off）では null を返す。null のとき呼び出し側は findings をそのまま
+ * 使うので、既存挙動と完全に同一になる。
+ *
+ * `llmAvailable: false`（dry-run / offline / API キー未設定）では LLM を
+ * 呼ばずに全件を critic-timeout へ倒す。ここで「呼べないから clean」と
+ * 読むことはしない。
+ *
+ * @param {object} params
+ * @param {Array<object>} params.findings  マージ済みの findings（この段は順序を変えない）
+ * @param {string} [params.diff]
+ * @param {object} [params.plan]
+ * @param {object} [params.fileTypes]
+ * @param {Array<object>} [params.diffFiles]
+ * @param {string} [params.originalAsk]
+ * @param {string[]} [params.acceptanceCriteria]
+ * @param {object} [params.reviewConfig]
+ * @param {Record<string, string|undefined>} [params.env]
+ * @param {object} [params.llm]           callChatCompletion のオプション一式
+ * @param {boolean} [params.llmAvailable] LLM 呼び出しが可能か
+ * @param {string} [params.language]
+ * @param {object} [params.redactOptions]
+ * @param {Function} [params.runImpl]     テスト用の注入点（既定は runFindingCritic）
+ * @returns {Promise<{ findings: Array<object>, observation: object }|null>}
+ */
+async function runFindingCriticStage({
+  findings,
+  diff = '',
+  plan,
+  fileTypes,
+  diffFiles,
+  originalAsk = '',
+  acceptanceCriteria = [],
+  reviewConfig,
+  env = process.env,
+  llm = {},
+  llmAvailable = true,
+  language = 'ja',
+  redactOptions = {},
+  runImpl,
+} = {}) {
+  if (resolveFindingCriticMode({ reviewConfig, env }) === FINDING_CRITIC_MODE.OFF) return null;
+
+  const list = Array.isArray(findings) ? findings : [];
+  // 既定 off で runner を読み込まないよう動的 import にしてある。off の経路が
+  // finding-critic-runner.mjs（→ review-engine.mjs）を評価しないことは、
+  // 循環 import の可能性をそもそも作らないことでもある。
+  const impl = runImpl ?? (await __nccwpck_require__.e(/* import() */ 18).then(__nccwpck_require__.bind(__nccwpck_require__, 1018))).runFindingCritic;
+  const skill = plan?.selected?.[0] ?? {};
+
+  /** @type {Array<{ finding: object, result: object }>} */
+  const entries = [];
+  for (const finding of list) {
+    if (!llmAvailable) {
+      entries.push({ finding, result: criticUnreachedResult('llm call unavailable') });
+      continue;
+    }
+    try {
+      const run = await impl({
+        finding,
+        diff,
+        originalAsk,
+        acceptanceCriteria,
+        skill,
+        fileTypes,
+        diffFiles,
+        llm,
+        language,
+        redactOptions,
+      });
+      // A runner that returns no `result` is not a clean pass either. The
+      // shipped runner always fills it (`result ??=`,
+      // finding-critic-runner.mjs), so this is unreachable today — but the
+      // destructuring used to sit outside the try, so an injected or future
+      // runner breaking that invariant threw a TypeError straight through
+      // generateReview and took the whole review down (#2339 review, Minor 2).
+      if (!run?.result) {
+        entries.push({
+          finding,
+          result: criticUnreachedResult('critic runner returned no result'),
+        });
+      } else {
+        entries.push({ finding, result: run.result });
+      }
+    } catch (err) {
+      // 段そのものが落ちても finding は消さない。retain したまま人へ回す。
+      entries.push({
+        finding,
+        result: criticUnreachedResult(`critic stage error: ${err?.message}`),
+      });
+    }
+  }
+
+  const kept = [];
+  let dropped = 0;
+  for (const { finding, result } of entries) {
+    if (result.retainFinding === false) {
+      dropped += 1;
+      continue;
+    }
+    kept.push({ ...finding, validation: (0,_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .buildValidatedFinding */ .us)(finding, result).validation });
+  }
+
+  return { findings: kept, observation: buildObservation(entries, dropped, language) };
+}
+
+
+/***/ }),
+
+/***/ 5863:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   Gl: () => (/* binding */ ASK_RELEVANCE),
+/* harmony export */   W2: () => (/* binding */ preVerifyFinding),
+/* harmony export */   aD: () => (/* binding */ FINAL_STATUS),
+/* harmony export */   bi: () => (/* binding */ evaluateExchange),
+/* harmony export */   fi: () => (/* binding */ CRITIC_VERDICT),
+/* harmony export */   hL: () => (/* binding */ runValidationLoop),
+/* harmony export */   iU: () => (/* binding */ partitionByAskRelevance),
+/* harmony export */   nH: () => (/* binding */ FAILSAFE_REASON),
+/* harmony export */   pL: () => (/* binding */ parseCriticResponse),
+/* harmony export */   qS: () => (/* binding */ HARD_CAP_INNER_ROUNDS),
+/* harmony export */   q_: () => (/* binding */ DEFAULT_MAX_INNER_ROUNDS),
+/* harmony export */   rK: () => (/* binding */ PROTOCOL_ID),
+/* harmony export */   us: () => (/* binding */ buildValidatedFinding),
+/* harmony export */   zH: () => (/* binding */ REVIEWER_ACTION)
+/* harmony export */ });
+/* unused harmony exports MODULE_ID, parseReviewerResponse, isCriticEvidenceGrounded, isCleanOutcome */
+/* harmony import */ var _verifier_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9341);
+/**
+ * Finding Critic — deterministic skeleton of the Evidence-Grounded Adversarial
+ * Review protocol (#1978 Phase 1a).
+ *
+ * SCOPE OF THIS MODULE
+ * --------------------
+ * Deterministic only. This module never calls an LLM. It parses a Critic
+ * response that some caller obtained elsewhere, runs the Reviewer response
+ * state machine over it, and applies the convergence and fail-safe rules.
+ * The LLM boundary lives outside; Phase 1b specifies the real 3-value verdict
+ * behaviour and Phase 3 would wire this into the orchestrator. Nothing here is
+ * reachable from `src/cli/**` by design.
+ *
+ * WHAT THIS MODULE DELIBERATELY DOES NOT REIMPLEMENT
+ * --------------------------------------------------
+ * - `verifyFinding` (src/lib/verifier.mjs) already rejects: missing evidence,
+ *   evidence path absent from the diff, incoherent phase, non-actionable
+ *   suggestion, unjustified severity. This module IMPORTS it and consumes its
+ *   result; it does not re-derive any of those checks.
+ * - `prefilterFindings` (src/lib/finding-factory.mjs:513) already suppresses
+ *   low_confidence / insufficient_evidence / style_only / duplicate.
+ * - `mergeFindings` (src/lib/reviewer-orchestrator.mjs) already owns dedup and
+ *   `agreement` provenance.
+ * - line mismatch and scope mismatch stay METADATA ONLY (#1644 Phase 1,
+ *   verifier.mjs:308-309). This module never promotes them to a rejection.
+ *
+ * VOCABULARY NOTE (#1978 Phase 0 note § 1.2)
+ * ------------------------------------------
+ * The issue proposed `scope: IN_SCOPE / SCOPE_UNCERTAIN / OUT_OF_SCOPE`. The
+ * key `scope` is already shipped with the value vocabulary
+ * `in-diff / pre-existing`, and `normalizeScope` silently coerces an unknown
+ * value to `in-diff` — an undetectable miscast, with the fail-safe pointing the
+ * opposite way. This module therefore uses a distinct axis, `askRelevance`,
+ * with hyphen-lowercase values matching every other finding enum.
+ *
+ * FAIL-SAFE INVARIANT
+ * -------------------
+ * No degraded path may produce a "clean" outcome. Timeout, parse failure,
+ * inner-loop cap, and a Critic dismissal that contradicts the deterministic
+ * verifier all keep the finding (`retainFinding: true`) and raise
+ * `humanReview: true`. A silent Critic must never look like an approval.
+ */
+
+
+
+/** Protocol identifier written into artifacts and prompts. */
+const PROTOCOL_ID = 'evidence-grounded-adversarial-v1';
+
+/** Internal module id. Chosen in Phase 0 note § 3.2; collides with no skill id. */
+const MODULE_ID = 'finding-critic';
+
+/** Critic verdict vocabulary. Wire format is uppercase, as in the paper. */
+const CRITIC_VERDICT = Object.freeze({
+  AGREE: 'AGREE',
+  DISAGREE_EVIDENCE: 'DISAGREE_EVIDENCE',
+  DISAGREE_CONCERN: 'DISAGREE_CONCERN',
+});
+
+/** Reviewer response vocabulary. */
+const REVIEWER_ACTION = Object.freeze({
+  KEEP: 'KEEP',
+  REVISE: 'REVISE',
+  WITHDRAW: 'WITHDRAW',
+});
+
+/**
+ * Relevance of a finding to the original ask. A separate axis from `scope`
+ * (`in-diff` / `pre-existing`); the two are orthogonal.
+ */
+const ASK_RELEVANCE = Object.freeze({
+  IN_ASK: 'in-ask',
+  UNCERTAIN: 'uncertain',
+  OUT_OF_ASK: 'out-of-ask',
+});
+
+const ASK_RELEVANCE_VALUES = new Set(Object.values(ASK_RELEVANCE));
+
+/**
+ * Terminal state of one finding after validation.
+ *
+ * This vocabulary is written to `validation.finalStatus` — a SEPARATE key from
+ * the schema's `validatedStatus` (`schemas/review-artifact.schema.json:455`).
+ * The two sets only partially overlap, and nothing here is written to
+ * `validatedStatus`. Do not wire one into the other without reconciling both
+ * enums first.
+ */
+const FINAL_STATUS = Object.freeze({
+  CONFIRMED: 'confirmed',
+  WITHDRAWN_BY_REVIEWER: 'withdrawn-by-reviewer',
+  DISMISSED_BY_EVIDENCE: 'dismissed-by-evidence',
+  // Borrows the SPELLING of the existing `validatedStatus` value for
+  // deterministic evidence rejects, so the two vocabularies stay readable
+  // side by side. It is still emitted under `validation.finalStatus`.
+  DISMISSED_HALLUCINATION: 'dismissed-hallucination',
+  NEEDS_HUMAN_JUDGMENT: 'needs-human-judgment',
+  OUT_OF_ASK: 'out-of-ask',
+  CRITIC_TIMEOUT: 'critic-timeout',
+});
+
+/** Default number of Reviewer↔Critic rounds. */
+const DEFAULT_MAX_INNER_ROUNDS = 2;
+
+/** Absolute ceiling; `maxInnerRounds` is clamped to it. */
+const HARD_CAP_INNER_ROUNDS = 5;
+
+/** Reason codes attached to fail-safe outcomes. */
+const FAILSAFE_REASON = Object.freeze({
+  CRITIC_TIMEOUT: 'critic-timeout',
+  CRITIC_PARSE_FAILURE: 'critic-parse-failure',
+  DETERMINISTIC_MISSING: 'deterministic-missing',
+  EXCHANGES_EXHAUSTED: 'exchanges-exhausted',
+  REVIEWER_PARSE_FAILURE: 'reviewer-parse-failure',
+  KEEP_WITHOUT_EVIDENCE: 'keep-without-evidence',
+  INNER_LOOP_CAP_REACHED: 'inner-loop-cap-reached',
+  DETERMINISTIC_CONTRADICTION: 'deterministic-contradiction',
+  ASK_RELEVANCE_UNCERTAIN: 'ask-relevance-uncertain',
+  AGREEMENT_WITHOUT_EVIDENCE: 'agreement-without-evidence',
+});
+
+// ---------------------------------------------------------------------------
+// Parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the minimal `key: value` block the protocol asks a Critic to emit.
+ * Supports scalars plus one `evidence:` list of `- artifact: …` items.
+ * @param {string} text
+ * @returns {Record<string, unknown>}
+ */
+function parseBlock(text) {
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  /** @type {Array<Record<string, string>>} */
+  const evidence = [];
+  let inEvidence = false;
+  /** @type {Record<string, string> | null} */
+  let current = null;
+
+  for (const rawLine of String(text).split('\n')) {
+    const line = rawLine.replace(/\s+$/u, '');
+    if (line.trim() === '') continue;
+    const indented = /^\s/u.test(line);
+    const trimmed = line.trim();
+
+    if (!indented && /^evidence:\s*$/iu.test(trimmed)) {
+      inEvidence = true;
+      current = null;
+      continue;
+    }
+    if (!indented && /^evidence:\s*\[\s*\]$/iu.test(trimmed)) {
+      inEvidence = false;
+      current = null;
+      continue;
+    }
+
+    if (inEvidence && trimmed.startsWith('- ')) {
+      current = {};
+      evidence.push(current);
+      const item = trimmed.slice(2).trim();
+      const m = /^([\w.-]+):\s*(.*)$/u.exec(item);
+      if (m) current[m[1]] = m[2].trim();
+      continue;
+    }
+    if (inEvidence && indented && current) {
+      const m = /^([\w.-]+):\s*(.*)$/u.exec(trimmed);
+      if (m) current[m[1]] = m[2].trim();
+      continue;
+    }
+
+    const m = /^([\w.-]+):\s*(.*)$/u.exec(trimmed);
+    if (!m) continue;
+    inEvidence = false;
+    current = null;
+    out[m[1]] = m[2].trim();
+  }
+
+  if (evidence.length > 0) out.evidence = evidence;
+  return out;
+}
+
+/**
+ * Coerce a raw Critic payload (JSON string, protocol block, or object) into a
+ * plain object. Returns null when nothing usable can be read.
+ * @param {unknown} raw
+ * @returns {Record<string, unknown> | null}
+ */
+function coerceToObject(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return /** @type {Record<string, unknown>} */ (raw);
+  }
+  if (typeof raw !== 'string') return null;
+  const text = raw.trim();
+  if (text === '') return null;
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  const block = parseBlock(text);
+  return Object.keys(block).length === 0 ? null : block;
+}
+
+/**
+ * Read a field under either snake_case or camelCase.
+ * @param {Record<string, unknown>} obj
+ * @param {string} snake
+ * @param {string} camel
+ * @returns {unknown}
+ */
+function pick(obj, snake, camel) {
+  return obj[snake] !== undefined ? obj[snake] : obj[camel];
+}
+
+/**
+ * Normalize a Critic evidence list into `{ artifact, lineStart, lineEnd, observation }`.
+ * Entries without an artifact path are dropped: an evidence citation that
+ * points at nothing cannot ground a disagreement.
+ * @param {unknown} raw
+ * @returns {Array<{ artifact: string, lineStart: number | null, lineEnd: number | null, observation: string }>}
+ */
+function normalizeEvidenceList(raw) {
+  if (!Array.isArray(raw)) return [];
+  const toInt = (/** @type {unknown} */ v) => {
+    const n = Number.parseInt(String(v ?? ''), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') {
+        return { artifact: item.trim(), lineStart: null, lineEnd: null, observation: '' };
+      }
+      if (!item || typeof item !== 'object') return null;
+      const rec = /** @type {Record<string, unknown>} */ (item);
+      const artifact = String(rec.artifact ?? rec.file ?? rec.path ?? '').trim();
+      return {
+        artifact,
+        lineStart: toInt(pick(rec, 'line_start', 'lineStart')),
+        lineEnd: toInt(pick(rec, 'line_end', 'lineEnd')),
+        observation: String(rec.observation ?? '').trim(),
+      };
+    })
+    .filter((e) => e !== null && e.artifact !== '');
+}
+
+/**
+ * Parse a Critic response.
+ *
+ * Fail-safe: a parse failure NEVER yields a usable verdict. The caller gets
+ * `{ ok: false }` and `evaluateExchange` turns that into
+ * `needs-human-judgment`, never into a clean or dismissed finding.
+ *
+ * `askRelevance` falls back to `uncertain` (human-review candidate) when the
+ * field is missing or unrecognized — never to `in-ask`, so an unreadable
+ * relevance claim cannot smuggle a finding into revision instructions.
+ *
+ * `DISAGREE_EVIDENCE` without a usable evidence citation is downgraded to
+ * `DISAGREE_CONCERN`: an ungrounded disagreement must return the burden of
+ * proof to the Reviewer rather than dismiss the finding (design principle 2).
+ *
+ * @param {unknown} raw
+ * @returns {{ ok: true, response: { findingId: string, verdict: string, reason: string, evidence: Array<object>, askRelevance: string, downgraded: boolean } }
+ *          | { ok: false, errors: string[] }}
+ */
+function parseCriticResponse(raw) {
+  const obj = coerceToObject(raw);
+  if (obj === null) {
+    return { ok: false, errors: ['critic response is not parseable'] };
+  }
+
+  const verdictRaw = String(pick(obj, 'verdict', 'verdict') ?? '').trim();
+  const verdict = verdictRaw.toUpperCase();
+  if (!Object.hasOwn(CRITIC_VERDICT, verdict)) {
+    return { ok: false, errors: [`unknown verdict: ${JSON.stringify(verdictRaw)}`] };
+  }
+
+  // Same separator/case normalization as `normalizeScope`
+  // (src/lib/finding-factory.mjs:347-364), so `OUT_OF_ASK` and `out of ask`
+  // reach the canonical `out-of-ask`. Without it every uppercase emission
+  // collapsed to `uncertain` and the Scope Gate stopped discriminating.
+  //
+  // Deliberately NOT aliased: the issue's original `IN_SCOPE` / `OUT_OF_SCOPE`
+  // spellings normalize to `in-scope` / `out-of-scope`, which are not in the
+  // vocabulary and therefore land on `uncertain`. Accepting them would revive
+  // the very `scope` ambiguity this axis was renamed to remove.
+  const relRaw = String(pick(obj, 'ask_relevance', 'askRelevance') ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/gu, '-');
+  const askRelevance = ASK_RELEVANCE_VALUES.has(relRaw) ? relRaw : ASK_RELEVANCE.UNCERTAIN;
+
+  const evidence = normalizeEvidenceList(obj.evidence);
+  let finalVerdict = verdict;
+  let downgraded = false;
+  if (verdict === CRITIC_VERDICT.DISAGREE_EVIDENCE && evidence.length === 0) {
+    finalVerdict = CRITIC_VERDICT.DISAGREE_CONCERN;
+    downgraded = true;
+  }
+
+  return {
+    ok: true,
+    response: {
+      findingId: String(pick(obj, 'finding_id', 'findingId') ?? '').trim(),
+      verdict: finalVerdict,
+      reason: String(obj.reason ?? '').trim(),
+      evidence,
+      askRelevance,
+      downgraded,
+    },
+  };
+}
+
+/**
+ * Parse a Reviewer response. `KEEP` requires at least one evidence citation;
+ * a `KEEP` without evidence is not a valid response and is reported as such.
+ * @param {unknown} raw
+ * @returns {{ ok: true, response: { findingId: string, action: string, evidence: Array<object>, respondTo: string } }
+ *          | { ok: false, errors: string[] }}
+ */
+function parseReviewerResponse(raw) {
+  const obj = coerceToObject(raw);
+  if (obj === null) return { ok: false, errors: ['reviewer response is not parseable'] };
+
+  const action = String(obj.action ?? '')
+    .trim()
+    .toUpperCase();
+  if (!Object.hasOwn(REVIEWER_ACTION, action)) {
+    return { ok: false, errors: [`unknown action: ${JSON.stringify(obj.action ?? '')}`] };
+  }
+
+  const evidence = normalizeEvidenceList(obj.evidence);
+  if (action === REVIEWER_ACTION.KEEP && evidence.length === 0) {
+    return { ok: false, errors: ['KEEP requires evidence'] };
+  }
+
+  return {
+    ok: true,
+    response: {
+      findingId: String(pick(obj, 'finding_id', 'findingId') ?? '').trim(),
+      action,
+      evidence,
+      respondTo: String(pick(obj, 'response_to', 'responseTo') ?? '').trim(),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic pre-verification bridge
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the existing deterministic verifier and decide whether the finding is
+ * worth an LLM Critic call at all.
+ *
+ * This is a thin adapter over `verifyFinding`; every check it reports comes
+ * from `src/lib/verifier.mjs`. Nothing is re-derived here.
+ *
+ * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[] }} input
+ * @returns {{ verified: boolean, sendToCritic: boolean, status: string | null, reasons: string[], checks: Record<string, boolean> }}
+ */
+function preVerifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
+  const result = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({ finding, diff, skill, fileTypes, diffFiles });
+  if (result.verified) {
+    return {
+      verified: true,
+      sendToCritic: true,
+      status: null,
+      reasons: [],
+      checks: result.checks,
+    };
+  }
+  const hallucinatedEvidence =
+    result.checks.evidenceExists === false || result.checks.evidenceInDiff === false;
+  return {
+    verified: false,
+    sendToCritic: false,
+    status: hallucinatedEvidence
+      ? FINAL_STATUS.DISMISSED_HALLUCINATION
+      : FINAL_STATUS.DISMISSED_BY_EVIDENCE,
+    reasons: result.reasons,
+    checks: result.checks,
+  };
+}
+
+/**
+ * Shape of a citable file reference. Mirrors `RE_FILE_REF` in verifier.mjs but
+ * anchored, because here the whole `artifact` field must BE a path — not merely
+ * contain one somewhere in prose.
+ */
+const RE_ARTIFACT_PATH = /^[\w/-]+(?:\.[\w]+)+$/u;
+
+/**
+ * Is at least one artifact the Critic cited actually present in the diff?
+ *
+ * Two gates, in this order:
+ *
+ * 1. SHAPE (here). The `artifact` field must itself be a file path. This gate
+ *    exists because `verifyFinding`'s `evidenceInDiff` is deliberately LENIENT:
+ *    `verifier.mjs:100-102` returns true when the evidence cites no file at
+ *    all, and its `RE_EVIDENCE` needs 5+ characters before it matches. Borrowing
+ *    that check alone answers "does this contradict the diff?", which fails
+ *    OPEN — `nowhere`, `a.js`, and `the login handler` all came back grounded.
+ *    Grounding must fail CLOSED, so anything that is not a path is not grounded.
+ * 2. MEMBERSHIP (delegated). Whether the path appears in the diff stays with
+ *    `verifyFinding`; that remains the single source of truth and is not
+ *    re-derived here. The probe message is padded so the citation always clears
+ *    `RE_EVIDENCE`'s minimum length.
+ *
+ * @param {Array<{ artifact: string }>} evidence
+ * @param {string} diff
+ * @returns {boolean}
+ */
+function isCriticEvidenceGrounded(evidence, diff) {
+  if (!Array.isArray(evidence) || evidence.length === 0) return false;
+  return evidence.some((entry) => {
+    const artifact = String(entry?.artifact ?? '').trim();
+    if (!RE_ARTIFACT_PATH.test(artifact)) return false;
+    const probe = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({
+      finding: { message: `Evidence: critic cited ${artifact}` },
+      diff,
+    });
+    return probe.checks.evidenceInDiff === true;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Outcome helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {{ status: string, terminal?: boolean, humanReview?: boolean, retainFinding?: boolean, reasons?: string[], rounds?: number, askRelevance?: string }} init
+ */
+function outcome(init) {
+  return {
+    protocol: PROTOCOL_ID,
+    status: init.status,
+    terminal: init.terminal !== false,
+    humanReview: init.humanReview === true,
+    retainFinding: init.retainFinding === true,
+    reasons: init.reasons ?? [],
+    rounds: init.rounds ?? 0,
+    askRelevance: init.askRelevance ?? ASK_RELEVANCE.UNCERTAIN,
+  };
+}
+
+/**
+ * A "clean" outcome is one where the finding disappears and no human is
+ * asked to look. Every fail-safe path must be false here.
+ * @param {{ retainFinding: boolean, humanReview: boolean }} result
+ * @returns {boolean}
+ */
+function isCleanOutcome(result) {
+  return result.retainFinding === false && result.humanReview === false;
+}
+
+// ---------------------------------------------------------------------------
+// State machine
+// ---------------------------------------------------------------------------
+
+/**
+ * Evaluate one Reviewer↔Critic exchange.
+ *
+ * @param {object} input
+ * @param {{ kind?: string, payload?: unknown }} input.critic - `{ kind: 'timeout' | 'error' }`
+ *   for a degraded call, otherwise `{ payload }` carrying the raw Critic output.
+ * @param {unknown} [input.reviewer] - raw Reviewer response, when one exists.
+ * @param {{ verified: boolean }} input.deterministic - result of `preVerifyFinding`.
+ *   REQUIRED. Omitting it used to make `verified` false, which disabled the
+ *   contradiction fail-safe and let a Critic dismiss a finding that had never
+ *   been checked deterministically. A missing value now escalates instead.
+ * @param {string} [input.diff] - diff text, used to ground Critic evidence.
+ * @param {number} [input.round] - 1-based round index.
+ * @returns {{ protocol: string, status: string, terminal: boolean, humanReview: boolean, retainFinding: boolean, reasons: string[], rounds: number, askRelevance: string }}
+ */
+function evaluateExchange({ critic, reviewer, deterministic, diff = '', round = 1 }) {
+  // Fail-safe 0: the caller skipped deterministic pre-verification. Nothing
+  // downstream can be trusted, so nothing downstream runs.
+  if (!deterministic || typeof deterministic.verified !== 'boolean') {
+    return outcome({
+      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+      humanReview: true,
+      retainFinding: true,
+      reasons: [FAILSAFE_REASON.DETERMINISTIC_MISSING],
+      rounds: round,
+    });
+  }
+
+  // `kind` is normalized: a Critic runner reporting `TIMEOUT` must not fall
+  // through to the parse-failure branch and mislabel the reason.
+  const kind = String(critic?.kind ?? 'response')
+    .trim()
+    .toLowerCase();
+
+  // Fail-safe 1: the Critic never answered. Keep the finding, ask a human.
+  if (kind === 'timeout' || kind === 'error') {
+    return outcome({
+      status: FINAL_STATUS.CRITIC_TIMEOUT,
+      humanReview: true,
+      retainFinding: true,
+      reasons: [FAILSAFE_REASON.CRITIC_TIMEOUT],
+      rounds: round,
+    });
+  }
+
+  // Fail-safe 2: the Critic answered something unreadable. Not a clean pass.
+  const parsedCritic = parseCriticResponse(critic?.payload);
+  if (!parsedCritic.ok) {
+    return outcome({
+      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+      humanReview: true,
+      retainFinding: true,
+      reasons: [FAILSAFE_REASON.CRITIC_PARSE_FAILURE, ...parsedCritic.errors],
+      rounds: round,
+    });
+  }
+
+  const { verdict, askRelevance, evidence } = parsedCritic.response;
+
+  // Ask-relevance gate: out-of-ask never reaches revision instructions.
+  //
+  // KNOWN LIMITATION (Phase 1a): this terminates on the Critic's sole judgment.
+  // No evidence is required, the Reviewer gets no chance to object, and no
+  // human is notified — a deterministically verified `critical` finding can be
+  // parked in `followUpNotes`. The finding is retained rather than dropped, so
+  // this is not a silent clean, but it IS a single-actor kill switch. Severity
+  // is not plumbed into this function; escalating high severities is deferred
+  // to Phase 1b, where the Critic's real classification accuracy is measurable.
+  if (askRelevance === ASK_RELEVANCE.OUT_OF_ASK) {
+    return outcome({
+      status: FINAL_STATUS.OUT_OF_ASK,
+      humanReview: false,
+      retainFinding: true,
+      reasons: ['critic classified the finding as outside the original ask'],
+      rounds: round,
+      askRelevance,
+    });
+  }
+
+  const verified = deterministic?.verified === true;
+
+  // Fail-safe 3: the Critic dismisses on evidence, but the deterministic
+  // verifier confirmed the finding and the Critic's own citation is not in the
+  // diff. Two authorities disagree; a human decides, and the finding stays.
+  if (
+    verdict === CRITIC_VERDICT.DISAGREE_EVIDENCE &&
+    verified &&
+    !isCriticEvidenceGrounded(evidence, diff)
+  ) {
+    return outcome({
+      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+      humanReview: true,
+      retainFinding: true,
+      reasons: [FAILSAFE_REASON.DETERMINISTIC_CONTRADICTION],
+      rounds: round,
+      askRelevance,
+    });
+  }
+
+  if (verdict === CRITIC_VERDICT.AGREE) {
+    // Consensus is not correctness: agreement without deterministic evidence
+    // does not confirm anything.
+    if (!verified) {
+      return outcome({
+        status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+        humanReview: true,
+        retainFinding: true,
+        reasons: [FAILSAFE_REASON.AGREEMENT_WITHOUT_EVIDENCE],
+        rounds: round,
+        askRelevance,
+      });
+    }
+    return outcome({
+      status: FINAL_STATUS.CONFIRMED,
+      humanReview: askRelevance === ASK_RELEVANCE.UNCERTAIN,
+      retainFinding: true,
+      reasons:
+        askRelevance === ASK_RELEVANCE.UNCERTAIN ? [FAILSAFE_REASON.ASK_RELEVANCE_UNCERTAIN] : [],
+      rounds: round,
+      askRelevance,
+    });
+  }
+
+  // Both DISAGREE_* verdicts need a Reviewer response before anything resolves.
+  if (reviewer === undefined || reviewer === null) {
+    return outcome({
+      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+      terminal: false,
+      humanReview: false,
+      retainFinding: true,
+      reasons: ['awaiting reviewer response'],
+      rounds: round,
+      askRelevance,
+    });
+  }
+
+  const parsedReviewer = parseReviewerResponse(reviewer);
+  if (!parsedReviewer.ok) {
+    const keepWithoutEvidence = parsedReviewer.errors.includes('KEEP requires evidence');
+    return outcome({
+      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+      humanReview: true,
+      retainFinding: true,
+      reasons: [
+        keepWithoutEvidence
+          ? FAILSAFE_REASON.KEEP_WITHOUT_EVIDENCE
+          : FAILSAFE_REASON.REVIEWER_PARSE_FAILURE,
+        ...parsedReviewer.errors,
+      ],
+      rounds: round,
+      askRelevance,
+    });
+  }
+
+  const { action } = parsedReviewer.response;
+
+  if (action === REVIEWER_ACTION.WITHDRAW) {
+    return outcome({
+      status:
+        verdict === CRITIC_VERDICT.DISAGREE_EVIDENCE
+          ? FINAL_STATUS.DISMISSED_BY_EVIDENCE
+          : FINAL_STATUS.WITHDRAWN_BY_REVIEWER,
+      humanReview: false,
+      retainFinding: false,
+      reasons: [],
+      rounds: round,
+      askRelevance,
+    });
+  }
+
+  if (action === REVIEWER_ACTION.KEEP) {
+    // KEEP is only reachable with evidence (parseReviewerResponse enforces it).
+    if (verdict === CRITIC_VERDICT.DISAGREE_CONCERN) {
+      return outcome({
+        status: FINAL_STATUS.CONFIRMED,
+        humanReview: askRelevance === ASK_RELEVANCE.UNCERTAIN,
+        retainFinding: true,
+        reasons: [],
+        rounds: round,
+        askRelevance,
+      });
+    }
+    // DISAGREE_EVIDENCE vs an evidence-backed KEEP: unresolved, run another round.
+    return outcome({
+      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+      terminal: false,
+      humanReview: false,
+      retainFinding: true,
+      reasons: ['evidence contested'],
+      rounds: round,
+      askRelevance,
+    });
+  }
+
+  // REVISE: the finding changed shape; it must be re-examined next round.
+  return outcome({
+    status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+    terminal: false,
+    humanReview: false,
+    retainFinding: true,
+    reasons: ['finding revised'],
+    rounds: round,
+    askRelevance,
+  });
+}
+
+/**
+ * Run the inner loop over a pre-collected list of exchanges.
+ *
+ * The artifact is frozen for the whole loop: this function reads exchanges and
+ * returns a state, and never edits code, diff, or finding text.
+ *
+ * Convergence: at most `maxInnerRounds` rounds, itself clamped to
+ * `HARD_CAP_INNER_ROUNDS`. Reaching the cap without a terminal state is a
+ * fail-safe, not an approval — the finding is retained and escalated.
+ *
+ * @param {object} input
+ * @param {Array<{ critic: object, reviewer?: unknown }>} input.exchanges
+ * @param {{ verified: boolean }} [input.deterministic]
+ * @param {string} [input.diff]
+ * @param {number} [input.maxInnerRounds]
+ * @param {number} [input.hardCap]
+ * @returns {{ protocol: string, status: string, terminal: boolean, humanReview: boolean, retainFinding: boolean, reasons: string[], rounds: number, askRelevance: string }}
+ */
+function runValidationLoop({
+  exchanges,
+  deterministic,
+  diff = '',
+  maxInnerRounds = DEFAULT_MAX_INNER_ROUNDS,
+  hardCap = HARD_CAP_INNER_ROUNDS,
+}) {
+  // Double clamp. `hardCap` is a caller-supplied argument, so on its own it can
+  // be raised past the protocol ceiling; `HARD_CAP_INNER_ROUNDS` is the ceiling
+  // #1978 Step 6 fixes at 5 and no caller may exceed it.
+  const cap = Math.max(
+    1,
+    Math.min(Number(maxInnerRounds) || 1, Number(hardCap) || 1, HARD_CAP_INNER_ROUNDS)
+  );
+  const list = Array.isArray(exchanges) ? exchanges : [];
+  let last = null;
+  let round = 0;
+
+  for (const exchange of list) {
+    if (round >= cap) break;
+    round += 1;
+    last = evaluateExchange({
+      critic: exchange.critic,
+      reviewer: exchange.reviewer,
+      deterministic,
+      diff,
+      round,
+    });
+    if (last.terminal) return last;
+  }
+
+  // Fail-safe 4: the loop ended without converging. The two ways that happens
+  // carry different operational meaning, so they carry different reason codes:
+  // hitting the cap means the exchange kept oscillating, while running out of
+  // exchanges early means the caller stopped feeding the loop.
+  return outcome({
+    status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+    humanReview: true,
+    retainFinding: true,
+    reasons: [
+      round >= cap ? FAILSAFE_REASON.INNER_LOOP_CAP_REACHED : FAILSAFE_REASON.EXCHANGES_EXHAUSTED,
+    ],
+    rounds: round,
+    askRelevance: last?.askRelevance ?? ASK_RELEVANCE.UNCERTAIN,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Post-validation routing
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the validated finding record.
+ *
+ * Severity is copied through unchanged. `agreement` is carried as provenance
+ * only: this function takes no vote count and exposes no path by which the
+ * number of agreeing reviewers could raise or lower severity.
+ *
+ * @param {{ id?: string, severity?: string, agreement?: unknown[] }} finding
+ * @param {{ status: string, humanReview: boolean, retainFinding: boolean, reasons: string[], rounds: number, askRelevance: string }} result
+ * @returns {object}
+ */
+function buildValidatedFinding(finding, result) {
+  const agreement = Array.isArray(finding?.agreement) ? [...finding.agreement] : [];
+  return {
+    id: finding?.id ?? null,
+    severity: finding?.severity ?? null,
+    agreement,
+    agreementCount: agreement.length,
+    validation: {
+      protocol: PROTOCOL_ID,
+      rounds: result.rounds,
+      finalStatus: result.status,
+      askRelevance: result.askRelevance,
+      humanReview: result.humanReview,
+      reasons: result.reasons,
+    },
+  };
+}
+
+/**
+ * Route validated findings.
+ *
+ * - `out-of-ask` never reaches revision instructions; it becomes a follow-up note.
+ * - `uncertain` never reaches revision instructions; it becomes a human-review candidate.
+ * - Anything flagged `humanReview` becomes a human-review candidate regardless of status.
+ *
+ * @param {Array<{ finding: object, result: object }>} entries
+ * @returns {{ revisionInstructions: object[], humanReviewCandidates: object[], followUpNotes: object[], dropped: object[] }}
+ */
+function partitionByAskRelevance(entries) {
+  const revisionInstructions = [];
+  const humanReviewCandidates = [];
+  const followUpNotes = [];
+  const dropped = [];
+
+  for (const { finding, result } of Array.isArray(entries) ? entries : []) {
+    const record = buildValidatedFinding(finding, result);
+    if (result.status === FINAL_STATUS.OUT_OF_ASK) {
+      followUpNotes.push(record);
+      continue;
+    }
+    if (result.humanReview === true || result.askRelevance === ASK_RELEVANCE.UNCERTAIN) {
+      humanReviewCandidates.push(record);
+      continue;
+    }
+    if (result.retainFinding === false) {
+      dropped.push(record);
+      continue;
+    }
+    revisionInstructions.push(record);
+  }
+
+  return { revisionInstructions, humanReviewCandidates, followUpNotes, dropped };
 }
 
 
@@ -56700,16 +57778,18 @@ function attachReviewFileScope(coverage, fileScope) {
 
 /***/ }),
 
-/***/ 6641:
+/***/ 5134:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
-  G1: () => (/* binding */ generateReview)
+  f7: () => (/* binding */ MAX_PROMPT_PREVIEW_CHARS),
+  G1: () => (/* binding */ generateReview),
+  _Q: () => (/* binding */ resolveRedactOptions)
 });
 
-// UNUSED EXPORTS: MAX_PROMPT_PREVIEW_CHARS, buildPrompt, computeBackoffMs, isRetryableNetworkError, isRetryableStatus, parseLineComments
+// UNUSED EXPORTS: buildPrompt, computeBackoffMs, isRetryableNetworkError, isRetryableStatus, parseLineComments
 
 // EXTERNAL MODULE: ./src/config/loader.mjs + 1 modules
 var loader = __nccwpck_require__(3833);
@@ -56735,1196 +57815,8 @@ var secret_redactor = __nccwpck_require__(12);
 var llm_pipeline = __nccwpck_require__(7303);
 // EXTERNAL MODULE: ./src/lib/diff-processor.mjs
 var diff_processor = __nccwpck_require__(861);
-// EXTERNAL MODULE: ./src/lib/verifier.mjs
-var verifier = __nccwpck_require__(9341);
-;// CONCATENATED MODULE: ./src/lib/finding-critic.mjs
-/**
- * Finding Critic — deterministic skeleton of the Evidence-Grounded Adversarial
- * Review protocol (#1978 Phase 1a).
- *
- * SCOPE OF THIS MODULE
- * --------------------
- * Deterministic only. This module never calls an LLM. It parses a Critic
- * response that some caller obtained elsewhere, runs the Reviewer response
- * state machine over it, and applies the convergence and fail-safe rules.
- * The LLM boundary lives outside; Phase 1b specifies the real 3-value verdict
- * behaviour and Phase 3 would wire this into the orchestrator. Nothing here is
- * reachable from `src/cli/**` by design.
- *
- * WHAT THIS MODULE DELIBERATELY DOES NOT REIMPLEMENT
- * --------------------------------------------------
- * - `verifyFinding` (src/lib/verifier.mjs) already rejects: missing evidence,
- *   evidence path absent from the diff, incoherent phase, non-actionable
- *   suggestion, unjustified severity. This module IMPORTS it and consumes its
- *   result; it does not re-derive any of those checks.
- * - `prefilterFindings` (src/lib/finding-factory.mjs:513) already suppresses
- *   low_confidence / insufficient_evidence / style_only / duplicate.
- * - `mergeFindings` (src/lib/reviewer-orchestrator.mjs) already owns dedup and
- *   `agreement` provenance.
- * - line mismatch and scope mismatch stay METADATA ONLY (#1644 Phase 1,
- *   verifier.mjs:308-309). This module never promotes them to a rejection.
- *
- * VOCABULARY NOTE (#1978 Phase 0 note § 1.2)
- * ------------------------------------------
- * The issue proposed `scope: IN_SCOPE / SCOPE_UNCERTAIN / OUT_OF_SCOPE`. The
- * key `scope` is already shipped with the value vocabulary
- * `in-diff / pre-existing`, and `normalizeScope` silently coerces an unknown
- * value to `in-diff` — an undetectable miscast, with the fail-safe pointing the
- * opposite way. This module therefore uses a distinct axis, `askRelevance`,
- * with hyphen-lowercase values matching every other finding enum.
- *
- * FAIL-SAFE INVARIANT
- * -------------------
- * No degraded path may produce a "clean" outcome. Timeout, parse failure,
- * inner-loop cap, and a Critic dismissal that contradicts the deterministic
- * verifier all keep the finding (`retainFinding: true`) and raise
- * `humanReview: true`. A silent Critic must never look like an approval.
- */
-
-
-
-/** Protocol identifier written into artifacts and prompts. */
-const finding_critic_PROTOCOL_ID = 'evidence-grounded-adversarial-v1';
-
-/** Internal module id. Chosen in Phase 0 note § 3.2; collides with no skill id. */
-const MODULE_ID = 'finding-critic';
-
-/** Critic verdict vocabulary. Wire format is uppercase, as in the paper. */
-const finding_critic_CRITIC_VERDICT = Object.freeze({
-  AGREE: 'AGREE',
-  DISAGREE_EVIDENCE: 'DISAGREE_EVIDENCE',
-  DISAGREE_CONCERN: 'DISAGREE_CONCERN',
-});
-
-/** Reviewer response vocabulary. */
-const finding_critic_REVIEWER_ACTION = Object.freeze({
-  KEEP: 'KEEP',
-  REVISE: 'REVISE',
-  WITHDRAW: 'WITHDRAW',
-});
-
-/**
- * Relevance of a finding to the original ask. A separate axis from `scope`
- * (`in-diff` / `pre-existing`); the two are orthogonal.
- */
-const finding_critic_ASK_RELEVANCE = Object.freeze({
-  IN_ASK: 'in-ask',
-  UNCERTAIN: 'uncertain',
-  OUT_OF_ASK: 'out-of-ask',
-});
-
-const ASK_RELEVANCE_VALUES = new Set(Object.values(finding_critic_ASK_RELEVANCE));
-
-/**
- * Terminal state of one finding after validation.
- *
- * This vocabulary is written to `validation.finalStatus` — a SEPARATE key from
- * the schema's `validatedStatus` (`schemas/review-artifact.schema.json:455`).
- * The two sets only partially overlap, and nothing here is written to
- * `validatedStatus`. Do not wire one into the other without reconciling both
- * enums first.
- */
-const FINAL_STATUS = Object.freeze({
-  CONFIRMED: 'confirmed',
-  WITHDRAWN_BY_REVIEWER: 'withdrawn-by-reviewer',
-  DISMISSED_BY_EVIDENCE: 'dismissed-by-evidence',
-  // Borrows the SPELLING of the existing `validatedStatus` value for
-  // deterministic evidence rejects, so the two vocabularies stay readable
-  // side by side. It is still emitted under `validation.finalStatus`.
-  DISMISSED_HALLUCINATION: 'dismissed-hallucination',
-  NEEDS_HUMAN_JUDGMENT: 'needs-human-judgment',
-  OUT_OF_ASK: 'out-of-ask',
-  CRITIC_TIMEOUT: 'critic-timeout',
-});
-
-/** Default number of Reviewer↔Critic rounds. */
-const DEFAULT_MAX_INNER_ROUNDS = 2;
-
-/** Absolute ceiling; `maxInnerRounds` is clamped to it. */
-const HARD_CAP_INNER_ROUNDS = 5;
-
-/** Reason codes attached to fail-safe outcomes. */
-const FAILSAFE_REASON = Object.freeze({
-  CRITIC_TIMEOUT: 'critic-timeout',
-  CRITIC_PARSE_FAILURE: 'critic-parse-failure',
-  DETERMINISTIC_MISSING: 'deterministic-missing',
-  EXCHANGES_EXHAUSTED: 'exchanges-exhausted',
-  REVIEWER_PARSE_FAILURE: 'reviewer-parse-failure',
-  KEEP_WITHOUT_EVIDENCE: 'keep-without-evidence',
-  INNER_LOOP_CAP_REACHED: 'inner-loop-cap-reached',
-  DETERMINISTIC_CONTRADICTION: 'deterministic-contradiction',
-  ASK_RELEVANCE_UNCERTAIN: 'ask-relevance-uncertain',
-  AGREEMENT_WITHOUT_EVIDENCE: 'agreement-without-evidence',
-});
-
-// ---------------------------------------------------------------------------
-// Parsing
-// ---------------------------------------------------------------------------
-
-/**
- * Parse the minimal `key: value` block the protocol asks a Critic to emit.
- * Supports scalars plus one `evidence:` list of `- artifact: …` items.
- * @param {string} text
- * @returns {Record<string, unknown>}
- */
-function parseBlock(text) {
-  /** @type {Record<string, unknown>} */
-  const out = {};
-  /** @type {Array<Record<string, string>>} */
-  const evidence = [];
-  let inEvidence = false;
-  /** @type {Record<string, string> | null} */
-  let current = null;
-
-  for (const rawLine of String(text).split('\n')) {
-    const line = rawLine.replace(/\s+$/u, '');
-    if (line.trim() === '') continue;
-    const indented = /^\s/u.test(line);
-    const trimmed = line.trim();
-
-    if (!indented && /^evidence:\s*$/iu.test(trimmed)) {
-      inEvidence = true;
-      current = null;
-      continue;
-    }
-    if (!indented && /^evidence:\s*\[\s*\]$/iu.test(trimmed)) {
-      inEvidence = false;
-      current = null;
-      continue;
-    }
-
-    if (inEvidence && trimmed.startsWith('- ')) {
-      current = {};
-      evidence.push(current);
-      const item = trimmed.slice(2).trim();
-      const m = /^([\w.-]+):\s*(.*)$/u.exec(item);
-      if (m) current[m[1]] = m[2].trim();
-      continue;
-    }
-    if (inEvidence && indented && current) {
-      const m = /^([\w.-]+):\s*(.*)$/u.exec(trimmed);
-      if (m) current[m[1]] = m[2].trim();
-      continue;
-    }
-
-    const m = /^([\w.-]+):\s*(.*)$/u.exec(trimmed);
-    if (!m) continue;
-    inEvidence = false;
-    current = null;
-    out[m[1]] = m[2].trim();
-  }
-
-  if (evidence.length > 0) out.evidence = evidence;
-  return out;
-}
-
-/**
- * Coerce a raw Critic payload (JSON string, protocol block, or object) into a
- * plain object. Returns null when nothing usable can be read.
- * @param {unknown} raw
- * @returns {Record<string, unknown> | null}
- */
-function coerceToObject(raw) {
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    return /** @type {Record<string, unknown>} */ (raw);
-  }
-  if (typeof raw !== 'string') return null;
-  const text = raw.trim();
-  if (text === '') return null;
-  if (text.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
-      return null;
-    } catch {
-      return null;
-    }
-  }
-  const block = parseBlock(text);
-  return Object.keys(block).length === 0 ? null : block;
-}
-
-/**
- * Read a field under either snake_case or camelCase.
- * @param {Record<string, unknown>} obj
- * @param {string} snake
- * @param {string} camel
- * @returns {unknown}
- */
-function pick(obj, snake, camel) {
-  return obj[snake] !== undefined ? obj[snake] : obj[camel];
-}
-
-/**
- * Normalize a Critic evidence list into `{ artifact, lineStart, lineEnd, observation }`.
- * Entries without an artifact path are dropped: an evidence citation that
- * points at nothing cannot ground a disagreement.
- * @param {unknown} raw
- * @returns {Array<{ artifact: string, lineStart: number | null, lineEnd: number | null, observation: string }>}
- */
-function normalizeEvidenceList(raw) {
-  if (!Array.isArray(raw)) return [];
-  const toInt = (/** @type {unknown} */ v) => {
-    const n = Number.parseInt(String(v ?? ''), 10);
-    return Number.isFinite(n) ? n : null;
-  };
-  return raw
-    .map((item) => {
-      if (typeof item === 'string') {
-        return { artifact: item.trim(), lineStart: null, lineEnd: null, observation: '' };
-      }
-      if (!item || typeof item !== 'object') return null;
-      const rec = /** @type {Record<string, unknown>} */ (item);
-      const artifact = String(rec.artifact ?? rec.file ?? rec.path ?? '').trim();
-      return {
-        artifact,
-        lineStart: toInt(pick(rec, 'line_start', 'lineStart')),
-        lineEnd: toInt(pick(rec, 'line_end', 'lineEnd')),
-        observation: String(rec.observation ?? '').trim(),
-      };
-    })
-    .filter((e) => e !== null && e.artifact !== '');
-}
-
-/**
- * Parse a Critic response.
- *
- * Fail-safe: a parse failure NEVER yields a usable verdict. The caller gets
- * `{ ok: false }` and `evaluateExchange` turns that into
- * `needs-human-judgment`, never into a clean or dismissed finding.
- *
- * `askRelevance` falls back to `uncertain` (human-review candidate) when the
- * field is missing or unrecognized — never to `in-ask`, so an unreadable
- * relevance claim cannot smuggle a finding into revision instructions.
- *
- * `DISAGREE_EVIDENCE` without a usable evidence citation is downgraded to
- * `DISAGREE_CONCERN`: an ungrounded disagreement must return the burden of
- * proof to the Reviewer rather than dismiss the finding (design principle 2).
- *
- * @param {unknown} raw
- * @returns {{ ok: true, response: { findingId: string, verdict: string, reason: string, evidence: Array<object>, askRelevance: string, downgraded: boolean } }
- *          | { ok: false, errors: string[] }}
- */
-function parseCriticResponse(raw) {
-  const obj = coerceToObject(raw);
-  if (obj === null) {
-    return { ok: false, errors: ['critic response is not parseable'] };
-  }
-
-  const verdictRaw = String(pick(obj, 'verdict', 'verdict') ?? '').trim();
-  const verdict = verdictRaw.toUpperCase();
-  if (!Object.hasOwn(finding_critic_CRITIC_VERDICT, verdict)) {
-    return { ok: false, errors: [`unknown verdict: ${JSON.stringify(verdictRaw)}`] };
-  }
-
-  // Same separator/case normalization as `normalizeScope`
-  // (src/lib/finding-factory.mjs:347-364), so `OUT_OF_ASK` and `out of ask`
-  // reach the canonical `out-of-ask`. Without it every uppercase emission
-  // collapsed to `uncertain` and the Scope Gate stopped discriminating.
-  //
-  // Deliberately NOT aliased: the issue's original `IN_SCOPE` / `OUT_OF_SCOPE`
-  // spellings normalize to `in-scope` / `out-of-scope`, which are not in the
-  // vocabulary and therefore land on `uncertain`. Accepting them would revive
-  // the very `scope` ambiguity this axis was renamed to remove.
-  const relRaw = String(pick(obj, 'ask_relevance', 'askRelevance') ?? '')
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/gu, '-');
-  const askRelevance = ASK_RELEVANCE_VALUES.has(relRaw) ? relRaw : finding_critic_ASK_RELEVANCE.UNCERTAIN;
-
-  const evidence = normalizeEvidenceList(obj.evidence);
-  let finalVerdict = verdict;
-  let downgraded = false;
-  if (verdict === finding_critic_CRITIC_VERDICT.DISAGREE_EVIDENCE && evidence.length === 0) {
-    finalVerdict = finding_critic_CRITIC_VERDICT.DISAGREE_CONCERN;
-    downgraded = true;
-  }
-
-  return {
-    ok: true,
-    response: {
-      findingId: String(pick(obj, 'finding_id', 'findingId') ?? '').trim(),
-      verdict: finalVerdict,
-      reason: String(obj.reason ?? '').trim(),
-      evidence,
-      askRelevance,
-      downgraded,
-    },
-  };
-}
-
-/**
- * Parse a Reviewer response. `KEEP` requires at least one evidence citation;
- * a `KEEP` without evidence is not a valid response and is reported as such.
- * @param {unknown} raw
- * @returns {{ ok: true, response: { findingId: string, action: string, evidence: Array<object>, respondTo: string } }
- *          | { ok: false, errors: string[] }}
- */
-function parseReviewerResponse(raw) {
-  const obj = coerceToObject(raw);
-  if (obj === null) return { ok: false, errors: ['reviewer response is not parseable'] };
-
-  const action = String(obj.action ?? '')
-    .trim()
-    .toUpperCase();
-  if (!Object.hasOwn(finding_critic_REVIEWER_ACTION, action)) {
-    return { ok: false, errors: [`unknown action: ${JSON.stringify(obj.action ?? '')}`] };
-  }
-
-  const evidence = normalizeEvidenceList(obj.evidence);
-  if (action === finding_critic_REVIEWER_ACTION.KEEP && evidence.length === 0) {
-    return { ok: false, errors: ['KEEP requires evidence'] };
-  }
-
-  return {
-    ok: true,
-    response: {
-      findingId: String(pick(obj, 'finding_id', 'findingId') ?? '').trim(),
-      action,
-      evidence,
-      respondTo: String(pick(obj, 'response_to', 'responseTo') ?? '').trim(),
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Deterministic pre-verification bridge
-// ---------------------------------------------------------------------------
-
-/**
- * Run the existing deterministic verifier and decide whether the finding is
- * worth an LLM Critic call at all.
- *
- * This is a thin adapter over `verifyFinding`; every check it reports comes
- * from `src/lib/verifier.mjs`. Nothing is re-derived here.
- *
- * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[] }} input
- * @returns {{ verified: boolean, sendToCritic: boolean, status: string | null, reasons: string[], checks: Record<string, boolean> }}
- */
-function preVerifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
-  const result = verifyFinding({ finding, diff, skill, fileTypes, diffFiles });
-  if (result.verified) {
-    return {
-      verified: true,
-      sendToCritic: true,
-      status: null,
-      reasons: [],
-      checks: result.checks,
-    };
-  }
-  const hallucinatedEvidence =
-    result.checks.evidenceExists === false || result.checks.evidenceInDiff === false;
-  return {
-    verified: false,
-    sendToCritic: false,
-    status: hallucinatedEvidence
-      ? FINAL_STATUS.DISMISSED_HALLUCINATION
-      : FINAL_STATUS.DISMISSED_BY_EVIDENCE,
-    reasons: result.reasons,
-    checks: result.checks,
-  };
-}
-
-/**
- * Shape of a citable file reference. Mirrors `RE_FILE_REF` in verifier.mjs but
- * anchored, because here the whole `artifact` field must BE a path — not merely
- * contain one somewhere in prose.
- */
-const RE_ARTIFACT_PATH = /^[\w/-]+(?:\.[\w]+)+$/u;
-
-/**
- * Is at least one artifact the Critic cited actually present in the diff?
- *
- * Two gates, in this order:
- *
- * 1. SHAPE (here). The `artifact` field must itself be a file path. This gate
- *    exists because `verifyFinding`'s `evidenceInDiff` is deliberately LENIENT:
- *    `verifier.mjs:100-102` returns true when the evidence cites no file at
- *    all, and its `RE_EVIDENCE` needs 5+ characters before it matches. Borrowing
- *    that check alone answers "does this contradict the diff?", which fails
- *    OPEN — `nowhere`, `a.js`, and `the login handler` all came back grounded.
- *    Grounding must fail CLOSED, so anything that is not a path is not grounded.
- * 2. MEMBERSHIP (delegated). Whether the path appears in the diff stays with
- *    `verifyFinding`; that remains the single source of truth and is not
- *    re-derived here. The probe message is padded so the citation always clears
- *    `RE_EVIDENCE`'s minimum length.
- *
- * @param {Array<{ artifact: string }>} evidence
- * @param {string} diff
- * @returns {boolean}
- */
-function isCriticEvidenceGrounded(evidence, diff) {
-  if (!Array.isArray(evidence) || evidence.length === 0) return false;
-  return evidence.some((entry) => {
-    const artifact = String(entry?.artifact ?? '').trim();
-    if (!RE_ARTIFACT_PATH.test(artifact)) return false;
-    const probe = verifyFinding({
-      finding: { message: `Evidence: critic cited ${artifact}` },
-      diff,
-    });
-    return probe.checks.evidenceInDiff === true;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Outcome helpers
-// ---------------------------------------------------------------------------
-
-/**
- * @param {{ status: string, terminal?: boolean, humanReview?: boolean, retainFinding?: boolean, reasons?: string[], rounds?: number, askRelevance?: string }} init
- */
-function outcome(init) {
-  return {
-    protocol: finding_critic_PROTOCOL_ID,
-    status: init.status,
-    terminal: init.terminal !== false,
-    humanReview: init.humanReview === true,
-    retainFinding: init.retainFinding === true,
-    reasons: init.reasons ?? [],
-    rounds: init.rounds ?? 0,
-    askRelevance: init.askRelevance ?? finding_critic_ASK_RELEVANCE.UNCERTAIN,
-  };
-}
-
-/**
- * A "clean" outcome is one where the finding disappears and no human is
- * asked to look. Every fail-safe path must be false here.
- * @param {{ retainFinding: boolean, humanReview: boolean }} result
- * @returns {boolean}
- */
-function isCleanOutcome(result) {
-  return result.retainFinding === false && result.humanReview === false;
-}
-
-// ---------------------------------------------------------------------------
-// State machine
-// ---------------------------------------------------------------------------
-
-/**
- * Evaluate one Reviewer↔Critic exchange.
- *
- * @param {object} input
- * @param {{ kind?: string, payload?: unknown }} input.critic - `{ kind: 'timeout' | 'error' }`
- *   for a degraded call, otherwise `{ payload }` carrying the raw Critic output.
- * @param {unknown} [input.reviewer] - raw Reviewer response, when one exists.
- * @param {{ verified: boolean }} input.deterministic - result of `preVerifyFinding`.
- *   REQUIRED. Omitting it used to make `verified` false, which disabled the
- *   contradiction fail-safe and let a Critic dismiss a finding that had never
- *   been checked deterministically. A missing value now escalates instead.
- * @param {string} [input.diff] - diff text, used to ground Critic evidence.
- * @param {number} [input.round] - 1-based round index.
- * @returns {{ protocol: string, status: string, terminal: boolean, humanReview: boolean, retainFinding: boolean, reasons: string[], rounds: number, askRelevance: string }}
- */
-function evaluateExchange({ critic, reviewer, deterministic, diff = '', round = 1 }) {
-  // Fail-safe 0: the caller skipped deterministic pre-verification. Nothing
-  // downstream can be trusted, so nothing downstream runs.
-  if (!deterministic || typeof deterministic.verified !== 'boolean') {
-    return outcome({
-      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-      humanReview: true,
-      retainFinding: true,
-      reasons: [FAILSAFE_REASON.DETERMINISTIC_MISSING],
-      rounds: round,
-    });
-  }
-
-  // `kind` is normalized: a Critic runner reporting `TIMEOUT` must not fall
-  // through to the parse-failure branch and mislabel the reason.
-  const kind = String(critic?.kind ?? 'response')
-    .trim()
-    .toLowerCase();
-
-  // Fail-safe 1: the Critic never answered. Keep the finding, ask a human.
-  if (kind === 'timeout' || kind === 'error') {
-    return outcome({
-      status: FINAL_STATUS.CRITIC_TIMEOUT,
-      humanReview: true,
-      retainFinding: true,
-      reasons: [FAILSAFE_REASON.CRITIC_TIMEOUT],
-      rounds: round,
-    });
-  }
-
-  // Fail-safe 2: the Critic answered something unreadable. Not a clean pass.
-  const parsedCritic = parseCriticResponse(critic?.payload);
-  if (!parsedCritic.ok) {
-    return outcome({
-      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-      humanReview: true,
-      retainFinding: true,
-      reasons: [FAILSAFE_REASON.CRITIC_PARSE_FAILURE, ...parsedCritic.errors],
-      rounds: round,
-    });
-  }
-
-  const { verdict, askRelevance, evidence } = parsedCritic.response;
-
-  // Ask-relevance gate: out-of-ask never reaches revision instructions.
-  //
-  // KNOWN LIMITATION (Phase 1a): this terminates on the Critic's sole judgment.
-  // No evidence is required, the Reviewer gets no chance to object, and no
-  // human is notified — a deterministically verified `critical` finding can be
-  // parked in `followUpNotes`. The finding is retained rather than dropped, so
-  // this is not a silent clean, but it IS a single-actor kill switch. Severity
-  // is not plumbed into this function; escalating high severities is deferred
-  // to Phase 1b, where the Critic's real classification accuracy is measurable.
-  if (askRelevance === finding_critic_ASK_RELEVANCE.OUT_OF_ASK) {
-    return outcome({
-      status: FINAL_STATUS.OUT_OF_ASK,
-      humanReview: false,
-      retainFinding: true,
-      reasons: ['critic classified the finding as outside the original ask'],
-      rounds: round,
-      askRelevance,
-    });
-  }
-
-  const verified = deterministic?.verified === true;
-
-  // Fail-safe 3: the Critic dismisses on evidence, but the deterministic
-  // verifier confirmed the finding and the Critic's own citation is not in the
-  // diff. Two authorities disagree; a human decides, and the finding stays.
-  if (
-    verdict === finding_critic_CRITIC_VERDICT.DISAGREE_EVIDENCE &&
-    verified &&
-    !isCriticEvidenceGrounded(evidence, diff)
-  ) {
-    return outcome({
-      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-      humanReview: true,
-      retainFinding: true,
-      reasons: [FAILSAFE_REASON.DETERMINISTIC_CONTRADICTION],
-      rounds: round,
-      askRelevance,
-    });
-  }
-
-  if (verdict === finding_critic_CRITIC_VERDICT.AGREE) {
-    // Consensus is not correctness: agreement without deterministic evidence
-    // does not confirm anything.
-    if (!verified) {
-      return outcome({
-        status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-        humanReview: true,
-        retainFinding: true,
-        reasons: [FAILSAFE_REASON.AGREEMENT_WITHOUT_EVIDENCE],
-        rounds: round,
-        askRelevance,
-      });
-    }
-    return outcome({
-      status: FINAL_STATUS.CONFIRMED,
-      humanReview: askRelevance === finding_critic_ASK_RELEVANCE.UNCERTAIN,
-      retainFinding: true,
-      reasons:
-        askRelevance === finding_critic_ASK_RELEVANCE.UNCERTAIN ? [FAILSAFE_REASON.ASK_RELEVANCE_UNCERTAIN] : [],
-      rounds: round,
-      askRelevance,
-    });
-  }
-
-  // Both DISAGREE_* verdicts need a Reviewer response before anything resolves.
-  if (reviewer === undefined || reviewer === null) {
-    return outcome({
-      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-      terminal: false,
-      humanReview: false,
-      retainFinding: true,
-      reasons: ['awaiting reviewer response'],
-      rounds: round,
-      askRelevance,
-    });
-  }
-
-  const parsedReviewer = parseReviewerResponse(reviewer);
-  if (!parsedReviewer.ok) {
-    const keepWithoutEvidence = parsedReviewer.errors.includes('KEEP requires evidence');
-    return outcome({
-      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-      humanReview: true,
-      retainFinding: true,
-      reasons: [
-        keepWithoutEvidence
-          ? FAILSAFE_REASON.KEEP_WITHOUT_EVIDENCE
-          : FAILSAFE_REASON.REVIEWER_PARSE_FAILURE,
-        ...parsedReviewer.errors,
-      ],
-      rounds: round,
-      askRelevance,
-    });
-  }
-
-  const { action } = parsedReviewer.response;
-
-  if (action === finding_critic_REVIEWER_ACTION.WITHDRAW) {
-    return outcome({
-      status:
-        verdict === finding_critic_CRITIC_VERDICT.DISAGREE_EVIDENCE
-          ? FINAL_STATUS.DISMISSED_BY_EVIDENCE
-          : FINAL_STATUS.WITHDRAWN_BY_REVIEWER,
-      humanReview: false,
-      retainFinding: false,
-      reasons: [],
-      rounds: round,
-      askRelevance,
-    });
-  }
-
-  if (action === finding_critic_REVIEWER_ACTION.KEEP) {
-    // KEEP is only reachable with evidence (parseReviewerResponse enforces it).
-    if (verdict === finding_critic_CRITIC_VERDICT.DISAGREE_CONCERN) {
-      return outcome({
-        status: FINAL_STATUS.CONFIRMED,
-        humanReview: askRelevance === finding_critic_ASK_RELEVANCE.UNCERTAIN,
-        retainFinding: true,
-        reasons: [],
-        rounds: round,
-        askRelevance,
-      });
-    }
-    // DISAGREE_EVIDENCE vs an evidence-backed KEEP: unresolved, run another round.
-    return outcome({
-      status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-      terminal: false,
-      humanReview: false,
-      retainFinding: true,
-      reasons: ['evidence contested'],
-      rounds: round,
-      askRelevance,
-    });
-  }
-
-  // REVISE: the finding changed shape; it must be re-examined next round.
-  return outcome({
-    status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-    terminal: false,
-    humanReview: false,
-    retainFinding: true,
-    reasons: ['finding revised'],
-    rounds: round,
-    askRelevance,
-  });
-}
-
-/**
- * Run the inner loop over a pre-collected list of exchanges.
- *
- * The artifact is frozen for the whole loop: this function reads exchanges and
- * returns a state, and never edits code, diff, or finding text.
- *
- * Convergence: at most `maxInnerRounds` rounds, itself clamped to
- * `HARD_CAP_INNER_ROUNDS`. Reaching the cap without a terminal state is a
- * fail-safe, not an approval — the finding is retained and escalated.
- *
- * @param {object} input
- * @param {Array<{ critic: object, reviewer?: unknown }>} input.exchanges
- * @param {{ verified: boolean }} [input.deterministic]
- * @param {string} [input.diff]
- * @param {number} [input.maxInnerRounds]
- * @param {number} [input.hardCap]
- * @returns {{ protocol: string, status: string, terminal: boolean, humanReview: boolean, retainFinding: boolean, reasons: string[], rounds: number, askRelevance: string }}
- */
-function runValidationLoop({
-  exchanges,
-  deterministic,
-  diff = '',
-  maxInnerRounds = DEFAULT_MAX_INNER_ROUNDS,
-  hardCap = HARD_CAP_INNER_ROUNDS,
-}) {
-  // Double clamp. `hardCap` is a caller-supplied argument, so on its own it can
-  // be raised past the protocol ceiling; `HARD_CAP_INNER_ROUNDS` is the ceiling
-  // #1978 Step 6 fixes at 5 and no caller may exceed it.
-  const cap = Math.max(
-    1,
-    Math.min(Number(maxInnerRounds) || 1, Number(hardCap) || 1, HARD_CAP_INNER_ROUNDS)
-  );
-  const list = Array.isArray(exchanges) ? exchanges : [];
-  let last = null;
-  let round = 0;
-
-  for (const exchange of list) {
-    if (round >= cap) break;
-    round += 1;
-    last = evaluateExchange({
-      critic: exchange.critic,
-      reviewer: exchange.reviewer,
-      deterministic,
-      diff,
-      round,
-    });
-    if (last.terminal) return last;
-  }
-
-  // Fail-safe 4: the loop ended without converging. The two ways that happens
-  // carry different operational meaning, so they carry different reason codes:
-  // hitting the cap means the exchange kept oscillating, while running out of
-  // exchanges early means the caller stopped feeding the loop.
-  return outcome({
-    status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
-    humanReview: true,
-    retainFinding: true,
-    reasons: [
-      round >= cap ? FAILSAFE_REASON.INNER_LOOP_CAP_REACHED : FAILSAFE_REASON.EXCHANGES_EXHAUSTED,
-    ],
-    rounds: round,
-    askRelevance: last?.askRelevance ?? finding_critic_ASK_RELEVANCE.UNCERTAIN,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Post-validation routing
-// ---------------------------------------------------------------------------
-
-/**
- * Build the validated finding record.
- *
- * Severity is copied through unchanged. `agreement` is carried as provenance
- * only: this function takes no vote count and exposes no path by which the
- * number of agreeing reviewers could raise or lower severity.
- *
- * @param {{ id?: string, severity?: string, agreement?: unknown[] }} finding
- * @param {{ status: string, humanReview: boolean, retainFinding: boolean, reasons: string[], rounds: number, askRelevance: string }} result
- * @returns {object}
- */
-function buildValidatedFinding(finding, result) {
-  const agreement = Array.isArray(finding?.agreement) ? [...finding.agreement] : [];
-  return {
-    id: finding?.id ?? null,
-    severity: finding?.severity ?? null,
-    agreement,
-    agreementCount: agreement.length,
-    validation: {
-      protocol: finding_critic_PROTOCOL_ID,
-      rounds: result.rounds,
-      finalStatus: result.status,
-      askRelevance: result.askRelevance,
-      humanReview: result.humanReview,
-      reasons: result.reasons,
-    },
-  };
-}
-
-/**
- * Route validated findings.
- *
- * - `out-of-ask` never reaches revision instructions; it becomes a follow-up note.
- * - `uncertain` never reaches revision instructions; it becomes a human-review candidate.
- * - Anything flagged `humanReview` becomes a human-review candidate regardless of status.
- *
- * @param {Array<{ finding: object, result: object }>} entries
- * @returns {{ revisionInstructions: object[], humanReviewCandidates: object[], followUpNotes: object[], dropped: object[] }}
- */
-function partitionByAskRelevance(entries) {
-  const revisionInstructions = [];
-  const humanReviewCandidates = [];
-  const followUpNotes = [];
-  const dropped = [];
-
-  for (const { finding, result } of Array.isArray(entries) ? entries : []) {
-    const record = buildValidatedFinding(finding, result);
-    if (result.status === FINAL_STATUS.OUT_OF_ASK) {
-      followUpNotes.push(record);
-      continue;
-    }
-    if (result.humanReview === true || result.askRelevance === finding_critic_ASK_RELEVANCE.UNCERTAIN) {
-      humanReviewCandidates.push(record);
-      continue;
-    }
-    if (result.retainFinding === false) {
-      dropped.push(record);
-      continue;
-    }
-    revisionInstructions.push(record);
-  }
-
-  return { revisionInstructions, humanReviewCandidates, followUpNotes, dropped };
-}
-
-// EXTERNAL MODULE: ./src/lib/skill-planner.mjs
-var skill_planner = __nccwpck_require__(5433);
-;// CONCATENATED MODULE: ./src/prompt/sections.mjs
-// Review prompt sections (#1859 の前段) — レビュー用プロンプトの「節」を組み立てる純関数群。
-//
-// 背景:
-//   これらはすべて review-engine.mjs の module-private 関数だった。ADR-006 の
-//   Prompt Compiler は同じ節を別の順序・別の system/user 配分で描画するため、
-//   節の生成規則を review-engine 側と compiler 側の 2 箇所へ複製することになる。
-//   レビュー契約の文面が二重管理になるのは CLAUDE.md「Import the SSoT, never
-//   re-derive it」が禁じる形なので、生成規則をこのモジュールへ集約し、双方が
-//   import する。
-//
-// このモジュールの契約:
-//   - 出力は buildPrompt が生成していた文字列と **バイト単位で同一**である。
-//     tests/prompt-sections.test.mjs が golden で pin している。
-//   - 副作用を持たない。I/O もプロセス状態の参照もしない。
-//   - レビュー判断（severity の意味、GO/NO-GO、スキル選択）はここに置かない。
-//     ここが持つのは「決まった判断をどう文字列にするか」だけである。
-//
-// 切り出していないもの:
-//   sanitizeSkillName / resolveOpenAIConfig は prompt の節ではなく、それぞれ
-//   fallback コメント生成と provider 設定解決に属するため review-engine に残す。
-
-
-
-/** PR 本文をプロンプトへ載せるときの上限。超過分は truncate する。 */
-const MAX_PR_BODY_CHARS = 4000;
-
-function buildSystemMessage(language) {
-  return language === 'en'
-    ? 'You are River Review, an expert code review assistant. Respond in English. You excel at spotting risky changes and explaining them briefly.'
-    : 'You are River Review, an expert code review assistant. Respond in Japanese. You excel at spotting risky changes and explaining them briefly.';
-}
-
-function buildLanguageInstruction(language) {
-  return language === 'en'
-    ? '- Write the <message> in English.'
-    : '- <message>は日本語で記述すること。';
-}
-
-function buildSeverityInstruction(severity, language) {
-  const japanese = {
-    strict: '軽微な懸念も含めて網羅的に指摘する',
-    normal: '重要度と再現性のバランスを取り、主要なリスクを指摘する',
-    relaxed: '重大・致命的な問題に限定し、軽微な指摘は省く',
-  };
-  const english = {
-    strict: 'Capture even minor risks and style regressions',
-    normal: 'Balance breadth with impact; focus on notable risks',
-    relaxed: 'Limit findings to critical or high-impact issues; skip nits',
-  };
-  const map = language === 'en' ? english : japanese;
-  const label = language === 'en' ? 'Severity focus' : '厳格度';
-  return `- ${label} (${severity}): ${map[severity] ?? map.normal}`;
-}
-
-function buildAdditionalSection(instructions, language) {
-  if (!instructions?.length) return '';
-  const header = language === 'en' ? 'Additional instructions:' : '追加指示:';
-  // T64: additionalInstructions が単一行 "<file>:<line>: <message>" 形式と
-  // 競合し、LLM出力のパース失敗を招いていたため、適用範囲を明示する。
-  const formatNote =
-    language === 'en'
-      ? 'These additional instructions apply only to the content of each finding\'s <message>. Always keep the "<file>:<line>: <message>" line format above.'
-      : 'これらの追加指示は各 finding の <message> 内容にのみ適用してください。上記の「<file>:<line>: <message>」という行フォーマット自体は常に維持してください。';
-  const body = instructions.map((item) => `- ${item}`).join('\n');
-  return `\n${header}\n${formatNote}\n${body}\n`;
-}
-
-function buildSkillSummary(plan) {
-  if (!plan?.selected?.length) return 'No skills selected; provide general review notes.';
-  const summaries = plan.selected.map((skill) => (0,skill_planner/* summarizeSkill */.P)(skill));
-  const top = summaries.slice(0, 6);
-  const body = top
-    .map(
-      (s) =>
-        `- ${s.id}: ${s.name} [phase=${s.phase}, severity=${s.severity ?? 'unknown'}, modelHint=${s.modelHint}]`
-    )
-    .join('\n');
-  const truncated =
-    summaries.length > top.length ? `\n...and ${summaries.length - top.length} more skills.` : '';
-  return `${body}${truncated}`;
-}
-
-function buildFileSummary(files = []) {
-  if (!files.length) return 'No files changed';
-  return files.map((file) => `- ${file.path} (hunks: ${file.hunks.length || 1})`).join('\n');
-}
-
-function buildProjectRulesSection(rulesText) {
-  if (!rulesText) return '';
-  return `\n### Project-specific review rules\n\n以下は、このリポジトリ専用のレビューガイドラインです。必ず考慮してください。\n\n---\n${rulesText}\n---\n`;
-}
-
-function buildPrDescriptionSection(prBody) {
-  if (typeof prBody !== 'string' || !prBody.trim()) return '';
-  const body =
-    prBody.length > MAX_PR_BODY_CHARS
-      ? `${prBody.slice(0, MAX_PR_BODY_CHARS)}\n...[truncated]`
-      : prBody;
-  return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。\n\n---\n${body}\n---\n`;
-}
-
-function reviewObligationOneLine(value) {
-  return String(value ?? '')
-    .replace(/[\r\n]+/g, ' ')
-    .trim();
-}
-
-function reviewObligationList(values) {
-  return (values ?? []).map(reviewObligationOneLine).filter(Boolean).join(', ');
-}
-
-/**
- * Render matched Review Obligations as questions that require evidence, never
- * as pre-asserted Findings. Activation details stay out of the prompt: they are
- * runtime provenance, not evidence that a violation exists.
- */
-function buildReviewObligationsSection(obligations = [], language = 'ja') {
-  if (!obligations?.length) return '';
-
-  const instruction =
-    language === 'en'
-      ? 'The following items are review obligations, not findings. Verify the required evidence in the diff and context. Emit a finding only when evidence supports a real issue; never invent missing evidence, and respect false-positive guards.'
-      : '以下は「確認すべき観点」であり、問題の存在を示す Finding ではありません。差分と文脈から Required evidence を確認し、実際の問題を裏付ける証拠がある場合だけ Finding を出してください。証拠を推測・捏造せず、False-positive guards に該当する場合は指摘しないでください。';
-  const lines = [];
-
-  for (const obligation of obligations) {
-    lines.push(
-      `- [${reviewObligationOneLine(obligation.id)}] ${reviewObligationOneLine(obligation.title)}`
-    );
-    lines.push(`  - Question: ${reviewObligationOneLine(obligation.question)}`);
-    lines.push(
-      `  - Required evidence: ${reviewObligationList(obligation.requiredEvidence) || '(none)'}`
-    );
-    const hints = reviewObligationList(obligation.evidenceHints);
-    if (hints) lines.push(`  - Evidence hints: ${hints}`);
-    const guards = reviewObligationList(obligation.falsePositiveGuards);
-    if (guards) lines.push(`  - False-positive guards: ${guards}`);
-  }
-
-  return `\n### Review Obligations\n\n${instruction}\n\n${lines.join('\n')}\n`;
-}
-
-// Opt-in (review.walkthrough). Asks the model to prepend a per-file walkthrough
-// to its output so reviewers see what changed, the risk, and a reading order.
-function buildWalkthroughSection(enabled) {
-  if (!enabled) return '';
-  return `\n### File Walkthrough (output request)\n\nFindings の前に "## File Walkthrough" セクションを出力してください。変更ファイルごとに 1 行で:\n- 何がどう変わったか（要約）\n- 変更リスク（high/medium/low）\n- 読むべき順番（依存や影響の大きい順）\nを示してください。差分に無いファイルは含めないでください。\n`;
-}
-
-// Opt-in (review.agentHandoff). Asks the model to append provider-agnostic
-// fix instructions another AI agent can act on. Distinct from per-finding
-// `suggestion` (a human hint); this is an executable instruction set.
-function buildHandoffSection(enabled) {
-  if (!enabled) return '';
-  return `\n### Agent Handoff (output request)\n\nFindings の後に "## Agent Handoff" セクションを出力してください。blocking な指摘を別の AI エージェントが修正できるよう、特定のツール名・CLI 名を含めずに以下を記述してください:\n- 修正の目的\n- 対象ファイル\n- 制約（壊してはいけない挙動・後方互換）\n- 実装手順\n- テスト手順\n- 完了条件\n`;
-}
-
-function buildADRContextSection(relatedADRs) {
-  if (!relatedADRs?.length) return '';
-  const lines = ['\n### Related ADRs/Specs\n'];
-  for (const adr of relatedADRs.slice(0, 5)) {
-    lines.push(`- ${adr.title} (${adr.path}) — ${adr.matchReason}`);
-  }
-  lines.push('\nこれらの設計文書との整合性を考慮してレビューしてください。\n');
-  return lines.join('\n');
-}
-
-function sanitizePath(p) {
-  return String(p)
-    .replace(/[\n\r]/g, '')
-    .slice(0, 200);
-}
-
-function buildRiskAssessmentSection(riskAssessment) {
-  if (!riskAssessment) return '';
-  const { escalatedFiles, humanReviewFiles } = riskAssessment;
-  if (!escalatedFiles?.length && !humanReviewFiles?.length) return '';
-  const lines = ['\n### Risk Assessment\n'];
-  if (humanReviewFiles?.length) {
-    lines.push('以下のファイルは人間によるレビューが必須です:');
-    for (const f of humanReviewFiles) lines.push('- ' + sanitizePath(f) + ': require_human_review');
-  }
-  if (escalatedFiles?.length) {
-    lines.push('以下のファイルはエスカレーション対象です:');
-    for (const f of escalatedFiles) lines.push('- ' + sanitizePath(f) + ': escalate');
-  }
-  lines.push('これらのファイルには特に注意してレビューしてください。\n');
-  return lines.join('\n');
-}
-
-/**
- * findings の出力契約そのもの。severity 語彙・証跡の必須項目・件数上限・
- * ID 捏造の禁止が、この 1 箇所に集まっている。
- *
- * Prompt Compiler の renderer はこの文字列を **そのまま** 使い、置き場所
- * （system へ寄せるか user に残すか）だけを変える。文面を profile 側で
- * 書き換えることは ADR-006 の不変条件が禁じている。
- *
- * @param {object} params
- * @param {string} params.language      'ja' | 'en'
- * @param {string} params.severity      'strict' | 'normal' | 'relaxed'
- * @param {object} params.depthConfig   getReviewDepthConfig() の戻り値
- * @param {string[]=} params.additionalInstructions
- */
-function buildFindingContractSection({
-  language,
-  severity,
-  depthConfig,
-  additionalInstructions,
-}) {
-  return `Review the unified git diff below and produce concise findings.
-${buildLanguageInstruction(language)}
-- Output each finding on its own line using the format "<file>:<line>: <message>".
-- In <message>, include short labels: "Finding:", "Evidence:", "Impact:", "Fix:", "Severity:", "Confidence:".
-- Every finding MUST carry "Severity:" and "Confidence:". It MUST also carry "Evidence:" (>=5 chars) and "Fix:" (>=10 chars) — findings without them are discarded during verification. "Finding:" and "Impact:" are recommended.
-- Use Severity: blocker|warning|nit and Confidence: high|medium|low.
-- Optionally add "Scope: in-diff" (the added lines introduce the problem) or "Scope: pre-existing" (the problem is in a changed file but outside the added lines). Verification re-derives scope from the diff and overrides this label when it can.
-- Optionally add "CriterionRefs: AC-4, TC-7" (acceptance-criterion or test-case identifiers) and/or "ArtifactRefs: plan.md#AC-4, todo.md#TASK-3" (artifact anchors) to link the finding back to the requirement it verifies. Separate values with a comma; a value must not contain spaces.
-- Use ONLY identifiers that appear verbatim in an artifact supplied above (plan / requirements / PR description). If no such artifact was supplied, or you are not certain of the exact identifier, omit the label entirely — never invent, guess, abbreviate, or renumber an ID.
-- Example finding line: src/app.ts:42: Finding: retry loop swallows errors Evidence: catch block at src/app.ts drops err Impact: failures are masked Fix: rethrow or log err with context Severity: warning Confidence: high
-- Focus on correctness, safety, and maintainability risks in the changed code.
-- Prefer commenting on changed lines; if a point depends on context not visible in the diff, set Confidence: low.
-- Before flagging a line, read the comments and docblocks adjacent to it in the diff, and never repeat a suggestion one of them already answers. Omitting a finding because a comment states the design intent is allowed ONLY for nits, style, and design-preference points whose concern that intent fully resolves.
-- Never omit a security, data-loss, or correctness risk because a comment calls it intentional: report it, cite that comment in <message>, and state the risk that remains. Lower the severity only when the stated intent genuinely mitigates part of the risk, and give that reason in <message>. A comment that contradicts the code it documents is itself a finding.
-- Limit to ${depthConfig.maxFindings} findings. If there are no issues worth mentioning, reply with "NO_ISSUES".
-- Keep messages brief (<=200 characters).
-- ${depthConfig.focusHint}
-${buildSeverityInstruction(severity, language)}
-${buildAdditionalSection(additionalInstructions, language)}`;
-}
-
-// ---------------------------------------------------------------------------
-// Evidence-Grounded Adversarial Review — Critic / Reviewer turns (#1978)
-// ---------------------------------------------------------------------------
-//
-// この 2 節は finding-critic の状態機械へ供給する LLM ターンの文面である。
-// 語彙（verdict / askRelevance / action）は src/lib/finding-critic.mjs が
-// export する定数から組み立てる。文字列リテラルで書き写すと、語彙の変更が
-// プロンプト側へ伝播しないためである（CLAUDE.md「Import the SSoT」）。
-//
-// レビュー判断はここに無い。ここにあるのは「決まった契約をどう文字列にするか」
-// だけであり、verdict の意味づけも接地判定も finding-critic.mjs が持つ。
-
-function joinList(values) {
-  return values.map((v) => `\`${v}\``).join(' | ');
-}
-
-/**
- * 出力契約の JSON テンプレへ埋めるプレースホルダ。
- *
- * 許容値を `A | B | C` の形でテンプレ内へ直接展開すると、テンプレそのものが
- * 有効な JSON でなくなり、モデルがそれを写して壊れた JSON を返す誘因になる。
- * テンプレは常に `JSON.parse` を通る形に保ち、許容値は直後の行で列挙する。
- * 値の生成元は finding-critic.mjs の語彙定数のままで、ここでは並べ方だけを変える。
- */
-const CHOICE_PLACEHOLDER = '<one of the values listed below>';
-
-function bulletList(items, empty) {
-  const list = (Array.isArray(items) ? items : []).map((v) => String(v).trim()).filter(Boolean);
-  if (!list.length) return empty;
-  return list.map((v) => `- ${v}`).join('\n');
-}
-
-function reasonLanguageInstruction(language) {
-  return language === 'en'
-    ? '- Write `reason` and `observation` in English.'
-    : '- `reason` と `observation` は日本語で記述すること。';
-}
-
-/** Critic / Reviewer ターンの system message。 */
-function buildCriticSystemMessage(role, language) {
-  const who =
-    role === 'reviewer'
-      ? 'the Reviewer who raised the finding, now answering the Critic'
-      : 'an adversarial Critic auditing another reviewer finding';
-  const lang = language === 'en' ? 'English' : 'Japanese';
-  return `You are ${who} in River Review's ${PROTOCOL_ID} protocol. Reply with a single JSON object and nothing else. Prose inside the JSON is written in ${lang}.`;
-}
-
-/**
- * Critic ターンの user prompt。
- *
- * @param {object} params
- * @param {{ id?: string, severity?: string, message?: string }} params.finding
- * @param {string} params.diff
- * @param {string} [params.originalAsk]
- * @param {string[]} [params.acceptanceCriteria]
- * @param {string} [params.language] 'ja' | 'en'
- */
-function buildCriticPromptSection({
-  finding,
-  diff,
-  originalAsk,
-  acceptanceCriteria,
-  language = 'ja',
-}) {
-  return `Audit the candidate finding below against the diff.
-
-### Original ask
-
-${String(originalAsk ?? '').trim() || '(not supplied)'}
-
-### Acceptance criteria
-
-${bulletList(acceptanceCriteria, '(none supplied)')}
-
-### Candidate finding
-
-- finding_id: ${String(finding?.id ?? '')}
-- severity: ${String(finding?.severity ?? '')}
-
-${String(finding?.message ?? '').trim()}
-
-### Diff
-
-${String(diff ?? '')}
-
-### Output contract
-
-Reply with ONE JSON object, no code fence, no commentary:
-
-{"finding_id": "<the finding_id above, verbatim>", "verdict": "${CHOICE_PLACEHOLDER}", "reason": "<why>", "ask_relevance": "${CHOICE_PLACEHOLDER}", "evidence": [{"artifact": "<path from the diff>", "line_start": 0, "line_end": 0, "observation": "<what is there>"}]}
-
-- \`verdict\` is one of: ${joinList(Object.values(CRITIC_VERDICT))}.
-- \`ask_relevance\` is one of: ${joinList(Object.values(ASK_RELEVANCE))}.
-- \`line_start\` / \`line_end\` are integers; replace the zeros with the real line numbers.
-
-- \`verdict\`: \`${CRITIC_VERDICT.AGREE}\` when the finding holds, \`${CRITIC_VERDICT.DISAGREE_EVIDENCE}\` when the diff itself refutes it, \`${CRITIC_VERDICT.DISAGREE_CONCERN}\` when you doubt it but cannot cite a refutation.
-- \`${CRITIC_VERDICT.DISAGREE_EVIDENCE}\` REQUIRES at least one \`evidence\` entry whose \`artifact\` is a file path that appears in the diff. Without it the verdict is downgraded to \`${CRITIC_VERDICT.DISAGREE_CONCERN}\`.
-- \`ask_relevance\` judges the finding against the original ask only, not against the diff: \`${ASK_RELEVANCE.IN_ASK}\` when it bears on the ask, \`${ASK_RELEVANCE.OUT_OF_ASK}\` when it is a separate concern, \`${ASK_RELEVANCE.UNCERTAIN}\` when you cannot tell. An unreadable or missing value is read as \`${ASK_RELEVANCE.UNCERTAIN}\`.
-- Never invent a path, a line number, or a finding_id.
-${reasonLanguageInstruction(language)}`;
-}
-
-/**
- * Reviewer 反論ターンの user prompt。Critic が DISAGREE_* を返した回のみ使う。
- *
- * @param {object} params
- * @param {{ id?: string, message?: string }} params.finding
- * @param {unknown} params.criticResponse Critic の生出力（文字列 or オブジェクト）
- * @param {string} params.diff
- * @param {string} [params.language] 'ja' | 'en'
- */
-function buildReviewerRebuttalPromptSection({
-  finding,
-  criticResponse,
-  diff,
-  language = 'ja',
-}) {
-  const critic =
-    typeof criticResponse === 'string' ? criticResponse : JSON.stringify(criticResponse ?? null);
-  return `The Critic challenged your finding. Answer it.
-
-### Your finding
-
-- finding_id: ${String(finding?.id ?? '')}
-
-${String(finding?.message ?? '').trim()}
-
-### Critic response
-
-${critic}
-
-### Diff
-
-${String(diff ?? '')}
-
-### Output contract
-
-Reply with ONE JSON object, no code fence, no commentary:
-
-{"finding_id": "<the finding_id above, verbatim>", "action": "${CHOICE_PLACEHOLDER}", "response_to": "<the Critic verdict you are answering>", "evidence": [{"artifact": "<path from the diff>", "line_start": 0, "line_end": 0, "observation": "<what is there>"}]}
-
-- \`action\` is one of: ${joinList(Object.values(REVIEWER_ACTION))}.
-- \`line_start\` / \`line_end\` are integers; replace the zeros with the real line numbers.
-
-- \`${REVIEWER_ACTION.KEEP}\` REQUIRES at least one \`evidence\` entry; a \`${REVIEWER_ACTION.KEEP}\` without evidence is not a valid answer and escalates to a human.
-- \`${REVIEWER_ACTION.WITHDRAW}\` when the Critic is right. \`${REVIEWER_ACTION.REVISE}\` when the finding survives in a changed shape.
-- Cite only paths and lines that appear in the diff above.
-${reasonLanguageInstruction(language)}`;
-}
-
+// EXTERNAL MODULE: ./src/prompt/sections.mjs
+var sections = __nccwpck_require__(148);
 // EXTERNAL MODULE: external "node:crypto"
 var external_node_crypto_ = __nccwpck_require__(7598);
 // EXTERNAL MODULE: ./src/lib/token-estimator.mjs
@@ -57945,7 +57837,7 @@ var token_estimator = __nccwpck_require__(467);
 
 /** モデルに与える役割宣言。language 以外の入力を取らない。 */
 function renderRoleMessage(ir) {
-  return buildSystemMessage(ir.outputContract.language);
+  return (0,sections/* buildSystemMessage */.HB)(ir.outputContract.language);
 }
 
 /** レビュー対象の宣言。phase と変更ファイル、関連する観点の一覧。 */
@@ -57954,10 +57846,10 @@ function renderSubjectBlock(ir) {
 Phase: ${ir.subject.phase}
 
 Changed files:
-${buildFileSummary(ir.subject.changedFiles)}
+${(0,sections/* buildFileSummary */.b)(ir.subject.changedFiles)}
 
 Relevant skills:
-${buildSkillSummary(ir.judgment.plan)}
+${(0,sections/* buildSkillSummary */.EV)(ir.judgment.plan)}
 `;
 }
 
@@ -57965,14 +57857,14 @@ ${buildSkillSummary(ir.judgment.plan)}
 function renderContextBlock(ir) {
   const c = ir.context;
   return [
-    buildProjectRulesSection(c.projectRules),
-    buildRiskAssessmentSection(c.riskAssessment),
-    buildADRContextSection(c.relatedADRs),
+    (0,sections/* buildProjectRulesSection */.gW)(c.projectRules),
+    (0,sections/* buildRiskAssessmentSection */.zx)(c.riskAssessment),
+    (0,sections/* buildADRContextSection */.gK)(c.relatedADRs),
     (0,repo_context/* buildRepoContextSection */.lQ)(c.repoContext),
-    buildPrDescriptionSection(c.prDescription),
-    buildWalkthroughSection(ir.constraints.walkthrough),
-    buildHandoffSection(ir.constraints.agentHandoff),
-    buildReviewObligationsSection(c.reviewObligations, ir.outputContract.language),
+    (0,sections/* buildPrDescriptionSection */.A3)(c.prDescription),
+    (0,sections/* buildWalkthroughSection */.qf)(ir.constraints.walkthrough),
+    (0,sections/* buildHandoffSection */.mN)(ir.constraints.agentHandoff),
+    (0,sections/* buildReviewObligationsSection */.vO)(c.reviewObligations, ir.outputContract.language),
   ].join('');
 }
 
@@ -57983,7 +57875,7 @@ function renderContextBlock(ir) {
  * 判断側の値を renderer が決めることになるため、欠けていても補わない。
  */
 function renderContractBlock(ir) {
-  return buildFindingContractSection({
+  return (0,sections/* buildFindingContractSection */.py)({
     language: ir.outputContract.language,
     severity: ir.judgment.severity,
     depthConfig: {
@@ -58426,7 +58318,7 @@ function runPromptCompilerStage({
     observation: buildPromptCompilerObservation({
       mode,
       profile,
-      legacyText: `${buildSystemMessage(language)}\n${promptInfo.prompt}`,
+      legacyText: `${(0,sections/* buildSystemMessage */.HB)(language)}\n${promptInfo.prompt}`,
       compiledText: `${compiled.systemMessage}\n${compiled.prompt}`,
     }),
   };
@@ -59281,6 +59173,8 @@ async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
   };
 }
 
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
+var finding_critic_stage = __nccwpck_require__(2954);
 ;// CONCATENATED MODULE: ./src/lib/review-engine.mjs
 
 
@@ -59302,6 +59196,9 @@ async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
 // runPromptCompilerStage が即 null を返し、compiler 側は一切呼ばれない。
 
 
+// #2334 / #1978 Phase 3: Finding Critic の配線段。既定 off では
+// runFindingCriticStage が即 null を返し、runner も状態機械も呼ばれない。
+
 
 const ENV_DEFAULT_MODEL = process.env.RIVER_OPENAI_MODEL || process.env.OPENAI_MODEL || null;
 const MAX_PROMPT_CHARS = 12000;
@@ -59314,6 +59211,27 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
 /**
  * スキル名のサニタイズ: Markdown インジェクション対策
  */
+/**
+ * Redaction options for anything that leaves process memory (prompt previews,
+ * artifact writes, Critic traces). The SSoT for the shape: every caller that
+ * needs these options imports this rather than rebuilding the object, so a
+ * second call site cannot quietly redact under different settings
+ * (#2339 review, Minor 4).
+ *
+ * @param {object} effectiveConfig merged config
+ */
+function resolveRedactOptions(effectiveConfig) {
+  return {
+    allowlist: effectiveConfig?.security?.redact?.allowlist ?? [],
+    ...(effectiveConfig?.security?.redact?.entropyThreshold != null
+      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
+      : {}),
+    ...(effectiveConfig?.security?.redact?.categories?.highEntropy === false
+      ? { highEntropy: false }
+      : {}),
+  };
+}
+
 function sanitizeSkillName(name) {
   if (!name) return '';
   return String(name).replace(/[\[\]`*_{}()#+\-.!|<>\n]/g, '');
@@ -59364,12 +59282,12 @@ function buildPrompt({
 Phase: ${phase}
 
 Changed files:
-${buildFileSummary(diffFiles)}
+${(0,sections/* buildFileSummary */.b)(diffFiles)}
 
 Relevant skills:
-${buildSkillSummary(plan)}
+${(0,sections/* buildSkillSummary */.EV)(plan)}
 
-${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${(0,repo_context/* buildRepoContextSection */.lQ)(repoContext)}${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(
+${(0,sections/* buildProjectRulesSection */.gW)(projectRules)}${(0,sections/* buildRiskAssessmentSection */.zx)(riskAssessment)}${(0,sections/* buildADRContextSection */.gK)(relatedADRs)}${(0,repo_context/* buildRepoContextSection */.lQ)(repoContext)}${(0,sections/* buildPrDescriptionSection */.A3)(prBody)}${(0,sections/* buildWalkthroughSection */.qf)(wantWalkthrough)}${(0,sections/* buildHandoffSection */.mN)(wantHandoff)}${(0,sections/* buildReviewObligationsSection */.vO)(reviewObligations, language)}${(0,sections/* buildFindingContractSection */.py)(
     {
       language,
       severity,
@@ -59689,6 +59607,11 @@ async function generateReview({
   prBody,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
+  // #2334: reviewer-orchestrator は findings をマージしたあとに Critic を
+  // 1 回だけ走らせる。その経路では per-reviewer の generateReview が同じ段を
+  // 二重に走らせないよう true を渡す。既定 false なので、単一レビューアの
+  // 既定経路（--reviewers 未指定）はここが Critic の唯一の呼び出し点になる。
+  deferFindingCritic = false,
 }) {
   const effectiveConfig = (0,loader/* mergeConfig */.R2)(config_default/* defaultConfig */.s, config ?? {});
   // LLM-facing view: strip non-reviewable build artifacts (dist bundles, source
@@ -59728,15 +59651,12 @@ async function generateReview({
   // otherwise leave process memory (debug.promptPreview, returned
   // `prompt`, downstream artifact writes). The LLM call still uses the
   // original `promptInfo.prompt` because it must.
-  const safePrompt = (0,secret_redactor/* redactText */.Rd)(promptInfo.prompt, {
-    allowlist: effectiveConfig.security?.redact?.allowlist ?? [],
-    ...(effectiveConfig.security?.redact?.entropyThreshold != null
-      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
-      : {}),
-    ...(effectiveConfig.security?.redact?.categories?.highEntropy === false
-      ? { highEntropy: false }
-      : {}),
-  }).text;
+  // #2334: 同じ options を Finding Critic の段の trace 控えにも渡すため、
+  // インラインだった object を resolveRedactOptions へ括り出している。値は
+  // 変えていない。reviewer-orchestrator も同じ関数を import して使うので、
+  // 2 経路で redaction 設定が食い違うことがない。
+  const redactOptions = resolveRedactOptions(effectiveConfig);
+  const safePrompt = (0,secret_redactor/* redactText */.Rd)(promptInfo.prompt, redactOptions).text;
 
   let comments = [];
   const debug = {
@@ -59823,7 +59743,7 @@ async function generateReview({
         maxTokens: openAIConfig.maxTokens,
         systemMessage: activeCompiledPrompt
           ? activeCompiledPrompt.systemMessage
-          : buildSystemMessage(language),
+          : (0,sections/* buildSystemMessage */.HB)(language),
       });
       // T64 follow-up (gemini security-high): redact at storage time so the
       // raw LLM output never leaves process memory unmasked. Keeps the same
@@ -59980,7 +59900,7 @@ async function generateReview({
   }
 
   // Build structured findings from verified comments
-  const findings = comments.map((c, i) => {
+  let findings = comments.map((c, i) => {
     const parsed = (0,finding_factory/* parseFindingMessage */.UB)(c.message);
     const severity = (0,finding_factory/* normalizeSeverity */.lv)(parsed.severity);
     // Confidence is guaranteed present+valid here (validateFindingMessage gates
@@ -60019,6 +59939,43 @@ async function generateReview({
     const bB = (0,breakdown/* computeFindingBreakdown */._)(b);
     return bB.composite - bA.composite;
   });
+
+  // --- #2334 / #1978: Finding Critic（配線はこの 1 箇所だけ）---
+  //
+  // 段の本体は src/lib/finding-critic-stage.mjs にある。既定は off で、その
+  // とき runFindingCriticStage は null を返し、findings は同一配列のまま
+  // classifyFindings へ渡る（導入前と同一）。
+  //
+  // LLM を呼べない条件（dry-run / offline / provider 非対応 / API キー未設定）は
+  // 上の skipReason がすでに判定済みなので、その真偽をそのまま渡す。呼べない
+  // ことを「指摘なし」とは読まない — 段の側で全件 critic-timeout（retain +
+  // humanReview）へ倒れる。
+  const criticStage = deferFindingCritic
+    ? null
+    : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
+        findings,
+        diff: diff.diffText,
+        plan,
+        fileTypes,
+        diffFiles: diff.files,
+        originalAsk: prBody ?? '',
+        reviewConfig: effectiveConfig.review,
+        llm: {
+          apiKey: openAIConfig.apiKey,
+          model: openAIConfig.model,
+          endpoint: openAIConfig.endpoint,
+        },
+        llmAvailable: !skipReason,
+        language,
+        redactOptions,
+      });
+  if (criticStage) {
+    findings = criticStage.findings;
+    debug.execution = {
+      ...(debug.execution ?? {}),
+      findingCritic: criticStage.observation,
+    };
+  }
 
   const classified = (0,finding_factory/* classifyFindings */.ZY)(findings, { reviewMode: reviewMode ?? 'medium' });
   // #1857 / ADR-007 `observe` 条件 3: the overview-cap overflow is a ranking
@@ -63353,6 +63310,413 @@ function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
     scopeSelfReported: scopeResult.selfReported,
     scopeMismatch: scopeResult.mismatch,
   };
+}
+
+
+/***/ }),
+
+/***/ 148:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   A3: () => (/* binding */ buildPrDescriptionSection),
+/* harmony export */   EV: () => (/* binding */ buildSkillSummary),
+/* harmony export */   HB: () => (/* binding */ buildSystemMessage),
+/* harmony export */   WT: () => (/* binding */ buildReviewerRebuttalPromptSection),
+/* harmony export */   b: () => (/* binding */ buildFileSummary),
+/* harmony export */   gK: () => (/* binding */ buildADRContextSection),
+/* harmony export */   gW: () => (/* binding */ buildProjectRulesSection),
+/* harmony export */   mN: () => (/* binding */ buildHandoffSection),
+/* harmony export */   py: () => (/* binding */ buildFindingContractSection),
+/* harmony export */   qf: () => (/* binding */ buildWalkthroughSection),
+/* harmony export */   v7: () => (/* binding */ buildCriticSystemMessage),
+/* harmony export */   vO: () => (/* binding */ buildReviewObligationsSection),
+/* harmony export */   wT: () => (/* binding */ buildCriticPromptSection),
+/* harmony export */   zx: () => (/* binding */ buildRiskAssessmentSection)
+/* harmony export */ });
+/* unused harmony exports MAX_PR_BODY_CHARS, buildLanguageInstruction, buildSeverityInstruction, buildAdditionalSection */
+/* harmony import */ var _lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(5863);
+/* harmony import */ var _lib_skill_planner_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5433);
+// Review prompt sections (#1859 の前段) — レビュー用プロンプトの「節」を組み立てる純関数群。
+//
+// 背景:
+//   これらはすべて review-engine.mjs の module-private 関数だった。ADR-006 の
+//   Prompt Compiler は同じ節を別の順序・別の system/user 配分で描画するため、
+//   節の生成規則を review-engine 側と compiler 側の 2 箇所へ複製することになる。
+//   レビュー契約の文面が二重管理になるのは CLAUDE.md「Import the SSoT, never
+//   re-derive it」が禁じる形なので、生成規則をこのモジュールへ集約し、双方が
+//   import する。
+//
+// このモジュールの契約:
+//   - 出力は buildPrompt が生成していた文字列と **バイト単位で同一**である。
+//     tests/prompt-sections.test.mjs が golden で pin している。
+//   - 副作用を持たない。I/O もプロセス状態の参照もしない。
+//   - レビュー判断（severity の意味、GO/NO-GO、スキル選択）はここに置かない。
+//     ここが持つのは「決まった判断をどう文字列にするか」だけである。
+//
+// 切り出していないもの:
+//   sanitizeSkillName / resolveOpenAIConfig は prompt の節ではなく、それぞれ
+//   fallback コメント生成と provider 設定解決に属するため review-engine に残す。
+
+
+
+/** PR 本文をプロンプトへ載せるときの上限。超過分は truncate する。 */
+const MAX_PR_BODY_CHARS = 4000;
+
+function buildSystemMessage(language) {
+  return language === 'en'
+    ? 'You are River Review, an expert code review assistant. Respond in English. You excel at spotting risky changes and explaining them briefly.'
+    : 'You are River Review, an expert code review assistant. Respond in Japanese. You excel at spotting risky changes and explaining them briefly.';
+}
+
+function buildLanguageInstruction(language) {
+  return language === 'en'
+    ? '- Write the <message> in English.'
+    : '- <message>は日本語で記述すること。';
+}
+
+function buildSeverityInstruction(severity, language) {
+  const japanese = {
+    strict: '軽微な懸念も含めて網羅的に指摘する',
+    normal: '重要度と再現性のバランスを取り、主要なリスクを指摘する',
+    relaxed: '重大・致命的な問題に限定し、軽微な指摘は省く',
+  };
+  const english = {
+    strict: 'Capture even minor risks and style regressions',
+    normal: 'Balance breadth with impact; focus on notable risks',
+    relaxed: 'Limit findings to critical or high-impact issues; skip nits',
+  };
+  const map = language === 'en' ? english : japanese;
+  const label = language === 'en' ? 'Severity focus' : '厳格度';
+  return `- ${label} (${severity}): ${map[severity] ?? map.normal}`;
+}
+
+function buildAdditionalSection(instructions, language) {
+  if (!instructions?.length) return '';
+  const header = language === 'en' ? 'Additional instructions:' : '追加指示:';
+  // T64: additionalInstructions が単一行 "<file>:<line>: <message>" 形式と
+  // 競合し、LLM出力のパース失敗を招いていたため、適用範囲を明示する。
+  const formatNote =
+    language === 'en'
+      ? 'These additional instructions apply only to the content of each finding\'s <message>. Always keep the "<file>:<line>: <message>" line format above.'
+      : 'これらの追加指示は各 finding の <message> 内容にのみ適用してください。上記の「<file>:<line>: <message>」という行フォーマット自体は常に維持してください。';
+  const body = instructions.map((item) => `- ${item}`).join('\n');
+  return `\n${header}\n${formatNote}\n${body}\n`;
+}
+
+function buildSkillSummary(plan) {
+  if (!plan?.selected?.length) return 'No skills selected; provide general review notes.';
+  const summaries = plan.selected.map((skill) => (0,_lib_skill_planner_mjs__WEBPACK_IMPORTED_MODULE_1__/* .summarizeSkill */ .P)(skill));
+  const top = summaries.slice(0, 6);
+  const body = top
+    .map(
+      (s) =>
+        `- ${s.id}: ${s.name} [phase=${s.phase}, severity=${s.severity ?? 'unknown'}, modelHint=${s.modelHint}]`
+    )
+    .join('\n');
+  const truncated =
+    summaries.length > top.length ? `\n...and ${summaries.length - top.length} more skills.` : '';
+  return `${body}${truncated}`;
+}
+
+function buildFileSummary(files = []) {
+  if (!files.length) return 'No files changed';
+  return files.map((file) => `- ${file.path} (hunks: ${file.hunks.length || 1})`).join('\n');
+}
+
+function buildProjectRulesSection(rulesText) {
+  if (!rulesText) return '';
+  return `\n### Project-specific review rules\n\n以下は、このリポジトリ専用のレビューガイドラインです。必ず考慮してください。\n\n---\n${rulesText}\n---\n`;
+}
+
+function buildPrDescriptionSection(prBody) {
+  if (typeof prBody !== 'string' || !prBody.trim()) return '';
+  const body =
+    prBody.length > MAX_PR_BODY_CHARS
+      ? `${prBody.slice(0, MAX_PR_BODY_CHARS)}\n...[truncated]`
+      : prBody;
+  return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。\n\n---\n${body}\n---\n`;
+}
+
+function reviewObligationOneLine(value) {
+  return String(value ?? '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+}
+
+function reviewObligationList(values) {
+  return (values ?? []).map(reviewObligationOneLine).filter(Boolean).join(', ');
+}
+
+/**
+ * Render matched Review Obligations as questions that require evidence, never
+ * as pre-asserted Findings. Activation details stay out of the prompt: they are
+ * runtime provenance, not evidence that a violation exists.
+ */
+function buildReviewObligationsSection(obligations = [], language = 'ja') {
+  if (!obligations?.length) return '';
+
+  const instruction =
+    language === 'en'
+      ? 'The following items are review obligations, not findings. Verify the required evidence in the diff and context. Emit a finding only when evidence supports a real issue; never invent missing evidence, and respect false-positive guards.'
+      : '以下は「確認すべき観点」であり、問題の存在を示す Finding ではありません。差分と文脈から Required evidence を確認し、実際の問題を裏付ける証拠がある場合だけ Finding を出してください。証拠を推測・捏造せず、False-positive guards に該当する場合は指摘しないでください。';
+  const lines = [];
+
+  for (const obligation of obligations) {
+    lines.push(
+      `- [${reviewObligationOneLine(obligation.id)}] ${reviewObligationOneLine(obligation.title)}`
+    );
+    lines.push(`  - Question: ${reviewObligationOneLine(obligation.question)}`);
+    lines.push(
+      `  - Required evidence: ${reviewObligationList(obligation.requiredEvidence) || '(none)'}`
+    );
+    const hints = reviewObligationList(obligation.evidenceHints);
+    if (hints) lines.push(`  - Evidence hints: ${hints}`);
+    const guards = reviewObligationList(obligation.falsePositiveGuards);
+    if (guards) lines.push(`  - False-positive guards: ${guards}`);
+  }
+
+  return `\n### Review Obligations\n\n${instruction}\n\n${lines.join('\n')}\n`;
+}
+
+// Opt-in (review.walkthrough). Asks the model to prepend a per-file walkthrough
+// to its output so reviewers see what changed, the risk, and a reading order.
+function buildWalkthroughSection(enabled) {
+  if (!enabled) return '';
+  return `\n### File Walkthrough (output request)\n\nFindings の前に "## File Walkthrough" セクションを出力してください。変更ファイルごとに 1 行で:\n- 何がどう変わったか（要約）\n- 変更リスク（high/medium/low）\n- 読むべき順番（依存や影響の大きい順）\nを示してください。差分に無いファイルは含めないでください。\n`;
+}
+
+// Opt-in (review.agentHandoff). Asks the model to append provider-agnostic
+// fix instructions another AI agent can act on. Distinct from per-finding
+// `suggestion` (a human hint); this is an executable instruction set.
+function buildHandoffSection(enabled) {
+  if (!enabled) return '';
+  return `\n### Agent Handoff (output request)\n\nFindings の後に "## Agent Handoff" セクションを出力してください。blocking な指摘を別の AI エージェントが修正できるよう、特定のツール名・CLI 名を含めずに以下を記述してください:\n- 修正の目的\n- 対象ファイル\n- 制約（壊してはいけない挙動・後方互換）\n- 実装手順\n- テスト手順\n- 完了条件\n`;
+}
+
+function buildADRContextSection(relatedADRs) {
+  if (!relatedADRs?.length) return '';
+  const lines = ['\n### Related ADRs/Specs\n'];
+  for (const adr of relatedADRs.slice(0, 5)) {
+    lines.push(`- ${adr.title} (${adr.path}) — ${adr.matchReason}`);
+  }
+  lines.push('\nこれらの設計文書との整合性を考慮してレビューしてください。\n');
+  return lines.join('\n');
+}
+
+function sanitizePath(p) {
+  return String(p)
+    .replace(/[\n\r]/g, '')
+    .slice(0, 200);
+}
+
+function buildRiskAssessmentSection(riskAssessment) {
+  if (!riskAssessment) return '';
+  const { escalatedFiles, humanReviewFiles } = riskAssessment;
+  if (!escalatedFiles?.length && !humanReviewFiles?.length) return '';
+  const lines = ['\n### Risk Assessment\n'];
+  if (humanReviewFiles?.length) {
+    lines.push('以下のファイルは人間によるレビューが必須です:');
+    for (const f of humanReviewFiles) lines.push('- ' + sanitizePath(f) + ': require_human_review');
+  }
+  if (escalatedFiles?.length) {
+    lines.push('以下のファイルはエスカレーション対象です:');
+    for (const f of escalatedFiles) lines.push('- ' + sanitizePath(f) + ': escalate');
+  }
+  lines.push('これらのファイルには特に注意してレビューしてください。\n');
+  return lines.join('\n');
+}
+
+/**
+ * findings の出力契約そのもの。severity 語彙・証跡の必須項目・件数上限・
+ * ID 捏造の禁止が、この 1 箇所に集まっている。
+ *
+ * Prompt Compiler の renderer はこの文字列を **そのまま** 使い、置き場所
+ * （system へ寄せるか user に残すか）だけを変える。文面を profile 側で
+ * 書き換えることは ADR-006 の不変条件が禁じている。
+ *
+ * @param {object} params
+ * @param {string} params.language      'ja' | 'en'
+ * @param {string} params.severity      'strict' | 'normal' | 'relaxed'
+ * @param {object} params.depthConfig   getReviewDepthConfig() の戻り値
+ * @param {string[]=} params.additionalInstructions
+ */
+function buildFindingContractSection({
+  language,
+  severity,
+  depthConfig,
+  additionalInstructions,
+}) {
+  return `Review the unified git diff below and produce concise findings.
+${buildLanguageInstruction(language)}
+- Output each finding on its own line using the format "<file>:<line>: <message>".
+- In <message>, include short labels: "Finding:", "Evidence:", "Impact:", "Fix:", "Severity:", "Confidence:".
+- Every finding MUST carry "Severity:" and "Confidence:". It MUST also carry "Evidence:" (>=5 chars) and "Fix:" (>=10 chars) — findings without them are discarded during verification. "Finding:" and "Impact:" are recommended.
+- Use Severity: blocker|warning|nit and Confidence: high|medium|low.
+- Optionally add "Scope: in-diff" (the added lines introduce the problem) or "Scope: pre-existing" (the problem is in a changed file but outside the added lines). Verification re-derives scope from the diff and overrides this label when it can.
+- Optionally add "CriterionRefs: AC-4, TC-7" (acceptance-criterion or test-case identifiers) and/or "ArtifactRefs: plan.md#AC-4, todo.md#TASK-3" (artifact anchors) to link the finding back to the requirement it verifies. Separate values with a comma; a value must not contain spaces.
+- Use ONLY identifiers that appear verbatim in an artifact supplied above (plan / requirements / PR description). If no such artifact was supplied, or you are not certain of the exact identifier, omit the label entirely — never invent, guess, abbreviate, or renumber an ID.
+- Example finding line: src/app.ts:42: Finding: retry loop swallows errors Evidence: catch block at src/app.ts drops err Impact: failures are masked Fix: rethrow or log err with context Severity: warning Confidence: high
+- Focus on correctness, safety, and maintainability risks in the changed code.
+- Prefer commenting on changed lines; if a point depends on context not visible in the diff, set Confidence: low.
+- Before flagging a line, read the comments and docblocks adjacent to it in the diff, and never repeat a suggestion one of them already answers. Omitting a finding because a comment states the design intent is allowed ONLY for nits, style, and design-preference points whose concern that intent fully resolves.
+- Never omit a security, data-loss, or correctness risk because a comment calls it intentional: report it, cite that comment in <message>, and state the risk that remains. Lower the severity only when the stated intent genuinely mitigates part of the risk, and give that reason in <message>. A comment that contradicts the code it documents is itself a finding.
+- Limit to ${depthConfig.maxFindings} findings. If there are no issues worth mentioning, reply with "NO_ISSUES".
+- Keep messages brief (<=200 characters).
+- ${depthConfig.focusHint}
+${buildSeverityInstruction(severity, language)}
+${buildAdditionalSection(additionalInstructions, language)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Evidence-Grounded Adversarial Review — Critic / Reviewer turns (#1978)
+// ---------------------------------------------------------------------------
+//
+// この 2 節は finding-critic の状態機械へ供給する LLM ターンの文面である。
+// 語彙（verdict / askRelevance / action）は src/lib/finding-critic.mjs が
+// export する定数から組み立てる。文字列リテラルで書き写すと、語彙の変更が
+// プロンプト側へ伝播しないためである（CLAUDE.md「Import the SSoT」）。
+//
+// レビュー判断はここに無い。ここにあるのは「決まった契約をどう文字列にするか」
+// だけであり、verdict の意味づけも接地判定も finding-critic.mjs が持つ。
+
+function joinList(values) {
+  return values.map((v) => `\`${v}\``).join(' | ');
+}
+
+/**
+ * 出力契約の JSON テンプレへ埋めるプレースホルダ。
+ *
+ * 許容値を `A | B | C` の形でテンプレ内へ直接展開すると、テンプレそのものが
+ * 有効な JSON でなくなり、モデルがそれを写して壊れた JSON を返す誘因になる。
+ * テンプレは常に `JSON.parse` を通る形に保ち、許容値は直後の行で列挙する。
+ * 値の生成元は finding-critic.mjs の語彙定数のままで、ここでは並べ方だけを変える。
+ */
+const CHOICE_PLACEHOLDER = '<one of the values listed below>';
+
+function bulletList(items, empty) {
+  const list = (Array.isArray(items) ? items : []).map((v) => String(v).trim()).filter(Boolean);
+  if (!list.length) return empty;
+  return list.map((v) => `- ${v}`).join('\n');
+}
+
+function reasonLanguageInstruction(language) {
+  return language === 'en'
+    ? '- Write `reason` and `observation` in English.'
+    : '- `reason` と `observation` は日本語で記述すること。';
+}
+
+/** Critic / Reviewer ターンの system message。 */
+function buildCriticSystemMessage(role, language) {
+  const who =
+    role === 'reviewer'
+      ? 'the Reviewer who raised the finding, now answering the Critic'
+      : 'an adversarial Critic auditing another reviewer finding';
+  const lang = language === 'en' ? 'English' : 'Japanese';
+  return `You are ${who} in River Review's ${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .PROTOCOL_ID */ .rK} protocol. Reply with a single JSON object and nothing else. Prose inside the JSON is written in ${lang}.`;
+}
+
+/**
+ * Critic ターンの user prompt。
+ *
+ * @param {object} params
+ * @param {{ id?: string, severity?: string, message?: string }} params.finding
+ * @param {string} params.diff
+ * @param {string} [params.originalAsk]
+ * @param {string[]} [params.acceptanceCriteria]
+ * @param {string} [params.language] 'ja' | 'en'
+ */
+function buildCriticPromptSection({
+  finding,
+  diff,
+  originalAsk,
+  acceptanceCriteria,
+  language = 'ja',
+}) {
+  return `Audit the candidate finding below against the diff.
+
+### Original ask
+
+${String(originalAsk ?? '').trim() || '(not supplied)'}
+
+### Acceptance criteria
+
+${bulletList(acceptanceCriteria, '(none supplied)')}
+
+### Candidate finding
+
+- finding_id: ${String(finding?.id ?? '')}
+- severity: ${String(finding?.severity ?? '')}
+
+${String(finding?.message ?? '').trim()}
+
+### Diff
+
+${String(diff ?? '')}
+
+### Output contract
+
+Reply with ONE JSON object, no code fence, no commentary:
+
+{"finding_id": "<the finding_id above, verbatim>", "verdict": "${CHOICE_PLACEHOLDER}", "reason": "<why>", "ask_relevance": "${CHOICE_PLACEHOLDER}", "evidence": [{"artifact": "<path from the diff>", "line_start": 0, "line_end": 0, "observation": "<what is there>"}]}
+
+- \`verdict\` is one of: ${joinList(Object.values(_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .CRITIC_VERDICT */ .fi))}.
+- \`ask_relevance\` is one of: ${joinList(Object.values(_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl))}.
+- \`line_start\` / \`line_end\` are integers; replace the zeros with the real line numbers.
+
+- \`verdict\`: \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .CRITIC_VERDICT */ .fi.AGREE}\` when the finding holds, \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .CRITIC_VERDICT */ .fi.DISAGREE_EVIDENCE}\` when the diff itself refutes it, \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .CRITIC_VERDICT */ .fi.DISAGREE_CONCERN}\` when you doubt it but cannot cite a refutation.
+- \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .CRITIC_VERDICT */ .fi.DISAGREE_EVIDENCE}\` REQUIRES at least one \`evidence\` entry whose \`artifact\` is a file path that appears in the diff. Without it the verdict is downgraded to \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .CRITIC_VERDICT */ .fi.DISAGREE_CONCERN}\`.
+- \`ask_relevance\` judges the finding against the original ask only, not against the diff: \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.IN_ASK}\` when it bears on the ask, \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.OUT_OF_ASK}\` when it is a separate concern, \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.UNCERTAIN}\` when you cannot tell. An unreadable or missing value is read as \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.UNCERTAIN}\`.
+- Never invent a path, a line number, or a finding_id.
+${reasonLanguageInstruction(language)}`;
+}
+
+/**
+ * Reviewer 反論ターンの user prompt。Critic が DISAGREE_* を返した回のみ使う。
+ *
+ * @param {object} params
+ * @param {{ id?: string, message?: string }} params.finding
+ * @param {unknown} params.criticResponse Critic の生出力（文字列 or オブジェクト）
+ * @param {string} params.diff
+ * @param {string} [params.language] 'ja' | 'en'
+ */
+function buildReviewerRebuttalPromptSection({
+  finding,
+  criticResponse,
+  diff,
+  language = 'ja',
+}) {
+  const critic =
+    typeof criticResponse === 'string' ? criticResponse : JSON.stringify(criticResponse ?? null);
+  return `The Critic challenged your finding. Answer it.
+
+### Your finding
+
+- finding_id: ${String(finding?.id ?? '')}
+
+${String(finding?.message ?? '').trim()}
+
+### Critic response
+
+${critic}
+
+### Diff
+
+${String(diff ?? '')}
+
+### Output contract
+
+Reply with ONE JSON object, no code fence, no commentary:
+
+{"finding_id": "<the finding_id above, verbatim>", "action": "${CHOICE_PLACEHOLDER}", "response_to": "<the Critic verdict you are answering>", "evidence": [{"artifact": "<path from the diff>", "line_start": 0, "line_end": 0, "observation": "<what is there>"}]}
+
+- \`action\` is one of: ${joinList(Object.values(_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .REVIEWER_ACTION */ .zH))}.
+- \`line_start\` / \`line_end\` are integers; replace the zeros with the real line numbers.
+
+- \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .REVIEWER_ACTION */ .zH.KEEP}\` REQUIRES at least one \`evidence\` entry; a \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .REVIEWER_ACTION */ .zH.KEEP}\` without evidence is not a valid answer and escalates to a human.
+- \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .REVIEWER_ACTION */ .zH.WITHDRAW}\` when the Critic is right. \`${_lib_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .REVIEWER_ACTION */ .zH.REVISE}\` when the finding survives in a changed shape.
+- Cite only paths and lines that appear in the diff above.
+${reasonLanguageInstruction(language)}`;
 }
 
 
@@ -82579,8 +82943,10 @@ async function resolveSelectionSkillIds(
   });
 }
 
-// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 15 modules
-var review_engine = __nccwpck_require__(6641);
+// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 13 modules
+var review_engine = __nccwpck_require__(5134);
+// EXTERNAL MODULE: ./src/config/default.mjs
+var config_default = __nccwpck_require__(4807);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
 
 
@@ -82682,11 +83048,19 @@ function synthesizeTeamLeadReport({ findings = [], reviewerResults = [] }) {
 
 // EXTERNAL MODULE: ./src/lib/review-coverage.mjs
 var review_coverage = __nccwpck_require__(3054);
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
+var finding_critic_stage = __nccwpck_require__(2954);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
 
 
 
 
+
+
+
+// #2334 / #1978 Phase 3: Finding Critic の配線段。ADR-011 が前提として挙げた
+// 「findings のマージ後」がここであり、per-reviewer の generateReview 側は
+// deferFindingCritic で抑止して二重実行を避ける。既定 off。
 
 
 const REVIEWER_ROLES = {
@@ -83450,6 +83824,10 @@ async function runReviewerOrchestration({
     reviewMode,
     config,
     prBody,
+    // #2334: Critic はマージ後に 1 回だけ走らせる。per-reviewer × chunk で
+    // 走らせるとマージ前の finding を判定してしまい、ADR-011 が指定した
+    // 挿入点（merge 後 → verifier → runFindingCritic）とずれる。
+    deferFindingCritic: true,
   };
 
   // #1689: resolve observability settings once per run.
@@ -83564,7 +83942,39 @@ async function runReviewerOrchestration({
   const allFindings = deduped.map((f) => ({ ...f, id: `rr-${nextId++}` }));
 
   const allComments = succeeded.flatMap((r) => r.comments ?? []);
-  const classified = (0,finding_factory/* classifyFindings */.ZY)(allFindings, { reviewMode: reviewMode ?? 'medium' });
+
+  // --- #2334 / #1978: Finding Critic（マージ後の 1 箇所だけ）---
+  //
+  // 既定 off。off のとき runFindingCriticStage は null を返し、finalFindings は
+  // allFindings と同一参照のまま classifyFindings へ渡る（導入前と同一）。
+  // LLM 可否は generateReview 側の skipReason と同じ条件で判定できないため、
+  // dryRun のみをここで見て、残りは段の内側の fail-safe に委ねる。
+  // off のときは diff の再構築も config のマージも起こさないよう、先にモードを
+  // 見る。mergedConfig は review-engine が generateReview の冒頭でやっているのと
+  // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
+  const criticEnabled = (0,finding_critic_stage/* resolveFindingCriticMode */.xL)({ reviewConfig: config?.review, env }) !== 'off';
+  const mergedConfig = criticEnabled ? (0,loader/* mergeConfig */.R2)(config_default/* defaultConfig */.s, config ?? {}) : null;
+  const criticStage = !criticEnabled
+    ? null
+    : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
+        findings: allFindings,
+        diff: (0,diff_processor/* renderDiffText */.pQ)(diff),
+        plan,
+        fileTypes,
+        diffFiles: (0,diff_processor/* buildLlmDiffView */.wT)(diff).files,
+        originalAsk: prBody ?? '',
+        reviewConfig: mergedConfig.review,
+        llm: { apiKey, model },
+        llmAvailable: !dryRun,
+        env,
+        // #2339 review (Minor 4): review-engine 側の呼び出しと同じ language /
+        // redactOptions を渡す。片方だけ既定に落ちると、active 時に 2 経路で
+        // Critic の出力言語と trace の redaction 設定が食い違う。
+        language: mergedConfig.review.language,
+        redactOptions: (0,review_engine/* resolveRedactOptions */._Q)(mergedConfig),
+      });
+  const finalFindings = criticStage ? criticStage.findings : allFindings;
+  const classified = (0,finding_factory/* classifyFindings */.ZY)(finalFindings, { reviewMode: reviewMode ?? 'medium' });
 
   // Summarise per-role results (aggregate across chunks)
   const reviewerResults = roles.map((name) => {
@@ -83610,13 +84020,13 @@ async function runReviewerOrchestration({
   );
 
   const teamLeadReport = synthesizeTeamLeadReport({
-    findings: allFindings,
+    findings: finalFindings,
     reviewerResults,
   });
 
   return {
     comments: allComments,
-    findings: allFindings,
+    findings: finalFindings,
     classified,
     reviewerResults,
     reviewCoverage,
@@ -83635,6 +84045,9 @@ async function runReviewerOrchestration({
       succeededReviewers: succeeded.length,
       failedReviewers: failed.length,
       deduplicatedCount: rawFindings.length - allFindings.length,
+      // #2334: 既定 off では criticStage が null なので、この key 自体が
+      // debug に現れない（既存の key 集合と同一）。
+      ...(criticStage ? { findingCritic: criticStage.observation } : {}),
       // #1689: the timeout is also recorded in the machine-readable result, not
       // only on stderr, so a CI consumer can tell "no findings" apart from
       // "the role never returned". `timeoutMs` is null when disabled (default).

@@ -29,8 +29,8 @@ var artifact_resolver = __webpack_require__(4281);
 var diff_processor = __webpack_require__(861);
 // EXTERNAL MODULE: ./runners/core/review-runner.mjs + 4 modules
 var review_runner = __webpack_require__(2821);
-// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 15 modules
-var review_engine = __webpack_require__(6641);
+// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 13 modules
+var review_engine = __webpack_require__(5134);
 // EXTERNAL MODULE: ./src/lib/risk-map.mjs + 1 modules
 var risk_map = __webpack_require__(572);
 // EXTERNAL MODULE: ./src/lib/planner-utils.mjs
@@ -1961,6 +1961,17 @@ function normalizeFindingForArtifact(finding, index, phase) {
   }
   if (typeof finding.suggestion === 'string' && finding.suggestion.length > 0) {
     out.suggestion = finding.suggestion;
+  }
+  // #2334: same reachability rule as `scope` and `criterionRefs`
+  // (src/cli/render.mjs) — a schema field that stops at the finding object is
+  // an unreachable spec. `validation` is what the Finding Critic writes, so
+  // this allowlist is the only thing standing between the opt-in stage and
+  // `schemas/review-artifact.schema.json`'s `finding.validation`. Guarded on a
+  // present object rather than truthiness, so the key appears only on runs
+  // where the Critic actually ran (the default emits nothing here, exactly as
+  // before).
+  if (finding.validation && typeof finding.validation === 'object') {
+    out.validation = finding.validation;
   }
   return out;
 }

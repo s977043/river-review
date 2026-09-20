@@ -1,4 +1,6 @@
-import { generateReview } from './review-engine.mjs';
+import { generateReview, resolveRedactOptions } from './review-engine.mjs';
+import { mergeConfig } from '../config/loader.mjs';
+import { defaultConfig } from '../config/default.mjs';
 import {
   classifyFindings,
   normalizeScope,
@@ -8,6 +10,10 @@ import {
 import { buildLlmDiffView, renderDiffText } from './diff-processor.mjs';
 import { synthesizeTeamLeadReport } from './team-lead-synthesizer.mjs';
 import { deriveReviewCoverage } from './review-coverage.mjs';
+// #2334 / #1978 Phase 3: Finding Critic の配線段。ADR-011 が前提として挙げた
+// 「findings のマージ後」がここであり、per-reviewer の generateReview 側は
+// deferFindingCritic で抑止して二重実行を避ける。既定 off。
+import { resolveFindingCriticMode, runFindingCriticStage } from './finding-critic-stage.mjs';
 
 export const REVIEWER_ROLES = {
   'bug-hunter': {
@@ -770,6 +776,10 @@ export async function runReviewerOrchestration({
     reviewMode,
     config,
     prBody,
+    // #2334: Critic はマージ後に 1 回だけ走らせる。per-reviewer × chunk で
+    // 走らせるとマージ前の finding を判定してしまい、ADR-011 が指定した
+    // 挿入点（merge 後 → verifier → runFindingCritic）とずれる。
+    deferFindingCritic: true,
   };
 
   // #1689: resolve observability settings once per run.
@@ -884,7 +894,39 @@ export async function runReviewerOrchestration({
   const allFindings = deduped.map((f) => ({ ...f, id: `rr-${nextId++}` }));
 
   const allComments = succeeded.flatMap((r) => r.comments ?? []);
-  const classified = classifyFindings(allFindings, { reviewMode: reviewMode ?? 'medium' });
+
+  // --- #2334 / #1978: Finding Critic（マージ後の 1 箇所だけ）---
+  //
+  // 既定 off。off のとき runFindingCriticStage は null を返し、finalFindings は
+  // allFindings と同一参照のまま classifyFindings へ渡る（導入前と同一）。
+  // LLM 可否は generateReview 側の skipReason と同じ条件で判定できないため、
+  // dryRun のみをここで見て、残りは段の内側の fail-safe に委ねる。
+  // off のときは diff の再構築も config のマージも起こさないよう、先にモードを
+  // 見る。mergedConfig は review-engine が generateReview の冒頭でやっているのと
+  // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
+  const criticEnabled = resolveFindingCriticMode({ reviewConfig: config?.review, env }) !== 'off';
+  const mergedConfig = criticEnabled ? mergeConfig(defaultConfig, config ?? {}) : null;
+  const criticStage = !criticEnabled
+    ? null
+    : await runFindingCriticStage({
+        findings: allFindings,
+        diff: renderDiffText(diff),
+        plan,
+        fileTypes,
+        diffFiles: buildLlmDiffView(diff).files,
+        originalAsk: prBody ?? '',
+        reviewConfig: mergedConfig.review,
+        llm: { apiKey, model },
+        llmAvailable: !dryRun,
+        env,
+        // #2339 review (Minor 4): review-engine 側の呼び出しと同じ language /
+        // redactOptions を渡す。片方だけ既定に落ちると、active 時に 2 経路で
+        // Critic の出力言語と trace の redaction 設定が食い違う。
+        language: mergedConfig.review.language,
+        redactOptions: resolveRedactOptions(mergedConfig),
+      });
+  const finalFindings = criticStage ? criticStage.findings : allFindings;
+  const classified = classifyFindings(finalFindings, { reviewMode: reviewMode ?? 'medium' });
 
   // Summarise per-role results (aggregate across chunks)
   const reviewerResults = roles.map((name) => {
@@ -930,13 +972,13 @@ export async function runReviewerOrchestration({
   );
 
   const teamLeadReport = synthesizeTeamLeadReport({
-    findings: allFindings,
+    findings: finalFindings,
     reviewerResults,
   });
 
   return {
     comments: allComments,
-    findings: allFindings,
+    findings: finalFindings,
     classified,
     reviewerResults,
     reviewCoverage,
@@ -955,6 +997,9 @@ export async function runReviewerOrchestration({
       succeededReviewers: succeeded.length,
       failedReviewers: failed.length,
       deduplicatedCount: rawFindings.length - allFindings.length,
+      // #2334: 既定 off では criticStage が null なので、この key 自体が
+      // debug に現れない（既存の key 集合と同一）。
+      ...(criticStage ? { findingCritic: criticStage.observation } : {}),
       // #1689: the timeout is also recorded in the machine-readable result, not
       // only on stderr, so a CI consumer can tell "no findings" apart from
       // "the role never returned". `timeoutMs` is null when disabled (default).
