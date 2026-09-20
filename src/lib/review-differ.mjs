@@ -155,7 +155,24 @@ export function diffReviews(previousFindings, currentFindings, options = {}) {
  */
 function normalizeCoverageStatus(coverage) {
   const status = coverage?.status;
-  return REVIEW_COVERAGE_STATUSES.includes(status) ? status : 'unknown';
+  if (!REVIEW_COVERAGE_STATUSES.includes(status)) return 'unknown';
+  // Cross-check the label against the counts it summarizes.
+  // `deriveReviewCoverage` keeps the two consistent, but a run record written
+  // by an older build (or hand-edited) can carry `complete` next to counts
+  // that say otherwise. Believing the label alone would re-open exactly the
+  // over-claim this module is closing, so an inconsistent record is demoted
+  // rather than trusted.
+  if (status === 'complete') {
+    const { requiredUnits, completedRequiredUnits } = coverage;
+    if (
+      Number.isFinite(requiredUnits) &&
+      Number.isFinite(completedRequiredUnits) &&
+      completedRequiredUnits < requiredUnits
+    ) {
+      return completedRequiredUnits > 0 ? 'partial' : 'not_executed';
+    }
+  }
+  return status;
 }
 
 /**

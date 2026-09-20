@@ -363,3 +363,34 @@ describe('diffReviews absence qualification (#2325)', () => {
     assert.ok(partial.includes('Current run coverage is `partial`'));
   });
 });
+
+// #2325 follow-up: a `complete` label is cross-checked against the counts it
+// summarizes, so a stale or hand-edited run record cannot re-open the
+// over-claim by asserting completeness it did not achieve.
+describe('diffReviews coverage label cross-check (#2325)', () => {
+  it('demotes complete that disagrees with its own unit counts', () => {
+    const diff = diffReviews([makeFinding()], [], {
+      currentCoverage: { status: 'complete', requiredUnits: 5, completedRequiredUnits: 0 },
+    });
+    assert.equal(diff.summary.currentCoverageStatus, 'not_executed');
+    assert.equal(diff.summary.absenceMayBeUnexecuted, true);
+  });
+
+  it('demotes to partial when some required units completed', () => {
+    const diff = diffReviews([makeFinding()], [], {
+      currentCoverage: { status: 'complete', requiredUnits: 5, completedRequiredUnits: 2 },
+    });
+    assert.equal(diff.summary.currentCoverageStatus, 'partial');
+  });
+
+  it('keeps complete when the counts agree or are absent', () => {
+    for (const coverage of [
+      { status: 'complete', requiredUnits: 3, completedRequiredUnits: 3 },
+      { status: 'complete' },
+    ]) {
+      const diff = diffReviews([makeFinding()], [], { currentCoverage: coverage });
+      assert.equal(diff.summary.currentCoverageStatus, 'complete');
+      assert.equal(diff.summary.absenceMayBeUnexecuted, false);
+    }
+  });
+});
