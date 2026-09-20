@@ -974,6 +974,8 @@ function finalizeArtifact(
         strictBlock: gateContext.strictBlock === true,
         // Epic #1347 §11.8 (c2) (#1401): deterministic gate could not run → 5c.
         deterministicUnrunnable: gateContext.deterministicUnrunnable === true,
+        // #2337 (opt-in, default OFF): see coverageIncompleteForGate.
+        coverageIncomplete: gateContext.coverageIncomplete === true,
         config: gateContext.config ?? {},
       });
     } catch {
@@ -1651,6 +1653,9 @@ async function runReviewPlan({
   // Opt-in only (double-gated below); false on the replay path and whenever the
   // host has not enabled the executor, so the artifact contract is unchanged.
   let gateDeterministicUnrunnable = false;
+  // #2337: coverage is observed by the orchestration boundary; the exec path
+  // reduces it here through the SSoT predicate (false unless the host opted in).
+  let gateCoverageIncomplete = false;
 
   const configArtifacts =
     config && typeof config.artifacts === 'object' && config.artifacts ? config.artifacts : {};
@@ -1796,6 +1801,7 @@ async function runReviewPlan({
       });
       if (execGate.strictBlock === true) gateStrictBlock = true;
       gateDeterministicUnrunnable = execGate.deterministicUnrunnable === true;
+      gateCoverageIncomplete = (0,gate_decision/* coverageIncompleteForGate */.p4)(review?.reviewCoverage, process.env);
       executionTrace = {
         // #1868: replay 経路（runReviewExecReplay）と同じ順序で engine 側の
         // debug.execution 観測を引き継ぐ。2 経路で挙動を揃えないと、同じ設定でも
@@ -1886,6 +1892,7 @@ async function runReviewPlan({
       riskMapDigest,
       strictBlock: gateStrictBlock,
       deterministicUnrunnable: gateDeterministicUnrunnable,
+      coverageIncomplete: gateCoverageIncomplete,
       config,
     },
   });
