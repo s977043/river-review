@@ -52254,10 +52254,20 @@ function deriveGateDecision({
     // Routing the same fact through a loopSignal downgrade instead would make
     // the outcome depend on `decision`: CONVERGED→NO_SIGNAL lands a
     // human-review-recommended run on rule 8 (GO_WITH_OBSERVATION, exit 0) while
-    // an auto-approve run lands on rule 9 (NO_GO). Ahead of rule 7 and behind
-    // 6a/6b the reasonCode still names the most specific cause, and the cliffs
-    // (0-4) plus strictBlock (5b) keep precedence — a confirmed NO_GO or an
-    // ESCALATE is never traded for this weaker one.
+    // an auto-approve run lands on rule 9 (NO_GO). The cliffs (0-4) plus
+    // strictBlock (5b) keep precedence — a confirmed NO_GO or an ESCALATE is
+    // never traded for this weaker one — and 6a/6b keep it too, since "nothing
+    // ran" is a more specific absence than "not everything ran".
+    //
+    // Being AHEAD of rule 7 is a deliberate loss of diagnostic detail, not a
+    // free win: when a run has blocking findings AND incomplete coverage the
+    // reasonCode reads COVERAGE_INCOMPLETE, hiding the more actionable
+    // BLOCKING_FINDINGS. `decision` is NO_GO either way, so nothing about merge
+    // authority changes. The order is this way round because the coverage fact
+    // qualifies the finding list itself: a partial review's "these are the
+    // blocking findings" is not a complete statement, so naming the incomplete
+    // coverage first describes the run more honestly than naming a finding
+    // count derived from it. Pinned in tests/gate-incompleteness-optin.test.mjs.
     if (inputs.coverageIncomplete) return ['NO_GO', 'COVERAGE_INCOMPLETE'];
     // 7. Blocking findings → revise.
     if (loopSignal === 'REVISE_REQUIRED') return ['NO_GO', 'BLOCKING_FINDINGS'];

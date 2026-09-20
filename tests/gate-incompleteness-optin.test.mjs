@@ -170,6 +170,26 @@ describe('#2337 — an independent input fails safe uniformly, a signal downgrad
     assert.equal(skipped.reasonCode, 'SKIPPED_BY_POLICY');
   });
 
+  test('rule order: 6c precedes rule 7, and that costs BLOCKING_FINDINGS detail', () => {
+    // The block above pins everything ABOVE 6c. This pins the side BELOW it —
+    // without it, a mutant that moves 6c past rule 7 survives (measured), and
+    // the placement that makes the fail-safe uniform would be unprotected.
+    const both = deriveGateDecision(
+      cleanRun({ loopSignal: 'REVISE_REQUIRED', blockingFindings: 2, coverageIncomplete: true })
+    );
+    assert.equal(both.decision, 'NO_GO');
+    assert.equal(both.reasonCode, 'COVERAGE_INCOMPLETE');
+    // The detail that is deliberately given up: the same run without the
+    // coverage fact names the more actionable cause. Recorded so the trade-off
+    // is visible rather than discovered later.
+    const findingsOnly = deriveGateDecision(
+      cleanRun({ loopSignal: 'REVISE_REQUIRED', blockingFindings: 2 })
+    );
+    assert.equal(findingsOnly.reasonCode, 'BLOCKING_FINDINGS');
+    // What must NOT change: merge authority is NO_GO on both paths.
+    assert.equal(findingsOnly.decision, both.decision);
+  });
+
   test('a host replaying gate.inputs reproduces the decision and the hash', () => {
     const gate = deriveGateDecision(cleanRun({ coverageIncomplete: true }));
     assert.equal(gate.inputs.coverageIncomplete, true);

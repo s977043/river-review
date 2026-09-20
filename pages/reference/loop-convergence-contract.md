@@ -51,7 +51,7 @@ River Review は各アーティファクトおよび `runs diff --output json` �
 - 執行のリファレンス実装と conformance fixture（`tests/fixtures/gate-conformance/`）で caller 側の振る舞いを検証できる
 - **不完全性の持ち込みは opt-in（#2320 / #2337）**: 「レビューは走ったが対象を見ていない」という事実を gate へ渡すかは host が選ぶ。既定は off であり、既定の gate 出力は従来と 1 ビットも変わらない
   - `RIVER_GATE_STAGING_UNRUNNABLE=1`: 決定論ゲートの subject file が sandbox へ揃わなかった run を `deterministicUnrunnable` として扱い、`ESCALATE`（`DETERMINISTIC_UNRUNNABLE`）へ倒す。空の sandbox を渡された checker は自力で exit 0 するため、その exit code は変更に対する verdict ではない。`strictBlock` には決して寄せない
-  - `RIVER_GATE_COVERAGE=1`: `reviewCoverage.status` が `partial` / `not_executed` の run を `NO_GO`（`COVERAGE_INCOMPLETE`）へ倒す。これは `suggestedLoopSignal` の降格ではなく gate の**独立入力**である。降格経路にすると結果が `decision` に依存し、`auto-approve` は `NO_GO` になる一方で `human-review-recommended` は rule 8 の `GO_WITH_OBSERVATION`（exit 0）のまま残る。独立入力なら両者とも一様に止まる
+  - `RIVER_GATE_COVERAGE=1`: `reviewCoverage.status` が `partial` / `not_executed` の run を `NO_GO`（`COVERAGE_INCOMPLETE`）へ倒す。これは `suggestedLoopSignal` の降格ではなく gate の**独立入力**である。降格経路にすると結果が `decision` に依存し、`auto-approve` は `NO_GO` になる一方で `human-review-recommended` は rule 8 の `GO_WITH_OBSERVATION`（exit 0）のまま残る。独立入力なら両者とも一様に止まる。**実効があるのは現時点で `river run --gate` 経路のみであり、`review exec` 経路は engine が `reviewCoverage` を返すまで no-op となる**
   - coverage が**存在しない**ことは不完全とは読まない。「観測が無い」と「欠落を観測した」は別の事実であり、マージを止めてよいのは後者だけである
 
 `gate` は advisory です。判定の執行（`--gate` モード、strict_block ルーティング）は Epic #1347 S4 で導入されます。
