@@ -38,6 +38,8 @@
  *     (plan-only / no-changes runs must not claim CONVERGED_CLEAN: a
  *     score of [] findings is vacuous, and an agent suppressing diff
  *     resolution must not obtain a GO — escalation rules 0-4 still fire)
+ *  6c. review coverage incomplete            → NO_GO     COVERAGE_INCOMPLETE
+ *     (#2337, opt-in: the review ran but not over every required unit)
  *  7. loopSignal REVISE_REQUIRED             → NO_GO     BLOCKING_FINDINGS
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
@@ -83,6 +85,7 @@ export const GATE_REASON_CODES = /** @type {const} */ ([
   'DETERMINISTIC_UNRUNNABLE',
   'SKIPPED_BY_POLICY',
   'NOT_EXECUTED',
+  'COVERAGE_INCOMPLETE',
   'BLOCKING_FINDINGS',
   'MINOR_FINDINGS_OBSERVE',
   'UNDETERMINED',
@@ -152,7 +155,48 @@ export function computeGateInputsHash(inputs) {
   if (inputs?.strictBlock === true) canonical.strictBlock = true;
   // #1401 §11.5: same "only when true" scheme so pre-#1401 gates keep their hash.
   if (inputs?.deterministicUnrunnable === true) canonical.deterministicUnrunnable = true;
+  // #2337: same "only when true" scheme. The coverage gate is opt-in and OFF by
+  // default, so every gate recorded before it (and every gate derived with the
+  // opt-in off) keeps its exact recorded hash — a host replaying an old
+  // `gate.inputs` object, which has no `coverageIncomplete` key at all, still
+  // reproduces both the decision and the hash. A true value produces a distinct
+  // hash so the S3 "same inputs, different decision" regression check stays sound.
+  if (inputs?.coverageIncomplete === true) canonical.coverageIncomplete = true;
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
+}
+
+/**
+ * Coverage-gate opt-in predicate (#2337) — the SINGLE source of truth, so the
+ * two wiring sites (`deriveRunGate` and `review-plan`'s gateContext) cannot
+ * drift apart (the P2 #1434 lesson). Pure: the env object is an argument, never
+ * read from `process` here, so `deriveGateDecision` and everything it depends on
+ * stays replayable.
+ *
+ * Checked strictly (exactly the string `'1'`) so no near-miss value (`'true'`,
+ * `'0'`, `' 1'`, `''`) flips a merge-blocking gate on by accident.
+ *
+ * @param {Record<string, string | undefined> | undefined} env process.env-like object
+ * @returns {boolean}
+ */
+export function isCoverageGateEnabled(env) {
+  return env?.RIVER_GATE_COVERAGE === '1';
+}
+
+/**
+ * Reduce a Review Coverage object to the gate's `coverageIncomplete` input
+ * (#2337). Returns false unless the host opted in AND the coverage object
+ * actually reports an incomplete status — an ABSENT or malformed coverage
+ * object is NOT read as incomplete, because "no observation" and "observed a
+ * gap" are different facts and only the second one should block a merge.
+ *
+ * @param {{status?: string} | null | undefined} reviewCoverage
+ * @param {Record<string, string | undefined> | undefined} env
+ * @returns {boolean}
+ */
+export function coverageIncompleteForGate(reviewCoverage, env) {
+  if (!isCoverageGateEnabled(env)) return false;
+  const status = reviewCoverage?.status;
+  return status === 'partial' || status === 'not_executed';
 }
 
 /**
@@ -189,12 +233,26 @@ export function computeGateInputsHash(inputs) {
  *   label-skip or a dry-run. The escalation cliffs (rules 0-4) still win, as
  *   ESCALATE is more conservative than NO_GO.
  * @param {boolean} [opts.deterministicUnrunnable] - Epic #1347 §11.5 (#1401): a
- *   deterministic-gate command could not be run (spawn failure / timeout /
- *   signal kill / invalid entry). Forces ESCALATE (reasonCode
+ *   deterministic-gate command could not produce a verdict ABOUT ITS SUBJECT.
+ *   Two ways that happens: the command itself could not be run (spawn failure /
+ *   timeout / signal kill / invalid entry), or — since #2320 — it ran but its
+ *   subject files never reached the sandbox, so its exit code describes
+ *   something other than the change under review. Forces ESCALATE (reasonCode
  *   DETERMINISTIC_UNRUNNABLE) — a "cannot judge" state, not a violation. Placed
  *   AFTER strictBlock so a confirmed NO_GO is never softened to ESCALATE by an
- *   induced-unrunnable elsewhere. Nothing populates this until the executor
- *   wiring (§11.8 c2/d) lands; this is the gate contract only.
+ *   induced-unrunnable elsewhere. The staging half is opt-in and OFF by default
+ *   (`RIVER_GATE_STAGING_UNRUNNABLE=1`, read in the orchestrator, never here —
+ *   this function stays pure).
+ * @param {boolean} [opts.coverageIncomplete] - #2337: the review executed but
+ *   did not cover every REQUIRED review unit (`reviewCoverage.status` is
+ *   `partial` or `not_executed`). An INDEPENDENT gate input, deliberately not a
+ *   `loopSignal` downgrade: routing it through the signal makes the outcome
+ *   depend on `decision` (`auto-approve` lands on rule 9 NO_GO/UNDETERMINED but
+ *   `human-review-recommended` lands on rule 8 GO_WITH_OBSERVATION, exit 0), so
+ *   the signal route does not give a UNIFORM fail-safe. As its own rule (6c) it
+ *   precedes both and every verdict lands on NO_GO. Opt-in and OFF by default:
+ *   the caller sets it only when the host opted in, so the default gate output
+ *   is unchanged bit for bit.
  * @param {object} [opts.config] - effective config; gate.observation / gate.circuitBreaker read here
  * @returns {{ decision: GateDecisionValue, reasonCode: string, tier: GateTier,
  *   inputs: object, inputsHash: string, configSnapshot: object, observation?: object,
@@ -215,6 +273,7 @@ export function deriveGateDecision({
   riskMapDigest = null,
   strictBlock = false,
   deterministicUnrunnable = false,
+  coverageIncomplete = false,
   config = {},
 } = {}) {
   const configChanged =
@@ -238,6 +297,13 @@ export function deriveGateDecision({
     strictBlock: strictBlock === true,
     deterministicUnrunnable: deterministicUnrunnable === true,
   };
+  // #2337: echoed ONLY when true, matching the canonical-hash scheme above.
+  // The coverage gate is opt-in and OFF by default, and an always-present
+  // `coverageIncomplete: false` would change the emitted `gate.inputs` object
+  // for every existing consumer and every recorded conformance fixture. Absent
+  // means "the coverage gate did not fire", which is exactly what a pre-#2337
+  // artifact means by having no such key — so replay is total in both directions.
+  if (coverageIncomplete === true) inputs.coverageIncomplete = true;
 
   const expiresInHours =
     config?.gate?.observation?.expiresInHours ?? DEFAULT_OBSERVATION_EXPIRES_IN_HOURS;
@@ -286,6 +352,18 @@ export function deriveGateDecision({
     // plan-only / no-changes runs score [] findings as a vacuous perfect
     // verdict, and suppressed diff resolution must not earn a GO.
     if (!inputs.reviewExecuted) return ['NO_GO', 'NOT_EXECUTED'];
+    // 6c. Coverage incomplete (#2337, opt-in): the review executed, but not over
+    // every REQUIRED unit. "Some of the change was never looked at" is the same
+    // family of fact as 6b ("nothing was looked at"), so it sits next to it and
+    // BEFORE rules 7-11 — that placement is what makes the fail-safe UNIFORM.
+    // Routing the same fact through a loopSignal downgrade instead would make
+    // the outcome depend on `decision`: CONVERGED→NO_SIGNAL lands a
+    // human-review-recommended run on rule 8 (GO_WITH_OBSERVATION, exit 0) while
+    // an auto-approve run lands on rule 9 (NO_GO). Ahead of rule 7 and behind
+    // 6a/6b the reasonCode still names the most specific cause, and the cliffs
+    // (0-4) plus strictBlock (5b) keep precedence — a confirmed NO_GO or an
+    // ESCALATE is never traded for this weaker one.
+    if (inputs.coverageIncomplete) return ['NO_GO', 'COVERAGE_INCOMPLETE'];
     // 7. Blocking findings → revise.
     if (loopSignal === 'REVISE_REQUIRED') return ['NO_GO', 'BLOCKING_FINDINGS'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.

@@ -838,9 +838,20 @@ async function executeDeterministicCommand({ entry, sandboxDir, env, limits } = 
  * `pass` as proof that a check ran on the changed files it names, and a checker
  * handed an empty sandbox exits 0 on its own. Each `results[]` row therefore
  * carries the `staging` summary of the sandbox it ran in, so the layer that
- * publishes a verdict can see which subject files never arrived, and why. Gate
- * aggregation (`strictBlock` / `deterministicUnrunnable`) is deliberately
- * UNCHANGED: this is additive surfacing, not a new gate rule.
+ * publishes a verdict can see which subject files never arrived, and why.
+ *
+ * INCOMPLETE STAGING AS UNRUNNABLE (#2320, opt-in). PR #2318 made the evidence
+ * layer refuse to call a check `pass` when staging was incomplete, but left the
+ * gate reading only the checker's exit code — so the same event had two
+ * readings, and the gate took the more permissive one. With
+ * `RIVER_GATE_STAGING_UNRUNNABLE=1` an incomplete staging (`staging.complete
+ * === false`) also sets `deterministicUnrunnable`, which is what
+ * DETERMINISTIC_UNRUNNABLE already means: the command produced no verdict ABOUT
+ * ITS SUBJECT. It is NOT `strictBlock` — nothing was proven wrong, the check
+ * simply never saw what it was asked to judge. Default OFF: the gate is a
+ * published surface with existing consumers, some of whom reasonably want a
+ * gate that reflects checker exit codes only, so widening it is the host's
+ * choice. Absent the opt-in, aggregation is byte-for-byte what it was.
  *
  * DELETION IS DECLARED, NEVER INFERRED (#2311 review). A file the change
  * DELETED cannot be staged: it is not in `reviewSourceDir` any more, so the
@@ -1082,6 +1093,10 @@ async function runDeterministicGates({
     )
   );
 
+  // #2320: read once, strictly, before the loop — same "exactly '1'" discipline
+  // as the RIVER_DETERMINISTIC_EXEC gate, so no near-miss value flips it on.
+  const stagingUnrunnableEnabled = processEnv?.RIVER_GATE_STAGING_UNRUNNABLE === '1';
+
   let strictBlock = false;
   let deterministicUnrunnable = false;
   const results = [];
@@ -1117,6 +1132,12 @@ async function runDeterministicGates({
       const reasonCode = result?.reasonCode;
       if (status === 'fail') strictBlock = true;
       if (status === 'unrunnable') deterministicUnrunnable = true;
+      // #2320 (opt-in, default OFF): a check handed a partial sandbox exits 0
+      // on its own, so its exit code is not a verdict about the change. Fold
+      // that into `deterministicUnrunnable`, never into `strictBlock`.
+      if (stagingUnrunnableEnabled && staging.complete === false) {
+        deterministicUnrunnable = true;
+      }
       results.push({
         gateIndex,
         skillId: gate.skillId,

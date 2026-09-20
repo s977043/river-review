@@ -12,7 +12,7 @@
 
 import { scoreReview, resolveVerdict } from './scoring/engine.mjs';
 import { deriveLoopSignalFromArtifact } from './loop-signal.mjs';
-import { deriveGateDecision } from './gate-decision.mjs';
+import { coverageIncompleteForGate, deriveGateDecision } from './gate-decision.mjs';
 
 /**
  * True when reviewer-role orchestration ran but NOT ONE role produced a result
@@ -98,6 +98,10 @@ export function deriveRunGate(result) {
       // Epic #1347 §11.8 (c2) (#1401): deterministic gate could not run → rule 5c
       // ESCALATE. False unless the double-gated executor was opted in (§11.6).
       deterministicUnrunnable: result.deterministicUnrunnable === true,
+      // #2337 (opt-in, default OFF): an execution that did not cover every
+      // REQUIRED review unit is not a clean review. Reduced by the SSoT
+      // predicate so this site and review-plan's gateContext cannot drift.
+      coverageIncomplete: coverageIncompleteForGate(result.reviewCoverage, process.env),
       config: result.config ?? {},
     });
   } catch {
