@@ -176,7 +176,7 @@ Epic 本文の方針を追認します。そのうえで前提条件を 1 つ足
 
 fail-safe の適用範囲について 1 点補足します。issue #2320 は、staging 不完全という同一事象を evidence 層では `unrunnable` と読み、gate 層では checker の exit code どおりに読む、という二重解釈を扱っています。Epic Phase 4 の「coverage partial は必ず `inconclusive`」は同型の設計判断です。**#2320 の結論が先例になります。** 片方の層だけを fail-safe にすると同じ形の乖離が再発します。
 
-この乖離は PR #2327 直後に実際に再発しました。`runs diff` の `suggestedLoopSignal` が coverage を一切読まず、reviewer がタイムアウトした run でも `CONVERGED` を返していた件です（issue #2331）。PR #2331 は Layer 2（`deriveLoopSignalFromRunsDiff`）に coverage qualification を入れ、`partial` / `not_executed` の run では `CONVERGED` を `NO_SIGNAL` に降格させました。Layer 1（`deriveLoopSignalFromArtifact`）と、その値を読む `gate`（`CONVERGED` → `GO` / `CONVERGED_CLEAN`）は据え置きです。gate は公開済みのマージ可否判断であり、そこへ coverage を持ち込むかは #2320 と同じ「公開ゲートの契約を広げるか」の決定になるためです。
+この乖離は PR #2327 直後に実際に再発しました。`runs diff` の `suggestedLoopSignal` が coverage を一切読まず、reviewer がタイムアウトした run でも `CONVERGED` を返していた件です（issue #2331）。PR #2335 は Layer 2（`deriveLoopSignalFromRunsDiff`）に coverage qualification を入れ、`partial` / `not_executed` の run では `CONVERGED` を `NO_SIGNAL` に降格させました。Layer 1（`deriveLoopSignalFromArtifact`）と、その値を読む `gate`（`CONVERGED` → `GO` / `CONVERGED_CLEAN`）は据え置きです。gate は公開済みのマージ可否判断であり、そこへ coverage を持ち込むかは #2320 と同じ「公開ゲートの契約を広げるか」の決定になるためです。この据え置きにより、`gate` を持つ artifact では参照実装が gate を優先して `partial` の run でも停止しえます。その扱いは #2337 で決めます。
 
 ## 本 ADR が決めないこと
 

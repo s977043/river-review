@@ -23,7 +23,11 @@ Derivation order: ESCALATE_HUMAN → REVISE_REQUIRED → CONVERGED → NO_SIGNAL
 
 **Layer 2** — `river runs diff --output json` (3+ runs): adds `STOP_OSCILLATED` when `oscillated` is non-empty. Oscillation takes priority over all Layer 1 values.
 
-Layer 2 additionally qualifies the derived value by the latest run's `reviewCoverage` ([Review Coverage](https://github.com/s977043/river-review/blob/main/src/lib/review-coverage.mjs)) as of PR #2331: when that coverage is `partial` or `not_executed`, `CONVERGED` is demoted to `NO_SIGNAL`. A run whose review units timed out is indistinguishable from a clean one on the two inputs Layer 1 reads (zero blocking findings plus an auto-approve decision), so returning `CONVERGED` there stops the caller's loop on the strength of a review that never finished. Only `CONVERGED` is demoted; the other values already point away from stopping and accepting. A run record without `reviewCoverage` counts as `unknown` and is not demoted, because a missing observation is not an observation of incompleteness.
+Layer 2 additionally qualifies the derived value by the latest run's `reviewCoverage` ([Review Coverage](https://github.com/s977043/river-review/blob/main/src/lib/review-coverage.mjs)) as of PR #2335, on both the 2-run and the 3+-run `river runs diff` paths: when that coverage is `partial` or `not_executed`, `CONVERGED` is demoted to `NO_SIGNAL`. A run whose review units timed out is indistinguishable from a clean one on the two inputs Layer 1 reads (zero blocking findings plus an auto-approve decision), so returning `CONVERGED` there stops the caller's loop on the strength of a review that never finished. Only `CONVERGED` is demoted; the other values already point away from stopping and accepting. A run record without `reviewCoverage` counts as `unknown` and is not demoted, because a missing observation is not an observation of incompleteness.
+
+Because of that demotion, a `partial` or `not_executed` run no longer stops the loop through `CONVERGED`, and a loop over runs that keep coming back incomplete never terminates on its own. **Callers must therefore also carry a Layer 3 bound such as `STOP_MAX_ITERATIONS`.**
+
+What the demotion suppresses is limited to the Layer 2 signal. When an artifact carries a `gate` block, the reference agent below treats `gate` as authoritative over the signal, so a Layer 1 derived `GO` can still stop a `partial` run. Whether coverage should reach `gate` is tracked in issue #2337.
 
 **Layer 3** — Caller-synthesized (River Review deliberately does **not** emit these):
 
