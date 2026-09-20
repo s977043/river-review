@@ -9,6 +9,14 @@
 # Behavior: formats the consumer project's changed files with the project's
 # own prettier. Degrades gracefully (exit 0) when npm / git / prettier are
 # unavailable, so it never blocks the host project.
+#
+# CONVENIENCE ONLY -- NOT VERIFICATION EVIDENCE (#2275 PR-3C). This hook MUTATES
+# the working tree and swallows prettier's exit status (`|| true`), so "it ran"
+# says nothing about whether the change is correct. The after-change
+# fast-verification checkpoint is the separate, non-mutating adapter
+# (`.claude/hooks/after-change-observe.sh`), and the two are deliberately not
+# merged: a formatter that quietly succeeds must never be readable as a check
+# that passed.
 set -euo pipefail
 
 # Run in the consumer's project directory (set by Claude Code), falling back

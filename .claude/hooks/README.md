@@ -132,6 +132,74 @@ PreToolUse passes its input as a stdin JSON payload; the Bash command is
 feeds stderr back to Claude. The hook is defense-in-depth: the session-start
 account sanity check in CLAUDE.md remains in place.
 
+## after-change-observe.sh
+
+PostToolUse hook (matcher: `Write|Edit|MultiEdit`) that converts an edit into
+the neutral `after-change` event and runs the fast-verification checkpoint in
+observe mode (#2275 PR-3C, Epic #2054 Phase 3).
+
+**Off by default.** Without `RIVER_AFTER_CHANGE_OBSERVE=1` the script returns at
+its first line: it reads no payload, runs no command and writes no file. A host
+that has not opted in — including every host without the plugin — behaves
+exactly as it did before this hook existed.
+
+### Why it is separate from format.sh
+
+`format.sh` / `scripts/plugin-format-hook.sh` mutate the working tree and
+swallow prettier's exit status, so "the formatter ran" is not a statement about
+correctness. This hook is non-mutating and produces evidence. Merging the two
+would let a formatter that quietly succeeded read as a check that passed, which
+is the false green the checkpoint exists to prevent.
+
+### Host boundary
+
+`PostToolUse`, the tool name and the payload shape appear in the `.sh` and
+nowhere else. What it hands to Node is a neutral request (project root, subject
+revision, `git diff --name-status` text); `src/lib/after-change-adapter.mjs` and
+`src/lib/fast-verification.mjs` are pinned by tests to be free of that
+vocabulary.
+
+### Deletions are declared, never inferred
+
+The checkpoint stages the changed files into a clean sandbox and refuses to read
+a `pass` whose subject files did not all arrive (#2311). A deleted file cannot
+arrive, so the adapter reads the status letters of `git diff --name-status`
+(`D`, and the old path of an `R` rename) and declares them as `deletedFiles`.
+Without that declaration every change that removes a file would be permanently
+`unrunnable` — pinned by `MUTATION (a)` in `tests/after-change-adapter.test.mjs`.
+
+### No authority, no silent success
+
+The hook always exits 0 and never blocks the session; it holds no gate, decision
+or merge authority. Every missing prerequisite (node, git, jq, an unreadable
+revision) prints a `not run (...)` line instead of exiting quietly, and a run
+with no selected check or no trusted allowlist is recorded as `skipped` /
+`bypassed` with a reason rather than as a pass.
+
+### Environment
+
+| Variable                      | Meaning                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `RIVER_AFTER_CHANGE_OBSERVE`  | Opt-in. Exactly `1` enables the hook; anything else leaves it off.                                           |
+| `RIVER_TRUSTED_TREE`          | Host-trusted base checkout the deterministic allowlist is read from. Absent means every check is `bypassed`. |
+| `RIVER_AFTER_CHANGE_SELECTED` | Path to a JSON array of selected skills (`metadata.deterministicGate`). Absent means `skipped`.              |
+
+Evidence is written under `${TMPDIR}/river-review-after-change/`, never into the
+project tree.
+
+### Wiring
+
+The hook is not registered in `.claude/settings.json` by this PR. To run it in
+this repo, add a `PostToolUse` entry with matcher `Write|Edit|MultiEdit` and
+command `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/after-change-observe.sh"`, and
+set the opt-in variable.
+
+### Tests
+
+`tests/after-change-adapter.test.mjs` (module, production wiring, mutations) and
+`tests/after-change-observe-hook.test.mjs` (the script against a real git repo):
+`npm test -- tests/after-change-adapter.test.mjs tests/after-change-observe-hook.test.mjs`
+
 ## format.sh
 
 Post-edit hook that runs after Claude writes or edits files.
