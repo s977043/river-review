@@ -137,7 +137,14 @@ describe('runDeterministicGates — single matching command', () => {
     assert.equal(result.strictBlock, false);
     assert.equal(result.deterministicUnrunnable, false);
     assert.deepEqual(result.results, [
-      { gateIndex: 0, skillId: 's1', status: 'pass', reasonCode: 'DETERMINISTIC_PASS' },
+      {
+        gateIndex: 0,
+        skillId: 's1',
+        status: 'pass',
+        reasonCode: 'DETERMINISTIC_PASS',
+        // #2311: every row carries what actually reached its sandbox.
+        staging: { requested: 1, copied: 1, complete: true, skipped: [], deleted: [] },
+      },
     ]);
     assert.equal(calls.length, 1);
     // The executor received the matched entry and a scrubbed env (no secrets).
