@@ -19,6 +19,7 @@ import { ALLOWLIST_RELATIVE_PATH } from '../src/lib/deterministic-command-orches
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
 const SCRIPT = path.join(REPO_ROOT, '.claude', 'hooks', 'after-change-observe.sh');
+const NODE_ENTRY = path.join(REPO_ROOT, '.claude', 'hooks', 'after-change-observe.mjs');
 const TRUE_BIN = '/usr/bin/true';
 
 const tempDirs = [];
@@ -83,6 +84,17 @@ async function runHook({ cwd, env, stdin = '' }) {
   child.stdout.on('data', (d) => (stdout += d));
   child.stderr.on('data', (d) => (stderr += d));
   child.stdin.end(stdin);
+  const code = await new Promise((resolve) => child.on('close', resolve));
+  return { code, stdout, stderr };
+}
+
+async function runNode({ env, request }) {
+  const child = execFile('node', [NODE_ENTRY], { env }, () => {});
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (d) => (stdout += d));
+  child.stderr.on('data', (d) => (stderr += d));
+  child.stdin.end(JSON.stringify(request));
   const code = await new Promise((resolve) => child.on('close', resolve));
   return { code, stdout, stderr };
 }
@@ -236,6 +248,112 @@ describe('after-change-observe.sh (#2275 PR-3C)', () => {
     assert.equal(evidence.checks[0].status, 'pass');
   });
 
+  test('M1: a file literally NAMED "secret" is deleted -- real git, real hook', async () => {
+    const dir = await makeRepo();
+    // The name itself carries the quotes. Under `-z` git emits it raw, so
+    // decoding it produced `secret`: a path that never existed, which landed
+    // in `deletedFiles`, excused staging, and let the run report `pass` while
+    // the file that was really removed appeared nowhere (#2328 review).
+    const quotedName = '"secret"';
+    await fsp.writeFile(path.join(dir, quotedName), 'x\n', 'utf8');
+    await run(['git', 'add', '-A'], { cwd: dir });
+    await run(['git', 'commit', '-qm', 'add quoted'], { cwd: dir });
+    await run(['git', 'rm', '-q', quotedName], { cwd: dir });
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        RIVER_TRUSTED_TREE: makeTrustedTree(),
+        RIVER_AFTER_CHANGE_SELECTED: makeSelectedFile(),
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const evidence = JSON.parse(
+      fs.readFileSync(path.join(tmp, 'river-review-after-change', evidenceIn(tmp)[0]), 'utf8')
+    );
+    // The real name is present, verbatim...
+    assert.ok(
+      evidence.changedFiles.includes(quotedName),
+      `real name missing: ${JSON.stringify(evidence.changedFiles)}`
+    );
+    // ...and the unwrapped path that never existed is nowhere.
+    assert.ok(
+      !evidence.changedFiles.includes('secret'),
+      `fictional path injected: ${JSON.stringify(evidence.changedFiles)}`
+    );
+    assert.ok(!JSON.stringify(evidence.checks).includes('"deleted":["secret"]'));
+  });
+
+  test('M4: a .gitignore-d file is not part of the change', async () => {
+    const dir = await makeRepo();
+    await fsp.writeFile(path.join(dir, '.gitignore'), 'build/\n*.log\n', 'utf8');
+    await fsp.mkdir(path.join(dir, 'build'), { recursive: true });
+    await fsp.writeFile(path.join(dir, 'build', 'out.js'), '1\n', 'utf8');
+    await fsp.writeFile(path.join(dir, 'debug.log'), 'noise\n', 'utf8');
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        RIVER_TRUSTED_TREE: makeTrustedTree(),
+        RIVER_AFTER_CHANGE_SELECTED: makeSelectedFile(),
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const evidence = JSON.parse(
+      fs.readFileSync(path.join(tmp, 'river-review-after-change', evidenceIn(tmp)[0]), 'utf8')
+    );
+    // `--exclude-standard` is what keeps build output out of the changed set;
+    // merging untracked paths in opened this surface, so it is pinned here.
+    assert.ok(!evidence.changedFiles.some((f) => f.startsWith('build/')), 'ignored dir leaked');
+    assert.ok(!evidence.changedFiles.includes('debug.log'), 'ignored file leaked');
+    assert.ok(evidence.changedFiles.includes('.gitignore'), '.gitignore itself is a real new file');
+  });
+
+  test('M6: a line-wrapping base64 (GNU) does not corrupt the record stream', async () => {
+    // macOS base64 emits one line, GNU base64 wraps at 76 columns. A local run
+    // therefore cannot tell whether `tr -d` is load-bearing; a stub that wraps
+    // makes the Linux CI behaviour measurable on either platform.
+    const dir = await makeRepo();
+    for (let i = 0; i < 40; i += 1) {
+      await fsp.writeFile(path.join(dir, `new-${i}.txt`), 'x\n', 'utf8');
+    }
+    const binDir = makeTempDir('river-afterchange-b64-');
+    fs.writeFileSync(
+      path.join(binDir, 'base64'),
+      '#!/bin/bash\n/usr/bin/base64 "$@" | fold -w 76\n',
+      { mode: 0o755 }
+    );
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        PATH: `${binDir}:${process.env.PATH}`,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const evidence = JSON.parse(
+      fs.readFileSync(path.join(tmp, 'river-review-after-change', evidenceIn(tmp)[0]), 'utf8')
+    );
+    // 40 new files + the tracked edit + the deletion.
+    assert.equal(evidence.changedFiles.length, 42, JSON.stringify(evidence.changedFiles));
+    assert.ok(evidence.changedFiles.includes('new-39.txt'));
+  });
+
   test('M2: jq missing is reported, not a silent skip', async () => {
     const dir = await makeRepo();
     const tmp = makeTempDir('river-afterchange-tmp-');
@@ -361,6 +479,43 @@ describe('after-change-observe.sh (#2275 PR-3C)', () => {
     assert.equal(result.code, 0);
     assert.match(result.stdout, /not run \(not a git repository\)/);
     assert.deepEqual(evidenceIn(tmp), []);
+  });
+
+  test('M7: the evidence file is not written through a planted symlink', async () => {
+    // Driving the Node entry directly is the only way to choose `outFile`: the
+    // shell derives it from a timestamp and the pid, so an attacker who cannot
+    // predict the name is not a way to measure what the `wx` flag does.
+    const dir = await makeRepo();
+    const outDir = makeTempDir('river-afterchange-out-');
+    const victim = makeTempDir('river-afterchange-victim-');
+    const target = path.join(victim, 'stolen.json');
+    const outFile = path.join(outDir, 'ev.json');
+    fs.symlinkSync(target, outFile);
+    const result = await runNode({
+      env: { ...process.env, RIVER_AFTER_CHANGE_OBSERVE: '1' },
+      request: {
+        projectRoot: dir,
+        subjectRevision: 'c'.repeat(40),
+        nameStatusZBase64: Buffer.from(['M', 'kept.txt', ''].join(String.fromCharCode(0))).toString(
+          'base64'
+        ),
+        untrackedZBase64: '',
+        outFile,
+      },
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /evidence could not be written/);
+    assert.ok(!fs.existsSync(target), 'the write followed the symlink');
+  });
+
+  test('M8: the Node entry refuses to run when the opt-in is absent', async () => {
+    const dir = await makeRepo();
+    const result = await runNode({
+      env: { ...process.env, RIVER_AFTER_CHANGE_OBSERVE: '' },
+      request: { projectRoot: dir, subjectRevision: 'c'.repeat(40) },
+    });
+    assert.equal(result.code, 0);
+    assert.match(result.stdout, /not run \(not opted in\)/);
   });
 
   test('opted in with no selected check: skipped with a reason, never pass', async () => {

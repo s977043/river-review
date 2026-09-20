@@ -118,20 +118,20 @@ test('MUTATION (d): a path that is BOTH deleted and untracked is not declared de
   assert.deepEqual(parsed.deletedFiles, ['really-gone.txt']);
 });
 
-test('M1: a non-ASCII or TAB-bearing path survives verbatim', () => {
-  // With `-z` git emits raw bytes; the TAB-split parser this replaces handed
-  // git's `core.quotePath` spelling (`"\346\227\245..."`) straight through,
-  // which made a modified file unstageable and — worse — let a DELETED one
-  // excuse a path that was never really named.
-  const parsed = parseChangedFileStatus(z('M', '日本語.txt', 'D', 'tab\there.txt'));
-  assert.deepEqual(parsed.changedFiles, ['tab\there.txt', '日本語.txt']);
-  assert.deepEqual(parsed.deletedFiles, ['tab\there.txt']);
-  // A quoted spelling that still reaches the parser is decoded by the repo's
-  // one decoder rather than passed through.
-  const quoted = parseChangedFileStatus(
-    z('M', '"\\346\\227\\245\\346\\234\\254\\350\\252\\236.txt"')
+test('M1: a `-z` path is passed through byte-for-byte, never decoded', () => {
+  // Under `-z` git quotes NOTHING, so every byte between the NULs is the real
+  // name. Decoding here is not defence, it is corruption: `unquoteGitPath`
+  // calls a path quoted when it merely starts and ends with `"`, so a file
+  // genuinely named `"secret"` became `secret` — a path that never existed —
+  // and, on a deletion, excused a staging that never happened (#2328 review).
+  const parsed = parseChangedFileStatus(
+    z('M', '日本語.txt', 'D', 'tab\there.txt', 'D', '"secret"')
   );
-  assert.deepEqual(quoted.changedFiles, ['日本語.txt']);
+  assert.deepEqual(parsed.changedFiles, ['"secret"', 'tab\there.txt', '日本語.txt']);
+  assert.deepEqual(parsed.deletedFiles, ['"secret"', 'tab\there.txt']);
+  // The octal spelling is a NAME under `-z`, not an encoding to unwrap.
+  const octal = String.raw`"\346\227\245.txt"`;
+  assert.deepEqual(parseChangedFileStatus(z('M', octal)).changedFiles, [octal]);
 });
 
 test('parseChangedFileStatus ignores records it cannot read rather than guessing', () => {
@@ -217,14 +217,7 @@ test('MUTATION (b): no host vocabulary reaches the adapter module or the core', 
 test('the adapter imports no model, network or host module', async () => {
   const source = await fs.readFile(path.join(repoRoot, 'src/lib/after-change-adapter.mjs'), 'utf8');
   const imports = [...source.matchAll(/^import[^;]*from\s+'([^']+)';/gm)].map((m) => m[1]);
-  assert.deepEqual(imports.sort(), [
-    './fast-verification.mjs',
-    './git.mjs',
-    './trigger-resolver.mjs',
-  ]);
-  // `./git.mjs` is imported for `unquoteGitPath` (a pure decoder). The adapter
-  // still starts no process of its own: the one command path is the #1401
-  // executor reached through the checkpoint.
+  assert.deepEqual(imports.sort(), ['./fast-verification.mjs', './trigger-resolver.mjs']);
   assert.ok(!/execFile|spawn|execSync/.test(source), 'adapter must not launch a process');
 });
 

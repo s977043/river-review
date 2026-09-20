@@ -105,11 +105,14 @@ try {
 }
 
 if (typeof outFile === 'string' && outFile.length > 0) {
-  // The evidence lands under a world-writable temp root, so the directory and
-  // the file are both created defensively: private mode, and never through a
-  // symlink another local user planted first. `O_EXCL` makes the file creation
-  // refuse a symlink outright, and the directory is checked with `lstat`
-  // because `mkdir -p` happily walks into one.
+  // The evidence lands under a shared temp root, so it is created with private
+  // modes and refuses the two substitutions that matter here: `O_EXCL` makes
+  // the FILE creation fail outright on a symlink, and `lstat` rejects the
+  // final component of the directory when something replaced it with one.
+  // SCOPE: `lstat` sees only that last component — a symlinked PARENT is not
+  // detected, and is not claimed to be. `$TMPDIR` is per-user 0700 on the
+  // supported hosts, which is what makes the parent trustworthy; the checks
+  // here cover the part of the path this process creates.
   const outDir = path.dirname(outFile);
   try {
     fs.mkdirSync(outDir, { recursive: true, mode: 0o700 });

@@ -90,6 +90,10 @@ fi
 # base64 IN THE PIPELINE, not after: a bash variable cannot hold a NUL byte, so
 # assigning the raw `-z` stream to one silently concatenates every path into a
 # single unusable field. The blob never exists as a shell string.
+# `tr -d` is hygiene, not correctness: GNU base64 wraps at 76 columns while the
+# BSD one does not, and Node's decoder ignores the newlines either way
+# (measured). Removing it is an equivalent mutation -- keep the one-line form
+# so the value stays a single readable shell field.
 NAME_STATUS_B64="$( (git diff -z --name-status HEAD 2>/dev/null || true) | base64 | tr -d '\n')"
 UNTRACKED_B64="$( (git ls-files -z --others --exclude-standard 2>/dev/null || true) | base64 | tr -d '\n')"
 

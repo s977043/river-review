@@ -37,7 +37,6 @@
  */
 
 import { runFastVerification } from './fast-verification.mjs';
-import { unquoteGitPath } from './git.mjs';
 import { resolveTrigger } from './trigger-resolver.mjs';
 
 /** The neutral event this adapter converts an edit into. */
@@ -69,26 +68,28 @@ export function isAfterChangeObserveEnabled(env) {
 /**
  * Split a NUL-delimited git record stream into fields.
  *
- * `-z` is what makes the path unambiguous: without it git applies
- * `core.quotePath` and emits `"tab\there.txt"` /
- * `"\346\227\245\346\234\254..."` for any path with a TAB or a non-ASCII
- * byte. The old TAB-split parser handed those spellings through verbatim, and
- * the two halves failed in OPPOSITE directions: a modified non-ASCII file got a
- * path that could not be staged (`unrunnable`, so a repo with Japanese
- * filenames could never run the checkpoint), while a DELETED one put a
- * fictional path into `deletedFiles`, which excused it from staging and let the
- * run report `pass` — with the file that was really removed never accounted for
- * at all. `-z` removes the quoting, and `unquoteGitPath` (`./git.mjs`, the
- * repo's single decoder for a quoted git path, #2240/#2241) decodes anything
- * that still arrives quoted rather than a second private unescaper here.
+ * `-z` is what makes a path unambiguous, and it is the ONLY thing this function
+ * relies on: under `-z` git writes the raw bytes of every path and applies no
+ * quoting at all. Without it, `core.quotePath` turns any path carrying a TAB or
+ * a non-ASCII byte into `"tab\there.txt"` / `"\346\227\245..."`, and the two
+ * halves then fail in OPPOSITE directions — a modified non-ASCII file gets a
+ * spelling that cannot be staged (`unrunnable`), while a DELETED one puts a
+ * fictional path into `deletedFiles`, which excuses it from staging and lets
+ * the run report `pass` with the really-removed file never accounted for.
+ *
+ * NOTHING IS DECODED HERE, and that is deliberate. `unquoteGitPath`
+ * (`./git.mjs`) is the repo's one decoder for a quoted git path, but it decides
+ * a path is quoted from its first and last character alone — so on a `-z`
+ * stream, where git quotes nothing, a file genuinely NAMED `"secret"` is read
+ * as a quoted spelling and unwrapped to `secret`. That is a path which has
+ * never existed: it lands in `changedFiles`, and if the change deleted the
+ * file it lands in `deletedFiles` too, excusing a staging that never happened
+ * and manufacturing the same `pass` the quoting was going to cause. Importing
+ * the SSoT is right only where the SSoT's precondition holds, and `-z` removes
+ * that precondition (#2328 review).
  */
 const gitRecords = (text) =>
-  typeof text === 'string'
-    ? text
-        .split('\0')
-        .filter((field) => field.length > 0)
-        .map((field) => unquoteGitPath(field))
-    : [];
+  typeof text === 'string' ? text.split('\0').filter((field) => field.length > 0) : [];
 
 /**
  * Build the changed set, and the subset of it the change DELETED, from git's

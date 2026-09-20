@@ -154,8 +154,11 @@ is the false green the checkpoint exists to prevent.
 ### Host boundary
 
 `PostToolUse`, the tool name and the payload shape appear in the `.sh` and
-nowhere else. What it hands to Node is a neutral request (project root, subject
-revision, `git diff --name-status` text); `src/lib/after-change-adapter.mjs` and
+nowhere else. What it hands to Node is a neutral request: the project root, the
+subject revision, and two base64-wrapped NUL-delimited record streams (`git diff
+-z --name-status HEAD` and `git ls-files -z --others --exclude-standard`) —
+base64 because a shell variable cannot hold a NUL byte.
+`src/lib/after-change-adapter.mjs` and
 `src/lib/fast-verification.mjs` are pinned by tests to be free of that
 vocabulary.
 
@@ -171,8 +174,11 @@ Both reads use `-z`: without it git applies `core.quotePath` and emits
 `"tab\there.txt"` / octal-escaped non-ASCII, and the two halves then fail in
 opposite directions — a modified non-ASCII file becomes unstageable, while a
 deleted one puts a fictional path into `deletedFiles` and excuses it from
-staging. Anything that still arrives quoted is decoded by `unquoteGitPath`
-(`src/lib/git.mjs`), the repo's single decoder for a quoted git path.
+staging. Nothing is decoded afterwards: under `-z` git quotes nothing, so every byte
+between the NULs is the real name. Running `unquoteGitPath` over such a stream
+is corruption rather than defence — it calls a path quoted from its first and
+last character alone, so a file genuinely named `"secret"` became `secret`, a
+path that never existed (#2328 review).
 
 ### Deletions are declared, never inferred
 
