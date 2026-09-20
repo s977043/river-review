@@ -507,4 +507,105 @@ const repoCommitFixtures = Object.entries(repoCommitDiffs).map(([id, entry]) => 
   };
 });
 
-export const corpus = [...handwrittenCorpus, ...bandFixtures, ...repoCommitFixtures];
+// --- #2314 review: stale hunk-heading false-activation shapes -----------------
+//
+// git prints an enclosing declaration after the closing `@@` of a hunk header,
+// but it is a funcname heuristic: it walks backwards to the nearest line that
+// starts in column 0 with an identifier character. A block opened by anything
+// else (`@Decorator`, a top-level IIFE, a bracket, a quote) therefore inherits
+// the heading of a declaration that has ALREADY CLOSED above it. These rows are
+// real `git diff` output for both openers, in both bands the shape appears in.
+// They are labeled negative because no contract property changes in any of
+// them. An implementation that trusts the heading activates on all four.
+
+const staleHeadingNegatives = [
+  {
+    id: 'n07-stale-heading-decorator-block-default',
+    shape: 'minimal',
+    band: 'default',
+    source: 'generated-git',
+    command: 'git diff',
+    rationale:
+      "Real `git diff` output. `ttlSeconds` changes inside a `@Module({...})` decorator argument. git's funcname heuristic skips the `@`-prefixed opener and labels the hunk with the ALREADY CLOSED `export interface HealthResponse {` above it. No contract property changes, so any activation here is a false one (#2314 review).",
+    expectedViewpointIds: [],
+    diff: `diff --git a/src/app/app.module.ts b/src/app/app.module.ts
+index a147f95..f97f6e2 100644
+--- a/src/app/app.module.ts
++++ b/src/app/app.module.ts
+@@ -4,6 +4,6 @@ export interface HealthResponse {
+ 
+ @Module({
+   providers: [],
+-  ttlSeconds: 30,
++  ttlSeconds: 60,
+ })
+ export class AppModule {}
+`,
+  },
+  {
+    id: 'n08-stale-heading-iife-block-default',
+    shape: 'minimal',
+    band: 'default',
+    source: 'generated-git',
+    command: 'git diff',
+    rationale:
+      "Real `git diff` output. `retries` changes inside a top-level IIFE. git's funcname heuristic skips the `(`-prefixed opener and labels the hunk with the already closed `export interface BootResponse {` above it. Same stale-heading shape as n07 with a different non-identifier opener.",
+    expectedViewpointIds: [],
+    diff: `diff --git a/src/app/boot.ts b/src/app/boot.ts
+index 7fdbe0f..fcd923f 100644
+--- a/src/app/boot.ts
++++ b/src/app/boot.ts
+@@ -4,7 +4,7 @@ export interface BootResponse {
+ 
+ (function bootstrap() {
+   const cfg = {
+-    retries: 3,
++    retries: 5,
+   };
+   return cfg;
+ })();
+`,
+  },
+  {
+    id: 'n09-stale-heading-decorator-block-u0',
+    shape: 'minimal',
+    band: 'u0',
+    source: 'generated-git',
+    command: 'git diff --unified=0',
+    rationale:
+      'Same change and same obligation as n07, captured at --unified=0. The stale heading survives the band, which is why scoping heading trust to --unified=0 would not remove the false activation.',
+    expectedViewpointIds: [],
+    diff: `diff --git a/src/app/app.module.ts b/src/app/app.module.ts
+index a147f95..f97f6e2 100644
+--- a/src/app/app.module.ts
++++ b/src/app/app.module.ts
+@@ -7 +7 @@ export interface HealthResponse {
+-  ttlSeconds: 30,
++  ttlSeconds: 60,
+`,
+  },
+  {
+    id: 'n10-stale-heading-iife-block-u0',
+    shape: 'minimal',
+    band: 'u0',
+    source: 'generated-git',
+    command: 'git diff --unified=0',
+    rationale: 'Same change and same obligation as n08, captured at --unified=0.',
+    expectedViewpointIds: [],
+    diff: `diff --git a/src/app/boot.ts b/src/app/boot.ts
+index 7fdbe0f..fcd923f 100644
+--- a/src/app/boot.ts
++++ b/src/app/boot.ts
+@@ -7 +7 @@ export interface BootResponse {
+-    retries: 3,
++    retries: 5,
+`,
+  },
+];
+
+export const corpus = [
+  ...handwrittenCorpus,
+  ...bandFixtures,
+  ...staleHeadingNegatives,
+  ...repoCommitFixtures,
+];
