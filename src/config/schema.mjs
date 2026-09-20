@@ -57,8 +57,18 @@ export const reviewViewpointsConfigSchema = z.object({
   mode: z.enum(['off', 'observe', 'active']).optional(),
 });
 
+// #2334 / #1978 Phase 3: Finding Critic の runtime mode。`off` が既定で、
+// そのとき配線段は runner を import すらしない。`observe` を持たないのは、
+// Critic の生成物が findings 集合そのもの（retain / drop / validation）であり、
+// 「作るが使わない」という中間状態が定義できないためである。
+// env `RIVER_FINDING_CRITIC=1` はこの設定より優先される。
+export const findingCriticConfigSchema = z.object({
+  mode: z.enum(['off', 'active']).optional(),
+});
+
 export const reviewConfigSchema = z.object({
   promptCompiler: promptCompilerConfigSchema.optional(),
+  findingCritic: findingCriticConfigSchema.optional(),
   viewpoints: reviewViewpointsConfigSchema.optional(),
   language: z.enum(['ja', 'en']).optional(),
   severity: z.enum(['strict', 'normal', 'relaxed']).optional(),

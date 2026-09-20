@@ -41,6 +41,9 @@ import {
 // runPromptCompilerStage が即 null を返し、compiler 側は一切呼ばれない。
 import { runPromptCompilerStage } from '../prompt/compiler-stage.mjs';
 import { runReviewViewpointStage } from './review-viewpoint-stage.mjs';
+// #2334 / #1978 Phase 3: Finding Critic の配線段。既定 off では
+// runFindingCriticStage が即 null を返し、runner も状態機械も呼ばれない。
+import { runFindingCriticStage } from './finding-critic-stage.mjs';
 
 const ENV_DEFAULT_MODEL = process.env.RIVER_OPENAI_MODEL || process.env.OPENAI_MODEL || null;
 const MAX_PROMPT_CHARS = 12000;
@@ -428,6 +431,11 @@ export async function generateReview({
   prBody,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
+  // #2334: reviewer-orchestrator は findings をマージしたあとに Critic を
+  // 1 回だけ走らせる。その経路では per-reviewer の generateReview が同じ段を
+  // 二重に走らせないよう true を渡す。既定 false なので、単一レビューアの
+  // 既定経路（--reviewers 未指定）はここが Critic の唯一の呼び出し点になる。
+  deferFindingCritic = false,
 }) {
   const effectiveConfig = mergeConfig(defaultConfig, config ?? {});
   // LLM-facing view: strip non-reviewable build artifacts (dist bundles, source
@@ -467,7 +475,9 @@ export async function generateReview({
   // otherwise leave process memory (debug.promptPreview, returned
   // `prompt`, downstream artifact writes). The LLM call still uses the
   // original `promptInfo.prompt` because it must.
-  const safePrompt = redactText(promptInfo.prompt, {
+  // #2334: 同じ options を Finding Critic の段の trace 控えにも渡すため、
+  // インラインだった object を 1 個の const へ束ねている。値は変えていない。
+  const redactOptions = {
     allowlist: effectiveConfig.security?.redact?.allowlist ?? [],
     ...(effectiveConfig.security?.redact?.entropyThreshold != null
       ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
@@ -475,7 +485,8 @@ export async function generateReview({
     ...(effectiveConfig.security?.redact?.categories?.highEntropy === false
       ? { highEntropy: false }
       : {}),
-  }).text;
+  };
+  const safePrompt = redactText(promptInfo.prompt, redactOptions).text;
 
   let comments = [];
   const debug = {
@@ -719,7 +730,7 @@ export async function generateReview({
   }
 
   // Build structured findings from verified comments
-  const findings = comments.map((c, i) => {
+  let findings = comments.map((c, i) => {
     const parsed = parseFindingMessage(c.message);
     const severity = normalizeSeverity(parsed.severity);
     // Confidence is guaranteed present+valid here (validateFindingMessage gates
@@ -758,6 +769,43 @@ export async function generateReview({
     const bB = computeFindingBreakdown(b);
     return bB.composite - bA.composite;
   });
+
+  // --- #2334 / #1978: Finding Critic（配線はこの 1 箇所だけ）---
+  //
+  // 段の本体は src/lib/finding-critic-stage.mjs にある。既定は off で、その
+  // とき runFindingCriticStage は null を返し、findings は同一配列のまま
+  // classifyFindings へ渡る（導入前と同一）。
+  //
+  // LLM を呼べない条件（dry-run / offline / provider 非対応 / API キー未設定）は
+  // 上の skipReason がすでに判定済みなので、その真偽をそのまま渡す。呼べない
+  // ことを「指摘なし」とは読まない — 段の側で全件 critic-timeout（retain +
+  // humanReview）へ倒れる。
+  const criticStage = deferFindingCritic
+    ? null
+    : await runFindingCriticStage({
+        findings,
+        diff: diff.diffText,
+        plan,
+        fileTypes,
+        diffFiles: diff.files,
+        originalAsk: prBody ?? '',
+        reviewConfig: effectiveConfig.review,
+        llm: {
+          apiKey: openAIConfig.apiKey,
+          model: openAIConfig.model,
+          endpoint: openAIConfig.endpoint,
+        },
+        llmAvailable: !skipReason,
+        language,
+        redactOptions,
+      });
+  if (criticStage) {
+    findings = criticStage.findings;
+    debug.execution = {
+      ...(debug.execution ?? {}),
+      findingCritic: criticStage.observation,
+    };
+  }
 
   const classified = classifyFindings(findings, { reviewMode: reviewMode ?? 'medium' });
   // #1857 / ADR-007 `observe` 条件 3: the overview-cap overflow is a ranking
