@@ -24,6 +24,7 @@ import { runFindingCritic } from '../src/lib/finding-critic-runner.mjs';
 import { ASK_RELEVANCE, FAILSAFE_REASON, FINAL_STATUS } from '../src/lib/finding-critic.mjs';
 import { generateReview } from '../src/lib/review-engine.mjs';
 import { runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
+import { runReviewPlan } from '../src/lib/review-plan.mjs';
 import { compileReviewArtifactValidator } from './helpers/schema-validator.mjs';
 
 const DIFF_TEXT = [
@@ -521,5 +522,257 @@ describe('#2334 schema accepts findings with and without validation', () => {
       [...Object.values(ASK_RELEVANCE)].sort(),
       'schema askRelevance enum must equal Object.values(ASK_RELEVANCE)'
     );
+  });
+});
+
+describe('#2334 wiring pins (mutations that survived the first round)', () => {
+  const ORCH_DIFF = {
+    diffText: DIFF_TEXT,
+    files: [{ path: 'src/lib/fetch-url.mjs', addedLines: [1, 2], hunks: [] }],
+  };
+  const orchArgs = (extra = {}) => ({
+    diff: ORCH_DIFF,
+    plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+    phase: 'midstream',
+    dryRun: true,
+    reviewers: ['bug-hunter'],
+    quiet: true,
+    config: { review: { findingCritic: { mode: 'active' } } },
+    generateReviewImpl: async () => ({
+      comments: [],
+      findings: [{ ...FINDING, id: undefined }],
+      classified: { overview: [], overflow: [] },
+      debug: {},
+    }),
+    ...extra,
+  });
+
+  // M3: `findings: finalFindings` -> `findings: allFindings` in the returned
+  // object. The returned set must be the post-Critic one, or `classified`
+  // (computed from finalFindings) and `findings` describe different sets.
+  it('M3 — the returned findings are the post-Critic set', async () => {
+    const result = await runReviewerOrchestration(orchArgs());
+    assert.ok(result.findings.length > 0);
+    for (const f of result.findings) {
+      assert.ok(f.validation, 'returned findings must carry the Critic verdict');
+      assert.equal(f.validation.finalStatus, FINAL_STATUS.CRITIC_TIMEOUT);
+    }
+    assert.equal(result.classified.overview.length + result.classified.overflow.length >= 0, true);
+    // classified must have been computed from the same objects that were returned.
+    const returnedIds = new Set(result.findings.map((f) => f.id));
+    for (const f of [...result.classified.overview, ...result.classified.overflow]) {
+      assert.ok(returnedIds.has(f.id), 'classified must describe the returned set');
+      assert.ok(f.validation, 'classified findings must carry the Critic verdict too');
+    }
+  });
+
+  // M5: `synthesizeTeamLeadReport({ findings: finalFindings })` -> allFindings.
+  // top3Findings carries whole finding objects, so the Critic verdict is
+  // observable there and the mutation is not equivalent.
+  it('M5 — the team lead report is built from the post-Critic set', async () => {
+    const result = await runReviewerOrchestration(orchArgs());
+    const top3 = result.teamLeadReport.top3Findings;
+    assert.ok(top3.length > 0, 'the fixture must produce at least one top finding');
+    for (const f of top3) {
+      assert.ok(f.validation, 'teamLeadReport.top3Findings must carry the Critic verdict');
+      assert.equal(f.validation.finalStatus, FINAL_STATUS.CRITIC_TIMEOUT);
+    }
+  });
+
+  // M10: `llmAvailable: !skipReason` -> `true` in review-engine. The reason
+  // string below is produced ONLY by the stage's llmAvailable === false branch,
+  // so it is what distinguishes "we never called" from "we called and it
+  // failed" — both of which otherwise land on critic-timeout.
+  it('M10 — when the LLM cannot be called the Critic is never called at all', async () => {
+    delete process.env[FINDING_CRITIC_OPT_IN_ENV];
+    const savedKeys = {
+      RIVER_OPENAI_API_KEY: process.env.RIVER_OPENAI_API_KEY,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    };
+    delete process.env.RIVER_OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const result = await generateReview({
+        diff: ORCH_DIFF,
+        plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+        phase: 'midstream',
+        // `skipReason` is what encodes "the LLM cannot be called". dry-run is
+        // the form of it that still yields findings to attach a verdict to (a
+        // missing key short-circuits to an empty set, so it cannot distinguish
+        // the two branches). The mutation under test replaces
+        // `llmAvailable: !skipReason` with `true`, which this catches either way.
+        dryRun: true,
+        config: { review: { findingCritic: { mode: 'active' } } },
+      });
+      assert.ok(result.debug.llmSkipped, 'precondition: the LLM must be skipped');
+      assert.ok(result.findings.length > 0);
+      for (const f of result.findings) {
+        assert.equal(f.validation.finalStatus, FINAL_STATUS.CRITIC_TIMEOUT);
+        assert.ok(
+          f.validation.reasons.includes('llm call unavailable'),
+          `expected the never-called reason, got ${JSON.stringify(f.validation.reasons)}`
+        );
+      }
+    } finally {
+      for (const [k, v] of Object.entries(savedKeys)) if (v !== undefined) process.env[k] = v;
+    }
+  });
+});
+
+describe('#2334 validation reaches the review artifact (#1666 reachability rule)', () => {
+  // `normalizeFindingForArtifact` (src/lib/review-plan.mjs) is an allowlist
+  // copy: a key it does not name never reaches the artifact, and a schema field
+  // that stops at the finding object is an unreachable spec. This drives the
+  // real exec path and asserts the emitted artifact both carries `validation`
+  // and validates against schemas/review-artifact.schema.json.
+  const validate = compileReviewArtifactValidator();
+  const CRITIC_VERDICT_RECORD = {
+    protocol: 'evidence-grounded-adversarial-v1',
+    rounds: 0,
+    finalStatus: 'critic-timeout',
+    askRelevance: 'uncertain',
+    humanReview: true,
+    reasons: ['critic-timeout', 'llm call unavailable'],
+  };
+
+  const runExec = (finding) =>
+    runReviewPlan({
+      planOnly: true,
+      executeReview: true,
+      now: () => '2026-01-01T00:00:00.000Z',
+      loadConfigImpl: async () => ({}),
+      resolveAllArtifactsImpl: () => ({
+        diff: { exists: true, path: '/repo/diff.patch', source: 'cwd' },
+      }),
+      readFileImpl: async () => DIFF_TEXT,
+      buildExecutionPlanImpl: async () => ({
+        selected: [{ metadata: { id: 'rr-test-skill', name: 'Test', phase: 'midstream' } }],
+        skipped: [],
+      }),
+      loadRiskMapImpl: async () => null,
+      humanApprovalAdjudicator: null,
+      generateReviewImpl: async () => ({ findings: [finding], debug: {} }),
+    });
+
+  const baseFinding = {
+    id: 'rr-1',
+    ruleId: 'rr-test-skill',
+    title: 'allowlist bypassed on redirect',
+    message: FINDING.message,
+    severity: 'major',
+    file: 'src/lib/fetch-url.mjs',
+    lineStart: 2,
+    confidence: 'high',
+    status: 'open',
+  };
+
+  it('carries validation through to the artifact, and the artifact validates', async () => {
+    const artifact = await runExec({ ...baseFinding, validation: CRITIC_VERDICT_RECORD });
+    assert.equal(artifact.findings.length, 1);
+    assert.deepEqual(
+      artifact.findings[0].validation,
+      CRITIC_VERDICT_RECORD,
+      'normalizeFindingForArtifact must copy validation, or the schema field is unreachable'
+    );
+    assert.equal(validate(artifact), true, JSON.stringify(validate.errors));
+  });
+
+  it('emits no validation key at all when the Critic did not run', async () => {
+    const artifact = await runExec({ ...baseFinding });
+    assert.equal(artifact.findings.length, 1);
+    assert.equal(
+      Object.hasOwn(artifact.findings[0], 'validation'),
+      false,
+      'the default run must not grow a key'
+    );
+    assert.equal(validate(artifact), true, JSON.stringify(validate.errors));
+  });
+});
+
+describe('#2334 both call sites resolve language from the config (review Minor 4)', () => {
+  const cfg = { review: { language: 'en', findingCritic: { mode: 'active' } } };
+
+  it('review-engine passes the configured language to the stage', async () => {
+    delete process.env[FINDING_CRITIC_OPT_IN_ENV];
+    const result = await generateReview({
+      diff: {
+        diffText: DIFF_TEXT,
+        files: [{ path: 'src/lib/fetch-url.mjs', addedLines: [1, 2], hunks: [] }],
+      },
+      plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+      phase: 'midstream',
+      dryRun: true,
+      config: cfg,
+    });
+    assert.equal(result.debug.execution.findingCritic.language, 'en');
+  });
+
+  it('the orchestrator resolves the same language, not the stage default', async () => {
+    delete process.env[FINDING_CRITIC_OPT_IN_ENV];
+    const result = await runReviewerOrchestration({
+      diff: {
+        diffText: DIFF_TEXT,
+        files: [{ path: 'src/lib/fetch-url.mjs', addedLines: [1, 2], hunks: [] }],
+      },
+      plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+      phase: 'midstream',
+      dryRun: true,
+      reviewers: ['bug-hunter'],
+      quiet: true,
+      config: cfg,
+      generateReviewImpl: async () => ({
+        comments: [],
+        findings: [{ ...FINDING, id: undefined }],
+        classified: { overview: [], overflow: [] },
+        debug: {},
+      }),
+    });
+    assert.equal(
+      result.debug.findingCritic.language,
+      'en',
+      'the orchestrator must resolve language from the merged config, like review-engine'
+    );
+  });
+});
+
+describe('#2334 env kill switch (review Minor 1)', () => {
+  it('RIVER_FINDING_CRITIC=0 turns off a config that says active', () => {
+    assert.equal(
+      resolveFindingCriticMode({
+        reviewConfig: { findingCritic: { mode: 'active' } },
+        env: { [FINDING_CRITIC_OPT_IN_ENV]: '0' },
+      }),
+      FINDING_CRITIC_MODE.OFF
+    );
+  });
+
+  it('a value that is neither "0" nor "1" defers to the config, both ways', () => {
+    for (const value of ['true', 'false', 'yes', 'off', '']) {
+      assert.equal(
+        resolveFindingCriticMode({
+          reviewConfig: { findingCritic: { mode: 'active' } },
+          env: { [FINDING_CRITIC_OPT_IN_ENV]: value },
+        }),
+        FINDING_CRITIC_MODE.ACTIVE,
+        `${JSON.stringify(value)} must not disable an explicit config`
+      );
+      assert.equal(
+        resolveFindingCriticMode({ reviewConfig: {}, env: { [FINDING_CRITIC_OPT_IN_ENV]: value } }),
+        FINDING_CRITIC_MODE.OFF
+      );
+    }
+  });
+});
+
+describe('#2334 a runner that returns no result is not a clean pass (review Minor 2)', () => {
+  it('does not throw through the stage, and keeps the finding', async () => {
+    const out = await runFindingCriticStage({
+      ...baseStageArgs(),
+      env: { [FINDING_CRITIC_OPT_IN_ENV]: '1' },
+      runImpl: async () => ({}),
+    });
+    assert.equal(out.findings.length, 1);
+    assert.equal(out.findings[0].validation.finalStatus, FINAL_STATUS.CRITIC_TIMEOUT);
+    assert.equal(out.findings[0].validation.humanReview, true);
   });
 });

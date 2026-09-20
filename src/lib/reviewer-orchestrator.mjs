@@ -1,4 +1,6 @@
-import { generateReview } from './review-engine.mjs';
+import { generateReview, resolveRedactOptions } from './review-engine.mjs';
+import { mergeConfig } from '../config/loader.mjs';
+import { defaultConfig } from '../config/default.mjs';
 import {
   classifyFindings,
   normalizeScope,
@@ -899,22 +901,30 @@ export async function runReviewerOrchestration({
   // allFindings と同一参照のまま classifyFindings へ渡る（導入前と同一）。
   // LLM 可否は generateReview 側の skipReason と同じ条件で判定できないため、
   // dryRun のみをここで見て、残りは段の内側の fail-safe に委ねる。
-  // off のときは diff の再構築すら起こさないよう、先にモードを見る。
-  const criticStage =
-    resolveFindingCriticMode({ reviewConfig: config?.review, env }) === 'off'
-      ? null
-      : await runFindingCriticStage({
-          findings: allFindings,
-          diff: renderDiffText(diff),
-          plan,
-          fileTypes,
-          diffFiles: buildLlmDiffView(diff).files,
-          originalAsk: prBody ?? '',
-          reviewConfig: config?.review,
-          llm: { apiKey, model },
-          llmAvailable: !dryRun,
-          env,
-        });
+  // off のときは diff の再構築も config のマージも起こさないよう、先にモードを
+  // 見る。mergedConfig は review-engine が generateReview の冒頭でやっているのと
+  // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
+  const criticEnabled = resolveFindingCriticMode({ reviewConfig: config?.review, env }) !== 'off';
+  const mergedConfig = criticEnabled ? mergeConfig(defaultConfig, config ?? {}) : null;
+  const criticStage = !criticEnabled
+    ? null
+    : await runFindingCriticStage({
+        findings: allFindings,
+        diff: renderDiffText(diff),
+        plan,
+        fileTypes,
+        diffFiles: buildLlmDiffView(diff).files,
+        originalAsk: prBody ?? '',
+        reviewConfig: mergedConfig.review,
+        llm: { apiKey, model },
+        llmAvailable: !dryRun,
+        env,
+        // #2339 review (Minor 4): review-engine 側の呼び出しと同じ language /
+        // redactOptions を渡す。片方だけ既定に落ちると、active 時に 2 経路で
+        // Critic の出力言語と trace の redaction 設定が食い違う。
+        language: mergedConfig.review.language,
+        redactOptions: resolveRedactOptions(mergedConfig),
+      });
   const finalFindings = criticStage ? criticStage.findings : allFindings;
   const classified = classifyFindings(finalFindings, { reviewMode: reviewMode ?? 'medium' });
 

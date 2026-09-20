@@ -1955,6 +1955,17 @@ function normalizeFindingForArtifact(finding, index, phase) {
   if (typeof finding.suggestion === 'string' && finding.suggestion.length > 0) {
     out.suggestion = finding.suggestion;
   }
+  // #2334: same reachability rule as `scope` and `criterionRefs`
+  // (src/cli/render.mjs) — a schema field that stops at the finding object is
+  // an unreachable spec. `validation` is what the Finding Critic writes, so
+  // this allowlist is the only thing standing between the opt-in stage and
+  // `schemas/review-artifact.schema.json`'s `finding.validation`. Guarded on a
+  // present object rather than truthiness, so the key appears only on runs
+  // where the Critic actually ran (the default emits nothing here, exactly as
+  // before).
+  if (finding.validation && typeof finding.validation === 'object') {
+    out.validation = finding.validation;
+  }
   return out;
 }
 

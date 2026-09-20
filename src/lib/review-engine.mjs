@@ -56,6 +56,27 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
 /**
  * スキル名のサニタイズ: Markdown インジェクション対策
  */
+/**
+ * Redaction options for anything that leaves process memory (prompt previews,
+ * artifact writes, Critic traces). The SSoT for the shape: every caller that
+ * needs these options imports this rather than rebuilding the object, so a
+ * second call site cannot quietly redact under different settings
+ * (#2339 review, Minor 4).
+ *
+ * @param {object} effectiveConfig merged config
+ */
+export function resolveRedactOptions(effectiveConfig) {
+  return {
+    allowlist: effectiveConfig?.security?.redact?.allowlist ?? [],
+    ...(effectiveConfig?.security?.redact?.entropyThreshold != null
+      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
+      : {}),
+    ...(effectiveConfig?.security?.redact?.categories?.highEntropy === false
+      ? { highEntropy: false }
+      : {}),
+  };
+}
+
 function sanitizeSkillName(name) {
   if (!name) return '';
   return String(name).replace(/[\[\]`*_{}()#+\-.!|<>\n]/g, '');
@@ -476,16 +497,10 @@ export async function generateReview({
   // `prompt`, downstream artifact writes). The LLM call still uses the
   // original `promptInfo.prompt` because it must.
   // #2334: 同じ options を Finding Critic の段の trace 控えにも渡すため、
-  // インラインだった object を 1 個の const へ束ねている。値は変えていない。
-  const redactOptions = {
-    allowlist: effectiveConfig.security?.redact?.allowlist ?? [],
-    ...(effectiveConfig.security?.redact?.entropyThreshold != null
-      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
-      : {}),
-    ...(effectiveConfig.security?.redact?.categories?.highEntropy === false
-      ? { highEntropy: false }
-      : {}),
-  };
+  // インラインだった object を resolveRedactOptions へ括り出している。値は
+  // 変えていない。reviewer-orchestrator も同じ関数を import して使うので、
+  // 2 経路で redaction 設定が食い違うことがない。
+  const redactOptions = resolveRedactOptions(effectiveConfig);
   const safePrompt = redactText(promptInfo.prompt, redactOptions).text;
 
   let comments = [];

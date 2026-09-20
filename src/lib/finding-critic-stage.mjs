@@ -57,7 +57,15 @@ export const FINDING_CRITIC_MODE = Object.freeze({
  * @returns {'off'|'active'}
  */
 export function resolveFindingCriticMode({ reviewConfig, env = process.env } = {}) {
-  if (env?.[FINDING_CRITIC_OPT_IN_ENV] === '1') return FINDING_CRITIC_MODE.ACTIVE;
+  const raw = env?.[FINDING_CRITIC_OPT_IN_ENV];
+  // `1` enables and `0` disables, both as exact literals; `0` also overrides a
+  // config that says `active`, so the env var works as a kill switch in both
+  // directions. Without that branch an operator who exports `…=0` to turn the
+  // Critic off would silently keep the config's `active` (#2339 review, Minor 1).
+  // Every other value — `true`, `yes`, an empty string — is not an answer, so
+  // it defers to the config rather than deciding anything.
+  if (raw === '1') return FINDING_CRITIC_MODE.ACTIVE;
+  if (raw === '0') return FINDING_CRITIC_MODE.OFF;
   return reviewConfig?.findingCritic?.mode === FINDING_CRITIC_MODE.ACTIVE
     ? FINDING_CRITIC_MODE.ACTIVE
     : FINDING_CRITIC_MODE.OFF;
@@ -91,7 +99,7 @@ function criticUnreachedResult(detail) {
  * @param {Array<{ result: object }>} entries
  * @param {number} dropped
  */
-function buildObservation(entries, dropped) {
+function buildObservation(entries, dropped, language) {
   /** @type {Record<string, number>} */
   const byFinalStatus = {};
   let humanReview = 0;
@@ -102,6 +110,11 @@ function buildObservation(entries, dropped) {
   return {
     mode: FINDING_CRITIC_MODE.ACTIVE,
     protocol: PROTOCOL_ID,
+    // #2339 review (Minor 4): recorded so the two call sites' language
+    // resolution is observable in the artifact instead of only in the source.
+    // Without this the orchestrator could silently fall back to the default
+    // while review-engine used the configured one, and nothing would show it.
+    language,
     evaluated: entries.length,
     dropped,
     humanReview,
@@ -181,7 +194,20 @@ export async function runFindingCriticStage({
         language,
         redactOptions,
       });
-      entries.push({ finding, result: run.result });
+      // A runner that returns no `result` is not a clean pass either. The
+      // shipped runner always fills it (`result ??=`,
+      // finding-critic-runner.mjs), so this is unreachable today — but the
+      // destructuring used to sit outside the try, so an injected or future
+      // runner breaking that invariant threw a TypeError straight through
+      // generateReview and took the whole review down (#2339 review, Minor 2).
+      if (!run?.result) {
+        entries.push({
+          finding,
+          result: criticUnreachedResult('critic runner returned no result'),
+        });
+      } else {
+        entries.push({ finding, result: run.result });
+      }
     } catch (err) {
       // 段そのものが落ちても finding は消さない。retain したまま人へ回す。
       entries.push({
@@ -201,5 +227,5 @@ export async function runFindingCriticStage({
     kept.push({ ...finding, validation: buildValidatedFinding(finding, result).validation });
   }
 
-  return { findings: kept, observation: buildObservation(entries, dropped) };
+  return { findings: kept, observation: buildObservation(entries, dropped, language) };
 }

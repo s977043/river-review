@@ -50767,7 +50767,15 @@ const FINDING_CRITIC_MODE = Object.freeze({
  * @returns {'off'|'active'}
  */
 function resolveFindingCriticMode({ reviewConfig, env = process.env } = {}) {
-  if (env?.[FINDING_CRITIC_OPT_IN_ENV] === '1') return FINDING_CRITIC_MODE.ACTIVE;
+  const raw = env?.[FINDING_CRITIC_OPT_IN_ENV];
+  // `1` enables and `0` disables, both as exact literals; `0` also overrides a
+  // config that says `active`, so the env var works as a kill switch in both
+  // directions. Without that branch an operator who exports `…=0` to turn the
+  // Critic off would silently keep the config's `active` (#2339 review, Minor 1).
+  // Every other value — `true`, `yes`, an empty string — is not an answer, so
+  // it defers to the config rather than deciding anything.
+  if (raw === '1') return FINDING_CRITIC_MODE.ACTIVE;
+  if (raw === '0') return FINDING_CRITIC_MODE.OFF;
   return reviewConfig?.findingCritic?.mode === FINDING_CRITIC_MODE.ACTIVE
     ? FINDING_CRITIC_MODE.ACTIVE
     : FINDING_CRITIC_MODE.OFF;
@@ -50801,7 +50809,7 @@ function criticUnreachedResult(detail) {
  * @param {Array<{ result: object }>} entries
  * @param {number} dropped
  */
-function buildObservation(entries, dropped) {
+function buildObservation(entries, dropped, language) {
   /** @type {Record<string, number>} */
   const byFinalStatus = {};
   let humanReview = 0;
@@ -50812,6 +50820,11 @@ function buildObservation(entries, dropped) {
   return {
     mode: FINDING_CRITIC_MODE.ACTIVE,
     protocol: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .PROTOCOL_ID */ .rK,
+    // #2339 review (Minor 4): recorded so the two call sites' language
+    // resolution is observable in the artifact instead of only in the source.
+    // Without this the orchestrator could silently fall back to the default
+    // while review-engine used the configured one, and nothing would show it.
+    language,
     evaluated: entries.length,
     dropped,
     humanReview,
@@ -50891,7 +50904,20 @@ async function runFindingCriticStage({
         language,
         redactOptions,
       });
-      entries.push({ finding, result: run.result });
+      // A runner that returns no `result` is not a clean pass either. The
+      // shipped runner always fills it (`result ??=`,
+      // finding-critic-runner.mjs), so this is unreachable today — but the
+      // destructuring used to sit outside the try, so an injected or future
+      // runner breaking that invariant threw a TypeError straight through
+      // generateReview and took the whole review down (#2339 review, Minor 2).
+      if (!run?.result) {
+        entries.push({
+          finding,
+          result: criticUnreachedResult('critic runner returned no result'),
+        });
+      } else {
+        entries.push({ finding, result: run.result });
+      }
     } catch (err) {
       // 段そのものが落ちても finding は消さない。retain したまま人へ回す。
       entries.push({
@@ -50911,7 +50937,7 @@ async function runFindingCriticStage({
     kept.push({ ...finding, validation: (0,_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .buildValidatedFinding */ .us)(finding, result).validation });
   }
 
-  return { findings: kept, observation: buildObservation(entries, dropped) };
+  return { findings: kept, observation: buildObservation(entries, dropped, language) };
 }
 
 
@@ -57586,7 +57612,8 @@ function attachReviewFileScope(coverage, fileScope) {
 // EXPORTS
 __nccwpck_require__.d(__webpack_exports__, {
   f7: () => (/* binding */ MAX_PROMPT_PREVIEW_CHARS),
-  G1: () => (/* binding */ generateReview)
+  G1: () => (/* binding */ generateReview),
+  _Q: () => (/* binding */ resolveRedactOptions)
 });
 
 // UNUSED EXPORTS: buildPrompt, computeBackoffMs, isRetryableNetworkError, isRetryableStatus, parseLineComments
@@ -59011,6 +59038,27 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
 /**
  * スキル名のサニタイズ: Markdown インジェクション対策
  */
+/**
+ * Redaction options for anything that leaves process memory (prompt previews,
+ * artifact writes, Critic traces). The SSoT for the shape: every caller that
+ * needs these options imports this rather than rebuilding the object, so a
+ * second call site cannot quietly redact under different settings
+ * (#2339 review, Minor 4).
+ *
+ * @param {object} effectiveConfig merged config
+ */
+function resolveRedactOptions(effectiveConfig) {
+  return {
+    allowlist: effectiveConfig?.security?.redact?.allowlist ?? [],
+    ...(effectiveConfig?.security?.redact?.entropyThreshold != null
+      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
+      : {}),
+    ...(effectiveConfig?.security?.redact?.categories?.highEntropy === false
+      ? { highEntropy: false }
+      : {}),
+  };
+}
+
 function sanitizeSkillName(name) {
   if (!name) return '';
   return String(name).replace(/[\[\]`*_{}()#+\-.!|<>\n]/g, '');
@@ -59431,16 +59479,10 @@ async function generateReview({
   // `prompt`, downstream artifact writes). The LLM call still uses the
   // original `promptInfo.prompt` because it must.
   // #2334: 同じ options を Finding Critic の段の trace 控えにも渡すため、
-  // インラインだった object を 1 個の const へ束ねている。値は変えていない。
-  const redactOptions = {
-    allowlist: effectiveConfig.security?.redact?.allowlist ?? [],
-    ...(effectiveConfig.security?.redact?.entropyThreshold != null
-      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
-      : {}),
-    ...(effectiveConfig.security?.redact?.categories?.highEntropy === false
-      ? { highEntropy: false }
-      : {}),
-  };
+  // インラインだった object を resolveRedactOptions へ括り出している。値は
+  // 変えていない。reviewer-orchestrator も同じ関数を import して使うので、
+  // 2 経路で redaction 設定が食い違うことがない。
+  const redactOptions = resolveRedactOptions(effectiveConfig);
   const safePrompt = (0,secret_redactor/* redactText */.Rd)(promptInfo.prompt, redactOptions).text;
 
   let comments = [];
@@ -82730,6 +82772,8 @@ async function resolveSelectionSkillIds(
 
 // EXTERNAL MODULE: ./src/lib/review-engine.mjs + 13 modules
 var review_engine = __nccwpck_require__(5134);
+// EXTERNAL MODULE: ./src/config/default.mjs
+var config_default = __nccwpck_require__(4807);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
 
 
@@ -82834,6 +82878,8 @@ var review_coverage = __nccwpck_require__(3054);
 // EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
 var finding_critic_stage = __nccwpck_require__(2954);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
+
+
 
 
 
@@ -83730,22 +83776,30 @@ async function runReviewerOrchestration({
   // allFindings と同一参照のまま classifyFindings へ渡る（導入前と同一）。
   // LLM 可否は generateReview 側の skipReason と同じ条件で判定できないため、
   // dryRun のみをここで見て、残りは段の内側の fail-safe に委ねる。
-  // off のときは diff の再構築すら起こさないよう、先にモードを見る。
-  const criticStage =
-    (0,finding_critic_stage/* resolveFindingCriticMode */.xL)({ reviewConfig: config?.review, env }) === 'off'
-      ? null
-      : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
-          findings: allFindings,
-          diff: (0,diff_processor/* renderDiffText */.pQ)(diff),
-          plan,
-          fileTypes,
-          diffFiles: (0,diff_processor/* buildLlmDiffView */.wT)(diff).files,
-          originalAsk: prBody ?? '',
-          reviewConfig: config?.review,
-          llm: { apiKey, model },
-          llmAvailable: !dryRun,
-          env,
-        });
+  // off のときは diff の再構築も config のマージも起こさないよう、先にモードを
+  // 見る。mergedConfig は review-engine が generateReview の冒頭でやっているのと
+  // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
+  const criticEnabled = (0,finding_critic_stage/* resolveFindingCriticMode */.xL)({ reviewConfig: config?.review, env }) !== 'off';
+  const mergedConfig = criticEnabled ? (0,loader/* mergeConfig */.R2)(config_default/* defaultConfig */.s, config ?? {}) : null;
+  const criticStage = !criticEnabled
+    ? null
+    : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
+        findings: allFindings,
+        diff: (0,diff_processor/* renderDiffText */.pQ)(diff),
+        plan,
+        fileTypes,
+        diffFiles: (0,diff_processor/* buildLlmDiffView */.wT)(diff).files,
+        originalAsk: prBody ?? '',
+        reviewConfig: mergedConfig.review,
+        llm: { apiKey, model },
+        llmAvailable: !dryRun,
+        env,
+        // #2339 review (Minor 4): review-engine 側の呼び出しと同じ language /
+        // redactOptions を渡す。片方だけ既定に落ちると、active 時に 2 経路で
+        // Critic の出力言語と trace の redaction 設定が食い違う。
+        language: mergedConfig.review.language,
+        redactOptions: (0,review_engine/* resolveRedactOptions */._Q)(mergedConfig),
+      });
   const finalFindings = criticStage ? criticStage.findings : allFindings;
   const classified = (0,finding_factory/* classifyFindings */.ZY)(finalFindings, { reviewMode: reviewMode ?? 'medium' });
 
