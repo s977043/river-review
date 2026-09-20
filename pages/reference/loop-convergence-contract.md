@@ -23,6 +23,8 @@ River Review は各アーティファクトおよび `runs diff --output json` �
 
 **Layer 2** — `river runs diff --output json`（3 件以上の run）: `oscillated` が非空の場合に `STOP_OSCILLATED` を追加。振動検知は Layer 1 の全値より優先。
 
+Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](https://github.com/s977043/river-review/blob/main/src/lib/review-coverage.mjs)）による qualification が入ります（PR #2331）。最新 run の coverage が `partial` または `not_executed` のとき、`CONVERGED` は `NO_SIGNAL` に降格します。レビュー単位がタイムアウトした run は「blocking findings 0 件 + auto-approve」という点で完走した run と区別がつかないため、そのまま `CONVERGED` を返すと caller は未完了のレビューを根拠にループを止めてしまいます。降格対象は `CONVERGED` のみで、他の値はもともと停止・受理の方向を示しません。`reviewCoverage` を持たない run record は `unknown` 扱いとし、降格しません（観測の欠落は不完全の観測ではないため）。
+
 **Layer 3** — 呼び出し元が合成（River Review は意図的に出力**しない**）:
 
 | 値                     | 合成タイミング                                                      |

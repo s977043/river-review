@@ -23,6 +23,8 @@ Derivation order: ESCALATE_HUMAN → REVISE_REQUIRED → CONVERGED → NO_SIGNAL
 
 **Layer 2** — `river runs diff --output json` (3+ runs): adds `STOP_OSCILLATED` when `oscillated` is non-empty. Oscillation takes priority over all Layer 1 values.
 
+Layer 2 additionally qualifies the derived value by the latest run's `reviewCoverage` ([Review Coverage](https://github.com/s977043/river-review/blob/main/src/lib/review-coverage.mjs)) as of PR #2331: when that coverage is `partial` or `not_executed`, `CONVERGED` is demoted to `NO_SIGNAL`. A run whose review units timed out is indistinguishable from a clean one on the two inputs Layer 1 reads (zero blocking findings plus an auto-approve decision), so returning `CONVERGED` there stops the caller's loop on the strength of a review that never finished. Only `CONVERGED` is demoted; the other values already point away from stopping and accepting. A run record without `reviewCoverage` counts as `unknown` and is not demoted, because a missing observation is not an observation of incompleteness.
+
 **Layer 3** — Caller-synthesized (River Review deliberately does **not** emit these):
 
 | Value                  | When to synthesize                                             |

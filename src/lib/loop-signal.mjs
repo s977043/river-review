@@ -15,6 +15,8 @@
  * All functions are pure — no side effects, no AI calls, no file I/O.
  */
 
+import { normalizeCoverageStatus } from './review-coverage.mjs';
+
 /** @typedef {'NO_SIGNAL' | 'REVISE_REQUIRED' | 'CONVERGED' | 'ESCALATE_HUMAN'} ArtifactSignal */
 /** @typedef {ArtifactSignal | 'STOP_OSCILLATED'} RunsDiffSignal */
 
@@ -65,6 +67,10 @@ export function deriveLoopSignalFromArtifact(artifact) {
  * STOP_OSCILLATED regardless of finding severity — the fix loop is spinning
  * and human triage is needed.
  *
+ * The derived signal is then qualified by the latest run's `reviewCoverage`
+ * (see `qualifyLoopSignalForCoverage`): a run that did not complete its planned
+ * review work cannot report CONVERGED.
+ *
  * Otherwise, derives from the latest run's artifact:
  * 1. `latestArtifact` parameter (explicit, preferred for 2-run and multi-run CLI paths)
  * 2. `diff.runs[last].artifact` or `diff.runs[last]` (embedded in diff object)
@@ -82,7 +88,10 @@ export function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
 
   // Prefer the explicitly passed latest artifact.
   if (latestArtifact != null && typeof latestArtifact === 'object') {
-    return deriveLoopSignalFromArtifact(latestArtifact);
+    return qualifyLoopSignalForCoverage(
+      deriveLoopSignalFromArtifact(latestArtifact),
+      latestArtifact.reviewCoverage
+    );
   }
 
   // Fall back to runs[] embedded in diff (for callers that populate it).
@@ -91,9 +100,44 @@ export function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
     const latest = runs[runs.length - 1];
     const embedded = latest?.artifact ?? latest;
     if (embedded && typeof embedded === 'object') {
-      return deriveLoopSignalFromArtifact(embedded);
+      return qualifyLoopSignalForCoverage(
+        deriveLoopSignalFromArtifact(embedded),
+        embedded.reviewCoverage ?? latest?.reviewCoverage
+      );
     }
   }
 
   return 'NO_SIGNAL';
+}
+
+/**
+ * Demote `CONVERGED` to `NO_SIGNAL` when the run it was derived from did not
+ * finish the review work it planned (#2331).
+ *
+ * `deriveLoopSignalFromArtifact` reads only `decision` and finding severities,
+ * so a run whose reviewers timed out looks byte-identical to a clean run: zero
+ * blocking findings plus an auto-approve decision. `CONVERGED` is the signal a
+ * caller stops iterating on, so emitting it there stops the loop on the
+ * strength of a review that never ran to completion — the layer inconsistency
+ * `docs/adr/011-review-resolution-loop.md` names.
+ *
+ * Only `CONVERGED` is qualified. `ESCALATE_HUMAN`, `STOP_OSCILLATED`,
+ * `REVISE_REQUIRED` and `NO_SIGNAL` already point away from "stop and accept",
+ * so incomplete coverage cannot make any of them less safe.
+ *
+ * `unknown` coverage (no `reviewCoverage` on the record — the shape every run
+ * written before Review Coverage was wired still has) is deliberately NOT
+ * demoted: doing so would make `CONVERGED` unreachable for those callers and
+ * silently convert a working loop into one that never terminates. Absence of
+ * the observation is not an observation of incompleteness.
+ *
+ * @param {string} signal  A signal from `deriveLoopSignalFromArtifact`.
+ * @param {object|null|undefined} coverage  The run's `reviewCoverage` object.
+ * @returns {string} The qualified signal.
+ */
+export function qualifyLoopSignalForCoverage(signal, coverage) {
+  if (signal !== 'CONVERGED') return signal;
+  const status = normalizeCoverageStatus(coverage);
+  if (status === 'partial' || status === 'not_executed') return 'NO_SIGNAL';
+  return signal;
 }
