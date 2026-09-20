@@ -224,3 +224,74 @@ describe('escHtml', () => {
     assert.equal(escHtml(undefined), '');
   });
 });
+
+// #2325: the churn chips are what a reader takes in at a glance. A green
+// "resolved N" chip after a run where a required reviewer timed out overstates
+// the result, and a warning further down the page does not reach the person
+// reading the chip. These tests pin the chip itself, not only the prose.
+describe('formatLoopDashboardHtml coverage qualification (#2325)', () => {
+  const RESOLVED_ENTRY = {
+    fingerprint: 'fp-resolved',
+    changeStatus: 'resolved',
+    basis: 'absent_from_current_run',
+    current: null,
+    previous: { severity: 'minor', file: 'src/b.mjs', title: 'Fixed issue' },
+  };
+  const makeDiff = (coverageStatus, absenceMayBeUnexecuted) => ({
+    new: [],
+    resolved: [{ ...RESOLVED_ENTRY, coverageStatus }],
+    persisting: [],
+    oscillated: [],
+    summary: {
+      newCount: 0,
+      resolvedCount: 1,
+      persistingCount: 0,
+      scoreChangedCount: 0,
+      regressionScore: -1,
+      resolvedBasis: 'absent_from_current_run',
+      currentCoverageStatus: coverageStatus,
+      absenceMayBeUnexecuted,
+    },
+  });
+
+  it('keeps the chip green and unmarked when coverage is complete', () => {
+    const html = formatLoopDashboardHtml(makeDiff('complete', false));
+    assert.match(html, /background:#2e7d32"[^>]*>resolved 1<\/span>/);
+    assert.ok(!html.includes('resolved 1*'));
+    assert.ok(html.includes('coverage: complete'));
+    assert.ok(!html.includes('<p class="meta">* <strong>resolved</strong>'));
+  });
+
+  it('degrades the chip and names the coverage when the run was partial', () => {
+    const html = formatLoopDashboardHtml(makeDiff('partial', true));
+    // Colour: no longer the green "verified win" chip.
+    assert.doesNotMatch(html, /background:#2e7d32"[^>]*>resolved 1/);
+    assert.ok(html.includes('background:#ef6c00'));
+    // Text: the asterisk survives copy-paste and screen readers.
+    assert.ok(html.includes('resolved 1*</span>'));
+    // Words: a neighbouring chip names the coverage status.
+    assert.ok(html.includes('coverage: partial'));
+    // And the footnote explaining the asterisk sits with the chips.
+    const chipIndex = html.indexOf('resolved 1*');
+    const footnoteIndex = html.indexOf('<p class="meta">* <strong>resolved</strong>');
+    assert.ok(footnoteIndex > chipIndex);
+    assert.ok(footnoteIndex - chipIndex < 400);
+  });
+
+  it('degrades the chip when coverage is unknown', () => {
+    const html = formatLoopDashboardHtml(makeDiff('unknown', true));
+    assert.ok(html.includes('resolved 1*</span>'));
+    assert.ok(html.includes('coverage: unknown'));
+  });
+
+  it('leaves a diff with no resolved entries alone', () => {
+    const diff = makeDiff('partial', true);
+    diff.resolved = [];
+    diff.summary.resolvedCount = 0;
+    const html = formatLoopDashboardHtml(diff);
+    assert.match(html, /background:#2e7d32"[^>]*>resolved 0<\/span>/);
+    assert.ok(!html.includes('resolved 0*'));
+    // The coverage chip still reports the run, since it is true of the run.
+    assert.ok(html.includes('coverage: partial'));
+  });
+});
