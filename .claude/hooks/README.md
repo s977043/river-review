@@ -132,6 +132,110 @@ PreToolUse passes its input as a stdin JSON payload; the Bash command is
 feeds stderr back to Claude. The hook is defense-in-depth: the session-start
 account sanity check in CLAUDE.md remains in place.
 
+## after-change-observe.sh
+
+PostToolUse hook (matcher: `Write|Edit|MultiEdit`) that converts an edit into
+the neutral `after-change` event and runs the fast-verification checkpoint in
+observe mode (#2275 PR-3C, Epic #2054 Phase 3).
+
+**Off by default.** Without `RIVER_AFTER_CHANGE_OBSERVE=1` the script returns at
+its first line: it reads no payload, runs no command and writes no file. A host
+that has not opted in — including every host without the plugin — behaves
+exactly as it did before this hook existed.
+
+### Why it is separate from format.sh
+
+`format.sh` / `scripts/plugin-format-hook.sh` mutate the working tree and
+swallow prettier's exit status, so "the formatter ran" is not a statement about
+correctness. This hook is non-mutating and produces evidence. Merging the two
+would let a formatter that quietly succeeded read as a check that passed, which
+is the false green the checkpoint exists to prevent.
+
+### Host boundary
+
+`PostToolUse`, the tool name and the payload shape appear in the `.sh` and
+nowhere else. What it hands to Node is a neutral request: the project root, the
+subject revision, and two base64-wrapped NUL-delimited record streams (`git diff
+-z --name-status HEAD` and `git ls-files -z --others --exclude-standard`) —
+base64 because a shell variable cannot hold a NUL byte.
+`src/lib/after-change-adapter.mjs` and
+`src/lib/fast-verification.mjs` are pinned by tests to be free of that
+vocabulary.
+
+### The changed set has two halves
+
+`git diff --name-status HEAD` reports only paths git already tracks, so a newly
+created file — the most common result of a `Write` — is absent from it. The
+adapter therefore merges `git ls-files --others --exclude-standard` in as an
+addition. Without it, one tracked edit alongside any number of new files still
+produced a `pass`, over a change whose new files were never looked at.
+
+Both reads use `-z`: without it git applies `core.quotePath` and emits
+`"tab\there.txt"` / octal-escaped non-ASCII, and the two halves then fail in
+opposite directions — a modified non-ASCII file becomes unstageable, while a
+deleted one puts a fictional path into `deletedFiles` and excuses it from
+staging. Nothing is decoded afterwards: under `-z` git quotes nothing, so every byte
+between the NULs is the real name. Running `unquoteGitPath` over such a stream
+is corruption rather than defence — it calls a path quoted from its first and
+last character alone, so a file genuinely named `"secret"` became `secret`, a
+path that never existed (#2328 review).
+
+### Deletions are declared, never inferred
+
+The checkpoint stages the changed files into a clean sandbox and refuses to read
+a `pass` whose subject files did not all arrive (#2311). A deleted file cannot
+arrive, so the adapter reads the status letters (`D`, and the old path of an `R`
+rename) and declares them as `deletedFiles`. Without that declaration every
+change that removes a file would be permanently `unrunnable` — pinned by
+`MUTATION (a)` in `tests/after-change-adapter.test.mjs`.
+
+A declared deletion is then checked against disk: a path that is both `D` in the
+diff and present in `--others` (`git rm --cached`, delete-then-recreate) exists
+and must be staged like any other, so it is dropped from `deletedFiles`.
+
+### No authority, no silent success
+
+The hook always exits 0 and never blocks the session; it holds no gate, decision
+or merge authority. Every missing prerequisite — `jq`, `node`, `git`, a missing
+or unreadable payload, an unreadable subject revision (`git rev-parse --verify`,
+so an unborn HEAD is caught rather than recorded as the literal `HEAD`) — prints
+a `not run (...)` line instead of exiting quietly. Prerequisites are checked
+before the payload is read, so an absent tool cannot be mistaken for "not an
+edit". A run with no selected check or no trusted allowlist is recorded as
+`skipped` / `bypassed` with a reason rather than as a pass.
+
+The single deliberately silent exit is a tool that is not `Write` / `Edit` /
+`MultiEdit`: that is not an after-change event, so there is nothing to report.
+
+Evidence is written with mode `0600` into a `0700` directory, and the write is
+refused if the directory is a symlink (`O_EXCL` on the file, `lstat` on the
+directory) — the temp root is world-writable, so another local user could
+otherwise plant a link and read or redirect it.
+
+### Environment
+
+| Variable                      | Meaning                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `RIVER_AFTER_CHANGE_OBSERVE`  | Opt-in. Exactly `1` enables the hook; anything else leaves it off.                                           |
+| `RIVER_TRUSTED_TREE`          | Host-trusted base checkout the deterministic allowlist is read from. Absent means every check is `bypassed`. |
+| `RIVER_AFTER_CHANGE_SELECTED` | Path to a JSON array of selected skills (`metadata.deterministicGate`). Absent means `skipped`.              |
+
+Evidence is written under `${TMPDIR}/river-review-after-change/`, never into the
+project tree.
+
+### Wiring
+
+The hook is not registered in `.claude/settings.json` by this PR. To run it in
+this repo, add a `PostToolUse` entry with matcher `Write|Edit|MultiEdit` and
+command `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/after-change-observe.sh"`, and
+set the opt-in variable.
+
+### Tests
+
+`tests/after-change-adapter.test.mjs` (module, production wiring, mutations) and
+`tests/after-change-observe-hook.test.mjs` (the script against a real git repo):
+`npm test -- tests/after-change-adapter.test.mjs tests/after-change-observe-hook.test.mjs`
+
 ## format.sh
 
 Post-edit hook that runs after Claude writes or edits files.
