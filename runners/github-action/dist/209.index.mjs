@@ -944,7 +944,7 @@ function finalizeArtifact(
   // Derived after decision is set so the two are always consistent.
   // Never let derivation errors break the artifact contract.
   try {
-    artifact.suggestedLoopSignal = (0,loop_signal/* deriveLoopSignalFromArtifact */.K)(artifact);
+    artifact.suggestedLoopSignal = (0,loop_signal/* deriveLoopSignalFromArtifact */.KF)(artifact);
   } catch {
     // leave suggestedLoopSignal unset on derivation failure
   }

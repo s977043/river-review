@@ -1,6 +1,6 @@
 import { computeFindingBreakdown } from './scoring/breakdown.mjs';
 import { annotateFingerprints } from './finding-factory.mjs';
-import { REVIEW_COVERAGE_STATUSES } from './review-coverage.mjs';
+import { normalizeCoverageStatus } from './review-coverage.mjs';
 
 /**
  * @typedef {'new'|'resolved'|'persisting'|'score_changed'|'oscillated'} FindingStatus
@@ -142,37 +142,6 @@ export function diffReviews(previousFindings, currentFindings, options = {}) {
     scoreChanged: scoreChangedFindings,
     summary,
   };
-}
-
-/**
- * Map a `reviewCoverage` object onto the four-state coverage vocabulary.
- * Anything that is not one of the three `REVIEW_COVERAGE_STATUSES` values —
- * including a missing object — is `unknown`, so a caller that supplies nothing
- * is never reported as having complete coverage.
- *
- * @param {object|null|undefined} coverage
- * @returns {CoverageStatus}
- */
-function normalizeCoverageStatus(coverage) {
-  const status = coverage?.status;
-  if (!REVIEW_COVERAGE_STATUSES.includes(status)) return 'unknown';
-  // Cross-check the label against the counts it summarizes.
-  // `deriveReviewCoverage` keeps the two consistent, but a run record written
-  // by an older build (or hand-edited) can carry `complete` next to counts
-  // that say otherwise. Believing the label alone would re-open exactly the
-  // over-claim this module is closing, so an inconsistent record is demoted
-  // rather than trusted.
-  if (status === 'complete') {
-    const { requiredUnits, completedRequiredUnits } = coverage;
-    if (
-      Number.isFinite(requiredUnits) &&
-      Number.isFinite(completedRequiredUnits) &&
-      completedRequiredUnits < requiredUnits
-    ) {
-      return completedRequiredUnits > 0 ? 'partial' : 'not_executed';
-    }
-  }
-  return status;
 }
 
 /**

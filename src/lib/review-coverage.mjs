@@ -90,6 +90,43 @@ export function deriveReviewCoverage(units = []) {
   };
 }
 
+/**
+ * Map a `reviewCoverage` object onto the four-state coverage vocabulary
+ * (`complete` | `partial` | `not_executed` | `unknown`).
+ *
+ * Anything that is not one of the three `REVIEW_COVERAGE_STATUSES` values —
+ * including a missing object — is `unknown`, so a caller that supplies nothing
+ * is never reported as having complete coverage.
+ *
+ * Single derivation for every consumer that has to qualify a claim by how much
+ * of the review actually ran (`review-differ.mjs` resolution basis,
+ * `loop-signal.mjs` signal qualification).
+ *
+ * @param {object|null|undefined} coverage
+ * @returns {'complete'|'partial'|'not_executed'|'unknown'}
+ */
+export function normalizeCoverageStatus(coverage) {
+  const status = coverage?.status;
+  if (!REVIEW_COVERAGE_STATUSES.includes(status)) return 'unknown';
+  // Cross-check the label against the counts it summarizes.
+  // `deriveReviewCoverage` keeps the two consistent, but a run record written
+  // by an older build (or hand-edited) can carry `complete` next to counts
+  // that say otherwise. Believing the label alone would re-open exactly the
+  // over-claim this module is closing, so an inconsistent record is demoted
+  // rather than trusted.
+  if (status === 'complete') {
+    const { requiredUnits, completedRequiredUnits } = coverage;
+    if (
+      Number.isFinite(requiredUnits) &&
+      Number.isFinite(completedRequiredUnits) &&
+      completedRequiredUnits < requiredUnits
+    ) {
+      return completedRequiredUnits > 0 ? 'partial' : 'not_executed';
+    }
+  }
+  return status;
+}
+
 function uniquePaths(paths = []) {
   const seen = new Set();
   const result = [];
