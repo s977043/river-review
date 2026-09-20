@@ -1,5 +1,6 @@
 import { computeFindingBreakdown } from './scoring/breakdown.mjs';
 import { annotateFingerprints } from './finding-factory.mjs';
+import { REVIEW_COVERAGE_STATUSES } from './review-coverage.mjs';
 
 /**
  * @typedef {'new'|'resolved'|'persisting'|'score_changed'|'oscillated'} FindingStatus
@@ -10,16 +11,46 @@ import { annotateFingerprints } from './finding-factory.mjs';
  * @property {object} current  — null when resolved
  * @property {object} previous — null when new
  * @property {number|null} scoreDelta — composite score change (current - previous), null when new/resolved
+ * @property {'absent_from_current_run'} [basis] — present on `resolved` entries only
+ * @property {CoverageStatus} [coverageStatus] — current run's execution coverage, `unknown` when not supplied
+ *
+ * @typedef {'complete'|'partial'|'not_executed'|'unknown'} CoverageStatus
  */
+
+/**
+ * What `changeStatus: 'resolved'` actually measures (#2325, ADR-011 系統 4).
+ *
+ * `diffReviews` compares fingerprint sets. A finding lands in `resolved` when
+ * its fingerprint was in the previous run and is not in the current one — that
+ * and nothing more. Absence has causes other than a fix: a reviewer that never
+ * ran, timed out or failed; routing or diff-scope changes; a suppressed or
+ * overflowed finding (those carry no fingerprint at all,
+ * `finding-factory.mjs:591-600`); or the same problem worded differently, since
+ * `computeFingerprint` keys on the first 60 characters of the message
+ * (`finding-factory.mjs:673-700`).
+ *
+ * The status value is kept for compatibility — it reaches users through
+ * `river runs diff --output json` (`src/cli/commands/runs.mjs`), which has no
+ * versioned schema. Instead of renaming it, every resolved entry now carries
+ * the basis of the judgement and the current run's coverage status, so a
+ * consumer can discount absences produced by a partial run.
+ */
+export const RESOLVED_BASIS = 'absent_from_current_run';
 
 /**
  * Compare two ordered lists of findings (previous run vs current run).
  *
  * @param {object[]} previousFindings
  * @param {object[]} currentFindings
+ * @param {object} [options]
+ * @param {object|null} [options.currentCoverage] — `reviewCoverage` of the current
+ *   run (see `review-coverage.mjs`). Supplying it lets the caller tell
+ *   "absent because it was fixed" apart from "absent because the reviewer that
+ *   would have reported it never completed". Omitted → `unknown`.
  * @returns {{ new: ComparedFinding[], resolved: ComparedFinding[], persisting: ComparedFinding[], scoreChanged: ComparedFinding[], summary: object }}
  */
-export function diffReviews(previousFindings, currentFindings) {
+export function diffReviews(previousFindings, currentFindings, options = {}) {
+  const coverageStatus = normalizeCoverageStatus(options?.currentCoverage);
   const prev = annotateFingerprints(previousFindings ?? []);
   const curr = annotateFingerprints(currentFindings ?? []);
 
@@ -49,7 +80,10 @@ export function diffReviews(previousFindings, currentFindings) {
     if (!currByFp.has(fp)) {
       resolvedFindings.push({
         fingerprint: fp,
+        // The name is historical; `basis` states what was measured (#2325).
         changeStatus: 'resolved',
+        basis: RESOLVED_BASIS,
+        coverageStatus,
         current: null,
         previous: f,
         scoreDelta: null,
@@ -94,6 +128,11 @@ export function diffReviews(previousFindings, currentFindings) {
     persistingCount: persistingFindings.length,
     scoreChangedCount: scoreChangedFindings.length,
     regressionScore: newFindings.length - resolvedFindings.length,
+    resolvedBasis: RESOLVED_BASIS,
+    currentCoverageStatus: coverageStatus,
+    // True when the current run did not complete every required review unit:
+    // some of `resolvedCount` may be unexecuted reviewers rather than fixes.
+    absenceMayBeUnexecuted: coverageStatus !== 'complete',
   };
 
   return {
@@ -103,6 +142,37 @@ export function diffReviews(previousFindings, currentFindings) {
     scoreChanged: scoreChangedFindings,
     summary,
   };
+}
+
+/**
+ * Map a `reviewCoverage` object onto the four-state coverage vocabulary.
+ * Anything that is not one of the three `REVIEW_COVERAGE_STATUSES` values —
+ * including a missing object — is `unknown`, so a caller that supplies nothing
+ * is never reported as having complete coverage.
+ *
+ * @param {object|null|undefined} coverage
+ * @returns {CoverageStatus}
+ */
+function normalizeCoverageStatus(coverage) {
+  const status = coverage?.status;
+  if (!REVIEW_COVERAGE_STATUSES.includes(status)) return 'unknown';
+  // Cross-check the label against the counts it summarizes.
+  // `deriveReviewCoverage` keeps the two consistent, but a run record written
+  // by an older build (or hand-edited) can carry `complete` next to counts
+  // that say otherwise. Believing the label alone would re-open exactly the
+  // over-claim this module is closing, so an inconsistent record is demoted
+  // rather than trusted.
+  if (status === 'complete') {
+    const { requiredUnits, completedRequiredUnits } = coverage;
+    if (
+      Number.isFinite(requiredUnits) &&
+      Number.isFinite(completedRequiredUnits) &&
+      completedRequiredUnits < requiredUnits
+    ) {
+      return completedRequiredUnits > 0 ? 'partial' : 'not_executed';
+    }
+  }
+  return status;
 }
 
 /**
@@ -134,13 +204,18 @@ export function diffRunHistory(runRecords) {
   });
 
   // Last adjacent diff for the main diff fields
+  // The latest run is the "current" side of the adjacent diff, so its coverage
+  // is what qualifies the absences that diff reports (#2325).
+  const latestRecord = sorted.length ? sorted[sorted.length - 1] : null;
+  const diffOptions = { currentCoverage: latestRecord?.reviewCoverage ?? null };
   let lastDiff =
     sorted.length >= 2
       ? diffReviews(
           sorted[sorted.length - 2].findings ?? [],
-          sorted[sorted.length - 1].findings ?? []
+          sorted[sorted.length - 1].findings ?? [],
+          diffOptions
         )
-      : diffReviews([], sorted.length === 1 ? (sorted[0].findings ?? []) : []);
+      : diffReviews([], sorted.length === 1 ? (sorted[0].findings ?? []) : [], diffOptions);
 
   // Annotate each run exactly once: collect fingerprint set AND fingerprint→finding map
   // in a single pass — O(N+M) instead of two O(N×M) annotation loops.
@@ -239,6 +314,17 @@ export function formatRegressionSummary(diff) {
 
   if (resolved.length) {
     lines.push('### Resolved findings');
+    lines.push('');
+    lines.push(
+      '> Measured as: the fingerprint was present in the previous run and is absent from the current one. Absence is not by itself evidence of a fix.'
+    );
+    if (summary.absenceMayBeUnexecuted) {
+      lines.push('>');
+      lines.push(
+        `> Current run coverage is \`${summary.currentCoverageStatus ?? 'unknown'}\` — some of these may be review work that did not complete rather than problems that were fixed.`
+      );
+    }
+    lines.push('');
     for (const f of resolved) {
       const sev = f.previous.severity ?? 'unknown';
       const file = f.previous.file ?? '?';

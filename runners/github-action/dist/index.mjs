@@ -82048,7 +82048,10 @@ async function runRunsCommand(parsed, targetPath) {
         loadRunRecord(storeDir, parsed.runsId1),
         loadRunRecord(storeDir, parsed.runsId2),
       ]);
-      const diff = diffReviews(run1.findings ?? [], run2.findings ?? []);
+      const diff = diffReviews(run1.findings ?? [], run2.findings ?? [], {
+        // run2 is the current side: its coverage qualifies the absences (#2325).
+        currentCoverage: run2.reviewCoverage ?? null,
+      });
       const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.v)(diff, run2);
       if (parsed.output === 'json') {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
@@ -86565,11 +86568,12 @@ Dependencies: ${
         fs.readFile(parsed.baseline, 'utf8')
       );
       const baselineFindings = JSON.parse(baselineRaw);
-      const prevFindings = Array.isArray(baselineFindings)
-        ? baselineFindings
-        : (baselineFindings.findings ?? baselineFindings.issues ?? []);
-      const diff = diffReviews(prevFindings, result.findings ?? []);
-      const regSummary = formatRegressionSummary(diff);
+      const regSummary = formatBaselineRegression(
+        result,
+        baselineFindings,
+        diffReviews,
+        formatRegressionSummary
+      );
       // #1706: the summary is a Markdown block printed BEFORE the structured
       // output, so on stdout it corrupts every machine-readable format —
       // `--output html --baseline > report.html` put text ahead of the
@@ -86605,6 +86609,37 @@ Dependencies: ${
   }
 
   return 0;
+}
+
+/**
+ * Build the `--baseline` regression summary for one completed run.
+ *
+ * Split out of the inline block so the wiring this function performs is
+ * testable without executing a review: passing the current run's
+ * `reviewCoverage` into `diffReviews` is the whole point of #2325, and a
+ * mutation that drops it has to fail a test. The differ functions are injected
+ * because `run.mjs` imports them lazily.
+ *
+ * @param {object} result — completed run result (`findings`, `reviewCoverage`).
+ * @param {object|object[]} baselineFindings — parsed baseline artifact.
+ * @param {Function} diffReviews
+ * @param {Function} formatRegressionSummary
+ * @returns {string} Markdown summary block.
+ */
+function formatBaselineRegression(
+  result,
+  baselineFindings,
+  diffReviews,
+  formatRegressionSummary
+) {
+  const prevFindings = Array.isArray(baselineFindings)
+    ? baselineFindings
+    : (baselineFindings?.findings ?? baselineFindings?.issues ?? []);
+  const diff = diffReviews(prevFindings, result?.findings ?? [], {
+    // The current run's coverage qualifies its absences (#2325).
+    currentCoverage: result?.reviewCoverage ?? null,
+  });
+  return formatRegressionSummary(diff);
 }
 
 // EXTERNAL MODULE: ./src/lib/feedback.mjs

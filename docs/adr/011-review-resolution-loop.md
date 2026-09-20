@@ -110,7 +110,9 @@ Epic 本文の判断を追認します。加えて根拠を次のように固定
 - `Resolution` は観測 2 のとおり 4 系統で先約があるが、**いずれも finding 単位の人間対応状態ではない**。系統 1 は provenance、系統 2 は参照解決、系統 3 は証拠接地、系統 4 は run 間の出現差である
 - 代替案として検討した `authorAction` / `handling` は、いずれも「検証後の確定状態」を表せない。本 Epic の対象は author の行為（`authorResponse`）とその検証結果（`verification`）の両方を束ねる状態であり、行為だけを指す語では狭い
 
-**ただし系統 4 との衝突は放置しない。** `review-differ.mjs` の `changeStatus: 'resolved'` は「前 run の fingerprint が今 run に無い」以上の意味を持たないことを、Phase 1 の契約テキストで明示します。本 ADR では `review-differ.mjs` の語をリネームしません（既存 consumer への波及が Phase 0 の範囲を超えるため）。リネームの要否は未決とします。
+**ただし系統 4 との衝突は放置しない。** `review-differ.mjs` の `changeStatus: 'resolved'` は「前 run の fingerprint が今 run に無い」以上の意味を持たないことを、Phase 1 の契約テキストで明示します。本 ADR では `review-differ.mjs` の語をリネームしません（既存 consumer への波及が Phase 0 の範囲を超えるため）。~~リネームの要否は未決とします。~~ → リネームの要否は issue #2325 で決着しました（リネームせず qualification を足す）。
+
+この明示は issue #2325 で実装しました。`resolved` という値は互換のため保ち、各エントリへ「何を測ったか」を示す `basis` と、現 run の `coverageStatus` を併記します。coverage が `complete` でない場合、`summary.absenceMayBeUnexecuted` が true になります。
 
 ### D2—`authorResponse.state` の値集合を feedback 8 値と字面で分離する
 
@@ -177,7 +179,7 @@ fail-safe の適用範囲について 1 点補足します。issue #2320 は、s
 ## 本 ADR が決めないこと
 
 - `authorResponse.state` / `resolution.state` / `verification.state` の具体的な値。D2 は「feedback 8 値と重ねない」という制約だけを固定する
-- `review-differ.mjs` の `changeStatus: 'resolved'` をリネームするか
+- ~~`review-differ.mjs` の `changeStatus: 'resolved'` をリネームするか~~ → issue #2325 で決着。リネームせず `basis` と `coverageStatus` の併記で qualification する
 - Phase 3 が marker 収束（#2323）を自身のスコープに含めるか、#2323 の解決を待つか
 - fingerprint 設計（先頭 60 字依存）を変更するか。変更は `.river/memory/index.json` に永続化済みの v1 値へ波及するため（`finding-factory.mjs:690-696`）、本 Epic の範囲では扱わない
 - `suppressed` / `overflow` へ fingerprint を付けるか。付ければ観測 6 の 2 が解消するが、`classifyFindings` の戻り値の形が変わる
