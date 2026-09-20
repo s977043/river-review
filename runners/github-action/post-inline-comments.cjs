@@ -37,9 +37,17 @@ const { stripSelfReportedScope } = require('../../src/lib/finding-factory.mjs');
  * `<!-- river-review -->` as the PR comment contract. The legacy spelling is
  * still accepted when searching for an existing summary comment, so a comment
  * written by an earlier release is updated in place rather than duplicated.
+ *
+ * #2330: the search predicate is imported from `post-comment.cjs` rather than
+ * written again here. Both runners dedup the same comment, so a second copy of
+ * the rule would let the two surfaces drift — and the removal condition for
+ * the legacy spelling is documented once, on that function.
  */
-const COMMENT_MARKER = '<!-- river-review -->';
-const LEGACY_COMMENT_MARKER = '<!-- river-reviewer -->';
+const {
+  isRiverReviewComment,
+  COMMENT_MARKER,
+  LEGACY_COMMENT_MARKER,
+} = require('./post-comment.cjs');
 const SEVERITY_EMOJI = { critical: '🔴', major: '🟠', minor: '🟡', info: 'ℹ️' };
 const MAX_INLINE_BODY = 65000;
 // GitHub rejects an issue comment body over 65536 characters. The summary is a
@@ -493,11 +501,7 @@ module.exports = async function postInlineComments({ github, context, core }) {
     per_page: 100,
   });
 
-  const existing = comments.find(
-    (c) =>
-      typeof c.body === 'string' &&
-      (c.body.includes(COMMENT_MARKER) || c.body.includes(LEGACY_COMMENT_MARKER))
-  );
+  const existing = comments.find((c) => isRiverReviewComment(c.body));
 
   if (existing) {
     await github.rest.issues.updateComment({
