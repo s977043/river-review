@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.118.1](https://github.com/s977043/river-review/compare/v1.118.0...v1.118.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **diff:** stop the ordinary-path no-newline marker from consuming a line number ([#2319](https://github.com/s977043/river-review/issues/2319)) ([c932ccc](https://github.com/s977043/river-review/commit/c932cccacb33bdba3fd22bb489dad59b65ce2263))
+* **verification:** surface sandbox staging so a refused file cannot pass ([#2318](https://github.com/s977043/river-review/issues/2318)) ([dd1717f](https://github.com/s977043/river-review/commit/dd1717fb9ee36e2e1ff6e964824f1ae370ef9ed9))
+* **viewpoints:** read combined-diff marker columns by parentCount ([#2314](https://github.com/s977043/river-review/issues/2314)) ([#2317](https://github.com/s977043/river-review/issues/2317)) ([8ef0cc0](https://github.com/s977043/river-review/commit/8ef0cc0b821e5dc420285f7a4994793d1c90b652))
+
 ## [1.118.0](https://github.com/s977043/river-review/compare/v1.117.0...v1.118.0) (2026-09-18)
 
 
