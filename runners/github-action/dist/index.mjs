@@ -54624,9 +54624,11 @@ async function callChatCompletion({
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
-/* harmony export */   K: () => (/* binding */ deriveLoopSignalFromArtifact),
-/* harmony export */   v: () => (/* binding */ deriveLoopSignalFromRunsDiff)
+/* harmony export */   KF: () => (/* binding */ deriveLoopSignalFromArtifact),
+/* harmony export */   vD: () => (/* binding */ deriveLoopSignalFromRunsDiff)
 /* harmony export */ });
+/* unused harmony export qualifyLoopSignalForCoverage */
+/* harmony import */ var _review_coverage_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(3054);
 /**
  * Loop-signal derivation (Epic #1171 item3).
  *
@@ -54643,6 +54645,8 @@ async function callChatCompletion({
  *
  * All functions are pure — no side effects, no AI calls, no file I/O.
  */
+
+
 
 /** @typedef {'NO_SIGNAL' | 'REVISE_REQUIRED' | 'CONVERGED' | 'ESCALATE_HUMAN'} ArtifactSignal */
 /** @typedef {ArtifactSignal | 'STOP_OSCILLATED'} RunsDiffSignal */
@@ -54694,6 +54698,10 @@ function deriveLoopSignalFromArtifact(artifact) {
  * STOP_OSCILLATED regardless of finding severity — the fix loop is spinning
  * and human triage is needed.
  *
+ * The derived signal is then qualified by the latest run's `reviewCoverage`
+ * (see `qualifyLoopSignalForCoverage`): a run that did not complete its planned
+ * review work cannot report CONVERGED.
+ *
  * Otherwise, derives from the latest run's artifact:
  * 1. `latestArtifact` parameter (explicit, preferred for 2-run and multi-run CLI paths)
  * 2. `diff.runs[last].artifact` or `diff.runs[last]` (embedded in diff object)
@@ -54711,7 +54719,10 @@ function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
 
   // Prefer the explicitly passed latest artifact.
   if (latestArtifact != null && typeof latestArtifact === 'object') {
-    return deriveLoopSignalFromArtifact(latestArtifact);
+    return qualifyLoopSignalForCoverage(
+      deriveLoopSignalFromArtifact(latestArtifact),
+      latestArtifact.reviewCoverage
+    );
   }
 
   // Fall back to runs[] embedded in diff (for callers that populate it).
@@ -54720,11 +54731,46 @@ function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
     const latest = runs[runs.length - 1];
     const embedded = latest?.artifact ?? latest;
     if (embedded && typeof embedded === 'object') {
-      return deriveLoopSignalFromArtifact(embedded);
+      return qualifyLoopSignalForCoverage(
+        deriveLoopSignalFromArtifact(embedded),
+        embedded.reviewCoverage ?? latest?.reviewCoverage
+      );
     }
   }
 
   return 'NO_SIGNAL';
+}
+
+/**
+ * Demote `CONVERGED` to `NO_SIGNAL` when the run it was derived from did not
+ * finish the review work it planned (#2331).
+ *
+ * `deriveLoopSignalFromArtifact` reads only `decision` and finding severities,
+ * so a run whose reviewers timed out looks byte-identical to a clean run: zero
+ * blocking findings plus an auto-approve decision. `CONVERGED` is the signal a
+ * caller stops iterating on, so emitting it there stops the loop on the
+ * strength of a review that never ran to completion — the layer inconsistency
+ * `docs/adr/011-review-resolution-loop.md` names.
+ *
+ * Only `CONVERGED` is qualified. `ESCALATE_HUMAN`, `STOP_OSCILLATED`,
+ * `REVISE_REQUIRED` and `NO_SIGNAL` already point away from "stop and accept",
+ * so incomplete coverage cannot make any of them less safe.
+ *
+ * `unknown` coverage (no `reviewCoverage` on the record — the shape every run
+ * written before Review Coverage was wired still has) is deliberately NOT
+ * demoted: doing so would make `CONVERGED` unreachable for those callers and
+ * silently convert a working loop into one that never terminates. Absence of
+ * the observation is not an observation of incompleteness.
+ *
+ * @param {string} signal  A signal from `deriveLoopSignalFromArtifact`.
+ * @param {object|null|undefined} coverage  The run's `reviewCoverage` object.
+ * @returns {string} The qualified signal.
+ */
+function qualifyLoopSignalForCoverage(signal, coverage) {
+  if (signal !== 'CONVERGED') return signal;
+  const status = (0,_review_coverage_mjs__WEBPACK_IMPORTED_MODULE_0__/* .normalizeCoverageStatus */ .aW)(coverage);
+  if (status === 'partial' || status === 'not_executed') return 'NO_SIGNAL';
+  return signal;
 }
 
 
@@ -56363,6 +56409,7 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   Ix: () => (/* binding */ deriveReviewCoverage),
 /* harmony export */   Vb: () => (/* binding */ REVIEW_COVERAGE_STATUSES),
+/* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
 /* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
 /* harmony export */   or: () => (/* binding */ deriveReviewFileScope)
@@ -56458,6 +56505,43 @@ function deriveReviewCoverage(units = []) {
     incompleteRequiredUnitIds,
     units: normalizedUnits,
   };
+}
+
+/**
+ * Map a `reviewCoverage` object onto the four-state coverage vocabulary
+ * (`complete` | `partial` | `not_executed` | `unknown`).
+ *
+ * Anything that is not one of the three `REVIEW_COVERAGE_STATUSES` values —
+ * including a missing object — is `unknown`, so a caller that supplies nothing
+ * is never reported as having complete coverage.
+ *
+ * Single derivation for every consumer that has to qualify a claim by how much
+ * of the review actually ran (`review-differ.mjs` resolution basis,
+ * `loop-signal.mjs` signal qualification).
+ *
+ * @param {object|null|undefined} coverage
+ * @returns {'complete'|'partial'|'not_executed'|'unknown'}
+ */
+function normalizeCoverageStatus(coverage) {
+  const status = coverage?.status;
+  if (!REVIEW_COVERAGE_STATUSES.includes(status)) return 'unknown';
+  // Cross-check the label against the counts it summarizes.
+  // `deriveReviewCoverage` keeps the two consistent, but a run record written
+  // by an older build (or hand-edited) can carry `complete` next to counts
+  // that say otherwise. Believing the label alone would re-open exactly the
+  // over-claim this module is closing, so an inconsistent record is demoted
+  // rather than trusted.
+  if (status === 'complete') {
+    const { requiredUnits, completedRequiredUnits } = coverage;
+    if (
+      Number.isFinite(requiredUnits) &&
+      Number.isFinite(completedRequiredUnits) &&
+      completedRequiredUnits < requiredUnits
+    ) {
+      return completedRequiredUnits > 0 ? 'partial' : 'not_executed';
+    }
+  }
+  return status;
 }
 
 function uniquePaths(paths = []) {
@@ -82012,7 +82096,7 @@ async function runRunsCommand(parsed, targetPath) {
         return ta !== tb ? ta - tb : (a.runId ?? '').localeCompare(b.runId ?? '');
       });
       const latestRunArtifact = sortedRecords[sortedRecords.length - 1];
-      const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.v)(diff, latestRunArtifact);
+      const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.vD)(diff, latestRunArtifact);
       if (parsed.output === 'json') {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
         console.log(JSON.stringify(diffWithSignal, null, 2));
@@ -82052,7 +82136,7 @@ async function runRunsCommand(parsed, targetPath) {
         // run2 is the current side: its coverage qualifies the absences (#2325).
         currentCoverage: run2.reviewCoverage ?? null,
       });
-      const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.v)(diff, run2);
+      const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.vD)(diff, run2);
       if (parsed.output === 'json') {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
         console.log(JSON.stringify(diffWithSignal, null, 2));
@@ -84896,7 +84980,7 @@ function deriveRunGate(result) {
   try {
     const findings = result.findings ?? [];
     const riskAssessment = result.plan?.riskAssessment;
-    const loopSignal = (0,loop_signal/* deriveLoopSignalFromArtifact */.K)({ decision, findings });
+    const loopSignal = (0,loop_signal/* deriveLoopSignalFromArtifact */.KF)({ decision, findings });
     gate = (0,gate_decision/* deriveGateDecision */.RF)({
       loopSignal,
       decision,
