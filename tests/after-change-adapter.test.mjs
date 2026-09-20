@@ -58,6 +58,9 @@ async function makeTrustedTree() {
   return dir;
 }
 
+/** `git diff -z --name-status` / `git ls-files -z` emit NUL-delimited records. */
+const z = (...fields) => fields.join('\0') + '\0';
+
 const skill = (id, command = TRUE_BIN) => ({
   id,
   metadata: { deterministicGate: { command, args: [] } },
@@ -67,12 +70,17 @@ const skill = (id, command = TRUE_BIN) => ({
 
 test('parseChangedFileStatus declares deletions from the status letters', () => {
   const parsed = parseChangedFileStatus(
-    [
-      'M\tsrc/kept.mjs',
-      'A\tsrc/added.mjs',
-      'D\tsrc/gone.mjs',
-      'R100\tsrc/old.mjs\tsrc/new.mjs',
-    ].join('\n')
+    z(
+      'M',
+      'src/kept.mjs',
+      'A',
+      'src/added.mjs',
+      'D',
+      'src/gone.mjs',
+      'R100',
+      'src/old.mjs',
+      'src/new.mjs'
+    )
   );
   assert.deepEqual(parsed.changedFiles, [
     'src/added.mjs',
@@ -83,15 +91,54 @@ test('parseChangedFileStatus declares deletions from the status letters', () => 
   ]);
   // A rename removes the old path, so it is declared deleted alongside `D`.
   assert.deepEqual(parsed.deletedFiles, ['src/gone.mjs', 'src/old.mjs']);
-  // Every declared deletion is in scope: the core drops any that is not, and a
-  // deletion it drops stops excusing its file from being staged.
-  for (const file of parsed.deletedFiles) assert.ok(parsed.changedFiles.includes(file));
 });
 
-test('parseChangedFileStatus ignores lines it cannot read rather than guessing', () => {
-  const parsed = parseChangedFileStatus('D\n\nM\tsrc/a.mjs\nR100\tonly-one-field\n');
-  assert.deepEqual(parsed.changedFiles, ['src/a.mjs']);
+test('B1: an untracked file is part of the change, not invisible to it', () => {
+  // `git diff --name-status HEAD` reports ONLY tracked paths, so the newly
+  // created file — the most common result of a Write — appears only in
+  // `--others`. A checkpoint fed the tracked half alone publishes a verdict
+  // about a change whose new files it never saw.
+  const parsed = parseChangedFileStatus(z('M', 'tracked.txt'), {
+    untrackedZ: z('brand-new.mjs', 'nested/also-new.mjs'),
+  });
+  assert.deepEqual(parsed.changedFiles, ['brand-new.mjs', 'nested/also-new.mjs', 'tracked.txt']);
   assert.deepEqual(parsed.deletedFiles, []);
+});
+
+test('MUTATION (d): a path that is BOTH deleted and untracked is not declared deleted', () => {
+  // `git rm --cached x`, and delete-then-recreate, both produce `D x` in the
+  // diff while `x` is on disk and listed in `--others`. Declaring it deleted
+  // would excuse it from staging and publish a verdict that never looked at
+  // it. This is the input that makes the subset guard reachable — without it
+  // the guard was dead code and its test self-consistent (review M4).
+  const parsed = parseChangedFileStatus(z('D', 'recreated.txt', 'D', 'really-gone.txt'), {
+    untrackedZ: z('recreated.txt'),
+  });
+  assert.deepEqual(parsed.changedFiles, ['really-gone.txt', 'recreated.txt']);
+  assert.deepEqual(parsed.deletedFiles, ['really-gone.txt']);
+});
+
+test('M1: a non-ASCII or TAB-bearing path survives verbatim', () => {
+  // With `-z` git emits raw bytes; the TAB-split parser this replaces handed
+  // git's `core.quotePath` spelling (`"\346\227\245..."`) straight through,
+  // which made a modified file unstageable and — worse — let a DELETED one
+  // excuse a path that was never really named.
+  const parsed = parseChangedFileStatus(z('M', '日本語.txt', 'D', 'tab\there.txt'));
+  assert.deepEqual(parsed.changedFiles, ['tab\there.txt', '日本語.txt']);
+  assert.deepEqual(parsed.deletedFiles, ['tab\there.txt']);
+  // A quoted spelling that still reaches the parser is decoded by the repo's
+  // one decoder rather than passed through.
+  const quoted = parseChangedFileStatus(
+    z('M', '"\\346\\227\\245\\346\\234\\254\\350\\252\\236.txt"')
+  );
+  assert.deepEqual(quoted.changedFiles, ['日本語.txt']);
+});
+
+test('parseChangedFileStatus ignores records it cannot read rather than guessing', () => {
+  assert.deepEqual(parseChangedFileStatus(z('D')), { changedFiles: [], deletedFiles: [] });
+  assert.deepEqual(parseChangedFileStatus(z('not-a-status', 'x', 'M', 'src/a.mjs')).changedFiles, [
+    'src/a.mjs',
+  ]);
   assert.deepEqual(parseChangedFileStatus(undefined), { changedFiles: [], deletedFiles: [] });
 });
 
@@ -100,7 +147,9 @@ test('a change that DELETES a file still produces a real verdict (not unrunnable
   const reviewSourceDir = await makeTempDir('river-afterchange-src-');
   await fs.writeFile(path.join(reviewSourceDir, 'kept.txt'), 'kept', 'utf8');
   // `gone.txt` is deliberately NOT written: the change removed it.
-  const { changedFiles, deletedFiles } = parseChangedFileStatus('M\tkept.txt\nD\tgone.txt');
+  const { changedFiles, deletedFiles } = parseChangedFileStatus(
+    z('M', 'kept.txt', 'D', 'gone.txt')
+  );
 
   const evidence = await runAfterChangeCheckpoint({
     registry: await readRegistry(),
@@ -124,7 +173,7 @@ test('MUTATION (a): withholding deletedFiles makes the same change unrunnable', 
   const trustedTree = await makeTrustedTree();
   const reviewSourceDir = await makeTempDir('river-afterchange-src-nodel-');
   await fs.writeFile(path.join(reviewSourceDir, 'kept.txt'), 'kept', 'utf8');
-  const { changedFiles } = parseChangedFileStatus('M\tkept.txt\nD\tgone.txt');
+  const { changedFiles } = parseChangedFileStatus(z('M', 'kept.txt', 'D', 'gone.txt'));
 
   const evidence = await runAfterChangeCheckpoint({
     registry: await readRegistry(),
@@ -144,7 +193,12 @@ test('MUTATION (a): withholding deletedFiles makes the same change unrunnable', 
 // --- host neutrality ---------------------------------------------------------
 
 test('MUTATION (b): no host vocabulary reaches the adapter module or the core', async () => {
-  const hostWords = /PostToolUse|tool_input|tool_name|MultiEdit|CLAUDE_PROJECT_DIR|hook/i;
+  // Snake_case and camelCase spellings of the same host concepts are listed
+  // too: a leak arrives as `POST_TOOL_USE_TOOLS` or `toolInput` at least as
+  // readily as the literal `PostToolUse`, and a pattern that only matched the
+  // literal let exactly that mutation survive.
+  const hostWords =
+    /post[_\s]*tool[_\s]*use|tool[_\s]*input|tool[_\s]*name|toolInput|toolName|MultiEdit|CLAUDE_PROJECT_DIR|hook/i;
   for (const file of ['src/lib/after-change-adapter.mjs', 'src/lib/fast-verification.mjs']) {
     const source = await fs.readFile(path.join(repoRoot, file), 'utf8');
     // Comments explain the boundary; the CODE must not name the host. Strip
@@ -163,7 +217,15 @@ test('MUTATION (b): no host vocabulary reaches the adapter module or the core', 
 test('the adapter imports no model, network or host module', async () => {
   const source = await fs.readFile(path.join(repoRoot, 'src/lib/after-change-adapter.mjs'), 'utf8');
   const imports = [...source.matchAll(/^import[^;]*from\s+'([^']+)';/gm)].map((m) => m[1]);
-  assert.deepEqual(imports.sort(), ['./fast-verification.mjs', './trigger-resolver.mjs']);
+  assert.deepEqual(imports.sort(), [
+    './fast-verification.mjs',
+    './git.mjs',
+    './trigger-resolver.mjs',
+  ]);
+  // `./git.mjs` is imported for `unquoteGitPath` (a pure decoder). The adapter
+  // still starts no process of its own: the one command path is the #1401
+  // executor reached through the checkpoint.
+  assert.ok(!/execFile|spawn|execSync/.test(source), 'adapter must not launch a process');
 });
 
 // --- opt-in / no authority ---------------------------------------------------

@@ -37,6 +37,7 @@
  */
 
 import { runFastVerification } from './fast-verification.mjs';
+import { unquoteGitPath } from './git.mjs';
 import { resolveTrigger } from './trigger-resolver.mjs';
 
 /** The neutral event this adapter converts an edit into. */
@@ -66,36 +67,77 @@ export function isAfterChangeObserveEnabled(env) {
 }
 
 /**
- * Parse `git diff --name-status` output into the changed set and the subset of
- * it the change DELETED.
+ * Split a NUL-delimited git record stream into fields.
  *
- * The status letter is the record of intent; the filesystem is not consulted.
- * Renames and copies arrive as `R100\told\tnew` / `C75\told\tnew`: the new path
- * is changed, and for a rename the old path is gone, so it is reported as a
- * deletion. `deletedFiles` is always a subset of `changedFiles`, which is what
- * the core requires — it drops any declared deletion that is not in scope.
+ * `-z` is what makes the path unambiguous: without it git applies
+ * `core.quotePath` and emits `"tab\there.txt"` /
+ * `"\346\227\245\346\234\254..."` for any path with a TAB or a non-ASCII
+ * byte. The old TAB-split parser handed those spellings through verbatim, and
+ * the two halves failed in OPPOSITE directions: a modified non-ASCII file got a
+ * path that could not be staged (`unrunnable`, so a repo with Japanese
+ * filenames could never run the checkpoint), while a DELETED one put a
+ * fictional path into `deletedFiles`, which excused it from staging and let the
+ * run report `pass` — with the file that was really removed never accounted for
+ * at all. `-z` removes the quoting, and `unquoteGitPath` (`./git.mjs`, the
+ * repo's single decoder for a quoted git path, #2240/#2241) decodes anything
+ * that still arrives quoted rather than a second private unescaper here.
+ */
+const gitRecords = (text) =>
+  typeof text === 'string'
+    ? text
+        .split('\0')
+        .filter((field) => field.length > 0)
+        .map((field) => unquoteGitPath(field))
+    : [];
+
+/**
+ * Build the changed set, and the subset of it the change DELETED, from git's
+ * own record of the change.
  *
- * Unparseable lines are ignored rather than guessed at: a line this function
- * cannot read contributes no file, so it can never quietly excuse one from
- * being staged.
+ * TWO SOURCES, because one is not the change. `git diff --name-status HEAD`
+ * reports only paths git already tracks, and the single most common thing a
+ * `Write` does is CREATE a file — which is untracked, and therefore absent from
+ * that output entirely. A checkpoint fed only the tracked half publishes a
+ * `pass` for a change whose new files it never looked at, and the mixed case is
+ * the dangerous one: one tracked edit alongside any number of new files still
+ * produces a `pass`, because the run is no longer empty. `git ls-files --others
+ * --exclude-standard` is the other half, merged in as an addition.
  *
- * @param {string} nameStatusText raw `git diff --name-status` output
+ * DELETION IS DECLARED, AND THEN CHECKED AGAINST DISK. A declared deletion
+ * excuses its path from staging, so a wrong one is a false green. Two things
+ * are therefore required of every entry in `deletedFiles`: it is in scope (the
+ * core drops what is not, and a dropped declaration stops excusing anything),
+ * and the path is not ALSO present as an untracked file. `git rm --cached`, and
+ * delete-then-recreate, both produce exactly that shape — `D` in the diff and
+ * the same path in `--others` — and the file is on disk, so it must be staged
+ * and checked like any other.
+ *
+ * Unparseable records are ignored rather than guessed at: a record this
+ * function cannot read contributes no file, so it can never quietly excuse one
+ * from being staged.
+ *
+ * @param {string} nameStatusZ `git diff -z --name-status` output (NUL-delimited)
+ * @param {object} [sources]
+ * @param {string} [sources.untrackedZ] `git ls-files -z --others --exclude-standard`
  * @returns {{ changedFiles: string[], deletedFiles: string[] }}
  */
-export function parseChangedFileStatus(nameStatusText) {
+export function parseChangedFileStatus(nameStatusZ, { untrackedZ } = {}) {
   const changed = new Set();
   const deleted = new Set();
-  if (typeof nameStatusText !== 'string') return { changedFiles: [], deletedFiles: [] };
-  for (const rawLine of nameStatusText.split('\n')) {
-    const line = rawLine.replace(/\r$/, '');
-    if (line.length === 0) continue;
-    const fields = line.split('\t');
-    const status = fields[0];
-    if (typeof status !== 'string' || status.length === 0) continue;
+  const untracked = new Set(gitRecords(untrackedZ));
+
+  const fields = gitRecords(nameStatusZ);
+  for (let i = 0; i < fields.length; i += 1) {
+    const status = fields[i];
+    // A status field is a letter plus an optional similarity score. Anything
+    // else means the stream is not the shape this function reads, and guessing
+    // where the next record starts is how a path gets misattributed.
+    if (!/^[A-Z][0-9]*$/.test(status)) continue;
     const letter = status[0];
     if (letter === 'R' || letter === 'C') {
-      const from = fields[1];
-      const to = fields[2];
+      const from = fields[i + 1];
+      const to = fields[i + 2];
+      i += 2;
       if (!from || !to) continue;
       changed.add(to);
       if (letter === 'R') {
@@ -104,15 +146,19 @@ export function parseChangedFileStatus(nameStatusText) {
       }
       continue;
     }
-    const filePath = fields[1];
+    const filePath = fields[i + 1];
+    i += 1;
     if (!filePath) continue;
     changed.add(filePath);
     if (letter === 'D') deleted.add(filePath);
   }
+
+  for (const file of untracked) changed.add(file);
+
   const changedFiles = [...changed].sort();
   return {
     changedFiles,
-    deletedFiles: [...deleted].filter((file) => changed.has(file)).sort(),
+    deletedFiles: [...deleted].filter((file) => changed.has(file) && !untracked.has(file)).sort(),
   };
 }
 

@@ -159,22 +159,52 @@ revision, `git diff --name-status` text); `src/lib/after-change-adapter.mjs` and
 `src/lib/fast-verification.mjs` are pinned by tests to be free of that
 vocabulary.
 
+### The changed set has two halves
+
+`git diff --name-status HEAD` reports only paths git already tracks, so a newly
+created file — the most common result of a `Write` — is absent from it. The
+adapter therefore merges `git ls-files --others --exclude-standard` in as an
+addition. Without it, one tracked edit alongside any number of new files still
+produced a `pass`, over a change whose new files were never looked at.
+
+Both reads use `-z`: without it git applies `core.quotePath` and emits
+`"tab\there.txt"` / octal-escaped non-ASCII, and the two halves then fail in
+opposite directions — a modified non-ASCII file becomes unstageable, while a
+deleted one puts a fictional path into `deletedFiles` and excuses it from
+staging. Anything that still arrives quoted is decoded by `unquoteGitPath`
+(`src/lib/git.mjs`), the repo's single decoder for a quoted git path.
+
 ### Deletions are declared, never inferred
 
 The checkpoint stages the changed files into a clean sandbox and refuses to read
 a `pass` whose subject files did not all arrive (#2311). A deleted file cannot
-arrive, so the adapter reads the status letters of `git diff --name-status`
-(`D`, and the old path of an `R` rename) and declares them as `deletedFiles`.
-Without that declaration every change that removes a file would be permanently
-`unrunnable` — pinned by `MUTATION (a)` in `tests/after-change-adapter.test.mjs`.
+arrive, so the adapter reads the status letters (`D`, and the old path of an `R`
+rename) and declares them as `deletedFiles`. Without that declaration every
+change that removes a file would be permanently `unrunnable` — pinned by
+`MUTATION (a)` in `tests/after-change-adapter.test.mjs`.
+
+A declared deletion is then checked against disk: a path that is both `D` in the
+diff and present in `--others` (`git rm --cached`, delete-then-recreate) exists
+and must be staged like any other, so it is dropped from `deletedFiles`.
 
 ### No authority, no silent success
 
 The hook always exits 0 and never blocks the session; it holds no gate, decision
-or merge authority. Every missing prerequisite (node, git, jq, an unreadable
-revision) prints a `not run (...)` line instead of exiting quietly, and a run
-with no selected check or no trusted allowlist is recorded as `skipped` /
-`bypassed` with a reason rather than as a pass.
+or merge authority. Every missing prerequisite — `jq`, `node`, `git`, a missing
+or unreadable payload, an unreadable subject revision (`git rev-parse --verify`,
+so an unborn HEAD is caught rather than recorded as the literal `HEAD`) — prints
+a `not run (...)` line instead of exiting quietly. Prerequisites are checked
+before the payload is read, so an absent tool cannot be mistaken for "not an
+edit". A run with no selected check or no trusted allowlist is recorded as
+`skipped` / `bypassed` with a reason rather than as a pass.
+
+The single deliberately silent exit is a tool that is not `Write` / `Edit` /
+`MultiEdit`: that is not an after-change event, so there is nothing to report.
+
+Evidence is written with mode `0600` into a `0700` directory, and the write is
+refused if the directory is a symlink (`O_EXCL` on the file, `lstat` on the
+directory) — the temp root is world-writable, so another local user could
+otherwise plant a link and read or redirect it.
 
 ### Environment
 

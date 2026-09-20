@@ -179,6 +179,172 @@ describe('after-change-observe.sh (#2275 PR-3C)', () => {
     assert.ok(!fs.existsSync(path.join(dir, '.river')));
   });
 
+  test('B1: a tracked edit mixed with a NEW file puts the new file in the evidence', async () => {
+    const dir = await makeRepo();
+    // The most common PostToolUse(Write): a brand-new file, invisible to
+    // `git diff --name-status HEAD`. Mixed with a tracked edit the run is not
+    // empty, so before this fix it published `pass` over only `tracked.txt`.
+    await fsp.writeFile(path.join(dir, 'brand-new.mjs'), 'export const x = 1;\n', 'utf8');
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        RIVER_TRUSTED_TREE: makeTrustedTree(),
+        RIVER_AFTER_CHANGE_SELECTED: makeSelectedFile(),
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const evidence = JSON.parse(
+      fs.readFileSync(path.join(tmp, 'river-review-after-change', evidenceIn(tmp)[0]), 'utf8')
+    );
+    assert.ok(
+      evidence.changedFiles.includes('brand-new.mjs'),
+      `new file missing from evidence: ${JSON.stringify(evidence.changedFiles)}`
+    );
+    assert.deepEqual(evidence.changedFiles, ['brand-new.mjs', 'gone.txt', 'kept.txt']);
+    assert.equal(evidence.checks[0].staging.requested, 2);
+    assert.equal(evidence.checks[0].status, 'pass');
+  });
+
+  test('M1: a non-ASCII path reaches the checkpoint verbatim, not git-quoted', async () => {
+    const dir = await makeRepo();
+    await fsp.writeFile(path.join(dir, '日本語.txt'), 'new\n', 'utf8');
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        RIVER_TRUSTED_TREE: makeTrustedTree(),
+        RIVER_AFTER_CHANGE_SELECTED: makeSelectedFile(),
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const evidence = JSON.parse(
+      fs.readFileSync(path.join(tmp, 'river-review-after-change', evidenceIn(tmp)[0]), 'utf8')
+    );
+    assert.ok(evidence.changedFiles.includes('日本語.txt'), JSON.stringify(evidence.changedFiles));
+    assert.ok(!evidence.changedFiles.some((f) => f.includes('\\3')), 'octal-escaped path leaked');
+    assert.equal(evidence.checks[0].status, 'pass');
+  });
+
+  test('M2: jq missing is reported, not a silent skip', async () => {
+    const dir = await makeRepo();
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    // A PATH holding node and git but no jq. Before the fix the jq check sat
+    // INSIDE the tool-name extraction, so the tool name came back empty and
+    // the script fell through `case *)` and exited saying nothing at all.
+    const binDir = makeTempDir('river-afterchange-bin-');
+    for (const tool of ['bash', 'node', 'git', 'base64', 'tr', 'date', 'cat', 'dirname', 'pwd']) {
+      const real = fs.existsSync(`/usr/bin/${tool}`) ? `/usr/bin/${tool}` : null;
+      const resolved = real ?? `/bin/${tool}`;
+      if (fs.existsSync(resolved)) fs.symlinkSync(resolved, path.join(binDir, tool));
+    }
+    fs.symlinkSync(process.execPath, path.join(binDir, 'node-real'));
+    fs.rmSync(path.join(binDir, 'node'), { force: true });
+    fs.symlinkSync(process.execPath, path.join(binDir, 'node'));
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        PATH: binDir,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0);
+    assert.match(result.stdout, /not run \(jq not found\)/);
+    assert.deepEqual(evidenceIn(tmp), []);
+  });
+
+  test('M2: an unreadable payload is reported, not a silent skip', async () => {
+    const dir = await makeRepo();
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const env = {
+      ...process.env,
+      RIVER_AFTER_CHANGE_OBSERVE: '1',
+      CLAUDE_PROJECT_DIR: dir,
+      TMPDIR: tmp,
+    };
+    const empty = await runHook({ cwd: dir, env, stdin: '' });
+    assert.match(empty.stdout, /not run \(empty hook payload\)/);
+    const broken = await runHook({ cwd: dir, env, stdin: 'not json' });
+    assert.match(broken.stdout, /not run \(tool name unreadable in payload\)/);
+    const noTool = await runHook({ cwd: dir, env, stdin: JSON.stringify({ tool_input: {} }) });
+    assert.match(noTool.stdout, /not run \(tool name unreadable in payload\)/);
+    assert.deepEqual(evidenceIn(tmp), []);
+  });
+
+  test('M3: evidence is private and is not written through a planted symlink', async () => {
+    const dir = await makeRepo();
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const elsewhere = makeTempDir('river-afterchange-elsewhere-');
+    // Another local user gets there first with a symlink into their own dir.
+    fs.symlinkSync(elsewhere, path.join(tmp, 'river-review-after-change'));
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0);
+    assert.match(result.stdout, /not run \(evidence directory is a symlink\)/);
+    assert.deepEqual(fs.readdirSync(elsewhere), [], 'evidence followed the symlink');
+  });
+
+  test('M3: the evidence directory and file are private (0700 / 0600)', async () => {
+    const dir = await makeRepo();
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    const outDir = path.join(tmp, 'river-review-after-change');
+    assert.equal(fs.statSync(outDir).mode & 0o777, 0o700);
+    const file = path.join(outDir, evidenceIn(tmp)[0]);
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  });
+
+  test('Minor 1: an unborn HEAD is reported, not recorded as the literal "HEAD"', async () => {
+    const dir = makeTempDir('river-afterchange-unborn-');
+    await run(['git', 'init', '-q'], { cwd: dir });
+    await fsp.writeFile(path.join(dir, 'a.txt'), 'a\n', 'utf8');
+    const tmp = makeTempDir('river-afterchange-tmp-');
+    const result = await runHook({
+      cwd: dir,
+      env: {
+        ...process.env,
+        RIVER_AFTER_CHANGE_OBSERVE: '1',
+        CLAUDE_PROJECT_DIR: dir,
+        TMPDIR: tmp,
+      },
+      stdin: payload('Write'),
+    });
+    assert.equal(result.code, 0);
+    assert.match(result.stdout, /not run \(subject revision unreadable\)/);
+    assert.deepEqual(evidenceIn(tmp), []);
+  });
+
   test('a missing prerequisite is reported, never a silent success', async () => {
     const outside = makeTempDir('river-afterchange-nogit-');
     const tmp = makeTempDir('river-afterchange-tmp-');
