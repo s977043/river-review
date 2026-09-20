@@ -332,9 +332,31 @@ function formatLoopDashboardHtml(diff, meta = {}) {
   parts.push('<h2>Churn</h2>');
   parts.push('<div class="counts">');
   parts.push(`<span class="count-chip" style="background:#1565c0">new ${newF.length}</span>`);
+  // #2325: the chip IS the claim. When the current run did not complete every
+  // required review unit, some of these absences are unexecuted reviewers
+  // rather than fixes, so the chip must not read as a verified win at a
+  // glance. Three signals, because each reaches a different reader: the colour
+  // drops from green to amber (the glance), an asterisk marks the number (copy
+  // -paste, plain text, screen readers), and a neighbouring chip names the
+  // coverage status in words.
+  const coverageStatus = diff?.summary?.currentCoverageStatus;
+  const absenceMayBeUnexecuted = diff?.summary?.absenceMayBeUnexecuted === true;
+  const degradeResolvedChip = absenceMayBeUnexecuted && resolvedF.length > 0;
   parts.push(
-    `<span class="count-chip" style="background:#2e7d32">resolved ${resolvedF.length}</span>`
+    `<span class="count-chip" style="background:${degradeResolvedChip ? '#ef6c00' : '#2e7d32'}"` +
+      ` title="${escHtml(
+        degradeResolvedChip
+          ? 'Absent from the current run. Coverage was not complete, so some of these may be review work that did not complete rather than fixes.'
+          : 'Absent from the current run. Absence is not by itself evidence of a fix.'
+      )}">resolved ${resolvedF.length}${degradeResolvedChip ? '*' : ''}</span>`
   );
+  if (typeof coverageStatus === 'string' && coverageStatus.length > 0) {
+    parts.push(
+      `<span class="count-chip" style="background:${
+        coverageStatus === 'complete' ? '#2e7d32' : '#ef6c00'
+      }">coverage: ${escHtml(coverageStatus)}</span>`
+    );
+  }
   parts.push(
     `<span class="count-chip" style="background:#757575">persisting ${persistingF.length}</span>`
   );
@@ -342,6 +364,11 @@ function formatLoopDashboardHtml(diff, meta = {}) {
     `<span class="count-chip" style="background:#c62828">oscillated ${oscillated.length}</span>`
   );
   parts.push('</div>');
+  if (degradeResolvedChip) {
+    parts.push(
+      '<p class="meta">* <strong>resolved</strong> counts fingerprints absent from the current run. Coverage was not complete, so some of them may be review work that did not complete rather than problems that were fixed.</p>'
+    );
+  }
 
   // Oscillation timeline — the core loop signal
   parts.push('<h2>Oscillation timeline</h2>');
