@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.120.0](https://github.com/s977043/river-review/compare/v1.119.0...v1.120.0) (2026-09-20)
+
+
+### Features
+
+* **gate:** add opt-in incompleteness inputs for staging and review coverage ([#2320](https://github.com/s977043/river-review/issues/2320), [#2337](https://github.com/s977043/river-review/issues/2337)) ([#2340](https://github.com/s977043/river-review/issues/2340)) ([1c1ef0e](https://github.com/s977043/river-review/commit/1c1ef0e0704e9708c94d0e26fcdb05b038b53c9d))
+* **review:** wire the Finding Critic into the main path behind an opt-in ([#2334](https://github.com/s977043/river-review/issues/2334)) ([#2339](https://github.com/s977043/river-review/issues/2339)) ([2e6fbe3](https://github.com/s977043/river-review/commit/2e6fbe3f9eb526078eb366622611cfa37543b8bc))
+
+
+### Bug Fixes
+
+* **action:** anchor the PR comment marker search to the body prefix ([#2330](https://github.com/s977043/river-review/issues/2330)) ([#2333](https://github.com/s977043/river-review/issues/2333)) ([cf7d158](https://github.com/s977043/river-review/commit/cf7d158d50f874e1d05e83d44e6b87fd9c8f044b))
+* **loop-signal:** do not report CONVERGED for a run that did not finish ([#2331](https://github.com/s977043/river-review/issues/2331)) ([#2335](https://github.com/s977043/river-review/issues/2335)) ([70d1b44](https://github.com/s977043/river-review/commit/70d1b44bdb7cefd2d6fa87739be0bea1ae984f2f))
+
 ## [1.119.0](https://github.com/s977043/river-review/compare/v1.118.1...v1.119.0) (2026-09-20)
 
 
