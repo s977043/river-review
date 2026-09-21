@@ -23,6 +23,12 @@ River Review は各アーティファクトおよび `runs diff --output json` �
 
 **Layer 2** — `river runs diff --output json`（3 件以上の run）: `oscillated` が非空の場合に `STOP_OSCILLATED` を追加。振動検知は Layer 1 の全値より優先。
 
+Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](https://github.com/s977043/river-review/blob/main/src/lib/review-coverage.mjs)）による qualification が入ります（PR #2335）。`river runs diff` の 2 run 経路と 3 run 以上の経路の両方が対象です。最新 run の coverage が `partial` または `not_executed` のとき、`CONVERGED` は `NO_SIGNAL` に降格します。レビュー単位がタイムアウトした run は「blocking findings 0 件 + auto-approve」という点で完走した run と区別がつかないため、そのまま `CONVERGED` を返すと caller は未完了のレビューを根拠にループを止めてしまいます。降格対象は `CONVERGED` のみで、他の値はもともと停止・受理の方向を示しません。`reviewCoverage` を持たない run record は `unknown` 扱いとし、降格しません（観測の欠落は不完全の観測ではないため）。
+
+この降格により、`partial` / `not_executed` の run では `CONVERGED` を根拠とした停止が起きなくなります。不完全な run が続く限りループは終わらないので、**caller は Layer 3 の `STOP_MAX_ITERATIONS` など上限側の停止条件を必ず併せて持ってください**。
+
+この降格が効く範囲は Layer 2 の signal だけです。artifact が `gate` ブロックを持つ場合、下記の参照実装は gate を signal より優先します。そのため既定では、Layer 1 由来の `GO` により `partial` の run でも停止しえます（#2337）。gate 側でも止めたい場合は、後述の `RIVER_GATE_COVERAGE=1` を有効にしてください。**Layer 2 の降格は既定で有効、gate 側の不完全性判定は opt-in** という非対称は意図したものです。
+
 **Layer 3** — 呼び出し元が合成（River Review は意図的に出力**しない**）:
 
 | 値                     | 合成タイミング                                                      |
@@ -49,6 +55,10 @@ River Review は各アーティファクトおよび `runs diff --output json` �
 - **replay check（正当性検証）**: 導出は純関数のため、caller は `gate.inputs` を `deriveGateDecision` に再投入して `decision` の一致を検証できる（`inputsHash` は S3 の回帰比較用サマリであり改竄防止ではない）。`inputs.riskMapDigest` は「YAML load → `JSON.stringify` → sha256 先頭16hex」で算出される
 - **circuit breaker**: `gate.configSnapshot.maxConsecutiveAutoGo` は助言値である。連続 auto-GO のカウントと強制チェックポイントの執行は caller 責務であり、**caller 側に独自設定がある場合は厳しい方（min）が優先**される
 - 執行のリファレンス実装と conformance fixture（`tests/fixtures/gate-conformance/`）で caller 側の振る舞いを検証できる
+- **不完全性の持ち込みは opt-in（#2320 / #2337）**: 「レビューは走ったが対象を見ていない」という事実を gate へ渡すかは host が選ぶ。既定は off であり、既定の gate 出力は従来と 1 ビットも変わらない
+  - `RIVER_GATE_STAGING_UNRUNNABLE=1`: 決定論ゲートの subject file が sandbox へ揃わなかった run を `deterministicUnrunnable` として扱い、`ESCALATE`（`DETERMINISTIC_UNRUNNABLE`）へ倒す。空の sandbox を渡された checker は自力で exit 0 するため、その exit code は変更に対する verdict ではない。`strictBlock` には決して寄せない
+  - `RIVER_GATE_COVERAGE=1`: `reviewCoverage.status` が `partial` / `not_executed` の run を `NO_GO`（`COVERAGE_INCOMPLETE`）へ倒す。これは `suggestedLoopSignal` の降格ではなく gate の**独立入力**である。降格経路にすると結果が `decision` に依存し、`auto-approve` は `NO_GO` になる一方で `human-review-recommended` は rule 8 の `GO_WITH_OBSERVATION`（exit 0）のまま残る。独立入力なら両者とも一様に止まる。**実効があるのは現時点で `river run --gate` 経路のみであり、`review exec` 経路は engine が `reviewCoverage` を返すまで no-op となる**
+  - coverage が**存在しない**ことは不完全とは読まない。「観測が無い」と「欠落を観測した」は別の事実であり、マージを止めてよいのは後者だけである
 
 `gate` は advisory です。判定の執行（`--gate` モード、strict_block ルーティング）は Epic #1347 S4 で導入されます。
 

@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test, { describe } from 'node:test';
 
+import { GATE_DECISIONS, GATE_REASON_CODES } from '../src/lib/gate-decision.mjs';
 import { compileReviewArtifactValidator } from './helpers/schema-validator.mjs';
 
 const validate = compileReviewArtifactValidator();
+const schema = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL('../schemas/review-artifact.schema.json', import.meta.url)),
+    'utf8'
+  )
+);
 
 function minimalArtifact(overrides = {}) {
   return {
@@ -313,5 +322,44 @@ describe('review-artifact.schema.json', () => {
     test('older artifacts without the new fields stay valid (additive)', () => {
       assert.equal(validate(minimalArtifact()), true);
     });
+  });
+});
+
+describe('gate vocabulary is pinned to the production ledger, not copied from it', () => {
+  // WHY THIS EXISTS. `schemas/flow.schema.json` has carried this exact pin since
+  // #2013 (tests/flow-schema.test.mjs:157), which is why adding a reason code
+  // forces that file to be updated. THIS schema had no such pin, and it drifted
+  // in silence: `STRICT_BLOCK` (#1351) and `DETERMINISTIC_UNRUNNABLE` (#1401)
+  // were emitted by production for two epics while the enum here still rejected
+  // them, so an artifact carrying either would have failed its own validation.
+  // Restoring the data without restoring the mechanism would just queue the
+  // same drift for the next reason code (CLAUDE.md "Check what the previous
+  // change pinned"), so the pin is what actually closes it.
+  const gate = schema.properties.gate.properties;
+
+  test('gate.reasonCode enum matches GATE_REASON_CODES exactly', () => {
+    assert.deepEqual(gate.reasonCode.enum, [...GATE_REASON_CODES]);
+  });
+
+  test('gate.decision enum matches GATE_DECISIONS exactly', () => {
+    assert.deepEqual(gate.decision.enum, [...GATE_DECISIONS]);
+  });
+
+  test('every production reason code validates inside a real gate block', () => {
+    // The enum comparison above is a shape check; this one proves the artifact
+    // an emitter actually produces is accepted for each code.
+    for (const reasonCode of GATE_REASON_CODES) {
+      const artifact = minimalArtifact({
+        gate: {
+          decision: 'NO_GO',
+          reasonCode,
+          tier: 'field',
+          inputs: {},
+          inputsHash: '0123456789abcdef',
+          schemaVersion: '1',
+        },
+      });
+      assert.equal(validate(artifact), true, `${reasonCode}: ${JSON.stringify(validate.errors)}`);
+    }
   });
 });

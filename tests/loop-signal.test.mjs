@@ -4,6 +4,7 @@
  * Coverage:
  * - Layer 1: deriveLoopSignalFromArtifact — all 4 signal values
  * - Layer 2: deriveLoopSignalFromRunsDiff — STOP_OSCILLATED + passthrough
+ * - Coverage qualification: CONVERGED is unreachable on an incomplete run (#2331)
  * - Schema validation: suggestedLoopSignal optional in review-artifact.schema.json
  * - Integration: finalizeArtifact (review-plan.mjs) emits suggestedLoopSignal
  */
@@ -14,7 +15,9 @@ import assert from 'node:assert/strict';
 import {
   deriveLoopSignalFromArtifact,
   deriveLoopSignalFromRunsDiff,
+  qualifyLoopSignalForCoverage,
 } from '../src/lib/loop-signal.mjs';
+import { deriveReviewCoverage } from '../src/lib/review-coverage.mjs';
 import { compileReviewArtifactValidator } from './helpers/schema-validator.mjs';
 
 // Compiled once at module scope (Ajv 2020, strict:false — same as review-artifact-schema.test.mjs)
@@ -298,6 +301,93 @@ describe('deriveLoopSignalFromRunsDiff', () => {
     };
     const latestArtifact = { decision: 'auto-approve', findings: [] };
     assert.equal(deriveLoopSignalFromRunsDiff(diff, latestArtifact), 'CONVERGED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Coverage qualification (#2331)
+// ---------------------------------------------------------------------------
+
+const COMPLETE_COVERAGE = deriveReviewCoverage([
+  { id: 'u-a', status: 'completed' },
+  { id: 'u-b', status: 'completed' },
+]);
+const PARTIAL_COVERAGE = deriveReviewCoverage([
+  { id: 'u-a', status: 'completed' },
+  { id: 'u-b', status: 'timed_out' },
+]);
+const NOT_EXECUTED_COVERAGE = deriveReviewCoverage([
+  { id: 'u-a', status: 'timed_out' },
+  { id: 'u-b', status: 'failed' },
+]);
+
+describe('qualifyLoopSignalForCoverage', () => {
+  test('keeps CONVERGED when the run completed every required unit', () => {
+    assert.equal(qualifyLoopSignalForCoverage('CONVERGED', COMPLETE_COVERAGE), 'CONVERGED');
+  });
+
+  test('demotes CONVERGED to NO_SIGNAL on partial coverage', () => {
+    assert.equal(qualifyLoopSignalForCoverage('CONVERGED', PARTIAL_COVERAGE), 'NO_SIGNAL');
+  });
+
+  test('demotes CONVERGED to NO_SIGNAL when nothing required ran', () => {
+    assert.equal(qualifyLoopSignalForCoverage('CONVERGED', NOT_EXECUTED_COVERAGE), 'NO_SIGNAL');
+  });
+
+  test('keeps CONVERGED when coverage is unknown (no observation)', () => {
+    assert.equal(qualifyLoopSignalForCoverage('CONVERGED', null), 'CONVERGED');
+    assert.equal(qualifyLoopSignalForCoverage('CONVERGED', undefined), 'CONVERGED');
+    assert.equal(qualifyLoopSignalForCoverage('CONVERGED', { status: 'bogus' }), 'CONVERGED');
+  });
+
+  test('demotes a `complete` label that its own counters contradict', () => {
+    const lying = { ...COMPLETE_COVERAGE, completedRequiredUnits: 1 };
+    assert.equal(qualifyLoopSignalForCoverage('CONVERGED', lying), 'NO_SIGNAL');
+  });
+
+  test('leaves every non-CONVERGED signal untouched', () => {
+    for (const signal of ['NO_SIGNAL', 'REVISE_REQUIRED', 'ESCALATE_HUMAN', 'STOP_OSCILLATED']) {
+      assert.equal(qualifyLoopSignalForCoverage(signal, PARTIAL_COVERAGE), signal);
+      assert.equal(qualifyLoopSignalForCoverage(signal, COMPLETE_COVERAGE), signal);
+    }
+  });
+});
+
+describe('deriveLoopSignalFromRunsDiff coverage qualification (#2331)', () => {
+  const cleanRun = (reviewCoverage) => ({
+    runId: 'r2',
+    decision: 'auto-approve',
+    findings: [],
+    reviewCoverage,
+  });
+
+  test('a clean partial run reports NO_SIGNAL, not CONVERGED', () => {
+    const diff = { oscillated: [] };
+    assert.equal(deriveLoopSignalFromRunsDiff(diff, cleanRun(PARTIAL_COVERAGE)), 'NO_SIGNAL');
+  });
+
+  test('a clean complete run still reports CONVERGED', () => {
+    const diff = { oscillated: [] };
+    assert.equal(deriveLoopSignalFromRunsDiff(diff, cleanRun(COMPLETE_COVERAGE)), 'CONVERGED');
+  });
+
+  test('a record without coverage keeps its pre-#2331 signal', () => {
+    const diff = { oscillated: [] };
+    assert.equal(deriveLoopSignalFromRunsDiff(diff, cleanRun(undefined)), 'CONVERGED');
+  });
+
+  test('qualifies the run embedded in diff.runs as well', () => {
+    const diff = {
+      oscillated: [],
+      runs: [cleanRun(COMPLETE_COVERAGE), cleanRun(PARTIAL_COVERAGE)],
+    };
+    assert.equal(deriveLoopSignalFromRunsDiff(diff), 'NO_SIGNAL');
+  });
+
+  test('partial coverage does not soften an escalation', () => {
+    const diff = { oscillated: [] };
+    const escalating = { ...cleanRun(PARTIAL_COVERAGE), decision: 'human-review-required' };
+    assert.equal(deriveLoopSignalFromRunsDiff(diff, escalating), 'ESCALATE_HUMAN');
   });
 });
 

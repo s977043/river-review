@@ -11,7 +11,7 @@ title: CLI Spec — `river gc`
 
 - `river gc` を **レビュー CLI として扱わない**。`river review plan` / `river review exec` / `river review verify` の姉妹コマンドではなく、それらが生成した成果物を回収するためのメンテナンス CLI として独立している。
 - 決定論の意味は「同じファイルシステム状態・同じ retention policy・同じ基準日 (`--now`) を与えると、常に同じ削除対象集合が得られる」こと。順序の曖昧さはパスの昇順（lexicographic）で解消する。
-- 安定性ラベルは **Beta**。フラグ追加は minor、既定値の変更・フラグ削除・意味変更は major bump とする。ただし以下の既定値は **Stable Contract** として扱う:
+- 安定性ラベルは **Internal**。`river` CLI は npm 未公開で配布経路を持たない。フラグの追加・削除・意味変更と既定値の変更はいずれも Stable Contract の対象外であり、minor 以下のリリースで入る。既定値は次のとおり:
   - `--retention-days` 既定値 `90`
   - `--max-entries` 既定値 `1000`
   - `--max-size-mb` 既定値 `500`

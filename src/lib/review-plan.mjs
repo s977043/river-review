@@ -39,7 +39,7 @@ import { resolveAvailableContexts, resolveAvailableDependencies } from './utils.
 import { scoreReview } from './scoring/engine.mjs';
 import { scanArtifactsForHumanApproval } from './plan-review/approval-scan.mjs';
 import { deriveLoopSignalFromArtifact } from './loop-signal.mjs';
-import { deriveGateDecision } from './gate-decision.mjs';
+import { coverageIncompleteForGate, deriveGateDecision } from './gate-decision.mjs';
 import { computeStrictBlock } from './deterministic-gate.mjs';
 import { runDeterministicExecGateIfEnabled } from './deterministic-exec-gate.mjs';
 import { SEVERITY_RANK } from './finding-factory.mjs';
@@ -125,6 +125,8 @@ function finalizeArtifact(
         strictBlock: gateContext.strictBlock === true,
         // Epic #1347 §11.8 (c2) (#1401): deterministic gate could not run → 5c.
         deterministicUnrunnable: gateContext.deterministicUnrunnable === true,
+        // #2337 (opt-in, default OFF): see coverageIncompleteForGate.
+        coverageIncomplete: gateContext.coverageIncomplete === true,
         config: gateContext.config ?? {},
       });
     } catch {
@@ -802,6 +804,9 @@ export async function runReviewPlan({
   // Opt-in only (double-gated below); false on the replay path and whenever the
   // host has not enabled the executor, so the artifact contract is unchanged.
   let gateDeterministicUnrunnable = false;
+  // #2337: coverage is observed by the orchestration boundary; the exec path
+  // reduces it here through the SSoT predicate (false unless the host opted in).
+  let gateCoverageIncomplete = false;
 
   const configArtifacts =
     config && typeof config.artifacts === 'object' && config.artifacts ? config.artifacts : {};
@@ -947,6 +952,7 @@ export async function runReviewPlan({
       });
       if (execGate.strictBlock === true) gateStrictBlock = true;
       gateDeterministicUnrunnable = execGate.deterministicUnrunnable === true;
+      gateCoverageIncomplete = coverageIncompleteForGate(review?.reviewCoverage, process.env);
       executionTrace = {
         // #1868: replay 経路（runReviewExecReplay）と同じ順序で engine 側の
         // debug.execution 観測を引き継ぐ。2 経路で挙動を揃えないと、同じ設定でも
@@ -1037,6 +1043,7 @@ export async function runReviewPlan({
       riskMapDigest,
       strictBlock: gateStrictBlock,
       deterministicUnrunnable: gateDeterministicUnrunnable,
+      coverageIncomplete: gateCoverageIncomplete,
       config,
     },
   });
@@ -1105,6 +1112,17 @@ function normalizeFindingForArtifact(finding, index, phase) {
   }
   if (typeof finding.suggestion === 'string' && finding.suggestion.length > 0) {
     out.suggestion = finding.suggestion;
+  }
+  // #2334: same reachability rule as `scope` and `criterionRefs`
+  // (src/cli/render.mjs) — a schema field that stops at the finding object is
+  // an unreachable spec. `validation` is what the Finding Critic writes, so
+  // this allowlist is the only thing standing between the opt-in stage and
+  // `schemas/review-artifact.schema.json`'s `finding.validation`. Guarded on a
+  // present object rather than truthiness, so the key appears only on runs
+  // where the Critic actually ran (the default emits nothing here, exactly as
+  // before).
+  if (finding.validation && typeof finding.validation === 'object') {
+    out.validation = finding.validation;
   }
   return out;
 }

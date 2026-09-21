@@ -175,3 +175,137 @@ describe('#2323 inline runner summary marker', () => {
     assert.equal(posted.updatedId, 55);
   });
 });
+
+// -----------------------------------------------------------------------------
+// #2330: the dedup search matches the marker as a PREFIX, not anywhere in the
+// body. A comment that quotes the marker (docs discussion, a support thread
+// pasting the action's output) must not be overwritten in place.
+//
+// The quoting bodies below are hand-written literals: under the previous
+// `includes` search every one of them was a hit, so reverting the predicate
+// fails here instead of staying self-consistent.
+
+/** A human comment that happens to contain the canonical marker mid-body. */
+const QUOTING_CANONICAL = [
+  'The action posts a body like this:',
+  '',
+  '```markdown',
+  '<!-- river-review -->',
+  '## River Review',
+  '```',
+].join('\n');
+
+/** The same, for the legacy spelling. */
+const QUOTING_LEGACY = `Older releases used to emit <!-- river-reviewer --> at the top.`;
+
+describe('#2330 marker search is prefix-anchored', () => {
+  for (const [label, body] of [
+    ['legacy only', '<!-- river-reviewer -->\nold'],
+    ['both markers', '<!-- river-reviewer -->\n<!-- river-review -->\nold'],
+    ['canonical only', '<!-- river-review -->\nold'],
+  ]) {
+    it(`updates in place when the body starts with the marker (${label})`, async () => {
+      const posted = await run({ comments: [{ id: 70, body }] });
+      assert.equal(posted.created, null, 'must not create a second comment');
+      assert.equal(posted.updatedId, 70);
+      assert.equal(posted.updated, RENDERED_BODY);
+      assert.ok(
+        posted.updated.startsWith('<!-- river-review -->'),
+        'the rewritten body carries the canonical marker at offset 0, which is what makes ' +
+          'the legacy acceptance self-terminating'
+      );
+      assert.ok(!posted.updated.includes('<!-- river-reviewer -->'));
+    });
+  }
+
+  it('does not overwrite a comment that only quotes the canonical marker', async () => {
+    const posted = await run({ comments: [{ id: 71, body: QUOTING_CANONICAL }] });
+    assert.equal(posted.updatedId, null, 'a quoting comment must never be updated');
+    assert.equal(posted.created, RENDERED_BODY);
+  });
+
+  it('does not overwrite a comment that only quotes the legacy marker', async () => {
+    const posted = await run({ comments: [{ id: 72, body: QUOTING_LEGACY }] });
+    assert.equal(posted.updatedId, null);
+    assert.equal(posted.created, RENDERED_BODY);
+  });
+
+  it('skips a quoting comment and still updates the real one behind it', async () => {
+    const posted = await run({
+      comments: [
+        { id: 73, body: QUOTING_CANONICAL },
+        { id: 74, body: '<!-- river-review -->\nold' },
+      ],
+    });
+    assert.equal(posted.created, null);
+    assert.equal(posted.updatedId, 74);
+  });
+
+  it('creates a comment when only unrelated bodies exist', async () => {
+    const posted = await run({ comments: [{ id: 75, body: 'looks good to me' }] });
+    assert.equal(posted.updatedId, null);
+    assert.equal(posted.created, RENDERED_BODY);
+  });
+
+  it('tolerates a non-string body', async () => {
+    const posted = await run({ comments: [{ id: 76, body: null }] });
+    assert.equal(posted.updatedId, null);
+    assert.equal(posted.created, RENDERED_BODY);
+  });
+
+  it('exports the prefix predicate', () => {
+    assert.equal(typeof postComment.isRiverReviewComment, 'function');
+    assert.equal(postComment.isRiverReviewComment('<!-- river-review -->\nx'), true);
+    assert.equal(postComment.isRiverReviewComment('<!-- river-reviewer -->\nx'), true);
+    assert.equal(postComment.isRiverReviewComment(QUOTING_CANONICAL), false);
+    assert.equal(postComment.isRiverReviewComment(undefined), false);
+  });
+});
+
+describe('#2330 inline runner uses the same prefix-anchored search', () => {
+  it('imports the predicate from post-comment.cjs rather than re-deriving it', () => {
+    assert.equal(postInlineComments.COMMENT_MARKER, postComment.COMMENT_MARKER);
+    assert.equal(postInlineComments.LEGACY_COMMENT_MARKER, postComment.LEGACY_COMMENT_MARKER);
+  });
+
+  for (const [label, body] of [
+    ['legacy only', '<!-- river-reviewer -->\n## River Reviewer'],
+    ['both markers', '<!-- river-reviewer -->\n<!-- river-review -->\n## River Reviewer'],
+    ['canonical only', '<!-- river-review -->\n## River Reviewer'],
+  ]) {
+    it(`updates the summary in place (${label})`, async () => {
+      const posted = await runInline([{ id: 80, body }]);
+      assert.equal(posted.created, null);
+      assert.equal(posted.updatedId, 80);
+      assert.ok(posted.updated.startsWith('<!-- river-review -->'));
+      assert.ok(!posted.updated.includes('<!-- river-reviewer -->'));
+    });
+  }
+
+  it('does not overwrite a comment that only quotes the canonical marker', async () => {
+    const posted = await runInline([{ id: 81, body: QUOTING_CANONICAL }]);
+    assert.equal(posted.updatedId, null);
+    assert.ok(posted.created.startsWith('<!-- river-review -->'));
+  });
+
+  it('does not overwrite a comment that only quotes the legacy marker', async () => {
+    const posted = await runInline([{ id: 82, body: QUOTING_LEGACY }]);
+    assert.equal(posted.updatedId, null);
+    assert.ok(posted.created.startsWith('<!-- river-review -->'));
+  });
+
+  it('skips a quoting comment and still updates the real summary behind it', async () => {
+    const posted = await runInline([
+      { id: 83, body: QUOTING_CANONICAL },
+      { id: 84, body: '<!-- river-reviewer -->\n## River Reviewer' },
+    ]);
+    assert.equal(posted.created, null);
+    assert.equal(posted.updatedId, 84);
+  });
+
+  it('creates a summary when only unrelated bodies exist', async () => {
+    const posted = await runInline([{ id: 85, body: 'nice work' }]);
+    assert.equal(posted.updatedId, null);
+    assert.ok(posted.created.startsWith('<!-- river-review -->'));
+  });
+});

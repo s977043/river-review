@@ -168,8 +168,11 @@
             "OSCILLATION_DETECTED",
             "RISK_MAP_HUMAN_REVIEW",
             "UNKNOWN_RISK_ACTION",
+            "STRICT_BLOCK",
+            "DETERMINISTIC_UNRUNNABLE",
             "SKIPPED_BY_POLICY",
             "NOT_EXECUTED",
+            "COVERAGE_INCOMPLETE",
             "BLOCKING_FINDINGS",
             "MINOR_FINDINGS_OBSERVE",
             "UNDETERMINED",
@@ -514,6 +517,51 @@
             "dismissed-duplicate",
             "needs-human-judgment"
           ]
+        },
+        "validation": {
+          "type": "object",
+          "description": "Optional Finding Critic verdict (#1978 / #2334). Present only when the Evidence-Grounded Adversarial Review stage ran (opt-in: `review.findingCritic.mode: active` or env RIVER_FINDING_CRITIC=1); absent on every default run. Additive/optional — a consumer that ignores it reads the finding exactly as before. Distinct from `validatedStatus`: the two vocabularies only partially overlap and nothing here is written to `validatedStatus` (src/lib/finding-critic.mjs:80-99). Display and triage metadata — MUST NOT override severity or gate decisions.",
+          "additionalProperties": false,
+          "required": ["protocol", "finalStatus"],
+          "properties": {
+            "protocol": {
+              "type": "string",
+              "description": "Protocol identifier. SSoT: PROTOCOL_ID (src/lib/finding-critic.mjs).",
+              "const": "evidence-grounded-adversarial-v1"
+            },
+            "rounds": {
+              "type": "integer",
+              "description": "Number of Reviewer<->Critic rounds actually run. 0 when the Critic never answered.",
+              "minimum": 0
+            },
+            "finalStatus": {
+              "type": "string",
+              "description": "Terminal state of the finding after validation. SSoT: FINAL_STATUS (src/lib/finding-critic.mjs); this enum is pinned to Object.values(FINAL_STATUS) by tests/finding-critic-stage.test.mjs and MUST NOT be extended independently.",
+              "enum": [
+                "confirmed",
+                "withdrawn-by-reviewer",
+                "dismissed-by-evidence",
+                "dismissed-hallucination",
+                "needs-human-judgment",
+                "out-of-ask",
+                "critic-timeout"
+              ]
+            },
+            "askRelevance": {
+              "type": "string",
+              "description": "Relevance of the finding to the original ask. SSoT: ASK_RELEVANCE (src/lib/finding-critic.mjs). A separate axis from `scope`; the two are orthogonal.",
+              "enum": ["in-ask", "uncertain", "out-of-ask"]
+            },
+            "humanReview": {
+              "type": "boolean",
+              "description": "True when the outcome is degraded or contested and a human must decide. Every fail-safe path (Critic timeout, unparseable response, deterministic contradiction, exhausted inner loop) sets this; a silent Critic never reads as an approval."
+            },
+            "reasons": {
+              "type": "array",
+              "description": "Reason codes and detail strings. Codes come from FAILSAFE_REASON (src/lib/finding-critic.mjs); free-text detail may follow them.",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
         }
       }
     }

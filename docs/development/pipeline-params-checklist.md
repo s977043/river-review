@@ -26,6 +26,7 @@
 - [ ] `tests/prompt-compiler-active.test.mjs`—`review.promptCompiler.mode` の active 配線テスト（ADR-006 / #1861）
 - [ ] `tests/prompt-compiler-paired.test.mjs`—observe の観測を legacy / compiled の 2 系統として取り出す導線のテスト（ADR-006 / #1860）
 - [ ] `tests/prompt-compiler-ab.test.mjs`—legacy を送った run と compiled を送った run の A/B 比較経路のテスト（ADR-006 / #1880）
+- [ ] `tests/finding-critic-stage.test.mjs`—Finding Critic の opt-in 配線テスト。`deferFindingCritic` の伝播と、既定 off で挙動が変わらないことの突合（#2334 / #1978）
 - [ ] `tests/review-viewpoint-active-mode.test.mjs`—Review Viewpoint active/observe 配線と `generateReview` / `buildPrompt` への Obligation 伝播テスト（#2252）
 - [ ] `scripts/measure-review-viewpoints.mjs`—Phase 8 効果測定ハーネスの `generateReview` 呼び出し（mode 別の prompt / comment / latency 比較、#2252）
 - [ ] `tests/integration/local-review.test.mjs`—統合テスト（関連する場合）

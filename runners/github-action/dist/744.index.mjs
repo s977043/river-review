@@ -66,7 +66,7 @@ const RESOLVED_BASIS = 'absent_from_current_run';
  * @returns {{ new: ComparedFinding[], resolved: ComparedFinding[], persisting: ComparedFinding[], scoreChanged: ComparedFinding[], summary: object }}
  */
 function diffReviews(previousFindings, currentFindings, options = {}) {
-  const coverageStatus = normalizeCoverageStatus(options?.currentCoverage);
+  const coverageStatus = (0,_review_coverage_mjs__WEBPACK_IMPORTED_MODULE_1__/* .normalizeCoverageStatus */ .aW)(options?.currentCoverage);
   const prev = (0,_finding_factory_mjs__WEBPACK_IMPORTED_MODULE_0__/* .annotateFingerprints */ .ic)(previousFindings ?? []);
   const curr = (0,_finding_factory_mjs__WEBPACK_IMPORTED_MODULE_0__/* .annotateFingerprints */ .ic)(currentFindings ?? []);
 
@@ -158,37 +158,6 @@ function diffReviews(previousFindings, currentFindings, options = {}) {
     scoreChanged: scoreChangedFindings,
     summary,
   };
-}
-
-/**
- * Map a `reviewCoverage` object onto the four-state coverage vocabulary.
- * Anything that is not one of the three `REVIEW_COVERAGE_STATUSES` values —
- * including a missing object — is `unknown`, so a caller that supplies nothing
- * is never reported as having complete coverage.
- *
- * @param {object|null|undefined} coverage
- * @returns {CoverageStatus}
- */
-function normalizeCoverageStatus(coverage) {
-  const status = coverage?.status;
-  if (!_review_coverage_mjs__WEBPACK_IMPORTED_MODULE_1__/* .REVIEW_COVERAGE_STATUSES */ .Vb.includes(status)) return 'unknown';
-  // Cross-check the label against the counts it summarizes.
-  // `deriveReviewCoverage` keeps the two consistent, but a run record written
-  // by an older build (or hand-edited) can carry `complete` next to counts
-  // that say otherwise. Believing the label alone would re-open exactly the
-  // over-claim this module is closing, so an inconsistent record is demoted
-  // rather than trusted.
-  if (status === 'complete') {
-    const { requiredUnits, completedRequiredUnits } = coverage;
-    if (
-      Number.isFinite(requiredUnits) &&
-      Number.isFinite(completedRequiredUnits) &&
-      completedRequiredUnits < requiredUnits
-    ) {
-      return completedRequiredUnits > 0 ? 'partial' : 'not_executed';
-    }
-  }
-  return status;
 }
 
 /**

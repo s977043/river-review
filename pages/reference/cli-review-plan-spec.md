@@ -11,7 +11,7 @@ title: river review plan CLI 仕様
 
 - `river review plan` は **PlanGate v6** をはじめとする上流ワークフローが生成した artifact を入力とし、レビュー計画（実行対象 skill の選定・順序）と、その計画に基づく実行結果を [Review Artifact](./review-artifact.md) スキーマで出力する。
 - 既存の `river run` がローカル開発者向けの汎用エントリであるのに対し、`river review plan` は **CI / バッチ実行で安定した契約** を提供することを目的とする。
-- 安定性ラベルは **Beta**（参考: [Stable Interfaces](./stable-interfaces.md)）。CLI オプションの追加は minor、削除/意味変更は major bump とする。
+- 安定性ラベルは **Internal**（参考: [Stable Interfaces](./stable-interfaces.md)）。`river` CLI は npm 未公開で配布経路を持たない。CLI オプションの追加・削除・意味変更はいずれも Stable Contract の対象外であり、minor 以下のリリースで入る。
 
 ## Usage
 
@@ -168,9 +168,8 @@ severity の内部語彙（`blocker` / `warning` / `nit`）と JSON スキーマ
 ## 互換性ポリシー
 
 - `--artifact` で渡せる ID 集合は Artifact Input Contract に従い拡張される。
-- フラグ追加は minor、フラグの削除・意味変更・既定値変更は major bump とする。
-- gate 判定の exit code の意味（`0` / `1` / `2` / `3`）は **Stable Contract** として扱い、変更には major bump を要する。
-- usage error（引数の解釈失敗）の exit code は Stable Contract に含めない。CLI サーフェス全体の Beta ラベルに従う。#1709 では引数エラーの検出層による粒度が変わった（parse 層は `1`、ハンドラ層の設定エラーは `3`）が、この変更は minor で入っている。用途別の裁定は [Stable Interfaces](./stable-interfaces.md) の「終了コードの安定性」が SSoT。
+- gate 判定の exit code の意味（`0` / `1` / `2` / `3`）は **Stable Contract** として扱い、変更には major bump を要する。利用者がこの意味へ到達するのは GitHub Action の step / job の終了コード経由であり、Action から到達するのは `0` / `1` / `3` である（`2` は CLI の `--warn-on` 経由のみ）。
+- usage error（引数の解釈失敗）の exit code は Stable Contract に含めない。CLI サーフェス全体の Internal ラベルに従う。#1709 では引数エラーの検出層による粒度が変わった（parse 層は `1`、ハンドラ層の設定エラーは `3`）が、この変更は minor で入っている。用途別の裁定は [Stable Interfaces](./stable-interfaces.md) の「終了コードの安定性」が SSoT。
 - JSON 出力スキーマの破壊的変更は [Review Artifact](./review-artifact.md) のバージョニングに従う。
 
 ## 関連ドキュメント

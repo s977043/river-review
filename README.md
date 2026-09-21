@@ -190,6 +190,8 @@ River Review は **artifact-driven review agent** です。外部から渡され
 
 詳細な仕様は [`river review plan` CLI 仕様](pages/reference/cli-review-plan-spec.md) / [`river review exec` CLI 仕様](pages/reference/cli-review-exec-spec.md) を参照してください。
 
+この CLI は npm へ公開しておらず、リポジトリを clone して `npm install` した開発者向けのサーフェスです。利用者向けの入口は GitHub Action と Claude Code / Codex プラグインになります。
+
 ```bash
 # 設計レビュー: plan 単体を検査
 river review plan --artifact plan=./artifacts/plan.md
@@ -238,7 +240,7 @@ jobs:
 
 <!-- x-release-please-start-version -->
 
-最新リリース: [v1.119.0](https://github.com/s977043/river-review/releases/latest)
+最新リリース: [v1.120.0](https://github.com/s977043/river-review/releases/latest)
 
 <!-- x-release-please-end -->
 

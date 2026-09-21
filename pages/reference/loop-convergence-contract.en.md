@@ -23,6 +23,12 @@ Derivation order: ESCALATE_HUMAN → REVISE_REQUIRED → CONVERGED → NO_SIGNAL
 
 **Layer 2** — `river runs diff --output json` (3+ runs): adds `STOP_OSCILLATED` when `oscillated` is non-empty. Oscillation takes priority over all Layer 1 values.
 
+Layer 2 additionally qualifies the derived value by the latest run's `reviewCoverage` ([Review Coverage](https://github.com/s977043/river-review/blob/main/src/lib/review-coverage.mjs)) as of PR #2335, on both the 2-run and the 3+-run `river runs diff` paths: when that coverage is `partial` or `not_executed`, `CONVERGED` is demoted to `NO_SIGNAL`. A run whose review units timed out is indistinguishable from a clean one on the two inputs Layer 1 reads (zero blocking findings plus an auto-approve decision), so returning `CONVERGED` there stops the caller's loop on the strength of a review that never finished. Only `CONVERGED` is demoted; the other values already point away from stopping and accepting. A run record without `reviewCoverage` counts as `unknown` and is not demoted, because a missing observation is not an observation of incompleteness.
+
+Because of that demotion, a `partial` or `not_executed` run no longer stops the loop through `CONVERGED`, and a loop over runs that keep coming back incomplete never terminates on its own. **Callers must therefore also carry a Layer 3 bound such as `STOP_MAX_ITERATIONS`.**
+
+What the demotion covers is limited to the Layer 2 signal. When an artifact carries a `gate` block, the reference agent below treats `gate` as authoritative over the signal, so by default a Layer 1 derived `GO` can still stop a `partial` run (#2337). To stop on the gate path as well, enable `RIVER_GATE_COVERAGE=1` (described below). The asymmetry is deliberate: **the Layer 2 demotion is on by default, while feeding incompleteness into `gate` is opt-in**.
+
 **Layer 3** — Caller-synthesized (River Review deliberately does **not** emit these):
 
 | Value                  | When to synthesize                                             |
@@ -49,6 +55,10 @@ Above `suggestedLoopSignal` sits `gate`, a machine-readable signal that composes
 - **Replay check (integrity verification)**: since derivation is pure, callers can re-feed `gate.inputs` into `deriveGateDecision` and compare decisions (`inputsHash` is a lightweight summary for S3 regression comparison, not a tamper-proof control). `inputs.riskMapDigest` is computed as "YAML load → `JSON.stringify` → sha256 first 16 hex"
 - **Circuit breaker**: `gate.configSnapshot.maxConsecutiveAutoGo` is advisory. Counting consecutive auto-GOs and enforcing checkpoints is the caller's job, and **when the caller has its own limit, the stricter value (min) wins**
 - The reference enforcement implementation lives in `examples/loop-reference-agent/`; conformance fixtures (`tests/fixtures/gate-conformance/`) let external callers verify their enforcement behavior
+- **Carrying incompleteness into the gate is opt-in (#2320 / #2337)**: whether the fact "the review ran but never saw its subject" reaches the gate is the host's choice. Both are OFF by default, and the default gate output is unchanged bit for bit
+  - `RIVER_GATE_STAGING_UNRUNNABLE=1`: a deterministic-gate run whose subject files never reached the sandbox is treated as `deterministicUnrunnable` and lands on `ESCALATE` (`DETERMINISTIC_UNRUNNABLE`). A checker handed an empty sandbox exits 0 on its own, so that exit code is not a verdict about the change. It never folds into `strictBlock`
+  - `RIVER_GATE_COVERAGE=1`: a run whose `reviewCoverage.status` is `partial` or `not_executed` lands on `NO_GO` (`COVERAGE_INCOMPLETE`). This is an **independent gate input**, not a `suggestedLoopSignal` downgrade. Through the signal the outcome would depend on `decision`: `auto-approve` reaches `NO_GO`, while `human-review-recommended` stays on rule 8's `GO_WITH_OBSERVATION` (exit 0). As its own input both stop uniformly. **Today this takes effect on the `river run --gate` path only; on the `review exec` path it is a no-op until the engine returns `reviewCoverage`**
+  - An ABSENT coverage object is never read as incomplete. "No observation" and "observed a gap" are different facts, and only the second one may block a merge
 
 `gate` is advisory. Enforcement (`--gate` mode, strict_block routing) lands in Epic #1347 S4.
 
