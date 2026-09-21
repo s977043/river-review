@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ALLOWLIST_RELATIVE_PATH } from '../src/lib/deterministic-command-orchestrator.mjs';
+import { endHookStdin } from './helpers/hook-stdin.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
@@ -83,7 +84,9 @@ async function runHook({ cwd, env, stdin = '' }) {
   let stderr = '';
   child.stdout.on('data', (d) => (stdout += d));
   child.stderr.on('data', (d) => (stderr += d));
-  child.stdin.end(stdin);
+  // #2341: the hook may exit before it reads stdin; that write must not
+  // become an uncaught EPIPE.
+  endHookStdin(child, stdin);
   const code = await new Promise((resolve) => child.on('close', resolve));
   return { code, stdout, stderr };
 }
@@ -94,7 +97,7 @@ async function runNode({ env, request }) {
   let stderr = '';
   child.stdout.on('data', (d) => (stdout += d));
   child.stderr.on('data', (d) => (stderr += d));
-  child.stdin.end(JSON.stringify(request));
+  endHookStdin(child, JSON.stringify(request));
   const code = await new Promise((resolve) => child.on('close', resolve));
   return { code, stdout, stderr };
 }
