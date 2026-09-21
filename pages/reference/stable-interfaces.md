@@ -13,7 +13,7 @@ River Review は OSS として成長中であり、内部実装は変更され�
 - スキル定義（`schemas/skill.schema.json`）と、その意味論（severity/confidence など）
 - `--output json` が出す成果物（`schemas/output.schema.json`）の最上位構造（`issues[]` / `summary` / `decision`）と各フィールドの意味
 - GitHub Actions（`runners/github-action/action.yml`）のinputs / outputsと動作
-- GitHub Action の step / job の終了コードと、gate 判定用の終了コード `0` / `1` / `2` / `3` の意味。`gate: true` の run では step の終了コードがそのまま job の成否になり、GO / GO_WITH_OBSERVATION は `0`、NO_GO は `1`、ESCALATE は `3` である（`runners/github-action/action.yml` の `gate` input）
+- GitHub Action の step / job の終了コードと、gate 判定用の終了コード `0` / `1` / `2` / `3` の意味。`gate: true` の run では、step の終了コードがそのまま job の成否になる（`runners/github-action/action.yml` の `gate` input）。GO / GO_WITH_OBSERVATION は `0`、NO_GO は `1`、ESCALATE は `3` である。Action から到達するのは `0` / `1` / `3` であり、`2` は CLI の `--warn-on`（Internal）経由でのみ到達する。4 値すべての意味が Stable である点は変わらない
 - PR コメントの idempotent 更新方式（marker）
 
 終了コードは用途で粒度を分けています。CI がゲート結果として読む上記の値だけを Stable Contract に含めます。利用者はこの終了コードへ GitHub Action 経由で到達し、step の終了コードがジョブの成否になります。usage error（引数の解釈失敗）の終了コードは含めず、CLI サーフェス全体のラベルである Internal に従います。後述の「終了コードの安定性」の表は、同じ終了コードを CLI リファレンスの文脈で宣言したものです。Stable Contract が保証するのは、そこへ GitHub Action 経由で到達する面になります。裁定の根拠も同じ節にあります。
@@ -169,7 +169,7 @@ usage error の終了コードはレビュー結果を含みません。表す�
 次は破壊的変更として扱いません。minor もしくは patch のリリースで入ります。
 
 - usage error（引数の解釈失敗）の終了コードの変更（CLI サーフェス全体の Internal ラベルに従う）
-- 値を消費しない面からのオプション受理範囲の縮小（#2065）。ここでいうオプション名/意味の変更・削除は、オプションそのものの削除を指す。受理をやめた面では、その flag を付けた呼び出し自体が usage error となり exit 1 で落ちる。ただし値は一度も読まれていなかったため、呼び出しから flag を外せば従来と同じ結果が得られる。移行が呼び出し側の 1 行修正で済むことを根拠に、こちらは破壊的変更として扱わない。影響を受ける面の一覧と移行手順は [Runner / CLI リファレンス](./runner-cli-reference.md#base-acceptance-scope) にある。後置サブコマンド語の解決（#2081）は例外である。`river skills --base main import` は flag を外しても `import/` のレビューには戻らず、`--base` を伴わない `river skills --output json import` も同じくサブコマンドとして動く。サブコマンド語と同名のディレクトリは `river skills ./import` と書く
+- 値を消費しない面からのオプション受理範囲の縮小（#2065）。受理をやめた面では、その flag を付けた呼び出し自体が usage error となり exit 1 で落ちる。ただし値は一度も読まれていなかったため、呼び出しから flag を外せば従来と同じ結果が得られる。移行が呼び出し側の 1 行修正で済むことを根拠に、こちらは破壊的変更として扱わない。影響を受ける面の一覧と移行手順は [Runner / CLI リファレンス](./runner-cli-reference.md#base-acceptance-scope) にある。後置サブコマンド語の解決（#2081）は例外である。`river skills --base main import` は flag を外しても `import/` のレビューには戻らず、`--base` を伴わない `river skills --output json import` も同じくサブコマンドとして動く。サブコマンド語と同名のディレクトリは `river skills ./import` と書く
 
 Action は安定動作のため、`@main` ではなく **リリースタグへピン留め**することを推奨します（例: `@v1.22.0`）。
 

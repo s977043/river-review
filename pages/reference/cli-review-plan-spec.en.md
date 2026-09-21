@@ -11,7 +11,7 @@ title: river review plan CLI Spec
 
 - `river review plan` consumes artifacts produced by upstream workflows such as **PlanGate v6**, generates a review plan (skill selection / ordering), and emits the execution result as a [Review Artifact](./review-artifact.en.md).
 - While `river run` is a generic local-developer entry point, `river review plan` provides a **stable contract for CI / batch execution**.
-- Stability label: **Beta** (see [Stable Interfaces](./stable-interfaces.en.md)). Adding flags is a minor bump; removing or changing the meaning of flags is a major bump.
+- Stability label: **Internal** (see [Stable Interfaces](./stable-interfaces.en.md)). The `river` CLI is not published to npm and has no distribution channel. Adding, removing, or changing the meaning of a flag is outside the Stable Contract and ships in a minor or patch release.
 
 ## Usage
 
@@ -170,7 +170,7 @@ When `--advisory-only` is set, fail/warn judgement is disabled and only internal
 - The set of `--artifact` IDs grows together with the Artifact Input Contract.
 - Adding flags is a minor bump; removing flags or changing their meaning / default value is a major bump.
 - Gate-decision exit codes (`0` / `1` / `2` / `3`) are part of the **stable contract** and require a major bump to change.
-- Usage-error exit codes (failure to interpret arguments) are not part of the stable contract; they follow the Beta label of the CLI surface as a whole. #1709 changed the granularity by detection layer (parse layer → `1`, handler-layer configuration errors → `3`) and shipped as a minor. The split by purpose is defined in "Exit Code Stability" in [Stable Interfaces](./stable-interfaces.en.md), which is the SSoT.
+- Usage-error exit codes (failure to interpret arguments) are not part of the stable contract; they follow the Internal label of the CLI surface as a whole. #1709 changed the granularity by detection layer (parse layer → `1`, handler-layer configuration errors → `3`) and shipped as a minor. The split by purpose is defined in "Exit Code Stability" in [Stable Interfaces](./stable-interfaces.en.md), which is the SSoT.
 - Breaking changes in JSON output follow the versioning rules of [Review Artifact](./review-artifact.en.md).
 
 ## See Also
