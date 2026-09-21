@@ -181,6 +181,8 @@ The primary integration today is with **PlanGate v6**: River Review receives `pl
 
 See [`river review plan` CLI spec](pages/reference/cli-review-plan-spec.en.md) and [`river review exec` CLI spec](pages/reference/cli-review-exec-spec.en.md) for full details.
 
+This CLI is not published to npm; it is a surface for developers who cloned the repository and ran `npm install`. The entry points for users are the GitHub Action and the Claude Code / Codex plugins.
+
 ```bash
 # Design review: inspect the plan alone
 river review plan --artifact plan=./artifacts/plan.md
