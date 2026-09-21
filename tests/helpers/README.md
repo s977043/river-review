@@ -18,6 +18,7 @@
 | `memory.mjs`      | `createTempMemory({ layout, entries })`, `makeMemoryEntry()`, `writeMemoryIndex()` |
 | `spawn-guard.mjs` | `spawnSyncGuarded(command, args, options)`, `SPAWN_TIMEOUT_MS`                     |
 | `gh-stub.mjs`     | `createGhStub(routes)`, `runScriptWithStub(script, args, stub)`, `callFunction()`  |
+| `hook-stdin.mjs`  | `endHookStdin(child, payload)`                                                     |
 
 ## 子プロセスを起動するテスト
 
