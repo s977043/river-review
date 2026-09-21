@@ -13,10 +13,10 @@ River Review は OSS として成長中であり、内部実装は変更され�
 - スキル定義（`schemas/skill.schema.json`）と、その意味論（severity/confidence など）
 - `--output json` が出す成果物（`schemas/output.schema.json`）の最上位構造（`issues[]` / `summary` / `decision`）と各フィールドの意味
 - GitHub Actions（`runners/github-action/action.yml`）のinputs / outputsと動作
-- GitHub Action の gate 判定用の終了コード（`--fail-on` / `--warn-on` / `--gate` が返す `0` / `1` / `2` / `3`）
+- GitHub Action の step / job の終了コードと、gate 判定用の終了コード `0` / `1` / `2` / `3` の意味。`gate: true` の run では step の終了コードがそのまま job の成否になり、GO / GO_WITH_OBSERVATION は `0`、NO_GO は `1`、ESCALATE は `3` である（`runners/github-action/action.yml` の `gate` input）
 - PR コメントの idempotent 更新方式（marker）
 
-終了コードは用途で粒度を分けています。CI がゲート結果として読む上記の値だけを Stable Contract に含めます。利用者はこの終了コードへ GitHub Action 経由で到達し、step の終了コードがジョブの成否になります。usage error（引数の解釈失敗）の終了コードは含めず、CLI サーフェス全体のラベルである Internal に従います。裁定の根拠は後述の「終了コードの安定性」にあります。
+終了コードは用途で粒度を分けています。CI がゲート結果として読む上記の値だけを Stable Contract に含めます。利用者はこの終了コードへ GitHub Action 経由で到達し、step の終了コードがジョブの成否になります。usage error（引数の解釈失敗）の終了コードは含めず、CLI サーフェス全体のラベルである Internal に従います。後述の「終了コードの安定性」の表は、同じ終了コードを CLI リファレンスの文脈で宣言したものです。Stable Contract が保証するのは、そこへ GitHub Action 経由で到達する面になります。裁定の根拠も同じ節にあります。
 
 ## コンポーネント安定性ラベル
 
@@ -162,7 +162,7 @@ usage error の終了コードはレビュー結果を含みません。表す�
 
 次を変更する場合は、破壊的変更として major version bump を必要とします。
 
-- gate 判定用の終了コード（`--fail-on` / `--warn-on` / `--gate` が返す `0` / `1` / `2` / `3`）の意味変更
+- gate 判定用の終了コード `0` / `1` / `2` / `3` の意味変更（GitHub Action では step / job の終了コードとして到達する）
 - Action inputs / outputs の変更・削除
 - スキルスキーマの必須フィールド変更、既存フィールドの意味変更
 

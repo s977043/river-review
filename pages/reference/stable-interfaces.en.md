@@ -13,10 +13,10 @@ The following elements are treated as "public interfaces":
 - Skill definitions (`schemas/skill.schema.json`) and their semantics (severity/confidence, etc.)
 - The artifact emitted by `--output json` (`schemas/output.schema.json`): its top-level structure (`issues[]` / `summary` / `decision`) and the meaning of those fields
 - GitHub Actions (`runners/github-action/action.yml`) inputs / outputs and behavior
-- GitHub Action gate-decision exit codes (`0` / `1` / `2` / `3` as returned by `--fail-on` / `--warn-on` / `--gate`)
+- GitHub Action step / job exit codes, and the meaning of the gate-decision exit codes `0` / `1` / `2` / `3`. On a run with `gate: true`, the step's exit code decides whether the job succeeds: GO / GO_WITH_OBSERVATION exit `0`, NO_GO exits `1`, and ESCALATE exits `3` (the `gate` input in `runners/github-action/action.yml`)
 - Idempotent update method for PR comments (marker)
 
-Exit codes are declared at two granularities by purpose. Only the gate-decision codes above, the ones CI reads as the gate result, belong to the Stable Contract. Users reach these codes through the GitHub Action, where the step's exit code decides whether the job succeeds. Usage-error exit codes (failure to interpret arguments) are excluded and follow **Internal**, the label of the CLI surface as a whole. See "Exit Code Stability" below for the reasoning.
+Exit codes are declared at two granularities by purpose. Only the gate-decision codes above, the ones CI reads as the gate result, belong to the Stable Contract. Users reach these codes through the GitHub Action, where the step's exit code decides whether the job succeeds. Usage-error exit codes (failure to interpret arguments) are excluded and follow **Internal**, the label of the CLI surface as a whole. The "Exit Code Stability" table below declares the same exit codes in the context of the CLI reference; what the Stable Contract guarantees is the surface users reach through the GitHub Action. See that section for the reasoning.
 
 ## Component Stability Labels
 
@@ -152,7 +152,7 @@ See `runners/github-action/action.yml` for definition.
 
 Changing the following requires a major version bump as a breaking change:
 
-- Changing the meaning of a gate-decision exit code (`0` / `1` / `2` / `3` as returned by `--fail-on` / `--warn-on` / `--gate`)
+- Changing the meaning of a gate-decision exit code `0` / `1` / `2` / `3` (users reach it as the GitHub Action step / job exit code)
 - Changing/Removing Action inputs / outputs
 - Changing required fields in Skill Schema, or changing meanings of existing fields
 
