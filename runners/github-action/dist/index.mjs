@@ -30291,7 +30291,7 @@ function checkMemorySyncInterval(ms, option) {
 /* harmony export */   Hh: () => (/* binding */ load)
 /* harmony export */ });
 /* unused harmony exports CHOMPING_CLIP, CHOMPING_KEEP, CHOMPING_MODE, CHOMPING_STRIP, COLLECTION_STYLE, COLLECTION_STYLE_BLOCK, COLLECTION_STYLE_FLOW, CORE_SCHEMA, DEFAULT_SCALAR_STYLE_RULES, DUMP_SCHEMA, EVENT_ALIAS, EVENT_DOCUMENT, EVENT_ID, EVENT_MAPPING, EVENT_POP, EVENT_SCALAR, EVENT_SEQUENCE, FAILSAFE_SCHEMA, JSON_SCHEMA, NOT_RESOLVED, SCALAR_STYLE, SCALAR_STYLE_DOUBLE_QUOTED, SCALAR_STYLE_FOLDED_BLOCK, SCALAR_STYLE_LITERAL_BLOCK, SCALAR_STYLE_PLAIN, SCALAR_STYLE_SINGLE_QUOTED, Schema, VISIT_BREAK, VISIT_SKIP, YAML11_SCHEMA, YAMLException, binaryTag, boolCoreTag, boolJsonTag, boolYaml11Tag, constructFromEvents, defineMappingTag, defineScalarTag, defineSequenceTag, eventsToAst, floatCoreTag, floatJsonTag, floatYaml11Tag, getScalarValue, intCoreTag, intJsonTag, intYaml11Tag, jsToAst, legacyMapTag, loadAll, mapTag, mergeTag, nullCoreTag, nullJsonTag, nullYaml11Tag, omapTag, pairsTag, parseEvents, present, realMapTag, seqTag, setTag, strTag, timestampTag, visit */
-/*! js-yaml 5.4.1 https://github.com/nodeca/js-yaml @license MIT */
+/*! js-yaml 5.4.2 https://github.com/nodeca/js-yaml @license MIT */
 //#region src/tag.ts
 /**
 * Returned by a scalar resolver when the source does not match its tag.
@@ -33153,6 +33153,7 @@ function doubleQuoteWhitespaceOnly(layout) {
 function applyForceQuotesOption(layout) {
 	if (!layout.presenterOptions.forceQuotes) return;
 	if (layout.isKey || layout.style !== SCALAR_STYLE.PLAIN) return;
+	if (layout.node.tag !== layout.presenterOptions.schema.defaultScalarTag.tagName) return;
 	layout.style = layout.node.value.includes("\n") ? SCALAR_STYLE.DOUBLE_QUOTED : _preferredQuotedStyle(layout);
 }
 function tryLongOrMultilineAsBlock(layout) {

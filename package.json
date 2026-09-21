@@ -101,7 +101,7 @@
     "ajv-formats": "^3.0.1",
     "commander": "^15.0.0",
     "gray-matter": "^4.0.3",
-    "js-yaml": "^5.4.1",
+    "js-yaml": "^5.4.2",
     "minimatch": "^10.2.6",
     "openai": "^7.17.0",
     "ora": "^9.4.1",
