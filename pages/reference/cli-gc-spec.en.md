@@ -11,7 +11,7 @@ title: CLI Spec — `river gc`
 
 - `river gc` is **not a review CLI**. It is not a sibling of `river review plan` / `river review exec` / `river review verify`; it is an independent maintenance CLI that collects the artifacts those commands produce.
 - "Deterministic" means: given the same filesystem state, the same retention policy, and the same reference timestamp (`--now`), the same set of files is always chosen for removal. Ties are broken by lexicographic path order.
-- Stability: **Beta**. Adding flags is minor; changing defaults, removing flags, or altering semantics requires a major bump. The following defaults are **Stable Contract**:
+- Stability: **Internal**. The `river` CLI is not published to npm and has no distribution channel. Adding, removing, or altering the semantics of a flag, and changing a default, are all outside the Stable Contract and ship in a minor or patch release. The defaults are:
   - `--retention-days` default `90`
   - `--max-entries` default `1000`
   - `--max-size-mb` default `500`

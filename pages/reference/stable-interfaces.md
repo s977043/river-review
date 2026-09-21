@@ -4,7 +4,7 @@ title: 安定インターフェース（CLI / GitHub Actions）
 
 River Review は OSS として成長中であり、内部実装は変更される可能性があります。一方で、利用者が安心して導入できるように **安定した契約（stable contract）** を定義します。
 
-破壊的変更（breaking change）は原則として **major version bump** が必要です。ただし何を破壊的変更と見なすかは、後述のコンポーネント安定性ラベルと Stable Contract の列挙で決まります。Beta のサーフェスなら、Stable Contract に載っていない要素の変更は minor 以下で入ります。
+破壊的変更（breaking change）は原則として **major version bump** が必要です。ただし何を破壊的変更と見なすかは、後述のコンポーネント安定性ラベルと Stable Contract の列挙で決まります。Beta / Internal のサーフェスなら、Stable Contract に載っていない要素の変更は minor 以下で入ります。
 
 ## 安定した契約（Stable Contract）
 
@@ -13,28 +13,26 @@ River Review は OSS として成長中であり、内部実装は変更され�
 - スキル定義（`schemas/skill.schema.json`）と、その意味論（severity/confidence など）
 - `--output json` が出す成果物（`schemas/output.schema.json`）の最上位構造（`issues[]` / `summary` / `decision`）と各フィールドの意味
 - GitHub Actions（`runners/github-action/action.yml`）のinputs / outputsと動作
-- CLI（`river` / `river-review`）のコマンド/オプション
-- CLI の gate 判定用の終了コード（`--fail-on` / `--warn-on` / `--gate` が返す `0` / `1` / `2` / `3`）
+- GitHub Action の step / job の終了コードと、gate 判定用の終了コード `0` / `1` / `2` / `3` の意味。`gate: true` の run では、step の終了コードがそのまま job の成否になる（`runners/github-action/action.yml` の `gate` input）。GO / GO_WITH_OBSERVATION は `0`、NO_GO は `1`、ESCALATE は `3` である。Action から到達するのは `0` / `1` / `3` であり、`2` は CLI の `--warn-on`（Internal）経由でのみ到達する。4 値すべての意味が Stable である点は変わらない
 - PR コメントの idempotent 更新方式（marker）
 
-CLI の項目はコマンド名とオプション名、およびその意味を指します。どの面がそのオプションを受理するかという範囲は含みません。受理範囲は CLI サーフェス全体のラベルである Beta に従います（後述の「バージョニング（破壊的変更の扱い）」を参照）。
-
-終了コードは用途で粒度を分けています。CI がゲート結果として読む上記の値だけを Stable Contract に含めます。usage error（引数の解釈失敗）の終了コードは含めず、CLI サーフェス全体のラベルである Beta に従います。裁定の根拠は後述の「終了コードの安定性」にあります。
+終了コードは用途で粒度を分けています。CI がゲート結果として読む上記の値だけを Stable Contract に含めます。利用者はこの終了コードへ GitHub Action 経由で到達し、step の終了コードがジョブの成否になります。usage error（引数の解釈失敗）の終了コードは含めず、CLI サーフェス全体のラベルである Internal に従います。後述の「終了コードの安定性」の表は、同じ終了コードを CLI リファレンスの文脈で宣言したものです。Stable Contract が保証するのは、そこへ GitHub Action 経由で到達する面になります。裁定の根拠も同じ節にあります。
 
 ## コンポーネント安定性ラベル
 
 各サーフェスの現在の安定性レベルを示します。
 
-| ラベル           | 定義                                                              |
-| ---------------- | ----------------------------------------------------------------- |
-| **Stable**       | 破壊的変更にはメジャーバンプが必要。本番利用推奨                  |
-| **Beta**         | マイナーバージョンで API が変わる可能性がある。非推奨化は事前通知 |
-| **Experimental** | 予告なく変更・削除される可能性がある。評価目的での利用を推奨      |
+| ラベル           | 定義                                                                    |
+| ---------------- | ----------------------------------------------------------------------- |
+| **Stable**       | 破壊的変更にはメジャーバンプが必要。本番利用推奨                        |
+| **Beta**         | マイナーバージョンで API が変わる可能性がある。非推奨化は事前通知       |
+| **Experimental** | 予告なく変更・削除される可能性がある。評価目的での利用を推奨            |
+| **Internal**     | リポジトリを clone した開発者向け。配布経路を持たず外部利用は想定しない |
 
 | サーフェス                                                                                 | ラベル       | 備考                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | GitHub Action                                                                              | Beta         | v0.x のため breaking changes の可能性あり                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| CLI (`river` コマンド)                                                                     | Beta         | サーフェス全体は Beta。Stable Contract に列挙した要素のみ Stable 扱い                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| CLI (`river` コマンド)                                                                     | Internal     | npm 未公開（`package.json` が `private: true`）で配布経路を持たない。リポジトリを clone した開発者向けのサーフェスにあたる。利用者向けの入口は GitHub Action と Claude Code / Codex プラグインである                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Skill Schema (`schemas/skill.schema.json`)                                                 | Beta         | CI バリデーション済み、フィールド拡張の可能性あり                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Flow Schema (`schemas/flow.schema.json`)                                                   | Experimental | #2013 で追加した contract。実行エンジンは未実装。`schemas/flow-entry-map.schema.json` と `flows/entry-map.json` も同じ Experimental 扱い                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Agent Contract (`schemas/agent-contract.schema.json`)                                      | Experimental | #2014 で追加した contract。実行エンジンは未実装                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -86,7 +84,7 @@ CLI の項目はコマンド名とオプション名、およびその意味を�
 - `--context <list>`: 利用可能なコンテキスト（例: `diff,fullFile`）
 - `--dependency <list>`: 利用可能な依存（例: `code_search,test_runner`）
 - `--base <ref>`: 差分の基準となるブランチ / ref。`run` / `skills` / `review plan|exec|route` が同じ解決経路を共有し、差分を読まない面はこの flag を受理しない。どの面が受理するか、値の検証、usage error の exit code はいずれも Stable Contract の対象外であり、SSoT は [Runner CLI リファレンス](./runner-cli-reference.md)
-- `--entry <name>`（Beta）: `review plan` と `review exec` が受理し、出力 artifact にレビュー Flow の pin（`flow`）と必須入力（`evidenceRequirements`）を追加する。`review exec` では Flow を走らせた各 step の結果（`steps`、Epic #2011 AC7 P2 では記録のみ）も追加する。flag と 3 フィールドは Stable Contract の対象外で、SSoT は [Runner CLI リファレンス](./runner-cli-reference.md#entry-acceptance-scope)
+- `--entry <name>`（Internal）: `review plan` と `review exec` が受理し、出力 artifact にレビュー Flow の pin（`flow`）と必須入力（`evidenceRequirements`）を追加する。`review exec` では Flow を走らせた各 step の結果（`steps`、Epic #2011 AC7 P2 では記録のみ）も追加する。flag と 3 フィールドは Stable Contract の対象外で、SSoT は [Runner CLI リファレンス](./runner-cli-reference.md#entry-acceptance-scope)
 - `--baseline <path>`: 過去のレビュー JSON（findings 配列）と比較して回帰を表示する
 - `--save`: レビュー実行をプロジェクトの result store（`.river/runs/`）に保存する
 - `--reviewers <roles|auto>`: レビュアーロールをカンマ区切りで指定、または `auto` でシグナルに基づく自動選択（詳細: [runner-cli-reference.md の `--reviewers` セクション](./runner-cli-reference.md#--reviewers-フラグ)）
@@ -110,14 +108,14 @@ severity の rank（低→高）: `info`=0 / `minor`=1 / `major`=2 / `critical`=
 
 終了コードは用途で 2 段階に分けて宣言します。
 
-| 用途                                                                           | ラベル | 変更に必要な bump                              |
-| ------------------------------------------------------------------------------ | ------ | ---------------------------------------------- |
-| gate 判定（`--fail-on` / `--warn-on` / `--gate` が返す `0` / `1` / `2` / `3`） | Stable | major                                          |
-| usage error（引数の解釈失敗）                                                  | Beta   | CLI サーフェス全体のラベルに従う（minor で可） |
+| 用途                                                                           | ラベル   | 変更に必要な bump                              |
+| ------------------------------------------------------------------------------ | -------- | ---------------------------------------------- |
+| gate 判定（`--fail-on` / `--warn-on` / `--gate` が返す `0` / `1` / `2` / `3`） | Stable   | major                                          |
+| usage error（引数の解釈失敗）                                                  | Internal | CLI サーフェス全体のラベルに従う（minor で可） |
 
 gate 判定用の終了コードは CI のジョブ成否へ直結します。閾値の意味が黙って変わると、利用者は失敗を検知できません。そのため Stable Contract に含めます。変更には major version bump が必要です。なお `--gate` の `3` は ESCALATE（人間の承認が必要）を表します。`river review` 系では、ハンドラ層の設定エラーにも `3` を割り当てています（[`river review plan` 仕様](./cli-review-plan-spec.md)）。
 
-usage error の終了コードはレビュー結果を含みません。表すのは「引数が受理されなかった」ことだけです。誤用の検出漏れを塞ぐたびに検出層と粒度が動きます。そのため CLI サーフェス全体の Beta ラベルへ従わせます。実例として #1709 では、引数エラーを exit 0 から exit 1 へ横断統一しました。粒度はさらに、parse 層の `1` とハンドラ層の設定エラーの `3` へ整理されています。この一連の変更は v1.71.0（#1735）と v1.72.0（#1746）という minor リリースで入りました。
+usage error の終了コードはレビュー結果を含みません。表すのは「引数が受理されなかった」ことだけです。誤用の検出漏れを塞ぐたびに検出層と粒度が動きます。そのため CLI サーフェス全体の Internal ラベルへ従わせます。実例として #1709 では、引数エラーを exit 0 から exit 1 へ横断統一しました。粒度はさらに、parse 層の `1` とハンドラ層の設定エラーの `3` へ整理されています。この一連の変更は v1.71.0（#1735）と v1.72.0（#1746）という minor リリースで入りました。
 
 ## GitHub Actions（`river-review`）リファレンス（最小）
 
@@ -164,15 +162,14 @@ usage error の終了コードはレビュー結果を含みません。表す�
 
 次を変更する場合は、破壊的変更として major version bump を必要とします。
 
-- `river` CLI のオプション名/意味の変更・削除
-- gate 判定用の終了コード（`--fail-on` / `--warn-on` / `--gate` が返す `0` / `1` / `2` / `3`）の意味変更
+- gate 判定用の終了コード `0` / `1` / `2` / `3` の意味変更（GitHub Action では step / job の終了コードとして到達する）
 - Action inputs / outputs の変更・削除
 - スキルスキーマの必須フィールド変更、既存フィールドの意味変更
 
 次は破壊的変更として扱いません。minor もしくは patch のリリースで入ります。
 
-- usage error（引数の解釈失敗）の終了コードの変更（CLI サーフェス全体の Beta ラベルに従う）
-- 値を消費しない面からのオプション受理範囲の縮小（#2065）。上の「オプション名/意味の変更・削除」はオプションそのものの削除を指す。受理をやめた面では、その flag を付けた呼び出し自体が usage error となり exit 1 で落ちる。ただし値は一度も読まれていなかったため、呼び出しから flag を外せば従来と同じ結果が得られる。移行が呼び出し側の 1 行修正で済むことを根拠に、こちらは破壊的変更として扱わない。影響を受ける面の一覧と移行手順は [Runner / CLI リファレンス](./runner-cli-reference.md#base-acceptance-scope) にある。後置サブコマンド語の解決（#2081）は例外である。`river skills --base main import` は flag を外しても `import/` のレビューには戻らず、`--base` を伴わない `river skills --output json import` も同じくサブコマンドとして動く。サブコマンド語と同名のディレクトリは `river skills ./import` と書く
+- usage error（引数の解釈失敗）の終了コードの変更（CLI サーフェス全体の Internal ラベルに従う）
+- 値を消費しない面からのオプション受理範囲の縮小（#2065）。受理をやめた面では、その flag を付けた呼び出し自体が usage error となり exit 1 で落ちる。ただし値は一度も読まれていなかったため、呼び出しから flag を外せば従来と同じ結果が得られる。移行が呼び出し側の 1 行修正で済むことを根拠に、こちらは破壊的変更として扱わない。影響を受ける面の一覧と移行手順は [Runner / CLI リファレンス](./runner-cli-reference.md#base-acceptance-scope) にある。後置サブコマンド語の解決（#2081）は例外である。`river skills --base main import` は flag を外しても `import/` のレビューには戻らず、`--base` を伴わない `river skills --output json import` も同じくサブコマンドとして動く。サブコマンド語と同名のディレクトリは `river skills ./import` と書く
 
 Action は安定動作のため、`@main` ではなく **リリースタグへピン留め**することを推奨します（例: `@v1.22.0`）。
 
