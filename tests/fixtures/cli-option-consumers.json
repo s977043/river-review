@@ -160,6 +160,7 @@
       "promote list",
       "promote approve",
       "promote reject",
+      "promote retarget",
       "promote template",
       "promote retire",
       "promote review-effectiveness"

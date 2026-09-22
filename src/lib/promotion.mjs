@@ -186,7 +186,9 @@ export function listPromotionCandidates(index, { includeInactive = false } = {})
 export function isSecuritySensitive(entry) {
   const pc = getPromotionCandidate(entry);
   const tags = (entry?.metadata?.tags ?? []).join(' ');
-  const haystack = `${tags} ${pc?.clusterKey ?? ''}`.toLowerCase();
+  const target = pc?.proposedTarget;
+  const haystack =
+    `${tags} ${pc?.clusterKey ?? ''} ${target?.kind ?? ''} ${target?.id ?? ''}`.toLowerCase();
   return SECURITY_RE.test(haystack);
 }
 

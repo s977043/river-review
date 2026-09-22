@@ -323,6 +323,25 @@ describe('isSecuritySensitive', () => {
     assert.equal(sensitive('repository-layer-boundary'), false);
   });
 
+  test('retarget cannot bypass PlanGate when the new target is security-sensitive', () => {
+    const entry = makeCandidate('skill-x', 'unclear', [fp(1), fp(2)]);
+    applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-security/references/AUTHZ.md',
+      approver: 'alice',
+      reason: 'security experience knowledge',
+      now: decidedNow,
+    });
+    applyPromotionDecision(entry, {
+      decision: 'approved',
+      approver: 'alice',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+
+    assert.equal(isSecuritySensitive(entry), true);
+    assert.equal(buildPrScaffold(entry).requiresPlanGate, true);
+  });
+
   // Canary: plural / derivational forms MUST be caught. A stem that only matched
   // when followed by a word boundary silently skipped these (the warning-1 bug).
   test('canary: plurals and derivations are caught (warning-1 regression guard)', () => {
