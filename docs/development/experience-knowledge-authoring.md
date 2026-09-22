@@ -10,14 +10,12 @@ River Review のレビュー結果・失敗経験・修正履歴から得た知�
 
 ## Asset boundaries
 
-| Asset | Put here | Do not put here |
-| --- | --- | --- |
-| `SKILL.md` | activation, responsibility, routing, hard guard, output contract | 長い背景説明、大量の失敗事例、公式ドキュメントの写し |
-| `references/` | experience knowledge, troubleshooting, examples, exceptions, workaround | 常時必須の短い制約、実行時に必ず読む必要がある全ルール |
-| fixture / test | should-detect / should-not-detect の再現可能な証拠 | 背景説明だけの文章 |
-| rule | 全対象へ常時適用する短い制約 | 長い理由説明、局所的な例外 |
-| Riverbed | observation, evidence, candidate, approval / lifecycle history | 実行ロジックの正本 |
-| Docs / ADR | 設計理由、背景、運用方針 | review runtime の詳細判断 |
+- `SKILL.md`: activation / responsibility / routing / hard guard / output contract。長い背景説明、大量の失敗事例、公式ドキュメントの写しは置かない。
+- `references/`: experience knowledge / troubleshooting / examples / exceptions。常時必須の短い制約は隠さない。
+- fixture / test: should-detect / should-not-detect の再現可能な証拠。背景説明だけの文章は置かない。
+- rule: 全対象へ常時適用する短い制約。長い理由説明や局所的な例外は Reference へ分ける。
+- Riverbed: observation / evidence / candidate / approval / lifecycle history。実行ロジックの正本にはしない。
+- Docs / ADR: 設計理由、背景、運用方針。review runtime の詳細判断は Skill / Reference 側へ置く。
 
 ## Classification rule
 
