@@ -849,6 +849,10 @@ function parsePromoteOption(arg, args, parsed) {
     return 'continue';
   }
   if (arg === '--target-kind') {
+    if (parsed.promoteSubcommand !== 'retarget') {
+      parsed.promoteUnknownOption = arg;
+      return 'break';
+    }
     const value = args.shift();
     if (!value || value.startsWith('-')) {
       console.error('Error: --target-kind option requires a value.');
@@ -859,6 +863,10 @@ function parsePromoteOption(arg, args, parsed) {
     return 'continue';
   }
   if (arg === '--target-id') {
+    if (parsed.promoteSubcommand !== 'retarget') {
+      parsed.promoteUnknownOption = arg;
+      return 'break';
+    }
     const value = args.shift();
     if (!value || value.startsWith('-')) {
       console.error('Error: --target-id option requires a value.');
