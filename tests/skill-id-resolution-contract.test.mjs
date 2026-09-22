@@ -4,10 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import {
-  resolveSkillId,
-  SkillIdResolutionError,
-} from '../src/lib/skill-id-resolver.mjs';
+import { resolveSkillId, SkillIdResolutionError } from '../src/lib/skill-id-resolver.mjs';
 
 async function makeRoot(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'rr-skill-id-'));
