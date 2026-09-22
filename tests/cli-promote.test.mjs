@@ -222,7 +222,7 @@ describe('river promote retarget', () => {
         ],
         { env: { RIVER_NOW: '2026-07-22T00:00:00.000Z' } }
       );
-  
+
       assert.equal(res.code, 0, res.stderr);
       assert.match(res.stdout, /must be approved again/);
       const template = await runCliInProcess([
@@ -234,6 +234,7 @@ describe('river promote retarget', () => {
       ]);
       assert.equal(template.code, 0, template.stderr);
       assert.match(template.stdout, /not approved/);
+    }
   );
 
   test('requires a reason and rejects unsafe reference paths', async (t) => {
