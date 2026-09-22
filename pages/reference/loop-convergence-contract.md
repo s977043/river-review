@@ -29,6 +29,10 @@ Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](ht
 
 この降格が効く範囲は Layer 2 の signal だけです。artifact が `gate` ブロックを持つ場合、下記の参照実装は gate を signal より優先します。そのため既定では、Layer 1 由来の `GO` により `partial` の run でも停止しえます（#2337）。gate 側でも止めたい場合は、後述の `RIVER_GATE_COVERAGE=1` を有効にしてください。**Layer 2 の降格は既定で有効、gate 側の不完全性判定は opt-in** という非対称は意図したものです。
 
+`oscillated` の判定側にも coverage の条件が入りました（PR #2336）。`oscillated` は present → absent → present という並びで検知しますが、この absent は「fingerprint がその run に無い」という測定でしかありません。reviewer がタイムアウトした run は finding を落とすため、完走した 2 つの run に挟まれた不完全な run 1 件だけで偽の振動が成立していました。そこで absent の run の coverage が `partial` / `not_executed` のときは、その absent を振動の根拠として数えません。coverage が `complete` または `unknown` の absent はこれまでどおり数えるため、本物の振動は引き続き `STOP_OSCILLATED` になります。
+
+降格ではなく検知側の条件としました。理由は、`deriveLoopSignalFromRunsDiff` から読めるのが最新 run の coverage だけという点にあります。present → absent → present の最新 run は finding が present 側にあたり、疑うべき absent は手前の run にあります。したがって最新 run の coverage は振動の真偽を判定する観測値になりません。判定は run ごとの timeline を持つ `review-differ.mjs` 側に置いています。
+
 **Layer 3** — 呼び出し元が合成（River Review は意図的に出力**しない**）:
 
 | 値                     | 合成タイミング                                                      |

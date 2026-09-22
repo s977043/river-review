@@ -178,6 +178,8 @@ fail-safe の適用範囲について 1 点補足します。issue #2320 は、s
 
 この乖離は PR #2327 直後に実際に再発しました。`runs diff` の `suggestedLoopSignal` が coverage を一切読まず、reviewer がタイムアウトした run でも `CONVERGED` を返していた件です（issue #2331）。PR #2335 は Layer 2（`deriveLoopSignalFromRunsDiff`）に coverage qualification を入れ、`partial` / `not_executed` の run では `CONVERGED` を `NO_SIGNAL` に降格させました。Layer 1（`deriveLoopSignalFromArtifact`）と、その値を読む `gate`（`CONVERGED` → `GO` / `CONVERGED_CLEAN`）は据え置きです。gate は公開済みのマージ可否判断であり、そこへ coverage を持ち込むかは #2320 と同じ「公開ゲートの契約を広げるか」の決定になるためです。この据え置きにより、`gate` を持つ artifact では参照実装が gate を優先して `partial` の run でも停止しえます。この点は #2337 として切り出し、PR #2340 が gate 側の opt-in（`RIVER_GATE_COVERAGE=1` で `NO_GO` / `COVERAGE_INCOMPLETE`）として決着させました。Layer 2 の降格は既定で有効、gate 側は opt-in という非対称が現在の到達点です。
 
+同じ未完走 run は `STOP_OSCILLATED` 側からも停止を作っていました（issue #2336）。`oscillated` の absent は「fingerprint がその run に無い」という測定であり、reviewer がタイムアウトした run は finding を落とすためです。PR #2336 の対応は、絶対の降格ではなく検知条件として入れました。absent の run の coverage が `partial` / `not_executed` のとき、その absent を振動の根拠として数えません。判定を signal 層に置きませんでした。`deriveLoopSignalFromRunsDiff` から読めるのは最新 run の coverage だけであり、疑うべき absent は手前の run にあるためです。run ごとの coverage を持つのは `review-differ.mjs` の timeline 側にあたります。
+
 ## 本 ADR が決めないこと
 
 - `authorResponse.state` / `resolution.state` / `verification.state` の具体的な値。D2 は「feedback 8 値と重ねない」という制約だけを固定する

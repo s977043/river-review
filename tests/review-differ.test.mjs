@@ -394,3 +394,100 @@ describe('diffReviews coverage label cross-check (#2325)', () => {
     }
   });
 });
+
+// #2336 — a run that did not finish drops the findings its reviewer would have
+// reported, so present→absent→present appears out of nothing and the caller
+// gets STOP_OSCILLATED (terminal for the reference loop). The absence has to be
+// discounted where the per-run coverage is known: the oscillation timeline.
+describe('diffRunHistory oscillation requires a real absence (#2336)', () => {
+  const COMPLETE = deriveReviewCoverage([
+    { id: 'u-security', status: 'completed' },
+    { id: 'u-testing', status: 'completed' },
+  ]);
+  const PARTIAL = deriveReviewCoverage([
+    { id: 'u-security', status: 'timed_out' },
+    { id: 'u-testing', status: 'completed' },
+  ]);
+  const NOT_EXECUTED = deriveReviewCoverage([
+    { id: 'u-security', status: 'timed_out' },
+    { id: 'u-testing', status: 'failed' },
+  ]);
+
+  const rec = (runId, timestamp, findings, reviewCoverage) => ({
+    runId,
+    timestamp,
+    findings,
+    ...(reviewCoverage === undefined ? {} : { reviewCoverage }),
+  });
+
+  /** present → absent → present, with the absent run's coverage under test. */
+  const window = (middleCoverage) => {
+    const f = makeFinding();
+    return diffRunHistory([
+      rec('run-1', '2024-01-01T00:00:00Z', [f], COMPLETE),
+      rec('run-2', '2024-01-02T00:00:00Z', [], middleCoverage),
+      rec('run-3', '2024-01-03T00:00:00Z', [f], COMPLETE),
+    ]);
+  };
+
+  it('partial coverage on the absent run → not oscillation', () => {
+    assert.equal(window(PARTIAL).oscillated.length, 0);
+    assert.equal(window(PARTIAL).summary.oscillatedCount, 0);
+  });
+
+  it('not_executed coverage on the absent run → not oscillation', () => {
+    assert.equal(window(NOT_EXECUTED).oscillated.length, 0);
+  });
+
+  // The regression guard: the fix must not amount to switching the detector off.
+  it('complete coverage on the absent run → still oscillation', () => {
+    const result = window(COMPLETE);
+    assert.equal(result.oscillated.length, 1);
+    assert.equal(result.summary.oscillatedCount, 1);
+    assert.deepEqual(
+      result.oscillated[0].timeline.map((t) => t.present),
+      [true, false, true]
+    );
+  });
+
+  it('absent run with no coverage observation at all → still oscillation', () => {
+    // Pre-#2212 record shape. Demoting `unknown` would make oscillation
+    // undetectable for every run written before coverage was wired.
+    assert.equal(window(undefined).oscillated.length, 1);
+  });
+
+  it('a coverage label contradicted by its own counts does not launder the absence', () => {
+    const lying = { ...PARTIAL, status: 'complete' };
+    assert.equal(window(lying).oscillated.length, 0);
+  });
+
+  it('a discounted absence does not disable the detector for a later real one', () => {
+    const f = makeFinding();
+    const result = diffRunHistory([
+      rec('run-1', '2024-01-01T00:00:00Z', [f], COMPLETE),
+      rec('run-2', '2024-01-02T00:00:00Z', [], PARTIAL), // discounted
+      rec('run-3', '2024-01-03T00:00:00Z', [], COMPLETE), // real absence
+      rec('run-4', '2024-01-04T00:00:00Z', [f], COMPLETE), // re-appeared
+    ]);
+    assert.equal(result.oscillated.length, 1);
+  });
+
+  it('carries each run coverage status onto the timeline it is judged from', () => {
+    const timeline = window(COMPLETE).oscillated[0].timeline;
+    assert.deepEqual(
+      timeline.map((t) => t.coverageStatus),
+      ['complete', 'complete', 'complete']
+    );
+    const f = makeFinding();
+    const mixed = diffRunHistory([
+      rec('run-1', '2024-01-01T00:00:00Z', [f], COMPLETE),
+      rec('run-2', '2024-01-02T00:00:00Z', [f], PARTIAL),
+      rec('run-3', '2024-01-03T00:00:00Z', [], COMPLETE),
+      rec('run-4', '2024-01-04T00:00:00Z', [f], undefined),
+    ]);
+    assert.deepEqual(
+      mixed.oscillated[0].timeline.map((t) => t.coverageStatus),
+      ['complete', 'partial', 'complete', 'unknown']
+    );
+  });
+});

@@ -16,6 +16,7 @@ import path from 'node:path';
 
 import { runRunsCommand } from '../src/cli/commands/runs.mjs';
 import { deriveReviewCoverage } from '../src/lib/review-coverage.mjs';
+import { decideLoopAction } from '../examples/loop-reference-agent/reference-loop.mjs';
 
 const PARTIAL_COVERAGE = deriveReviewCoverage([
   { id: 'u-security', status: 'timed_out' },
@@ -145,5 +146,103 @@ describe('runs diff qualifies suggestedLoopSignal by run coverage (#2331)', () =
     });
     assert.ok(out.includes('suggestedLoopSignal: CONVERGED'));
     assert.ok(out.includes('background:#e8f5e9'));
+  });
+});
+
+// #2336 wiring tests.
+//
+// `review-differ.test.mjs` pins what `diffRunHistory` does once each run record
+// reaches it carrying `reviewCoverage`. That is one layer inside the change:
+// the value of this work depends on the `runs diff` handler loading whole run
+// records (it does — `loadRunRecord`, not a findings projection), on
+// `diffRunHistory` putting each run's coverage onto the oscillation timeline,
+// and on the reference loop no longer treating the result as terminal. So these
+// tests drive the CLI handler end-to-end over real run records on disk and run
+// its output through `decideLoopAction`.
+describe('runs diff does not manufacture oscillation from a partial run (#2336)', () => {
+  let tmpDir;
+
+  before(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'river-2336-'));
+    const storeDir = path.join(tmpDir, '.river', 'runs');
+    await fs.mkdir(storeDir, { recursive: true });
+    const write = (runId, timestamp, findings, reviewCoverage) =>
+      fs.writeFile(
+        path.join(storeDir, `${runId}.json`),
+        JSON.stringify({
+          runId,
+          timestamp,
+          phase: 'upstream',
+          decision: findings.length ? 'human-review-required' : 'auto-approve',
+          findings,
+          ...(reviewCoverage === undefined ? {} : { reviewCoverage }),
+        }),
+        'utf8'
+      );
+    // present → absent → present, where the absence is a reviewer that timed out.
+    await write('osc-a', '2024-02-01T00:00:00Z', [makeFinding()], COMPLETE_COVERAGE);
+    await write('osc-b', '2024-02-02T00:00:00Z', [], PARTIAL_COVERAGE);
+    await write('osc-c', '2024-02-03T00:00:00Z', [makeFinding()], COMPLETE_COVERAGE);
+    // The same window with a complete middle run: a genuine oscillation.
+    await write('gen-b', '2024-02-02T00:00:00Z', [], COMPLETE_COVERAGE);
+  });
+
+  after(async () => {
+    if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  const diffJson = async (ids) => {
+    const out = await captureStdout(async () => {
+      const code = await runRunsCommand(
+        {
+          runsSubcommand: 'diff',
+          runsId1: ids[0],
+          runsId2: ids[1],
+          runsIds: ids,
+          output: 'json',
+          storeDir: undefined,
+        },
+        tmpDir
+      );
+      assert.equal(code, 0);
+    });
+    return JSON.parse(out);
+  };
+
+  it('a timed-out reviewer between two complete runs is not an oscillation', async () => {
+    const diff = await diffJson(['osc-a', 'osc-b', 'osc-c']);
+    assert.equal(diff.summary.oscillatedCount, 0);
+    assert.deepEqual(diff.oscillated, []);
+    assert.notEqual(diff.suggestedLoopSignal, 'STOP_OSCILLATED');
+  });
+
+  it('the reference loop therefore keeps working instead of escalating', async () => {
+    const diff = await diffJson(['osc-a', 'osc-b', 'osc-c']);
+    // `revise-required` keeps the artifact off the ESCALATE_HUMAN path, so
+    // `stop-escalate` here could only come from the oscillation override.
+    const decision = decideLoopAction({
+      artifact: { decision: 'revise-required', findings: [makeFinding()] },
+      runsDiff: diff,
+      iteration: 1,
+      maxIterations: 5,
+    });
+    assert.notEqual(decision.signal, 'STOP_OSCILLATED');
+    assert.notEqual(decision.action, 'stop-escalate');
+    assert.equal(decision.signal, 'REVISE_REQUIRED');
+  });
+
+  it('a genuine oscillation across complete runs still stops the loop', async () => {
+    const diff = await diffJson(['osc-a', 'gen-b', 'osc-c']);
+    assert.equal(diff.summary.oscillatedCount, 1);
+    assert.equal(diff.suggestedLoopSignal, 'STOP_OSCILLATED');
+    // Same artifact as the negative case above: only the diff differs.
+    const decision = decideLoopAction({
+      artifact: { decision: 'revise-required', findings: [makeFinding()] },
+      runsDiff: diff,
+      iteration: 1,
+      maxIterations: 5,
+    });
+    assert.equal(decision.signal, 'STOP_OSCILLATED');
+    assert.equal(decision.action, 'stop-escalate');
   });
 });
