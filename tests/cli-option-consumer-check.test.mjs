@@ -83,10 +83,10 @@ const UPDATE_FIXTURE = process.env.RIVER_UPDATE_OPTION_CONSUMERS === '1';
  * 表を見なくても挙動変更の総量が PR の diff に現れるようにする
  * （canary の EXPECTED_CONTRACT_COUNTS と同じ役割）。
  *
- * 2026-09-05 実測: 71 オプション × 31 面 = 2201 組のうち受理 862 組、
- * うち消費されない 532 組。#2065 の `--base` は 0（5 面だけ受理し全部読む）。
+ * 2026-09-23 実測: 受理されるが消費されない組は 533。
+ * #2065 の `--base` は 0（受理する面ではすべて消費する）。
  */
-const EXPECTED_ACCEPTED_UNCONSUMED = 532;
+const EXPECTED_ACCEPTED_UNCONSUMED = 533;
 
 const CLI_ENV = { RIVER_OFFLINE: '1', ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', NO_COLOR: '1' };
 

@@ -160,6 +160,7 @@
       "promote list",
       "promote approve",
       "promote reject",
+      "promote retarget",
       "promote template",
       "promote retire",
       "promote review-effectiveness"
@@ -843,6 +844,16 @@
       "feedback add",
       "suppression add"
     ]
+  },
+  "--target-id": {
+    "writes": ["promoteTargetId"],
+    "readBy": ["promote"],
+    "acceptedUnconsumedOn": []
+  },
+  "--target-kind": {
+    "writes": ["promoteTargetKind"],
+    "readBy": ["promote"],
+    "acceptedUnconsumedOn": []
   },
   "--threshold": {
     "writes": ["promoteThreshold"],
