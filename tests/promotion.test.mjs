@@ -197,7 +197,10 @@ describe('promotion retarget', () => {
     assert.equal(entry.context.promotionCandidate.promotionStatus, 'candidate');
     assert.equal(entry.context.approval, undefined);
     assert.equal(entry.context.approvalHistory.length, 1);
-    assert.equal(entry.context.promotionCandidate.targetHistory[0].previousPromotionStatus, 'approved');
+    assert.equal(
+      entry.context.promotionCandidate.targetHistory[0].previousPromotionStatus,
+      'approved'
+    );
     assert.equal(buildPrScaffold(entry).eligible, false);
   });
 
