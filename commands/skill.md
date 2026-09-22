@@ -33,6 +33,5 @@ For `river skills export`, the same resolver contract applies to the export root
 `<export-root>/<skill-id>/SKILL.md`. Exported files carry the canonical ID under
 `metadata.rr.id`; the resolver verifies that value before returning a package.
 
-See `skill-id-resolver` and
-`docs/development/skill-id-resolution-contract.md` for the full ownership and
-degradation contract.
+See `docs/development/skill-id-resolution-contract.md` for the full ownership,
+resolution, and degradation contract.
