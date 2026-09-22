@@ -23,7 +23,7 @@ Steps:
    keyword-fallback or reconstruct the missing specialist knowledge by guess.
 5. For an ad-hoc user keyword (not an owner-skill delegation), an unresolved exact
    lookup may fall back to a case-insensitive search across the whole collection:
-   `rg -i -l "$ARGUMENTS" "$RIVER_ROOT/skills" -g 'SKILL.md'`.
+   `rg -i -l -F -g 'SKILL.md' -- "$ARGUMENTS" "$RIVER_ROOT/skills"`.
 6. Inputs containing slash, backslash, `..`, whitespace, or other characters
    outside the ID grammar are never sanitized into another ID. Path-like input
    must not be treated as an owner skill ID.
