@@ -245,6 +245,24 @@ test('#2033 redactText leaves AWS-shaped identifiers that are not keys alone', (
     'arn:aws:iam::123456789012:role/ReadOnly',
     'bucket: AKIA123',
     'region = us-east-1',
+    // #2033 follow-up: the bands an "AKIA + 16 alphanumerics" shape can
+    // collide with. Each was measured against this pattern before being
+    // pinned; none of them is an AWS access key id.
+    // One char short and one char long of the 20-char total.
+    'id: AKIAZ7NMQ4RTXPLBVD',
+    'id: AKIAZ7NMQ4RTXPLBVDCGH',
+    // 20 uppercase alphanumerics that are not an AWS key — a base32-shaped
+    // digest and a long SCREAMING_CASE identifier.
+    'digest: MNBVCXZLKJHGFDSAQWER',
+    'const MAX_RETRY_ATTEMPTS_UP = 5;',
+    // Lowercase: AWS access key ids are uppercase, so the lowercase spelling
+    // is some other token and must not be masked.
+    'akiaz7nmq4rtxplbvdcg',
+    // The prefix appears mid-token, so there is no word boundary before it.
+    'XAKIAZ7NMQ4RTXPLBVDCG',
+    // An AWS principal id shares the 4+16 shape but is an identifier, not a
+    // credential; `AIDA` is deliberately outside the prefix alternation.
+    'AIDAZ7NMQ4RTXPLBVDCG',
   ];
   for (const sample of negatives) {
     const { text, hits } = redactText(sample, { highEntropy: false });
