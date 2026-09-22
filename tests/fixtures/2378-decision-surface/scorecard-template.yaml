@@ -390,5 +390,12 @@ summary:
       mode: unavailable
     visibilityLost: null
     visibilityMisleading: null
+  pairedAttention:
+    medianDeltaSeconds: null
+    candidateFasterCases: null
+    equalCases: null
+    candidateSlowerCases: null
+    baselineFirstMedianDeltaSeconds: null
+    candidateFirstMedianDeltaSeconds: null
   decision: null
   decisionReason: ''
