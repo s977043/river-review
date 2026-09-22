@@ -16,6 +16,7 @@
 //   river promote list                 List promotion candidates
 //   river promote approve <id>         Approve a candidate (promotionStatus -> approved)
 //   river promote reject  <id>         Reject a candidate  (promotionStatus -> archived)
+//   river promote retarget <id>         Change proposedTarget with an audit trail
 //   river promote template [<id>]      Emit PR scaffold(s) for approved candidate(s)
 //   river promote retire               Archive expired candidates + sync promotionStatus (Phase 3)
 //   river promote review-effectiveness Flag needs_review on negative post-activation feedback (Phase 3)
@@ -30,6 +31,7 @@ import { listFeedbackEntries } from '../../lib/feedback.mjs';
 import {
   listPromotionCandidates,
   decidePromotion,
+  retargetPromotion,
   buildPrScaffold,
   getPromotionCandidate,
   retirePromotions,
@@ -113,7 +115,7 @@ export async function runPromoteCommand(parsed, targetPath) {
   // otherwise leave dryRun false and let `propose` write the index for real.
   if (parsed.promoteUnknownOption) {
     console.error(
-      `Error: unknown option for promote: ${parsed.promoteUnknownOption}. Use: --input --cluster-key --policy-version --approver --reason --index --threshold --feedback-root --include-inactive --output --dry-run`
+      `Error: unknown option for promote: ${parsed.promoteUnknownOption}. Use: --input --cluster-key --policy-version --target-kind --target-id --approver --reason --index --threshold --feedback-root --include-inactive --output --dry-run`
     );
     return 1;
   }
@@ -123,13 +125,14 @@ export async function runPromoteCommand(parsed, targetPath) {
       'list',
       'approve',
       'reject',
+      'retarget',
       'template',
       'retire',
       'review-effectiveness',
     ].includes(sub)
   ) {
     console.error(
-      'Error: usage: river promote <propose|list|approve <id>|reject <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <jsonl>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
+      'Error: usage: river promote <propose|list|approve <id>|reject <id>|retarget <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <jsonl>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--target-kind <kind>] [--target-id <id>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
     );
     return 1;
   }
@@ -275,6 +278,68 @@ export async function runPromoteCommand(parsed, targetPath) {
       console.log(
         '  note: any PR scaffold previously generated for this candidate is now invalid (regenerate after a fresh approval).'
       );
+    }
+    console.log(`  written to: ${indexPath}`);
+    return 0;
+  }
+
+  if (sub === 'retarget') {
+    if (!parsed.promoteId) {
+      console.error('Error: river promote retarget requires a candidate <id>.');
+      return 1;
+    }
+    if (!parsed.promoteTargetKind) {
+      console.error('Error: river promote retarget requires --target-kind <kind>.');
+      return 1;
+    }
+    if (!parsed.promoteReason) {
+      console.error('Error: river promote retarget requires --reason <text>.');
+      return 1;
+    }
+
+    const approver =
+      parsed.promoteApprover ||
+      process.env.RIVER_APPROVER ||
+      process.env.USER ||
+      process.env.USERNAME ||
+      null;
+    if (!approver) {
+      console.error('Error: river promote retarget requires an auditable approver.');
+      return 1;
+    }
+
+    let result;
+    try {
+      result = retargetPromotion({
+        indexPath,
+        id: parsed.promoteId,
+        kind: parsed.promoteTargetKind,
+        targetId: parsed.promoteTargetId ?? null,
+        approver,
+        reason: parsed.promoteReason,
+        now,
+      });
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      return 1;
+    }
+
+    const pc = getPromotionCandidate(result.entry);
+    if (!result.changed) {
+      console.log(
+        `Candidate ${result.entry.id} already targets ${pc.proposedTarget.kind}${pc.proposedTarget.id ? ` (${pc.proposedTarget.id})` : ''} (no change).`
+      );
+      return 0;
+    }
+
+    console.log(`Candidate ${result.entry.id} retargeted.`);
+    console.log(
+      `  target: ${result.previousTarget.kind} -> ${result.target.kind}${result.target.id ? ` (${result.target.id})` : ''}`
+    );
+    console.log(`  approver: ${approver}`);
+    console.log(`  decidedAt: ${result.record.decidedAt}`);
+    if (result.approvalReset) {
+      console.log('  approval: reset; candidate must be approved again for the new target');
     }
     console.log(`  written to: ${indexPath}`);
     return 0;
