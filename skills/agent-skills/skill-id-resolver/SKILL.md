@@ -19,72 +19,63 @@ River Review の entry skill が specialist skill へ委譲するときに使う
 
 ## Input
 
-1つの skill ID。
-
-許可する ID は次の形式だけです。
+1つの skill ID。許可する形式は次だけ。
 
 ```text
 ^[a-z0-9][a-z0-9._-]*$
 ```
 
-slash、backslash、`..`、空白、制御文字を含む値は ID として扱わない。
+slash、backslash、`..`、空白、制御文字を含む値は owner skill ID として扱わない。
 unsafe な値を sanitize して別 ID に変換してはいけない。
+
+## Executable Resolver
+
+full plugin / source tree では次を使う。
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT:-.}/scripts/resolve-skill-id.mjs"   "${CLAUDE_PLUGIN_ROOT:-.}" "<skill-id>"
+```
+
+実装正本は `src/lib/skill-id-resolver.mjs`。wrapper は結果の path を stdout
+へ返し、unresolved は exit 2、invalid / ambiguous は exit 1 で fail closed する。
 
 ## Resolution
 
+resolver は frontmatter の宣言 ID を読み、文字列検索だけで決めない。
+
 ### Source repository / full plugin root
 
-plugin/repository root の `skills/` を skill root とし、次を順に確認する。
-
-1. `agent-skills/<skill-id>/SKILL.md`
-2. `core/**/<skill-id>/SKILL.md`
-3. `upstream/**/<skill-id>/SKILL.md`
-4. `midstream/**/<skill-id>/SKILL.md`
-5. `downstream/**/<skill-id>/SKILL.md`
-
-候補を見つけたら frontmatter の `id` が要求 ID と完全一致することを確認する。
-複数の canonical candidate が残る場合は曖昧として扱い、任意に1つを選ばない。
+`skills/` 以下の Agent Skill と Review Skill を走査し、top-level `id` が
+要求 ID と完全一致する package を解決する。複数 package が同じ ID を宣言した
+場合は ambiguous として失敗し、順序で片方を選ばない。
 
 ### Exported Agent Skills
 
-`river skills export` 後の pack では sibling package の
+`river skills export` 後は次を確認する。
 
 ```text
 <export-root>/<skill-id>/SKILL.md
 ```
 
-を確認する。
-
-export root が host から取得できない場合は、現在の skill package と同じ skill collection 内から exact ID で解決する。
+exported frontmatter では canonical ID が `metadata.rr.id` に入るため、その値が
+要求 ID と完全一致することを検証する。directory 名だけを信用しない。
 
 ## Output
 
-解決できた場合:
+解決できた場合は requested ID、resolved `SKILL.md`、source kind
+(`agent` / `review` / `exported`) を持つ。
 
-- requested skill ID
-- resolved `SKILL.md`
-- source kind: `agent` / `review` / `exported`
-
-解決できない場合:
-
-- unresolved skill ID
-- `skippedSkills` または同等の trace
-- degrade / human handoff の必要性
-
-## Missing Owner Guard
-
-owner skill を見つけられない場合、その本文を推測で再構築しない。
-
-- generic entry checklist だけで安全に継続できる場合は degrade
-- critical / security / compliance の必須判断なら既存 gate または人間へ handoff
-- 「owner skill を読んだ」ことにしない
+解決できない場合は owner skill を `skippedSkills` 等へ残し、generic entry
+checklist だけで安全に継続できる場合に限って degrade する。critical / security /
+compliance の必須判断では既存 gate または人間へ handoff する。
 
 ## Knowledge Ownership
 
-specialist の Experience Knowledge / false-positive guard / fixture は owner Review Skill が正本です。
-Agent entry skill の `references/` へ同じ内容を手書きコピーしない。
+specialist の Experience Knowledge / false-positive guard / fixture は owner Review
+Skill が正本。Agent entry skill の `references/` へ同じ内容を手書きコピーしない。
 
-generated bridge が必要な host では、source skill ID / source hash / generator version / freshness check を必須にする。
+generated bridge が必要な host では source skill ID / source hash / generator version /
+freshness check を必須にする。
 
 ## Related
 
