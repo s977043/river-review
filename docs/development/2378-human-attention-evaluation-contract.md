@@ -52,18 +52,16 @@ Machine-readable fixture set:
 
 v1は10ケースです。
 
-| Case | Purpose |
-| --- | --- |
-| HA-01 | clean |
-| HA-02 | critical + major |
-| HA-03 | minor / info only |
-| HA-04 | human-review-required |
-| HA-05 | partial coverage |
-| HA-06 | not_executed coverage |
-| HA-07 | failed / timeout units |
-| HA-08 | Team Lead blind spot |
-| HA-09 | mixed risk + incomplete coverage |
-| HA-10 | legacy result without coverage |
+- HA-01: clean
+- HA-02: critical + major
+- HA-03: minor / info only
+- HA-04: human-review-required
+- HA-05: partial coverage
+- HA-06: not_executed coverage
+- HA-07: failed / timeout units
+- HA-08: Team Lead blind spot
+- HA-09: mixed risk + incomplete coverage
+- HA-10: legacy result without coverage
 
 fixture数10は統計的十分性を意味しません。最初のcontract / regression coverageです。
 
@@ -71,18 +69,18 @@ fixture数10は統計的十分性を意味しません。最初のcontract / reg
 
 ## 2.1 v1 vocabulary boundary
 
-#2371 v1が直接投影するHuman signalは、既存canonical stateの **human-review-required** です。
+`#2371` v1が直接投影するHuman signalは、既存canonical stateの **human-review-required** です。
 
-#2322 Review Resolutionが将来提供する、個別trade-offやResolutionに対する **human-decision-required** をv1の評価で推測・代用しません。
+`#2322` Review Resolutionが将来提供する、個別trade-offやResolutionに対する **human-decision-required** をv1の評価で推測・代用しません。
 
 したがってPhase A v1では:
 
-- `humanReviewRequired` は評価対象です
-- Resolution由来の `humanDecisionRequired` はnot applicableです
-- evaluator question 2は、利用可能なcanonical stateの範囲で採点します
-- v1未実装stateを「candidateが表示できなかったmiss」と数えません
+- `humanReviewRequired` を評価対象とする
+- Resolution由来の `humanDecisionRequired` はnot applicableとする
+- evaluator question 2は、利用可能なcanonical stateの範囲で採点する
+- v1未実装stateを「candidateが表示できなかったmiss」と数えない
 
-#2322のcanonical contractが利用可能になった時点で、同じ評価contractへadditive caseを追加します。
+`#2322` のcanonical contractが利用可能になった時点で、同じ評価contractへadditive caseを追加します。
 
 ## 2.2 Fixture adapter boundary
 
@@ -409,7 +407,7 @@ material visibility / correctness / Human authorityを悪化させます。
 
 ## 12. Known hypothesis risk
 
-#2371 v1はadditiveです。
+`#2371` v1はadditiveです。
 
 ```text
 Headline
@@ -422,8 +420,8 @@ Findings
 
 既存sectionを削除していないため:
 
-- Decision Extractionは改善する可能性があります
-- initially visible information / duplicationは増える可能性があります
+- Decision Extractionは改善する可能性がある
+- initially visible information / duplicationは増える可能性がある
 
 したがってv1評価で「Decision Surfaceがある = Attention低下」と仮定しません。
 
@@ -497,7 +495,7 @@ Findings
 
 ## 16. Exit
 
-#2378を完了できるのは、Phase Aだけではありません。
+`#2378` を完了できるのは、Phase Aだけではありません。
 
 ```text
 Phase A fixed-fixture result
