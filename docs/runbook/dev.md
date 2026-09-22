@@ -138,13 +138,16 @@ npm run codex:verify
 npm run codex:verify -- --live
 ```
 
-通常モードはプラグイン manifest / 同期状態 / skill 定義と、Codex adapter・cross-runtime の関連テストをローカルで検査する。`--live` は Codex CLI を読み取り専用 sandbox で起動し、manifest と plan-review flow を読ませる。認証済み Codex が必要で、180 秒を超える場合はタイムアウトする。実行時の標準入力は閉じる。
+通常モードはプラグイン manifest / 同期状態 / skill 定義と、Codex adapter・cross-runtime の関連テストをローカルで検査する。`--live` はCodexでRiver Review 1.xがinstalled/enabledであることを確認してから、testing skillにサンプルテストをレビューさせる。Codex CLI認証が必要で、180秒を超える場合はタイムアウトする。実行時の標準入力は閉じる。project-local configの読み込みには、Codexでプロジェクトを信頼済みにする必要がある。
 
-### 2026-09-22 の実測
+### 2026-09-23 の実測
 
-- Codex CLI `0.155.0-alpha.9.2`。River Review の skill はこの Codex セッションの利用可能 skill 一覧にあり、キャッシュ上の配布版は `1.120.0`。
+- Codex CLI `0.155.0-alpha.16`。`codex plugin list` は `river-review@river-review-marketplace` を `installed, enabled 1.120.0`、source `/home/minewo/github/river-review` と表示する。現在のCodexセッションにも配布されたRiver Review skillsが現れる。
 - `npm run codex:verify` の契約テストは190件成功。リポジトリ全体でも `npm run lint` 成功、`npm test` は5,258件成功。
-- ローカルチェックアウトの marketplace 登録は成功。続く `codex plugin add river-review@river-review-marketplace` は45秒でタイムアウトしたため、この操作での新規インストール完了は確認できていない。
-- `codex exec` の live smoke は Codex 起動中の marketplace 更新が30秒でタイムアウトし、レビュー出力を得られなかった。従って確認できたのは契約・skill 配布とローカル参照までであり、Codex 上の end-to-end review 成功とは扱わない。
+- ローカル marketplace の登録は成功。最初のCLI installコマンドはタイムアウトしたが、その後のCodex plugin一覧でインストールと有効化を確認した。CLIから直接インストールする手順はCodex公式文書でもauthoring用CLIとデスクトップのinstall/test手順が区別されているため、実機テストの唯一の経路にしない。
+- `codex exec` の live skill invocation は、登録済みskillを呼ぶプロンプトに変えて再試行しても、起動時にユーザー設定下のPlanGate marketplace更新が30秒でタイムアウトし、回答を得られなかった。今回のログ上、River Reviewではなく別marketplaceの更新が停止点である。
+- 現在のCodexセッションでRiver Reviewの `river-review-testing` を読み、`tests/fix-dashes.test.mjs` に適用した。ネスト対象と除外、変更・非変更経路、読取エラー後の継続と非ゼロ終了を確認し、現状で指摘はなかった。これはskillの実利用確認だが、CLIの独立した `codex exec` セッション完走を証明するものではない。
+
+プラグインの登録・有効化・skill利用は確認できています。CLIの独立したend-to-end skill invocationは未確認です。CLI E2Eを再試行する場合は `--live` を使い、marketplace timeoutとskill invocation結果を別々に記録します。
 
 プラグインのインストール処理が止まる場合、まずCodex起動ログの `unsupported source`、marketplace clone timeout、または認証エラーを区別する。インストール済みであることと、対象リポジトリで skill が使われたことも別々に確認する。

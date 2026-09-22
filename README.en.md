@@ -380,7 +380,7 @@ See `templates/agent-workflow/README.md` for the full Codex (and Cursor) setup. 
 
 ### Using Codex with a project-local config
 
-The project-local Codex config lives in [`.codex/config.toml`](./.codex/config.toml). Trust this project before launching. These commands preserve `CODEX_HOME`, authentication, and installed plugin settings:
+The project-local Codex config lives in [`.codex/config.toml`](./.codex/config.toml). Trust this project before launching. These commands preserve `CODEX_HOME`, authentication, and installed plugin settings. River Review is enabled for trusted projects:
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)

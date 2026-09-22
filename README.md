@@ -494,7 +494,7 @@ Codex（および Cursor）の完全なセットアップは `templates/agent-wo
 
 ### Codex を project-local config で使う
 
-Codex 用の project-local config は [`.codex/config.toml`](./.codex/config.toml) にあります。プロジェクトを信頼済みにして、以下のいずれかで起動します。`CODEX_HOME` は変更せず、通常の認証とプラグイン設定を引き継ぎます。
+Codex 用の project-local config は [`.codex/config.toml`](./.codex/config.toml) にあります。プロジェクトを信頼済みにして、以下のいずれかで起動します。`CODEX_HOME` は変更せず、通常の認証とプラグイン設定を引き継ぎます。trusted project ではRiver Review pluginも自動で有効になります。
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)

@@ -22,3 +22,7 @@ sandbox_mode = "workspace-write"
 [shell_environment_policy]
 # Forward as few env vars as possible to reduce accidental secret leakage.
 include_only = ["PATH", "HOME", "USER", "SHELL", "LANG", "LC_ALL"]
+
+# Enable the repo's Codex marketplace plugin when this project is trusted.
+[plugins."river-review@river-review-marketplace"]
+enabled = true

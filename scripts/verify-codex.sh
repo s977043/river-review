@@ -18,7 +18,15 @@ bash scripts/local-npm.sh exec -- node --test --test-reporter=spec \
 if [[ "${1:-}" == --live ]]; then
   command -v codex >/dev/null || { printf 'error: codex is required\n' >&2; exit 1; }
   command -v timeout >/dev/null || { printf 'error: timeout is required\n' >&2; exit 1; }
+  plugin_list="$(codex plugin list 2>&1)" || {
+    printf 'error: unable to inspect Codex plugins\n%s\n' "$plugin_list" >&2
+    exit 1
+  }
+  if ! grep -Eq 'river-review@river-review-marketplace[[:space:]]+installed, enabled[[:space:]]+1\.' <<<"$plugin_list"; then
+    printf 'error: River Review 1.x is not installed and enabled in Codex\n%s\n' "$plugin_list" >&2
+    exit 1
+  fi
   codex --version
   timeout --kill-after=10s 180s codex exec --ephemeral --sandbox read-only --json \
-    'Read .codex-plugin/plugin.json, flows/entry-map.json and flows/plan-review.flow.json. Report the plugin version, skills path, review-plan resolution and stopConditions. State whether River Review is registered in your available skills or only readable from this checkout. Do not edit files, delegate, or access external services. Do not claim an end-to-end review passed from these reads alone.' </dev/null
+    'Use the $river-review:river-review-testing skill to review tests/fix-dashes.test.mjs for coverage and stability. Return concise findings or explicitly report no findings. Do not edit files, run shell commands, access external services, or delegate.' </dev/null
 fi
