@@ -59,6 +59,17 @@ test('rejects path-like IDs instead of sanitizing them', async (t) => {
   }
 });
 
+test('ignores nested SKILL.md files outside the canonical package depth', async (t) => {
+  const root = await makeRoot(t);
+  await writeSkill(
+    root,
+    'skills/midstream/fixture-holder/examples/shadow/SKILL.md',
+    'id: shadow\nname: shadow\ndescription: nested fixture'
+  );
+
+  assert.equal(await resolveSkillId(root, 'shadow'), null);
+});
+
 test('fails closed when the same exact ID is declared by multiple source packages', async (t) => {
   const root = await makeRoot(t);
   await writeSkill(
