@@ -209,6 +209,11 @@ Reference を追加したこと自体を成果にしない。可能な範囲で�
 
 判断にLLMが関与する場合は #1574 の paired replay / held-out / independent verification を優先する。critical regression は 0 を維持する。
 
+## Cross-skill ownership
+
+別の Review Skill が同じ判断の canonical owner である場合、Agent Skill の `references/` へ内容をコピーしない。
+durable dependency は物理パスではなく skill ID で表し、解決規約は [`skill-id-resolution-contract.md`](./skill-id-resolution-contract.md) に従う。
+
 ## Relationship to current loops
 
 - #743: 1 feedback を fixture / reference / suppression / routing 等へ返す inner loop
