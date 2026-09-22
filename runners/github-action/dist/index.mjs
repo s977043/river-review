@@ -95170,7 +95170,8 @@ const SAFE_REFERENCE_PATH_RE =
 /**
  * Resolve a reference target without allowing a candidate-controlled path to
  * escape the repository skill tree. Exact repo paths are preserved only when
- * they point below skills/**/references/*.md; otherwise we fall back to a safe
+ * they point to a Markdown file under a repo-owned skills/.../references/ directory;
+ * otherwise we fall back to a safe
  * scaffold template using the slugified target id.
  */
 function safeReferenceTargetPath(pc) {
