@@ -181,6 +181,15 @@ river gc --force --json --output-file ./artifacts/gc-result.json
 - exit `1` / `2` が返った場合は `weekly-gc.yml` が失敗 Issue を自動起票する運用に接続する（詳細は workflow 側のロジックに従う）。
 - 現行の `.github/workflows/weekly-gc.yml` はまだ `river gc` 本体を呼んでおらず、lint / structure test / build を代理で実行している。本 spec は `river gc` 実装後に workflow を接続するための **前提契約** として機能する。
 
+## 実装状況（非規範）
+
+> **このセクションは規範的な契約ではありません。** 実装の現在地を示すスナップショットであり、実装が進むにつれて更新または削除されます。上記の契約テーブル（オプション・終了コード・出力）が常に正です。
+
+### 未実装（2026-09-22 時点）
+
+- `river gc` サブコマンドは **未実装**である。`src/cli.mjs` は `gc` を受理せず、`river --help` の Commands 一覧にも現れない。本ドキュメントに書かれた既定値（`--retention-days` `90` / `--max-entries` `1000` / `--max-size-mb` `500`）やフラグは、実装時に満たすべき仕様であって現在の実行可能な挙動ではない。
+- `.github/workflows/weekly-gc.yml` も `river gc` 本体を呼んでいない（上記「CI 連携」を参照）。
+
 ## 関連ドキュメント
 
 - [Artifact Input Contract](./artifact-input-contract.md) — 入力 artifact の SSoT（GC 対象 scope の前提となる）

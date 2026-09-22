@@ -181,6 +181,15 @@ river gc --force --json --output-file ./artifacts/gc-result.json
 - Non-zero exit feeds into the `weekly-gc.yml` "create issue on failure" path.
 - The current `.github/workflows/weekly-gc.yml` does not yet invoke `river gc`; it runs lint / structure test / build as a placeholder. This spec is the **prerequisite contract** for wiring `river gc` into that workflow once the implementation lands.
 
+## Implementation status (non-normative)
+
+> **This section is not a normative contract.** It is a snapshot of where the implementation stands and is updated or removed as work lands. The contract tables above (options, exit codes, output) always win.
+
+### Not implemented (as of 2026-09-22)
+
+- The `river gc` subcommand is **not implemented**. `src/cli.mjs` does not accept `gc`, and it does not appear in the Commands list of `river --help`. The defaults documented here (`--retention-days` `90` / `--max-entries` `1000` / `--max-size-mb` `500`) and the flags are the specification an implementation must satisfy, not behavior you can run today.
+- `.github/workflows/weekly-gc.yml` does not invoke `river gc` either (see "CI integration" above).
+
 ## Related documents
 
 - [Artifact Input Contract](./artifact-input-contract.en.md) — input artifact SSoT (prerequisite for scope targeting)

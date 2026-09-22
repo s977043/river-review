@@ -178,9 +178,11 @@ CI から安定して判定できるよう、終了コードを以下の通り�
 
 ## 安定性と互換性
 
-- 安定性ラベルは **Beta**（参考: [Stable Interfaces](./stable-interfaces.md)）。
-- フラグ追加は minor、フラグの削除・意味変更・既定値変更・上表の終了コードの意味変更・`status` 値の意味変更は **major** bump とする。
-- usage error（引数の解釈失敗）の終了コードは上表の対象外とし、CLI サーフェス全体の Beta ラベルに従う。用途別の裁定は [Stable Interfaces](./stable-interfaces.md) の「終了コードの安定性」が SSoT。
+- 安定性ラベルは **Internal**（参考: [Stable Interfaces](./stable-interfaces.md)）。`river` CLI は npm 未公開で配布経路を持たない。
+- フラグの追加・削除・意味変更・既定値変更はいずれも Stable Contract の対象外であり、minor 以下のリリースで入る。
+- 上表の終了コードは gate 判定用ではない（`verify` は gate 判定を行わない）ため Stable Contract の列挙に含まれず、意味変更も minor 以下で入る。Stable Contract が保証するのは gate 判定用の終了コード `0` / `1` / `2` / `3` であり、利用者はそこへ GitHub Action 経由で到達する。
+- usage error（引数の解釈失敗）の終了コードは上表の対象外とし、CLI サーフェス全体の Internal ラベルに従う。用途別の裁定は [Stable Interfaces](./stable-interfaces.md) の「終了コードの安定性」が SSoT。
+- `status` 値は Review Artifact のフィールドであり、その意味変更は下記の Review Artifact のバージョニングに従う。
 - JSON 出力スキーマの破壊的変更は [Review Artifact](./review-artifact.md) のバージョニングに従う。
 
 ## 関連ドキュメント

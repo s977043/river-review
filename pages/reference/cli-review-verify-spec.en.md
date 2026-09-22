@@ -178,9 +178,11 @@ Syntax errors for `--artifact` / `--phase` / `--planner` (unknown values, invali
 
 ## Stability and compatibility
 
-- Stability: **Beta** (see [Stable Interfaces](./stable-interfaces.en.md)).
-- Flag additions are minor; flag removal, semantic changes, default changes, meaning changes to the exit codes in the table above, and `status` value meaning changes are **major** bumps.
-- Usage-error exit codes (failure to interpret arguments) are outside that table and follow the Beta label of the CLI surface as a whole. The split by purpose is defined in "Exit Code Stability" in [Stable Interfaces](./stable-interfaces.en.md), which is the SSoT.
+- Stability: **Internal** (see [Stable Interfaces](./stable-interfaces.en.md)). The `river` CLI is not published to npm and has no distribution channel.
+- Adding, removing, or altering the semantics of a flag, and changing a default, are all outside the Stable Contract and ship in a minor or patch release.
+- The exit codes in the table above are not gate-decision codes (`verify` performs no gate decision), so they are not among the Stable Contract entries; changing their meaning also ships in a minor or patch release. What the Stable Contract guarantees is the gate-decision exit codes `0` / `1` / `2` / `3`, which users reach through the GitHub Action.
+- Usage-error exit codes (failure to interpret arguments) are outside that table and follow the Internal label of the CLI surface as a whole. The split by purpose is defined in "Exit Code Stability" in [Stable Interfaces](./stable-interfaces.en.md), which is the SSoT.
+- `status` is a Review Artifact field, so changes to the meaning of its values follow the Review Artifact versioning noted below.
 - Breaking JSON output changes follow [Review Artifact](./review-artifact.en.md) versioning.
 
 ## See Also
