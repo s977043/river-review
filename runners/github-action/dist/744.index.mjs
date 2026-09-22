@@ -170,7 +170,7 @@ function diffReviews(previousFindings, currentFindings, options = {}) {
  *   resolved: ComparedFinding[],
  *   persisting: ComparedFinding[],
  *   scoreChanged: ComparedFinding[],
- *   oscillated: Array<{ fingerprint: string, finding: object, timeline: { runId: string, present: boolean }[] }>,
+ *   oscillated: Array<{ fingerprint: string, finding: object, timeline: { runId: string, present: boolean, coverageStatus: CoverageStatus }[] }>,
  *   summary: object
  * }}
  */
@@ -215,7 +215,13 @@ function diffRunHistory(runRecords) {
       allFingerprints.add(f.fingerprint);
       fingerprintToFinding.set(f.fingerprint, f); // last run wins (chronological)
     }
-    return { runId: record.runId, fingerprints };
+    return {
+      runId: record.runId,
+      fingerprints,
+      // Carried so `_hasOscillation` can tell a real absence apart from a run
+      // that never produced the finding because its reviewer did not finish.
+      coverageStatus: (0,_review_coverage_mjs__WEBPACK_IMPORTED_MODULE_1__/* .normalizeCoverageStatus */ .aW)(record?.reviewCoverage),
+    };
   });
 
   // Build timeline per fingerprint
@@ -225,6 +231,7 @@ function diffRunHistory(runRecords) {
     const timeline = annotatedRuns.map((run) => ({
       runId: run.runId,
       present: run.fingerprints.has(fp),
+      coverageStatus: run.coverageStatus,
     }));
 
     // Detect oscillation: present -> absent -> present pattern
@@ -250,7 +257,26 @@ function diffRunHistory(runRecords) {
 
 /**
  * Returns true if the presence timeline contains a resolved→re-appeared pattern.
- * @param {{ runId: string, present: boolean }[]} timeline
+ *
+ * The middle step of that pattern is an absence, and absence is measured the
+ * same way `changeStatus: 'resolved'` measures it: the fingerprint is simply
+ * not in that run (see `RESOLVED_BASIS`). A run whose reviewers timed out
+ * therefore looks identical to a run where the finding was fixed, so a single
+ * partial run between two complete ones manufactured present→absent→present out
+ * of nothing and `deriveLoopSignalFromRunsDiff` turned it into
+ * `STOP_OSCILLATED` — a terminal signal for the reference loop (#2336).
+ *
+ * So an absence only counts as one when the run that produced it actually
+ * finished its planned review work. `isIncompleteCoverageStatus` is the shared
+ * derivation of that test (`review-coverage.mjs`), the same one #2331 used to
+ * demote `CONVERGED`; `unknown` coverage keeps counting, otherwise oscillation
+ * would be undetectable for run records written before coverage was wired.
+ *
+ * An absence discounted this way is not evidence against oscillation either —
+ * it is simply not evidence for it, so the timeline continues to be scanned
+ * and a later real absence still trips the detector.
+ *
+ * @param {{ runId: string, present: boolean, coverageStatus?: CoverageStatus }[]} timeline
  */
 function _hasOscillation(timeline) {
   // Detect: present=true ... present=false ... present=true
@@ -261,6 +287,9 @@ function _hasOscillation(timeline) {
       if (seenAbsent) return true; // re-appeared after absence
       seenPresent = true;
     } else {
+      // Not "absent because resolved" — the run did not finish, so this step
+      // carries no information about the finding at all.
+      if ((0,_review_coverage_mjs__WEBPACK_IMPORTED_MODULE_1__/* .isIncompleteCoverageStatus */ .$J)(entry.coverageStatus)) continue;
       if (seenPresent) seenAbsent = true;
     }
   }
