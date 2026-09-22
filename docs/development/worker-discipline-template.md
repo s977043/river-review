@@ -163,7 +163,11 @@
   `duplicate-import`（同一モジュールを 2 行に分けて import）でこのチェックが落ち、**後続の必須ジョブが
   すべて `skipping` になって PR が数時間止まった**。
 - 日本語ドキュメントを編集した場合は `npx textlint --no-cache <files>` が pass することを確認し、
-  同じパスで `npm run fix:dashes` も実行すること。
+  同じパスで `npm run fix:dashes` も実行すること。**`npx prettier --check <files>` も同じパスで流すこと。**
+  CI の `Lint` job は `Check formatting`（prettier）を textlint とは別ステップで持っており、
+  textlint と `fix:dashes` が両方 exit 0 でも prettier だけ落ちる。**とくに Markdown の表へ
+  セルを追記すると区切り線の桁がずれて落ちる**。2026-09-22 の PR #2362 がこれで失敗し、
+  ワーカーの完了報告には textlint と `fix:dashes` の exit 0 しか載っていなかった。
 - シェルスクリプト（`scripts/*.sh` / `.claude/hooks/*.sh` / `hooks/*.sh`）を編集した場合は `npm run lint:sh`（shellcheck）が exit 0 であることを確認すること。
 - 読み取り専用の検証であっても、旧版の CLI を実行する場合は書き込み副作用を先に確認すること。
   `git archive` で展開した旧版でも書き込み先は現在の作業ツリーであり、`skills import` /
