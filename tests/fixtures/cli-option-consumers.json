@@ -844,6 +844,16 @@
       "suppression add"
     ]
   },
+  "--target-id": {
+    "writes": ["promoteTargetId"],
+    "readBy": ["promote"],
+    "acceptedUnconsumedOn": []
+  },
+  "--target-kind": {
+    "writes": ["promoteTargetKind"],
+    "readBy": ["promote"],
+    "acceptedUnconsumedOn": []
+  },
   "--threshold": {
     "writes": ["promoteThreshold"],
     "readBy": ["promote"],

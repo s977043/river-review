@@ -177,6 +177,10 @@ export const OPTION_SAMPLES = {
   '--input': { value: ['input.jsonl'] },
   '--cluster-key': { value: ['skill::false_positive'] },
   '--policy-version': { value: ['v1'] },
+  '--target-kind': { value: ['reference'] },
+  '--target-id': {
+    value: ['skills/agent-skills/river-review-code/references/ERROR-HANDLING.md'],
+  },
   // evolve
   '--min': { value: ['2'] },
   '--month': { value: ['2026-01'] },
