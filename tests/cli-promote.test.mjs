@@ -267,6 +267,23 @@ describe('river promote retarget', () => {
   });
 });
 
+describe('river promote retarget option scope', () => {
+  test('retarget-only options fail on other promote subcommands', async (t) => {
+    const { cleanup, indexPath } = seed();
+    t.after(cleanup);
+    const res = await runCliInProcess([
+      'promote',
+      'list',
+      '--index',
+      indexPath,
+      '--target-kind',
+      'reference',
+    ]);
+    assert.equal(res.code, 1);
+    assert.match(res.stderr, /unknown option for promote: --target-kind/);
+  });
+});
+
 describe('river promote template', () => {
   test('scaffolds only approved candidates; rejected are excluded', async (t) => {
     const { cleanup, indexPath, fixtureId, securityId } = seed();
