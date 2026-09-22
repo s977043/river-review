@@ -49,7 +49,12 @@ test('resolves exact IDs across agent and native Review Skill roots', async (t) 
 
 test('rejects path-like IDs instead of sanitizing them', async (t) => {
   const root = await makeRoot(t);
-  for (const id of ['../nullability-contract', 'midstream/nullability-contract', 'skill id']) {
+  for (const id of [
+    '../nullability-contract',
+    'midstream/nullability-contract',
+    'skill id',
+    'skill..shadow',
+  ]) {
     await assert.rejects(
       () => resolveSkillId(root, id),
       (err) => err instanceof SkillIdResolutionError && /Unsafe skill ID/.test(err.message)
