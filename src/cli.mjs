@@ -100,6 +100,9 @@ Commands:
   promote list          List promotion_candidate entries (Judgment Promotion Loop Phase 2)
   promote approve <id>  Approve a candidate (promotionStatus -> approved)
   promote reject <id>   Reject a candidate (promotionStatus -> archived)
+  promote retarget <id> Change the proposed target with an auditable human decision
+                        (--target-kind <kind> [--target-id <id>] --approver <name>
+                         --reason <text> --index <path>)
   promote template [<id>] Emit PR scaffold(s) for approved candidate(s) (text only)
                         (--approver <name> --reason <text> --index <path>
                          --include-inactive; --output json for machine output)
@@ -208,7 +211,7 @@ const COMMAND_USAGE = {
   suppression:
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
-    'river promote <propose|list|approve|reject|template|retire|review-effectiveness> [options]',
+    'river promote <propose|list|approve|reject|retarget|template|retire|review-effectiveness> [options]',
   evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
 };
 
@@ -620,6 +623,8 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--input',
   '--cluster-key',
   '--policy-version',
+  '--target-kind',
+  '--target-id',
   // evolve
   '--min',
   '--month',
@@ -841,6 +846,26 @@ function parsePromoteOption(arg, args, parsed) {
       return 'break';
     }
     parsed.promoteReason = taken.value;
+    return 'continue';
+  }
+  if (arg === '--target-kind') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --target-kind option requires a value.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.promoteTargetKind = value;
+    return 'continue';
+  }
+  if (arg === '--target-id') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --target-id option requires a value.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.promoteTargetId = value;
     return 'continue';
   }
   if (arg === '--index') {
@@ -1428,6 +1453,8 @@ function parseArgs(argv) {
     promoteInput: null,
     promoteClusterKey: null,
     promotePolicyVersion: null,
+    promoteTargetKind: null,
+    promoteTargetId: null,
     promoteUnknownOption: null,
     // evolve subcommand fields (#1574 P1 Shadow aggregate / P2 Paired replay)
     evolveSubcommand: null,
