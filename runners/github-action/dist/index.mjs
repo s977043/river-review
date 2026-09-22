@@ -57171,7 +57171,13 @@ function createRedactionPrimitives(security) {
     if (hits.length) bumpHits(hits);
     return redacted;
   };
-  return { isPathExcluded, maybeRedact, totalHits, excludedPaths };
+  // #2033 AC3: report WHICH categories were searched for, not just the hit
+  // tally. A consumer reading `redactionHits: []` cannot tell an exhaustive
+  // clean scan from a disabled redactor; the pattern id list makes the
+  // difference explicit. Empty when redaction is off, because in that case
+  // no category was searched for at all.
+  const redactionPatternIds = redactionEnabled ? secret_redactor/* REDACTION_PATTERN_IDS */.E2 : [];
+  return { isPathExcluded, maybeRedact, totalHits, excludedPaths, redactionPatternIds };
 }
 
 /**
@@ -57324,7 +57330,7 @@ async function collectRepoContext({
 }) {
   const rankingEnabled = contextConfig?.ranking?.enabled === true;
   const primitives = createRedactionPrimitives(security);
-  const { isPathExcluded, maybeRedact, totalHits, excludedPaths } = primitives;
+  const { isPathExcluded, maybeRedact, totalHits, excludedPaths, redactionPatternIds } = primitives;
 
   // 1. Full text of changed source files — the SAME computation the fullFile
   //    availability declaration uses (#1606), so declaration and injection can
@@ -57441,6 +57447,7 @@ async function collectRepoContext({
     totalChars: maxChars - budget,
     truncated: budget <= 0 || tokenBudgetExhausted(),
     redactionHits,
+    redactionPatternIds,
     excludedPaths,
     // PR-C (#689): expose ranking + budget telemetry on the result so
     // callers can surface it via reviewDebug. Raw context never appears
@@ -60971,10 +60978,11 @@ const VERDICT_THRESHOLDS = {
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   E2: () => (/* binding */ REDACTION_PATTERN_IDS),
 /* harmony export */   Rd: () => (/* binding */ redactText),
 /* harmony export */   g: () => (/* binding */ shouldExcludeForContext)
 /* harmony export */ });
-/* unused harmony exports DEFAULT_DENY_GLOBS, REDACTION_PATTERN_IDS, shannonEntropy, extractCaptureGroups */
+/* unused harmony exports DEFAULT_DENY_GLOBS, shannonEntropy, extractCaptureGroups */
 /* harmony import */ var minimatch__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9519);
 // Secret redaction for repo-wide review context (#692 PR-A).
 //
@@ -60991,6 +60999,9 @@ const VERDICT_THRESHOLDS = {
 // that records "redaction ran" must not read that as "no secret remains".
 // `REDACTION_PATTERN_IDS` names the pattern set that was applied so consumers
 // can record *which* categories were searched for rather than a bare boolean.
+// Wired into `src/lib/repo-context.mjs` (`redactionPatternIds` on the collect
+// result), which `src/lib/local-runner.mjs` surfaces on
+// `reviewDebug.repoContextSecurity` (#2033 AC3).
 //
 // Design notes (see Issue #692 plan):
 // - Replacements are *length-independent* (`<REDACTED:category>`) so that
@@ -93135,10 +93146,19 @@ async function runLocalReview({
       // #692 PR-C: surface redaction telemetry without leaking the
       // pre-redaction text. `redactionHits` is a small {category, count}
       // tally; raw context never appears here.
-      ...(repoContext?.redactionHits?.length || repoContext?.excludedPaths?.length
+      // #2033 AC3: `redactionPatternIds` names the category set the redactor
+      // searched for. Redaction is pattern-based and therefore incomplete by
+      // construction, so an empty `redactionHits` must not read as "no secret
+      // remains" — the id list is what tells a reader which categories were
+      // covered. Emitted whenever the redactor ran, even with zero hits, since
+      // that is exactly the case the bare tally cannot describe.
+      ...(repoContext?.redactionHits?.length ||
+      repoContext?.excludedPaths?.length ||
+      repoContext?.redactionPatternIds?.length
         ? {
             repoContextSecurity: {
               redactionHits: repoContext?.redactionHits ?? [],
+              redactionPatternIds: repoContext?.redactionPatternIds ?? [],
               excludedPaths: repoContext?.excludedPaths ?? [],
             },
           }

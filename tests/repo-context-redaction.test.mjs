@@ -5,6 +5,9 @@
 //   - redactText masks an inline-leaked token in a regular .ts file
 //   - the wiring exposes redactionHits + excludedPaths on the result so
 //     local-runner.mjs can surface them on reviewDebug.repoContextSecurity.
+//   - #2033 AC3: the result also carries `redactionPatternIds`, the category
+//     set the redactor searched for, so a consumer cannot read an empty hit
+//     tally as "exhaustively clean".
 
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -12,6 +15,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { collectRepoContext } from '../src/lib/repo-context.mjs';
+import { REDACTION_PATTERN_IDS } from '../src/lib/secret-redactor.mjs';
 import { createTempDir, cleanupTempDir } from './helpers/temp-dir.mjs';
 
 function setupRepo() {
@@ -88,6 +92,9 @@ test('collectRepoContext redacts an inline leaked token in a tracked source file
       result.redactionHits.some((h) => h.category === 'githubToken'),
       JSON.stringify(result.redactionHits)
     );
+    // #2033 AC3: the applied pattern set travels with the tally and is the
+    // module's own list, not a copy maintained here.
+    assert.deepEqual(result.redactionPatternIds, [...REDACTION_PATTERN_IDS]);
   } finally {
     cleanupTempDir(dir);
   }
@@ -107,6 +114,10 @@ test('collectRepoContext skips redaction when security.redact.enabled is false',
     // runs — that is independent of redact.enabled.)
     assert.match(fullFile.content, /ghp_[A-Za-z0-9]{36,}/);
     assert.equal(result.redactionHits.length, 0);
+    // #2033 AC3: with the redactor off, NO category was searched for. An
+    // empty hit tally is indistinguishable from a clean scan, so the
+    // pattern list must be empty here rather than claim full coverage.
+    assert.deepEqual(result.redactionPatternIds, []);
   } finally {
     cleanupTempDir(dir);
   }
@@ -134,6 +145,26 @@ test('collectRepoContext honors caller denyFiles in addition to defaults', async
     );
     // src/lib/leaky.mjs is unaffected.
     assert.ok(result.sections.some((s) => s.label.includes('src/lib/leaky.mjs')));
+  } finally {
+    cleanupTempDir(dir);
+  }
+});
+
+test('#2033 AC3 redactionPatternIds is non-empty even when nothing was hit', async () => {
+  const dir = createTempDir({ prefix: 'river-redact-clean-' });
+  try {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'src', 'clean.mjs'), 'export const x = 1;\n', 'utf8');
+    const result = await collectRepoContext({
+      changedFiles: ['src/clean.mjs'],
+      repoRoot: dir,
+    });
+    // This is the case the bare tally cannot describe: the redactor ran and
+    // found nothing. `redactionHits: []` alone reads as "no secret remains";
+    // the pattern ids say which categories that statement actually covers.
+    assert.equal(result.redactionHits.length, 0);
+    assert.ok(result.redactionPatternIds.length > 0);
+    assert.deepEqual(result.redactionPatternIds, [...REDACTION_PATTERN_IDS]);
   } finally {
     cleanupTempDir(dir);
   }
