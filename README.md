@@ -509,6 +509,7 @@ npm run codex:exec -- "review this branch"
 ```
 
 `npm run codex:verify` でプラグイン契約と関連テストを検証します。`npm run codex:verify -- --live` は追加で読み取り専用の Codex を起動し、180 秒で打ち切ります。実機検証には Codex の認証が必要です。契約テストの成功だけでは、レビュー全体の動作確認にはなりません。
+実測結果と確認できた範囲は[開発ランブック](docs/runbook/dev.md#codex-連携の検証)を参照してください。
 
 運用上の前提:
 

@@ -395,6 +395,7 @@ npm run codex:exec -- "review this branch"
 ```
 
 Run `npm run codex:verify` for offline plugin contracts and related tests. Add `-- --live` for a read-only Codex smoke test with a 180-second timeout. Live execution requires Codex authentication. Passing contract tests alone does not establish end-to-end review correctness.
+See the [development runbook](docs/runbook/dev.md) for the observed results and their limits.
 
 Operating assumptions:
 

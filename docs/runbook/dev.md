@@ -128,3 +128,23 @@ npm run skills:validate
 `runners/github-action/src/**` を変更した場合、または CI の "Action dist freshness" が失敗した場合は、再生成が必要です。`.nvmrc` の Node バージョンに揃えてから `npm run build:action` で `runners/github-action/dist/` を再生成する。詳細は `docs/development/dist-check-rebuild-guide.md` を参照。
 
 PR マージ前のチェックリスト（CI green / レビュアーコメント disposition / preflight など）は `docs/governance.md` § "PR レビューとマージ" にまとまっている。
+
+## Codex 連携の検証
+
+Codex CLI から River Review の skill とフロー定義を参照できるかを確認する。
+
+```bash
+npm run codex:verify
+npm run codex:verify -- --live
+```
+
+通常モードはプラグイン manifest / 同期状態 / skill 定義と、Codex adapter・cross-runtime の関連テストをローカルで検査する。`--live` は Codex CLI を読み取り専用 sandbox で起動し、manifest と plan-review flow を読ませる。認証済み Codex が必要で、180 秒を超える場合はタイムアウトする。実行時の標準入力は閉じる。
+
+### 2026-09-22 の実測
+
+- Codex CLI `0.155.0-alpha.9.2`。River Review の skill はこの Codex セッションの利用可能 skill 一覧にあり、キャッシュ上の配布版は `1.120.0`。
+- `npm run codex:verify` の契約テストは190件成功。リポジトリ全体でも `npm run lint` 成功、`npm test` は5,258件成功。
+- ローカルチェックアウトの marketplace 登録は成功。続く `codex plugin add river-review@river-review-marketplace` は45秒でタイムアウトしたため、この操作での新規インストール完了は確認できていない。
+- `codex exec` の live smoke は Codex 起動中の marketplace 更新が30秒でタイムアウトし、レビュー出力を得られなかった。従って確認できたのは契約・skill 配布とローカル参照までであり、Codex 上の end-to-end review 成功とは扱わない。
+
+プラグインのインストール処理が止まる場合、まずCodex起動ログの `unsupported source`、marketplace clone timeout、または認証エラーを区別する。インストール済みであることと、対象リポジトリで skill が使われたことも別々に確認する。
