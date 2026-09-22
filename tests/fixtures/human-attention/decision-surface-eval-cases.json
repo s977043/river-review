@@ -46,22 +46,14 @@
       "id": "HA-02-critical-major",
       "description": "Critical and major findings with lower-severity findings present.",
       "signals": {
-        "findingSeverities": [
-          "critical",
-          "major",
-          "minor",
-          "info"
-        ],
+        "findingSeverities": ["critical", "major", "minor", "info"],
         "humanReviewRequired": false,
         "coverageStatus": "complete",
         "blindSpotCount": 0
       },
       "materialReference": {
         "requiredActionCount": 2,
-        "requiredFindingSeverities": [
-          "critical",
-          "major"
-        ],
+        "requiredFindingSeverities": ["critical", "major"],
         "lowerSeverityFindingsMustRemainReachable": true,
         "coverageWarningRequired": false
       }
@@ -70,10 +62,7 @@
       "id": "HA-03-minor-info-only",
       "description": "Only minor and info findings.",
       "signals": {
-        "findingSeverities": [
-          "minor",
-          "info"
-        ],
+        "findingSeverities": ["minor", "info"],
         "humanReviewRequired": false,
         "coverageStatus": "complete",
         "blindSpotCount": 0
@@ -170,10 +159,7 @@
       "id": "HA-09-mixed-risk-and-coverage",
       "description": "Major finding, human review requirement, partial coverage, and blind spot coexist.",
       "signals": {
-        "findingSeverities": [
-          "major",
-          "minor"
-        ],
+        "findingSeverities": ["major", "minor"],
         "humanReviewRequired": true,
         "humanReviewFileCount": 1,
         "coverageStatus": "partial",
