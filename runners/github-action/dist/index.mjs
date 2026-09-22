@@ -95404,8 +95404,7 @@ function applyPromotionRetarget(
   }
 
   const previousPromotionStatus = pc.promotionStatus;
-  const approvalReset =
-    previousPromotionStatus !== 'candidate' || Boolean(entry.context?.approval);
+  const approvalReset = previousPromotionStatus !== 'candidate' || Boolean(entry.context?.approval);
   const decidedAt = now.toISOString();
   const record = {
     from: previousTarget,
