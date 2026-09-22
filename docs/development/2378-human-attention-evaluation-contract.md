@@ -68,6 +68,21 @@ fixture数10は統計的十分性を意味しません。最初のcontract / reg
 
 ---
 
+## 2.1 v1 vocabulary boundary
+
+#2371 v1が直接投影するHuman signalは、既存canonical stateの **human-review-required** です。
+
+#2322 Review Resolutionが将来提供する、個別trade-offやResolutionに対する **human-decision-required** をv1の評価で推測・代用しません。
+
+したがってPhase A v1では:
+
+- `humanReviewRequired` は評価対象です
+- Resolution由来の `humanDecisionRequired` はnot applicableです
+- evaluator question 2は、利用可能なcanonical stateの範囲で採点します
+- v1未実装stateを「candidateが表示できなかったmiss」と数えません
+
+#2322のcanonical contractが利用可能になった時点で、同じ評価contractへadditive caseを追加します。
+
 ## 3. Material reference set
 
 ### Rule
