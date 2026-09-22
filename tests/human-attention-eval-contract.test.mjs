@@ -42,7 +42,10 @@ describe('#2378 Human Attention evaluation contract', () => {
   it('requires every case to carry signals and an independent material reference', () => {
     for (const item of manifest.cases) {
       assert.ok(item.description, `${item.id}: description is required`);
-      assert.ok(item.signals && typeof item.signals === 'object', `${item.id}: signals are required`);
+      assert.ok(
+        item.signals && typeof item.signals === 'object',
+        `${item.id}: signals are required`
+      );
       assert.ok(
         item.materialReference && typeof item.materialReference === 'object',
         `${item.id}: materialReference is required`
