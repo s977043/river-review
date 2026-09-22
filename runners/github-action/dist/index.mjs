@@ -64326,6 +64326,7 @@ const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'pr
 const PROMOTE_ID_SUBCOMMANDS = new Set([
   'approve',
   'reject',
+  'retarget',
   'template',
   'review-effectiveness',
 ]);
@@ -95116,6 +95117,22 @@ const DECISION_STATUS = Object.freeze({
 
 const VALID_DECISIONS = Object.freeze(['approved', 'rejected']);
 
+const PROMOTION_TARGET_KINDS = Object.freeze([
+  'linter',
+  'test',
+  'fixture',
+  'skill',
+  'reference',
+  'rule',
+  'routing',
+  'riverbed',
+  'docs',
+  'human_judgment',
+]);
+
+const PROMOTION_TARGET_KIND_SET = new Set(PROMOTION_TARGET_KINDS);
+const RETARGET_TERMINAL_STATUSES = new Set(['archived', 'superseded']);
+
 // Deterministic substring signals that flag a candidate as security/compliance
 // sensitive. Matched against the lowercased skillId + clusterKey.
 const SECURITY_SIGNALS = Object.freeze([
@@ -95164,6 +95181,63 @@ function safeTargetId(pc, fallback) {
   return id ? slugify(id) : fallback;
 }
 
+const SAFE_REFERENCE_PATH_RE = /^skills\/(?:[a-zA-Z0-9._-]+\/)*references\/[a-zA-Z0-9._-]+\.md$/;
+
+/**
+ * Resolve a reference target without allowing a candidate-controlled path to
+ * escape the repository skill tree. Exact repo paths are preserved only when
+ * they point to a Markdown file under a repo-owned skills/.../references/ directory;
+ * otherwise we fall back to a safe
+ * scaffold template using the slugified target id.
+ */
+function safeReferenceTargetPath(pc) {
+  const id = pc?.proposedTarget?.id;
+  if (!id) return 'skills/**/references/<reference>.md';
+  const value = String(id).replaceAll('\\', '/');
+  const segments = value.split('/');
+  if (SAFE_REFERENCE_PATH_RE.test(value) && !segments.includes('.') && !segments.includes('..')) {
+    return value;
+  }
+  return `skills/**/references/${safeTargetId(pc, '<reference>')}.md`;
+}
+
+function normalizeRetargetTarget(kind, id) {
+  if (!PROMOTION_TARGET_KIND_SET.has(kind)) {
+    throw new Error(
+      `Invalid promotion target kind: ${kind}. Expected one of: ${PROMOTION_TARGET_KINDS.join(', ')}`
+    );
+  }
+
+  if (id == null) {
+    if (kind === 'reference') {
+      throw new Error('reference retarget requires --target-id under skills/.../references/*.md.');
+    }
+    return { kind, id: null };
+  }
+
+  if (typeof id !== 'string' || !id.trim()) {
+    throw new Error('promotion target id must be a non-empty string when provided.');
+  }
+  const value = id.trim();
+  if (
+    value.length > 500 ||
+    /[\u0000-\u001f\u007f]/.test(value) ||
+    value.includes('\\') ||
+    value.startsWith('/') ||
+    /^[a-zA-Z]:\//.test(value) ||
+    value.split('/').includes('..')
+  ) {
+    throw new Error('promotion target id contains an unsafe or unsupported path.');
+  }
+  if (kind === 'reference' && !SAFE_REFERENCE_PATH_RE.test(value)) {
+    throw new Error('reference target must be a repo-owned skills/.../references/*.md path.');
+  }
+  if (kind === 'human_judgment') {
+    throw new Error('human_judgment retarget does not accept a target id.');
+  }
+  return { kind, id: value };
+}
+
 /**
  * Read the promotionCandidate body from an entry, or null when absent.
  * @param {object} entry
@@ -95199,7 +95273,9 @@ function listPromotionCandidates(index, { includeInactive = false } = {}) {
 function isSecuritySensitive(entry) {
   const pc = getPromotionCandidate(entry);
   const tags = (entry?.metadata?.tags ?? []).join(' ');
-  const haystack = `${tags} ${pc?.clusterKey ?? ''}`.toLowerCase();
+  const target = pc?.proposedTarget;
+  const haystack =
+    `${tags} ${pc?.clusterKey ?? ''} ${target?.kind ?? ''} ${target?.id ?? ''}`.toLowerCase();
   return SECURITY_RE.test(haystack);
 }
 
@@ -95290,6 +95366,97 @@ function decidePromotion({
   let result;
   const entry = (0,riverbed_memory/* updateEntry */.W8)(indexPath, id, (live) => {
     result = applyPromotionDecision(live, { decision, approver, reason, now });
+  });
+  return { ...result, entry };
+}
+
+/**
+ * Change proposedTarget while preserving candidate identity and evidence.
+ * Retargeting invalidates any previous adoption approval: the candidate returns
+ * to candidate status and must be approved again for the new target.
+ */
+function applyPromotionRetarget(
+  entry,
+  { kind, targetId = null, approver, reason, now = new Date() }
+) {
+  const pc = getPromotionCandidate(entry);
+  if (!pc) throw new Error(`Entry ${entry?.id} is not a promotion_candidate.`);
+  if (!approver || !String(approver).trim()) {
+    throw new Error('approver is required for promotion retarget.');
+  }
+  if (!reason || !String(reason).trim()) {
+    throw new Error('reason is required for promotion retarget.');
+  }
+  if (
+    RETARGET_TERMINAL_STATUSES.has(entry.status) ||
+    RETARGET_TERMINAL_STATUSES.has(pc.promotionStatus)
+  ) {
+    throw new Error(
+      `Candidate ${entry.id} is terminal (promotionStatus=${pc.promotionStatus}, status=${entry.status}); retarget is not allowed.`
+    );
+  }
+
+  const nextTarget = normalizeRetargetTarget(kind, targetId);
+  const previousTarget = {
+    kind: pc.proposedTarget?.kind ?? 'human_judgment',
+    id: pc.proposedTarget?.id ?? null,
+  };
+  if (previousTarget.kind === nextTarget.kind && previousTarget.id === nextTarget.id) {
+    return { changed: false, entry, previousTarget, target: nextTarget, approvalReset: false };
+  }
+
+  const previousPromotionStatus = pc.promotionStatus;
+  const approvalReset = previousPromotionStatus !== 'candidate' || Boolean(entry.context?.approval);
+  const decidedAt = now.toISOString();
+  const record = {
+    from: previousTarget,
+    to: nextTarget,
+    approver: String(approver).trim(),
+    reason: String(reason).trim(),
+    decidedAt,
+    previousPromotionStatus,
+    approvalReset,
+  };
+
+  pc.targetHistory = pc.targetHistory ?? [];
+  pc.targetHistory.push(record);
+  pc.proposedTarget = nextTarget;
+  if (approvalReset) {
+    pc.promotionStatus = 'candidate';
+    delete entry.context.approval;
+  }
+  entry.status = 'active';
+  entry.metadata = entry.metadata ?? {};
+  entry.metadata.updatedAt = decidedAt;
+
+  return {
+    changed: true,
+    entry,
+    previousTarget,
+    target: nextTarget,
+    approvalReset,
+    record,
+  };
+}
+
+/** Persisting wrapper for applyPromotionRetarget(). */
+function retargetPromotion({
+  indexPath,
+  id,
+  kind,
+  targetId = null,
+  approver,
+  reason,
+  now = new Date(),
+}) {
+  const index = (0,riverbed_memory/* loadMemory */.ab)(indexPath);
+  const target = listPromotionCandidates(index, { includeInactive: true }).find((e) => e.id === id);
+  if (!target) {
+    throw new Error(`No promotion_candidate entry with id: ${id}`);
+  }
+  let result;
+  const entry = (0,riverbed_memory/* updateEntry */.W8)(indexPath, id, (live) => {
+    result = applyPromotionRetarget(live, { kind, targetId, approver, reason, now });
   });
   return { ...result, entry };
 }
@@ -95711,6 +95878,11 @@ const KIND_TEMPLATE = Object.freeze({
     title: (k) => `docs(skill): refine ${k} skill contract`,
     paths: (pc) => [`skills/**/${safeTargetId(pc, '<skill-id>')}/SKILL.md`],
   },
+  reference: {
+    branchPrefix: 'promote/reference',
+    title: (k) => `docs(reference): codify ${k} experience knowledge`,
+    paths: (pc) => [safeReferenceTargetPath(pc)],
+  },
   rule: {
     branchPrefix: 'promote/rule',
     title: (k) => `chore(rules): promote ${k} to project rules`,
@@ -95915,6 +96087,7 @@ var promotion_candidates = __nccwpck_require__(3077);
 //   river promote list                 List promotion candidates
 //   river promote approve <id>         Approve a candidate (promotionStatus -> approved)
 //   river promote reject  <id>         Reject a candidate  (promotionStatus -> archived)
+//   river promote retarget <id>         Change proposedTarget with an audit trail
 //   river promote template [<id>]      Emit PR scaffold(s) for approved candidate(s)
 //   river promote retire               Archive expired candidates + sync promotionStatus (Phase 3)
 //   river promote review-effectiveness Flag needs_review on negative post-activation feedback (Phase 3)
@@ -95999,7 +96172,7 @@ async function runPromoteCommand(parsed, targetPath) {
   // otherwise leave dryRun false and let `propose` write the index for real.
   if (parsed.promoteUnknownOption) {
     console.error(
-      `Error: unknown option for promote: ${parsed.promoteUnknownOption}. Use: --input --cluster-key --policy-version --approver --reason --index --threshold --feedback-root --include-inactive --output --dry-run`
+      `Error: unknown option for promote: ${parsed.promoteUnknownOption}. Use: --input --cluster-key --policy-version --target-kind --target-id --approver --reason --index --threshold --feedback-root --include-inactive --output --dry-run`
     );
     return 1;
   }
@@ -96009,13 +96182,14 @@ async function runPromoteCommand(parsed, targetPath) {
       'list',
       'approve',
       'reject',
+      'retarget',
       'template',
       'retire',
       'review-effectiveness',
     ].includes(sub)
   ) {
     console.error(
-      'Error: usage: river promote <propose|list|approve <id>|reject <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <jsonl>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
+      'Error: usage: river promote <propose|list|approve <id>|reject <id>|retarget <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <jsonl>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--target-kind <kind>] [--target-id <id>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
     );
     return 1;
   }
@@ -96161,6 +96335,63 @@ async function runPromoteCommand(parsed, targetPath) {
       console.log(
         '  note: any PR scaffold previously generated for this candidate is now invalid (regenerate after a fresh approval).'
       );
+    }
+    console.log(`  written to: ${indexPath}`);
+    return 0;
+  }
+
+  if (sub === 'retarget') {
+    if (!parsed.promoteId) {
+      console.error('Error: river promote retarget requires a candidate <id>.');
+      return 1;
+    }
+    if (!parsed.promoteTargetKind) {
+      console.error('Error: river promote retarget requires --target-kind <kind>.');
+      return 1;
+    }
+    if (!parsed.promoteReason) {
+      console.error('Error: river promote retarget requires --reason <text>.');
+      return 1;
+    }
+
+    const approver = parsed.promoteApprover || external_node_process_.env.RIVER_APPROVER || null;
+    if (!approver) {
+      console.error('Error: river promote retarget requires an auditable approver.');
+      return 1;
+    }
+
+    let result;
+    try {
+      result = retargetPromotion({
+        indexPath,
+        id: parsed.promoteId,
+        kind: parsed.promoteTargetKind,
+        targetId: parsed.promoteTargetId ?? null,
+        approver,
+        reason: parsed.promoteReason,
+        now,
+      });
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      return 1;
+    }
+
+    const pc = getPromotionCandidate(result.entry);
+    if (!result.changed) {
+      console.log(
+        `Candidate ${result.entry.id} already targets ${pc.proposedTarget.kind}${pc.proposedTarget.id ? ` (${pc.proposedTarget.id})` : ''} (no change).`
+      );
+      return 0;
+    }
+
+    console.log(`Candidate ${result.entry.id} retargeted.`);
+    console.log(
+      `  target: ${result.previousTarget.kind} -> ${result.target.kind}${result.target.id ? ` (${result.target.id})` : ''}`
+    );
+    console.log(`  approver: ${approver}`);
+    console.log(`  decidedAt: ${result.record.decidedAt}`);
+    if (result.approvalReset) {
+      console.log('  approval: reset; candidate must be approved again for the new target');
     }
     console.log(`  written to: ${indexPath}`);
     return 0;
@@ -96778,6 +97009,9 @@ Commands:
   promote list          List promotion_candidate entries (Judgment Promotion Loop Phase 2)
   promote approve <id>  Approve a candidate (promotionStatus -> approved)
   promote reject <id>   Reject a candidate (promotionStatus -> archived)
+  promote retarget <id> Change the proposed target with an auditable human decision
+                        (--target-kind <kind> [--target-id <id>] --approver <name>
+                         --reason <text> --index <path>)
   promote template [<id>] Emit PR scaffold(s) for approved candidate(s) (text only)
                         (--approver <name> --reason <text> --index <path>
                          --include-inactive; --output json for machine output)
@@ -96886,7 +97120,7 @@ const COMMAND_USAGE = {
   suppression:
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
-    'river promote <propose|list|approve|reject|template|retire|review-effectiveness> [options]',
+    'river promote <propose|list|approve|reject|retarget|template|retire|review-effectiveness> [options]',
   evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
 };
 
@@ -97298,6 +97532,8 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--input',
   '--cluster-key',
   '--policy-version',
+  '--target-kind',
+  '--target-id',
   // evolve
   '--min',
   '--month',
@@ -97519,6 +97755,34 @@ function parsePromoteOption(arg, args, parsed) {
       return 'break';
     }
     parsed.promoteReason = taken.value;
+    return 'continue';
+  }
+  if (arg === '--target-kind') {
+    if (parsed.promoteSubcommand !== 'retarget') {
+      parsed.promoteUnknownOption = arg;
+      return 'break';
+    }
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --target-kind option requires a value.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.promoteTargetKind = value;
+    return 'continue';
+  }
+  if (arg === '--target-id') {
+    if (parsed.promoteSubcommand !== 'retarget') {
+      parsed.promoteUnknownOption = arg;
+      return 'break';
+    }
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --target-id option requires a value.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.promoteTargetId = value;
     return 'continue';
   }
   if (arg === '--index') {
@@ -98106,6 +98370,8 @@ function parseArgs(argv) {
     promoteInput: null,
     promoteClusterKey: null,
     promotePolicyVersion: null,
+    promoteTargetKind: null,
+    promoteTargetId: null,
     promoteUnknownOption: null,
     // evolve subcommand fields (#1574 P1 Shadow aggregate / P2 Paired replay)
     evolveSubcommand: null,

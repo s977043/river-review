@@ -103,6 +103,7 @@
                 "test",
                 "fixture",
                 "skill",
+                "reference",
                 "rule",
                 "routing",
                 "riverbed",
@@ -113,7 +114,88 @@
             },
             "id": {
               "type": ["string", "null"],
-              "description": "Optional target identifier (fixture id, skill id, rule file, etc.)."
+              "description": "Optional target identifier (fixture id, skill id, reference path, rule file, etc.)."
+            }
+          }
+        },
+        "targetHistory": {
+          "type": "array",
+          "description": "Append-only audit trail of human retarget decisions. Optional for legacy candidates.",
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to",
+              "approver",
+              "reason",
+              "decidedAt",
+              "previousPromotionStatus",
+              "approvalReset"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "object",
+                "required": ["kind", "id"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "linter",
+                      "test",
+                      "fixture",
+                      "skill",
+                      "reference",
+                      "rule",
+                      "routing",
+                      "riverbed",
+                      "docs",
+                      "human_judgment"
+                    ]
+                  },
+                  "id": { "type": ["string", "null"] }
+                }
+              },
+              "to": {
+                "type": "object",
+                "required": ["kind", "id"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "linter",
+                      "test",
+                      "fixture",
+                      "skill",
+                      "reference",
+                      "rule",
+                      "routing",
+                      "riverbed",
+                      "docs",
+                      "human_judgment"
+                    ]
+                  },
+                  "id": { "type": ["string", "null"] }
+                }
+              },
+              "approver": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 },
+              "decidedAt": { "type": "string", "format": "date-time" },
+              "previousPromotionStatus": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "pending",
+                  "approved",
+                  "active",
+                  "needs_review",
+                  "superseded",
+                  "archived"
+                ]
+              },
+              "approvalReset": { "type": "boolean" }
             }
           }
         },

@@ -32,6 +32,7 @@ export const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compar
 export const PROMOTE_ID_SUBCOMMANDS = new Set([
   'approve',
   'reject',
+  'retarget',
   'template',
   'review-effectiveness',
 ]);
