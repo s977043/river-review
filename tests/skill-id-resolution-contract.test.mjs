@@ -139,5 +139,6 @@ test('skill command wires exact-ID resolution before keyword fallback', async ()
   assert.match(command, /Bash\(node:\*\)/);
   assert.match(command, /Read/);
   assert.match(command, /owner-skill delegation/);
+  assert.match(command, /rg -i -l -F -g 'SKILL\.md' --/);
   assert.doesNotMatch(command, /SKILL_ROOT=.*skills\/agent-skills/);
 });
