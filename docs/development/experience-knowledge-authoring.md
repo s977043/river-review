@@ -34,12 +34,16 @@ River Review のレビュー結果・失敗経験・修正履歴から得た知�
 
 ## Reference eligibility
 
-Reference candidate は、少なくとも次のいずれかを満たす。
+Judgment Promotion Loop 経由で Reference へ昇格する場合は、既存の promotion candidate evidence gate をそのまま使う。現行の自動候補生成は同種 feedback の反復 2 件以上を既定とし、この契約だけで単一事例の自動 promotion 経路を追加しない。
+
+Reference の内容としては、次のような evidence を扱える。
 
 - 複数の review / feedback で同じ判断が反復した
-- 実障害・修正 PR・運用失敗で再現した
+- 実障害・修正 PR・運用失敗で原因と対処が検証できた
 - 公式手順だけでは解けなかった原因と対処が検証できた
 - repository / team 固有の scope / exception がレビュー品質へ影響した
+
+単一 incident の知見を直ちに共有する必要がある場合も、自動 candidate gate を迂回しない。まず Riverbed / incident doc 等へ evidence を残し、明示的な人間レビューを伴う変更として扱う。
 
 単なる好み、未検証の推測、モデルの一度きりの回答は Reference に昇格しない。
 
@@ -66,6 +70,7 @@ Reference candidate は、少なくとも次のいずれかを満たす。
 ### Evidence / provenance
 
 PR、finding fingerprint、fixture、incident、公式 source など、再確認できる出典。
+秘密情報、認証情報、個人情報、raw session transcript、hidden CoT は保存しない。
 
 ### Scope
 
