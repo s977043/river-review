@@ -7,6 +7,8 @@ import test, { describe } from 'node:test';
 import {
   applyPromotionDecision,
   decidePromotion,
+  applyPromotionRetarget,
+  retargetPromotion,
   listPromotionCandidates,
   isSecuritySensitive,
   buildPrScaffold,
@@ -154,6 +156,132 @@ describe('decidePromotion (persisting wrapper)', () => {
     } finally {
       cleanup();
     }
+  });
+});
+
+describe('promotion retarget', () => {
+  test('retargets to reference, appends audit history, and stays schema-valid', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    const evidenceBefore = structuredClone(entry.context.promotionCandidate.evidence);
+    const result = applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+      approver: 'alice',
+      reason: 'experience knowledge belongs in a reference',
+      now: decidedNow,
+    });
+
+    assert.equal(result.changed, true);
+    assert.equal(entry.context.promotionCandidate.proposedTarget.kind, 'reference');
+    assert.equal(entry.context.promotionCandidate.targetHistory.length, 1);
+    assert.deepEqual(entry.context.promotionCandidate.evidence, evidenceBefore);
+    assert.equal(entry.context.promotionCandidate.promotionStatus, 'candidate');
+    assert.equal(validate(wrapIndex([entry])), true, JSON.stringify(validate.errors, null, 2));
+  });
+
+  test('retargeting an approved candidate invalidates the old approval', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    applyPromotionDecision(entry, { decision: 'approved', approver: 'alice', now: decidedNow });
+
+    const result = applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+      approver: 'bob',
+      reason: 'move detail out of the skill contract',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+
+    assert.equal(result.approvalReset, true);
+    assert.equal(entry.context.promotionCandidate.promotionStatus, 'candidate');
+    assert.equal(entry.context.approval, undefined);
+    assert.equal(entry.context.approvalHistory.length, 1);
+    assert.equal(entry.context.promotionCandidate.targetHistory[0].previousPromotionStatus, 'approved');
+    assert.equal(buildPrScaffold(entry).eligible, false);
+  });
+
+  test('same target is idempotent and does not grow targetHistory', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    entry.context.promotionCandidate.proposedTarget = {
+      kind: 'reference',
+      id: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+    };
+    const result = applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+      approver: 'alice',
+      reason: 'same target',
+      now: decidedNow,
+    });
+
+    assert.equal(result.changed, false);
+    assert.equal(entry.context.promotionCandidate.targetHistory, undefined);
+  });
+
+  test('rejects traversal-like reference targets and terminal candidates', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    assert.throws(
+      () =>
+        applyPromotionRetarget(entry, {
+          kind: 'reference',
+          targetId: '../../etc/passwd',
+          approver: 'alice',
+          reason: 'bad path',
+          now: decidedNow,
+        }),
+      /reference target|unsafe/
+    );
+
+    applyPromotionDecision(entry, { decision: 'rejected', approver: 'alice', now: decidedNow });
+    assert.throws(
+      () =>
+        applyPromotionRetarget(entry, {
+          kind: 'skill',
+          targetId: 'river-review-code',
+          approver: 'alice',
+          reason: 'terminal',
+          now: decidedNow,
+        }),
+      /terminal/
+    );
+  });
+
+  test('persisting wrapper updates the index', () => {
+    const { cleanup, indexPath } = createTempMemory({ layout: 'flat', prefix: 'rr-retarget-' });
+    try {
+      const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+      appendEntry(indexPath, entry);
+      retargetPromotion({
+        indexPath,
+        id: entry.id,
+        kind: 'reference',
+        targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+        approver: 'alice',
+        reason: 'promote experience knowledge',
+        now: decidedNow,
+      });
+      const reloaded = loadMemory(indexPath).entries.find((e) => e.id === entry.id);
+      assert.equal(reloaded.context.promotionCandidate.proposedTarget.kind, 'reference');
+      assert.equal(reloaded.context.promotionCandidate.targetHistory.length, 1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('security candidate still delegates to PlanGate after retarget and re-approval', () => {
+    const entry = makeCandidate('secret-scanner', 'missed_issue', [fp(1), fp(2)]);
+    applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-security/references/SECRET-SCANNING.md',
+      approver: 'alice',
+      reason: 'capture recurring operational detail',
+      now: decidedNow,
+    });
+    applyPromotionDecision(entry, {
+      decision: 'approved',
+      approver: 'alice',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+    assert.equal(buildPrScaffold(entry).requiresPlanGate, true);
   });
 });
 
