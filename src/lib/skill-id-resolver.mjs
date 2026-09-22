@@ -11,8 +11,6 @@ const SOURCE_SKILL_ROOTS = Object.freeze([
   ['midstream', 'review'],
   ['downstream', 'review'],
 ]);
-const MAX_SCAN_DEPTH = 12;
-
 export class SkillIdResolutionError extends Error {
   constructor(message) {
     super(message);
@@ -45,19 +43,18 @@ async function isFile(targetPath) {
   }
 }
 
-async function collectSkillMdFiles(root, depth = 0) {
-  if (depth > MAX_SCAN_DEPTH || !(await isDirectory(root))) return [];
+async function collectSkillMdFiles(root) {
+  if (!(await isDirectory(root))) return [];
 
   const entries = await fs.readdir(root, { withFileTypes: true });
-  const groups = await Promise.all(
-    entries.map(async (entry) => {
-      const entryPath = path.join(root, entry.name);
-      if (entry.isFile() && entry.name === 'SKILL.md') return [entryPath];
-      if (!entry.isDirectory()) return [];
-      return collectSkillMdFiles(entryPath, depth + 1);
-    })
+  const candidates = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(root, entry.name, 'SKILL.md'));
+
+  const existing = await Promise.all(
+    candidates.map(async (candidate) => ((await isFile(candidate)) ? candidate : null))
   );
-  return groups.flat();
+  return existing.filter(Boolean);
 }
 
 async function readDeclaredSkillId(skillPath) {
