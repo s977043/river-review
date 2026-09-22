@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -97,7 +97,7 @@ test('resolves exported sibling package by metadata.rr.id', async (t) => {
   });
 });
 
-test('rejects an exported package whose declared ID does not match its directory key', async (t) => {
+test('rejects mismatched IDs in exported packages', async (t) => {
   const root = await makeRoot(t);
   await writeSkill(
     root,
@@ -113,6 +113,18 @@ test('rejects an exported package whose declared ID does not match its directory
 
   await assert.rejects(
     () => resolveSkillId(root, 'nullability-contract'),
-    (err) => err instanceof SkillIdResolutionError && /declares a different skill ID/.test(err.message)
+    (err) =>
+      err instanceof SkillIdResolutionError &&
+      /declares a different skill ID/.test(err.message)
   );
+});
+
+test('skill command wires exact-ID resolution before keyword fallback', async () => {
+  const command = await readFile(new URL('../commands/skill.md', import.meta.url), 'utf8');
+
+  assert.match(command, /resolve-skill-id\.mjs/);
+  assert.match(command, /Bash\(node:\*\)/);
+  assert.match(command, /Read/);
+  assert.match(command, /owner-skill delegation/);
+  assert.doesNotMatch(command, /SKILL_ROOT=.*skills\/agent-skills/);
 });
