@@ -253,6 +253,25 @@ describe('river promote retarget', () => {
     assert.equal(missingReason.code, 1);
     assert.match(missingReason.stderr, /requires --reason/);
 
+    const missingApprover = await runCliInProcess(
+      [
+        'promote',
+        'retarget',
+        fixtureId,
+        '--index',
+        indexPath,
+        '--target-kind',
+        'reference',
+        '--target-id',
+        'skills/agent-skills/x/references/X.md',
+        '--reason',
+        'human classification',
+      ],
+      { env: { RIVER_APPROVER: '', USER: 'runner', USERNAME: 'runner' } }
+    );
+    assert.equal(missingApprover.code, 1);
+    assert.match(missingApprover.stderr, /auditable approver/);
+
     const unsafe = await runCliInProcess([
       'promote',
       'retarget',
