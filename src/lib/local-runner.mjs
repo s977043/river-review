@@ -725,10 +725,19 @@ export async function runLocalReview({
       // #692 PR-C: surface redaction telemetry without leaking the
       // pre-redaction text. `redactionHits` is a small {category, count}
       // tally; raw context never appears here.
-      ...(repoContext?.redactionHits?.length || repoContext?.excludedPaths?.length
+      // #2033 AC3: `redactionPatternIds` names the category set the redactor
+      // searched for. Redaction is pattern-based and therefore incomplete by
+      // construction, so an empty `redactionHits` must not read as "no secret
+      // remains" — the id list is what tells a reader which categories were
+      // covered. Emitted whenever the redactor ran, even with zero hits, since
+      // that is exactly the case the bare tally cannot describe.
+      ...(repoContext?.redactionHits?.length ||
+      repoContext?.excludedPaths?.length ||
+      repoContext?.redactionPatternIds?.length
         ? {
             repoContextSecurity: {
               redactionHits: repoContext?.redactionHits ?? [],
+              redactionPatternIds: repoContext?.redactionPatternIds ?? [],
               excludedPaths: repoContext?.excludedPaths ?? [],
             },
           }

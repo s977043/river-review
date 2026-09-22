@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { redactText, shouldExcludeForContext } from './secret-redactor.mjs';
+import { REDACTION_PATTERN_IDS, redactText, shouldExcludeForContext } from './secret-redactor.mjs';
 import { charsToTokens, estimateTokens } from './token-estimator.mjs';
 import { DEFAULT_WEIGHTS, pathProximity, scoreContextCandidate } from './context-ranker.mjs';
 import { resolveContextBudget } from './context-presets.mjs';
@@ -112,7 +112,13 @@ export function createRedactionPrimitives(security) {
     if (hits.length) bumpHits(hits);
     return redacted;
   };
-  return { isPathExcluded, maybeRedact, totalHits, excludedPaths };
+  // #2033 AC3: report WHICH categories were searched for, not just the hit
+  // tally. A consumer reading `redactionHits: []` cannot tell an exhaustive
+  // clean scan from a disabled redactor; the pattern id list makes the
+  // difference explicit. Empty when redaction is off, because in that case
+  // no category was searched for at all.
+  const redactionPatternIds = redactionEnabled ? REDACTION_PATTERN_IDS : [];
+  return { isPathExcluded, maybeRedact, totalHits, excludedPaths, redactionPatternIds };
 }
 
 /**
@@ -265,7 +271,7 @@ export async function collectRepoContext({
 }) {
   const rankingEnabled = contextConfig?.ranking?.enabled === true;
   const primitives = createRedactionPrimitives(security);
-  const { isPathExcluded, maybeRedact, totalHits, excludedPaths } = primitives;
+  const { isPathExcluded, maybeRedact, totalHits, excludedPaths, redactionPatternIds } = primitives;
 
   // 1. Full text of changed source files — the SAME computation the fullFile
   //    availability declaration uses (#1606), so declaration and injection can
@@ -382,6 +388,7 @@ export async function collectRepoContext({
     totalChars: maxChars - budget,
     truncated: budget <= 0 || tokenBudgetExhausted(),
     redactionHits,
+    redactionPatternIds,
     excludedPaths,
     // PR-C (#689): expose ranking + budget telemetry on the result so
     // callers can surface it via reviewDebug. Raw context never appears

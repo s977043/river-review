@@ -13,6 +13,9 @@
 // that records "redaction ran" must not read that as "no secret remains".
 // `REDACTION_PATTERN_IDS` names the pattern set that was applied so consumers
 // can record *which* categories were searched for rather than a bare boolean.
+// Wired into `src/lib/repo-context.mjs` (`redactionPatternIds` on the collect
+// result), which `src/lib/local-runner.mjs` surfaces on
+// `reviewDebug.repoContextSecurity` (#2033 AC3).
 //
 // Design notes (see Issue #692 plan):
 // - Replacements are *length-independent* (`<REDACTED:category>`) so that
