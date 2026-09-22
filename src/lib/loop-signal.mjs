@@ -15,7 +15,7 @@
  * All functions are pure — no side effects, no AI calls, no file I/O.
  */
 
-import { normalizeCoverageStatus } from './review-coverage.mjs';
+import { isIncompleteCoverage } from './review-coverage.mjs';
 
 /** @typedef {'NO_SIGNAL' | 'REVISE_REQUIRED' | 'CONVERGED' | 'ESCALATE_HUMAN'} ArtifactSignal */
 /** @typedef {ArtifactSignal | 'STOP_OSCILLATED'} RunsDiffSignal */
@@ -65,7 +65,10 @@ export function deriveLoopSignalFromArtifact(artifact) {
  *
  * When `diff.oscillated` is non-empty, oscillation takes priority and returns
  * STOP_OSCILLATED regardless of finding severity — the fix loop is spinning
- * and human triage is needed.
+ * and human triage is needed. Whether an entry belongs in `diff.oscillated` at
+ * all is decided upstream, in `_hasOscillation` (`review-differ.mjs`), which
+ * ignores absences produced by a run that did not finish (#2336) — see
+ * `qualifyLoopSignalForCoverage` for why that test cannot live here.
  *
  * The derived signal is then qualified by the latest run's `reviewCoverage`
  * (see `qualifyLoopSignalForCoverage`): a run that did not complete its planned
@@ -121,9 +124,22 @@ export function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
  * strength of a review that never ran to completion — the layer inconsistency
  * `docs/adr/011-review-resolution-loop.md` names.
  *
- * Only `CONVERGED` is qualified. `ESCALATE_HUMAN`, `STOP_OSCILLATED`,
- * `REVISE_REQUIRED` and `NO_SIGNAL` already point away from "stop and accept",
- * so incomplete coverage cannot make any of them less safe.
+ * Only `CONVERGED` is qualified here. `ESCALATE_HUMAN`, `REVISE_REQUIRED` and
+ * `NO_SIGNAL` already point away from "stop and accept", so incomplete
+ * coverage cannot make any of them less safe.
+ *
+ * `STOP_OSCILLATED` is the one signal that breaks that reasoning: it does point
+ * at stopping, and a partial run can manufacture it (#2336). It is still not
+ * qualified *here*, because this function only ever sees the coverage of the
+ * run the signal was derived from — the latest one — and that is the wrong
+ * observable for oscillation. In a present→absent→present timeline the latest
+ * run is a run where the finding is *present*; the absence that has to be
+ * doubted sits in an earlier run. Qualifying on the latest run's coverage would
+ * therefore miss the false oscillation it is aimed at (latest complete, middle
+ * partial) and suppress genuine ones (latest partial, middle complete).
+ * The absence is instead discounted where the per-run timeline exists, in
+ * `_hasOscillation` (`review-differ.mjs`), using the same
+ * `isIncompleteCoverage` derivation this function uses.
  *
  * `unknown` coverage (no `reviewCoverage` on the record — the shape every run
  * written before Review Coverage was wired still has) is deliberately NOT
@@ -137,7 +153,6 @@ export function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
  */
 export function qualifyLoopSignalForCoverage(signal, coverage) {
   if (signal !== 'CONVERGED') return signal;
-  const status = normalizeCoverageStatus(coverage);
-  if (status === 'partial' || status === 'not_executed') return 'NO_SIGNAL';
+  if (isIncompleteCoverage(coverage)) return 'NO_SIGNAL';
   return signal;
 }

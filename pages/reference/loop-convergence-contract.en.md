@@ -29,6 +29,12 @@ Because of that demotion, a `partial` or `not_executed` run no longer stops the 
 
 What the demotion covers is limited to the Layer 2 signal. When an artifact carries a `gate` block, the reference agent below treats `gate` as authoritative over the signal, so by default a Layer 1 derived `GO` can still stop a `partial` run (#2337). To stop on the gate path as well, enable `RIVER_GATE_COVERAGE=1` (described below). The asymmetry is deliberate: **the Layer 2 demotion is on by default, while feeding incompleteness into `gate` is opt-in**.
 
+As of PR #2365 the oscillation test itself is also coverage-conditioned. `oscillated` is detected as present → absent → present, but that absence measures one thing only: the fingerprint is not in that run. A run whose reviewer timed out drops the finding, so a single incomplete run between two complete ones was enough to manufacture a false oscillation. An absence is therefore no longer counted as evidence of oscillation when the run that produced it reports `partial` or `not_executed` coverage. An absence on a `complete` or `unknown` run still counts.
+
+The condition withholds the oscillation judgement rather than settling it. For as long as the run that produced the absence is incomplete, that absence is not counted as evidence, so `STOP_OSCILLATED` is unreachable in an environment whose coverage is persistently `partial` or `not_executed`. Granularity matters too: `reviewCoverage` is an observation about a run, not about the review unit that would have reported the finding, so an absence is discounted the same way on a run where only an unrelated unit timed out. A narrower test would need the finding's owning unit, which run records do not carry today. A caller that needs a genuine oscillation escalated reliably should therefore also carry a Layer 3 bound such as `STOP_MAX_ITERATIONS`.
+
+This is a condition on detection rather than a demotion of the signal, because the only coverage `deriveLoopSignalFromRunsDiff` can see is the latest run's. In a present → absent → present window the latest run is one where the finding is present, while the absence that has to be doubted sits in an earlier run — so the latest run's coverage is not the observable that decides whether the oscillation is real. The test lives instead in `review-differ.mjs`, which holds the per-run timeline.
+
 **Layer 3** — Caller-synthesized (River Review deliberately does **not** emit these):
 
 | Value                  | When to synthesize                                             |
