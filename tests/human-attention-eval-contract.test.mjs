@@ -60,6 +60,7 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.freezePolicy?.rubric, 'freeze-before-run');
     assert.strictEqual(manifest.freezePolicy?.baselineCommit, 'freeze-at-run-start');
     assert.strictEqual(manifest.freezePolicy?.candidateCommit, 'freeze-at-run-start');
+    assert.strictEqual(manifest.freezePolicy?.fixtureAdapter, 'freeze-at-run-start');
   });
 
   it('keeps the legacy case fail-safe instead of inventing missing state', () => {
