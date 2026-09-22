@@ -71,10 +71,10 @@ Commands:
   review plan           Resolve upstream artifacts and emit a Review Artifact
                         (Phase 3 slice: --plan-only only; --base <ref> diffs
                          against that ref instead of the diff artifact;
-                         --entry <name> pins a review Flow entry, Beta)
+                         --entry <name> pins a review Flow entry, Internal)
   review exec           Run the review and emit a Review Artifact with findings
                         (--dry-run: plan only; --plan <file>: replay an existing plan;
-                         --entry <name> pins a review Flow entry and records steps, Beta)
+                         --entry <name> pins a review Flow entry and records steps, Internal)
   review route          Recommend a review mode (light|standard|team|human-required)
                         for the current diff (--format json|markdown; --base <ref>)
   eval                  Run review fixtures evaluation (must_include checks)
@@ -165,7 +165,7 @@ Options:
   --base <ref>      Branch or ref to diff against (e.g. main). Default: auto-detected default branch
                     Accepted only by: run, skills (no subcommand), review plan|exec|route.
                     Other surfaces reject it (#2065) — they never read a diff.
-  --entry <name>    (review plan|exec, Beta) Review Flow entry to pin the artifact to
+  --entry <name>    (review plan|exec, Internal) Review Flow entry to pin the artifact to
                     (review-plan|review-task|review-final|... from the entry map).
                     Adds flow and evidenceRequirements to the artifact; review exec also
                     records the Flow's per-step outcomes as steps. No other output changes.
@@ -347,7 +347,7 @@ const BASE_CONSUMING_SURFACES = new Set([
 ]);
 
 /**
- * The surfaces that READ `parsed.entry` (#2054 PR-3, Beta).
+ * The surfaces that READ `parsed.entry` (#2054 PR-3, Internal).
  *
  * `--entry <name>` names a review Flow entry (a key of the entry map's
  * `entries`, read through `src/lib/flow-loader.mjs`) and is consumed by
