@@ -47,7 +47,7 @@ nullability-contract
 existing-pattern-conformance
 ```
 
-物理パスは resolver の実装詳細である。
+物理パスは resolver の実装詳細です。
 
 ## Resolution order
 
@@ -69,7 +69,7 @@ Claude Marketplace は `.claude-plugin/marketplace.json` で `source: "./"` を�
 ### `river skills export`
 
 `river skills export` は Review Skill をそれぞれ Agent Skill package として export する。
-export 後は sibling package の
+export 後は、次の sibling package path を解決先として扱います。
 
 ```text
 <export-root>/<skill-id>/SKILL.md
@@ -147,14 +147,14 @@ Progressive Disclosure は「ファイルを細かく分けること」ではな
 ## Implementation gap
 
 現時点の `commands/skill.md` は `skills/agent-skills/` のみを検索する。
-そのため full plugin root に native Review Skill が存在していても、直接の `/skill` surface では skill-ID resolution が不完全である。
+そのため full plugin root に native Review Skill が存在していても、直接の `/skill` surface では skill-ID resolution が不完全です。
 
 この gap は別 Issue で resolver を追加する。
-#2381 の dogfood は resolver contract が実装されるまで、knowledge を複製して回避しない。
+Issue #2381 の dogfood は resolver contract が実装されるまで、knowledge を複製して回避しません。
 
 ## Non-goals
 
-- Agent Skill と Review Skill を一つのディレクトリ体系へ統合する
+- Agent Skill と Review Skill を1つのディレクトリ体系へ統合する
 - 全 Review Skill を `.claude-plugin/plugin.json` の discoverable skill に直接列挙する
 - cross-skill knowledge を build 時に無条件 flatten する
 - physical path を stable interface にする
