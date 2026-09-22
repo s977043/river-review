@@ -127,6 +127,40 @@ export function normalizeCoverageStatus(coverage) {
   return status;
 }
 
+/**
+ * True when a run's coverage says review work that was expected to run did not
+ * finish (`partial` or `not_executed`).
+ *
+ * Single derivation of the "this observation is not safe to act on" set, shared
+ * by every consumer that has to discount a claim a partial run produced:
+ * `loop-signal.mjs` (`CONVERGED` demotion, #2331) and `review-differ.mjs`
+ * (absence-based oscillation detection, #2336).
+ *
+ * `unknown` is deliberately NOT incomplete. A record with no `reviewCoverage`
+ * — the shape of every run written before Review Coverage was wired — would
+ * otherwise make both `CONVERGED` and oscillation detection unreachable for
+ * those callers. Absence of the observation is not an observation of
+ * incompleteness.
+ *
+ * @param {object|null|undefined} coverage  A run's `reviewCoverage` object.
+ * @returns {boolean}
+ */
+export function isIncompleteCoverage(coverage) {
+  return isIncompleteCoverageStatus(normalizeCoverageStatus(coverage));
+}
+
+/**
+ * `isIncompleteCoverage` for callers that already hold a normalized status
+ * (e.g. the per-run status on a `runs diff` oscillation timeline), so the
+ * `partial` / `not_executed` set is written down exactly once.
+ *
+ * @param {'complete'|'partial'|'not_executed'|'unknown'} status
+ * @returns {boolean}
+ */
+export function isIncompleteCoverageStatus(status) {
+  return status === 'partial' || status === 'not_executed';
+}
+
 function uniquePaths(paths = []) {
   const seen = new Set();
   const result = [];
