@@ -1,4 +1,4 @@
-# #2378 Phase A — Decision Surface Human Attention Evaluation Plan
+# #2378 Phase A—Decision Surface Human Attention Evaluation Plan
 
 > Issue: #2378
 > Parent: #2368
@@ -120,45 +120,45 @@ The reference set must be frozen before rendering either arm.
 
 For every rendered artifact, the Human evaluator answers the same five questions.
 
-### Q1 — Action
+### Q1—Action
 
-What requires action now?
+What requires action now
 
 Pass:
 
 - exact actionable count when count is material
 - no false action requirement for lower-severity-only fixtures
 
-### Q2 — Human decision / review
+### Q2—Human decision / review
 
-Is explicit Human review or decision required?
+Is explicit Human review or decision required
 
 Pass:
 
 - correct yes / no
 - no new Human requirement invented by the presentation layer
 
-### Q3 — Uncertainty
+### Q3—Uncertainty
 
-Is review / verification incomplete, failed, timed out, not executed, or otherwise uncertain?
+Is review / verification incomplete or otherwise uncertain
 
 Pass:
 
 - correct state identified
 - unknown is not interpreted as complete
 
-### Q4 — Detail trace
+### Q4—Detail trace
 
-Can the evaluator identify where to inspect the underlying finding / coverage / evidence detail?
+Can the evaluator identify where to inspect the underlying finding / coverage / evidence detail
 
 Pass:
 
 - L2 / L3 path is identifiable
 - collapsed content still counts as visible when clearly reachable
 
-### Q5 — Confidence
+### Q5—Confidence
 
-Can the evaluator state whether the run is clean, actionable, Human-gated, or uncertain without contradicting the material reference?
+Can the evaluator classify the run without contradicting the material reference
 
 Pass:
 
@@ -311,7 +311,7 @@ Therefore the candidate may improve Decision Extraction while increasing duplica
 
 This is an expected hypothesis, not a failure by itself.
 
-If Phase A confirms extraction benefit with zero visibility regression but duplication remains high, create a **separate presentation candidate** for folding / relocating existing sections.
+If Phase A confirms extraction benefit with zero visibility regression, evaluate duplication separately. When duplication remains high, create a **separate presentation candidate** for folding / relocating existing sections.
 
 Do not combine that optimization into #2371.
 
