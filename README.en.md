@@ -239,8 +239,8 @@ Latest release: [v1.120.0](https://github.com/s977043/river-review/releases/late
 
 ## Quick start (local)
 
-1. Environment: Node 22 required (`package.json` `engines.node` is `22.x`; CI runs on Node 22)
-2. Install dependencies: `npm install`
+1. Environment: use the Node.js version in [`.nvmrc`](.nvmrc). Run `nvm install` once, then `nvm use`
+2. Install dependencies: `npm ci` (uses the committed lockfile)
 3. Validate skills: `npm run skills:validate`
 4. Validate Agent Skills (optional): `npm run agent-skills:validate`
 5. Tests: `npm test`
@@ -248,6 +248,8 @@ Latest release: [v1.120.0](https://github.com/s977043/river-review/releases/late
 7. Review fixtures evaluation (optional): `npm run eval:fixtures` (must_include style)
 8. Repo-wide evaluation (optional): `npm run eval:repo-context` (measures detection / context lift / false positive against the [#688](https://github.com/s977043/river-review/issues/688) repo-wide fixtures)
 9. Docs development (optional): `npm run dev`
+
+If your shell selects a different Node.js version, use `bash scripts/local-npm.sh test`. See the [development runbook](docs/runbook/dev.md) (Japanese) for prerequisites and daily commands.
 
 ### Major features added in v0.21–v0.28
 
@@ -378,11 +380,11 @@ See `templates/agent-workflow/README.md` for the full Codex (and Cursor) setup. 
 
 ### Using Codex with a project-local config
 
-The project-local Codex config lives in [`.codex/config.toml`](./.codex/config.toml) and is **opt-in**: it does not affect normal Codex usage. Launch with one of the following only when you want to use this repository's config:
+The project-local Codex config lives in [`.codex/config.toml`](./.codex/config.toml). Trust this project before launching. These commands preserve `CODEX_HOME`, authentication, and installed plugin settings:
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
-CODEX_HOME="$REPO_ROOT/.codex" codex -C "$REPO_ROOT"
+codex -C "$REPO_ROOT"
 npm run codex:local -- "Read AGENTS.md and propose a work plan for this branch"
 ```
 
@@ -391,6 +393,8 @@ To run non-interactively:
 ```bash
 npm run codex:exec -- "review this branch"
 ```
+
+Run `npm run codex:verify` for offline plugin contracts and related tests. Add `-- --live` for a read-only Codex smoke test with a 180-second timeout. Live execution requires Codex authentication. Passing contract tests alone does not establish end-to-end review correctness.
 
 Operating assumptions:
 

@@ -13,9 +13,11 @@ const targetFiles = [path.join(root, 'README.md'), path.join(root, 'AGENTS.md')]
 
 function walkDir(dir) {
   const files = [];
-  for (const name of fs.readdirSync(dir)) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const name = entry.name;
     const full = path.join(dir, name);
-    const stat = fs.statSync(full);
+    // Directory entries already carry the type; resolve only symbolic links.
+    const stat = entry.isSymbolicLink() ? fs.statSync(full) : entry;
     if (stat.isDirectory()) {
       if (excludeDirs.includes(name) || name.startsWith('.')) continue;
       files.push(...walkDir(full));
@@ -165,15 +167,19 @@ function main() {
   const check = process.argv.includes('--check');
   const files = collectTargetFiles();
   const modifiedFiles = [];
+  let failed = false;
   for (const file of files) {
     try {
       const changed = processMarkdownFile(file, { check });
       if (changed) modifiedFiles.push(file);
     } catch (err) {
+      failed = true;
       console.error(`Error processing ${file}:`, err.message);
     }
   }
+  if (failed) process.exitCode = 1;
   if (modifiedFiles.length === 0) {
+    if (failed) return;
     console.log('No heading/title dash normalizations needed.');
     process.exit(0);
   }

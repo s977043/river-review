@@ -1,14 +1,14 @@
-# Project Codex Instructions (CODEX_HOME scoped)
+# Project Codex Instructions
 
 > **Single source:** 共通ルールは [AGENTS.md](../AGENTS.md)。本ファイルは Codex 向けの最小差分です。
 
 ## 起動
 
-project-local config は opt-in です。Codex をこのリポジトリ設定で起動する場合のみ `CODEX_HOME` を指定します。
+プロジェクトを信頼済みにして起動します。認証とプラグイン設定を引き継ぐため、`CODEX_HOME` は変更しません。共通規則はルートの `AGENTS.md` を参照します。
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
-CODEX_HOME="$REPO_ROOT/.codex" codex -C "$REPO_ROOT"
+codex -C "$REPO_ROOT"
 ```
 
 `package.json` のショートカットを使う場合:
