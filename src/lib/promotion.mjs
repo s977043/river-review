@@ -78,8 +78,7 @@ function safeTargetId(pc, fallback) {
   return id ? slugify(id) : fallback;
 }
 
-const SAFE_REFERENCE_PATH_RE =
-  /^skills\/(?:[a-zA-Z0-9._-]+\/)*references\/[a-zA-Z0-9._-]+\.md$/;
+const SAFE_REFERENCE_PATH_RE = /^skills\/(?:[a-zA-Z0-9._-]+\/)*references\/[a-zA-Z0-9._-]+\.md$/;
 
 /**
  * Resolve a reference target without allowing a candidate-controlled path to
@@ -93,11 +92,7 @@ function safeReferenceTargetPath(pc) {
   if (!id) return 'skills/**/references/<reference>.md';
   const value = String(id).replaceAll('\\', '/');
   const segments = value.split('/');
-  if (
-    SAFE_REFERENCE_PATH_RE.test(value) &&
-    !segments.includes('.') &&
-    !segments.includes('..')
-  ) {
+  if (SAFE_REFERENCE_PATH_RE.test(value) && !segments.includes('.') && !segments.includes('..')) {
     return value;
   }
   return `skills/**/references/${safeTargetId(pc, '<reference>')}.md`;
