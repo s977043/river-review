@@ -163,6 +163,7 @@ describe('promotion retarget', () => {
   test('retargets to reference, appends audit history, and stays schema-valid', () => {
     const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
     const evidenceBefore = structuredClone(entry.context.promotionCandidate.evidence);
+    entry.context.promotionCandidate.contentHash = 'a'.repeat(64);
     const result = applyPromotionRetarget(entry, {
       kind: 'reference',
       targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
@@ -175,6 +176,7 @@ describe('promotion retarget', () => {
     assert.equal(entry.context.promotionCandidate.proposedTarget.kind, 'reference');
     assert.equal(entry.context.promotionCandidate.targetHistory.length, 1);
     assert.deepEqual(entry.context.promotionCandidate.evidence, evidenceBefore);
+    assert.equal(entry.context.promotionCandidate.contentHash, 'a'.repeat(64));
     assert.equal(entry.context.promotionCandidate.promotionStatus, 'candidate');
     assert.equal(validate(wrapIndex([entry])), true, JSON.stringify(validate.errors, null, 2));
   });
