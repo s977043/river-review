@@ -7,6 +7,8 @@ import test, { describe } from 'node:test';
 import {
   applyPromotionDecision,
   decidePromotion,
+  applyPromotionRetarget,
+  retargetPromotion,
   listPromotionCandidates,
   isSecuritySensitive,
   buildPrScaffold,
@@ -157,6 +159,137 @@ describe('decidePromotion (persisting wrapper)', () => {
   });
 });
 
+describe('promotion retarget', () => {
+  test('retargets to reference, appends audit history, and stays schema-valid', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    const evidenceBefore = structuredClone(entry.context.promotionCandidate.evidence);
+    entry.context.promotionCandidate.contentHash = 'a'.repeat(64);
+    const result = applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+      approver: 'alice',
+      reason: 'experience knowledge belongs in a reference',
+      now: decidedNow,
+    });
+
+    assert.equal(result.changed, true);
+    assert.equal(entry.context.promotionCandidate.proposedTarget.kind, 'reference');
+    assert.equal(entry.context.promotionCandidate.targetHistory.length, 1);
+    assert.deepEqual(entry.context.promotionCandidate.evidence, evidenceBefore);
+    assert.equal(entry.context.promotionCandidate.contentHash, 'a'.repeat(64));
+    assert.equal(entry.context.promotionCandidate.promotionStatus, 'candidate');
+    assert.equal(validate(wrapIndex([entry])), true, JSON.stringify(validate.errors, null, 2));
+  });
+
+  test('retargeting an approved candidate invalidates the old approval', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    applyPromotionDecision(entry, { decision: 'approved', approver: 'alice', now: decidedNow });
+
+    const result = applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+      approver: 'bob',
+      reason: 'move detail out of the skill contract',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+
+    assert.equal(result.approvalReset, true);
+    assert.equal(entry.context.promotionCandidate.promotionStatus, 'candidate');
+    assert.equal(entry.context.approval, undefined);
+    assert.equal(entry.context.approvalHistory.length, 1);
+    assert.equal(
+      entry.context.promotionCandidate.targetHistory[0].previousPromotionStatus,
+      'approved'
+    );
+    assert.equal(buildPrScaffold(entry).eligible, false);
+  });
+
+  test('same target is idempotent and does not grow targetHistory', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    entry.context.promotionCandidate.proposedTarget = {
+      kind: 'reference',
+      id: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+    };
+    const result = applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+      approver: 'alice',
+      reason: 'same target',
+      now: decidedNow,
+    });
+
+    assert.equal(result.changed, false);
+    assert.equal(entry.context.promotionCandidate.targetHistory, undefined);
+  });
+
+  test('rejects traversal-like reference targets and terminal candidates', () => {
+    const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+    assert.throws(
+      () =>
+        applyPromotionRetarget(entry, {
+          kind: 'reference',
+          targetId: '../../etc/passwd',
+          approver: 'alice',
+          reason: 'bad path',
+          now: decidedNow,
+        }),
+      /reference target|unsafe/
+    );
+
+    applyPromotionDecision(entry, { decision: 'rejected', approver: 'alice', now: decidedNow });
+    assert.throws(
+      () =>
+        applyPromotionRetarget(entry, {
+          kind: 'skill',
+          targetId: 'river-review-code',
+          approver: 'alice',
+          reason: 'terminal',
+          now: decidedNow,
+        }),
+      /terminal/
+    );
+  });
+
+  test('persisting wrapper updates the index', () => {
+    const { cleanup, indexPath } = createTempMemory({ layout: 'flat', prefix: 'rr-retarget-' });
+    try {
+      const entry = makeCandidate('skill-a', 'unclear', [fp(1), fp(2)]);
+      appendEntry(indexPath, entry);
+      retargetPromotion({
+        indexPath,
+        id: entry.id,
+        kind: 'reference',
+        targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+        approver: 'alice',
+        reason: 'promote experience knowledge',
+        now: decidedNow,
+      });
+      const reloaded = loadMemory(indexPath).entries.find((e) => e.id === entry.id);
+      assert.equal(reloaded.context.promotionCandidate.proposedTarget.kind, 'reference');
+      assert.equal(reloaded.context.promotionCandidate.targetHistory.length, 1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('security candidate still delegates to PlanGate after retarget and re-approval', () => {
+    const entry = makeCandidate('secret-scanner', 'missed_issue', [fp(1), fp(2)]);
+    applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-security/references/SECRET-SCANNING.md',
+      approver: 'alice',
+      reason: 'capture recurring operational detail',
+      now: decidedNow,
+    });
+    applyPromotionDecision(entry, {
+      decision: 'approved',
+      approver: 'alice',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+    assert.equal(buildPrScaffold(entry).requiresPlanGate, true);
+  });
+});
+
 describe('listPromotionCandidates', () => {
   test('returns only active promotion_candidate entries by default', () => {
     const a = makeCandidate('skill-a', 'false_positive', [fp(1), fp(2)]);
@@ -188,6 +321,25 @@ describe('isSecuritySensitive', () => {
     );
     assert.equal(sensitive('auth-guard'), true);
     assert.equal(sensitive('repository-layer-boundary'), false);
+  });
+
+  test('retarget cannot bypass PlanGate when the new target is security-sensitive', () => {
+    const entry = makeCandidate('skill-x', 'unclear', [fp(1), fp(2)]);
+    applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-security/references/AUTHZ.md',
+      approver: 'alice',
+      reason: 'security experience knowledge',
+      now: decidedNow,
+    });
+    applyPromotionDecision(entry, {
+      decision: 'approved',
+      approver: 'alice',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+
+    assert.equal(isSecuritySensitive(entry), true);
+    assert.equal(buildPrScaffold(entry).requiresPlanGate, true);
   });
 
   // Canary: plural / derivational forms MUST be caught. A stem that only matched
