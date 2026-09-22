@@ -103,6 +103,7 @@
                 "test",
                 "fixture",
                 "skill",
+                "reference",
                 "rule",
                 "routing",
                 "riverbed",
@@ -113,7 +114,7 @@
             },
             "id": {
               "type": ["string", "null"],
-              "description": "Optional target identifier (fixture id, skill id, rule file, etc.)."
+              "description": "Optional target identifier (fixture id, skill id, reference path, rule file, etc.)."
             }
           }
         },
