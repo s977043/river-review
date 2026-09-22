@@ -139,7 +139,21 @@
                 "required": ["kind", "id"],
                 "additionalProperties": false,
                 "properties": {
-                  "kind": { "type": "string" },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "linter",
+                      "test",
+                      "fixture",
+                      "skill",
+                      "reference",
+                      "rule",
+                      "routing",
+                      "riverbed",
+                      "docs",
+                      "human_judgment"
+                    ]
+                  },
                   "id": { "type": ["string", "null"] }
                 }
               },
@@ -148,7 +162,21 @@
                 "required": ["kind", "id"],
                 "additionalProperties": false,
                 "properties": {
-                  "kind": { "type": "string" },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "linter",
+                      "test",
+                      "fixture",
+                      "skill",
+                      "reference",
+                      "rule",
+                      "routing",
+                      "riverbed",
+                      "docs",
+                      "human_judgment"
+                    ]
+                  },
                   "id": { "type": ["string", "null"] }
                 }
               },
