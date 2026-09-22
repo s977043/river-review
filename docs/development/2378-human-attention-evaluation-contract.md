@@ -35,6 +35,7 @@ review qualityそのものは比較しません。presentationだけを比較し
 - baseline commit SHAを固定
 - candidate commit SHAを固定
 - fixture manifestを固定
+- fixture adapter（signals → actual River Review result）を固定
 - material reference setを固定
 - rubricを固定
 - evaluatorへconditionを開示するか、blind / counterbalanceするかを固定
@@ -82,6 +83,23 @@ fixture数10は統計的十分性を意味しません。最初のcontract / reg
 - v1未実装stateを「candidateが表示できなかったmiss」と数えません
 
 #2322のcanonical contractが利用可能になった時点で、同じ評価contractへadditive caseを追加します。
+
+## 2.2 Fixture adapter boundary
+
+fixture manifestの `signals` は評価意図を固定する宣言的contractです。River Review runtimeの入力schemaではありません。
+
+Phase A runnerは、`signals` を実際のRiver Review resultへ変換するfixture adapterを持ちます。
+
+このadapterはbaseline / candidateで同一実装を使い、run開始時に次を固定します。
+
+- adapter path
+- adapter commit SHA
+- adapter content hash
+- supported manifest schemaVersion
+
+candidate側だけ別adapterを使いません。
+
+adapter変更後のrunは同一experimentとして比較しません。
 
 ## 3. Material reference set
 
@@ -236,6 +254,11 @@ environment:
 
 fixture:
   path: tests/fixtures/human-attention/decision-surface-eval-cases.json
+  sha256: <hash>
+
+fixtureAdapter:
+  path: <frozen adapter path>
+  commit: <sha>
   sha256: <hash>
 
 rubric:
