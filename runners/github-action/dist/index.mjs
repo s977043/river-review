@@ -95273,7 +95273,9 @@ function listPromotionCandidates(index, { includeInactive = false } = {}) {
 function isSecuritySensitive(entry) {
   const pc = getPromotionCandidate(entry);
   const tags = (entry?.metadata?.tags ?? []).join(' ');
-  const haystack = `${tags} ${pc?.clusterKey ?? ''}`.toLowerCase();
+  const target = pc?.proposedTarget;
+  const haystack =
+    `${tags} ${pc?.clusterKey ?? ''} ${target?.kind ?? ''} ${target?.id ?? ''}`.toLowerCase();
   return SECURITY_RE.test(haystack);
 }
 
@@ -96352,12 +96354,7 @@ async function runPromoteCommand(parsed, targetPath) {
       return 1;
     }
 
-    const approver =
-      parsed.promoteApprover ||
-      external_node_process_.env.RIVER_APPROVER ||
-      external_node_process_.env.USER ||
-      external_node_process_.env.USERNAME ||
-      null;
+    const approver = parsed.promoteApprover || external_node_process_.env.RIVER_APPROVER || null;
     if (!approver) {
       console.error('Error: river promote retarget requires an auditable approver.');
       return 1;
