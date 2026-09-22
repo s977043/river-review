@@ -298,6 +298,40 @@ describe('buildPrScaffold', () => {
     }
   });
 
+  test('reference target is schema-valid and produces an exact safe reference path', () => {
+    const entry = makeCandidate('skill-x', 'unclear', [fp(1), fp(2)]);
+    entry.context.promotionCandidate.proposedTarget = {
+      kind: 'reference',
+      id: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+    };
+    approve(entry);
+
+    assert.equal(validate(wrapIndex([entry])), true, JSON.stringify(validate.errors, null, 2));
+
+    const s = buildPrScaffold(entry);
+    assert.equal(s.eligible, true);
+    assert.equal(s.kind, 'reference');
+    assert.match(s.branchName, /^promote\/reference\//);
+    assert.match(s.prTitle, /^docs\(reference\):/);
+    assert.deepEqual(s.targetPaths, [
+      'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+    ]);
+    assert.match(s.prBody, /kind: reference/);
+  });
+
+  test('reference target falls back to a safe scaffold path on traversal-like ids', () => {
+    const entry = makeCandidate('skill-x', 'unclear', [fp(1), fp(2)]);
+    entry.context.promotionCandidate.proposedTarget = {
+      kind: 'reference',
+      id: '../../etc/passwd',
+    };
+    approve(entry);
+
+    const s = buildPrScaffold(entry);
+    assert.deepEqual(s.targetPaths, ['skills/**/references/etc-passwd.md']);
+    assert.ok(!s.targetPaths[0].includes('..'));
+  });
+
   test('each proposedTarget.kind produces a branch, title and paths', () => {
     const cases = [
       {
