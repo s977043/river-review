@@ -1,0 +1,70 @@
+evaluation:
+  issue: 2378
+  fixtureRevision: null
+  baselineSha: null
+  candidateSha: null
+  evaluatorId: anonymous-or-local
+  evaluatorMode: human
+  measurementMode: unavailable
+  orderProtocol: counterbalanced
+  startedAt: null
+  completedAt: null
+  notes: ''
+
+cases:
+  - caseId: HA-001
+    firstArm: baseline
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+
+summary:
+  baseline:
+    caseExtractionSuccessRate: null
+    meanItemExtractionScore: null
+    attentionSeconds:
+      value: null
+      mode: unavailable
+    visibilityLost: null
+    visibilityMisleading: null
+  candidate:
+    caseExtractionSuccessRate: null
+    meanItemExtractionScore: null
+    attentionSeconds:
+      value: null
+      mode: unavailable
+    visibilityLost: null
+    visibilityMisleading: null
+  decision: null
+  decisionReason: ''
