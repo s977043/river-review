@@ -297,12 +297,7 @@ export async function runPromoteCommand(parsed, targetPath) {
       return 1;
     }
 
-    const approver =
-      parsed.promoteApprover ||
-      process.env.RIVER_APPROVER ||
-      process.env.USER ||
-      process.env.USERNAME ||
-      null;
+    const approver = parsed.promoteApprover || process.env.RIVER_APPROVER || null;
     if (!approver) {
       console.error('Error: river promote retarget requires an auditable approver.');
       return 1;
