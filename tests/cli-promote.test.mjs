@@ -195,38 +195,46 @@ describe('river promote retarget', () => {
     assert.equal(entry.context.promotionCandidate.targetHistory.length, 1);
   });
 
-  test('retargeting an approved candidate resets approval before template generation', async (t) => {
-    const { cleanup, indexPath, fixtureId } = seed();
-    t.after(cleanup);
-    await runCliInProcess(
-      ['promote', 'approve', fixtureId, '--index', indexPath, '--approver', 'alice'],
-      { env: { RIVER_NOW: '2026-07-21T09:00:00.000Z' } }
-    );
-    const res = await runCliInProcess(
-      [
+  test(
+    'retargeting an approved candidate resets approval before template generation',
+    async (t) => {
+      const { cleanup, indexPath, fixtureId } = seed();
+      t.after(cleanup);
+      await runCliInProcess(
+        ['promote', 'approve', fixtureId, '--index', indexPath, '--approver', 'alice'],
+        { env: { RIVER_NOW: '2026-07-21T09:00:00.000Z' } }
+      );
+      const res = await runCliInProcess(
+        [
+          'promote',
+          'retarget',
+          fixtureId,
+          '--index',
+          indexPath,
+          '--target-kind',
+          'reference',
+          '--target-id',
+          'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+          '--approver',
+          'bob',
+          '--reason',
+          'target changed after approval',
+        ],
+        { env: { RIVER_NOW: '2026-07-22T00:00:00.000Z' } }
+      );
+  
+      assert.equal(res.code, 0, res.stderr);
+      assert.match(res.stdout, /must be approved again/);
+      const template = await runCliInProcess([
         'promote',
-        'retarget',
+        'template',
         fixtureId,
         '--index',
         indexPath,
-        '--target-kind',
-        'reference',
-        '--target-id',
-        'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
-        '--approver',
-        'bob',
-        '--reason',
-        'target changed after approval',
-      ],
-      { env: { RIVER_NOW: '2026-07-22T00:00:00.000Z' } }
-    );
-
-    assert.equal(res.code, 0, res.stderr);
-    assert.match(res.stdout, /must be approved again/);
-    const template = await runCliInProcess(['promote', 'template', fixtureId, '--index', indexPath]);
-    assert.equal(template.code, 0, template.stderr);
-    assert.match(template.stdout, /not approved/);
-  });
+      ]);
+      assert.equal(template.code, 0, template.stderr);
+      assert.match(template.stdout, /not approved/);
+  );
 
   test('requires a reason and rejects unsafe reference paths', async (t) => {
     const { cleanup, indexPath, fixtureId } = seed();
