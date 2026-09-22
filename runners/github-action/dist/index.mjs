@@ -95164,6 +95164,30 @@ function safeTargetId(pc, fallback) {
   return id ? slugify(id) : fallback;
 }
 
+const SAFE_REFERENCE_PATH_RE =
+  /^skills\/(?:[a-zA-Z0-9._-]+\/)*references\/[a-zA-Z0-9._-]+\.md$/;
+
+/**
+ * Resolve a reference target without allowing a candidate-controlled path to
+ * escape the repository skill tree. Exact repo paths are preserved only when
+ * they point below skills/**/references/*.md; otherwise we fall back to a safe
+ * scaffold template using the slugified target id.
+ */
+function safeReferenceTargetPath(pc) {
+  const id = pc?.proposedTarget?.id;
+  if (!id) return 'skills/**/references/<reference>.md';
+  const value = String(id).replaceAll('\\', '/');
+  const segments = value.split('/');
+  if (
+    SAFE_REFERENCE_PATH_RE.test(value) &&
+    !segments.includes('.') &&
+    !segments.includes('..')
+  ) {
+    return value;
+  }
+  return `skills/**/references/${safeTargetId(pc, '<reference>')}.md`;
+}
+
 /**
  * Read the promotionCandidate body from an entry, or null when absent.
  * @param {object} entry
@@ -95710,6 +95734,11 @@ const KIND_TEMPLATE = Object.freeze({
     branchPrefix: 'promote/skill',
     title: (k) => `docs(skill): refine ${k} skill contract`,
     paths: (pc) => [`skills/**/${safeTargetId(pc, '<skill-id>')}/SKILL.md`],
+  },
+  reference: {
+    branchPrefix: 'promote/reference',
+    title: (k) => `docs(reference): codify ${k} experience knowledge`,
+    paths: (pc) => [safeReferenceTargetPath(pc)],
   },
   rule: {
     branchPrefix: 'promote/rule',
