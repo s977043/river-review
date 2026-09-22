@@ -213,6 +213,6 @@ Reference を追加したこと自体を成果にしない。可能な範囲で�
 
 ## Source inspiration
 
-- https://github.com/minorun365/agent-builder-skills
+- [minorun365/agent-builder-skills](https://github.com/minorun365/agent-builder-skills)
 
 採用しているのは repository 内容のコピーではなく、薄い `SKILL.md` + 必要時に読む `references/`、および「公式仕様ではなく実戦で詰まった知識を補完する」という設計原則である。
