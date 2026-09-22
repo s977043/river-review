@@ -242,7 +242,28 @@ For a second evaluator or second session, reverse the order.
 
 Where practical, present arms as A / B rather than baseline / candidate during scoring.
 
-## 8. Sample-size interpretation
+## 8. Paired analysis
+
+Human Attention timing is analyzed per fixture as a paired delta:
+
+```text
+attentionDeltaSeconds = candidate - baseline
+```
+
+Negative means the candidate required less measured attention for that fixture.
+
+Report:
+
+- median paired delta
+- count of fixtures where candidate is faster / equal / slower
+- arm-order split to detect obvious order bias
+- raw per-case timing
+
+Do not use a pooled arm average as the only timing result.
+
+With this pilot size, do not claim statistical significance.
+
+## 9. Sample-size interpretation
 
 Ten fixtures are sufficient for:
 
@@ -259,7 +280,7 @@ If one Human evaluator performs the pilot, the result means:
 
 It must not be generalized into a universal percentage improvement.
 
-## 9. Secondary presentation metrics
+## 10. Secondary presentation metrics
 
 These are diagnostic only.
 
@@ -275,7 +296,7 @@ In particular:
 
 `fewer lines != better`
 
-## 10. Expected v1 risk
+## 11. Expected v1 risk
 
 The current #2371 implementation is additive:
 
@@ -294,7 +315,7 @@ If Phase A confirms extraction benefit with zero visibility regression but dupli
 
 Do not combine that optimization into #2371.
 
-## 11. Result record
+## 12. Result record
 
 The evaluation result must record:
 
@@ -329,10 +350,12 @@ visibility:
 notes: ''
 ```
 
-The exact storage file can be selected at execution time.
+Use `tests/fixtures/2378-decision-surface/scorecard-template.yaml` as the recording template.
+
+The template is an evaluation record, not a runtime schema.
 No new runtime schema is required for Phase A.
 
-## 12. Phase A decision rule
+## 13. Phase A decision rule
 
 ### Adopt for dogfood
 
@@ -377,7 +400,7 @@ Use when:
 - baseline or candidate SHA is not fixed
 - material reference set was changed after seeing candidate output
 
-## 13. Phase B gate
+## 14. Phase B gate
 
 Repository dogfood begins only after Phase A is Adopt for dogfood.
 
@@ -392,7 +415,7 @@ It tests operational behavior:
 - Time to Human Required
 - coverage / provenance incidents
 
-## 14. Non-goals
+## 15. Non-goals
 
 - new eval runner before the fixture protocol proves useful
 - new shared rubric schema
@@ -404,7 +427,7 @@ It tests operational behavior:
 - changing gate / merge authority
 - modifying #2371 to optimize duplication before measurement
 
-## 15. Review checklist before execution
+## 16. Review checklist before execution
 
 - baseline / candidate SHA frozen
 - fixture revision frozen
@@ -416,4 +439,6 @@ It tests operational behavior:
 - no top-N / line-count success criterion
 - no individual performance interpretation
 - raw outputs retained
+- paired timing delta reported rather than pooled average alone
+- no statistical-significance claim from this pilot
 - result classified as Adopt / Revise / Reject / Inconclusive
