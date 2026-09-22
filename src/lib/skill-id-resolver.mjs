@@ -21,7 +21,11 @@ export class SkillIdResolutionError extends Error {
 }
 
 function assertSafeSkillId(skillId) {
-  if (typeof skillId !== 'string' || !SKILL_ID_PATTERN.test(skillId)) {
+  if (
+    typeof skillId !== 'string' ||
+    !SKILL_ID_PATTERN.test(skillId) ||
+    skillId.includes('..')
+  ) {
     throw new SkillIdResolutionError(
       `Unsafe skill ID "${String(skillId)}". Expected ${SKILL_ID_PATTERN}.`
     );
