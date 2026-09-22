@@ -14,7 +14,10 @@ EOS 5-layer ([`docs/ai/eos-overview.md`](../ai/eos-overview.md)) の **Governanc
 | Review policy             | repo メンテナ                                                    | [`pages/reference/review-policy.md`](../../pages/reference/review-policy.md), [`docs/review/`](../review/)                                                                               |
 | Severity / applyTo policy | repo メンテナ                                                    | [`docs/development/skill-severity-rubric.md`](../development/skill-severity-rubric.md), [`docs/development/skill-applyto-scoping.md`](../development/skill-applyto-scoping.md)           |
 | Memory / suppression      | repo メンテナ                                                    | [`skills/agent-skills/river-review/references/`](../../skills/agent-skills/river-review/references/), [`pages/guides/use-riverbed-memory.md`](../../pages/guides/use-riverbed-memory.md) |
-| Experience Knowledge / references | repo メンテナ | [`docs/development/experience-knowledge-authoring.md`](../development/experience-knowledge-authoring.md), [`skills/agent-skills/`](../../skills/agent-skills/) |
+
+## Experience Knowledge authoring
+
+Experience Knowledge と `SKILL.md` / `references/` / fixture / rule / Riverbed の責務境界は [`docs/development/experience-knowledge-authoring.md`](../development/experience-knowledge-authoring.md) を正本とする。
 
 ## Approval policy
 
