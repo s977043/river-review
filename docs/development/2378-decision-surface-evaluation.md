@@ -168,6 +168,14 @@ Pass:
 
 A case succeeds only when Q1–Q5 all pass.
 
+For diagnostic resolution, also record an item-level extraction score:
+
+```text
+itemExtractionScore = passed questions / 5
+```
+
+The item-level score helps distinguish partial improvement when both arms do not achieve a perfect case pass rate. It does not relax the case-level safety rule: a missed material item still makes the case fail.
+
 Do not compensate for a missed material item with faster reading time.
 
 ## 5. Visibility grading
@@ -311,6 +319,8 @@ q2_human_required: pass | fail
 q3_uncertainty: pass | fail
 q4_trace: pass | fail
 q5_confidence: pass | fail
+itemExtractionScore: 0.0-1.0
+caseExtractionSuccess: true | false
 attentionSeconds: number | null
 visibility:
   lost: 0
@@ -328,7 +338,8 @@ No new runtime schema is required for Phase A.
 
 All of the following:
 
-- candidate Decision Extraction Success >= baseline
+- candidate case-level Decision Extraction Success >= baseline
+- candidate item-level extraction score >= baseline
 - material visibility regression = 0
 - critical / major visibility >= baseline
 - incomplete / not-executed / failed / timeout visibility = 100%
