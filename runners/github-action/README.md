@@ -55,7 +55,7 @@ If you're using this action within the River Review repository itself:
 | -------------- | --------------------------------------------------------------------- | -------- | ----------- |
 | `phase`        | Review phase (`upstream`, `midstream`, or `downstream`)               | No       | `midstream` |
 | `planner`      | Planner mode (`off`, `order`, or `prune`)                             | No       | `off`       |
-| `reviewers`    | Reviewer roles (comma-separated or `auto`)                              | No       | ``          |
+| `reviewers`    | Reviewer roles (comma-separated or `auto`)                            | No       | ``          |
 | `target`       | Path to the git repository to review                                  | No       | `.`         |
 | `comment`      | Post a PR comment with results (only on pull_request events)          | No       | `true`      |
 | `dry_run`      | Run in dry-run mode (no external API calls, print to stdout)          | No       | `true`      |
