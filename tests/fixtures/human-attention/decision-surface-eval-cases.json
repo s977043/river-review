@@ -176,7 +176,8 @@
         "failedUnitCount": 1,
         "timedOutUnitCount": 1,
         "blindSpotCount": 0,
-        "findings": []
+        "findings": [],
+        "incompleteUnitCount": 2
       },
       "materialReference": {
         "coverageWarningRequired": true,
