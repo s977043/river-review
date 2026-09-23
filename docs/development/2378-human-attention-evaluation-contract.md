@@ -217,6 +217,13 @@ Attention改善を採用根拠に使う場合は、最低2つのcounterbalanced 
 
 Timingはfixtureごとのpaired delta（candidate - baseline）を保存します。pooled averageだけで結論を出さず、このpilotから統計的有意差を主張しません。
 
+Phase A summaryでは最低限、次を併記します。
+
+- median paired delta
+- candidateが faster / equal / slower だったfixture数
+- arm-order split
+- raw per-fixture timing
+
 ### Measure
 
 最低限:
