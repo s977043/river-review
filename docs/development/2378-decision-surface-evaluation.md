@@ -226,17 +226,17 @@ Use counterbalanced order.
 Suggested deterministic order:
 
 | Fixture | First arm |
-| --- | --- |
-| HA-001 | baseline |
-| HA-002 | candidate |
-| HA-003 | baseline |
-| HA-004 | candidate |
-| HA-005 | baseline |
-| HA-006 | candidate |
-| HA-007 | baseline |
-| HA-008 | candidate |
-| HA-009 | baseline |
-| HA-010 | candidate |
+| ------- | --------- |
+| HA-001  | baseline  |
+| HA-002  | candidate |
+| HA-003  | baseline  |
+| HA-004  | candidate |
+| HA-005  | baseline  |
+| HA-006  | candidate |
+| HA-007  | baseline  |
+| HA-008  | candidate |
+| HA-009  | baseline  |
+| HA-010  | candidate |
 
 For a second evaluator or second session, reverse the order.
 
