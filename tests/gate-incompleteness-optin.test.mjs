@@ -96,9 +96,7 @@ describe('#2320/#2337 — the default gate output is unchanged', () => {
     assert.equal(failedCoverage.status, 'not_executed');
 
     const defaultIncomplete = coverageIncompleteForGate(failedCoverage, {});
-    const defaultGate = deriveGateDecision(
-      cleanRun({ coverageIncomplete: defaultIncomplete })
-    );
+    const defaultGate = deriveGateDecision(cleanRun({ coverageIncomplete: defaultIncomplete }));
     assert.equal(defaultGate.decision, 'GO');
     assert.equal(defaultGate.reasonCode, 'CONVERGED_CLEAN');
 

@@ -6,7 +6,7 @@ Contract foundation inspired by Alibaba OpenCodeReview's deterministic dispatch 
 
 **Stability: Experimental.**
 
-Review Coverage is emitted on machine-readable review execution surfaces. Reviewer orchestration always emits it. Since #2410, the single-reviewer path also emits it when an LLM call was actually attempted: a valid semantic response is `complete`, while transport / response / parse failure is represented as a failed required unit (`not_executed`). Intentional skips (dry-run, offline, missing key) remain unobserved. Review Coverage is not a Stable Contract; Gate integration remains opt-in via `RIVER_GATE_COVERAGE=1`.
+Review Coverage is emitted on machine-readable review execution surfaces. Reviewer orchestration always emits it. Since #2410, the single-reviewer path also emits it when an LLM call was actually attempted. A valid semantic response is `complete`. A transport / response / parse failure is represented as a failed required unit (`not_executed`). Intentional skips (dry-run, offline, missing key) remain unobserved. Review Coverage is not a Stable Contract. Gate integration remains opt-in via `RIVER_GATE_COVERAGE=1`.
 
 The JSON/saved-run surface is Experimental. Its stability is recorded in `pages/reference/stable-interfaces.md`.
 
@@ -185,7 +185,7 @@ That policy belongs to later Gate integration. Phase 1 keeps file selection as o
 
 `fileScope` is attached to an existing Review Coverage observation, including the single-reviewer attempted-LLM observation introduced by #2410.
 
-River Review still does not synthesize Review Coverage for intentional no-review paths. A single-reviewer run that is skipped by dry-run / offline mode / missing credentials keeps the field absent, preserving the distinction between **no observation** and **observed execution failure**.
+River Review still does not synthesize Review Coverage for intentional no-review paths. A single-reviewer run skipped by dry-run, offline mode, or missing credentials keeps the field absent. This preserves the distinction between **no observation** and **observed execution failure**.
 
 The single-reviewer unit reports execution completeness only. It does not claim reviewer quality, finding correctness, or semantic completeness beyond whether the required LLM review call returned usable output.
 

@@ -139,7 +139,9 @@ describe('Review Coverage surface propagation', () => {
 
     const context = await planLocalReview({ cwd: dir, dryRun: true });
     const originalFetch = global.fetch;
-    t.after(() => { global.fetch = originalFetch; });
+    t.after(() => {
+      global.fetch = originalFetch;
+    });
     global.fetch = async () => ({
       ok: true,
       json: async () => JSON.parse('OK\\r\\n'),
@@ -157,9 +159,7 @@ describe('Review Coverage surface propagation', () => {
     assert.match(result.reviewDebug.llmError, /Unexpected token/);
     assert.equal(result.reviewCoverage.status, 'not_executed');
     assert.equal(result.reviewCoverage.units[0].status, 'failed');
-    assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, [
-      'reviewer:single/chunk:1',
-    ]);
+    assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, ['reviewer:single/chunk:1']);
   });
 
   it('emits schema-valid JSON Review Coverage only when present', () => {
