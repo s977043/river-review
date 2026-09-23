@@ -12,7 +12,8 @@ const ACTION_PATH = path.join(REPO_ROOT, 'runners', 'github-action', 'action.yml
 const actionYml = fs.readFileSync(ACTION_PATH, 'utf8');
 
 function runBlock() {
-  const block = /      run: \\|\\n((?:        .*\\n|\\n)+?)\\n    # Both comment steps/.exec(actionYml)?.[1];
+  const block =
+    /      run: \|\n((?:        .*\n|\n)+?)\n    # Both comment steps/.exec(actionYml)?.[1];
   assert.ok(block, 'run block not found');
   return block;
 }
@@ -32,11 +33,11 @@ function render({ reviewers = '', entry = '' } = {}) {
   };
 
   const script = runBlock()
-    .split('\\n')
+    .split('\n')
     .map((line) => line.slice(8))
-    .join('\\n')
-    .replace(/\\$\\{\\{ inputs\\.(\\w+) \\}\\}/g, (_, key) => inputs[key] ?? '')
-    .replace(/echo "Running: \\${cmd\\[\\*\\]}"[\\s\\S]*$/, 'echo "Running: ${cmd[*]}"\\n');
+    .join('\n')
+    .replace(/\$\{\{ inputs\.(\w+) \}\}/g, (_, key) => inputs[key] ?? '')
+    .replace(/echo "Running: \${cmd\[\*\]}"[\s\S]*$/, 'echo "Running: ${cmd[*]}"\n');
 
   return execFileSync('bash', ['-c', script], {
     cwd: REPO_ROOT,
@@ -55,10 +56,10 @@ function render({ reviewers = '', entry = '' } = {}) {
 }
 
 test('GitHub Action declares reviewers as an additive empty-default input (#2344)', () => {
-  const block = /^  reviewers:\\n(?:    .*\\n)+/m.exec(actionYml)?.[0] ?? '';
+  const block = /^  reviewers:\n(?:    .*\n)+/m.exec(actionYml)?.[0] ?? '';
   assert.match(block, /required: false/);
   assert.match(block, /default: ''/);
-  assert.match(actionYml, /INPUT_REVIEWERS: \\$\\{\\{ inputs\\.reviewers \\}\\}/);
+  assert.match(actionYml, /INPUT_REVIEWERS: \$\{\{ inputs\.reviewers \}\}/);
 });
 
 test('GitHub Action forwards one reviewers argument pair only on the run path (#2344)', () => {
@@ -70,11 +71,15 @@ test('GitHub Action forwards one reviewers argument pair only on the run path (#
   const withoutReviewers = /^Running: (.*)$/m.exec(render())?.[1] ?? '';
   assert.doesNotMatch(withoutReviewers, /--reviewers/);
 
-  const entryOutput = render({ reviewers: 'bug-hunter,security-scanner', entry: 'review-task' });
+  const entryOutput = render({
+    reviewers: 'bug-hunter,security-scanner',
+    entry: 'review-task',
+  });
   const entryCommand = /^Running: (.*)$/m.exec(entryOutput)?.[1] ?? '';
   assert.doesNotMatch(entryCommand, /--reviewers/);
-  const notice = entryOutput.split('\\n').find((line) => line.startsWith('::notice::')) ?? '';
-  assert.match(notice, /\\breviewers\\b/);
+  const notice =
+    entryOutput.split('\n').find((line) => line.startsWith('::notice::')) ?? '';
+  assert.match(notice, /\breviewers\b/);
 });
 
 test('reviewers shell metacharacters remain data and are not evaluated (#2344)', () => {
