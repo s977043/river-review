@@ -50,6 +50,9 @@ Machine-readable fixture set:
 
 `tests/fixtures/human-attention/decision-surface-eval-cases.json`
 
+This file is the **single machine-readable SSoT** for Phase A case signals and material references.
+Older experimental fixture locations are not alternative inputs and must not be used by the runner.
+
 v1は10ケースです。
 
 - HA-01: clean
@@ -271,6 +274,12 @@ candidateを見た後にfixture / rubric / oracleを書き換えた場合、そ�
 ## 8. Phase A execution
 
 各caseで同じstructured inputからbaseline / candidate markdownを生成します。
+
+Recording template:
+
+`tests/fixtures/human-attention/decision-surface-scorecard-template.yaml`
+
+The scorecard is a recording template only. It does not redefine fixture signals or material references.
 
 保存対象:
 
