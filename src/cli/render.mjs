@@ -367,6 +367,97 @@ function buildRenderedFindingSet(result) {
 }
 
 /**
+ * #2370: build the display-only Human Decision Surface from already-canonical
+ * review state.
+ *
+ * This function is intentionally a projection, not a judge:
+ * - actionRequiredCount comes from the exact rendered set (#1713)
+ * - humanReviewRequired only reflects existing decision / gate / risk-map state
+ * - coverage and blind spots are surfaced as-is
+ *
+ * It must never change decision, gate, severity, disposition, or finding truth.
+ */
+export function buildHumanDecisionSurface({ rendered, artifact, result }) {
+  const riskAssessmentFiles = result?.plan?.riskAssessment?.humanReviewFiles ?? [];
+  const riskMapFiles = result?.plan?.riskMap?.require_human_review ?? [];
+  const humanReviewFiles = new Set([...riskAssessmentFiles, ...riskMapFiles].filter(Boolean));
+
+  const coverage = result?.reviewCoverage ?? artifact?.reviewCoverage ?? null;
+  const units = Array.isArray(coverage?.units) ? coverage.units : [];
+  const incompleteUnits = units.filter((unit) => unit?.status !== 'completed');
+  const failedUnits = incompleteUnits.filter((unit) => unit?.status === 'failed');
+  const timedOutUnits = incompleteUnits.filter((unit) => unit?.status === 'timed_out');
+  const blindSpots = Array.isArray(result?.teamLeadReport?.blindSpots)
+    ? result.teamLeadReport.blindSpots
+    : [];
+
+  const actionRequiredCount = rendered?.expanded?.length ?? 0;
+  const humanReviewRequired =
+    artifact?.decision === 'human-review-required' ||
+    artifact?.gate?.decision === 'ESCALATE' ||
+    result?.plan?.riskAssessment?.aggregateAction === 'require_human_review' ||
+    humanReviewFiles.size > 0;
+
+  const coverageStatus = coverage?.status ?? null;
+  const coverageIncomplete = coverageStatus !== null && coverageStatus !== 'complete';
+
+  return {
+    actionRequiredCount,
+    humanReviewRequired,
+    humanReviewFileCount: humanReviewFiles.size,
+    coverageStatus,
+    incompleteUnitCount: incompleteUnits.length,
+    failedUnitCount: failedUnits.length,
+    timedOutUnitCount: timedOutUnits.length,
+    blindSpotCount: blindSpots.length,
+    hasAttentionRequired:
+      actionRequiredCount > 0 || humanReviewRequired || coverageIncomplete || blindSpots.length > 0,
+  };
+}
+
+/**
+ * #2370: L1 Decision Surface. It contains only counts / existing state pointers;
+ * the full findings, risk details, coverage evidence, and provenance remain in
+ * the existing L2/L3 surfaces below.
+ */
+export function formatHumanDecisionSurfaceMarkdown(surface) {
+  if (!surface?.hasAttentionRequired) return null;
+
+  const lines = ['### 判断が必要な項目', ''];
+
+  if (surface.actionRequiredCount > 0) {
+    lines.push(`- 要対応: **${surface.actionRequiredCount} 件**`);
+  }
+
+  if (surface.humanReviewRequired) {
+    const fileSuffix =
+      surface.humanReviewFileCount > 0 ? `（対象ファイル ${surface.humanReviewFileCount} 件）` : '';
+    lines.push(`- 人間レビュー: **必須**${fileSuffix}`);
+  }
+
+  if (surface.coverageStatus && surface.coverageStatus !== 'complete') {
+    const details = [];
+    if (surface.incompleteUnitCount > 0) {
+      details.push(`未完了 ${surface.incompleteUnitCount} unit`);
+    }
+    if (surface.failedUnitCount > 0) {
+      details.push(`failed ${surface.failedUnitCount}`);
+    }
+    if (surface.timedOutUnitCount > 0) {
+      details.push(`timeout ${surface.timedOutUnitCount}`);
+    }
+    const suffix = details.length > 0 ? `（${details.join('、')}）` : '';
+    lines.push(`- レビュー網羅性: **${surface.coverageStatus}**${suffix}`);
+  }
+
+  if (surface.blindSpotCount > 0) {
+    lines.push(`- 未実行のレビュー観点: **${surface.blindSpotCount} 件**`);
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+/**
  * #1713 Slice 1: split findings at the `major` boundary. `critical` / `major`
  * render expanded under 要対応; `minor` / `info` are folded into a `<details>`
  * block that keeps their full text.
@@ -529,6 +620,8 @@ export function printMarkdownReport(result, phase) {
   // #1713 F1: one rendered set feeds the headline, the ✅ line, the priority
   // summary and the section headings — they can no longer contradict each other.
   const rendered = buildRenderedFindingSet(result);
+  const decisionSurfaceModel = buildHumanDecisionSurface({ rendered, artifact, result });
+  const decisionSurface = formatHumanDecisionSurfaceMarkdown(decisionSurfaceModel);
   const findingSections = formatFindingsSectionsMarkdown(rendered);
 
   const header = `${COMMENT_MARKER}
@@ -536,7 +629,7 @@ export function printMarkdownReport(result, phase) {
 
 ${formatHeadlineMarkdown(rendered, phase, score)}
 `;
-  const noBlockerNote = formatNoBlockerNoteMarkdown(rendered);
+  const noBlockerNote = formatNoBlockerNoteMarkdown(rendered, decisionSurfaceModel);
   const riskSection = formatRiskSummaryMarkdown(result.plan);
   const humanReviewSection = formatHumanReviewFilesMarkdown(result);
   const teamLeadSection = formatTeamLeadReportMarkdown(result.teamLeadReport);
@@ -546,6 +639,7 @@ ${formatHeadlineMarkdown(rendered, phase, score)}
   console.log(
     [
       header,
+      decisionSurface,
       noBlockerNote,
       riskSection,
       humanReviewSection,
@@ -600,8 +694,13 @@ export function formatHeadlineMarkdown(rendered, phase, score) {
  * rendered set to be empty. Deriving it from `findings.length` let a run print
  * it directly above a 要対応 section holding a blocker.
  */
-function formatNoBlockerNoteMarkdown(rendered) {
+function formatNoBlockerNoteMarkdown(rendered, decisionSurface = null) {
   if (rendered.expanded.length > 0) return null;
+  // #2370: a positive "nothing needs attention" line must not sit under a
+  // Decision Surface that says human review, incomplete coverage, or blind
+  // spots still require attention. This is display-only; gate/decision are
+  // untouched.
+  if (decisionSurface?.hasAttentionRequired) return null;
   if (rendered.collapsed.length === 0) return '✅ マージ前に対応が必要な指摘はありません。\n';
   return '✅ マージ前必須（P1 / P2）の指摘はありません。軽微・参考の指摘のみです。\n';
 }
