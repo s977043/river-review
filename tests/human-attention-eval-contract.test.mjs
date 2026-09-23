@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
+import * as yaml from 'js-yaml';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const manifestPath = path.join(
   here,
@@ -13,6 +15,13 @@ const manifestPath = path.join(
 );
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 const repoRoot = path.join(here, '..');
+const scorecardPath = path.join(
+  here,
+  'fixtures',
+  'human-attention',
+  'decision-surface-scorecard-template.yaml'
+);
+const scorecard = yaml.load(readFileSync(scorecardPath, 'utf8'));
 
 describe('#2378 Human Attention evaluation contract', () => {
   it('keeps the v1 fixture set explicit and uniquely addressable', () => {
@@ -70,6 +79,24 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.freezePolicy?.baselineCommit, 'freeze-at-run-start');
     assert.strictEqual(manifest.freezePolicy?.candidateCommit, 'freeze-at-run-start');
     assert.strictEqual(manifest.freezePolicy?.fixtureAdapter, 'freeze-at-run-start');
+  });
+
+  it('keeps the scorecard aligned with the canonical fixture IDs and four-question rubric', () => {
+    const fixtureIds = manifest.cases.map((item) => item.id);
+    const scorecardIds = scorecard.cases.map((item) => item.caseId);
+
+    assert.deepStrictEqual(scorecardIds, fixtureIds);
+
+    for (const item of scorecard.cases) {
+      for (const arm of ['baseline', 'candidate']) {
+        assert.ok(item[arm], `${item.caseId}: ${arm} score block is required`);
+        assert.strictEqual(
+          Object.hasOwn(item[arm], 'q5_confidence'),
+          false,
+          `${item.caseId}: q5_confidence belongs to the superseded five-question rubric`
+        );
+      }
+    }
   });
 
   it('keeps one machine-readable fixture SSoT', () => {
