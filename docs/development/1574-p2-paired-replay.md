@@ -55,7 +55,7 @@ paired replay が `improvementCandidate` を含む場合、result は `promotion
 
 `promotionHandoff` は、既存の観測値だけを再掲します。
 
-- #1568 と同じ content-addressed `candidateId`
+- #1568 と同じ content-addressed `candidateId` と full `contentHash`
 - Experiment Manifest の ID / hash と integrity 結果
 - activation が観測できたか、および provenance / configuration の注意理由
 - dataset pairing の警告
