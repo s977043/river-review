@@ -471,6 +471,10 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     const handoff = result.promotionHandoff;
     assert.ok(handoff);
     assert.equal(handoff.candidateId, result.manifest.improvementCandidate.candidateId);
+    assert.equal(
+      handoff.candidateContentHash,
+      result.manifest.improvementCandidate.contentHash
+    );
     assert.equal(handoff.manifestId, result.manifest.manifestId);
     assert.equal(handoff.experimentKey, result.manifest.experimentKey);
     assert.equal(handoff.manifestHash, result.manifest.manifestHash);
