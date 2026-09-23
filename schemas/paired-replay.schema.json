@@ -760,6 +760,7 @@
           "type": "object",
           "required": [
             "candidateId",
+            "candidateContentHash",
             "manifestId",
             "experimentKey",
             "manifestHash",
@@ -781,6 +782,10 @@
           "additionalProperties": false,
           "properties": {
             "candidateId": { "type": "string", "pattern": "^RR-PC-[0-9a-f]{12}$" },
+            "candidateContentHash": {
+              "$ref": "#/$defs/sha256",
+              "description": "Full content hash from the same #1568 candidate derivation. G2 must match both this hash and candidateId before attaching evidence."
+            },
             "manifestId": { "type": "string", "pattern": "^RR-EXP-[0-9a-f]{12}$" },
             "experimentKey": { "$ref": "#/$defs/sha256" },
             "manifestHash": { "$ref": "#/$defs/sha256" },
