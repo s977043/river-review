@@ -118,7 +118,8 @@ Baseline / Candidateの両方を同じreferenceへ照合します。
 
 - required action
 - critical / major finding identity
-- human review / human decision requirement
+- human review requirement
+- human decision requirement（canonical stateが利用可能な将来caseのみ）
 - incomplete / partial / not_executed coverage
 - failed / timed-out reviewer unit
 - blind spot
@@ -146,7 +147,7 @@ Baseline / Candidateの両方を同じreferenceへ照合します。
 各fixtureについてHuman evaluatorへ次の4問を出します。
 
 1. 今、対応が必要なものは何か
-2. Human review / Human decisionは必要か
+2. Human reviewは必要か
 3. incomplete / uncertain / failed / timed outなものは何か
 4. full detail / provenanceへどこから辿るか
 
