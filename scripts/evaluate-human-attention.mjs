@@ -133,7 +133,7 @@ async function assertOutputAbsent(outputDir) {
 function installFrozenDependencies(worktree) {
   const result = spawnSync(
     'npm',
-    ['ci', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'],
+    ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'],
     {
       cwd: worktree,
       encoding: 'utf8',
@@ -396,7 +396,7 @@ export async function runEvaluation({ baseline, candidate, fixtures, output }) {
     packageLockBaselineSha256: baselineLockHash,
     packageLockCandidateSha256: candidateLockHash,
     packageLockRunnerSha256: runnerLockHash,
-    conditionDependencyInstall: 'baseline-lock/npm-ci-ignore-scripts',
+    conditionDependencyInstall: 'baseline-lock/npm-ci-omit-dev-ignore-scripts',
     candidateNodeModules: 'shared-from-baseline-worktree',
     startedAt,
     measurementMode: 'unavailable',
