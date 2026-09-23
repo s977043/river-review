@@ -767,8 +767,10 @@
             "experimentKeyMatchesInputs",
             "activationVerified",
             "acceptanceEvaluable",
+            "evaluatedOn",
             "profiles",
             "criticalRegressionCount",
+            "overallCriticalRegressionCount",
             "independentVerifierVerified",
             "terminalReason",
             "requiresHumanJudgment",
@@ -787,6 +789,11 @@
               "description": "Observation copied from the activation check, never an adoption verdict."
             },
             "acceptanceEvaluable": { "type": "boolean" },
+            "evaluatedOn": {
+              "type": "string",
+              "enum": ["heldOut", "overall"],
+              "description": "Scope used for criticalRegressionCount and profile observations."
+            },
             "profiles": {
               "type": "array",
               "items": {
@@ -810,6 +817,11 @@
               }
             },
             "criticalRegressionCount": { "type": ["integer", "null"], "minimum": 0 },
+            "overallCriticalRegressionCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Critical regressions across all paired cases, surfaced so a clean held-out scope cannot hide an overall regression."
+            },
             "independentVerifierVerified": {
               "type": "boolean",
               "const": false,
