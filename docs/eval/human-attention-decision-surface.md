@@ -34,18 +34,18 @@ review generation / finding set / gate / decision / coverageは同一にしま�
 
 Machine-readable oracle: `docs/eval/human-attention-fixtures.yaml`
 
-| ID | Case | Material state |
-| --- | --- | --- |
-| HA-01 | clean | no finding / complete coverage |
-| HA-02 | critical + major | 2 action-required findings |
-| HA-03 | minor + info only | no action-required finding |
-| HA-04 | human review required | existing human-review signal |
-| HA-05 | partial coverage | incomplete review unit |
-| HA-06 | not executed | reviewCoverage=not_executed |
-| HA-07 | timeout + failed | incomplete coverage with failure reason |
-| HA-08 | blind spot | Team Lead blind spot present |
-| HA-09 | mixed | major finding + partial coverage + blind spot |
-| HA-10 | legacy compatible | reviewCoverage absent |
+| ID    | Case                  | Material state                                |
+| ----- | --------------------- | --------------------------------------------- |
+| HA-01 | clean                 | no finding / complete coverage                |
+| HA-02 | critical + major      | 2 action-required findings                    |
+| HA-03 | minor + info only     | no action-required finding                    |
+| HA-04 | human review required | existing human-review signal                  |
+| HA-05 | partial coverage      | incomplete review unit                        |
+| HA-06 | not executed          | reviewCoverage=not_executed                   |
+| HA-07 | timeout + failed      | incomplete coverage with failure reason       |
+| HA-08 | blind spot            | Team Lead blind spot present                  |
+| HA-09 | mixed                 | major finding + partial coverage + blind spot |
+| HA-10 | legacy compatible     | reviewCoverage absent                         |
 
 Fixture追加はPhase A開始前まで可能です。開始後はcase setをfreezeします。
 
