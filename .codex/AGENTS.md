@@ -1,14 +1,14 @@
-# Project Codex Instructions (CODEX_HOME scoped)
+# Project Codex Instructions
 
 > **Single source:** 共通ルールは [AGENTS.md](../AGENTS.md)。本ファイルは Codex 向けの最小差分です。
 
 ## 起動
 
-project-local config は opt-in です。Codex をこのリポジトリ設定で起動する場合のみ `CODEX_HOME` を指定します。
+プロジェクトを信頼済みにして起動します。認証とプラグイン設定を引き継ぐため、`CODEX_HOME` は変更しません。共通規則はルートの `AGENTS.md` を参照します。
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
-CODEX_HOME="$REPO_ROOT/.codex" codex -C "$REPO_ROOT"
+codex -C "$REPO_ROOT"
 ```
 
 `package.json` のショートカットを使う場合:
@@ -40,6 +40,7 @@ npm run codex:exec -- "review this branch"
 ## Codex-Specific Notes
 
 - 設定: `.codex/config.toml`（承認ポリシー / サンドボックス）
+- trusted project では `[plugins."river-review@river-review-marketplace"] enabled = true` で同梱 marketplace plugin を有効にする
 - 環境変数は最小限のみ forward する（PATH, HOME, USER, SHELL, LANG, LC_ALL）
 - 承認ポリシーは`on-request`（`sandbox_mode=workspace-write` と併用で CLI の `--full-auto` 相当。sandbox_modeで安全性を担保）。`--model`、`--profile`、`--search`、`--add-dir`は実行時に上書きする
 - web search や sandbox bypass は repo 既定値にしない
