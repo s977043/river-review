@@ -1305,6 +1305,7 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
         experimentKeyMatchesInputs,
         activationVerified: configurationDiffers && observedDifference,
         acceptanceEvaluable,
+        evaluatedOn,
         profiles: evaluations.map((evaluation) => ({
           profile: evaluation.profile,
           allRequiredSatisfied: evaluation.allRequiredSatisfied,
@@ -1314,6 +1315,9 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
         criticalRegressionCount: acceptanceEvaluable
           ? acceptanceMetrics.criticalRegressionCount
           : null,
+        // Never let a clean held-out scope hide a critical regression observed
+        // elsewhere in the paired dataset. This mirrors acceptance.contract6.
+        overallCriticalRegressionCount: overall.criticalRegressionCount,
         independentVerifierVerified,
         terminalReason,
         requiresHumanJudgment: true,
@@ -1524,8 +1528,9 @@ export function formatPairedReplayMarkdown(result) {
       `- manifest integrity: verified ${handoff.manifestVerified ? 'yes' : 'NO'} / matches current inputs ${handoff.experimentKeyMatchesInputs ? 'yes' : 'NO'}`
     );
     lines.push(`- activation verified: ${handoff.activationVerified ? 'yes' : 'no'}`);
+    lines.push(`- acceptance evaluated on: ${handoff.evaluatedOn}`);
     lines.push(
-      `- critical regressions: ${handoff.criticalRegressionCount ?? '観測不可'}`
+      `- critical regressions: ${handoff.criticalRegressionCount ?? '観測不可'} (evaluated scope) / ${handoff.overallCriticalRegressionCount} (overall)`
     );
     if (handoff.profiles.length === 0) {
       lines.push('- acceptance profiles: none declared');
