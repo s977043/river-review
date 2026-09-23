@@ -366,7 +366,6 @@ function buildRenderedFindingSet(result) {
   };
 }
 
-
 /**
  * #2370: build the display-only Human Decision Surface from already-canonical
  * review state.
