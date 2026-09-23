@@ -29,6 +29,11 @@ import {
 import { createTempDir, cleanupTempDirAsync } from './helpers/temp-dir.mjs';
 import { defaultPaths as skillLoaderPaths } from '../runners/core/skill-loader.mjs';
 
+// Escape every RegExp metacharacter, backslash included (same form as
+// scripts/normalize-dist.mjs). Interpolating a raw value into a pattern
+// would let `.` or `\\` in the value change what the assertion accepts.
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // -----------------------------------------------------------------------------
 // river run - dry-run outputs
 // -----------------------------------------------------------------------------
@@ -898,7 +903,7 @@ describe('river suppression add --skill - skill provenance (#2401)', () => {
       'utf8'
     );
     const frontMatter = text.split(/^---$/m)[1];
-    assert.match(frontMatter, new RegExp(`^id: ${skillId}$`, 'm'));
+    assert.match(frontMatter, new RegExp(`^id: ${escapeRegExp(skillId)}$`, 'm'));
     const version = frontMatter.match(/^version:\s*['"]?([^'"\s]+)['"]?\s*$/m)?.[1];
     assert.ok(version, `no version in ${skillId}/SKILL.md`);
     return version;
@@ -935,11 +940,8 @@ describe('river suppression add --skill - skill provenance (#2401)', () => {
       entries[0].context.rulesDigest,
       crypto.createHash('sha256').update('- base rule').digest('hex')
     );
-    assert.match(result.stdout, new RegExp(`skillId: ${SKILL_ID}`));
-    assert.match(
-      result.stdout,
-      new RegExp(`skillVersion: ${expectedVersion.replace(/\./g, '\\.')}`)
-    );
+    assert.match(result.stdout, new RegExp(`skillId: ${escapeRegExp(SKILL_ID)}`));
+    assert.match(result.stdout, new RegExp(`skillVersion: ${escapeRegExp(expectedVersion)}`));
     assert.doesNotMatch(result.stderr, /Warning:/);
   });
 
