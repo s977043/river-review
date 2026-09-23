@@ -89,6 +89,8 @@ chore: eslint を v9 にアップグレード
 
 ### ✅ ローカルでのチェック（推奨）
 
+初回は[開発ランブック](docs/runbook/dev.md)に従って、`.nvmrc` の Node.js と依存関係を用意してください。
+
 ```bash
 npm test
 npm run lint
@@ -125,7 +127,7 @@ npm run lint
 
 ### 🧭 コーディング/運用ルール（要約）
 
-- JS/Node は ESM を前提とし、テストは `node --test` を使用します
+- JS/Node は ESM を前提とし、テストは `npm test` で実行します。実行器の不安定さを避けるフラグは npm スクリプト側で管理します
 - フォーマットは Prettier を使用します（`npm run lint` でチェック）
 - `.env*` などの秘密情報はコミットしないでください（例示はダミー値を使ってください）
 - ドキュメントサイトのソースは `pages/`（Docusaurus）です。`docs/` は内部/運用ドキュメントの置き場で、必要に応じて `pages/` から参照します

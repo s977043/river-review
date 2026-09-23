@@ -55,6 +55,7 @@ If you're using this action within the River Review repository itself:
 | -------------- | --------------------------------------------------------------------- | -------- | ----------- |
 | `phase`        | Review phase (`upstream`, `midstream`, or `downstream`)               | No       | `midstream` |
 | `planner`      | Planner mode (`off`, `order`, or `prune`)                             | No       | `off`       |
+| `reviewers`    | Reviewer roles (comma-separated or `auto`)                            | No       | ``          |
 | `target`       | Path to the git repository to review                                  | No       | `.`         |
 | `comment`      | Post a PR comment with results (only on pull_request events)          | No       | `true`      |
 | `dry_run`      | Run in dry-run mode (no external API calls, print to stdout)          | No       | `true`      |
@@ -62,6 +63,23 @@ If you're using this action within the River Review repository itself:
 | `estimate`     | Estimate cost only without running the review                         | No       | `false`     |
 | `max_cost`     | Abort if estimated USD cost exceeds this value                        | No       | ``          |
 | `node_version` | Node.js version to use                                                | No       | `20`        |
+
+### Review Coverage Gate
+
+Review Coverage is opt-in. To make incomplete reviewer execution fail the GitHub Actions job, enable all three conditions:
+
+```yaml
+- name: Run River Review with coverage gate
+  uses: s977043/river-review/runners/github-action@main
+  with:
+    gate: true
+    reviewers: bug-hunter,security-scanner
+  env:
+    RIVER_GATE_COVERAGE: '1'
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+`reviewers: auto` is also supported. Reviewer names are forwarded to the CLI unchanged, so the CLI remains the validation and vocabulary source of truth.
 
 ## Phases
 
