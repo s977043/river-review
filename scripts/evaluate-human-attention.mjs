@@ -15,16 +15,13 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 
-import {
-  adaptHumanAttentionCase,
-} from '../tests/fixtures/human-attention/decision-surface-eval-adapter.mjs';
+import { adaptHumanAttentionCase } from '../tests/fixtures/human-attention/decision-surface-eval-adapter.mjs';
 
 const DEFAULT_FIXTURES = 'tests/fixtures/human-attention/decision-surface-eval-cases.json';
 const RUBRIC_PATH = 'docs/development/2378-human-attention-evaluation-contract.md';
 const ADAPTER_PATH = 'tests/fixtures/human-attention/decision-surface-eval-adapter.mjs';
 const FIXTURE_HELPER_PATH = 'tests/helpers/render-result-fixtures.mjs';
-const SCORECARD_PATH =
-  'tests/fixtures/human-attention/decision-surface-scorecard-template.yaml';
+const SCORECARD_PATH = 'tests/fixtures/human-attention/decision-surface-scorecard-template.yaml';
 const RUNNER_PATH = 'scripts/evaluate-human-attention.mjs';
 
 const SUPPORTED_MATERIAL_REFERENCE_KEYS = new Set([
@@ -611,11 +608,7 @@ async function execute() {
   const outputRoot = path.resolve(repoRoot, 'artifacts/evals/human-attention');
   const outputDir = path.resolve(repoRoot, args.output);
   const relativeOutput = path.relative(outputRoot, outputDir);
-  if (
-    relativeOutput === '' ||
-    relativeOutput.startsWith('..') ||
-    path.isAbsolute(relativeOutput)
-  ) {
+  if (relativeOutput === '' || relativeOutput.startsWith('..') || path.isAbsolute(relativeOutput)) {
     throw new EvaluationError(
       'USAGE',
       '--output must be a new child directory under artifacts/evals/human-attention/'
