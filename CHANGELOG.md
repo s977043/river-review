@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.122.0](https://github.com/s977043/river-review/compare/v1.121.0...v1.122.0) (2026-09-23)
+
+
+### Features
+
+* **action:** expose reviewer orchestration input ([#2344](https://github.com/s977043/river-review/issues/2344)) ([3326539](https://github.com/s977043/river-review/commit/332653950c0d6fa17ccda7b6b84e4001e1cb2843))
+* **skill:** add executable skill-ID resolver ([#2389](https://github.com/s977043/river-review/issues/2389)) ([46cd02a](https://github.com/s977043/river-review/commit/46cd02a682453220c011f0e7b5bcf3d0ac3db580))
+
+
+### Bug Fixes
+
+* **review:** reject silently dropped reviewer roles ([#2363](https://github.com/s977043/river-review/issues/2363)) ([ab1f238](https://github.com/s977043/river-review/commit/ab1f2381a8dc25c98803c14c52bf746f61902e50))
+
 ## [1.121.0](https://github.com/s977043/river-review/compare/v1.120.0...v1.121.0) (2026-09-22)
 
 
