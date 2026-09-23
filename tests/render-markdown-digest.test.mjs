@@ -232,6 +232,7 @@ describe('#1713 Slice 1: markdown headline and progressive disclosure', () => {
     assert.doesNotMatch(markdown, /優先度サマリー/);
     assert.doesNotMatch(markdown, /✅ マージ前に対応が必要な指摘はありません/);
     assert.match(markdown, /人間レビュー: \*\*必須\*\*/);
+    // Risk paths keep the renderer's existing Markdown escaping contract.
     assert.ok(markdown.includes('src/app\\.js'));
   });
 
