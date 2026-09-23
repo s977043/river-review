@@ -30,6 +30,22 @@ export const DECISION_STATUS = Object.freeze({
 
 export const VALID_DECISIONS = Object.freeze(['approved', 'rejected']);
 
+export const PROMOTION_TARGET_KINDS = Object.freeze([
+  'linter',
+  'test',
+  'fixture',
+  'skill',
+  'reference',
+  'rule',
+  'routing',
+  'riverbed',
+  'docs',
+  'human_judgment',
+]);
+
+const PROMOTION_TARGET_KIND_SET = new Set(PROMOTION_TARGET_KINDS);
+const RETARGET_TERMINAL_STATUSES = new Set(['archived', 'superseded']);
+
 // Deterministic substring signals that flag a candidate as security/compliance
 // sensitive. Matched against the lowercased skillId + clusterKey.
 const SECURITY_SIGNALS = Object.freeze([
@@ -78,6 +94,63 @@ function safeTargetId(pc, fallback) {
   return id ? slugify(id) : fallback;
 }
 
+const SAFE_REFERENCE_PATH_RE = /^skills\/(?:[a-zA-Z0-9._-]+\/)*references\/[a-zA-Z0-9._-]+\.md$/;
+
+/**
+ * Resolve a reference target without allowing a candidate-controlled path to
+ * escape the repository skill tree. Exact repo paths are preserved only when
+ * they point to a Markdown file under a repo-owned skills/.../references/ directory;
+ * otherwise we fall back to a safe
+ * scaffold template using the slugified target id.
+ */
+function safeReferenceTargetPath(pc) {
+  const id = pc?.proposedTarget?.id;
+  if (!id) return 'skills/**/references/<reference>.md';
+  const value = String(id).replaceAll('\\', '/');
+  const segments = value.split('/');
+  if (SAFE_REFERENCE_PATH_RE.test(value) && !segments.includes('.') && !segments.includes('..')) {
+    return value;
+  }
+  return `skills/**/references/${safeTargetId(pc, '<reference>')}.md`;
+}
+
+function normalizeRetargetTarget(kind, id) {
+  if (!PROMOTION_TARGET_KIND_SET.has(kind)) {
+    throw new Error(
+      `Invalid promotion target kind: ${kind}. Expected one of: ${PROMOTION_TARGET_KINDS.join(', ')}`
+    );
+  }
+
+  if (id == null) {
+    if (kind === 'reference') {
+      throw new Error('reference retarget requires --target-id under skills/.../references/*.md.');
+    }
+    return { kind, id: null };
+  }
+
+  if (typeof id !== 'string' || !id.trim()) {
+    throw new Error('promotion target id must be a non-empty string when provided.');
+  }
+  const value = id.trim();
+  if (
+    value.length > 500 ||
+    /[\u0000-\u001f\u007f]/.test(value) ||
+    value.includes('\\') ||
+    value.startsWith('/') ||
+    /^[a-zA-Z]:\//.test(value) ||
+    value.split('/').includes('..')
+  ) {
+    throw new Error('promotion target id contains an unsafe or unsupported path.');
+  }
+  if (kind === 'reference' && !SAFE_REFERENCE_PATH_RE.test(value)) {
+    throw new Error('reference target must be a repo-owned skills/.../references/*.md path.');
+  }
+  if (kind === 'human_judgment') {
+    throw new Error('human_judgment retarget does not accept a target id.');
+  }
+  return { kind, id: value };
+}
+
 /**
  * Read the promotionCandidate body from an entry, or null when absent.
  * @param {object} entry
@@ -113,7 +186,9 @@ export function listPromotionCandidates(index, { includeInactive = false } = {})
 export function isSecuritySensitive(entry) {
   const pc = getPromotionCandidate(entry);
   const tags = (entry?.metadata?.tags ?? []).join(' ');
-  const haystack = `${tags} ${pc?.clusterKey ?? ''}`.toLowerCase();
+  const target = pc?.proposedTarget;
+  const haystack =
+    `${tags} ${pc?.clusterKey ?? ''} ${target?.kind ?? ''} ${target?.id ?? ''}`.toLowerCase();
   return SECURITY_RE.test(haystack);
 }
 
@@ -204,6 +279,97 @@ export function decidePromotion({
   let result;
   const entry = updateEntry(indexPath, id, (live) => {
     result = applyPromotionDecision(live, { decision, approver, reason, now });
+  });
+  return { ...result, entry };
+}
+
+/**
+ * Change proposedTarget while preserving candidate identity and evidence.
+ * Retargeting invalidates any previous adoption approval: the candidate returns
+ * to candidate status and must be approved again for the new target.
+ */
+export function applyPromotionRetarget(
+  entry,
+  { kind, targetId = null, approver, reason, now = new Date() }
+) {
+  const pc = getPromotionCandidate(entry);
+  if (!pc) throw new Error(`Entry ${entry?.id} is not a promotion_candidate.`);
+  if (!approver || !String(approver).trim()) {
+    throw new Error('approver is required for promotion retarget.');
+  }
+  if (!reason || !String(reason).trim()) {
+    throw new Error('reason is required for promotion retarget.');
+  }
+  if (
+    RETARGET_TERMINAL_STATUSES.has(entry.status) ||
+    RETARGET_TERMINAL_STATUSES.has(pc.promotionStatus)
+  ) {
+    throw new Error(
+      `Candidate ${entry.id} is terminal (promotionStatus=${pc.promotionStatus}, status=${entry.status}); retarget is not allowed.`
+    );
+  }
+
+  const nextTarget = normalizeRetargetTarget(kind, targetId);
+  const previousTarget = {
+    kind: pc.proposedTarget?.kind ?? 'human_judgment',
+    id: pc.proposedTarget?.id ?? null,
+  };
+  if (previousTarget.kind === nextTarget.kind && previousTarget.id === nextTarget.id) {
+    return { changed: false, entry, previousTarget, target: nextTarget, approvalReset: false };
+  }
+
+  const previousPromotionStatus = pc.promotionStatus;
+  const approvalReset = previousPromotionStatus !== 'candidate' || Boolean(entry.context?.approval);
+  const decidedAt = now.toISOString();
+  const record = {
+    from: previousTarget,
+    to: nextTarget,
+    approver: String(approver).trim(),
+    reason: String(reason).trim(),
+    decidedAt,
+    previousPromotionStatus,
+    approvalReset,
+  };
+
+  pc.targetHistory = pc.targetHistory ?? [];
+  pc.targetHistory.push(record);
+  pc.proposedTarget = nextTarget;
+  if (approvalReset) {
+    pc.promotionStatus = 'candidate';
+    delete entry.context.approval;
+  }
+  entry.status = 'active';
+  entry.metadata = entry.metadata ?? {};
+  entry.metadata.updatedAt = decidedAt;
+
+  return {
+    changed: true,
+    entry,
+    previousTarget,
+    target: nextTarget,
+    approvalReset,
+    record,
+  };
+}
+
+/** Persisting wrapper for applyPromotionRetarget(). */
+export function retargetPromotion({
+  indexPath,
+  id,
+  kind,
+  targetId = null,
+  approver,
+  reason,
+  now = new Date(),
+}) {
+  const index = loadMemory(indexPath);
+  const target = listPromotionCandidates(index, { includeInactive: true }).find((e) => e.id === id);
+  if (!target) {
+    throw new Error(`No promotion_candidate entry with id: ${id}`);
+  }
+  let result;
+  const entry = updateEntry(indexPath, id, (live) => {
+    result = applyPromotionRetarget(live, { kind, targetId, approver, reason, now });
   });
   return { ...result, entry };
 }
@@ -624,6 +790,11 @@ const KIND_TEMPLATE = Object.freeze({
     branchPrefix: 'promote/skill',
     title: (k) => `docs(skill): refine ${k} skill contract`,
     paths: (pc) => [`skills/**/${safeTargetId(pc, '<skill-id>')}/SKILL.md`],
+  },
+  reference: {
+    branchPrefix: 'promote/reference',
+    title: (k) => `docs(reference): codify ${k} experience knowledge`,
+    paths: (pc) => [safeReferenceTargetPath(pc)],
   },
   rule: {
     branchPrefix: 'promote/rule',

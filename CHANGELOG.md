@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.122.0](https://github.com/s977043/river-review/compare/v1.121.0...v1.122.0) (2026-09-23)
+
+
+### Features
+
+* **action:** expose reviewer orchestration input ([#2344](https://github.com/s977043/river-review/issues/2344)) ([3326539](https://github.com/s977043/river-review/commit/332653950c0d6fa17ccda7b6b84e4001e1cb2843))
+* **skill:** add executable skill-ID resolver ([#2389](https://github.com/s977043/river-review/issues/2389)) ([46cd02a](https://github.com/s977043/river-review/commit/46cd02a682453220c011f0e7b5bcf3d0ac3db580))
+
+
+### Bug Fixes
+
+* **review:** reject silently dropped reviewer roles ([#2363](https://github.com/s977043/river-review/issues/2363)) ([ab1f238](https://github.com/s977043/river-review/commit/ab1f2381a8dc25c98803c14c52bf746f61902e50))
+
+## [1.121.0](https://github.com/s977043/river-review/compare/v1.120.0...v1.121.0) (2026-09-22)
+
+
+### Features
+
+* **promotion:** add auditable retarget lifecycle ([#2380](https://github.com/s977043/river-review/issues/2380)) ([804c60a](https://github.com/s977043/river-review/commit/804c60ad4c8a3cb8f271bd64fdc798a856814a12))
+* **promotion:** add reference promotion target ([#2374](https://github.com/s977043/river-review/issues/2374)) ([3f18144](https://github.com/s977043/river-review/commit/3f1814486c2b352635ddfe0f87cddccbd57cac0c))
+
+
+### Bug Fixes
+
+* **review-differ:** 未完走 run が作る偽の振動で STOP_OSCILLATED を出さない ([#2336](https://github.com/s977043/river-review/issues/2336)) ([#2365](https://github.com/s977043/river-review/issues/2365)) ([a6abded](https://github.com/s977043/river-review/commit/a6abdedf8364021dca02d9d0595611f926b8fe89))
+* **secret-redactor:** 適用パターン集合を消費側へ配線し AWS キーの陰性帯域を固定 ([#2364](https://github.com/s977043/river-review/issues/2364)) ([fd527e3](https://github.com/s977043/river-review/commit/fd527e33188de280c8e6286ce0e430465f03e49d))
+
 ## [1.120.0](https://github.com/s977043/river-review/compare/v1.119.0...v1.120.0) (2026-09-20)
 
 

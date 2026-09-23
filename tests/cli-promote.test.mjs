@@ -161,6 +161,154 @@ describe('river promote approve / reject', () => {
   });
 });
 
+describe('river promote retarget', () => {
+  test('retargets a candidate to a reference and records targetHistory', async (t) => {
+    const { cleanup, indexPath, fixtureId } = seed();
+    t.after(cleanup);
+    const target = 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md';
+    const res = await runCliInProcess(
+      [
+        'promote',
+        'retarget',
+        fixtureId,
+        '--index',
+        indexPath,
+        '--target-kind',
+        'reference',
+        '--target-id',
+        target,
+        '--approver',
+        'alice',
+        '--reason',
+        'capture recurring experience knowledge',
+      ],
+      { env: { RIVER_NOW: '2026-07-21T09:00:00.000Z' } }
+    );
+
+    assert.equal(res.code, 0, res.stderr);
+    assert.match(res.stdout, /retargeted/);
+    const entry = loadMemory(indexPath).entries.find((e) => e.id === fixtureId);
+    assert.deepEqual(entry.context.promotionCandidate.proposedTarget, {
+      kind: 'reference',
+      id: target,
+    });
+    assert.equal(entry.context.promotionCandidate.targetHistory.length, 1);
+  });
+
+  test('approved candidate requires re-approval after retarget', async (t) => {
+    const { cleanup, indexPath, fixtureId } = seed();
+    t.after(cleanup);
+    await runCliInProcess(
+      ['promote', 'approve', fixtureId, '--index', indexPath, '--approver', 'alice'],
+      { env: { RIVER_NOW: '2026-07-21T09:00:00.000Z' } }
+    );
+    const res = await runCliInProcess(
+      [
+        'promote',
+        'retarget',
+        fixtureId,
+        '--index',
+        indexPath,
+        '--target-kind',
+        'reference',
+        '--target-id',
+        'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+        '--approver',
+        'bob',
+        '--reason',
+        'target changed after approval',
+      ],
+      { env: { RIVER_NOW: '2026-07-22T00:00:00.000Z' } }
+    );
+
+    assert.equal(res.code, 0, res.stderr);
+    assert.match(res.stdout, /must be approved again/);
+    const template = await runCliInProcess([
+      'promote',
+      'template',
+      fixtureId,
+      '--index',
+      indexPath,
+    ]);
+    assert.equal(template.code, 0, template.stderr);
+    assert.match(template.stdout, /not approved/);
+  });
+
+  test('requires a reason and rejects unsafe reference paths', async (t) => {
+    const { cleanup, indexPath, fixtureId } = seed();
+    t.after(cleanup);
+    const missingReason = await runCliInProcess([
+      'promote',
+      'retarget',
+      fixtureId,
+      '--index',
+      indexPath,
+      '--target-kind',
+      'reference',
+      '--target-id',
+      'skills/agent-skills/x/references/X.md',
+      '--approver',
+      'alice',
+    ]);
+    assert.equal(missingReason.code, 1);
+    assert.match(missingReason.stderr, /requires --reason/);
+
+    const missingApprover = await runCliInProcess(
+      [
+        'promote',
+        'retarget',
+        fixtureId,
+        '--index',
+        indexPath,
+        '--target-kind',
+        'reference',
+        '--target-id',
+        'skills/agent-skills/x/references/X.md',
+        '--reason',
+        'human classification',
+      ],
+      { env: { RIVER_APPROVER: '', USER: 'runner', USERNAME: 'runner' } }
+    );
+    assert.equal(missingApprover.code, 1);
+    assert.match(missingApprover.stderr, /auditable approver/);
+
+    const unsafe = await runCliInProcess([
+      'promote',
+      'retarget',
+      fixtureId,
+      '--index',
+      indexPath,
+      '--target-kind',
+      'reference',
+      '--target-id',
+      '../../etc/passwd',
+      '--approver',
+      'alice',
+      '--reason',
+      'bad',
+    ]);
+    assert.equal(unsafe.code, 1);
+    assert.match(unsafe.stderr, /unsafe|reference target/);
+  });
+});
+
+describe('river promote retarget option scope', () => {
+  test('retarget-only options fail on other promote subcommands', async (t) => {
+    const { cleanup, indexPath } = seed();
+    t.after(cleanup);
+    const res = await runCliInProcess([
+      'promote',
+      'list',
+      '--index',
+      indexPath,
+      '--target-kind',
+      'reference',
+    ]);
+    assert.equal(res.code, 1);
+    assert.match(res.stderr, /unknown option for promote: --target-kind/);
+  });
+});
+
 describe('river promote template', () => {
   test('scaffolds only approved candidates; rejected are excluded', async (t) => {
     const { cleanup, indexPath, fixtureId, securityId } = seed();
