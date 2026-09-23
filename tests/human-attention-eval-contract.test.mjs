@@ -115,6 +115,29 @@ describe('#2378 Human Attention evaluation contract', () => {
     }
   });
 
+  it('freezes finding identity and partial-coverage unit outcomes before the run', () => {
+    for (const item of manifest.cases) {
+      assert.ok(Array.isArray(item.signals.findings), `${item.id}: findings must be explicit`);
+
+      const findingIds = item.signals.findings.map((finding) => finding.id);
+      assert.strictEqual(new Set(findingIds).size, findingIds.length, `${item.id}: finding IDs`);
+
+      if (item.materialReference.allFindingIds) {
+        assert.deepStrictEqual(item.materialReference.allFindingIds, findingIds);
+      }
+
+      if (item.signals.coverageStatus === 'partial') {
+        const failed = item.signals.failedUnitCount ?? 0;
+        const timedOut = item.signals.timedOutUnitCount ?? 0;
+        assert.strictEqual(
+          item.signals.incompleteUnitCount,
+          failed + timedOut,
+          `${item.id}: partial coverage must freeze concrete incomplete unit outcomes`
+        );
+      }
+    }
+  });
+
   it('keeps the legacy case fail-safe instead of inventing missing state', () => {
     const legacy = manifest.cases.find((item) => item.id === 'HA-10-legacy-no-coverage');
     assert.ok(legacy);
