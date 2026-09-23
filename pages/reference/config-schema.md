@@ -51,7 +51,7 @@
     - `duplicate`: 別エントリの fingerprint への参照。`duplicateOfFingerprint` フィールドで参照先を示せる（schema 上は任意だが運用上は記録推奨）。`major` / `critical` は guard でブロックされる。
   - CLI: `river suppression add` で対話的に登録できる。
     - 必須フラグ: `--fingerprint <fp>` / `--feedback <type>` / `--rationale <text>`
-    - 任意フラグ: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>`
+    - 任意フラグ: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>` / `--skill <id>`
 - `context`（[#689](https://github.com/s977043/river-review/issues/689)）
   - `reviewMode`: `tiny` / `medium` / `large`。budget を省略すると `src/lib/context-presets.mjs` のプリセットを適用する。`budget` を明示するとプリセットより優先される。
   - `budget.maxTokens`: `256`〜`64000`。

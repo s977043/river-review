@@ -51,7 +51,7 @@ Place `.river-review.json` in the repository root to customize review model sett
     - `duplicate`: a reference to another entry's fingerprint. The `duplicateOfFingerprint` field can point at the referenced entry (optional in the schema, but recording it is the recommended practice). `major` / `critical` are blocked by the guard.
   - CLI: register an entry interactively with `river suppression add`.
     - Required flags: `--fingerprint <fp>` / `--feedback <type>` / `--rationale <text>`
-    - Optional flags: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>`
+    - Optional flags: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>` / `--skill <id>`
 - `context` ([#689](https://github.com/s977043/river-review/issues/689))
   - `reviewMode`: `tiny` / `medium` / `large`. When `budget` is omitted, the preset from `src/lib/context-presets.mjs` is applied. An explicit `budget` always wins.
   - `budget.maxTokens`: `256`–`64000`.
