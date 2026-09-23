@@ -105,7 +105,9 @@ describe('Review Coverage surface propagation', () => {
 
     const context = await planLocalReview({ cwd: dir, dryRun: true });
     const originalFetch = global.fetch;
-    t.after(() => { global.fetch = originalFetch; });
+    t.after(() => {
+      global.fetch = originalFetch;
+    });
     global.fetch = async () => ({
       ok: true,
       json: async () => ({ choices: [{ message: { content: 'NO_ISSUES' } }] }),
@@ -159,6 +161,7 @@ describe('Review Coverage surface propagation', () => {
       'reviewer:single/chunk:1',
     ]);
   });
+
   it('emits schema-valid JSON Review Coverage only when present', () => {
     const coverage = deriveReviewCoverage([unit()]);
     const artifact = formatJsonOutput(baseResult({ reviewCoverage: coverage }), 'midstream');
