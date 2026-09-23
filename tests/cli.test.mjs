@@ -15,9 +15,10 @@
 // tests/helpers/ に統合済み。
 
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import test, { describe } from 'node:test';
+import test, { describe, mock } from 'node:test';
 
 import { runCliInProcess } from './helpers/cli.mjs';
 import {
@@ -761,5 +762,104 @@ describe('river run --save - run record provenance', () => {
     // Running in CI is not attestation: the record is still self-reported by a
     // process inside the reviewed repo, so trustedBy stays null (契約1).
     assert.strictEqual(record.provenance.trustedBy, null);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// river suppression add - rulesDigest provenance wiring (#2401)
+// -----------------------------------------------------------------------------
+//
+// #2202 Phase 0 let createSuppression record a rulesDigest, but the only
+// production caller (`river suppression add`) passed nothing. These tests go
+// through the real CLI entry so they check the wiring, not
+// resolveSuppressionProvenance alone (which tests/suppression.test.mjs covers).
+describe('river suppression add - rulesDigest provenance (#2401)', () => {
+  const ARGV = [
+    'suppression',
+    'add',
+    '--fingerprint',
+    '0123456789abcdef',
+    '--feedback',
+    'false_positive',
+    '--rationale',
+    'provenance wiring',
+  ];
+
+  function readSuppressionEntries(dir) {
+    const index = JSON.parse(readFileSync(join(dir, '.river', 'memory', 'index.json'), 'utf8'));
+    return index.entries.filter((e) => e.type === 'suppression');
+  }
+
+  test('records context.rulesDigest when .river/rules.md exists', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({ rules: '- base rule\n' });
+    t.after(cleanup);
+    // Independent derivation: rulesText is the trimmed rules.md content.
+    const expected = crypto.createHash('sha256').update('- base rule').digest('hex');
+
+    const result = await runCliInProcess(ARGV, { cwd: dir });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    const entries = readSuppressionEntries(dir);
+    assert.strictEqual(entries.length, 1);
+    assert.strictEqual(entries[0].context.rulesDigest, expected);
+    assert.match(result.stdout, new RegExp(`rulesDigest: ${expected}`));
+    assert.doesNotMatch(result.stderr, /Warning:/);
+  });
+
+  test('omits the rulesDigest key (not null) when the repo has no project rules', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo();
+    t.after(cleanup);
+
+    const result = await runCliInProcess(ARGV, { cwd: dir });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    const entries = readSuppressionEntries(dir);
+    assert.strictEqual(entries.length, 1);
+    assert.strictEqual(Object.hasOwn(entries[0].context, 'rulesDigest'), false);
+    assert.doesNotMatch(result.stderr, /Warning:/);
+  });
+
+  test('still creates the suppression (exit 0) when .river/rules.md is unreadable, omitting only rulesDigest', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo();
+    t.after(cleanup);
+    // A directory at the rules.md path makes loadProjectRules throw
+    // ProjectRulesError (EISDIR). Before #2401 this command never read the
+    // rules and exited 0 here; the record-only provenance must not change that.
+    mkdirSync(join(dir, '.river', 'rules.md'), { recursive: true });
+
+    const result = await runCliInProcess(ARGV, { cwd: dir });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    assert.match(result.stdout, /Suppression created: /);
+    const entries = readSuppressionEntries(dir);
+    assert.strictEqual(entries.length, 1);
+    assert.strictEqual(entries[0].context.fingerprint, '0123456789abcdef');
+    assert.strictEqual(entries[0].context.feedbackType, 'false_positive');
+    assert.strictEqual(Object.hasOwn(entries[0].context, 'rulesDigest'), false);
+    // The omission is announced on one stderr line, in the CLI's Warning: shape.
+    assert.match(
+      result.stderr,
+      /^Warning: rulesDigest not recorded on this suppression: Failed to read project rules at /m
+    );
+  });
+
+  test('does not swallow errors other than ProjectRulesError', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({ rules: '- base rule\n' });
+    t.after(cleanup);
+    // Only the rules digest reaches crypto.createHash on this path (the entry id
+    // comes from --fingerprint), so this stands in for an unexpected bug inside
+    // provenance resolution. It must surface, not be downgraded to a warning.
+    const createHash = mock.method(crypto, 'createHash', () => {
+      throw new Error('unexpected-2401');
+    });
+    t.after(() => createHash.mock.restore());
+
+    const result = await runCliInProcess(ARGV, { cwd: dir });
+    createHash.mock.restore();
+
+    assert.strictEqual(result.code, 1, result.stdout);
+    assert.match(result.stderr, /unexpected-2401/);
+    assert.doesNotMatch(result.stderr, /Warning: rulesDigest not recorded/);
+    assert.strictEqual(createHash.mock.callCount() > 0, true);
   });
 });
