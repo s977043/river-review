@@ -1313,6 +1313,8 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
         manifestVerified: manifestVerification.verified,
         experimentKeyMatchesInputs,
         activationVerified: configurationDiffers && observedDifference,
+        activationReasons: [...activationReasons],
+        pairingWarnings: [...pairingWarnings],
         acceptanceEvaluable,
         evaluatedOn,
         profiles: evaluations.map((evaluation) => ({
@@ -1320,6 +1322,10 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
           allRequiredSatisfied: evaluation.allRequiredSatisfied,
           sampleSizeSatisfied: evaluation.sampleSizeSatisfied,
           failedMetrics: [...evaluation.failedMetrics],
+          unevaluableMetrics: evaluation.criteria
+            .filter((criterion) => criterion.satisfied === null)
+            .map((criterion) => criterion.metric)
+            .sort(compareStrings),
         })),
         criticalRegressionCount: acceptanceEvaluable
           ? acceptanceMetrics.criticalRegressionCount
@@ -1537,6 +1543,8 @@ export function formatPairedReplayMarkdown(result) {
       `- manifest integrity: verified ${handoff.manifestVerified ? 'yes' : 'NO'} / matches current inputs ${handoff.experimentKeyMatchesInputs ? 'yes' : 'NO'}`
     );
     lines.push(`- activation verified: ${handoff.activationVerified ? 'yes' : 'no'}`);
+    lines.push(`- activation caveats: ${handoff.activationReasons.length}`);
+    lines.push(`- pairing warnings: ${handoff.pairingWarnings.length}`);
     lines.push(`- acceptance evaluated on: ${handoff.evaluatedOn}`);
     lines.push(
       `- critical regressions: ${handoff.criticalRegressionCount ?? '観測不可'} (evaluated scope) / ${handoff.overallCriticalRegressionCount} (overall)`
@@ -1546,7 +1554,7 @@ export function formatPairedReplayMarkdown(result) {
     } else {
       for (const profile of handoff.profiles) {
         lines.push(
-          `- profile \`${profile.profile}\`: allRequiredSatisfied ${tick(profile.allRequiredSatisfied)} / sampleSizeSatisfied ${tick(profile.sampleSizeSatisfied)} / failedMetrics ${profile.failedMetrics.length ? profile.failedMetrics.join(', ') : 'なし'}`
+          `- profile \`${profile.profile}\`: allRequiredSatisfied ${tick(profile.allRequiredSatisfied)} / sampleSizeSatisfied ${tick(profile.sampleSizeSatisfied)} / failedMetrics ${profile.failedMetrics.length ? profile.failedMetrics.join(', ') : 'なし'} / unevaluableMetrics ${profile.unevaluableMetrics.length ? profile.unevaluableMetrics.join(', ') : 'なし'}`
         );
       }
     }
