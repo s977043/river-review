@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { writeFileSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { loadProjectRules } from '../src/lib/rules.mjs';
+import { computeRulesDigest, loadProjectRules, loadProjectRulesDigest } from '../src/lib/rules.mjs';
 import { withTempDir } from './helpers/temp-dir.mjs';
 
 test('loadProjectRules returns null when rules file is absent', async () => {
@@ -129,6 +130,46 @@ test('loadProjectRules ignores non-md files in rules.d and custom path skips rul
       const custom = await loadProjectRules(dir, { rulesPath: 'custom-rules.md' });
       assert.equal(custom.rulesText, '- custom only'); // custom path does not scan rules.d
       assert.equal(custom.extraPaths.length, 0);
+    },
+    { prefix: 'river-rules-' }
+  );
+});
+
+// --- #2202 Phase 0: rules digest ---
+
+test('computeRulesDigest is null for no rules and a sha256 hex of rulesText otherwise', () => {
+  assert.equal(computeRulesDigest(null), null);
+  assert.equal(computeRulesDigest(undefined), null);
+  assert.equal(computeRulesDigest(''), null);
+  const expected = crypto.createHash('sha256').update('- a rule').digest('hex');
+  assert.equal(computeRulesDigest('- a rule'), expected);
+  assert.match(computeRulesDigest('- a rule'), /^[0-9a-f]{64}$/);
+});
+
+test('loadProjectRulesDigest is deterministic and changes when rules.md or rules.d changes', async () => {
+  await withTempDir(
+    async (dir) => {
+      assert.equal(await loadProjectRulesDigest(dir), null); // no rules
+
+      const riverDir = path.join(dir, '.river');
+      const rulesDDir = path.join(riverDir, 'rules.d');
+      await mkdir(rulesDDir, { recursive: true });
+      writeFileSync(path.join(riverDir, 'rules.md'), '- base');
+      const d1 = await loadProjectRulesDigest(dir);
+      assert.equal(await loadProjectRulesDigest(dir), d1); // same content, same digest
+      assert.equal(d1, computeRulesDigest((await loadProjectRules(dir)).rulesText));
+
+      writeFileSync(path.join(riverDir, 'rules.md'), '- base changed');
+      const d2 = await loadProjectRulesDigest(dir);
+      assert.notEqual(d2, d1);
+
+      writeFileSync(path.join(rulesDDir, 'domain.md'), '- domain');
+      const d3 = await loadProjectRulesDigest(dir);
+      assert.notEqual(d3, d2);
+
+      writeFileSync(path.join(riverDir, 'rules.md'), '- base');
+      await unlink(path.join(rulesDDir, 'domain.md'));
+      assert.equal(await loadProjectRulesDigest(dir), d1); // back to original content
     },
     { prefix: 'river-rules-' }
   );

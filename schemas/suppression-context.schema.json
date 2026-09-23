@@ -83,6 +83,21 @@
       "type": "integer",
       "minimum": 1,
       "description": "GitHub review comment ID that recorded the feedback."
+    },
+    "skillId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Id of the skill that produced the suppressed finding (the finding's `ruleId`), recorded at issuance (#2202 Phase 0). Provenance only: not read by the expiry rule. Omitted when the skill is unknown."
+    },
+    "skillVersion": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The `version` of that skill's SKILL.md metadata at issuance (#2202 Phase 0). Provenance only: not read by the expiry rule. Omitted when the skill or its version is unknown."
+    },
+    "rulesDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lowercase hex sha256 of the project rules text (`.river/rules.md` plus `.river/rules.d/*.md`, as loaded by loadProjectRules and hashed by computeRulesDigest in src/lib/rules.mjs) at issuance (#2202 Phase 0). Provenance only: not read by the expiry rule. Omitted when the project has no rules."
     }
   }
 }
