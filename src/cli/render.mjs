@@ -596,6 +596,17 @@ export function isLlmlessEmptyReview(result) {
   return llmKeyMissing && noFindings;
 }
 
+function isLlmFailedEmptyReview(result) {
+  const debug = result?.reviewDebug ?? {};
+  const llmFailed =
+    debug.llmUsed === false &&
+    typeof debug.llmError === 'string' &&
+    debug.llmError.trim().length > 0;
+  const noComments = !Array.isArray(result?.comments) || result.comments.length === 0;
+  const noFindings = !Array.isArray(result?.findings) || result.findings.length === 0;
+  return llmFailed && noComments && noFindings;
+}
+
 export function printMarkdownReport(result, phase) {
   if (isLlmlessEmptyReview(result)) {
     console.log(
@@ -604,6 +615,17 @@ export function printMarkdownReport(result, phase) {
 
 - フェーズ: \`${phase}\`
 - LLM レビュー未設定（\`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\` / \`GOOGLE_API_KEY\` のいずれも未設定）のため静的チェックのみ実行し、**指摘はありません**。いずれか 1 つを設定すると LLM レビューが有効になり、リポジトリ固有の規約・差分スコープ等の観点でレビューします。`
+    );
+    return;
+  }
+  if (isLlmFailedEmptyReview(result)) {
+    console.log(
+      `${COMMENT_MARKER}
+## River Review
+
+- フェーズ: \`${phase}\`
+- ⚠️ **LLM semantic review は未完了です。** LLM 実行エラー後の静的チェックでは最終指摘がありませんでした。
+- この結果は「指摘なし」「auto-approve」「マージ可能」を意味しません。LLM 経路を復旧して再レビューしてください。`
     );
     return;
   }
