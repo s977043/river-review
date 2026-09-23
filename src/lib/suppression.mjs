@@ -6,6 +6,8 @@ import {
   loadMemory,
   queryMemory,
 } from './riverbed-memory.mjs';
+import { loadProjectRulesDigest } from './rules.mjs';
+import { loadAllSkillMetadata } from '../../runners/core/skill-loader.mjs';
 
 /**
  * Create a stable content hash from a finding's key fields.
@@ -39,6 +41,15 @@ export function inferSubsystem(filePath) {
  * call sites remain compatible. The shape of the resulting `context` is
  * validated by `schemas/suppression-context.schema.json`.
  *
+ * `skillId`, `skillVersion` and `rulesDigest` (#2202 Phase 0) record the
+ * provenance of the review criteria at issuance time: which skill produced the
+ * suppressed finding, that skill's `version`, and the digest of the project
+ * rules. They are RECORDED ONLY — `isSuppressionExpired` does not read them.
+ * Like the other optional fields, each is written only when it is a non-empty
+ * string; an absent value leaves the key out entirely (no null, no ""), so an
+ * entry without provenance is indistinguishable from one written before
+ * #2202. Use `resolveSuppressionProvenance` to derive the three values.
+ *
  * @param {object} options
  * @returns {object} The created suppression entry
  */
@@ -58,6 +69,9 @@ export function createSuppression({
   expiresAt,
   prNumber,
   sourceCommentId,
+  skillId,
+  skillVersion,
+  rulesDigest,
   author = 'river-review',
 }) {
   if (!rationale) throw new Error('Suppression requires a rationale');
@@ -85,6 +99,9 @@ export function createSuppression({
   if (Number.isInteger(sourceCommentId) && sourceCommentId > 0) {
     context.sourceCommentId = sourceCommentId;
   }
+  if (isNonEmptyString(skillId)) context.skillId = skillId;
+  if (isNonEmptyString(skillVersion)) context.skillVersion = skillVersion;
+  if (isNonEmptyString(rulesDigest)) context.rulesDigest = rulesDigest;
 
   const entry = {
     id: 'suppression-' + idSeed + '-' + Date.now(),
@@ -103,6 +120,57 @@ export function createSuppression({
 
   appendEntry(indexPath, entry);
   return entry;
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.length > 0;
+}
+
+/**
+ * Derive the review-criteria provenance that `createSuppression` records
+ * (#2202 Phase 0). Every value comes from an existing SSoT:
+ *
+ * - `skillId` is the finding's `ruleId` — findings are built with
+ *   `ruleId: c.skillId || 'unknown'` (local-runner.mjs / review-engine.mjs), so
+ *   `'unknown'` is the "skill not identified" sentinel and is NOT recorded.
+ * - `skillVersion` is the `version` of that skill's metadata as loaded by
+ *   `loadAllSkillMetadata` (runners/core/skill-loader.mjs), or from the
+ *   already-loaded `skills` list when the caller has one.
+ * - `rulesDigest` is `loadProjectRulesDigest` (rules.mjs) over `repoRoot`.
+ *
+ * A value that cannot be determined is left out of the result (never null),
+ * so spreading the result into `createSuppression` omits the key.
+ *
+ * @param {object} options
+ * @param {string} [options.ruleId] - the suppressed finding's ruleId
+ * @param {string} [options.repoRoot] - repository whose project rules apply
+ * @param {Array<{ metadata?: { id?: string, version?: unknown } }>} [options.skills]
+ *   already-loaded skills; loaded via `loadAllSkillMetadata` when omitted
+ * @param {string} [options.skillsDir] - passed to `loadAllSkillMetadata`
+ * @param {{ rulesPath?: string }} [options.rulesOptions] - passed to `loadProjectRulesDigest`
+ * @returns {Promise<{ skillId?: string, skillVersion?: string, rulesDigest?: string }>}
+ */
+export async function resolveSuppressionProvenance({
+  ruleId,
+  repoRoot,
+  skills,
+  skillsDir,
+  rulesOptions,
+} = {}) {
+  const provenance = {};
+  if (isNonEmptyString(ruleId) && ruleId !== 'unknown') {
+    provenance.skillId = ruleId;
+    const list = Array.isArray(skills)
+      ? skills
+      : await loadAllSkillMetadata(skillsDir ? { skillsDir } : {});
+    const version = list.find((s) => s?.metadata?.id === ruleId)?.metadata?.version;
+    if (isNonEmptyString(version)) provenance.skillVersion = version;
+  }
+  if (isNonEmptyString(repoRoot)) {
+    const digest = await loadProjectRulesDigest(repoRoot, rulesOptions);
+    if (isNonEmptyString(digest)) provenance.rulesDigest = digest;
+  }
+  return provenance;
 }
 
 /**

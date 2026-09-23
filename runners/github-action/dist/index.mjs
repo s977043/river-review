@@ -60574,6 +60574,151 @@ function expireEntries(
 
 /***/ }),
 
+/***/ 1688:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   DB: () => (/* binding */ ProjectRulesError),
+/* harmony export */   LJ: () => (/* binding */ loadProjectRulesDigest),
+/* harmony export */   TR: () => (/* binding */ loadProjectRules)
+/* harmony export */ });
+/* unused harmony export computeRulesDigest */
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
+/* harmony import */ var node_fs_promises__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(1455);
+/* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(6760);
+
+
+
+
+const DEFAULT_RULES_PATH = node_path__WEBPACK_IMPORTED_MODULE_2__.join('.river', 'rules.md');
+const DEFAULT_RULES_DIR = node_path__WEBPACK_IMPORTED_MODULE_2__.join('.river', 'rules.d');
+
+class ProjectRulesError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ProjectRulesError';
+  }
+}
+
+/**
+ * Read a single rules file. Missing or empty files yield null (no error).
+ *
+ * @param {string} filePath
+ * @param {{ tolerateDirectory?: boolean }} [options] When true, a path that is
+ *   actually a directory (EISDIR) yields null instead of throwing. Used for the
+ *   rules.d/ scan, where a stray `*.md` sub-directory should be skipped — but
+ *   NOT for the base rules.md, where a directory is a misconfiguration to surface.
+ */
+async function readRulesFile(filePath, { tolerateDirectory = false } = {}) {
+  try {
+    const raw = await node_fs_promises__WEBPACK_IMPORTED_MODULE_1__.readFile(filePath, 'utf8');
+    return raw.trim() || null;
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    if (error.code === 'EISDIR' && tolerateDirectory) return null;
+    throw new ProjectRulesError(`Failed to read project rules at ${filePath}: ${error.message}`);
+  }
+}
+
+/**
+ * Load project-specific review rules.
+ *
+ * Reads `.river/rules.md` (or a custom path via `options.rulesPath`). When the
+ * default path is used, additional `*.md` files under `.river/rules.d/` are
+ * read in alphabetical order and appended (each prefixed with a `## <file>`
+ * header), so teams can split domain / incidents / glossary rules across files.
+ * Missing or empty files are treated as "no rules" without error; with no base
+ * file and no rules.d entries the result is identical to the single-file case.
+ */
+async function loadProjectRules(repoRoot, options = {}) {
+  const repoRootAbs = node_path__WEBPACK_IMPORTED_MODULE_2__.resolve(repoRoot);
+  const relativeRulesPath = options.rulesPath ?? DEFAULT_RULES_PATH;
+  const rulesPath = node_path__WEBPACK_IMPORTED_MODULE_2__.resolve(repoRootAbs, relativeRulesPath);
+
+  if (!rulesPath.startsWith(repoRootAbs + node_path__WEBPACK_IMPORTED_MODULE_2__.sep) && rulesPath !== repoRootAbs) {
+    throw new ProjectRulesError(
+      `Project rules path is outside of the repository: ${relativeRulesPath}`
+    );
+  }
+
+  const sections = [];
+  const extraPaths = [];
+
+  const base = await readRulesFile(rulesPath);
+  if (base) sections.push(base);
+
+  // Only the default rules path activates the rules.d/ split; custom rulesPath
+  // callers keep the exact single-file behavior. Compare the resolved relative
+  // path so an explicit `rulesPath: '.river/rules.md'` still scans rules.d/.
+  if (relativeRulesPath === DEFAULT_RULES_PATH) {
+    const rulesDir = node_path__WEBPACK_IMPORTED_MODULE_2__.resolve(repoRootAbs, DEFAULT_RULES_DIR);
+    let entries = [];
+    try {
+      entries = (await node_fs_promises__WEBPACK_IMPORTED_MODULE_1__.readdir(rulesDir)).filter((name) => name.endsWith('.md')).sort();
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw new ProjectRulesError(
+          `Failed to read project rules directory at ${rulesDir}: ${error.message}`
+        );
+      }
+    }
+    // Files are independent; read them in parallel but keep alphabetical order.
+    const loaded = await Promise.all(
+      entries.map(async (name) => ({
+        name,
+        filePath: node_path__WEBPACK_IMPORTED_MODULE_2__.join(rulesDir, name),
+        text: await readRulesFile(node_path__WEBPACK_IMPORTED_MODULE_2__.join(rulesDir, name), { tolerateDirectory: true }),
+      }))
+    );
+    for (const { name, filePath, text } of loaded) {
+      if (text) {
+        sections.push(`## ${name}\n\n${text}`);
+        extraPaths.push(filePath);
+      }
+    }
+  }
+
+  return {
+    rulesText: sections.length ? sections.join('\n\n') : null,
+    path: rulesPath,
+    extraPaths,
+  };
+}
+
+/**
+ * Content digest of the project rules text returned by {@link loadProjectRules}.
+ *
+ * The digest is taken over `rulesText` — the exact string the review prompt
+ * receives (base `.river/rules.md` plus the `## <file>` sections appended from
+ * `.river/rules.d/`) — so it changes exactly when the effective project rules
+ * change. Returns null when there are no rules, so callers can omit the field
+ * instead of recording an empty value (#2202 Phase 0).
+ *
+ * @param {string | null | undefined} rulesText
+ * @returns {string | null} lowercase hex sha256, or null when there are no rules
+ */
+function computeRulesDigest(rulesText) {
+  if (typeof rulesText !== 'string' || rulesText.length === 0) return null;
+  return node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash('sha256').update(rulesText, 'utf8').digest('hex');
+}
+
+/**
+ * Load the project rules through {@link loadProjectRules} and return their
+ * digest. The read path is not re-derived here: the same resolution (default
+ * path, rules.d/ scan, outside-repo guard, error semantics) applies.
+ *
+ * @param {string} repoRoot
+ * @param {{ rulesPath?: string }} [options]
+ * @returns {Promise<string | null>}
+ */
+async function loadProjectRulesDigest(repoRoot, options = {}) {
+  const { rulesText } = await loadProjectRules(repoRoot, options);
+  return computeRulesDigest(rulesText);
+}
+
+
+/***/ }),
+
 /***/ 9946:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
@@ -62378,11 +62523,16 @@ async function planSkills({ skills, context, llmPlan, appendRemaining = true }) 
 /* harmony export */   RL: () => (/* binding */ formatUnparseableExpiresAtWarning),
 /* harmony export */   createSuppression: () => (/* binding */ createSuppression),
 /* harmony export */   lq: () => (/* binding */ isSuppressionExpired),
+/* harmony export */   resolveSuppressionProvenance: () => (/* binding */ resolveSuppressionProvenance),
 /* harmony export */   vU: () => (/* binding */ hasUnparseableSuppressionExpiresAt)
 /* harmony export */ });
 /* unused harmony exports hashFinding, inferSubsystem, revokeSuppression, matchesScopeFiles, collectRevokedSuppressionIds, findUnparseableSuppressionExpiries, findActiveSuppressions */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /* harmony import */ var _riverbed_memory_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4216);
+/* harmony import */ var _rules_mjs__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(1688);
+/* harmony import */ var _runners_core_skill_loader_mjs__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(8478);
+
+
 
 
 
@@ -62418,6 +62568,15 @@ function inferSubsystem(filePath) {
  * call sites remain compatible. The shape of the resulting `context` is
  * validated by `schemas/suppression-context.schema.json`.
  *
+ * `skillId`, `skillVersion` and `rulesDigest` (#2202 Phase 0) record the
+ * provenance of the review criteria at issuance time: which skill produced the
+ * suppressed finding, that skill's `version`, and the digest of the project
+ * rules. They are RECORDED ONLY — `isSuppressionExpired` does not read them.
+ * Like the other optional fields, each is written only when it is a non-empty
+ * string; an absent value leaves the key out entirely (no null, no ""), so an
+ * entry without provenance is indistinguishable from one written before
+ * #2202. Use `resolveSuppressionProvenance` to derive the three values.
+ *
  * @param {object} options
  * @returns {object} The created suppression entry
  */
@@ -62437,6 +62596,9 @@ function createSuppression({
   expiresAt,
   prNumber,
   sourceCommentId,
+  skillId,
+  skillVersion,
+  rulesDigest,
   author = 'river-review',
 }) {
   if (!rationale) throw new Error('Suppression requires a rationale');
@@ -62464,6 +62626,9 @@ function createSuppression({
   if (Number.isInteger(sourceCommentId) && sourceCommentId > 0) {
     context.sourceCommentId = sourceCommentId;
   }
+  if (isNonEmptyString(skillId)) context.skillId = skillId;
+  if (isNonEmptyString(skillVersion)) context.skillVersion = skillVersion;
+  if (isNonEmptyString(rulesDigest)) context.rulesDigest = rulesDigest;
 
   const entry = {
     id: 'suppression-' + idSeed + '-' + Date.now(),
@@ -62482,6 +62647,57 @@ function createSuppression({
 
   (0,_riverbed_memory_mjs__WEBPACK_IMPORTED_MODULE_1__/* .appendEntry */ .D4)(indexPath, entry);
   return entry;
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.length > 0;
+}
+
+/**
+ * Derive the review-criteria provenance that `createSuppression` records
+ * (#2202 Phase 0). Every value comes from an existing SSoT:
+ *
+ * - `skillId` is the finding's `ruleId` — findings are built with
+ *   `ruleId: c.skillId || 'unknown'` (local-runner.mjs / review-engine.mjs), so
+ *   `'unknown'` is the "skill not identified" sentinel and is NOT recorded.
+ * - `skillVersion` is the `version` of that skill's metadata as loaded by
+ *   `loadAllSkillMetadata` (runners/core/skill-loader.mjs), or from the
+ *   already-loaded `skills` list when the caller has one.
+ * - `rulesDigest` is `loadProjectRulesDigest` (rules.mjs) over `repoRoot`.
+ *
+ * A value that cannot be determined is left out of the result (never null),
+ * so spreading the result into `createSuppression` omits the key.
+ *
+ * @param {object} options
+ * @param {string} [options.ruleId] - the suppressed finding's ruleId
+ * @param {string} [options.repoRoot] - repository whose project rules apply
+ * @param {Array<{ metadata?: { id?: string, version?: unknown } }>} [options.skills]
+ *   already-loaded skills; loaded via `loadAllSkillMetadata` when omitted
+ * @param {string} [options.skillsDir] - passed to `loadAllSkillMetadata`
+ * @param {{ rulesPath?: string }} [options.rulesOptions] - passed to `loadProjectRulesDigest`
+ * @returns {Promise<{ skillId?: string, skillVersion?: string, rulesDigest?: string }>}
+ */
+async function resolveSuppressionProvenance({
+  ruleId,
+  repoRoot,
+  skills,
+  skillsDir,
+  rulesOptions,
+} = {}) {
+  const provenance = {};
+  if (isNonEmptyString(ruleId) && ruleId !== 'unknown') {
+    provenance.skillId = ruleId;
+    const list = Array.isArray(skills)
+      ? skills
+      : await (0,_runners_core_skill_loader_mjs__WEBPACK_IMPORTED_MODULE_3__/* .loadAllSkillMetadata */ .Qv)(skillsDir ? { skillsDir } : {});
+    const version = list.find((s) => s?.metadata?.id === ruleId)?.metadata?.version;
+    if (isNonEmptyString(version)) provenance.skillVersion = version;
+  }
+  if (isNonEmptyString(repoRoot)) {
+    const digest = await (0,_rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .loadProjectRulesDigest */ .LJ)(repoRoot, rulesOptions);
+    if (isNonEmptyString(digest)) provenance.rulesDigest = digest;
+  }
+  return provenance;
 }
 
 /**
@@ -64073,107 +64289,8 @@ var external_node_url_ = __nccwpck_require__(3136);
 var git = __nccwpck_require__(8613);
 // EXTERNAL MODULE: ./runners/core/skill-loader.mjs + 1 modules
 var skill_loader = __nccwpck_require__(8478);
-// EXTERNAL MODULE: external "node:fs/promises"
-var promises_ = __nccwpck_require__(1455);
-;// CONCATENATED MODULE: ./src/lib/rules.mjs
-
-
-
-const DEFAULT_RULES_PATH = external_node_path_.join('.river', 'rules.md');
-const DEFAULT_RULES_DIR = external_node_path_.join('.river', 'rules.d');
-
-class ProjectRulesError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ProjectRulesError';
-  }
-}
-
-/**
- * Read a single rules file. Missing or empty files yield null (no error).
- *
- * @param {string} filePath
- * @param {{ tolerateDirectory?: boolean }} [options] When true, a path that is
- *   actually a directory (EISDIR) yields null instead of throwing. Used for the
- *   rules.d/ scan, where a stray `*.md` sub-directory should be skipped — but
- *   NOT for the base rules.md, where a directory is a misconfiguration to surface.
- */
-async function readRulesFile(filePath, { tolerateDirectory = false } = {}) {
-  try {
-    const raw = await promises_.readFile(filePath, 'utf8');
-    return raw.trim() || null;
-  } catch (error) {
-    if (error.code === 'ENOENT') return null;
-    if (error.code === 'EISDIR' && tolerateDirectory) return null;
-    throw new ProjectRulesError(`Failed to read project rules at ${filePath}: ${error.message}`);
-  }
-}
-
-/**
- * Load project-specific review rules.
- *
- * Reads `.river/rules.md` (or a custom path via `options.rulesPath`). When the
- * default path is used, additional `*.md` files under `.river/rules.d/` are
- * read in alphabetical order and appended (each prefixed with a `## <file>`
- * header), so teams can split domain / incidents / glossary rules across files.
- * Missing or empty files are treated as "no rules" without error; with no base
- * file and no rules.d entries the result is identical to the single-file case.
- */
-async function loadProjectRules(repoRoot, options = {}) {
-  const repoRootAbs = external_node_path_.resolve(repoRoot);
-  const relativeRulesPath = options.rulesPath ?? DEFAULT_RULES_PATH;
-  const rulesPath = external_node_path_.resolve(repoRootAbs, relativeRulesPath);
-
-  if (!rulesPath.startsWith(repoRootAbs + external_node_path_.sep) && rulesPath !== repoRootAbs) {
-    throw new ProjectRulesError(
-      `Project rules path is outside of the repository: ${relativeRulesPath}`
-    );
-  }
-
-  const sections = [];
-  const extraPaths = [];
-
-  const base = await readRulesFile(rulesPath);
-  if (base) sections.push(base);
-
-  // Only the default rules path activates the rules.d/ split; custom rulesPath
-  // callers keep the exact single-file behavior. Compare the resolved relative
-  // path so an explicit `rulesPath: '.river/rules.md'` still scans rules.d/.
-  if (relativeRulesPath === DEFAULT_RULES_PATH) {
-    const rulesDir = external_node_path_.resolve(repoRootAbs, DEFAULT_RULES_DIR);
-    let entries = [];
-    try {
-      entries = (await promises_.readdir(rulesDir)).filter((name) => name.endsWith('.md')).sort();
-    } catch (error) {
-      if (error.code !== 'ENOENT') {
-        throw new ProjectRulesError(
-          `Failed to read project rules directory at ${rulesDir}: ${error.message}`
-        );
-      }
-    }
-    // Files are independent; read them in parallel but keep alphabetical order.
-    const loaded = await Promise.all(
-      entries.map(async (name) => ({
-        name,
-        filePath: external_node_path_.join(rulesDir, name),
-        text: await readRulesFile(external_node_path_.join(rulesDir, name), { tolerateDirectory: true }),
-      }))
-    );
-    for (const { name, filePath, text } of loaded) {
-      if (text) {
-        sections.push(`## ${name}\n\n${text}`);
-        extraPaths.push(filePath);
-      }
-    }
-  }
-
-  return {
-    rulesText: sections.length ? sections.join('\n\n') : null,
-    path: rulesPath,
-    extraPaths,
-  };
-}
-
+// EXTERNAL MODULE: ./src/lib/rules.mjs
+var rules = __nccwpck_require__(1688);
 // EXTERNAL MODULE: ./src/lib/risk-map.mjs + 1 modules
 var risk_map = __nccwpck_require__(572);
 // EXTERNAL MODULE: ./src/lib/utils.mjs
@@ -89861,6 +89978,8 @@ Provide your review as a JSON array of comments (compatible with GitHub Review A
 `.trim();
 };
 
+// EXTERNAL MODULE: external "node:fs/promises"
+var promises_ = __nccwpck_require__(1455);
 // EXTERNAL MODULE: external "node:crypto"
 var external_node_crypto_ = __nccwpck_require__(7598);
 ;// CONCATENATED MODULE: ./src/lib/usage-persistence.mjs
@@ -90624,6 +90743,7 @@ async function runFeedbackCommand(parsed, targetPath) {
 
 
 
+
 /**
  * Handle the `suppression` command (suppression add).
  *
@@ -90674,7 +90794,20 @@ async function runSuppressionCommand(parsed, targetPath) {
   }
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
   const indexPath = external_node_path_.resolve(repoRoot, '.river', 'memory', 'index.json');
-  const { createSuppression } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 3528));
+  const { createSuppression, resolveSuppressionProvenance } =
+    await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 3528));
+  // #2401: record the project-rules digest (#2202 Phase 0) through the SSoT.
+  // Provenance is record-only, so a failure to read the project rules must not
+  // fail the suppression itself: only ProjectRulesError is caught, the key is
+  // left out, and the user is told why. Anything else is a real bug and throws.
+  // skillId / skillVersion need a skill selector this command does not have.
+  let provenance = {};
+  try {
+    provenance = await resolveSuppressionProvenance({ repoRoot });
+  } catch (error) {
+    if (!(error instanceof rules/* ProjectRulesError */.DB)) throw error;
+    console.warn(`Warning: rulesDigest not recorded on this suppression: ${error.message}`);
+  }
   const entry = createSuppression({
     indexPath,
     findingId: parsed.suppressionFindingId,
@@ -90691,6 +90824,7 @@ async function runSuppressionCommand(parsed, targetPath) {
     filePaths: parsed.suppressionFiles,
     expiresAt: parsed.suppressionExpiresAt,
     prNumber: parsed.suppressionPrNumber,
+    ...provenance,
   });
   console.log('Suppression created: ' + entry.id);
   console.log('  fingerprint: ' + entry.context.fingerprint);
@@ -90698,6 +90832,7 @@ async function runSuppressionCommand(parsed, targetPath) {
   console.log('  feedbackType: ' + entry.context.feedbackType);
   console.log('  scope: ' + entry.context.scope);
   if (entry.context.severity) console.log('  severity: ' + entry.context.severity);
+  if (entry.context.rulesDigest) console.log('  rulesDigest: ' + entry.context.rulesDigest);
   console.log('  written to: ' + indexPath);
   return 0;
 }
@@ -92589,7 +92724,7 @@ async function collectLocalContext({
   const { config, path: configPath, source: configSource } = await configLoader.load(repoRoot);
   const prLabels = await resolvePullRequestLabels();
   const prBody = await resolvePullRequestBody();
-  const { rulesText: projectRules } = await loadProjectRules(repoRoot);
+  const { rulesText: projectRules } = await (0,rules/* loadProjectRules */.TR)(repoRoot);
   const riskMap = await (0,risk_map.loadRiskMap)(repoRoot);
   // When --base is provided, compare against the explicit ref instead of the
   // auto-detected default branch. Falls back to detection when unset.
@@ -98773,7 +98908,7 @@ async function main(argv = external_node_process_.argv.slice(2)) {
         'Run `npm run skills:validate` to see full validation errors.',
         'Docs: pages/guides/validate-skill-schema.md',
       ]);
-    } else if (error instanceof ProjectRulesError) {
+    } else if (error instanceof rules/* ProjectRulesError */.DB) {
       console.error(error.message);
       printHintLines([
         'Check `.river/rules.md` exists and is readable (or remove it to disable rules).',

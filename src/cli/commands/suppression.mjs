@@ -6,6 +6,7 @@
 // import depth differ from the original inline block.
 import path from 'node:path';
 import { ensureGitRepo } from '../../lib/git.mjs';
+import { ProjectRulesError } from '../../lib/rules.mjs';
 
 /**
  * Handle the `suppression` command (suppression add).
@@ -57,7 +58,20 @@ export async function runSuppressionCommand(parsed, targetPath) {
   }
   const repoRoot = await ensureGitRepo(targetPath);
   const indexPath = path.resolve(repoRoot, '.river', 'memory', 'index.json');
-  const { createSuppression } = await import('../../lib/suppression.mjs');
+  const { createSuppression, resolveSuppressionProvenance } =
+    await import('../../lib/suppression.mjs');
+  // #2401: record the project-rules digest (#2202 Phase 0) through the SSoT.
+  // Provenance is record-only, so a failure to read the project rules must not
+  // fail the suppression itself: only ProjectRulesError is caught, the key is
+  // left out, and the user is told why. Anything else is a real bug and throws.
+  // skillId / skillVersion need a skill selector this command does not have.
+  let provenance = {};
+  try {
+    provenance = await resolveSuppressionProvenance({ repoRoot });
+  } catch (error) {
+    if (!(error instanceof ProjectRulesError)) throw error;
+    console.warn(`Warning: rulesDigest not recorded on this suppression: ${error.message}`);
+  }
   const entry = createSuppression({
     indexPath,
     findingId: parsed.suppressionFindingId,
@@ -74,6 +88,7 @@ export async function runSuppressionCommand(parsed, targetPath) {
     filePaths: parsed.suppressionFiles,
     expiresAt: parsed.suppressionExpiresAt,
     prNumber: parsed.suppressionPrNumber,
+    ...provenance,
   });
   console.log('Suppression created: ' + entry.id);
   console.log('  fingerprint: ' + entry.context.fingerprint);
@@ -81,6 +96,7 @@ export async function runSuppressionCommand(parsed, targetPath) {
   console.log('  feedbackType: ' + entry.context.feedbackType);
   console.log('  scope: ' + entry.context.scope);
   if (entry.context.severity) console.log('  severity: ' + entry.context.severity);
+  if (entry.context.rulesDigest) console.log('  rulesDigest: ' + entry.context.rulesDigest);
   console.log('  written to: ' + indexPath);
   return 0;
 }

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -94,4 +95,35 @@ export async function loadProjectRules(repoRoot, options = {}) {
     path: rulesPath,
     extraPaths,
   };
+}
+
+/**
+ * Content digest of the project rules text returned by {@link loadProjectRules}.
+ *
+ * The digest is taken over `rulesText` — the exact string the review prompt
+ * receives (base `.river/rules.md` plus the `## <file>` sections appended from
+ * `.river/rules.d/`) — so it changes exactly when the effective project rules
+ * change. Returns null when there are no rules, so callers can omit the field
+ * instead of recording an empty value (#2202 Phase 0).
+ *
+ * @param {string | null | undefined} rulesText
+ * @returns {string | null} lowercase hex sha256, or null when there are no rules
+ */
+export function computeRulesDigest(rulesText) {
+  if (typeof rulesText !== 'string' || rulesText.length === 0) return null;
+  return crypto.createHash('sha256').update(rulesText, 'utf8').digest('hex');
+}
+
+/**
+ * Load the project rules through {@link loadProjectRules} and return their
+ * digest. The read path is not re-derived here: the same resolution (default
+ * path, rules.d/ scan, outside-repo guard, error semantics) applies.
+ *
+ * @param {string} repoRoot
+ * @param {{ rulesPath?: string }} [options]
+ * @returns {Promise<string | null>}
+ */
+export async function loadProjectRulesDigest(repoRoot, options = {}) {
+  const { rulesText } = await loadProjectRules(repoRoot, options);
+  return computeRulesDigest(rulesText);
 }

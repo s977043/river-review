@@ -50,6 +50,9 @@ Machine-readable fixture set:
 
 `tests/fixtures/human-attention/decision-surface-eval-cases.json`
 
+This file is the **single machine-readable SSoT** for Phase A case signals and material references.
+Older experimental fixture locations are not alternative inputs and must not be used by the runner.
+
 v1は10ケースです。
 
 - HA-01: clean
@@ -115,7 +118,8 @@ Baseline / Candidateの両方を同じreferenceへ照合します。
 
 - required action
 - critical / major finding identity
-- human review / human decision requirement
+- human review requirement
+- human decision requirement（canonical stateが利用可能な将来caseのみ）
 - incomplete / partial / not_executed coverage
 - failed / timed-out reviewer unit
 - blind spot
@@ -143,7 +147,7 @@ Baseline / Candidateの両方を同じreferenceへ照合します。
 各fixtureについてHuman evaluatorへ次の4問を出します。
 
 1. 今、対応が必要なものは何か
-2. Human review / Human decisionは必要か
+2. Human reviewは必要か
 3. incomplete / uncertain / failed / timed outなものは何か
 4. full detail / provenanceへどこから辿るか
 
@@ -162,6 +166,8 @@ correct applicable answers
 /
 applicable questions
 ```
+
+Recording templateもこの4問を正本とし、旧5問scorecardの `q5_confidence` は使用しません。
 
 ### Success
 
@@ -192,14 +198,31 @@ critical / major / human-required / incomplete coverageのmissは平均値で相
 
 ### Timing protocol
 
-可能ならbaseline / candidateをcounterbalancedします。
+baseline / candidateはcounterbalancedします。
 
 例:
 
 - evaluator A: baseline → candidate
 - evaluator B: candidate → baseline
 
+Attention改善を採用根拠に使う場合は、最低2つのcounterbalanced evaluator session、または同等の順序反転Evidenceを要求します。
+
 同一evaluatorが連続して同一fixtureを見る場合、2回目は内容を記憶して速くなるため、raw timeをそのまま効果量と解釈しません。
+
+1 sessionしか得られない場合:
+
+- Decision Extraction / Visibilityは評価可能
+- Human Attention Timeはdescriptive observation
+- Attention改善を確定せず、必要なら `ATTENTION_INCONCLUSIVE` とする
+
+Timingはfixtureごとのpaired delta（candidate - baseline）を保存します。pooled averageだけで結論を出さず、このpilotから統計的有意差を主張しません。
+
+Phase A summaryでは最低限、次を併記します。
+
+- median paired delta
+- candidateが faster / equal / slower だったfixture数
+- arm-order split
+- raw per-fixture timing
 
 ### Measure
 
@@ -271,6 +294,12 @@ candidateを見た後にfixture / rubric / oracleを書き換えた場合、そ�
 ## 8. Phase A execution
 
 各caseで同じstructured inputからbaseline / candidate markdownを生成します。
+
+Recording template:
+
+`tests/fixtures/human-attention/decision-surface-scorecard-template.yaml`
+
+The scorecard is a recording template only. It does not redefine fixture signals or material references.
 
 保存対象:
 

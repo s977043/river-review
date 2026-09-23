@@ -20,7 +20,7 @@
   },
   "commonQuestions": [
     "What action is required now?",
-    "Is human review or a human decision required?",
+    "Is human review required?",
     "What is incomplete, uncertain, failed, or timed out?",
     "Where can the reviewer navigate for full detail and provenance?"
   ],
@@ -46,42 +46,71 @@
       "id": "HA-02-critical-major",
       "description": "Critical and major findings with lower-severity findings present.",
       "signals": {
-        "findingSeverities": ["critical", "major", "minor", "info"],
         "humanReviewRequired": false,
         "coverageStatus": "complete",
-        "blindSpotCount": 0
+        "blindSpotCount": 0,
+        "findings": [
+          {
+            "id": "RR-HA-02-1",
+            "severity": "critical"
+          },
+          {
+            "id": "RR-HA-02-2",
+            "severity": "major"
+          },
+          {
+            "id": "RR-HA-02-3",
+            "severity": "minor"
+          },
+          {
+            "id": "RR-HA-02-4",
+            "severity": "info"
+          }
+        ]
       },
       "materialReference": {
         "requiredActionCount": 2,
         "requiredFindingSeverities": ["critical", "major"],
         "lowerSeverityFindingsMustRemainReachable": true,
-        "coverageWarningRequired": false
+        "coverageWarningRequired": false,
+        "requiredFindingIds": ["RR-HA-02-1", "RR-HA-02-2"],
+        "allFindingIds": ["RR-HA-02-1", "RR-HA-02-2", "RR-HA-02-3", "RR-HA-02-4"]
       }
     },
     {
       "id": "HA-03-minor-info-only",
       "description": "Only minor and info findings.",
       "signals": {
-        "findingSeverities": ["minor", "info"],
         "humanReviewRequired": false,
         "coverageStatus": "complete",
-        "blindSpotCount": 0
+        "blindSpotCount": 0,
+        "findings": [
+          {
+            "id": "RR-HA-03-1",
+            "severity": "minor"
+          },
+          {
+            "id": "RR-HA-03-2",
+            "severity": "info"
+          }
+        ]
       },
       "materialReference": {
         "requiredActionCount": 0,
         "lowerSeverityFindingsMustRemainReachable": true,
-        "mustNotUpgradeSeverity": true
+        "mustNotUpgradeSeverity": true,
+        "allFindingIds": ["RR-HA-03-1", "RR-HA-03-2"]
       }
     },
     {
       "id": "HA-04-human-review-required",
       "description": "Existing canonical state requires human review.",
       "signals": {
-        "findingSeverities": [],
         "humanReviewRequired": true,
         "humanReviewFileCount": 2,
         "coverageStatus": "complete",
-        "blindSpotCount": 0
+        "blindSpotCount": 0,
+        "findings": []
       },
       "materialReference": {
         "humanReviewRequired": true,
@@ -93,11 +122,13 @@
       "id": "HA-05-partial-coverage",
       "description": "Review coverage is partial even though there are no action findings.",
       "signals": {
-        "findingSeverities": [],
         "humanReviewRequired": false,
         "coverageStatus": "partial",
         "incompleteUnitCount": 1,
-        "blindSpotCount": 0
+        "blindSpotCount": 0,
+        "findings": [],
+        "failedUnitCount": 1,
+        "timedOutUnitCount": 0
       },
       "materialReference": {
         "coverageWarningRequired": true,
@@ -109,11 +140,11 @@
       "id": "HA-06-not-executed",
       "description": "Review coverage exists but was not executed.",
       "signals": {
-        "findingSeverities": [],
         "humanReviewRequired": false,
         "coverageStatus": "not_executed",
         "incompleteUnitCount": 0,
-        "blindSpotCount": 0
+        "blindSpotCount": 0,
+        "findings": []
       },
       "materialReference": {
         "coverageWarningRequired": true,
@@ -126,12 +157,13 @@
       "id": "HA-07-timeout-failure",
       "description": "Required review units fail or time out.",
       "signals": {
-        "findingSeverities": [],
         "humanReviewRequired": false,
         "coverageStatus": "partial",
         "failedUnitCount": 1,
         "timedOutUnitCount": 1,
-        "blindSpotCount": 0
+        "blindSpotCount": 0,
+        "findings": [],
+        "incompleteUnitCount": 2
       },
       "materialReference": {
         "coverageWarningRequired": true,
@@ -144,10 +176,10 @@
       "id": "HA-08-team-lead-blind-spot",
       "description": "Team Lead reports one blind spot.",
       "signals": {
-        "findingSeverities": [],
         "humanReviewRequired": false,
         "coverageStatus": "complete",
-        "blindSpotCount": 1
+        "blindSpotCount": 1,
+        "findings": []
       },
       "materialReference": {
         "blindSpotWarningRequired": true,
@@ -159,29 +191,42 @@
       "id": "HA-09-mixed-risk-and-coverage",
       "description": "Major finding, human review requirement, partial coverage, and blind spot coexist.",
       "signals": {
-        "findingSeverities": ["major", "minor"],
         "humanReviewRequired": true,
         "humanReviewFileCount": 1,
         "coverageStatus": "partial",
         "incompleteUnitCount": 1,
-        "blindSpotCount": 1
+        "blindSpotCount": 1,
+        "findings": [
+          {
+            "id": "RR-HA-09-1",
+            "severity": "major"
+          },
+          {
+            "id": "RR-HA-09-2",
+            "severity": "minor"
+          }
+        ],
+        "failedUnitCount": 0,
+        "timedOutUnitCount": 1
       },
       "materialReference": {
         "requiredActionCount": 1,
         "humanReviewRequired": true,
         "coverageWarningRequired": true,
         "blindSpotWarningRequired": true,
-        "lowerSeverityFindingsMustRemainReachable": true
+        "lowerSeverityFindingsMustRemainReachable": true,
+        "requiredFindingIds": ["RR-HA-09-1"],
+        "allFindingIds": ["RR-HA-09-1", "RR-HA-09-2"]
       }
     },
     {
       "id": "HA-10-legacy-no-coverage",
       "description": "Backward-compatible review result without reviewCoverage or Team Lead data.",
       "signals": {
-        "findingSeverities": [],
         "humanReviewRequired": false,
         "coverageStatus": null,
-        "blindSpotCount": 0
+        "blindSpotCount": 0,
+        "findings": []
       },
       "materialReference": {
         "mustNotInventCoverageState": true,
@@ -189,5 +234,9 @@
         "mustRemainBackwardCompatible": true
       }
     }
-  ]
+  ],
+  "vocabularyBoundary": {
+    "humanReviewRequired": "canonical-v1-signal",
+    "humanDecisionRequired": "not-applicable-in-v1"
+  }
 }
