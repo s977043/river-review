@@ -90744,6 +90744,25 @@ async function runFeedbackCommand(parsed, targetPath) {
 
 
 
+
+/**
+ * Whether `error` is a failure to READ the skill metadata that `--skill`
+ * looks its version up in (#2401), as opposed to a bug.
+ *
+ * loadAllSkillMetadata logs and skips a broken individual skill file, so what
+ * escapes it is the schema (`loadSchema`: an fs error, or SkillLoaderError on
+ * a JSON parse failure) or the skills directory itself (`listSkillFiles`: an
+ * fs error from readdir). Node fs errors carry both `code` and `syscall`,
+ * which is what separates them from a TypeError raised by a real bug.
+ *
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isSkillMetadataReadError(error) {
+  if (error instanceof skill_loader/* SkillLoaderError */.vN) return true;
+  return typeof error?.code === 'string' && typeof error?.syscall === 'string';
+}
+
 /**
  * Handle the `suppression` command (suppression add).
  *
@@ -90792,6 +90811,18 @@ async function runSuppressionCommand(parsed, targetPath) {
     console.error('Error: --scope must be one of: global, subsystem, file.');
     return 1;
   }
+  // #2401: `--skill` takes the same argv as `feedback add --skill` (one parse
+  // helper) and the same value rule: trimmed, blank rejected, and an id that
+  // no skill carries still recorded as given (feedback add does not check it
+  // against the registry either).
+  let skillId;
+  if (typeof parsed.suppressionSkillId === 'string') {
+    skillId = parsed.suppressionSkillId.trim();
+    if (!skillId) {
+      console.error('Error: --skill must not be blank.');
+      return 1;
+    }
+  }
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
   const indexPath = external_node_path_.resolve(repoRoot, '.river', 'memory', 'index.json');
   const { createSuppression, resolveSuppressionProvenance } =
@@ -90800,13 +90831,34 @@ async function runSuppressionCommand(parsed, targetPath) {
   // Provenance is record-only, so a failure to read the project rules must not
   // fail the suppression itself: only ProjectRulesError is caught, the key is
   // left out, and the user is told why. Anything else is a real bug and throws.
-  // skillId / skillVersion need a skill selector this command does not have.
   let provenance = {};
   try {
     provenance = await resolveSuppressionProvenance({ repoRoot });
   } catch (error) {
     if (!(error instanceof rules/* ProjectRulesError */.DB)) throw error;
     console.warn(`Warning: rulesDigest not recorded on this suppression: ${error.message}`);
+  }
+  // #2401: skillId / skillVersion from `--skill`, resolved separately from the
+  // digest so that a failure on one side never drops the other. Same policy:
+  // a failure to read the skill metadata only drops skillVersion (skillId is
+  // the caller's own input and is still resolved through the SSoT, with no
+  // skills to look the version up in); anything else throws.
+  if (skillId === 'unknown') {
+    // resolveSuppressionProvenance never records 'unknown': it is the ruleId of
+    // a finding that no skill produced, not the id of a skill.
+    console.warn(
+      'Warning: skillId not recorded on this suppression: "unknown" is the placeholder for a finding with no skill, not a skill id.'
+    );
+  } else if (skillId !== undefined) {
+    let skillProvenance;
+    try {
+      skillProvenance = await resolveSuppressionProvenance({ ruleId: skillId });
+    } catch (error) {
+      if (!isSkillMetadataReadError(error)) throw error;
+      console.warn(`Warning: skillVersion not recorded on this suppression: ${error.message}`);
+      skillProvenance = await resolveSuppressionProvenance({ ruleId: skillId, skills: [] });
+    }
+    provenance = { ...provenance, ...skillProvenance };
   }
   const entry = createSuppression({
     indexPath,
@@ -90832,6 +90884,8 @@ async function runSuppressionCommand(parsed, targetPath) {
   console.log('  feedbackType: ' + entry.context.feedbackType);
   console.log('  scope: ' + entry.context.scope);
   if (entry.context.severity) console.log('  severity: ' + entry.context.severity);
+  if (entry.context.skillId) console.log('  skillId: ' + entry.context.skillId);
+  if (entry.context.skillVersion) console.log('  skillVersion: ' + entry.context.skillVersion);
   if (entry.context.rulesDigest) console.log('  rulesDigest: ' + entry.context.rulesDigest);
   console.log('  written to: ' + indexPath);
   return 0;
@@ -97233,7 +97287,7 @@ Commands:
   eval                  Run review fixtures evaluation (must_include checks)
   suppression add       Create a Riverbed Memory suppression entry
                         (--fingerprint --feedback --rationale [--scope]
-                         [--severity] [--files] [--expires] [--pr]
+                         [--severity] [--files] [--expires] [--pr] [--skill]
                          [--fingerprint-algo v1|v2]; v2 = line-anchored,
                          suppresses only the occurrence at that line but
                          stops matching once the line shifts)
@@ -98196,6 +98250,29 @@ function parseRunsOption(arg, args, parsed) {
 }
 
 /**
+ * Value of `--skill <id>`, shared by `feedback add` and `suppression add`
+ * (#2401) so that the two options accept and reject exactly the same argv.
+ *
+ * `--skill --pr 123` used to record skillId:"--pr" on `feedback add`: a flag
+ * is a non-empty string, so buildFeedbackEntry's "skillId is required."
+ * check accepted it and wrote the entry. A missing value / a following flag
+ * is therefore a usage error here, before any handler runs.
+ *
+ * @param {string[]} args
+ * @param {Record<string, any>} parsed
+ * @returns {string|null} the value, or null once the usage error is reported
+ */
+function takeSkillIdValue(args, parsed) {
+  const value = args.shift();
+  if (!value || value.startsWith('-')) {
+    console.error('Error: --skill option requires a value.');
+    usageError(parsed);
+    return null;
+  }
+  return value;
+}
+
+/**
  * `feedback` options.
  * @param {string} arg
  * @param {string[]} args
@@ -98223,15 +98300,8 @@ function parseFeedbackOption(arg, args, parsed) {
     return 'continue';
   }
   if (arg === '--skill') {
-    const value = args.shift();
-    // `--skill --pr 123` used to record skillId:"--pr": a flag is a
-    // non-empty string, so buildFeedbackEntry's "skillId is required."
-    // check accepted it and wrote the entry.
-    if (!value || value.startsWith('-')) {
-      console.error('Error: --skill option requires a value.');
-      usageError(parsed);
-      return 'break';
-    }
+    const value = takeSkillIdValue(args, parsed);
+    if (value === null) return 'break';
     parsed.feedbackSkillId = value;
     return 'continue';
   }
@@ -98397,6 +98467,15 @@ function parseSuppressionOption(arg, args, parsed) {
       return 'break';
     }
     parsed.suppressionFingerprintAlgo = algo;
+    return 'continue';
+  }
+  if (arg === '--skill') {
+    // #2401: same option as `feedback add --skill`, parsed by the same helper.
+    // The handler records it as context.skillId / skillVersion through
+    // resolveSuppressionProvenance.
+    const value = takeSkillIdValue(args, parsed);
+    if (value === null) return 'break';
+    parsed.suppressionSkillId = value;
     return 'continue';
   }
   if (arg === '--finding') {
@@ -98601,6 +98680,8 @@ function parseArgs(argv) {
     suppressionFiles: null,
     suppressionExpiresAt: null,
     suppressionPrNumber: null,
+    // #2401: `suppression add --skill <id>`; null = do not record skillId.
+    suppressionSkillId: null,
     // promote subcommand fields (#1622 / #1568-B)
     promoteSubcommand: null,
     promoteId: null,
