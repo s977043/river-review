@@ -16,7 +16,7 @@ cases:
     firstArm: baseline
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -32,7 +32,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -50,7 +50,7 @@ cases:
     firstArm: candidate
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -66,7 +66,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -84,7 +84,7 @@ cases:
     firstArm: baseline
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -100,7 +100,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -118,7 +118,7 @@ cases:
     firstArm: candidate
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -134,7 +134,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -152,7 +152,7 @@ cases:
     firstArm: baseline
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -168,7 +168,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -186,7 +186,7 @@ cases:
     firstArm: candidate
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -202,7 +202,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -220,7 +220,7 @@ cases:
     firstArm: baseline
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -236,7 +236,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -254,7 +254,7 @@ cases:
     firstArm: candidate
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -270,7 +270,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -288,7 +288,7 @@ cases:
     firstArm: baseline
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -304,7 +304,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -322,7 +322,7 @@ cases:
     firstArm: candidate
     baseline:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
@@ -338,7 +338,7 @@ cases:
       notes: ''
     candidate:
       q1_action: null
-      q2_human_required: null
+      q2_human_review: null
       q3_uncertainty: null
       q4_trace: null
       itemExtractionScore: null
