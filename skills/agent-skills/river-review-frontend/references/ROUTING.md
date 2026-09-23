@@ -71,7 +71,7 @@
 - 日本語: コンポーネントバリアント, variants, hover, focus, disabled, 状態文書化
 - 英語: component variants, interactive states, hover, focus, disabled, loading, error state
 - → `component-variants-states`
-- 注意: 状態は定義済みだが破壊的操作に確認ステップがないケースは UX-SAFEGUARD 観点に委譲済み。本スキルは variants・インタラクティブ状態の**定義・文書化の欠落**を扱う
+- 注意: 状態は定義済みだが破壊的操作に確認ステップがないケースは owner skill `river-review-code` の UX-SAFEGUARD 観点に委譲済み。本スキルは variants・インタラクティブ状態の**定義・文書化の欠落**を扱う
 
 ### Next.js App Router 境界
 
@@ -90,13 +90,13 @@
 - 日本語: React Router, action, バリデーションエラー, リダイレクト, ErrorBoundary
 - 英語: React Router action, validation error, 4xx, redirect on success, ErrorBoundary
 - → `react-router-action-contract`
-- 注意: React Router action のエラー表示の**回復支援文言**（フレームワーク非依存の部分）は UX-SAFEGUARD 観点に委譲済み。本スキルは action の**規約（4xx / redirect / 3分岐 ErrorBoundary）**を扱う
+- 注意: React Router action のエラー表示の**回復支援文言**（フレームワーク非依存の部分）は owner skill `river-review-code` の UX-SAFEGUARD 観点に委譲済み。本スキルは action の**規約（4xx / redirect / 3分岐 ErrorBoundary）**を扱う
 
 ### Core Web Vitals・Modern Web パフォーマンス（参照のみ）
 
 - 日本語: Core Web Vitals, LCP, INP, CLS, リソースコスト
 - 英語: Core Web Vitals, LCP, INP, CLS, resource cost
-- → 実行は `river-review-performance`（[river-review-performance/references/ROUTING.md](../../river-review-performance/references/ROUTING.md) の「Core Web Vitals・Modern Web パフォーマンス」節）に据置。ドメイン一貫性（実行効率観点は performance に統一）を優先し、本ルーターにはアクティブなキーワードルートを追加しない。14 候補スキルとしての到達性のみ本表に記載する
+- → 実行は owner skill `river-review-performance` に据置。Core Web Vitals / Modern Web performance の詳細判断が必要なときだけ skill ID で owner を解決し、その owner-local routing contract に従う。owner を解決できない場合は performance の詳細判断を推測で再構築せずスキップする。ドメイン一貫性（実行効率観点は performance に統一）を優先し、本ルーターにはアクティブなキーワードルートを追加しない。14 候補スキルとしての到達性のみ本表に記載する
 
 ## 自動判定ルール
 
