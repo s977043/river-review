@@ -1307,6 +1307,7 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
   const promotionHandoff = promotionHandoffEligible
     ? {
         candidateId: built.manifest.improvementCandidate.candidateId,
+        candidateContentHash: built.manifest.improvementCandidate.contentHash,
         manifestId: manifest.manifestId,
         experimentKey: manifest.experimentKey,
         manifestHash: manifest.manifestHash,
