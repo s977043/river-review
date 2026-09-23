@@ -83,7 +83,7 @@ UI/コンポーネント変更に影響するアクセシビリティ、デザ�
 
 ### `modern-web-performance` の帰属について
 
-14 候補スキルのうち `modern-web-performance`（Core Web Vitals / LCP / INP / CLS）は UI 起因の懸念だが、ドメイン一貫性を優先し実行は `river-review-performance` に据え置く（`river-review-performance/references/ROUTING.md` の「Core Web Vitals・Modern Web パフォーマンス」節）。本表には**到達性のための参照行**として掲載するのみで、frontend 側に重複するアクティブなキーワードルートは追加しない（同一キーワードが2ルーターで競合発火するリスクを避けるため）。
+14 候補スキルのうち `modern-web-performance`（Core Web Vitals / LCP / INP / CLS）は UI 起因の懸念だが、ドメイン一貫性を優先し実行は owner skill `river-review-performance` に据え置く。詳細判断が必要な場合だけ skill ID で owner を解決し、その owner-local routing contract に従う。owner を解決できない場合は performance の詳細判断を推測で再構築しない。本表には**到達性のための参照行**として掲載するのみで、frontend 側に重複するアクティブなキーワードルートは追加しない（同一キーワードが2ルーターで競合発火するリスクを避けるため）。
 
 ## Execution Flow / 実行フロー
 
