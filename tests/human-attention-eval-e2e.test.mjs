@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import os from 'node:os';
+import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
@@ -19,21 +18,29 @@ function hasCommit(revision) {
 }
 
 describe('#2382 Human Attention paired runner E2E', () => {
-  let tempRoot;
+  let output;
 
-  before(async () => {
-    tempRoot = await mkdtemp(path.join(os.tmpdir(), 'river-review-ha-e2e-'));
+  before(() => {
+    const repoRoot = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+    }).stdout.trim();
+    output = path.join(
+      repoRoot,
+      'artifacts',
+      'evals',
+      'human-attention',
+      `test-${process.pid}-e2e`
+    );
   });
 
   after(async () => {
-    await rm(tempRoot, { recursive: true, force: true });
+    await rm(output, { recursive: true, force: true });
   });
 
   it(
     'runs the real frozen baseline/candidate pair without deterministic safety regressions',
     { timeout: 60_000, skip: !hasCommit(BASELINE) || !hasCommit(CANDIDATE) },
     async () => {
-      const output = path.join(tempRoot, 'result');
       const summary = await runEvaluation({
         baseline: BASELINE,
         candidate: CANDIDATE,
@@ -51,6 +58,8 @@ describe('#2382 Human Attention paired runner E2E', () => {
       assert.strictEqual(manifest.baselineCommit, BASELINE);
       assert.strictEqual(manifest.candidateCommit, CANDIDATE);
       assert.strictEqual(manifest.measurementMode, 'unavailable');
+      assert.strictEqual(manifest.executionStatus, 'completed');
+      assert.match(manifest.completedAt, /^\d{4}-\d{2}-\d{2}T/);
       assert.strictEqual(
         manifest.adapterHelperPath,
         'tests/helpers/render-result-fixtures.mjs'
