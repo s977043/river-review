@@ -149,6 +149,53 @@ describe('#1713 Slice 1: markdown headline and progressive disclosure', () => {
     assert.match(visible[2], /フェーズ `midstream`/);
   });
 
+  it('does not present an empty LLM failure as a clean or auto-approved review (#2410)', () => {
+    const markdown = renderMarkdown(
+      makeResult({
+        plan: {
+          selected: [],
+          skipped: [],
+          riskAssessment: {
+            aggregateAction: 'require_human_review',
+            humanReviewFiles: ['src/app.js'],
+          },
+        },
+        reviewDebug: {
+          llmUsed: false,
+          llmError: 'response envelope could not be parsed',
+          heuristicsUsed: true,
+          heuristicsCount: 0,
+        },
+      })
+    );
+
+    assert.match(markdown, /LLM semantic review は未完了/);
+    assert.match(markdown, /「指摘なし」「auto-approve」「マージ可能」を意味しません/);
+    assert.doesNotMatch(markdown, /\*\*判定: auto-approve\*\*/);
+    assert.doesNotMatch(markdown, /指摘 0 件/);
+    assert.doesNotMatch(markdown, /スコア 100\/100/);
+    assert.doesNotMatch(markdown, /スコア内訳/);
+    assert.doesNotMatch(markdown, /優先度サマリー/);
+    assert.doesNotMatch(markdown, /✅ マージ前に対応が必要な指摘はありません/);
+    assert.match(markdown, /人間レビュー: \*\*必須\*\*/);
+    // Risk paths keep the renderer's existing Markdown escaping contract.
+    assert.ok(markdown.includes('src/app\\.js'));
+  });
+
+  it('keeps a successful empty LLM review on the normal clean surface (#2410)', () => {
+    const markdown = renderMarkdown(
+      makeResult({
+        reviewDebug: {
+          llmUsed: true,
+          llmModel: 'gpt-4o-mini',
+        },
+      })
+    );
+
+    assert.match(markdown, /指摘 0 件/);
+    assert.doesNotMatch(markdown, /LLM semantic review は未完了/);
+  });
+
   it('leaves critical / major findings outside <details> and folds minor / info in', () => {
     const findings = [
       makeFinding({ id: 'rr-1', severity: 'critical', file: 'src/a.js', title: 'クリティカル' }),

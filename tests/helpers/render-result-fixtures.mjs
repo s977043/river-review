@@ -37,6 +37,7 @@ export function makeResult({
   plan,
   teamLeadReport = null,
   reviewCoverage,
+  reviewDebug,
 } = {}) {
   return {
     findings,
@@ -47,5 +48,6 @@ export function makeResult({
     tokenEstimate: 42,
     teamLeadReport,
     ...(reviewCoverage === undefined ? {} : { reviewCoverage }),
+    ...(reviewDebug ? { reviewDebug } : {}),
   };
 }
