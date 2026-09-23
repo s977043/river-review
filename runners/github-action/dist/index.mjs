@@ -57702,11 +57702,7 @@ function deriveReviewCoverage(units = []) {
  * @param {number} [params.findingsCount] final finding count
  * @returns {ReturnType<typeof deriveReviewCoverage>|null}
  */
-function deriveSingleReviewerLlmCoverage({
-  debug,
-  subjects = [],
-  findingsCount = 0,
-} = {}) {
+function deriveSingleReviewerLlmCoverage({ debug, subjects = [], findingsCount = 0 } = {}) {
   const llmCompleted = debug?.llmUsed === true;
   const llmFailed =
     debug?.llmUsed === false &&
