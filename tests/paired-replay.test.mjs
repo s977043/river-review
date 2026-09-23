@@ -457,6 +457,86 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
       /does not match the id derived from its evidence/
     );
   });
+
+  test('paired replay emits a read-only promotion handoff for the same candidate id', () => {
+    const result = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    const handoff = result.promotionHandoff;
+    assert.ok(handoff);
+    assert.equal(handoff.candidateId, result.manifest.improvementCandidate.candidateId);
+    assert.equal(handoff.manifestId, result.manifest.manifestId);
+    assert.equal(handoff.experimentKey, result.manifest.experimentKey);
+    assert.equal(handoff.manifestHash, result.manifest.manifestHash);
+    assert.equal(handoff.manifestVerified, true);
+    assert.equal(handoff.experimentKeyMatchesInputs, true);
+    assert.equal(handoff.activationVerified, result.activationCheck.verified);
+    assert.equal(handoff.acceptanceEvaluable, result.acceptance.evaluable);
+    assert.equal(handoff.criticalRegressionCount, result.acceptance.contract6.criticalRegressionCount);
+    assert.equal(handoff.independentVerifierVerified, false);
+    assert.equal(handoff.requiresHumanJudgment, true);
+    assert.deepEqual(handoff.writeEffects, []);
+    // A profile may meet its finding criteria while still missing its declared
+    // sample-size floor. The handoff reports both facts; it never collapses them
+    // into a "pass" or promotion decision.
+    assert.deepEqual(handoff.profiles, [
+      {
+        profile: 'standard',
+        allRequiredSatisfied: true,
+        sampleSizeSatisfied: false,
+        failedMetrics: [],
+      },
+    ]);
+    assert.equal(result.acceptance.decision, null);
+    assert.deepEqual(result.writeEffects, []);
+    assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
+  });
+
+  test('an unevaluable replay never turns zero-looking metrics into a handoff pass', () => {
+    const noPair = spec({
+      dataset: { heldOutCaseKeys: [] },
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    noPair.baseline.runs = [
+      runRecord({ runId: 'base-only', caseId: 'baseline-case', findings: [] }),
+    ];
+    noPair.candidate.runs = [
+      runRecord({ runId: 'candidate-only', caseId: 'candidate-case', findings: [] }),
+    ];
+    const result = buildPairedReplay(noPair, { now: NOW });
+    assert.equal(result.acceptance.evaluable, false);
+    assert.equal(result.promotionHandoff.acceptanceEvaluable, false);
+    assert.equal(result.promotionHandoff.criticalRegressionCount, null);
+    assert.equal(result.promotionHandoff.profiles[0].allRequiredSatisfied, false);
+    assert.equal(result.promotionHandoff.profiles[0].sampleSizeSatisfied, null);
+    assert.equal(result.promotionHandoff.requiresHumanJudgment, true);
+    assert.deepEqual(result.promotionHandoff.writeEffects, []);
+  });
+
+  test('a supplied stale manifest is made explicit in the handoff integrity flags', () => {
+    const current = spec({
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    const stale = buildExperimentManifest(spec({ hypothesis: '別実験' }), { now: NOW }).manifest;
+    const result = buildPairedReplay(current, { now: NOW, manifest: stale });
+    assert.equal(result.manifestVerification.verified, true);
+    assert.equal(result.manifestVerification.experimentKeyMatchesInputs, false);
+    assert.equal(result.promotionHandoff.manifestVerified, true);
+    assert.equal(result.promotionHandoff.experimentKeyMatchesInputs, false);
+    assert.equal(result.promotionHandoff.candidateId, buildExperimentManifest(current, { now: NOW }).manifest.improvementCandidate.candidateId);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1466,6 +1546,14 @@ describe('paired-replay #1724: cross-side source_commit_sha', () => {
 describe('paired-replay: artifact', () => {
   test('validates against schemas/paired-replay.schema.json', () => {
     const result = buildPairedReplay(spec(), { now: NOW });
+    assert.equal(result.promotionHandoff, null);
+    assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
+  });
+
+  test('schemaVersion 1 stays backward-compatible when promotionHandoff is absent', () => {
+    const result = buildPairedReplay(spec(), { now: NOW });
+    delete result.promotionHandoff;
+    assert.equal(result.schemaVersion, 1);
     assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
   });
 
@@ -1483,6 +1571,28 @@ describe('paired-replay: artifact', () => {
     assert.match(text, /Paired replay \(read-only\)/);
     assert.match(text, /decision は常に null/);
     assert.match(text, /Critical regressions \| 0/);
+    assert.doesNotMatch(text, /Promotion handoff/);
+  });
+
+  test('the Markdown renders a candidate handoff as observation, not a verdict', () => {
+    const evidence = [
+      { skillId: 'secret-scanner', feedbackType: 'false_positive', findingFingerprint: FP_A, pr: 1 },
+      { skillId: 'secret-scanner', feedbackType: 'false_positive', findingFingerprint: FP_B, pr: 2 },
+    ];
+    const result = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    const text = formatPairedReplayMarkdown(result);
+    assert.match(text, /Promotion handoff \(read-only\)/);
+    assert.match(text, new RegExp(result.promotionHandoff.candidateId));
+    assert.match(text, /Human judgment required/);
+    assert.doesNotMatch(text, /recommended decision|promotion decision: (approve|reject)/i);
   });
 
   test('the Markdown distinguishes satisfied / failed / unobservable criteria', () => {
