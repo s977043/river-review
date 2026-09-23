@@ -87,6 +87,7 @@ describe('#2320/#2337 — the default gate output is unchanged', () => {
   });
 
   test('single-reviewer LLM failure preserves default GO but becomes COVERAGE_INCOMPLETE when opted in (#2410)', () => {
+    // Pin the new observation to the already-published default-off Gate contract.
     const failedCoverage = deriveSingleReviewerLlmCoverage({
       debug: { llmUsed: false, llmError: 'response envelope parse failed' },
       subjects: ['src/app.js'],
