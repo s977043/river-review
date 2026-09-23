@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it } from 'node:test';
@@ -12,6 +12,7 @@ const manifestPath = path.join(
   'decision-surface-eval-cases.json'
 );
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+const repoRoot = path.join(here, '..');
 
 describe('#2378 Human Attention evaluation contract', () => {
   it('keeps the v1 fixture set explicit and uniquely addressable', () => {
@@ -20,6 +21,11 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.comparison?.paired, true);
     assert.strictEqual(manifest.comparison?.sameUnderlyingReviewState, true);
     assert.strictEqual(manifest.comparison?.presentationOnly, true);
+    assert.strictEqual(manifest.vocabularyBoundary?.humanReviewRequired, 'canonical-v1-signal');
+    assert.strictEqual(
+      manifest.vocabularyBoundary?.humanDecisionRequired,
+      'not-applicable-in-v1'
+    );
 
     assert.strictEqual(manifest.cases.length, 10);
 
@@ -64,6 +70,22 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.freezePolicy?.baselineCommit, 'freeze-at-run-start');
     assert.strictEqual(manifest.freezePolicy?.candidateCommit, 'freeze-at-run-start');
     assert.strictEqual(manifest.freezePolicy?.fixtureAdapter, 'freeze-at-run-start');
+  });
+
+  it('keeps one machine-readable fixture SSoT', () => {
+    const obsoletePaths = [
+      'docs/eval/human-attention-fixtures.yaml',
+      'tests/fixtures/2378-decision-surface/cases.json',
+      'tests/fixtures/2378-decision-surface/scorecard-template.yaml',
+    ];
+
+    for (const obsoletePath of obsoletePaths) {
+      assert.strictEqual(
+        existsSync(path.join(repoRoot, obsoletePath)),
+        false,
+        `obsolete Human Attention eval asset must stay removed: ${obsoletePath}`
+      );
+    }
   });
 
   it('keeps the legacy case fail-safe instead of inventing missing state', () => {
