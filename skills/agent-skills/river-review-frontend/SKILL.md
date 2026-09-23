@@ -162,4 +162,4 @@ UI/コンポーネント変更に影響するアクセシビリティ、デザ�
 ## References
 
 - [ROUTING.md](./references/ROUTING.md): 詳細なルーティングルール
-- [UX-SAFEGUARD.md](../river-review-code/references/UX-SAFEGUARD.md): 破壊的操作の確認・取り消し / エラー回復支援の report-only 参照観点（`river-review-code` に据置、#1460）。`loading-state` / `component-variants-states` / `react-router-action-contract` の委譲表を含む
+- UX-SAFEGUARD（report-only）: 破壊的操作の確認・取り消し / エラー回復支援が論点のときだけ owner skill `river-review-code` を skill ID で解決し、その owner-local `UX-SAFEGUARD.md` を読む（#1460）。owner を解決できない場合はこの補助観点を推測で再構築せずスキップする。`loading-state` / `component-variants-states` / `react-router-action-contract` の委譲判断も owner 側を正本とする
