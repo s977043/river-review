@@ -789,6 +789,8 @@ test('resolveSuppressionProvenance -> createSuppression records the rules digest
       writeFileSync(path.join(dir, '.river', 'rules.md'), '- base rule');
       writeFileSync(path.join(dir, '.river', 'rules.d', 'domain.md'), '- domain rule');
       // Independent derivation of the expected text: base + "## <file>" section.
+      // The text has no CR and no trailing whitespace, so the 'v2' digest new
+      // suppressions record (#2202 Phase 2) equals the plain sha256 here.
       const expected = crypto
         .createHash('sha256')
         .update('- base rule\n\n## domain.md\n\n- domain rule')
@@ -799,7 +801,12 @@ test('resolveSuppressionProvenance -> createSuppression records the rules digest
         repoRoot: dir,
         skills: SKILLS,
       });
-      assert.deepEqual(prov, { skillId: 'sk-a', skillVersion: '1.4.0', rulesDigest: expected });
+      assert.deepEqual(prov, {
+        skillId: 'sk-a',
+        skillVersion: '1.4.0',
+        rulesDigest: expected,
+        rulesDigestAlgo: 'v2',
+      });
 
       const { cleanup, indexPath } = tmpIndex();
       try {
@@ -812,6 +819,7 @@ test('resolveSuppressionProvenance -> createSuppression records the rules digest
         assert.equal(entry.context.skillId, 'sk-a');
         assert.equal(entry.context.skillVersion, '1.4.0');
         assert.equal(entry.context.rulesDigest, expected);
+        assert.equal(entry.context.rulesDigestAlgo, 'v2');
         assert.ok(
           validateSuppressionContext(entry.context),
           JSON.stringify(validateSuppressionContext.errors)

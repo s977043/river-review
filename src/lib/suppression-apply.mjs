@@ -42,6 +42,19 @@
 //     `warn` sink, so a suppression that silently stopped working is visible
 //     the same way an unparseable `expiresAt` is (#1780/#1801).
 //
+// Project-rules match (#2202 Phase 2, opt-in): when
+// `config.memory.suppressionRequireRulesMatch === true`, a suppression whose
+// `context.rulesDigest` was recorded under different project rules no longer
+// suppresses anything. The verdict comes from `evaluateSuppressionRulesMatch`
+// (src/lib/suppression.mjs), a predicate kept apart from `isSuppressionExpired`
+// because the two fail safe in opposite directions: an entry this gate cannot
+// judge (no rulesDigest, no current rules, or an unknown `rulesDigestAlgo`)
+// keeps suppressing. An unknown `rulesDigestAlgo` is reported through `warn`
+// exactly like an unknown `fingerprintAlgo`; a mismatch is recorded in
+// `applied` as `reason: 'rules-digest-mismatch'` and warned once per entry.
+// With the option off (the default) the predicate is never called, so the
+// result is identical to the pre-Phase-2 gate.
+//
 // Not evaluated here: revocation via `resurface` entries
 // (`collectRevokedSuppressionIds`). `revokeSuppression` never flips the
 // original's `context.active`, and the revoking entry is a separate memory
@@ -54,9 +67,24 @@ import {
   hasUnparseableSuppressionExpiresAt,
   formatUnparseableExpiresAtWarning,
   formatUnknownFingerprintAlgoWarning,
+  evaluateSuppressionRulesMatch,
+  formatUnknownRulesDigestAlgoWarning,
+  formatRulesDigestMismatchWarning,
 } from './suppression.mjs';
 
 const HIGH_SEVERITY = new Set(['major', 'critical']);
+
+/**
+ * Whether the opt-in project-rules match gate (#2202 Phase 2) is on. Checked
+ * strictly (`=== true`) so no near-miss value turns off suppressions that are
+ * in force today; the default (absent) is off.
+ *
+ * @param {object | undefined} config effective config
+ * @returns {boolean}
+ */
+export function isSuppressionRulesMatchEnabled(config) {
+  return config?.memory?.suppressionRequireRulesMatch === true;
+}
 
 function severityOf(finding) {
   return String(finding.severity || 'info').toLowerCase();
@@ -79,6 +107,11 @@ function severityOf(finding) {
  *   `console.warn` — the same contract as `findActiveSuppressions`.
  * @param {Date} [opts.now]         Reference instant for the expiry decision.
  *   Injectable for tests, defaults to `new Date()`.
+ * @param {string | null} [opts.rulesText] Current project rules text
+ *   (`loadProjectRules(...).rulesText`). Read only when
+ *   `config.memory.suppressionRequireRulesMatch === true` (#2202 Phase 2);
+ *   absent or null means the rules cannot be compared, and no entry is stopped
+ *   on that axis.
  * @returns {{ keptFindings: Array<object>, suppressedFindings: Array<object>, applied: Array<object> }}
  *   `applied` is the observability log. Each entry: `{ fingerprint, suppressionId,
  *   feedbackType, severity, action: 'suppressed' | 'skipped', reason? }`. Findings
@@ -104,17 +137,41 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
   const warn = opts?.warn ?? ((m) => console.warn(m));
   const byFingerprintV1 = new Map();
   const byFingerprintV2 = new Map();
+  // #2202 Phase 2: rules-match verdicts, filled only when the gate is opted in.
+  // With the gate off this stays null and nothing below reads the rules.
+  const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
+  const rulesDigests = new Map();
   for (const s of suppressions) {
     const fp = s?.context?.fingerprint;
     if (typeof fp !== 'string' || fp.length !== 16) continue;
     const algo = s?.context?.fingerprintAlgo ?? 'v1';
-    if (algo === 'v1') byFingerprintV1.set(fp, s);
-    else if (algo === 'v2') byFingerprintV2.set(fp, s);
-    // The entry is otherwise usable (it carries a canonical fingerprint) and
-    // stops taking effect only because of the algo value. Report it through
-    // the same `warn` sink as the expiry stop (#1780/#1801) rather than
-    // dropping it in silence; the value is repairable.
-    else warn(formatUnknownFingerprintAlgoWarning({ id: s.id, fingerprintAlgo: algo }));
+    let target;
+    if (algo === 'v1') target = byFingerprintV1;
+    else if (algo === 'v2') target = byFingerprintV2;
+    else {
+      // The entry is otherwise usable (it carries a canonical fingerprint) and
+      // stops taking effect only because of the algo value. Report it through
+      // the same `warn` sink as the expiry stop (#1780/#1801) rather than
+      // dropping it in silence; the value is repairable.
+      warn(formatUnknownFingerprintAlgoWarning({ id: s.id, fingerprintAlgo: algo }));
+      continue;
+    }
+    if (rulesMismatched) {
+      const verdict = evaluateSuppressionRulesMatch(s, opts?.rulesText, { digests: rulesDigests });
+      if (verdict.status === 'mismatch') rulesMismatched.add(s);
+      // Unknown digest version: not judged on this axis (the entry keeps
+      // suppressing), reported through the same sink as an unknown
+      // fingerprintAlgo so the pass-through is visible.
+      else if (verdict.status === 'unknown-algo') {
+        warn(
+          formatUnknownRulesDigestAlgoWarning({
+            id: s.id,
+            rulesDigestAlgo: verdict.rulesDigestAlgo,
+          })
+        );
+      }
+    }
+    target.set(fp, s);
   }
   if (byFingerprintV1.size === 0 && byFingerprintV2.size === 0) return result;
 
@@ -123,6 +180,7 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
   const applied = [];
   const now = opts?.now ?? new Date();
   const warnedIds = new Set();
+  const rulesWarnedIds = new Set();
 
   for (const finding of list) {
     // v2 (line-anchored) is consulted first: it is the more specific claim.
@@ -166,6 +224,27 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
         warn(
           formatUnparseableExpiresAtWarning({ id: match.id, expiresAt: match.context.expiresAt })
         );
+      }
+      continue;
+    }
+
+    // Project-rules gate (#2202 Phase 2, opt-in). After the expiry gate so an
+    // expired entry keeps its pre-Phase-2 `applied` record; before the
+    // severity gates so `applied` names the reason the entry did nothing.
+    if (rulesMismatched?.has(match)) {
+      kept.push(finding);
+      applied.push({
+        fingerprint: fp,
+        suppressionId: match.id,
+        fingerprintAlgo: matchedAlgo,
+        feedbackType,
+        severity: sev,
+        action: 'skipped',
+        reason: 'rules-digest-mismatch',
+      });
+      if (!rulesWarnedIds.has(match.id)) {
+        rulesWarnedIds.add(match.id);
+        warn(formatRulesDigestMismatchWarning({ id: match.id }));
       }
       continue;
     }

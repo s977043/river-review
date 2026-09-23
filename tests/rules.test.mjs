@@ -4,7 +4,12 @@ import { writeFileSync } from 'node:fs';
 import { mkdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { computeRulesDigest, loadProjectRules, loadProjectRulesDigest } from '../src/lib/rules.mjs';
+import {
+  computeRulesDigest,
+  loadProjectRules,
+  loadProjectRulesDigest,
+  normalizeRulesTextV2,
+} from '../src/lib/rules.mjs';
 import { withTempDir } from './helpers/temp-dir.mjs';
 
 test('loadProjectRules returns null when rules file is absent', async () => {
@@ -172,5 +177,76 @@ test('loadProjectRulesDigest is deterministic and changes when rules.md or rules
       assert.equal(await loadProjectRulesDigest(dir), d1); // back to original content
     },
     { prefix: 'river-rules-' }
+  );
+});
+
+// --- #2202 Phase 2: digest versions ---
+
+const sha256 = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+
+test('computeRulesDigest defaults to v1 and v1 stays the unnormalized sha256 (#2202 Phase 2)', () => {
+  const text = '- a rule  \r\n- b rule\t';
+  // The Phase 0 digest is not changed by Phase 2: the default and an explicit
+  // 'v1' both hash the text as-is, so already-recorded digests keep matching.
+  assert.equal(computeRulesDigest(text), sha256(text));
+  assert.equal(computeRulesDigest(text, { algo: 'v1' }), sha256(text));
+});
+
+test('computeRulesDigest v2 hashes LF-unified text with per-line trailing whitespace removed (#2202 Phase 2)', () => {
+  // Expected value derived independently: the normalized text written by hand.
+  const expected = sha256('- a rule\n- b rule\n\n## x.md\n\n- c');
+  const variants = [
+    '- a rule\n- b rule\n\n## x.md\n\n- c',
+    '- a rule\r\n- b rule\r\n\r\n## x.md\r\n\r\n- c', // CRLF
+    '- a rule\r- b rule\r\r## x.md\r\r- c', // lone CR
+    '- a rule   \n- b rule\t\n  \n## x.md \n\n- c  ', // trailing whitespace
+    '- a rule \r\n- b rule\t\r\n\n## x.md\n\n- c', // both, mixed
+  ];
+  for (const text of variants) {
+    assert.equal(computeRulesDigest(text, { algo: 'v2' }), expected, JSON.stringify(text));
+  }
+  // Content changes still change the v2 digest, including leading whitespace
+  // and the rules.d file header (headers are kept by the normalization).
+  assert.notEqual(computeRulesDigest('- a rule changed', { algo: 'v2' }), expected);
+  assert.notEqual(
+    computeRulesDigest('  - a rule\n- b rule\n\n## x.md\n\n- c', { algo: 'v2' }),
+    expected
+  );
+  assert.notEqual(
+    computeRulesDigest('- a rule\n- b rule\n\n## y.md\n\n- c', { algo: 'v2' }),
+    expected
+  );
+  assert.equal(normalizeRulesTextV2('a \r\nb\t'), 'a\nb');
+});
+
+test('computeRulesDigest v2 returns null for no rules, and an unknown algo throws (#2202 Phase 2)', () => {
+  for (const empty of [null, undefined, '']) {
+    assert.equal(computeRulesDigest(empty, { algo: 'v2' }), null);
+  }
+  assert.throws(() => computeRulesDigest('- a', { algo: 'v3' }), TypeError);
+  assert.throws(() => computeRulesDigest('- a', { algo: '' }), TypeError);
+});
+
+test('loadProjectRulesDigest passes algo to the digest and the rest to loadProjectRules (#2202 Phase 2)', async () => {
+  await withTempDir(
+    async (dir) => {
+      await mkdir(path.join(dir, '.river', 'rules.d'), { recursive: true });
+      writeFileSync(path.join(dir, '.river', 'rules.md'), '- base rule  \r\n- second\r\n');
+      writeFileSync(path.join(dir, '.river', 'rules.d', 'a.md'), '- extra');
+      const { rulesText } = await loadProjectRules(dir);
+      assert.equal(await loadProjectRulesDigest(dir), sha256(rulesText));
+      assert.equal(await loadProjectRulesDigest(dir, { algo: 'v1' }), sha256(rulesText));
+      assert.equal(
+        await loadProjectRulesDigest(dir, { algo: 'v2' }),
+        sha256('- base rule\n- second\n\n## a.md\n\n- extra')
+      );
+      // rulesPath still reaches loadProjectRules alongside algo.
+      writeFileSync(path.join(dir, 'custom.md'), '- custom\r\n');
+      assert.equal(
+        await loadProjectRulesDigest(dir, { rulesPath: 'custom.md', algo: 'v2' }),
+        sha256('- custom')
+      );
+    },
+    { prefix: 'river-rules-digest-v2-' }
   );
 });
