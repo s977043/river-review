@@ -32,6 +32,7 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.comparison?.presentationOnly, true);
     assert.strictEqual(manifest.vocabularyBoundary?.humanReviewRequired, 'canonical-v1-signal');
     assert.strictEqual(manifest.vocabularyBoundary?.humanDecisionRequired, 'not-applicable-in-v1');
+    assert.strictEqual(manifest.commonQuestions[1], 'Is human review required?');
 
     assert.strictEqual(manifest.cases.length, 10);
 
@@ -92,6 +93,12 @@ describe('#2378 Human Attention evaluation contract', () => {
           false,
           `${item.caseId}: q5_confidence belongs to the superseded five-question rubric`
         );
+        assert.strictEqual(
+          Object.hasOwn(item[arm], 'q2_human_required'),
+          false,
+          `${item.caseId}: q2_human_required is ambiguous in the v1 review-only rubric`
+        );
+        assert.ok(item[arm].q2_human_review !== undefined, `${item.caseId}: q2_human_review`);
       }
     }
   });
