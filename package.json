@@ -86,7 +86,8 @@
     "packs:tier": "node scripts/pack-tier-check.mjs",
     "suppression:analytics": "node scripts/suppression-analytics.mjs",
     "feedback:rules": "node scripts/feedback-rule-candidates.mjs",
-    "skills:validate:refs": "node scripts/check-skill-id-references.mjs"
+    "skills:validate:refs": "node scripts/check-skill-id-references.mjs",
+    "eval:human-attention": "node scripts/evaluate-human-attention.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
