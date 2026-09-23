@@ -97,10 +97,7 @@ describe('callChatCompletion', () => {
       };
     };
 
-    await assert.rejects(
-      () => callChatCompletion(baseParams),
-      /Unexpected token/
-    );
+    await assert.rejects(() => callChatCompletion(baseParams), /Unexpected token/);
     assert.equal(calls, 1, 'response-envelope syntax errors are not transient retries');
   });
 
@@ -114,12 +111,10 @@ describe('callChatCompletion', () => {
       };
     };
 
-    await assert.rejects(
-      () => callChatCompletion(baseParams),
-      /JSON|Unexpected/
-    );
+    await assert.rejects(() => callChatCompletion(baseParams), /JSON|Unexpected/);
     assert.equal(calls, 1);
   });
+
   test('retries a 429 and succeeds on the next attempt', async () => {
     let calls = 0;
     global.fetch = async () => {
