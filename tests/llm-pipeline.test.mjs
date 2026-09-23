@@ -87,6 +87,39 @@ describe('callChatCompletion', () => {
     assert.equal(captured.body.messages[0].content, 'system message');
   });
 
+  test('rejects HTTP 200 with a plain OK body instead of treating it as a completion', async () => {
+    let calls = 0;
+    global.fetch = async () => {
+      calls += 1;
+      return {
+        ok: true,
+        json: async () => JSON.parse('OK\\r\\n'),
+      };
+    };
+
+    await assert.rejects(
+      () => callChatCompletion(baseParams),
+      /Unexpected token/
+    );
+    assert.equal(calls, 1, 'response-envelope syntax errors are not transient retries');
+  });
+
+  test('rejects HTTP 200 with malformed JSON response body', async () => {
+    let calls = 0;
+    global.fetch = async () => {
+      calls += 1;
+      return {
+        ok: true,
+        json: async () => JSON.parse('{ malformed'),
+      };
+    };
+
+    await assert.rejects(
+      () => callChatCompletion(baseParams),
+      /JSON|Unexpected/
+    );
+    assert.equal(calls, 1);
+  });
   test('retries a 429 and succeeds on the next attempt', async () => {
     let calls = 0;
     global.fetch = async () => {
