@@ -64,7 +64,7 @@
 - 日本語: ローディング, 空状態, スピナー, 状態欠落, 読み込み中
 - 英語: loading state, empty state, spinner, missing state handling
 - → `loading-state`
-- 注意: エラー表示は存在するが**回復方法を示さない文言**は UX-SAFEGUARD 観点（[river-review-code/references/UX-SAFEGUARD.md](../../river-review-code/references/UX-SAFEGUARD.md)、`river-review-code` に据置）に委譲済み。本スキルは loading/error/empty state の**表示欠落そのもの**を扱う
+- 注意: エラー表示は存在するが**回復方法を示さない文言**は owner skill `river-review-code` の UX-SAFEGUARD 観点に委譲済み。本スキルは loading/error/empty state の**表示欠落そのもの**を扱う
 
 ### コンポーネント状態の文書化
 
@@ -113,7 +113,7 @@
 
 ## `river-review-code` からの移設について
 
-以下 7 スキルは `river-review-code`（旧デフォルトフォールバック）の keyword routing から本ルーターへ移設した（二重発火を避けるため `river-review-code/references/ROUTING.md` から該当節を削除済み）:
+以下 7 スキルは owner skill `river-review-code`（旧デフォルトフォールバック）の routing contract から本ルーターへ移設した（二重発火を避けるため、owner 側の該当ルートも削除済み）:
 
 - `a11y-accessible-name`（2節）
 - `modern-web-a11y-interactive`
