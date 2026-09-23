@@ -477,6 +477,8 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     assert.equal(handoff.manifestVerified, true);
     assert.equal(handoff.experimentKeyMatchesInputs, true);
     assert.equal(handoff.activationVerified, result.activationCheck.verified);
+    assert.deepEqual(handoff.activationReasons, result.activationCheck.reasons);
+    assert.deepEqual(handoff.pairingWarnings, result.pairing.warnings);
     assert.equal(handoff.acceptanceEvaluable, result.acceptance.evaluable);
     assert.equal(handoff.evaluatedOn, result.acceptance.evaluatedOn);
     assert.equal(handoff.criticalRegressionCount, result.acceptance.contract6.criticalRegressionCount);
@@ -496,6 +498,7 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
         allRequiredSatisfied: true,
         sampleSizeSatisfied: false,
         failedMetrics: [],
+        unevaluableMetrics: [],
       },
     ]);
     assert.equal(result.acceptance.decision, null);
@@ -525,6 +528,8 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     assert.equal(result.promotionHandoff.overallCriticalRegressionCount, 0);
     assert.equal(result.promotionHandoff.profiles[0].allRequiredSatisfied, false);
     assert.equal(result.promotionHandoff.profiles[0].sampleSizeSatisfied, null);
+    assert.ok(result.promotionHandoff.profiles[0].unevaluableMetrics.length > 0);
+    assert.ok(result.promotionHandoff.pairingWarnings.length > 0);
     assert.equal(result.promotionHandoff.requiresHumanJudgment, true);
     assert.deepEqual(result.promotionHandoff.writeEffects, []);
   });
