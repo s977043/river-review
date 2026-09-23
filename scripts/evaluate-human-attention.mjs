@@ -164,6 +164,8 @@ export async function withTemporaryWorktrees({
   candidate,
   task,
   tempParent = os.tmpdir(),
+  prepareBaseline = installFrozenDependencies,
+  prepareCandidate = linkCandidateNodeModules,
 }) {
   const root = await mkdtemp(path.join(tempParent, 'river-review-human-attention-'));
   const baselineDir = path.join(root, 'baseline');
@@ -174,11 +176,11 @@ export async function withTemporaryWorktrees({
   try {
     runGit(repoRoot, ['worktree', 'add', '--detach', baselineDir, baseline]);
     baselineAdded = true;
-    installFrozenDependencies(baselineDir);
+    await prepareBaseline(baselineDir);
 
     runGit(repoRoot, ['worktree', 'add', '--detach', candidateDir, candidate]);
     candidateAdded = true;
-    await linkCandidateNodeModules(baselineDir, candidateDir);
+    await prepareCandidate(baselineDir, candidateDir);
 
     return await task({ baselineDir, candidateDir });
   } finally {
