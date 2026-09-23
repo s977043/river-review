@@ -127,8 +127,7 @@ test('rejects mismatched IDs in exported packages', async (t) => {
   await assert.rejects(
     () => resolveSkillId(root, 'nullability-contract'),
     (err) =>
-      err instanceof SkillIdResolutionError &&
-      /declares a different skill ID/.test(err.message)
+      err instanceof SkillIdResolutionError && /declares a different skill ID/.test(err.message)
   );
 });
 
