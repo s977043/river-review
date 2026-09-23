@@ -1,5 +1,22 @@
 {
   "editor.formatOnSave": true,
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.docusaurus/**": true,
+    "**/build/**": true,
+    "**/.claude/worktrees/**": true,
+    "**/.worktrees/**": true
+  },
+  "search.exclude": {
+    "**/node_modules/**": true,
+    "**/.docusaurus/**": true,
+    "**/build/**": true,
+    "**/.claude/worktrees/**": true,
+    "**/.worktrees/**": true,
+    "**/.codex/runtime-home/**": true,
+    "**/.codex/sessions/**": true,
+    "**/.codex/plugins/**": true
+  },
   "editor.codeActionsOnSave": {
     "source.fixAll.markdownlint": "explicit"
   },

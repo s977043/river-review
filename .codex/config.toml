@@ -1,7 +1,8 @@
 # Project-local Codex defaults for river-review
-# Opt in explicitly:
+# Trust the project before loading its configuration:
 #   REPO_ROOT=$(git rev-parse --show-toplevel)
-#   CODEX_HOME="$REPO_ROOT/.codex" codex -C "$REPO_ROOT"
+#   codex -C "$REPO_ROOT"
+# Preserve CODEX_HOME so authentication and installed plugins stay available.
 #
 # Choose model, profile, web search, or extra writable dirs at runtime:
 #   --model <MODEL>
@@ -21,3 +22,7 @@ sandbox_mode = "workspace-write"
 [shell_environment_policy]
 # Forward as few env vars as possible to reduce accidental secret leakage.
 include_only = ["PATH", "HOME", "USER", "SHELL", "LANG", "LC_ALL"]
+
+# Enable the repo's Codex marketplace plugin when this project is trusted.
+[plugins."river-review@river-review-marketplace"]
+enabled = true
