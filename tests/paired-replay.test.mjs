@@ -552,6 +552,32 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
   });
 
+  test('schema rejects a non-null handoff whose integrity flags are false', () => {
+    const result = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    result.promotionHandoff.manifestVerified = false;
+    assert.equal(validateReplay(result), false);
+
+    const second = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    second.promotionHandoff.experimentKeyMatchesInputs = false;
+    assert.equal(validateReplay(second), false);
+  });
+
   test('a supplied manifest for another experiment suppresses the handoff (fail closed)', () => {
     const current = spec({
       improvementCandidate: {
