@@ -547,7 +547,7 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
   });
 
-  test('a supplied stale manifest is made explicit in the handoff integrity flags', () => {
+  test('a supplied manifest for another experiment suppresses the handoff (fail closed)', () => {
     const current = spec({
       improvementCandidate: {
         clusterKey: 'secret-scanner::false_positive',
@@ -558,9 +558,24 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     const result = buildPairedReplay(current, { now: NOW, manifest: stale });
     assert.equal(result.manifestVerification.verified, true);
     assert.equal(result.manifestVerification.experimentKeyMatchesInputs, false);
-    assert.equal(result.promotionHandoff.manifestVerified, true);
-    assert.equal(result.promotionHandoff.experimentKeyMatchesInputs, false);
-    assert.equal(result.promotionHandoff.candidateId, buildExperimentManifest(current, { now: NOW }).manifest.improvementCandidate.candidateId);
+    assert.equal(result.promotionHandoff, null);
+    assert.match(formatPairedReplayMarkdown(result), /Promotion handoff \(read-only\)/);
+    assert.match(formatPairedReplayMarkdown(result), /機械可読に結合しない/);
+  });
+
+  test('a tampered manifest suppresses the handoff even when a candidate is present', () => {
+    const current = spec({
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    const valid = buildExperimentManifest(current, { now: NOW }).manifest;
+    const tampered = { ...valid, manifestHash: '0'.repeat(64) };
+    const result = buildPairedReplay(current, { now: NOW, manifest: tampered });
+    assert.equal(result.manifestVerification.verified, false);
+    assert.equal(result.manifestVerification.experimentKeyMatchesInputs, true);
+    assert.equal(result.promotionHandoff, null);
   });
 });
 
