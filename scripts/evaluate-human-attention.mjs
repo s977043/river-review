@@ -228,11 +228,9 @@ function addWorktree(repoRoot, targetPath, commit) {
 }
 
 export function removeWorktree(repoRoot, targetPath) {
-  const result = spawnSync(
-    'git',
-    ['-C', repoRoot, 'worktree', 'remove', '--force', targetPath],
-    { encoding: 'utf8' }
-  );
+  const result = spawnSync('git', ['-C', repoRoot, 'worktree', 'remove', '--force', targetPath], {
+    encoding: 'utf8',
+  });
 
   if (result.status === 0) return null;
 
