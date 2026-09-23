@@ -784,8 +784,16 @@
             "manifestId": { "type": "string", "pattern": "^RR-EXP-[0-9a-f]{12}$" },
             "experimentKey": { "$ref": "#/$defs/sha256" },
             "manifestHash": { "$ref": "#/$defs/sha256" },
-            "manifestVerified": { "type": "boolean" },
-            "experimentKeyMatchesInputs": { "type": "boolean" },
+            "manifestVerified": {
+              "type": "boolean",
+              "const": true,
+              "description": "A non-null handoff exists only for an integrity-verified Experiment Manifest."
+            },
+            "experimentKeyMatchesInputs": {
+              "type": "boolean",
+              "const": true,
+              "description": "A non-null handoff exists only when the manifest describes the current replay inputs."
+            },
             "activationVerified": {
               "type": "boolean",
               "description": "Observation copied from the activation check, never an adoption verdict."
