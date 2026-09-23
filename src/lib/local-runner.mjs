@@ -639,12 +639,18 @@ export async function runLocalReview({
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
   // config.memory.suppressionEnabled === false (see suppression-apply.mjs).
+  // #2202 Phase 2: the current project rules are handed over for the opt-in
+  // rules-match gate (config.memory.suppressionRequireRulesMatch); with the
+  // option off applySuppressions does not read them.
   const annotatedFindings = annotateFingerprints(review.findings ?? []);
   const {
     keptFindings,
     suppressedFindings,
     applied: suppressionsApplied,
-  } = applySuppressions(annotatedFindings, memoryContext, { config: context.config });
+  } = applySuppressions(annotatedFindings, memoryContext, {
+    config: context.config,
+    rulesText: context.projectRules,
+  });
 
   // Epic #1347 S4 (#1351): deterministic strict_block gate. Computed over the
   // PRE-suppression finding set joined with the selected skills so a suppressed

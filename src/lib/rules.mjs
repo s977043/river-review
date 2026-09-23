@@ -98,6 +98,38 @@ export async function loadProjectRules(repoRoot, options = {}) {
 }
 
 /**
+ * Rules digest algorithms (#2202 Phase 2). A suppression records which one
+ * produced its `context.rulesDigest` in `context.rulesDigestAlgo`; an absent
+ * value is read as `'v1'`, the pre-Phase-2 digest. The digest cannot be
+ * normalized after the fact, so normalization is introduced as a new version
+ * rather than by changing `'v1'` — the same shape as `fingerprintAlgo` (#1797).
+ *
+ * - `'v1'`: sha256 of `rulesText` exactly as loaded (no normalization).
+ * - `'v2'`: sha256 of `rulesText` after {@link normalizeRulesTextV2}.
+ */
+export const RULES_DIGEST_ALGOS = Object.freeze(['v1', 'v2']);
+
+/** The algorithm new suppressions record (#2202 Phase 2). */
+export const CURRENT_RULES_DIGEST_ALGO = 'v2';
+
+/**
+ * The `'v2'` normalization: line endings unified to LF (CRLF and lone CR), and
+ * trailing whitespace removed from every line. Nothing else changes — the
+ * `## <file>` headers `loadProjectRules` inserts for `.river/rules.d/` stay in
+ * the text, because they are part of the string the review prompt receives.
+ *
+ * @param {string} rulesText
+ * @returns {string}
+ */
+export function normalizeRulesTextV2(rulesText) {
+  return rulesText
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n');
+}
+
+/**
  * Content digest of the project rules text returned by {@link loadProjectRules}.
  *
  * The digest is taken over `rulesText` — the exact string the review prompt
@@ -106,12 +138,25 @@ export async function loadProjectRules(repoRoot, options = {}) {
  * change. Returns null when there are no rules, so callers can omit the field
  * instead of recording an empty value (#2202 Phase 0).
  *
+ * `options.algo` selects the version (#2202 Phase 2). The default stays `'v1'`
+ * (the unnormalized digest) so every existing caller and every digest already
+ * recorded keeps its meaning; `'v2'` hashes {@link normalizeRulesTextV2}'s
+ * output instead, so a CRLF checkout or trailing whitespace does not change it.
+ * An algorithm outside {@link RULES_DIGEST_ALGOS} throws: callers decide what
+ * an unknown recorded version means before asking for a digest.
+ *
  * @param {string | null | undefined} rulesText
+ * @param {{ algo?: 'v1' | 'v2' }} [options]
  * @returns {string | null} lowercase hex sha256, or null when there are no rules
  */
-export function computeRulesDigest(rulesText) {
+export function computeRulesDigest(rulesText, { algo = 'v1' } = {}) {
+  if (!RULES_DIGEST_ALGOS.includes(algo)) {
+    throw new TypeError(`Unsupported rules digest algorithm: ${JSON.stringify(algo)}`);
+  }
   if (typeof rulesText !== 'string' || rulesText.length === 0) return null;
-  return crypto.createHash('sha256').update(rulesText, 'utf8').digest('hex');
+  const text = algo === 'v2' ? normalizeRulesTextV2(rulesText) : rulesText;
+  if (text.length === 0) return null;
+  return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
 /**
@@ -120,10 +165,12 @@ export function computeRulesDigest(rulesText) {
  * path, rules.d/ scan, outside-repo guard, error semantics) applies.
  *
  * @param {string} repoRoot
- * @param {{ rulesPath?: string }} [options]
+ * @param {{ rulesPath?: string, algo?: 'v1' | 'v2' }} [options] `algo` is passed
+ *   to {@link computeRulesDigest}; the rest to {@link loadProjectRules}
  * @returns {Promise<string | null>}
  */
 export async function loadProjectRulesDigest(repoRoot, options = {}) {
-  const { rulesText } = await loadProjectRules(repoRoot, options);
-  return computeRulesDigest(rulesText);
+  const { algo, ...loadOptions } = options ?? {};
+  const { rulesText } = await loadProjectRules(repoRoot, loadOptions);
+  return computeRulesDigest(rulesText, algo === undefined ? {} : { algo });
 }

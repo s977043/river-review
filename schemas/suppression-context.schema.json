@@ -26,6 +26,11 @@
       "type": "string",
       "enum": ["v1", "v2"],
       "description": "Which fingerprint algorithm produced `fingerprint`, and therefore which finding-side value applySuppressions matches it against. Both are the first 16 chars of the lowercase hex sha256 of a key string, and both build that key from the same base: `<ruleId>::<file>::<message>`, where ruleId defaults to \"unknown\", file defaults to \"\", and message is `(finding.message ?? finding.title ?? \"\")` lowercased, with runs of whitespace collapsed to one space, trimmed, then truncated to 60 chars. v1 (computeFingerprint in src/lib/finding-factory.mjs, the default) hashes that base as-is — no line — so it survives line drift but suppresses EVERY same-kind finding in the same file. v2 (computeFingerprintV2, #1797) hashes `<base>::L<line>`, where line is `finding.lineStart ?? finding.line` when that is an integer >= 1 and 0 otherwise (a finding with no line anchor), so it suppresses only the occurrence at that line; the trade-off is that it stops matching once the line shifts. Absent is read as v1; an unrecognized value is ignored and reported through applySuppressions' warn sink (fail-safe: it must not gate findings under v1 semantics)."
+    },
+    "rulesDigestAlgo": {
+      "type": "string",
+      "enum": ["v1", "v2"],
+      "description": "Which digest algorithm produced `rulesDigest` (#2202 Phase 2), and therefore how the current project rules are hashed before the two are compared. Both are the lowercase hex sha256 of `rulesText` as loaded by loadProjectRules (`.river/rules.md` plus the `## <file>` sections appended from `.river/rules.d/*.md`). v1 (the Phase 0 digest) hashes that text as-is. v2 (computeRulesDigest with `algo: 'v2'` in src/lib/rules.mjs, recorded by new suppressions) first unifies line endings to LF and removes trailing whitespace from every line, so a CRLF checkout or trailing spaces do not change it; the `## <file>` headers are kept. Absent is read as v1. An unrecognized value is reported through applySuppressions' warn sink and the entry is not compared on this axis (fail-safe: it keeps suppressing rather than being stopped by a digest it cannot interpret)."
     }
   },
   "properties": {
@@ -97,7 +102,10 @@
     "rulesDigest": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$",
-      "description": "Lowercase hex sha256 of the project rules text (`.river/rules.md` plus `.river/rules.d/*.md`, as loaded by loadProjectRules and hashed by computeRulesDigest in src/lib/rules.mjs) at issuance (#2202 Phase 0). Provenance only: not read by the expiry rule. Omitted when the project has no rules."
+      "description": "Lowercase hex sha256 of the project rules text (`.river/rules.md` plus `.river/rules.d/*.md`, as loaded by loadProjectRules and hashed by computeRulesDigest in src/lib/rules.mjs with the algorithm named by `rulesDigestAlgo`) at issuance (#2202 Phase 0). Not read by the calendar expiry rule (`isSuppressionExpired`). Read only when the repository opts in with `memory.suppressionRequireRulesMatch: true` (#2202 Phase 2): applySuppressions then compares it with the current rules hashed by the version in `rulesDigestAlgo`, and a mismatch stops the suppression. An entry without it is never stopped on that axis. Omitted when the project has no rules."
+    },
+    "rulesDigestAlgo": {
+      "$ref": "#/$defs/rulesDigestAlgo"
     }
   }
 }
