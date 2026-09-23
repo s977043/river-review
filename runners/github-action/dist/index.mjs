@@ -60579,9 +60579,10 @@ function expireEntries(
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   DB: () => (/* binding */ ProjectRulesError),
+/* harmony export */   LJ: () => (/* binding */ loadProjectRulesDigest),
 /* harmony export */   TR: () => (/* binding */ loadProjectRules)
 /* harmony export */ });
-/* unused harmony exports computeRulesDigest, loadProjectRulesDigest */
+/* unused harmony export computeRulesDigest */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /* harmony import */ var node_fs_promises__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(1455);
 /* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(6760);
@@ -60698,7 +60699,7 @@ async function loadProjectRules(repoRoot, options = {}) {
  */
 function computeRulesDigest(rulesText) {
   if (typeof rulesText !== 'string' || rulesText.length === 0) return null;
-  return crypto.createHash('sha256').update(rulesText, 'utf8').digest('hex');
+  return node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash('sha256').update(rulesText, 'utf8').digest('hex');
 }
 
 /**
@@ -62522,9 +62523,10 @@ async function planSkills({ skills, context, llmPlan, appendRemaining = true }) 
 /* harmony export */   RL: () => (/* binding */ formatUnparseableExpiresAtWarning),
 /* harmony export */   createSuppression: () => (/* binding */ createSuppression),
 /* harmony export */   lq: () => (/* binding */ isSuppressionExpired),
+/* harmony export */   resolveSuppressionProvenance: () => (/* binding */ resolveSuppressionProvenance),
 /* harmony export */   vU: () => (/* binding */ hasUnparseableSuppressionExpiresAt)
 /* harmony export */ });
-/* unused harmony exports hashFinding, inferSubsystem, resolveSuppressionProvenance, revokeSuppression, matchesScopeFiles, collectRevokedSuppressionIds, findUnparseableSuppressionExpiries, findActiveSuppressions */
+/* unused harmony exports hashFinding, inferSubsystem, revokeSuppression, matchesScopeFiles, collectRevokedSuppressionIds, findUnparseableSuppressionExpiries, findActiveSuppressions */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /* harmony import */ var _riverbed_memory_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4216);
 /* harmony import */ var _rules_mjs__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(1688);
@@ -62687,12 +62689,12 @@ async function resolveSuppressionProvenance({
     provenance.skillId = ruleId;
     const list = Array.isArray(skills)
       ? skills
-      : await loadAllSkillMetadata(skillsDir ? { skillsDir } : {});
+      : await (0,_runners_core_skill_loader_mjs__WEBPACK_IMPORTED_MODULE_3__/* .loadAllSkillMetadata */ .Qv)(skillsDir ? { skillsDir } : {});
     const version = list.find((s) => s?.metadata?.id === ruleId)?.metadata?.version;
     if (isNonEmptyString(version)) provenance.skillVersion = version;
   }
   if (isNonEmptyString(repoRoot)) {
-    const digest = await loadProjectRulesDigest(repoRoot, rulesOptions);
+    const digest = await (0,_rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .loadProjectRulesDigest */ .LJ)(repoRoot, rulesOptions);
     if (isNonEmptyString(digest)) provenance.rulesDigest = digest;
   }
   return provenance;
@@ -90741,6 +90743,7 @@ async function runFeedbackCommand(parsed, targetPath) {
 
 
 
+
 /**
  * Handle the `suppression` command (suppression add).
  *
@@ -90791,7 +90794,20 @@ async function runSuppressionCommand(parsed, targetPath) {
   }
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
   const indexPath = external_node_path_.resolve(repoRoot, '.river', 'memory', 'index.json');
-  const { createSuppression } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 3528));
+  const { createSuppression, resolveSuppressionProvenance } =
+    await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 3528));
+  // #2401: record the project-rules digest (#2202 Phase 0) through the SSoT.
+  // Provenance is record-only, so a failure to read the project rules must not
+  // fail the suppression itself: only ProjectRulesError is caught, the key is
+  // left out, and the user is told why. Anything else is a real bug and throws.
+  // skillId / skillVersion need a skill selector this command does not have.
+  let provenance = {};
+  try {
+    provenance = await resolveSuppressionProvenance({ repoRoot });
+  } catch (error) {
+    if (!(error instanceof rules/* ProjectRulesError */.DB)) throw error;
+    console.warn(`Warning: rulesDigest not recorded on this suppression: ${error.message}`);
+  }
   const entry = createSuppression({
     indexPath,
     findingId: parsed.suppressionFindingId,
@@ -90808,6 +90824,7 @@ async function runSuppressionCommand(parsed, targetPath) {
     filePaths: parsed.suppressionFiles,
     expiresAt: parsed.suppressionExpiresAt,
     prNumber: parsed.suppressionPrNumber,
+    ...provenance,
   });
   console.log('Suppression created: ' + entry.id);
   console.log('  fingerprint: ' + entry.context.fingerprint);
@@ -90815,6 +90832,7 @@ async function runSuppressionCommand(parsed, targetPath) {
   console.log('  feedbackType: ' + entry.context.feedbackType);
   console.log('  scope: ' + entry.context.scope);
   if (entry.context.severity) console.log('  severity: ' + entry.context.severity);
+  if (entry.context.rulesDigest) console.log('  rulesDigest: ' + entry.context.rulesDigest);
   console.log('  written to: ' + indexPath);
   return 0;
 }
