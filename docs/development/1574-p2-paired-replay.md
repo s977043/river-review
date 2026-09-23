@@ -55,7 +55,7 @@ paired replay が `improvementCandidate` を含む場合、result は `promotion
 
 `promotionHandoff` は、既存の観測値だけを再掲します。
 
-- #1568 と同じ content-addressed `candidateId` と full `contentHash`
+- #1568 と同じ content-addressed `candidateId`、および full `contentHash`
 - Experiment Manifest の ID / hash と integrity 結果
 - activation が観測できたか、および provenance / configuration の注意理由
 - dataset pairing の警告
@@ -71,10 +71,10 @@ candidate が宣言されていない場合、または Experiment Manifest の�
 
 `promotionHandoff` と `reviewPromotionEffectiveness` は同じ意味ではありません。
 
-| Artifact / mechanism | 時点 | 観測対象 |
-| --- | --- | --- |
-| paired replay / `promotionHandoff` | promotion 採用前 | baseline と candidate の統制された実験差分 |
-| `reviewPromotionEffectiveness` | approval / activation 後 | 実運用 feedback の recurrence / reversal |
+| Artifact / mechanism               | 時点                     | 観測対象                                   |
+| ---------------------------------- | ------------------------ | ------------------------------------------ |
+| paired replay / `promotionHandoff` | promotion 採用前         | baseline と candidate の統制された実験差分 |
+| `reviewPromotionEffectiveness`     | approval / activation 後 | 実運用 feedback の recurrence / reversal   |
 
 採用前の replay metrics を `context.effectivenessHistory` へ直接混ぜません。G1 は read-only の証拠受け渡しまでとし、candidate への永続化や approve / reject / retarget / Keep / Rollback / Retire は行いません。後続の G2 で、Human-invoked な #1568 操作として接続します。
 

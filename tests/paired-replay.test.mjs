@@ -471,10 +471,16 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     const handoff = result.promotionHandoff;
     assert.ok(handoff);
     assert.equal(handoff.candidateId, result.manifest.improvementCandidate.candidateId);
-    assert.equal(
-      handoff.candidateContentHash,
-      result.manifest.improvementCandidate.contentHash
-    );
+    assert.equal(handoff.candidateContentHash, result.manifest.improvementCandidate.contentHash);
+    // Cross-path guard: the handoff must name the same candidate that
+    // `river promote propose` persists, not only echo the manifest.
+    const proposed = buildProposedCandidate({
+      entries: evidence,
+      clusterKey: 'secret-scanner::false_positive',
+      now: NOW,
+    });
+    assert.equal(handoff.candidateId, proposed.candidateId);
+    assert.equal(handoff.candidateContentHash, proposed.contentHash);
     assert.equal(handoff.manifestId, result.manifest.manifestId);
     assert.equal(handoff.experimentKey, result.manifest.experimentKey);
     assert.equal(handoff.manifestHash, result.manifest.manifestHash);
@@ -485,7 +491,10 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     assert.deepEqual(handoff.pairingWarnings, result.pairing.warnings);
     assert.equal(handoff.acceptanceEvaluable, result.acceptance.evaluable);
     assert.equal(handoff.evaluatedOn, result.acceptance.evaluatedOn);
-    assert.equal(handoff.criticalRegressionCount, result.acceptance.contract6.criticalRegressionCount);
+    assert.equal(
+      handoff.criticalRegressionCount,
+      result.acceptance.contract6.criticalRegressionCount
+    );
     assert.equal(
       handoff.overallCriticalRegressionCount,
       result.acceptance.contract6.overallCriticalRegressionCount
@@ -1651,8 +1660,18 @@ describe('paired-replay: artifact', () => {
 
   test('the Markdown renders a candidate handoff as observation, not a verdict', () => {
     const evidence = [
-      { skillId: 'secret-scanner', feedbackType: 'false_positive', findingFingerprint: FP_A, pr: 1 },
-      { skillId: 'secret-scanner', feedbackType: 'false_positive', findingFingerprint: FP_B, pr: 2 },
+      {
+        skillId: 'secret-scanner',
+        feedbackType: 'false_positive',
+        findingFingerprint: FP_A,
+        pr: 1,
+      },
+      {
+        skillId: 'secret-scanner',
+        feedbackType: 'false_positive',
+        findingFingerprint: FP_B,
+        pr: 2,
+      },
     ];
     const result = buildPairedReplay(
       spec({
