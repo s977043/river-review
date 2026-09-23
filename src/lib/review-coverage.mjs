@@ -91,6 +91,63 @@ export function deriveReviewCoverage(units = []) {
 }
 
 /**
+ * Build Review Coverage for the legacy single-reviewer LLM path.
+ *
+ * The observation exists only when an LLM call was actually attempted:
+ * - successful response (including valid NO_ISSUES) => completed
+ * - transport / response / parse failure => failed
+ * - intentional skip (dry-run, offline, missing key) => no coverage observation
+ *
+ * llmError can also accompany a successful partial finding batch. llmUsed
+ * wins in that case because execution completed and usable semantic output was
+ * produced; Review Coverage measures execution completeness, not finding quality.
+ *
+ * @param {object} params
+ * @param {object|null|undefined} params.debug generateReview debug
+ * @param {string[]} [params.subjects] paths in the LLM-facing file scope
+ * @param {number} [params.findingsCount] final finding count
+ * @returns {ReturnType<typeof deriveReviewCoverage>|null}
+ */
+export function deriveSingleReviewerLlmCoverage({
+  debug,
+  subjects = [],
+  findingsCount = 0,
+} = {}) {
+  const llmCompleted = debug?.llmUsed === true;
+  const llmFailed =
+    debug?.llmUsed === false &&
+    typeof debug?.llmError === 'string' &&
+    debug.llmError.trim().length > 0;
+
+  if (!llmCompleted && !llmFailed) return null;
+
+  const normalizedSubjects = [
+    ...new Set(
+      (Array.isArray(subjects) ? subjects : []).filter(
+        (subject) => typeof subject === 'string' && subject.length > 0
+      )
+    ),
+  ];
+
+  const status = llmCompleted ? 'completed' : 'failed';
+  return deriveReviewCoverage([
+    {
+      id: 'reviewer:single/chunk:1',
+      kind: 'diff-chunk',
+      subjects: normalizedSubjects.length > 0 ? normalizedSubjects : ['<unknown-diff>'],
+      reviewerRole: 'single-reviewer',
+      required: true,
+      status,
+      reasonCode: status === 'completed' ? null : 'reviewer_error',
+      findingsCount:
+        status === 'completed' && Number.isInteger(findingsCount) && findingsCount >= 0
+          ? findingsCount
+          : 0,
+    },
+  ]);
+}
+
+/**
  * Map a `reviewCoverage` object onto the four-state coverage vocabulary
  * (`complete` | `partial` | `not_executed` | `unknown`).
  *
