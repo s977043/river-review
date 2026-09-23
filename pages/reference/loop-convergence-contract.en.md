@@ -66,7 +66,7 @@ Above `suggestedLoopSignal` sits `gate`, a machine-readable signal that composes
   - `RIVER_GATE_COVERAGE=1`: a run whose `reviewCoverage.status` is `partial` or `not_executed` lands on `NO_GO` (`COVERAGE_INCOMPLETE`). This is an **independent gate input**, not a `suggestedLoopSignal` downgrade. Through the signal the outcome would depend on `decision`: `auto-approve` reaches `NO_GO`, while `human-review-recommended` stays on rule 8's `GO_WITH_OBSERVATION` (exit 0). As its own input both stop uniformly. **Today this takes effect on the `river run --gate` path only; on the `review exec` path it is a no-op until the engine returns `reviewCoverage`**
     - Three conditions gate the opt-in: `RIVER_GATE_COVERAGE=1`, `river run --gate`, and `--reviewers`. `--reviewers` has no default, so omitting it leaves the gate output unchanged
     - The reason is where `reviewCoverage` is produced. A run with `--reviewers` goes through `runReviewerOrchestration`, which returns `reviewCoverage`; without it the run branches to `generateReview`, which never produces `reviewCoverage`
-    - The GitHub Action cannot reach it: `runners/github-action/action.yml` has a `gate` input but no `reviewers` input
+    - From the GitHub Action, set `gate: true`, provide a non-empty `reviewers` input, and set `RIVER_GATE_COVERAGE=1` in the step environment. The Action forwards `reviewers` unchanged to the CLI
   - An ABSENT coverage object is never read as incomplete. "No observation" and "observed a gap" are different facts, and only the second one may block a merge
 
 `gate` is advisory. Enforcement (`--gate` mode, strict_block routing) lands in Epic #1347 S4.
