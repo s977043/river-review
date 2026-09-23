@@ -57587,6 +57587,7 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   dD: () => (/* binding */ isIncompleteCoverage),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
+/* harmony export */   mz: () => (/* binding */ deriveSingleReviewerLlmCoverage),
 /* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
 /* harmony export */   or: () => (/* binding */ deriveReviewFileScope)
 /* harmony export */ });
@@ -57681,6 +57682,63 @@ function deriveReviewCoverage(units = []) {
     incompleteRequiredUnitIds,
     units: normalizedUnits,
   };
+}
+
+/**
+ * Build Review Coverage for the legacy single-reviewer LLM path.
+ *
+ * The observation exists only when an LLM call was actually attempted:
+ * - successful response (including valid NO_ISSUES) => completed
+ * - transport / response / parse failure => failed
+ * - intentional skip (dry-run, offline, missing key) => no coverage observation
+ *
+ * llmError can also accompany a successful partial finding batch. llmUsed
+ * wins in that case because execution completed and usable semantic output was
+ * produced; Review Coverage measures execution completeness, not finding quality.
+ *
+ * @param {object} params
+ * @param {object|null|undefined} params.debug generateReview debug
+ * @param {string[]} [params.subjects] paths in the LLM-facing file scope
+ * @param {number} [params.findingsCount] final finding count
+ * @returns {ReturnType<typeof deriveReviewCoverage>|null}
+ */
+function deriveSingleReviewerLlmCoverage({
+  debug,
+  subjects = [],
+  findingsCount = 0,
+} = {}) {
+  const llmCompleted = debug?.llmUsed === true;
+  const llmFailed =
+    debug?.llmUsed === false &&
+    typeof debug?.llmError === 'string' &&
+    debug.llmError.trim().length > 0;
+
+  if (!llmCompleted && !llmFailed) return null;
+
+  const normalizedSubjects = [
+    ...new Set(
+      (Array.isArray(subjects) ? subjects : []).filter(
+        (subject) => typeof subject === 'string' && subject.length > 0
+      )
+    ),
+  ];
+
+  const status = llmCompleted ? 'completed' : 'failed';
+  return deriveReviewCoverage([
+    {
+      id: 'reviewer:single/chunk:1',
+      kind: 'diff-chunk',
+      subjects: normalizedSubjects.length > 0 ? normalizedSubjects : ['<unknown-diff>'],
+      reviewerRole: 'single-reviewer',
+      required: true,
+      status,
+      reasonCode: status === 'completed' ? null : 'reviewer_error',
+      findingsCount:
+        status === 'completed' && Number.isInteger(findingsCount) && findingsCount >= 0
+          ? findingsCount
+          : 0,
+    },
+  ]);
 }
 
 /**
@@ -93485,11 +93543,24 @@ async function runLocalReview({
     ? await runReviewerOrchestration({ ...reviewArgs, reviewers, quiet })
     : await (0,review_engine/* generateReview */.G1)(reviewArgs);
 
-  // Slice C enriches an existing orchestration observation with the selection
+  // Orchestrated review already owns its role/chunk coverage. The legacy
+  // single-reviewer path emits the same execution-completeness contract only
+  // when the LLM was actually attempted. Intentional skips keep the legacy
+  // no-observation shape.
+  const baseReviewCoverage =
+    review.reviewCoverage ??
+    (!reviewers?.length
+      ? (0,review_coverage/* deriveSingleReviewerLlmCoverage */.mz)({
+          debug: review.debug,
+          subjects: context.reviewFileScope?.selected ?? [],
+          findingsCount: review.findings?.length ?? 0,
+        })
+      : null);
+
+  // Slice C enriches an existing execution observation with the selection
   // ledger from the boundary that actually filtered the diff. Counters/status/
-  // units are never recomputed here, and callers that provide an older context
-  // without the ledger keep the exact pre-Slice-C Review Coverage object.
-  const reviewCoverage = (0,review_coverage/* attachReviewFileScope */.oG)(review.reviewCoverage, context.reviewFileScope);
+  // units are never recomputed here.
+  const reviewCoverage = (0,review_coverage/* attachReviewFileScope */.oG)(baseReviewCoverage, context.reviewFileScope);
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
