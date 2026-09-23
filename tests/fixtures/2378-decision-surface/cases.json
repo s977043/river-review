@@ -1,0 +1,225 @@
+[
+  {
+    "caseId": "HA-001",
+    "name": "clean-complete-run",
+    "intent": "A fully complete review with no actionable finding must remain obviously clean.",
+    "inputProfile": {
+      "findings": [],
+      "humanReviewRequired": false,
+      "coverageStatus": "complete",
+      "failedUnits": 0,
+      "timedOutUnits": 0,
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "actionRequiredCount": 0,
+      "humanReviewRequired": false,
+      "coverageWarning": false,
+      "blindSpotWarning": false
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": false,
+      "cleanNoteAllowed": true
+    }
+  },
+  {
+    "caseId": "HA-002",
+    "name": "critical-and-major-action-required",
+    "intent": "Critical and major findings must be immediately visible as actionable without hiding lower-severity findings.",
+    "inputProfile": {
+      "findings": [
+        { "id": "RR-HA-002-1", "severity": "critical" },
+        { "id": "RR-HA-002-2", "severity": "major" },
+        { "id": "RR-HA-002-3", "severity": "minor" }
+      ],
+      "humanReviewRequired": false,
+      "coverageStatus": "complete",
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "actionRequiredCount": 2,
+      "criticalMajorIds": ["RR-HA-002-1", "RR-HA-002-2"],
+      "allFindingIds": ["RR-HA-002-1", "RR-HA-002-2", "RR-HA-002-3"]
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": true,
+      "cleanNoteAllowed": false,
+      "lowerSeverityStillTraceable": true
+    }
+  },
+  {
+    "caseId": "HA-003",
+    "name": "minor-info-only",
+    "intent": "Lower-severity findings must remain available without being promoted into action-required semantics.",
+    "inputProfile": {
+      "findings": [
+        { "id": "RR-HA-003-1", "severity": "minor" },
+        { "id": "RR-HA-003-2", "severity": "info" }
+      ],
+      "humanReviewRequired": false,
+      "coverageStatus": "complete",
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "actionRequiredCount": 0,
+      "allFindingIds": ["RR-HA-003-1", "RR-HA-003-2"]
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": false,
+      "lowerSeverityStillTraceable": true
+    }
+  },
+  {
+    "caseId": "HA-004",
+    "name": "human-review-required",
+    "intent": "An existing human-review requirement must be surfaced without inventing a new judgment.",
+    "inputProfile": {
+      "findings": [],
+      "humanReviewRequired": true,
+      "humanReviewFileCount": 2,
+      "coverageStatus": "complete",
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "humanReviewRequired": true,
+      "humanReviewFileCount": 2
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": true,
+      "cleanNoteAllowed": false
+    }
+  },
+  {
+    "caseId": "HA-005",
+    "name": "partial-coverage",
+    "intent": "Partial review coverage must never look like a clean fully-reviewed run.",
+    "inputProfile": {
+      "findings": [],
+      "humanReviewRequired": false,
+      "coverageStatus": "partial",
+      "incompleteUnits": 1,
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "coverageWarning": true,
+      "coverageStatus": "partial",
+      "incompleteUnits": 1
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": true,
+      "cleanNoteAllowed": false
+    }
+  },
+  {
+    "caseId": "HA-006",
+    "name": "not-executed-coverage",
+    "intent": "A review that did not execute must not be represented as clean and must not fabricate unit details.",
+    "inputProfile": {
+      "findings": [],
+      "humanReviewRequired": false,
+      "coverageStatus": "not_executed",
+      "incompleteUnits": 0,
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "coverageWarning": true,
+      "coverageStatus": "not_executed"
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": true,
+      "cleanNoteAllowed": false,
+      "mustNotInventIncompleteUnitCount": true
+    }
+  },
+  {
+    "caseId": "HA-007",
+    "name": "timeout-and-failed-units",
+    "intent": "Timeout and failed review units must remain visible as coverage uncertainty.",
+    "inputProfile": {
+      "findings": [],
+      "humanReviewRequired": false,
+      "coverageStatus": "partial",
+      "incompleteUnits": 2,
+      "failedUnits": 1,
+      "timedOutUnits": 1,
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "coverageWarning": true,
+      "failedUnits": 1,
+      "timedOutUnits": 1
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": true,
+      "cleanNoteAllowed": false
+    }
+  },
+  {
+    "caseId": "HA-008",
+    "name": "team-lead-blind-spot",
+    "intent": "Known blind spots must be surfaced without the projection inferring new blind spots.",
+    "inputProfile": {
+      "findings": [],
+      "humanReviewRequired": false,
+      "coverageStatus": "complete",
+      "blindSpots": 1
+    },
+    "materialReference": {
+      "blindSpotWarning": true,
+      "blindSpotCount": 1
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": true,
+      "cleanNoteAllowed": false
+    }
+  },
+  {
+    "caseId": "HA-009",
+    "name": "mixed-action-and-incomplete-coverage",
+    "intent": "Actionable findings and coverage uncertainty must both remain visible without one suppressing the other.",
+    "inputProfile": {
+      "findings": [
+        { "id": "RR-HA-009-1", "severity": "major" },
+        { "id": "RR-HA-009-2", "severity": "minor" }
+      ],
+      "humanReviewRequired": true,
+      "coverageStatus": "partial",
+      "incompleteUnits": 1,
+      "timedOutUnits": 1,
+      "blindSpots": 1
+    },
+    "materialReference": {
+      "actionRequiredCount": 1,
+      "criticalMajorIds": ["RR-HA-009-1"],
+      "allFindingIds": ["RR-HA-009-1", "RR-HA-009-2"],
+      "humanReviewRequired": true,
+      "coverageWarning": true,
+      "blindSpotWarning": true
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": true,
+      "cleanNoteAllowed": false,
+      "lowerSeverityStillTraceable": true
+    }
+  },
+  {
+    "caseId": "HA-010",
+    "name": "legacy-result-without-review-coverage",
+    "intent": "Older results without Review Coverage must remain renderable and must not have coverage state invented.",
+    "inputProfile": {
+      "findings": [],
+      "humanReviewRequired": false,
+      "coverageStatus": null,
+      "blindSpots": 0
+    },
+    "materialReference": {
+      "coverageStateKnown": false,
+      "actionRequiredCount": 0,
+      "humanReviewRequired": false
+    },
+    "expectedCandidateBehavior": {
+      "decisionSurfaceVisible": false,
+      "mustNotInventCoverage": true
+    }
+  }
+]
