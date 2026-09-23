@@ -478,7 +478,12 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     assert.equal(handoff.experimentKeyMatchesInputs, true);
     assert.equal(handoff.activationVerified, result.activationCheck.verified);
     assert.equal(handoff.acceptanceEvaluable, result.acceptance.evaluable);
+    assert.equal(handoff.evaluatedOn, result.acceptance.evaluatedOn);
     assert.equal(handoff.criticalRegressionCount, result.acceptance.contract6.criticalRegressionCount);
+    assert.equal(
+      handoff.overallCriticalRegressionCount,
+      result.acceptance.contract6.overallCriticalRegressionCount
+    );
     assert.equal(handoff.independentVerifierVerified, false);
     assert.equal(handoff.requiresHumanJudgment, true);
     assert.deepEqual(handoff.writeEffects, []);
@@ -515,11 +520,31 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     const result = buildPairedReplay(noPair, { now: NOW });
     assert.equal(result.acceptance.evaluable, false);
     assert.equal(result.promotionHandoff.acceptanceEvaluable, false);
+    assert.equal(result.promotionHandoff.evaluatedOn, 'overall');
     assert.equal(result.promotionHandoff.criticalRegressionCount, null);
+    assert.equal(result.promotionHandoff.overallCriticalRegressionCount, 0);
     assert.equal(result.promotionHandoff.profiles[0].allRequiredSatisfied, false);
     assert.equal(result.promotionHandoff.profiles[0].sampleSizeSatisfied, null);
     assert.equal(result.promotionHandoff.requiresHumanJudgment, true);
     assert.deepEqual(result.promotionHandoff.writeEffects, []);
+  });
+
+  test('a clean held-out scope cannot hide an overall critical regression in the handoff', () => {
+    const withRegression = spec({
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    // case-2 is held out and remains unchanged. Remove the critical FP_A only
+    // from case-1 so the evaluated held-out scope is clean while overall is not.
+    withRegression.candidate.runs[0].findings = [finding(FP_D)];
+    const result = buildPairedReplay(withRegression, { now: NOW });
+    assert.equal(result.promotionHandoff.evaluatedOn, 'heldOut');
+    assert.equal(result.promotionHandoff.criticalRegressionCount, 0);
+    assert.equal(result.promotionHandoff.overallCriticalRegressionCount, 1);
+    assert.equal(result.acceptance.contract6.overallCriticalRegressionCount, 1);
+    assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
   });
 
   test('a supplied stale manifest is made explicit in the handoff integrity flags', () => {
