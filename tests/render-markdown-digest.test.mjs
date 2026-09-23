@@ -22,6 +22,7 @@ import {
 } from '../src/cli/render.mjs';
 import { formatYamlOutput } from '../src/lib/output-formatters/yaml.mjs';
 import { formatHtmlOutput } from '../src/lib/output-formatters/html.mjs';
+import { commentFor, makeFinding, makeResult } from './helpers/render-result-fixtures.mjs';
 
 /** printMarkdownReport の stdout を文字列で受け取る。 */
 function renderMarkdown(result, phase = 'midstream') {
@@ -104,59 +105,6 @@ function expandedBody(markdown) {
 
 function countOccurrences(haystack, needle) {
   return haystack.split(needle).length - 1;
-}
-
-function makeFinding(overrides = {}) {
-  const finding = {
-    id: 'rr-1',
-    ruleId: 'logging-observability',
-    file: 'src/app.js',
-    lineStart: 5,
-    lineEnd: 5,
-    title: 'catch で例外が握りつぶされる',
-    severity: 'major',
-    confidence: 'high',
-    status: 'open',
-    evidence: ['catch 内で return'],
-    ...overrides,
-  };
-  // review-engine.mjs は message の `Finding:` ラベルから title を作るので、
-  // fixture でも title を message に含めて実データの関係を保つ。
-  finding.message =
-    overrides.message ??
-    `Finding: ${finding.title} Evidence: catch 内で return Impact: 障害調査が困難 Fix: ログ+再throw Severity: warning Confidence: high`;
-  return finding;
-}
-
-/** finding と 1:1 対応する comment（review-engine.mjs の構築規則に合わせる）。 */
-function commentFor(finding) {
-  return {
-    skillId: finding.ruleId,
-    file: finding.file,
-    line: finding.lineStart,
-    message: finding.message,
-  };
-}
-
-function makeResult({
-  findings = [],
-  comments,
-  suppressed = [],
-  overflow = [],
-  plan,
-  teamLeadReport = null,
-} = {}) {
-  return {
-    findings,
-    // `comments` を明示指定できるのは F1 の再現用。実行時は findings と
-    // comments が別集合になりうる（--reviewers の dedup / 抑制の fingerprint 照合）。
-    comments: comments ?? findings.map(commentFor),
-    classified: suppressed.length || overflow.length ? { suppressed, overflow } : undefined,
-    plan: plan ?? { selected: [], skipped: [] },
-    changedFiles: ['src/app.js'],
-    tokenEstimate: 42,
-    teamLeadReport,
-  };
 }
 
 /** ヘッドライン行（`**判定: ...`）を取り出す。 */
