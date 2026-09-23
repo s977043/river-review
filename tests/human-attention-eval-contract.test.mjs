@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+
+import * as yaml from 'js-yaml';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const manifestPath = path.join(
@@ -12,6 +14,14 @@ const manifestPath = path.join(
   'decision-surface-eval-cases.json'
 );
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+const repoRoot = path.join(here, '..');
+const scorecardPath = path.join(
+  here,
+  'fixtures',
+  'human-attention',
+  'decision-surface-scorecard-template.yaml'
+);
+const scorecard = yaml.load(readFileSync(scorecardPath, 'utf8'));
 
 describe('#2378 Human Attention evaluation contract', () => {
   it('keeps the v1 fixture set explicit and uniquely addressable', () => {
@@ -20,6 +30,9 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.comparison?.paired, true);
     assert.strictEqual(manifest.comparison?.sameUnderlyingReviewState, true);
     assert.strictEqual(manifest.comparison?.presentationOnly, true);
+    assert.strictEqual(manifest.vocabularyBoundary?.humanReviewRequired, 'canonical-v1-signal');
+    assert.strictEqual(manifest.vocabularyBoundary?.humanDecisionRequired, 'not-applicable-in-v1');
+    assert.strictEqual(manifest.commonQuestions[1], 'Is human review required?');
 
     assert.strictEqual(manifest.cases.length, 10);
 
@@ -64,6 +77,69 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.freezePolicy?.baselineCommit, 'freeze-at-run-start');
     assert.strictEqual(manifest.freezePolicy?.candidateCommit, 'freeze-at-run-start');
     assert.strictEqual(manifest.freezePolicy?.fixtureAdapter, 'freeze-at-run-start');
+  });
+
+  it('keeps the scorecard aligned with the canonical fixture IDs and four-question rubric', () => {
+    const fixtureIds = manifest.cases.map((item) => item.id);
+    const scorecardIds = scorecard.cases.map((item) => item.caseId);
+
+    assert.deepStrictEqual(scorecardIds, fixtureIds);
+
+    for (const item of scorecard.cases) {
+      for (const arm of ['baseline', 'candidate']) {
+        assert.ok(item[arm], `${item.caseId}: ${arm} score block is required`);
+        assert.strictEqual(
+          Object.hasOwn(item[arm], 'q5_confidence'),
+          false,
+          `${item.caseId}: q5_confidence belongs to the superseded five-question rubric`
+        );
+        assert.strictEqual(
+          Object.hasOwn(item[arm], 'q2_human_required'),
+          false,
+          `${item.caseId}: q2_human_required is ambiguous in the v1 review-only rubric`
+        );
+        assert.ok(item[arm].q2_human_review !== undefined, `${item.caseId}: q2_human_review`);
+      }
+    }
+  });
+
+  it('keeps one machine-readable fixture SSoT', () => {
+    const obsoletePaths = [
+      'docs/eval/human-attention-fixtures.yaml',
+      'tests/fixtures/2378-decision-surface/cases.json',
+      'tests/fixtures/2378-decision-surface/scorecard-template.yaml',
+    ];
+
+    for (const obsoletePath of obsoletePaths) {
+      assert.strictEqual(
+        existsSync(path.join(repoRoot, obsoletePath)),
+        false,
+        `obsolete Human Attention eval asset must stay removed: ${obsoletePath}`
+      );
+    }
+  });
+
+  it('freezes finding identity and partial-coverage unit outcomes before the run', () => {
+    for (const item of manifest.cases) {
+      assert.ok(Array.isArray(item.signals.findings), `${item.id}: findings must be explicit`);
+
+      const findingIds = item.signals.findings.map((finding) => finding.id);
+      assert.strictEqual(new Set(findingIds).size, findingIds.length, `${item.id}: finding IDs`);
+
+      if (item.materialReference.allFindingIds) {
+        assert.deepStrictEqual(item.materialReference.allFindingIds, findingIds);
+      }
+
+      if (item.signals.coverageStatus === 'partial') {
+        const failed = item.signals.failedUnitCount ?? 0;
+        const timedOut = item.signals.timedOutUnitCount ?? 0;
+        assert.strictEqual(
+          item.signals.incompleteUnitCount,
+          failed + timedOut,
+          `${item.id}: partial coverage must freeze concrete incomplete unit outcomes`
+        );
+      }
+    }
   });
 
   it('keeps the legacy case fail-safe instead of inventing missing state', () => {
