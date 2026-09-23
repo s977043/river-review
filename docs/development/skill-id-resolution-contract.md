@@ -144,13 +144,18 @@ Progressive Disclosure は「ファイルを細かく分けること」ではな
 
 `river-review-code` は詳細説明を縮め、owner skill ID と loading condition を残す。
 
-## Implementation gap
+## Resolver implementation
 
-現時点の `commands/skill.md` は `skills/agent-skills/` のみを検索する。
-そのため full plugin root に native Review Skill が存在していても、直接の `/skill` surface では skill-ID resolution が不完全です。
+#2386 / PR #2389 で executable skill-ID resolver を実装済みです。
 
-この gap は別 Issue で resolver を追加する。
-Issue #2381 の dogfood は resolver contract が実装されるまで、knowledge を複製して回避しません。
+- `commands/skill.md` は exact skill ID を先に `scripts/resolve-skill-id.mjs` へ渡す
+- source / full plugin root では Agent Skill と native Review Skill の canonical package depth を走査する
+- `river skills export` 後は sibling package の `metadata.rr.id` を検証して解決する
+- unsafe / path-like ID と ambiguous ID は fail closed にする
+- owner-skill delegation では exact resolution 失敗時に keyword fallback せず、未解決として degrade する
+- ad-hoc user keyword のみ literal search へ fallback できる
+
+この実装により #2381 の dogfood は knowledge を複製せず、canonical owner skill ID への委譲を使える。
 
 ## Non-goals
 
@@ -161,7 +166,7 @@ Issue #2381 の dogfood は resolver contract が実装されるまで、knowled
 
 ## Verification
 
-resolver 実装では最低限次を確認する。
+resolver 実装の回帰では最低限次を確認する。
 
 - plugin/source tree で agent skill / native Review Skill の両方を ID 解決できる
 - unknown ID は fail/degrade が明示される
