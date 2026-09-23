@@ -94,6 +94,71 @@ describe('Review Coverage surface propagation', () => {
     assert.equal(unorchestrated.reviewCoverage, null);
   });
 
+  it('emits complete coverage for a successful single-reviewer LLM call', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-review-single-coverage-success-',
+      initialFiles: { 'src/app.js': 'export const value = 1;\n' },
+      changedFiles: { 'src/app.js': 'export const value = 2;\n' },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const context = await planLocalReview({ cwd: dir, dryRun: true });
+    const originalFetch = global.fetch;
+    t.after(() => { global.fetch = originalFetch; });
+    global.fetch = async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: 'NO_ISSUES' } }] }),
+    });
+
+    const result = await runLocalReview({
+      cwd: dir,
+      context,
+      dryRun: false,
+      apiKey: 'test-key',
+      quiet: true,
+    });
+
+    assert.equal(result.reviewDebug.llmUsed, true);
+    assert.equal(result.reviewCoverage.status, 'complete');
+    assert.equal(result.reviewCoverage.units[0].status, 'completed');
+    assert.deepEqual(result.reviewCoverage.units[0].subjects, ['src/app.js']);
+    assert.deepEqual(result.reviewCoverage.fileScope, context.reviewFileScope);
+  });
+
+  it('emits not_executed coverage for a single-reviewer response-envelope parse failure', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-review-single-coverage-failure-',
+      initialFiles: { 'src/app.js': 'export const value = 1;\n' },
+      changedFiles: { 'src/app.js': 'export const value = 2;\n' },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const context = await planLocalReview({ cwd: dir, dryRun: true });
+    const originalFetch = global.fetch;
+    t.after(() => { global.fetch = originalFetch; });
+    global.fetch = async () => ({
+      ok: true,
+      json: async () => JSON.parse('OK\\r\\n'),
+    });
+
+    const result = await runLocalReview({
+      cwd: dir,
+      context,
+      dryRun: false,
+      apiKey: 'test-key',
+      quiet: true,
+    });
+
+    assert.equal(result.reviewDebug.llmUsed, false);
+    assert.match(result.reviewDebug.llmError, /Unexpected token/);
+    assert.equal(result.reviewCoverage.status, 'not_executed');
+    assert.equal(result.reviewCoverage.units[0].status, 'failed');
+    assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, [
+      'reviewer:single/chunk:1',
+    ]);
+  });
   it('emits schema-valid JSON Review Coverage only when present', () => {
     const coverage = deriveReviewCoverage([unit()]);
     const artifact = formatJsonOutput(baseResult({ reviewCoverage: coverage }), 'midstream');
