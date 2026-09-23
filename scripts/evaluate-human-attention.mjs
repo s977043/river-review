@@ -130,16 +130,27 @@ async function assertOutputAbsent(outputDir) {
   }
 }
 
-async function linkNodeModules(repoRoot, worktree) {
-  const source = path.join(repoRoot, 'node_modules');
-  try {
-    await access(source);
-  } catch {
+function installFrozenDependencies(worktree) {
+  const result = spawnSync(
+    'npm',
+    ['ci', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'],
+    {
+      cwd: worktree,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }
+  );
+  if (result.status !== 0) {
     throw new Error(
-      'INCONCLUSIVE_ENVIRONMENT: node_modules is missing; run npm ci for the frozen lockfile first'
+      `INCONCLUSIVE_ENVIRONMENT: npm ci failed for frozen condition: ${result.stderr.trim()}`
     );
   }
-  const target = path.join(worktree, 'node_modules');
+}
+
+async function linkCandidateNodeModules(baselineWorktree, candidateWorktree) {
+  const source = path.join(baselineWorktree, 'node_modules');
+  await access(source);
+  const target = path.join(candidateWorktree, 'node_modules');
   await symlink(source, target, process.platform === 'win32' ? 'junction' : 'dir');
 }
 
@@ -163,11 +174,11 @@ export async function withTemporaryWorktrees({
   try {
     runGit(repoRoot, ['worktree', 'add', '--detach', baselineDir, baseline]);
     baselineAdded = true;
-    await linkNodeModules(repoRoot, baselineDir);
+    installFrozenDependencies(baselineDir);
 
     runGit(repoRoot, ['worktree', 'add', '--detach', candidateDir, candidate]);
     candidateAdded = true;
-    await linkNodeModules(repoRoot, candidateDir);
+    await linkCandidateNodeModules(baselineDir, candidateDir);
 
     return await task({ baselineDir, candidateDir });
   } finally {
@@ -320,11 +331,6 @@ export async function runEvaluation({ baseline, candidate, fixtures, output }) {
   const candidateLockHash = sha256(candidateLock);
   const runnerLockHash = sha256(runnerLock);
   assertSameLockfile(baselineLockHash, candidateLockHash);
-  if (runnerLockHash !== baselineLockHash) {
-    throw new Error(
-      'INCONCLUSIVE_ENVIRONMENT: current checkout package-lock.json differs from frozen conditions'
-    );
-  }
 
   const fixtureText = await readFile(canonicalFixture, 'utf8');
   const adapterText = await readFile(path.join(repoRoot, ADAPTER_PATH), 'utf8');
@@ -388,6 +394,8 @@ export async function runEvaluation({ baseline, candidate, fixtures, output }) {
     packageLockBaselineSha256: baselineLockHash,
     packageLockCandidateSha256: candidateLockHash,
     packageLockRunnerSha256: runnerLockHash,
+    conditionDependencyInstall: 'baseline-lock/npm-ci-ignore-scripts',
+    candidateNodeModules: 'shared-from-baseline-worktree',
     startedAt,
     measurementMode: 'unavailable',
     executionStatus: 'running',
