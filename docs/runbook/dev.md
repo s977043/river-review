@@ -2,17 +2,33 @@
 
 ## 前提
 
-- Node.js—リポジトリ直下の `.nvmrc` でピン留めされたバージョン (現状 `22.22.2`) を使用する。`nvm use` または同等の version manager で揃える。CI も同じ `.nvmrc` を SSoT として参照する。
+- Node.js—リポジトリ直下の [`.nvmrc`](../../.nvmrc) で指定されたバージョンを使用する。`nvm use` または同等のバージョン管理ツールで揃える。
 - npm
+- ShellCheck—`npm run lint` がシェルスクリプトを検査する。Ubuntu / WSL では `sudo apt install shellcheck` で導入できる。
 
 ## 初期セットアップ
 
 ```bash
-nvm use      # .nvmrc を読み込む (任意の version manager 可)
+nvm install  # .nvmrc の指定版を導入（初回のみ）
+nvm use
+node --version
 npm ci
 ```
 
-CI ではこれらの手順を `.github/actions/setup-node-deps` (composite action) に集約しており、`actions/setup-node@v6` + `npm ci --prefer-offline` を一括で実行する。
+### シェルの Node.js が指定版に切り替わらない場合
+
+[ローカル実行スクリプト](../../scripts/local-npm.sh)を使うと、指定版の Node.js で npm を実行できる。リポジトリ直下で次を実行する。
+
+```bash
+bash scripts/local-npm.sh exec -- node --version
+bash scripts/local-npm.sh run dev
+```
+
+スクリプトは `.nvmrc` を読み、現在の Node.js が一致しなければ nvm で切り替える。指定版は事前にインストールしておく。別のバージョン管理ツールを使う場合は、そのツールで指定版を有効にしてから実行する。切り替えは子プロセス内で行い、シェル全体の既定値は変更しない。
+
+### CI との対応
+
+[共通セットアップ](../../.github/actions/setup-node-deps/action.yml)は、`actions/setup-node` と npm キャッシュを使い、`npm ci` を実行する。共通処理の Node.js 指定は既定で `22.x`。一部のジョブは `.nvmrc` を直接参照するため、すべての CI ジョブが同じパッチ版になるわけではない。
 
 CI ワークフローの一覧、branch protection の必須チェックがどのジョブに対応するか、新しいワークフローを追加する手順は [.github/workflows/README.md](../../.github/workflows/README.md) にまとまっている。
 
@@ -26,6 +42,23 @@ npm run skills:validate
 npm run agent-skills:validate
 ```
 
+Node.js の切り替えをコマンドごとに確実に行う場合は、次を使う。
+
+```bash
+bash scripts/local-npm.sh run lint
+bash scripts/local-npm.sh test
+```
+
+### 特定のテストだけ実行する
+
+```bash
+npm test -- tests/fix-dashes.test.mjs
+# シェルの Node.js が指定版と異なる場合
+bash scripts/local-npm.sh test -- tests/fix-dashes.test.mjs
+```
+
+対象を絞った確認の後も、PR 前には全体の lint とテストを実行する。
+
 ### テスト構成
 
 `npm test` は `node --experimental-test-isolation=none --test` で `tests/**/*.test.mjs` を実行する。isolation フラグは #1415 の `Unable to deserialize cloned data` flake（node:test の子プロセス IPC バグ）を避けるため npm script 側に置いており、`npm test` を経由する呼び出しはすべてこの保護を受ける。レイアウトは:
@@ -36,7 +69,7 @@ npm run agent-skills:validate
 - `tests/helpers/`—`createTempMemory` / `createTempDir` など複数テストで共有するヘルパー (#506 で導入)
 - `tests/fixtures/`—eval / レビュー / Riverbed Memory のフィクスチャ
 
-CI ではカバレッジを `NODE_V8_COVERAGE=coverage npm test` で取得し、Codecov へ OIDC (`id-token: write`) でアップロードする (`.github/workflows/test.yml` `unit-tests` ジョブ)。Codecov を呼び出すジョブには `permissions.id-token: write` が必須で、無いと OIDC トークン取得に失敗する (#546 で修正済み)。
+CI ではカバレッジを `NODE_V8_COVERAGE=coverage npm test` で取得し、Codecov へ OIDC (`id-token: write`) でアップロードする ([CI ワークフロー](../../.github/workflows/test.yml)の `test` ジョブ、表示名は `Unit tests`)。Codecov を呼び出すジョブには `permissions.id-token: write` が必須で、無いと OIDC トークン取得に失敗する (#546 で修正済み)。
 
 ## よくある詰まりどころ
 
@@ -46,6 +79,12 @@ CI ではカバレッジを `NODE_V8_COVERAGE=coverage npm test` で取得し、
 - Lint エラーが日本語文書で出る場合:
   - `npm run lint:text` の出力に従って文言を修正。
 
+### 検証とファイル監視の対象
+
+[`.markdownlintignore`](../../.markdownlintignore)は、生成物、別 worktree、Codex の実行時ファイルを Markdown lint から除外する。通常の設定ファイルやスキルは検査対象に残る。VS Code の監視対象は [`.vscode/settings.json`](../../.vscode/settings.json)で別に設定する。
+
+`npm run check:dashes` は、`docs/`、所定のチェックリスト、ルートの `README.md` と `AGENTS.md` を検査する。表記違反または読み取りエラーがあれば失敗する。`npm run fix:dashes` で修正した後は、差分を確認してから再検証する。
+
 ## 並行タスク（Git Worktree）
 
 異なるコンテキストのタスクは物理的に分離して実行する。
@@ -54,6 +93,7 @@ CI ではカバレッジを `NODE_V8_COVERAGE=coverage npm test` で取得し、
 # 作成
 git worktree add -b <new-branch-name> ../<project>-worktrees/<feature-name> main
 cd ../<project>-worktrees/<feature-name>
+nvm use
 npm ci
 
 # 作業・検証後にクリーンアップ（PRマージ確認後）
@@ -68,7 +108,8 @@ git worktree prune
 
 - `\\wsl.localhost\Ubuntu\...`のようなUNCパス経由では`husky`や`prettier`がCMD.EXEで実行されエラーになることがある
 - Git操作やnpmスクリプトはWSLターミナル内（`/home/<user>/...`）で実行する
-- やむをえない場合は`git commit --no-verify`を使用し、CIでの検証に委ねる
+- Node.js の実行元が不明な場合は `command -v node` と `node --version` を確認する
+- フックが失敗した場合は、WSL 内で指定版の Node.js を有効にし、lint とテストを通してからコミットを再実行する
 
 ## PR 前チェック
 
@@ -87,3 +128,26 @@ npm run skills:validate
 `runners/github-action/src/**` を変更した場合、または CI の "Action dist freshness" が失敗した場合は、再生成が必要です。`.nvmrc` の Node バージョンに揃えてから `npm run build:action` で `runners/github-action/dist/` を再生成する。詳細は `docs/development/dist-check-rebuild-guide.md` を参照。
 
 PR マージ前のチェックリスト（CI green / レビュアーコメント disposition / preflight など）は `docs/governance.md` § "PR レビューとマージ" にまとまっている。
+
+## Codex 連携の検証
+
+Codex CLI から River Review の skill とフロー定義を参照できるかを確認する。
+
+```bash
+npm run codex:verify
+npm run codex:verify -- --live
+```
+
+通常モードはプラグイン manifest / 同期状態 / skill 定義と、Codex adapter・cross-runtime の関連テストをローカルで検査する。`--live` はCodexでRiver Review 1.xがinstalled/enabledであることを確認してから、testing skillにサンプルテストをレビューさせる。Codex CLI認証が必要で、180秒を超える場合はタイムアウトする。実行時の標準入力は閉じる。project-local configの読み込みには、Codexでプロジェクトを信頼済みにする必要がある。
+
+### 2026-09-23 の実測
+
+- Codex CLI `0.155.0-alpha.16`。`codex plugin list` は `river-review@river-review-marketplace` を `installed, enabled 1.120.0`、source `/home/minewo/github/river-review` と表示する。現在のCodexセッションにも配布されたRiver Review skillsが現れる。
+- `npm run codex:verify` の契約テストは190件成功。リポジトリ全体でも `npm run lint` 成功、`npm test` は5,258件成功。
+- ローカル marketplace の登録は成功。最初のCLI installコマンドはタイムアウトしたが、その後のCodex plugin一覧でインストールと有効化を確認した。CLIから直接インストールする手順はCodex公式文書でもauthoring用CLIとデスクトップのinstall/test手順が区別されているため、実機テストの唯一の経路にしない。
+- `codex exec` の live skill invocation は、登録済みskillを呼ぶプロンプトに変えて再試行しても、起動時にユーザー設定下のPlanGate marketplace更新が30秒でタイムアウトし、回答を得られなかった。今回のログ上、River Reviewではなく別marketplaceの更新が停止点である。
+- 現在のCodexセッションでRiver Reviewの `river-review-testing` を読み、`tests/fix-dashes.test.mjs` に適用した。ネスト対象と除外、変更・非変更経路、読取エラー後の継続と非ゼロ終了を確認し、現状で指摘はなかった。これはskillの実利用確認だが、CLIの独立した `codex exec` セッション完走を証明するものではない。
+
+プラグインの登録・有効化・skill利用は確認できています。CLIの独立したend-to-end skill invocationは未確認です。CLI E2Eを再試行する場合は `--live` を使い、marketplace timeoutとskill invocation結果を別々に記録します。
+
+プラグインのインストール処理が止まる場合、まずCodex起動ログの `unsupported source`、marketplace clone timeout、または認証エラーを区別する。インストール済みであることと、対象リポジトリで skill が使われたことも別々に確認する。

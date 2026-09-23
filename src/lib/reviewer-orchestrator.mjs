@@ -751,6 +751,16 @@ export async function runReviewerOrchestration({
     autoSelection = null,
   } = resolveReviewerRoles(reviewers, { fileTypes, riskAssessment, signals });
 
+  // #2363: an explicit reviewer list is an execution contract. Silently
+  // dropping an unknown role lets the remaining valid subset produce
+  // reviewCoverage.status=complete even though requested work never ran.
+  // Reject before creating tasks so coverage cannot over-claim completion.
+  if (Array.isArray(reviewers) && invalid.length > 0) {
+    throw new Error(
+      `Unknown reviewer roles: [${invalid.join(', ')}]. Valid: [${Object.keys(REVIEWER_ROLES).join(', ')}]`
+    );
+  }
+
   if (!roles.length) {
     throw new Error(
       `No valid reviewer roles. Got: [${(reviewers ?? []).join(', ')}]. Valid: [${Object.keys(REVIEWER_ROLES).join(', ')}]`

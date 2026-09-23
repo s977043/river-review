@@ -109,10 +109,10 @@ describe('resolveReviewerRoles', () => {
 });
 
 describe('runReviewerOrchestration', () => {
-  it('throws when no valid roles are provided', async () => {
+  it('rejects an explicit list when every reviewer role is unknown (#2363)', async () => {
     await assert.rejects(
       () => runReviewerOrchestration({ diff: makeDiff(), reviewers: ['nonexistent'] }),
-      /No valid reviewer roles/
+      /Unknown reviewer roles: \[nonexistent\]/
     );
   });
 
@@ -172,14 +172,55 @@ describe('runReviewerOrchestration', () => {
     assert.deepEqual(roles, DEFAULT_REVIEWERS);
   });
 
-  it('returns invalidRoles list for unknown roles', async () => {
+  it('rejects mixed valid and unknown explicit roles before review execution (#2363)', async () => {
+    const generateReviewImpl = mock.fn(async () => {
+      throw new Error('must not execute');
+    });
+
+    await assert.rejects(
+      () =>
+        runReviewerOrchestration({
+          diff: makeDiff(),
+          dryRun: true,
+          reviewers: ['bug-hunter', 'security'],
+          generateReviewImpl,
+        }),
+      /Unknown reviewer roles: \[security\].*security-scanner/
+    );
+
+    assert.equal(generateReviewImpl.mock.callCount(), 0, 'no valid subset may execute');
+  });
+
+  it('counts every valid explicit reviewer in Review Coverage (#2363)', async () => {
     const result = await runReviewerOrchestration({
       diff: makeDiff(),
       dryRun: true,
-      reviewers: ['bug-hunter', 'unknown-role'],
+      reviewers: ['bug-hunter', 'security-scanner'],
     });
-    assert.ok(Array.isArray(result.invalidRoles));
-    assert.ok(result.invalidRoles.includes('unknown-role'));
+
+    assert.equal(result.reviewCoverage.status, 'complete');
+    assert.equal(result.reviewCoverage.expectedUnits, 2);
+    assert.equal(result.reviewCoverage.completedUnits, 2);
+    assert.equal(result.reviewCoverage.requiredUnits, 2);
+    assert.equal(result.reviewCoverage.completedRequiredUnits, 2);
+    assert.deepEqual(
+      result.reviewCoverage.units.map((unit) => unit.reviewerRole),
+      ['bug-hunter', 'security-scanner']
+    );
+  });
+
+  it('keeps duplicate valid explicit roles deduplicated in Review Coverage (#2363)', async () => {
+    const result = await runReviewerOrchestration({
+      diff: makeDiff(),
+      dryRun: true,
+      reviewers: ['bug-hunter', 'bug-hunter', 'security-scanner'],
+    });
+
+    assert.equal(result.reviewCoverage.expectedUnits, 2);
+    assert.deepEqual(
+      result.reviewCoverage.units.map((unit) => unit.reviewerRole),
+      ['bug-hunter', 'security-scanner']
+    );
   });
 
   it('returns comments array', async () => {

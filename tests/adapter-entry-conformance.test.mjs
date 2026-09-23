@@ -200,6 +200,7 @@ describe('paired adapter conformance for --entry (#2054 PR-5)', () => {
               INPUT_DETERMINISTIC_EXEC: 'false',
               INPUT_TRUSTED_TREE: '',
               INPUT_ENTRY: entry,
+              INPUT_REVIEWERS: '',
               GITHUB_ACTION_PATH: path.join(REPO_ROOT, 'runners', 'github-action'),
             },
           });

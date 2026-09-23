@@ -100,6 +100,24 @@ test('--reviewers writes role progress to stderr, never to stdout', async (t) =>
   );
 });
 
+// #2363: explicit reviewer input is an execution contract. A typo alongside a
+// valid role must fail before the valid subset starts; otherwise Review Coverage
+// can report complete for less work than the caller requested.
+test('--reviewers rejects a mixed valid and unknown role before execution', async (t) => {
+  const { dir, cleanup } = await setupRepoWithDiff();
+  t.after(cleanup);
+
+  const result = await runCliInProcess(
+    ['run', '.', '--dry-run', '--reviewers', 'bug-hunter,security', '--output', 'json'],
+    { cwd: dir }
+  );
+
+  assert.notStrictEqual(result.code, 0);
+  assert.match(result.stderr, /Unknown reviewer roles: \[security\]/);
+  assert.match(result.stderr, /security-scanner/);
+  assert.doesNotMatch(result.stderr, /Reviewer bug-hunter: start/);
+});
+
 // #1700: the JSON artifact of a --reviewers run carries teamLeadReport plus
 // per-issue consensusLevel / reviewerRole. None of the three were declared in
 // schemas/output.schema.json, which is additionalProperties: false, so every

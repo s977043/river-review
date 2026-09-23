@@ -13,6 +13,8 @@ Install the required dependency with `pip install jsonschema` before running the
 
 The `--reviewers` flag on `river run` accepts a comma-separated list of role names or the special keyword `auto`.
 
+If an explicit list contains any unknown role name, River Review fails before starting reviewer execution.
+
 ### `auto` keyword
 
 When `--reviewers auto` is specified, River Review analyzes the diff content and selects reviewer roles automatically. `bug-hunter` is always included; additional roles are added based on the following signals:
