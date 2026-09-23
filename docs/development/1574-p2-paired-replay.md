@@ -57,9 +57,10 @@ paired replay が `improvementCandidate` を含む場合、result は `promotion
 
 - #1568 と同じ content-addressed `candidateId`
 - Experiment Manifest の ID / hash と integrity 結果
-- activation が観測できたか
+- activation が観測できたか、および provenance / configuration の注意理由
+- dataset pairing の警告
 - acceptance が評価可能だったか
-- profile ごとの `allRequiredSatisfied` / sample-size 状態 / failed metric
+- profile ごとの `allRequiredSatisfied` / sample-size 状態 / failed metric / 観測不能 metric
 - critical regression 件数
 - independent verifier が実際に検証済みか
 - terminal reason
