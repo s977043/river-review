@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
@@ -194,7 +196,7 @@ describe('#2382 Human Attention paired runner contract', () => {
   });
 
   it('surfaces worktree cleanup failure instead of silently succeeding', () => {
-    const missing = `/tmp/river-review-ha-not-a-worktree-${process.pid}`;
+    const missing = path.join(os.tmpdir(), `river-review-ha-not-a-worktree-${process.pid}`);
     const failure = removeWorktree(process.cwd(), missing);
 
     assert.ok(failure, 'missing worktree removal must be observable');
