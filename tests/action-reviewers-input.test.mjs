@@ -75,14 +75,10 @@ test('GitHub Action forwards one reviewers argument pair only on the run path (#
   const withoutReviewers = /^Running: (.*)$/m.exec(render())?.[1] ?? '';
   assert.doesNotMatch(withoutReviewers, /--reviewers/);
 
-  const entryOutput = render({
-    reviewers: 'bug-hunter,security-scanner',
-    entry: 'review-task',
-  });
+  const entryOutput = render({ reviewers: 'bug-hunter,security-scanner', entry: 'review-task' });
   const entryCommand = /^Running: (.*)$/m.exec(entryOutput)?.[1] ?? '';
   assert.doesNotMatch(entryCommand, /--reviewers/);
-  const notice =
-    entryOutput.split('\n').find((line) => line.startsWith('::notice::')) ?? '';
+  const notice = entryOutput.split('\n').find((line) => line.startsWith('::notice::')) ?? '';
   assert.match(notice, /\breviewers\b/);
 });
 
