@@ -94405,6 +94405,17 @@ function isLlmlessEmptyReview(result) {
   return llmKeyMissing && noFindings;
 }
 
+function isLlmFailedEmptyReview(result) {
+  const debug = result?.reviewDebug ?? {};
+  const llmFailed =
+    debug.llmUsed === false &&
+    typeof debug.llmError === 'string' &&
+    debug.llmError.trim().length > 0;
+  const noComments = !Array.isArray(result?.comments) || result.comments.length === 0;
+  const noFindings = !Array.isArray(result?.findings) || result.findings.length === 0;
+  return llmFailed && noComments && noFindings;
+}
+
 function printMarkdownReport(result, phase) {
   if (isLlmlessEmptyReview(result)) {
     console.log(
@@ -94433,17 +94444,30 @@ function printMarkdownReport(result, phase) {
   const decisionSurface = formatHumanDecisionSurfaceMarkdown(decisionSurfaceModel);
   const findingSections = formatFindingsSectionsMarkdown(rendered);
 
-  const header = `${COMMENT_MARKER}
+  const llmFailedEmpty = isLlmFailedEmptyReview(result);
+  const header = llmFailedEmpty
+    ? `${COMMENT_MARKER}
+## River Review
+
+- フェーズ: \`${phase}\`
+- ⚠️ **LLM semantic review は未完了です。** LLM 実行エラー後の静的チェックでは最終指摘がありませんでした。
+- この結果は「指摘なし」「auto-approve」「マージ可能」を意味しません。LLM 経路を復旧して再レビューしてください。
+`
+    : `${COMMENT_MARKER}
 ## River Review
 
 ${formatHeadlineMarkdown(rendered, phase, score)}
 `;
-  const noBlockerNote = formatNoBlockerNoteMarkdown(rendered, decisionSurfaceModel);
+  const noBlockerNote = llmFailedEmpty
+    ? null
+    : formatNoBlockerNoteMarkdown(rendered, decisionSurfaceModel);
   const riskSection = formatRiskSummaryMarkdown(result.plan);
   const humanReviewSection = formatHumanReviewFilesMarkdown(result);
   const teamLeadSection = formatTeamLeadReportMarkdown(result.teamLeadReport);
-  const prioritySummary = formatPrioritySummaryMarkdown(rendered, result.classified);
-  const scoreSection = formatScoreSectionMarkdown(score);
+  const prioritySummary = llmFailedEmpty
+    ? null
+    : formatPrioritySummaryMarkdown(rendered, result.classified);
+  const scoreSection = llmFailedEmpty ? null : formatScoreSectionMarkdown(score);
   const executionSection = formatExecutionDetailsMarkdown(result);
   console.log(
     [
