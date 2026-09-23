@@ -1,0 +1,193 @@
+{
+  "schemaVersion": "1",
+  "evaluationId": "rr-human-attention-decision-surface-v1",
+  "issue": 2378,
+  "purpose": "Compare baseline River Review markdown with the Human Decision Surface candidate using the same underlying review state.",
+  "freezePolicy": {
+    "fixtureSet": "freeze-before-run",
+    "materialReferenceSet": "freeze-before-run",
+    "rubric": "freeze-before-run",
+    "baselineCommit": "freeze-at-run-start",
+    "candidateCommit": "freeze-at-run-start",
+    "fixtureAdapter": "freeze-at-run-start"
+  },
+  "comparison": {
+    "paired": true,
+    "sameUnderlyingReviewState": true,
+    "presentationOnly": true,
+    "baseline": "renderer without Human Decision Surface",
+    "candidate": "renderer with Human Decision Surface"
+  },
+  "commonQuestions": [
+    "What action is required now?",
+    "Is human review or a human decision required?",
+    "What is incomplete, uncertain, failed, or timed out?",
+    "Where can the reviewer navigate for full detail and provenance?"
+  ],
+  "cases": [
+    {
+      "id": "HA-01-clean",
+      "description": "Clean run with no findings and complete or absent non-warning coverage state.",
+      "signals": {
+        "findings": [],
+        "humanReviewRequired": false,
+        "coverageStatus": "complete",
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "requiredActionCount": 0,
+        "humanReviewRequired": false,
+        "coverageWarningRequired": false,
+        "blindSpotWarningRequired": false,
+        "mustNotClaimAttentionRequired": true
+      }
+    },
+    {
+      "id": "HA-02-critical-major",
+      "description": "Critical and major findings with lower-severity findings present.",
+      "signals": {
+        "findingSeverities": ["critical", "major", "minor", "info"],
+        "humanReviewRequired": false,
+        "coverageStatus": "complete",
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "requiredActionCount": 2,
+        "requiredFindingSeverities": ["critical", "major"],
+        "lowerSeverityFindingsMustRemainReachable": true,
+        "coverageWarningRequired": false
+      }
+    },
+    {
+      "id": "HA-03-minor-info-only",
+      "description": "Only minor and info findings.",
+      "signals": {
+        "findingSeverities": ["minor", "info"],
+        "humanReviewRequired": false,
+        "coverageStatus": "complete",
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "requiredActionCount": 0,
+        "lowerSeverityFindingsMustRemainReachable": true,
+        "mustNotUpgradeSeverity": true
+      }
+    },
+    {
+      "id": "HA-04-human-review-required",
+      "description": "Existing canonical state requires human review.",
+      "signals": {
+        "findingSeverities": [],
+        "humanReviewRequired": true,
+        "humanReviewFileCount": 2,
+        "coverageStatus": "complete",
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "humanReviewRequired": true,
+        "humanReviewFileCount": 2,
+        "mustNotInventNewReason": true
+      }
+    },
+    {
+      "id": "HA-05-partial-coverage",
+      "description": "Review coverage is partial even though there are no action findings.",
+      "signals": {
+        "findingSeverities": [],
+        "humanReviewRequired": false,
+        "coverageStatus": "partial",
+        "incompleteUnitCount": 1,
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "coverageWarningRequired": true,
+        "coverageStatus": "partial",
+        "mustNotPresentAsClean": true
+      }
+    },
+    {
+      "id": "HA-06-not-executed",
+      "description": "Review coverage exists but was not executed.",
+      "signals": {
+        "findingSeverities": [],
+        "humanReviewRequired": false,
+        "coverageStatus": "not_executed",
+        "incompleteUnitCount": 0,
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "coverageWarningRequired": true,
+        "coverageStatus": "not_executed",
+        "mustNotInventIncompleteUnitCount": true,
+        "mustNotPresentAsClean": true
+      }
+    },
+    {
+      "id": "HA-07-timeout-failure",
+      "description": "Required review units fail or time out.",
+      "signals": {
+        "findingSeverities": [],
+        "humanReviewRequired": false,
+        "coverageStatus": "partial",
+        "failedUnitCount": 1,
+        "timedOutUnitCount": 1,
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "coverageWarningRequired": true,
+        "failedUnitCount": 1,
+        "timedOutUnitCount": 1,
+        "mustNotCollapseFailureIntoClean": true
+      }
+    },
+    {
+      "id": "HA-08-team-lead-blind-spot",
+      "description": "Team Lead reports one blind spot.",
+      "signals": {
+        "findingSeverities": [],
+        "humanReviewRequired": false,
+        "coverageStatus": "complete",
+        "blindSpotCount": 1
+      },
+      "materialReference": {
+        "blindSpotWarningRequired": true,
+        "blindSpotCount": 1,
+        "mustNotPresentAsClean": true
+      }
+    },
+    {
+      "id": "HA-09-mixed-risk-and-coverage",
+      "description": "Major finding, human review requirement, partial coverage, and blind spot coexist.",
+      "signals": {
+        "findingSeverities": ["major", "minor"],
+        "humanReviewRequired": true,
+        "humanReviewFileCount": 1,
+        "coverageStatus": "partial",
+        "incompleteUnitCount": 1,
+        "blindSpotCount": 1
+      },
+      "materialReference": {
+        "requiredActionCount": 1,
+        "humanReviewRequired": true,
+        "coverageWarningRequired": true,
+        "blindSpotWarningRequired": true,
+        "lowerSeverityFindingsMustRemainReachable": true
+      }
+    },
+    {
+      "id": "HA-10-legacy-no-coverage",
+      "description": "Backward-compatible review result without reviewCoverage or Team Lead data.",
+      "signals": {
+        "findingSeverities": [],
+        "humanReviewRequired": false,
+        "coverageStatus": null,
+        "blindSpotCount": 0
+      },
+      "materialReference": {
+        "mustNotInventCoverageState": true,
+        "mustNotInventResolutionState": true,
+        "mustRemainBackwardCompatible": true
+      }
+    }
+  ]
+}
