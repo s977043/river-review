@@ -1,0 +1,401 @@
+evaluation:
+  issue: 2378
+  fixtureRevision: null
+  baselineSha: null
+  candidateSha: null
+  evaluatorId: anonymous-or-local
+  evaluatorMode: human
+  measurementMode: unavailable
+  orderProtocol: counterbalanced
+  startedAt: null
+  completedAt: null
+  notes: ''
+
+cases:
+  - caseId: HA-01-clean
+    firstArm: baseline
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-02-critical-major
+    firstArm: candidate
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-03-minor-info-only
+    firstArm: baseline
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-04-human-review-required
+    firstArm: candidate
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-05-partial-coverage
+    firstArm: baseline
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-06-not-executed
+    firstArm: candidate
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-07-timeout-failure
+    firstArm: baseline
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-08-team-lead-blind-spot
+    firstArm: candidate
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-09-mixed-risk-and-coverage
+    firstArm: baseline
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+  - caseId: HA-10-legacy-no-coverage
+    firstArm: candidate
+    baseline:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+    candidate:
+      q1_action: null
+      q2_human_required: null
+      q3_uncertainty: null
+      q4_trace: null
+      q5_confidence: null
+      itemExtractionScore: null
+      caseExtractionSuccess: null
+      attentionSeconds: null
+      visibility:
+        visible: null
+        traceable: null
+        lost: null
+        misleading: null
+      initiallyVisibleLines: null
+      duplicatedVisibleItems: null
+      notes: ''
+
+summary:
+  baseline:
+    caseExtractionSuccessRate: null
+    meanItemExtractionScore: null
+    attentionSeconds:
+      value: null
+      mode: unavailable
+    visibilityLost: null
+    visibilityMisleading: null
+  candidate:
+    caseExtractionSuccessRate: null
+    meanItemExtractionScore: null
+    attentionSeconds:
+      value: null
+      mode: unavailable
+    visibilityLost: null
+    visibilityMisleading: null
+  pairedAttention:
+    medianDeltaSeconds: null
+    candidateFasterCases: null
+    equalCases: null
+    candidateSlowerCases: null
+    baselineFirstMedianDeltaSeconds: null
+    candidateFirstMedianDeltaSeconds: null
+  decision: null
+  decisionReason: ''
