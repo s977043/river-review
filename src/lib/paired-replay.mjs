@@ -1555,7 +1555,10 @@ export function formatPairedReplayMarkdown(result) {
     );
     lines.push('- Human judgment required; this handoff applies no promotion decision.');
     lines.push('');
-  } else if (result.manifest.improvementCandidate) {
+  } else if (
+    !result.manifestVerification.verified ||
+    !result.manifestVerification.experimentKeyMatchesInputs
+  ) {
     lines.push('### Promotion handoff (read-only)');
     lines.push(
       '- unavailable: Experiment Manifest の integrity 検証または current inputs との一致確認に失敗したため、candidate と実験証拠を機械可読に結合しない。'
