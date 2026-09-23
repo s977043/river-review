@@ -1,0 +1,244 @@
+version: 1
+tracking:
+  issue: "#2378"
+  parent: "#2368"
+purpose: >
+  Freeze the Phase A presentation-evaluation cases and material reference set
+  before Human Attention measurements are collected.
+runtime_schema: false
+freeze_policy:
+  case_set: freeze_before_phase_a_execution
+  oracle: freeze_before_candidate_measurement
+  baseline_is_oracle: false
+
+cases:
+  - id: HA-01
+    name: clean
+    input:
+      findings: []
+      review_coverage: complete
+      human_review_required: false
+      blind_spots: []
+    oracle:
+      required_actions: []
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: complete
+      blind_spots: []
+      verification_uncertainty: []
+      evidence_locations:
+        - full_review_artifact
+
+  - id: HA-02
+    name: critical-major
+    input:
+      findings:
+        - id: RR-F-CRITICAL
+          severity: critical
+        - id: RR-F-MAJOR
+          severity: major
+      review_coverage: complete
+      human_review_required: false
+      blind_spots: []
+    oracle:
+      required_actions:
+        - RR-F-CRITICAL
+        - RR-F-MAJOR
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings:
+        - RR-F-CRITICAL
+        - RR-F-MAJOR
+      coverage_state: complete
+      blind_spots: []
+      verification_uncertainty: []
+      evidence_locations:
+        - findings_section
+        - full_review_artifact
+
+  - id: HA-03
+    name: minor-info-only
+    input:
+      findings:
+        - id: RR-F-MINOR
+          severity: minor
+        - id: RR-F-INFO
+          severity: info
+      review_coverage: complete
+      human_review_required: false
+      blind_spots: []
+    oracle:
+      required_actions: []
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: complete
+      blind_spots: []
+      verification_uncertainty: []
+      evidence_locations:
+        - folded_findings
+        - full_review_artifact
+
+  - id: HA-04
+    name: human-review-required
+    input:
+      findings: []
+      review_coverage: complete
+      human_review_required: true
+      blind_spots: []
+    oracle:
+      required_actions: []
+      human_review_required: true
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: complete
+      blind_spots: []
+      verification_uncertainty: []
+      evidence_locations:
+        - human_review_section
+        - full_review_artifact
+
+  - id: HA-05
+    name: partial-coverage
+    input:
+      findings: []
+      review_coverage: partial
+      incomplete_units:
+        - reviewer:security/chunk:2
+      human_review_required: false
+      blind_spots: []
+    oracle:
+      required_actions: []
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: partial
+      blind_spots: []
+      verification_uncertainty:
+        - incomplete_review_unit
+      evidence_locations:
+        - review_coverage
+        - full_review_artifact
+
+  - id: HA-06
+    name: not-executed-coverage
+    input:
+      findings: []
+      review_coverage: not_executed
+      human_review_required: false
+      blind_spots: []
+    oracle:
+      required_actions: []
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: not_executed
+      blind_spots: []
+      verification_uncertainty:
+        - review_not_executed
+      evidence_locations:
+        - review_coverage
+        - full_review_artifact
+
+  - id: HA-07
+    name: timeout-and-failed
+    input:
+      findings: []
+      review_coverage: partial
+      incomplete_units:
+        - reviewer:security/chunk:2
+        - reviewer:performance/chunk:1
+      failed_units:
+        - reviewer:performance/chunk:1
+      timed_out_units:
+        - reviewer:security/chunk:2
+      human_review_required: false
+      blind_spots: []
+    oracle:
+      required_actions: []
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: partial
+      blind_spots: []
+      verification_uncertainty:
+        - reviewer_timeout
+        - reviewer_failure
+      evidence_locations:
+        - review_coverage
+        - full_review_artifact
+
+  - id: HA-08
+    name: team-lead-blind-spot
+    input:
+      findings: []
+      review_coverage: complete
+      human_review_required: false
+      blind_spots:
+        - security-reviewer
+    oracle:
+      required_actions: []
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: complete
+      blind_spots:
+        - security-reviewer
+      verification_uncertainty:
+        - blind_spot
+      evidence_locations:
+        - team_lead_report
+        - full_review_artifact
+
+  - id: HA-09
+    name: mixed-material-state
+    input:
+      findings:
+        - id: RR-F-MAJOR-MIXED
+          severity: major
+      review_coverage: partial
+      incomplete_units:
+        - reviewer:security/chunk:2
+      human_review_required: true
+      blind_spots:
+        - performance-reviewer
+    oracle:
+      required_actions:
+        - RR-F-MAJOR-MIXED
+      human_review_required: true
+      human_decision_required: unavailable
+      material_findings:
+        - RR-F-MAJOR-MIXED
+      coverage_state: partial
+      blind_spots:
+        - performance-reviewer
+      verification_uncertainty:
+        - incomplete_review_unit
+        - blind_spot
+      evidence_locations:
+        - findings_section
+        - review_coverage
+        - team_lead_report
+        - full_review_artifact
+
+  - id: HA-10
+    name: legacy-compatible-no-coverage
+    input:
+      findings: []
+      review_coverage: unavailable
+      human_review_required: false
+      blind_spots: []
+    oracle:
+      required_actions: []
+      human_review_required: false
+      human_decision_required: unavailable
+      material_findings: []
+      coverage_state: unavailable
+      blind_spots: []
+      verification_uncertainty: []
+      evidence_locations:
+        - full_review_artifact
+    notes:
+      - Absence of reviewCoverage must not be converted into complete coverage.
+      - The presentation must not invent resolution or verification state.
