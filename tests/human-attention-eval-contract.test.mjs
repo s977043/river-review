@@ -31,10 +31,7 @@ describe('#2378 Human Attention evaluation contract', () => {
     assert.strictEqual(manifest.comparison?.sameUnderlyingReviewState, true);
     assert.strictEqual(manifest.comparison?.presentationOnly, true);
     assert.strictEqual(manifest.vocabularyBoundary?.humanReviewRequired, 'canonical-v1-signal');
-    assert.strictEqual(
-      manifest.vocabularyBoundary?.humanDecisionRequired,
-      'not-applicable-in-v1'
-    );
+    assert.strictEqual(manifest.vocabularyBoundary?.humanDecisionRequired, 'not-applicable-in-v1');
 
     assert.strictEqual(manifest.cases.length, 10);
 
