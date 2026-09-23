@@ -336,7 +336,19 @@ export async function runEvaluation({ baseline, candidate, fixtures, output }) {
     throw new Error(`unsupported fixture schemaVersion: ${fixtureManifest.schemaVersion}`);
   }
 
+  const outputRoot = path.resolve(repoRoot, 'artifacts/evals/human-attention');
   const outputDir = path.resolve(repoRoot, output);
+  const relativeOutput = path.relative(outputRoot, outputDir);
+  if (
+    relativeOutput === '' ||
+    relativeOutput.startsWith('..') ||
+    path.isAbsolute(relativeOutput)
+  ) {
+    throw new Error(
+      'output must be a new child directory under artifacts/evals/human-attention/'
+    );
+  }
+
   await assertOutputAbsent(outputDir);
   await mkdir(outputDir, { recursive: true });
 
@@ -378,6 +390,7 @@ export async function runEvaluation({ baseline, candidate, fixtures, output }) {
     packageLockRunnerSha256: runnerLockHash,
     startedAt,
     measurementMode: 'unavailable',
+    executionStatus: 'running',
   };
   await writeJson(path.join(outputDir, 'manifest.json'), experimentManifest);
 
@@ -449,6 +462,11 @@ export async function runEvaluation({ baseline, candidate, fixtures, output }) {
     nextState: safetyRegressionCount === 0 ? 'READY_FOR_HUMAN_SCORING' : 'SAFETY_REGRESSION',
   };
   await writeJson(path.join(outputDir, 'summary.json'), summary);
+  await writeJson(path.join(outputDir, 'manifest.json'), {
+    ...experimentManifest,
+    executionStatus: 'completed',
+    completedAt: new Date().toISOString(),
+  });
   return summary;
 }
 
