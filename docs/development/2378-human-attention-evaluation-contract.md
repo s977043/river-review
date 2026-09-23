@@ -166,6 +166,8 @@ correct applicable answers
 applicable questions
 ```
 
+Recording templateもこの4問を正本とし、旧5問scorecardの `q5_confidence` は使用しません。
+
 ### Success
 
 Primary successは全fixture平均だけで決めません。
@@ -195,14 +197,24 @@ critical / major / human-required / incomplete coverageのmissは平均値で相
 
 ### Timing protocol
 
-可能ならbaseline / candidateをcounterbalancedします。
+baseline / candidateはcounterbalancedします。
 
 例:
 
 - evaluator A: baseline → candidate
 - evaluator B: candidate → baseline
 
+Attention改善を採用根拠に使う場合は、最低2つのcounterbalanced evaluator session、または同等の順序反転Evidenceを要求します。
+
 同一evaluatorが連続して同一fixtureを見る場合、2回目は内容を記憶して速くなるため、raw timeをそのまま効果量と解釈しません。
+
+1 sessionしか得られない場合:
+
+- Decision Extraction / Visibilityは評価可能
+- Human Attention Timeはdescriptive observation
+- Attention改善を確定せず、必要なら `ATTENTION_INCONCLUSIVE` とする
+
+Timingはfixtureごとのpaired delta（candidate - baseline）を保存します。pooled averageだけで結論を出さず、このpilotから統計的有意差を主張しません。
 
 ### Measure
 
