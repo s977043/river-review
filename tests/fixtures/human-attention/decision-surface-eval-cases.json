@@ -70,22 +70,11 @@
       },
       "materialReference": {
         "requiredActionCount": 2,
-        "requiredFindingSeverities": [
-          "critical",
-          "major"
-        ],
+        "requiredFindingSeverities": ["critical", "major"],
         "lowerSeverityFindingsMustRemainReachable": true,
         "coverageWarningRequired": false,
-        "requiredFindingIds": [
-          "RR-HA-02-1",
-          "RR-HA-02-2"
-        ],
-        "allFindingIds": [
-          "RR-HA-02-1",
-          "RR-HA-02-2",
-          "RR-HA-02-3",
-          "RR-HA-02-4"
-        ]
+        "requiredFindingIds": ["RR-HA-02-1", "RR-HA-02-2"],
+        "allFindingIds": ["RR-HA-02-1", "RR-HA-02-2", "RR-HA-02-3", "RR-HA-02-4"]
       }
     },
     {
@@ -110,10 +99,7 @@
         "requiredActionCount": 0,
         "lowerSeverityFindingsMustRemainReachable": true,
         "mustNotUpgradeSeverity": true,
-        "allFindingIds": [
-          "RR-HA-03-1",
-          "RR-HA-03-2"
-        ]
+        "allFindingIds": ["RR-HA-03-1", "RR-HA-03-2"]
       }
     },
     {
@@ -229,13 +215,8 @@
         "coverageWarningRequired": true,
         "blindSpotWarningRequired": true,
         "lowerSeverityFindingsMustRemainReachable": true,
-        "requiredFindingIds": [
-          "RR-HA-09-1"
-        ],
-        "allFindingIds": [
-          "RR-HA-09-1",
-          "RR-HA-09-2"
-        ]
+        "requiredFindingIds": ["RR-HA-09-1"],
+        "allFindingIds": ["RR-HA-09-1", "RR-HA-09-2"]
       }
     },
     {
