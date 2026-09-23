@@ -754,7 +754,7 @@
       }
     },
     "promotionHandoff": {
-      "description": "Optional read-only bridge from a paired replay experiment to the existing #1568 promotion lifecycle. Null when the experiment declares no improvementCandidate. Observation only: no verdict and no write side effect.",
+      "description": "Optional read-only bridge from a paired replay experiment to the existing #1568 promotion lifecycle. Null when the experiment declares no improvementCandidate, when manifest integrity verification fails, or when the supplied manifest does not describe the current inputs. Observation only: no verdict and no write side effect.",
       "oneOf": [
         {
           "type": "object",
