@@ -5,8 +5,9 @@ import { describe, it } from 'node:test';
 import * as yaml from 'js-yaml';
 
 const FIXTURE_PATH = 'docs/eval/human-attention-fixtures.yaml';
-const EXPECTED_IDS = Array.from({ length: 10 }, (_, index) =>
-  `HA-${String(index + 1).padStart(2, '0')}`
+const EXPECTED_IDS = Array.from(
+  { length: 10 },
+  (_, index) => `HA-${String(index + 1).padStart(2, '0')}`
 );
 const COVERAGE_STATES = new Set(['complete', 'partial', 'not_executed', 'unavailable']);
 const MATERIAL_SEVERITIES = new Set(['critical', 'major']);
@@ -95,7 +96,8 @@ describe('#2378 Human Attention fixture oracle', () => {
         `${entry.id}: blind spots must not disappear in the oracle`
       );
       const hasEvidenceLocations =
-        Array.isArray(entry.oracle.evidence_locations) && entry.oracle.evidence_locations.length > 0;
+        Array.isArray(entry.oracle.evidence_locations) &&
+        entry.oracle.evidence_locations.length > 0;
       assert.ok(hasEvidenceLocations, `${entry.id}: at least one evidence location is required`);
     }
   });

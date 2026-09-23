@@ -202,7 +202,7 @@ visibility:
   lost: 0
   misleading: 0
   trace_unavailable: 0
-notes: ""
+notes: ''
 ```
 
 これはeval recordの概念例です。Phase Aでは新runtime schemaを追加しません。

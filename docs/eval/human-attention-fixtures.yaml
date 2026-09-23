@@ -1,7 +1,7 @@
 version: 1
 tracking:
-  issue: "#2378"
-  parent: "#2368"
+  issue: '#2378'
+  parent: '#2368'
 purpose: >
   Freeze the Phase A presentation-evaluation cases and material reference set
   before Human Attention measurements are collected.
