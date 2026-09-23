@@ -1295,7 +1295,16 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
   // factual handoff, not a verdict: profile observations stay per-profile and
   // no aggregate pass/fail/keep/rollback decision is invented here.
   const independentVerifierVerified = false;
-  const promotionHandoff = built.manifest.improvementCandidate
+  // A handoff is only meaningful when the supplied/stored manifest both
+  // verifies and describes these exact replay inputs. Otherwise pairing the
+  // freshly-derived candidateId with another experiment's manifest would
+  // create a machine-readable false association even though the mismatch flags
+  // are visible elsewhere in the result.
+  const promotionHandoffEligible =
+    built.manifest.improvementCandidate != null &&
+    manifestVerification.verified &&
+    experimentKeyMatchesInputs;
+  const promotionHandoff = promotionHandoffEligible
     ? {
         candidateId: built.manifest.improvementCandidate.candidateId,
         manifestId: manifest.manifestId,
@@ -1545,6 +1554,12 @@ export function formatPairedReplayMarkdown(result) {
       `- independent verifier verified: ${handoff.independentVerifierVerified ? 'yes' : 'no'}`
     );
     lines.push('- Human judgment required; this handoff applies no promotion decision.');
+    lines.push('');
+  } else if (result.manifest.improvementCandidate) {
+    lines.push('### Promotion handoff (read-only)');
+    lines.push(
+      '- unavailable: Experiment Manifest の integrity 検証または current inputs との一致確認に失敗したため、candidate と実験証拠を機械可読に結合しない。'
+    );
     lines.push('');
   }
   lines.push(
