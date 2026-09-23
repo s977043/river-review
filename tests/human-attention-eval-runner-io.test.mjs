@@ -114,6 +114,8 @@ describe('#2382 Human Attention runner I/O guards', () => {
             baseline: BASELINE,
             candidate: CANDIDATE,
             tempParent,
+            prepareBaseline: async () => {},
+            prepareCandidate: async () => {},
             task: async (paths) => {
               baselineDir = paths.baselineDir;
               candidateDir = paths.candidateDir;
