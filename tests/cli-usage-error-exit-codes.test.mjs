@@ -237,7 +237,14 @@ const CONTRACTS = {
 // である。**exit code は動いていない**（追加前後とも 5 形すべて exit 1）。収録の理由は
 // 変異注入で穴が実測されたことにある。入口の検査を `if (false)` へ落としてもフル
 // スイート 4718 件が全緑で、実出力は exit 1 から exit 3 へ変わっていた。
-const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 173, C4: 1 };
+// #2401 で `suppression add --skill` を新設し、値欠落 1 形を追加して C3 が
+// 173 -> 174 になった。BEFORE（15f15fe8）では `Error: unknown option --skill.` の
+// exit 1 であり、exit code は動いていない。収録の理由は、値を取るオプションの
+// 値欠落が書き込みまで進まないこと（下の副作用ゼロの不変条件）を新しい
+// オプションにも掛けるためである。値欠落の判定は `feedback add --skill` と
+// 同じヘルパー（src/cli.mjs の takeSkillIdValue）が行う。受理形は
+// VALID_CASES 側へ 2 行（通常の語順 / フラグ先行語順）pin した（99 -> 101）。
+const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 174, C4: 1 };
 
 /** 一時 repo 配下の「存在しないパス」に実行時に差し替えるプレースホルダ。 */
 const NONEXISTENT_PATH = '<nonexistent-path>';
@@ -1085,6 +1092,25 @@ const CASES = [
     contract: 'C3',
   },
   {
+    // #2401: `--skill` は値を取る新規オプション。値欠落を黙って捨てると、
+    // 利用者が skill を指定したつもりで skillId の無いエントリが exit 0 で
+    // 書き込まれる（`--scope` / `--fingerprint-algo` の値欠落と同型の穴）。
+    surface: 'suppression',
+    kind: 'value-missing',
+    argv: [
+      'suppression',
+      'add',
+      '--fingerprint',
+      '0123456789abcdef',
+      '--feedback',
+      'false_positive',
+      '--rationale',
+      'r',
+      '--skill',
+    ],
+    contract: 'C3',
+  },
+  {
     surface: 'suppression',
     kind: 'unknown-option',
     argv: ['suppression', 'add', '--nope'],
@@ -1719,11 +1745,11 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // テーブルそのものの健全性（転記ミス・重複の検出）
   // ---------------------------------------------------------------------------
 
-  test('the matrix pins 174 usage-error cases and every row is unique', () => {
+  test('the matrix pins 175 usage-error cases and every row is unique', () => {
     assert.equal(
       CASES.length,
-      174,
-      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）'
+      175,
+      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）'
     );
     const keys = new Set(CASES.map(caseKey));
     assert.equal(keys.size, CASES.length, '同一 (surface, kind, argv) の行が重複している');
@@ -1750,15 +1776,15 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // 「フラグ先行形を拒否」も v1.72.1 の「`--phase Upstream` を誤拒否」も
   // 壊したのは**成功側**であり、守りが薄いのは逆だった。行を消すだけで
   // 黙って保護が減るのを防ぐ。
-  test('the success-side table pins 99 legitimate argv forms', () => {
+  test('the success-side table pins 101 legitimate argv forms', () => {
     assert.equal(
       VALID_CASES.length,
-      99,
-      'コマンド面ごとの正常形: run 14 (#1759 C3 で --context 未知語彙 1行追加、#2065 で run --base main を1行追加) / doctor 5 / skills 16 (#2051 で skills --base main を1行追加、#2081 で後置サブコマンド 1行と ./import 明示パス 1行追加) / runs 7 (#1759 B2 で1行追加) / review 23 (#2046 で review plan --base を1行追加、#2065 で review exec --base を1行追加、#2054 PR-3 で review plan --entry を1行追加、#2011 AC7 P2 で review exec --entry を1行追加) / eval 2 / feedback 2 / suppression 6 / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
+      101,
+      'コマンド面ごとの正常形: run 14 (#1759 C3 で --context 未知語彙 1行追加、#2065 で run --base main を1行追加) / doctor 5 / skills 16 (#2051 で skills --base main を1行追加、#2081 で後置サブコマンド 1行と ./import 明示パス 1行追加) / runs 7 (#1759 B2 で1行追加) / review 23 (#2046 で review plan --base を1行追加、#2065 で review exec --base を1行追加、#2054 PR-3 で review plan --entry を1行追加、#2011 AC7 P2 で review exec --entry を1行追加) / eval 2 / feedback 2 / suppression 8 (#2401 で --skill の両語順 2行追加) / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
     );
   });
 
-  test('the contract distribution is C1:0 / C2:0 / C3:173 / C4:1 (0 of 174 exit 0)', () => {
+  test('the contract distribution is C1:0 / C2:0 / C3:174 / C4:1 (0 of 175 exit 0)', () => {
     const counts = { C1: 0, C2: 0, C3: 0, C4: 0 };
     for (const testCase of CASES) counts[testCase.contract] += 1;
     assert.deepEqual(
@@ -2081,6 +2107,41 @@ const VALID_CASES = [
     ],
     command: 'suppression',
     expect: { suppressionFingerprintAlgo: 'v2' },
+  },
+  {
+    // #2401: `--skill <id>` は suppression の context に skillId / skillVersion を
+    // 記録する。値は `feedback add --skill` と同じヘルパーで取る。
+    argv: [
+      'suppression',
+      'add',
+      '--fingerprint',
+      'c'.repeat(16),
+      '--feedback',
+      'false_positive',
+      '--rationale',
+      'skill provenance',
+      '--skill',
+      'river-review-security',
+    ],
+    command: 'suppression',
+    expect: { suppressionSkillId: 'river-review-security' },
+  },
+  {
+    // 同 フラグ先行語順（v1.72.0 がフラグ先行形を拒否した回帰と同じ入口）。
+    argv: [
+      'suppression',
+      'add',
+      '--skill',
+      'river-review-security',
+      '--fingerprint',
+      'c'.repeat(16),
+      '--feedback',
+      'false_positive',
+      '--rationale',
+      'skill provenance',
+    ],
+    command: 'suppression',
+    expect: { suppressionSkillId: 'river-review-security' },
   },
   {
     argv: [

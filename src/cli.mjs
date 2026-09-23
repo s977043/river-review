@@ -80,7 +80,7 @@ Commands:
   eval                  Run review fixtures evaluation (must_include checks)
   suppression add       Create a Riverbed Memory suppression entry
                         (--fingerprint --feedback --rationale [--scope]
-                         [--severity] [--files] [--expires] [--pr]
+                         [--severity] [--files] [--expires] [--pr] [--skill]
                          [--fingerprint-algo v1|v2]; v2 = line-anchored,
                          suppresses only the occurrence at that line but
                          stops matching once the line shifts)
@@ -1043,6 +1043,29 @@ function parseRunsOption(arg, args, parsed) {
 }
 
 /**
+ * Value of `--skill <id>`, shared by `feedback add` and `suppression add`
+ * (#2401) so that the two options accept and reject exactly the same argv.
+ *
+ * `--skill --pr 123` used to record skillId:"--pr" on `feedback add`: a flag
+ * is a non-empty string, so buildFeedbackEntry's "skillId is required."
+ * check accepted it and wrote the entry. A missing value / a following flag
+ * is therefore a usage error here, before any handler runs.
+ *
+ * @param {string[]} args
+ * @param {Record<string, any>} parsed
+ * @returns {string|null} the value, or null once the usage error is reported
+ */
+function takeSkillIdValue(args, parsed) {
+  const value = args.shift();
+  if (!value || value.startsWith('-')) {
+    console.error('Error: --skill option requires a value.');
+    usageError(parsed);
+    return null;
+  }
+  return value;
+}
+
+/**
  * `feedback` options.
  * @param {string} arg
  * @param {string[]} args
@@ -1070,15 +1093,8 @@ function parseFeedbackOption(arg, args, parsed) {
     return 'continue';
   }
   if (arg === '--skill') {
-    const value = args.shift();
-    // `--skill --pr 123` used to record skillId:"--pr": a flag is a
-    // non-empty string, so buildFeedbackEntry's "skillId is required."
-    // check accepted it and wrote the entry.
-    if (!value || value.startsWith('-')) {
-      console.error('Error: --skill option requires a value.');
-      usageError(parsed);
-      return 'break';
-    }
+    const value = takeSkillIdValue(args, parsed);
+    if (value === null) return 'break';
     parsed.feedbackSkillId = value;
     return 'continue';
   }
@@ -1244,6 +1260,15 @@ function parseSuppressionOption(arg, args, parsed) {
       return 'break';
     }
     parsed.suppressionFingerprintAlgo = algo;
+    return 'continue';
+  }
+  if (arg === '--skill') {
+    // #2401: same option as `feedback add --skill`, parsed by the same helper.
+    // The handler records it as context.skillId / skillVersion through
+    // resolveSuppressionProvenance.
+    const value = takeSkillIdValue(args, parsed);
+    if (value === null) return 'break';
+    parsed.suppressionSkillId = value;
     return 'continue';
   }
   if (arg === '--finding') {
@@ -1448,6 +1473,8 @@ function parseArgs(argv) {
     suppressionFiles: null,
     suppressionExpiresAt: null,
     suppressionPrNumber: null,
+    // #2401: `suppression add --skill <id>`; null = do not record skillId.
+    suppressionSkillId: null,
     // promote subcommand fields (#1622 / #1568-B)
     promoteSubcommand: null,
     promoteId: null,

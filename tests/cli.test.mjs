@@ -16,7 +16,7 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, promises as fsPromises, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test, { describe, mock } from 'node:test';
 
@@ -27,6 +27,7 @@ import {
   runGit,
 } from './helpers/temp-repo.mjs';
 import { createTempDir, cleanupTempDirAsync } from './helpers/temp-dir.mjs';
+import { defaultPaths as skillLoaderPaths } from '../runners/core/skill-loader.mjs';
 
 // -----------------------------------------------------------------------------
 // river run - dry-run outputs
@@ -861,5 +862,203 @@ describe('river suppression add - rulesDigest provenance (#2401)', () => {
     assert.match(result.stderr, /unexpected-2401/);
     assert.doesNotMatch(result.stderr, /Warning: rulesDigest not recorded/);
     assert.strictEqual(createHash.mock.callCount() > 0, true);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// river suppression add --skill - skillId / skillVersion provenance (#2401)
+// -----------------------------------------------------------------------------
+//
+// `--skill <id>` is the same option as `feedback add --skill` (one parse helper
+// in src/cli.mjs). Through the real CLI entry, it must reach
+// resolveSuppressionProvenance as `ruleId` and land in context.skillId /
+// context.skillVersion. The expected version is read from the SKILL.md text
+// here, not through the skill loader the production path uses.
+describe('river suppression add --skill - skill provenance (#2401)', () => {
+  const BASE_ARGV = [
+    'suppression',
+    'add',
+    '--fingerprint',
+    '0123456789abcdef',
+    '--feedback',
+    'false_positive',
+    '--rationale',
+    'skill provenance wiring',
+  ];
+  const SKILL_ID = 'river-review-security';
+
+  function readSuppressionEntries(dir) {
+    const index = JSON.parse(readFileSync(join(dir, '.river', 'memory', 'index.json'), 'utf8'));
+    return index.entries.filter((e) => e.type === 'suppression');
+  }
+
+  function versionFromSkillMd(skillId) {
+    const text = readFileSync(
+      join(skillLoaderPaths.skillsDir, 'agent-skills', skillId, 'SKILL.md'),
+      'utf8'
+    );
+    const frontMatter = text.split(/^---$/m)[1];
+    assert.match(frontMatter, new RegExp(`^id: ${skillId}$`, 'm'));
+    const version = frontMatter.match(/^version:\s*['"]?([^'"\s]+)['"]?\s*$/m)?.[1];
+    assert.ok(version, `no version in ${skillId}/SKILL.md`);
+    return version;
+  }
+
+  /**
+   * Make readdir of the bundled skills directory fail with `makeError()`, and
+   * leave every other readdir alone.
+   */
+  function failSkillsDirReaddir(t, makeError) {
+    const realReaddir = fsPromises.readdir.bind(fsPromises);
+    const readdir = mock.method(fsPromises, 'readdir', async (dirPath, ...rest) => {
+      if (resolve(String(dirPath)) === resolve(skillLoaderPaths.skillsDir)) throw await makeError();
+      return realReaddir(dirPath, ...rest);
+    });
+    t.after(() => readdir.mock.restore());
+    return readdir;
+  }
+
+  test('records context.skillId and the SKILL.md version as context.skillVersion', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({ rules: '- base rule\n' });
+    t.after(cleanup);
+    const expectedVersion = versionFromSkillMd(SKILL_ID);
+
+    const result = await runCliInProcess([...BASE_ARGV, '--skill', SKILL_ID], { cwd: dir });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    const entries = readSuppressionEntries(dir);
+    assert.strictEqual(entries.length, 1);
+    assert.strictEqual(entries[0].context.skillId, SKILL_ID);
+    assert.strictEqual(entries[0].context.skillVersion, expectedVersion);
+    // The digest is resolved independently and is still recorded alongside.
+    assert.strictEqual(
+      entries[0].context.rulesDigest,
+      crypto.createHash('sha256').update('- base rule').digest('hex')
+    );
+    assert.match(result.stdout, new RegExp(`skillId: ${SKILL_ID}`));
+    assert.match(
+      result.stdout,
+      new RegExp(`skillVersion: ${expectedVersion.replace(/\./g, '\\.')}`)
+    );
+    assert.doesNotMatch(result.stderr, /Warning:/);
+  });
+
+  test('also accepts the flag-first order (--skill before the required options)', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo();
+    t.after(cleanup);
+
+    const result = await runCliInProcess(
+      ['suppression', 'add', '--skill', SKILL_ID, ...BASE_ARGV.slice(2)],
+      { cwd: dir }
+    );
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    assert.strictEqual(readSuppressionEntries(dir)[0].context.skillId, SKILL_ID);
+  });
+
+  test('omitting --skill writes no skillId / skillVersion keys but still records rulesDigest', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({ rules: '- base rule\n' });
+    t.after(cleanup);
+
+    const result = await runCliInProcess(BASE_ARGV, { cwd: dir });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    const { context } = readSuppressionEntries(dir)[0];
+    assert.strictEqual(Object.hasOwn(context, 'skillId'), false);
+    assert.strictEqual(Object.hasOwn(context, 'skillVersion'), false);
+    assert.match(context.rulesDigest, /^[0-9a-f]{64}$/);
+  });
+
+  test('an id no skill carries is recorded as given, without skillVersion (same as feedback add)', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo();
+    t.after(cleanup);
+
+    const result = await runCliInProcess([...BASE_ARGV, '--skill', 'no-such-skill-2401'], {
+      cwd: dir,
+    });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    const { context } = readSuppressionEntries(dir)[0];
+    assert.strictEqual(context.skillId, 'no-such-skill-2401');
+    assert.strictEqual(Object.hasOwn(context, 'skillVersion'), false);
+    assert.doesNotMatch(result.stderr, /Warning:/);
+
+    // Parity: feedback add does not check --skill against the registry either.
+    const feedback = await runCliInProcess(
+      ['feedback', 'add', '--type', 'false_positive', '--skill', 'no-such-skill-2401'],
+      { cwd: dir }
+    );
+    assert.strictEqual(feedback.code, 0, feedback.stderr);
+  });
+
+  test('a blank --skill is rejected with exit 1 before anything is written (same as feedback add)', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo();
+    t.after(cleanup);
+
+    const result = await runCliInProcess([...BASE_ARGV, '--skill', '   '], { cwd: dir });
+
+    assert.strictEqual(result.code, 1, result.stdout);
+    assert.match(result.stderr, /^Error: --skill must not be blank\.$/m);
+    assert.throws(() => readFileSync(join(dir, '.river', 'memory', 'index.json')), {
+      code: 'ENOENT',
+    });
+
+    const feedback = await runCliInProcess(
+      ['feedback', 'add', '--type', 'false_positive', '--skill', '   '],
+      { cwd: dir }
+    );
+    assert.strictEqual(feedback.code, 1, feedback.stdout);
+  });
+
+  test('--skill unknown creates the suppression but records no skillId, and says why', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo();
+    t.after(cleanup);
+
+    const result = await runCliInProcess([...BASE_ARGV, '--skill', 'unknown'], { cwd: dir });
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    const { context } = readSuppressionEntries(dir)[0];
+    assert.strictEqual(Object.hasOwn(context, 'skillId'), false);
+    assert.strictEqual(Object.hasOwn(context, 'skillVersion'), false);
+    assert.match(result.stderr, /^Warning: skillId not recorded on this suppression: "unknown" /m);
+  });
+
+  test('a skill metadata read failure still creates the suppression, dropping only skillVersion', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({ rules: '- base rule\n' });
+    t.after(cleanup);
+    // A genuine fs error (ENOENT from a real readdir), as listSkillFiles would
+    // raise if the bundled skills directory were missing.
+    const readdir = failSkillsDirReaddir(t, () =>
+      fsPromises.readdir(join(dir, 'no-such-skills-dir')).catch((error) => error)
+    );
+
+    const result = await runCliInProcess([...BASE_ARGV, '--skill', SKILL_ID], { cwd: dir });
+    readdir.mock.restore();
+
+    assert.strictEqual(result.code, 0, result.stderr);
+    assert.match(result.stdout, /Suppression created: /);
+    const { context } = readSuppressionEntries(dir)[0];
+    assert.strictEqual(context.skillId, SKILL_ID);
+    assert.strictEqual(Object.hasOwn(context, 'skillVersion'), false);
+    assert.match(context.rulesDigest, /^[0-9a-f]{64}$/);
+    assert.match(
+      result.stderr,
+      /^Warning: skillVersion not recorded on this suppression: ENOENT: /m
+    );
+  });
+
+  test('does not swallow errors other than a skill metadata read failure', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo();
+    t.after(cleanup);
+    // Stands in for a bug inside skill resolution: no fs `code` / `syscall`,
+    // not a SkillLoaderError. It must surface, not become a warning.
+    const readdir = failSkillsDirReaddir(t, () => new TypeError('unexpected-2401-skill'));
+
+    const result = await runCliInProcess([...BASE_ARGV, '--skill', SKILL_ID], { cwd: dir });
+    readdir.mock.restore();
+
+    assert.strictEqual(result.code, 1, result.stdout);
+    assert.match(result.stderr, /unexpected-2401-skill/);
+    assert.doesNotMatch(result.stderr, /Warning: skillVersion not recorded/);
   });
 });
