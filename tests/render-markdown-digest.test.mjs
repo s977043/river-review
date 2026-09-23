@@ -228,6 +228,8 @@ describe('#1713 Slice 1: markdown headline and progressive disclosure', () => {
     assert.doesNotMatch(markdown, /\*\*判定: auto-approve\*\*/);
     assert.doesNotMatch(markdown, /指摘 0 件/);
     assert.doesNotMatch(markdown, /スコア 100\/100/);
+    assert.doesNotMatch(markdown, /スコア内訳/);
+    assert.doesNotMatch(markdown, /優先度サマリー/);
     assert.doesNotMatch(markdown, /✅ マージ前に対応が必要な指摘はありません/);
     assert.match(markdown, /人間レビュー: \*\*必須\*\*/);
     assert.match(markdown, /src\/app\.js/);
