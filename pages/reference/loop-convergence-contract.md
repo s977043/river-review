@@ -63,10 +63,10 @@ Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](ht
 - 執行のリファレンス実装と conformance fixture（`tests/fixtures/gate-conformance/`）で caller 側の振る舞いを検証できる
 - **不完全性の持ち込みは opt-in（#2320 / #2337）**: 「レビューは走ったが対象を見ていない」という事実を gate へ渡すかは host が選ぶ。既定は off であり、既定の gate 出力は従来と 1 ビットも変わらない
   - `RIVER_GATE_STAGING_UNRUNNABLE=1`: 決定論ゲートの subject file が sandbox へ揃わなかった run を `deterministicUnrunnable` として扱い、`ESCALATE`（`DETERMINISTIC_UNRUNNABLE`）へ倒す。空の sandbox を渡された checker は自力で exit 0 するため、その exit code は変更に対する verdict ではない。`strictBlock` には決して寄せない
-  - `RIVER_GATE_COVERAGE=1`: `reviewCoverage.status` が `partial` / `not_executed` の run を `NO_GO`（`COVERAGE_INCOMPLETE`）へ倒す。これは `suggestedLoopSignal` の降格ではなく gate の**独立入力**である。降格経路にすると結果が `decision` に依存し、`auto-approve` は `NO_GO` になる一方で `human-review-recommended` は rule 8 の `GO_WITH_OBSERVATION`（exit 0）のまま残る。独立入力なら両者とも一様に止まる。**実効があるのは現時点で `river run --gate` 経路のみであり、`review exec` 経路は engine が `reviewCoverage` を返すまで no-op となる**
-    - 発火条件は 3 つである。`RIVER_GATE_COVERAGE=1` / `river run --gate` / `--reviewers` が揃わないと opt-in は発火しない。`--reviewers` に既定値は無く、省略すると gate は従来どおりの出力になる
-    - 理由は `reviewCoverage` の生成経路にある。`--reviewers` 付きの run は `runReviewerOrchestration` 経由で `reviewCoverage` を得る。省略した run は `generateReview` 経路へ分岐し、`reviewCoverage` を生成しない
-    - GitHub Action からは `gate: true` と非空の `reviewers` input を指定し、step の `env` に `RIVER_GATE_COVERAGE=1` を設定する。Action は `reviewers` を解釈せず CLI へそのまま渡す
+  - `RIVER_GATE_COVERAGE=1`: `reviewCoverage.status` が `partial` / `not_executed` の run を `NO_GO`（`COVERAGE_INCOMPLETE`）へ倒す。これは `suggestedLoopSignal` の降格ではなく gate の**独立入力**である。降格経路にすると結果が `decision` に依存するため、coverage gap は独立入力として一様に止める。**実効があるのは現時点で `river run --gate` 経路のみであり、`review exec` 経路は engine が `reviewCoverage` を返すまで no-op となる**
+    - #2410 以降、`reviewCoverage` は `--reviewers` orchestration だけでなく単一 reviewer 経路でも、LLM call を**実際に試行した場合だけ**生成される。有効な応答（`NO_ISSUES` を含む）は `complete`、transport / response-envelope / model-output parse failure は required unit `failed` → `not_executed` になる
+    - dry-run / offline / API key 未設定などの意図的 skip は coverage を生成しない。「LLM を試して失敗した」と「そもそも実行しなかった」を同一視しないためである
+    - 発火条件は `RIVER_GATE_COVERAGE=1` + `river run --gate` + 不完全な coverage 観測であり、`--reviewers` は必須ではない。GitHub Action では `gate: true` と step の `env` に `RIVER_GATE_COVERAGE=1` を設定する。`reviewers` input は複数 reviewer coverage が必要な場合だけ指定する
   - coverage が**存在しない**ことは不完全とは読まない。「観測が無い」と「欠落を観測した」は別の事実であり、マージを止めてよいのは後者だけである
 
 `gate` は advisory です。判定の執行（`--gate` モード、strict_block ルーティング）は Epic #1347 S4 で導入されます。
