@@ -64,7 +64,7 @@ paired replay が `improvementCandidate` を含む場合、result は `promotion
 - independent verifier が実際に検証済みか
 - terminal reason
 
-candidate が宣言されていない場合は `promotionHandoff: null` です。既存 schemaVersion 1 artifact との互換性を維持するため、schema 上は optional field とします。
+candidate が宣言されていない場合、または Experiment Manifest の改変検知・current inputs との `experimentKey` 不一致がある場合は `promotionHandoff: null` です。後者は fail-closed です。candidate と別実験の manifest を同じ機械可読 handoff に結合すると、下流が integrity flag を見落としただけで証拠を誤帰属できるためです。既存 schemaVersion 1 artifact との互換性を維持するため、schema 上は optional field とします。
 
 ### post-adoption effectiveness とは分ける
 
