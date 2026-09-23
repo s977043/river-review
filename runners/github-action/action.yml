@@ -9,6 +9,10 @@ inputs:
     description: 'Planner mode (off|order|prune).'
     required: false
     default: 'off'
+  reviewers:
+    description: 'Reviewer roles for orchestration (comma-separated canonical roles or auto).'
+    required: false
+    default: ''
   target:
     description: 'Path to the git repository to review.'
     required: false
@@ -116,6 +120,9 @@ runs:
         # Same env passthrough for the Beta Flow entry name (#2054 PR-5): the
         # value never reaches the shell script as an expanded expression.
         INPUT_ENTRY: ${{ inputs.entry }}
+        # Reviewer selection is untrusted string input. Keep it out of the shell
+        # source and pass it as data to the CLI command array.
+        INPUT_REVIEWERS: ${{ inputs.reviewers }}
       run: |
         set -euo pipefail
         export RIVER_REPO_ROOT="$(cd "${RIVER_REPO_ROOT}" && pwd)"
@@ -181,11 +188,15 @@ runs:
           [ -n "${{ inputs.max_cost }}" ] && ignored="${ignored} max_cost"
           [ "${{ inputs.comment }}" = "true" ] && ignored="${ignored} comment"
           [ "${{ inputs.inline_comments }}" = "true" ] && ignored="${ignored} inline_comments"
+          [ -n "${INPUT_REVIEWERS}" ] && ignored="${ignored} reviewers"
           if [ -n "${ignored}" ]; then
             echo "::notice::entry is set (${INPUT_ENTRY}); these inputs do not apply on the plan-only path and are ignored:${ignored}"
           fi
         else
           cmd=(node "${GITHUB_ACTION_PATH}/dist/index.mjs" run "${repo_path}" --phase "${{ inputs.phase }}" --planner "${{ inputs.planner }}" --output "${output_fmt}")
+          if [ -n "${INPUT_REVIEWERS}" ]; then
+            cmd+=("--reviewers" "${INPUT_REVIEWERS}")
+          fi
         fi
         # dry_run / estimate / max_cost describe the `run` path only: `review
         # plan --plan-only` calls no model, so they are not forwarded there.
