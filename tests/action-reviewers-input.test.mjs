@@ -12,10 +12,14 @@ const ACTION_PATH = path.join(REPO_ROOT, 'runners', 'github-action', 'action.yml
 const actionYml = fs.readFileSync(ACTION_PATH, 'utf8');
 
 function runBlock() {
-  const block =
-    /      run: \|\n((?:        .*\n|\n)+?)\n    # Both comment steps/.exec(actionYml)?.[1];
-  assert.ok(block, 'run block not found');
-  return block;
+  const startMarker = '      run: |\n';
+  const endMarker = '\n    # Both comment steps';
+  const start = actionYml.indexOf(startMarker);
+  assert.notEqual(start, -1, 'run block start not found');
+  const contentStart = start + startMarker.length;
+  const end = actionYml.indexOf(endMarker, contentStart);
+  assert.notEqual(end, -1, 'run block end not found');
+  return actionYml.slice(contentStart, end);
 }
 
 function render({ reviewers = '', entry = '' } = {}) {
