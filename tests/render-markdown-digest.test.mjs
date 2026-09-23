@@ -14,7 +14,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
-import { formatJsonOutput, printMarkdownReport } from '../src/cli/render.mjs';
+import {
+  buildHumanDecisionSurface,
+  formatHumanDecisionSurfaceMarkdown,
+  formatJsonOutput,
+  printMarkdownReport,
+} from '../src/cli/render.mjs';
 import { formatYamlOutput } from '../src/lib/output-formatters/yaml.mjs';
 import { formatHtmlOutput } from '../src/lib/output-formatters/html.mjs';
 
@@ -506,6 +511,169 @@ describe('#1713 F1: the headline describes exactly what is rendered below it', (
     assert.match(minorOnly, /✅ マージ前必須（P1 \/ P2）の指摘はありません/);
     assert.doesNotMatch(minorOnly, /✅ マージ前に対応が必要な指摘はありません/);
     assertNoContradiction(minorOnly, 'minor only');
+  });
+});
+
+// -----------------------------------------------------------------------------
+// #2370: Human Decision Surface — display-only deterministic projection
+// -----------------------------------------------------------------------------
+
+// These tests protect visibility and fail-safe display invariants.
+// They intentionally do not define new judgment semantics.
+describe('#2370: Human Decision Surface', () => {
+  it('adds no Decision Surface to a clean run with no attention signal', () => {
+    const markdown = renderMarkdown(makeResult());
+
+    assert.doesNotMatch(markdown, /### 判断が必要な項目/);
+    assert.match(markdown, /✅ マージ前に対応が必要な指摘はありません/);
+  });
+
+  it('counts exactly the existing expanded findings as action required', () => {
+    const findings = [
+      makeFinding({ id: 'rr-1', severity: 'critical', title: 'critical issue' }),
+      makeFinding({ id: 'rr-2', severity: 'major', file: 'src/b.js', title: 'major issue' }),
+      makeFinding({ id: 'rr-3', severity: 'minor', file: 'src/c.js', title: 'minor issue' }),
+      makeFinding({ id: 'rr-4', severity: 'info', file: 'src/d.js', title: 'info issue' }),
+    ];
+    const markdown = renderMarkdown(makeResult({ findings }));
+    const expanded = expandedBody(markdown);
+    const collapsed = collapsedBody(markdown);
+
+    assert.match(expanded, /### 判断が必要な項目/);
+    assert.match(expanded, /- 要対応: \*\*2 件\*\*/);
+    assert.match(expanded, /### 要対応 \(2 件:/);
+
+    // Decision Surface is a pointer only. Lower-severity findings remain fully
+    // available through the existing progressive-disclosure surface.
+    assert.match(collapsed, /src\/c\.js:5/);
+    assert.match(collapsed, /src\/d\.js:5/);
+  });
+
+  it('surfaces existing human-review requirements without creating a new judgment', () => {
+    const surface = buildHumanDecisionSurface({
+      rendered: { expanded: [] },
+      artifact: {
+        decision: 'human-review-required',
+        gate: { decision: 'ESCALATE' },
+      },
+      result: {
+        plan: {
+          riskAssessment: {
+            aggregateAction: 'require_human_review',
+            humanReviewFiles: ['src/api/orders.ts'],
+          },
+          riskMap: {
+            require_human_review: ['src/api/orders.ts', 'src/api/payments.ts'],
+          },
+        },
+      },
+    });
+
+    assert.strictEqual(surface.humanReviewRequired, true);
+    assert.strictEqual(surface.humanReviewFileCount, 2);
+    assert.strictEqual(surface.actionRequiredCount, 0);
+
+    const markdown = formatHumanDecisionSurfaceMarkdown(surface);
+    assert.match(markdown, /人間レビュー: \*\*必須\*\*（対象ファイル 2 件）/);
+  });
+
+  it('shows partial coverage, timeout and blind spots instead of presenting a clean surface', () => {
+    const result = makeResult({
+      teamLeadReport: {
+        top3Findings: [],
+        blindSpots: [{ role: 'security-reviewer', label: 'Security Reviewer' }],
+        consensusSummary: { consensus: 0, multi: 0, single: 0, total: 0 },
+      },
+    });
+    result.reviewCoverage = {
+      schemaVersion: '1',
+      status: 'partial',
+      expectedUnits: 2,
+      completedUnits: 1,
+      requiredUnits: 2,
+      completedRequiredUnits: 1,
+      incompleteRequiredUnitIds: ['reviewer:security/chunk:2'],
+      units: [
+        {
+          id: 'reviewer:security/chunk:1',
+          kind: 'diff-chunk',
+          subjects: ['src/a.js'],
+          reviewerRole: 'security-reviewer',
+          required: true,
+          status: 'completed',
+          reasonCode: null,
+          findingsCount: 0,
+        },
+        {
+          id: 'reviewer:security/chunk:2',
+          kind: 'diff-chunk',
+          subjects: ['src/b.js'],
+          reviewerRole: 'security-reviewer',
+          required: true,
+          status: 'timed_out',
+          reasonCode: 'reviewer_timeout',
+          findingsCount: 0,
+        },
+      ],
+    };
+
+    const markdown = renderMarkdown(result);
+    const expanded = expandedBody(markdown);
+
+    assert.match(expanded, /### 判断が必要な項目/);
+    assert.match(expanded, /レビュー網羅性: \*\*partial\*\*（未完了 1 unit、timeout 1）/);
+    assert.match(expanded, /未実行のレビュー観点: \*\*1 件\*\*/);
+    assert.doesNotMatch(expanded, /✅ マージ前に対応が必要な指摘はありません/);
+  });
+
+  it('shows not_executed coverage without inventing missing unit details', () => {
+    const result = makeResult();
+    result.reviewCoverage = {
+      schemaVersion: '1',
+      status: 'not_executed',
+      expectedUnits: 0,
+      completedUnits: 0,
+      requiredUnits: 0,
+      completedRequiredUnits: 0,
+      incompleteRequiredUnitIds: [],
+      units: [],
+    };
+
+    const markdown = renderMarkdown(result);
+    const expanded = expandedBody(markdown);
+
+    assert.match(expanded, /レビュー網羅性: \*\*not_executed\*\*/);
+    assert.doesNotMatch(expanded, /未完了 \d+ unit/);
+    assert.doesNotMatch(expanded, /✅ マージ前に対応が必要な指摘はありません/);
+  });
+
+  it('does not invent coverage or resolution state when upstream data is absent', () => {
+    const surface = buildHumanDecisionSurface({
+      rendered: { expanded: [] },
+      artifact: { decision: 'auto-approve' },
+      result: { plan: {}, teamLeadReport: null },
+    });
+
+    assert.strictEqual(surface.coverageStatus, null);
+    assert.strictEqual(surface.incompleteUnitCount, 0);
+    assert.strictEqual(surface.failedUnitCount, 0);
+    assert.strictEqual(surface.timedOutUnitCount, 0);
+    assert.strictEqual(surface.humanReviewRequired, false);
+    assert.strictEqual(surface.hasAttentionRequired, false);
+    assert.strictEqual(formatHumanDecisionSurfaceMarkdown(surface), null);
+  });
+
+  it('keeps the canonical marker single and leaves all finding bodies present', () => {
+    const findings = [
+      makeFinding({ id: 'rr-1', severity: 'major', title: 'major-one' }),
+      makeFinding({ id: 'rr-2', severity: 'minor', file: 'src/minor.js', title: 'minor-one' }),
+    ];
+    const markdown = renderMarkdown(makeResult({ findings }));
+
+    assert.strictEqual(countOccurrences(markdown, '<!-- river-review -->'), 1);
+    assert.strictEqual(countOccurrences(markdown, '- **Evidence:**'), 2);
+    assert.match(markdown, /major-one/);
+    assert.match(markdown, /minor-one/);
   });
 });
 
