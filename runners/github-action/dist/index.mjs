@@ -93781,10 +93781,7 @@ function buildHumanDecisionSurface({ rendered, artifact, result }) {
     timedOutUnitCount: timedOutUnits.length,
     blindSpotCount: blindSpots.length,
     hasAttentionRequired:
-      actionRequiredCount > 0 ||
-      humanReviewRequired ||
-      coverageIncomplete ||
-      blindSpots.length > 0,
+      actionRequiredCount > 0 || humanReviewRequired || coverageIncomplete || blindSpots.length > 0,
   };
 }
 
