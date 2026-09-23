@@ -28,6 +28,17 @@ async function pathExists(target) {
 }
 
 describe('#2382 Human Attention runner I/O guards', () => {
+  const repoRoot = git('rev-parse', '--show-toplevel').stdout.trim();
+
+  function repoOutput(name) {
+    return path.join(
+      repoRoot,
+      'artifacts',
+      'evals',
+      'human-attention',
+      `test-${process.pid}-${name}`
+    );
+  }
   it('rejects a missing baseline commit before producing output', async () => {
     const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'river-review-ha-missing-'));
     const output = path.join(tempRoot, 'result');
@@ -49,10 +60,30 @@ describe('#2382 Human Attention runner I/O guards', () => {
     }
   });
 
-  it('refuses to overwrite an existing output directory', async () => {
-    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'river-review-ha-output-'));
+  it('rejects output outside the canonical evaluation artifact root', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'river-review-ha-output-escape-'));
     const output = path.join(tempRoot, 'result');
-    await mkdir(output);
+
+    try {
+      await assert.rejects(
+        () =>
+          runEvaluation({
+            baseline: BASELINE,
+            candidate: CANDIDATE,
+            fixtures: CANONICAL_FIXTURE_PATH,
+            output,
+          }),
+        /output must be a new child directory under artifacts\/evals\/human-attention/
+      );
+      assert.strictEqual(await pathExists(output), false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to overwrite an existing canonical output directory', async () => {
+    const output = repoOutput('existing');
+    await mkdir(output, { recursive: true });
 
     try {
       await assert.rejects(
@@ -66,12 +97,11 @@ describe('#2382 Human Attention runner I/O guards', () => {
         /output already exists/
       );
     } finally {
-      await rm(tempRoot, { recursive: true, force: true });
+      await rm(output, { recursive: true, force: true });
     }
   });
 
   it('removes temporary worktrees when the evaluation task throws', async () => {
-    const repoRoot = git('rev-parse', '--show-toplevel').stdout.trim();
     const tempParent = await mkdtemp(path.join(os.tmpdir(), 'river-review-ha-worktrees-'));
     let baselineDir;
     let candidateDir;
