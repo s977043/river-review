@@ -146,7 +146,7 @@ Progressive Disclosure は「ファイルを細かく分けること」ではな
 
 ## Resolver implementation
 
-#2386 / PR #2389 で executable skill-ID resolver を実装済みです。
+Issue #2386 / PR #2389 で executable skill-ID resolver を実装済みです。
 
 - `commands/skill.md` は exact skill ID を先に `scripts/resolve-skill-id.mjs` へ渡す
 - source / full plugin root では Agent Skill と native Review Skill の canonical package depth を走査する
