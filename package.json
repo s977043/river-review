@@ -53,6 +53,7 @@
     "planner:eval": "node scripts/evaluate-planner.mjs",
     "planner:eval:dataset": "node scripts/evaluate-planner-dataset.mjs",
     "eval:fixtures": "node scripts/evaluate-review-fixtures.mjs",
+    "eval:human-attention": "node scripts/evaluate-human-attention.mjs",
     "eval:convergence": "node scripts/evaluate-convergence-efficiency.mjs",
     "eval:repo-context": "node scripts/evaluate-repo-wide-fixtures.mjs",
     "check:doc-enum": "node scripts/check-doc-enumerations.mjs",
