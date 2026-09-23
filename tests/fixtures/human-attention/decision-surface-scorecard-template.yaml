@@ -19,7 +19,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -36,7 +35,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -55,7 +53,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -72,7 +69,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -91,7 +87,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -108,7 +103,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -127,7 +121,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -144,7 +137,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -163,7 +155,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -180,7 +171,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -199,7 +189,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -216,7 +205,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -235,7 +223,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -252,7 +239,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -271,7 +257,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -288,7 +273,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -307,7 +291,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -324,7 +307,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -343,7 +325,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
@@ -360,7 +341,6 @@ cases:
       q2_human_required: null
       q3_uncertainty: null
       q4_trace: null
-      q5_confidence: null
       itemExtractionScore: null
       caseExtractionSuccess: null
       attentionSeconds: null
