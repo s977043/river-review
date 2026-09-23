@@ -6,7 +6,12 @@ import {
   loadMemory,
   queryMemory,
 } from './riverbed-memory.mjs';
-import { loadProjectRulesDigest } from './rules.mjs';
+import {
+  CURRENT_RULES_DIGEST_ALGO,
+  RULES_DIGEST_ALGOS,
+  computeRulesDigest,
+  loadProjectRulesDigest,
+} from './rules.mjs';
 import { loadAllSkillMetadata } from '../../runners/core/skill-loader.mjs';
 
 /**
@@ -44,11 +49,15 @@ export function inferSubsystem(filePath) {
  * `skillId`, `skillVersion` and `rulesDigest` (#2202 Phase 0) record the
  * provenance of the review criteria at issuance time: which skill produced the
  * suppressed finding, that skill's `version`, and the digest of the project
- * rules. They are RECORDED ONLY — `isSuppressionExpired` does not read them.
+ * rules. `isSuppressionExpired` does not read them. `rulesDigest` is read by
+ * the opt-in rules-match gate (#2202 Phase 2, `evaluateSuppressionRulesMatch`),
+ * which needs `rulesDigestAlgo` to know which digest version it holds.
  * Like the other optional fields, each is written only when it is a non-empty
  * string; an absent value leaves the key out entirely (no null, no ""), so an
  * entry without provenance is indistinguishable from one written before
- * #2202. Use `resolveSuppressionProvenance` to derive the three values.
+ * #2202. `rulesDigestAlgo` is written only together with `rulesDigest`; when
+ * it is left out the digest is read as `'v1'`. Use
+ * `resolveSuppressionProvenance` to derive the values.
  *
  * @param {object} options
  * @returns {object} The created suppression entry
@@ -72,6 +81,7 @@ export function createSuppression({
   skillId,
   skillVersion,
   rulesDigest,
+  rulesDigestAlgo,
   author = 'river-review',
 }) {
   if (!rationale) throw new Error('Suppression requires a rationale');
@@ -101,7 +111,10 @@ export function createSuppression({
   }
   if (isNonEmptyString(skillId)) context.skillId = skillId;
   if (isNonEmptyString(skillVersion)) context.skillVersion = skillVersion;
-  if (isNonEmptyString(rulesDigest)) context.rulesDigest = rulesDigest;
+  if (isNonEmptyString(rulesDigest)) {
+    context.rulesDigest = rulesDigest;
+    if (isNonEmptyString(rulesDigestAlgo)) context.rulesDigestAlgo = rulesDigestAlgo;
+  }
 
   const entry = {
     id: 'suppression-' + idSeed + '-' + Date.now(),
@@ -136,7 +149,9 @@ function isNonEmptyString(value) {
  * - `skillVersion` is the `version` of that skill's metadata as loaded by
  *   `loadAllSkillMetadata` (runners/core/skill-loader.mjs), or from the
  *   already-loaded `skills` list when the caller has one.
- * - `rulesDigest` is `loadProjectRulesDigest` (rules.mjs) over `repoRoot`.
+ * - `rulesDigest` is `loadProjectRulesDigest` (rules.mjs) over `repoRoot`,
+ *   computed with `CURRENT_RULES_DIGEST_ALGO` (`'v2'`, normalized, #2202
+ *   Phase 2) and returned together with `rulesDigestAlgo` naming that version.
  *
  * A value that cannot be determined is left out of the result (never null),
  * so spreading the result into `createSuppression` omits the key.
@@ -148,7 +163,7 @@ function isNonEmptyString(value) {
  *   already-loaded skills; loaded via `loadAllSkillMetadata` when omitted
  * @param {string} [options.skillsDir] - passed to `loadAllSkillMetadata`
  * @param {{ rulesPath?: string }} [options.rulesOptions] - passed to `loadProjectRulesDigest`
- * @returns {Promise<{ skillId?: string, skillVersion?: string, rulesDigest?: string }>}
+ * @returns {Promise<{ skillId?: string, skillVersion?: string, rulesDigest?: string, rulesDigestAlgo?: string }>}
  */
 export async function resolveSuppressionProvenance({
   ruleId,
@@ -167,8 +182,14 @@ export async function resolveSuppressionProvenance({
     if (isNonEmptyString(version)) provenance.skillVersion = version;
   }
   if (isNonEmptyString(repoRoot)) {
-    const digest = await loadProjectRulesDigest(repoRoot, rulesOptions);
-    if (isNonEmptyString(digest)) provenance.rulesDigest = digest;
+    const digest = await loadProjectRulesDigest(repoRoot, {
+      ...rulesOptions,
+      algo: CURRENT_RULES_DIGEST_ALGO,
+    });
+    if (isNonEmptyString(digest)) {
+      provenance.rulesDigest = digest;
+      provenance.rulesDigestAlgo = CURRENT_RULES_DIGEST_ALGO;
+    }
   }
   return provenance;
 }
@@ -375,6 +396,90 @@ export function formatUnknownFingerprintAlgoWarning({ id, fingerprintAlgo }) {
     `(${JSON.stringify(fingerprintAlgo)}); it is ignored and no longer suppresses findings. ` +
     'Repair the value to "v1" (line-independent) or "v2" (line-anchored).'
   );
+}
+
+/**
+ * The operator-facing sentence for one suppression whose
+ * `context.rulesDigestAlgo` is not a value this version understands
+ * (#2202 Phase 2). Same shape as `formatUnknownFingerprintAlgoWarning`, but
+ * the consequence is the opposite direction: an unknown digest version makes
+ * the rules-match gate unable to judge the entry, so the entry is NOT judged
+ * on that axis and keeps suppressing. The warning is what keeps that silent
+ * pass-through visible.
+ *
+ * @param {{ id: string, rulesDigestAlgo: unknown }} entry
+ * @returns {string}
+ */
+export function formatUnknownRulesDigestAlgoWarning({ id, rulesDigestAlgo }) {
+  return (
+    `Warning: suppression ${id} declares an unsupported context.rulesDigestAlgo ` +
+    `(${JSON.stringify(rulesDigestAlgo)}); its rulesDigest is not compared with the current project rules. ` +
+    'Repair the value to "v1" (unnormalized) or "v2" (line endings and trailing whitespace normalized).'
+  );
+}
+
+/**
+ * The operator-facing sentence for one suppression that the opt-in rules-match
+ * gate stopped (#2202 Phase 2): its `context.rulesDigest` was recorded under
+ * project rules that differ from the current ones. Like the other suppression
+ * warnings it carries the entry id only; the digests themselves are not
+ * repairable values and stay out of the warning stream.
+ *
+ * @param {{ id: string }} entry
+ * @returns {string}
+ */
+export function formatRulesDigestMismatchWarning({ id }) {
+  return (
+    `Warning: suppression ${id} was issued under different project rules ` +
+    '(context.rulesDigest does not match the current .river/rules.md and .river/rules.d/); ' +
+    'it no longer suppresses findings because memory.suppressionRequireRulesMatch is enabled. ' +
+    'Re-issue the suppression if it still applies under the current rules.'
+  );
+}
+
+/**
+ * Whether a suppression's recorded `context.rulesDigest` matches the current
+ * project rules (#2202 Phase 2). This is a SEPARATE predicate from
+ * `isSuppressionExpired` on purpose: the expiry rule fails safe to "expired"
+ * on an unreadable value, which is the safe direction for a calendar deadline
+ * but the destructive one here (#1756 has the same shape). Every case this
+ * function cannot decide therefore answers `'undetermined'`, never
+ * `'mismatch'`:
+ *
+ * - no `rulesDigest` on the entry (written before #2202, or in a repo without
+ *   rules): `'undetermined'` — no provenance is not a stale provenance;
+ * - an unknown `rulesDigestAlgo`: `'unknown-algo'` — the caller reports it and
+ *   treats it as undetermined (the `fingerprintAlgo` precedent, #1797);
+ * - no current rules text (no `.river/rules.md`, or the caller has none):
+ *   `'undetermined'`.
+ *
+ * The comparison uses the entry's own version: an absent `rulesDigestAlgo` is
+ * `'v1'`, so a digest recorded before Phase 2 is compared against the current
+ * rules hashed the Phase-0 way, and `'v2'` against the normalized digest.
+ *
+ * @param {{ id?: string, context?: { rulesDigest?: unknown, rulesDigestAlgo?: unknown } }} suppression
+ * @param {string | null | undefined} rulesText current rules text, as returned
+ *   by `loadProjectRules` (`rulesText`)
+ * @param {{ digests?: Map<string, string | null> }} [options] per-call memo of
+ *   the current digest by algorithm, so a batch hashes the rules once per version
+ * @returns {{ status: 'match' | 'mismatch' | 'undetermined' | 'unknown-algo', rulesDigestAlgo?: unknown }}
+ */
+export function evaluateSuppressionRulesMatch(suppression, rulesText, { digests } = {}) {
+  const recorded = suppression?.context?.rulesDigest;
+  if (!isNonEmptyString(recorded)) return { status: 'undetermined' };
+  const algo = suppression?.context?.rulesDigestAlgo ?? 'v1';
+  if (!RULES_DIGEST_ALGOS.includes(algo)) {
+    return { status: 'unknown-algo', rulesDigestAlgo: algo };
+  }
+  let current;
+  if (digests?.has(algo)) {
+    current = digests.get(algo);
+  } else {
+    current = computeRulesDigest(rulesText, { algo });
+    digests?.set(algo, current);
+  }
+  if (!isNonEmptyString(current)) return { status: 'undetermined' };
+  return { status: current === recorded ? 'match' : 'mismatch' };
 }
 
 /**

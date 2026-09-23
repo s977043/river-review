@@ -498,6 +498,8 @@ PR 番号 / head SHA / ローカル検証の exit code / 変更ファイル一�
 - **契約の名前そのもの**（`Stable Contract` 等）でも grep する。ラベル名の grep では、SSoT に載っていない契約を派生文書が独自に主張しているケースが見つからない。
 - **契約の効果を述べる語**（`major bump` / `minor` / `破壊的変更` 等）でも grep する。ラベル名と契約名のどちらも出さず、効果だけを書いている行がある。PR #2356 の `cli-review-plan-spec:171` がこれで、前の 2 軸をすり抜けた。
 
+**CLI の flag を新設したときは、上の 3 軸に加えて、同じコマンドの既存 flag 名でも grep する。** 上の 3 軸は「契約について述べた文」を探すもので、flag の**一覧**は拾えない。PR #2411 で `river suppression add` に `--skill` を足したとき、`pages/reference/config-schema.md:54` の任意フラグ一覧から `--skill` が漏れていた。既存 flag 名（この場合は `--fingerprint-algo`）で `pages/` `docs/` `README*.md` を grep すれば、一覧の箇所が見つかる。見つかった一覧には同じ PR で新しい flag を足すこと。
+
 判定結果は「変更 N 件 / 据え置き M 件」と**件数で報告する**こと。据え置いた理由も 1 行ずつ書く。
 
 ## 関連

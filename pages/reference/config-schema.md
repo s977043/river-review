@@ -43,6 +43,7 @@
   - `redact.entropyMinLength`: 既定 `24`。fallback 検出の対象とする最小文字数。
 - `memory`（[#687](https://github.com/s977043/river-review/issues/687)）
   - `suppressionEnabled`: `true`（デフォルト）。Riverbed Memory に登録された suppression entry を反映する。`false` で gate を完全バイパス（緊急対応用）。
+  - `suppressionRequireRulesMatch`: `false`（デフォルト）。`true` にすると、発行時の `context.rulesDigest` が現在の `.river/rules.md`（と `.river/rules.d/*.md`）の digest と一致しない suppression entry は効かなくなる（#2202 Phase 2）。`rulesDigest` を持たない entry、ルールファイルが無い repo、未知の `rulesDigestAlgo` の entry はこの判定の対象外で、効いたままになる。効かなくなった entry は警告と `reviewDebug.suppressionsApplied` の `reason: "rules-digest-mismatch"` で知らせる。Phase 2 より前に作った entry は `rulesDigestAlgo` を持たず `v1`（正規化なし）として比べるため、有効化すると rules.md の改行コード変換や行末空白の変更だけでも止まる。
   - **suppression entry の `feedbackType`** (`schemas/suppression-context.schema.json`):
     - `accepted_risk`: リスクを認識した上で残すと決めた指摘。**HIGH_SEVERITY guard を通過できる唯一の値**で、`major` / `critical` の自動抑止にはこの値が必須（`src/lib/suppression-apply.mjs` の HIGH_SEVERITY guard）。
     - `false_positive`: 誤検知。`major` / `critical` は guard でブロックされ自動抑止されない（manual-handle 扱い）。`minor` / `info` は自動抑止する。
@@ -51,7 +52,7 @@
     - `duplicate`: 別エントリの fingerprint への参照。`duplicateOfFingerprint` フィールドで参照先を示せる（schema 上は任意だが運用上は記録推奨）。`major` / `critical` は guard でブロックされる。
   - CLI: `river suppression add` で対話的に登録できる。
     - 必須フラグ: `--fingerprint <fp>` / `--feedback <type>` / `--rationale <text>`
-    - 任意フラグ: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>`
+    - 任意フラグ: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>` / `--skill <id>`
 - `context`（[#689](https://github.com/s977043/river-review/issues/689)）
   - `reviewMode`: `tiny` / `medium` / `large`。budget を省略すると `src/lib/context-presets.mjs` のプリセットを適用する。`budget` を明示するとプリセットより優先される。
   - `budget.maxTokens`: `256`〜`64000`。

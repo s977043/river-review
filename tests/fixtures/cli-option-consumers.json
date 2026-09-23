@@ -755,8 +755,8 @@
     "acceptedUnconsumedOn": []
   },
   "--skill": {
-    "writes": ["feedbackSkillId"],
-    "readBy": ["feedback"],
+    "writes": ["feedbackSkillId", "suppressionSkillId"],
+    "readBy": ["feedback", "suppression"],
     "acceptedUnconsumedOn": []
   },
   "--skill-set": {

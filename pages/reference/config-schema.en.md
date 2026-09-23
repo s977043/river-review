@@ -43,6 +43,7 @@ Place `.river-review.json` in the repository root to customize review model sett
   - `redact.entropyMinLength`: Default `24`. Minimum substring length the fallback detector considers.
 - `memory` ([#687](https://github.com/s977043/river-review/issues/687))
   - `suppressionEnabled`: `true` (default). Applies suppression entries from Riverbed Memory. Set to `false` to bypass the gate (emergency override).
+  - `suppressionRequireRulesMatch`: `false` (default). When `true`, a suppression entry whose `context.rulesDigest` (recorded at issuance) does not match the digest of the current `.river/rules.md` (plus `.river/rules.d/*.md`) stops suppressing (#2202 Phase 2). Entries without `rulesDigest`, repositories without rules files, and entries with an unknown `rulesDigestAlgo` are not judged and keep suppressing. A stopped entry is reported by a warning and by `reason: "rules-digest-mismatch"` in `reviewDebug.suppressionsApplied`. Entries created before Phase 2 have no `rulesDigestAlgo` and are compared as `v1` (no normalization), so after enabling this option a line-ending conversion or trailing-whitespace change in `rules.md` alone stops them.
   - **`feedbackType` of a suppression entry** (`schemas/suppression-context.schema.json`):
     - `accepted_risk`: a finding kept deliberately after weighing the risk. **The only value that passes the HIGH_SEVERITY guard** — automatic suppression of `major` / `critical` requires it (the HIGH_SEVERITY guard in `src/lib/suppression-apply.mjs`).
     - `false_positive`: a misdetection. `major` / `critical` are blocked by the guard and are not suppressed automatically (they stay manual-handle); `minor` / `info` are suppressed automatically.
@@ -51,7 +52,7 @@ Place `.river-review.json` in the repository root to customize review model sett
     - `duplicate`: a reference to another entry's fingerprint. The `duplicateOfFingerprint` field can point at the referenced entry (optional in the schema, but recording it is the recommended practice). `major` / `critical` are blocked by the guard.
   - CLI: register an entry interactively with `river suppression add`.
     - Required flags: `--fingerprint <fp>` / `--feedback <type>` / `--rationale <text>`
-    - Optional flags: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>`
+    - Optional flags: `--scope <pattern>` / `--severity <level>` / `--files <glob>` / `--expires <date>` / `--pr <num>` / `--fingerprint-algo <v1|v2>` / `--skill <id>`
 - `context` ([#689](https://github.com/s977043/river-review/issues/689))
   - `reviewMode`: `tiny` / `medium` / `large`. When `budget` is omitted, the preset from `src/lib/context-presets.mjs` is applied. An explicit `budget` always wins.
   - `budget.maxTokens`: `256`–`64000`.

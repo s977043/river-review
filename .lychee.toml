@@ -33,6 +33,10 @@ exclude = [
   # note.com returns 403 to bot user-agents (anti-scraping); the articles are
   # valid in browsers. Linked from README as reference posts, not functional.
   '^https?://([^/]+\.)?note\.com([/?#]|$)',
+  # opensource.org rejects Lychee's bot HEAD request for the stable MIT
+  # license page with 403. The README badge target is informational.
+  '^https?://opensource\.org/licenses/MIT([/?#]|$)',
+
 
   # docs.aws.amazon.com 403s HEAD requests from non-browser user-agents; the
   # pages are valid (e.g. well-architected SaaS lens linked from a skill README).

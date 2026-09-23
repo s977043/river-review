@@ -149,9 +149,15 @@ export const securityConfigSchema = z
 // `false`, the suppression gate is bypassed entirely (debugging /
 // emergency disable). Defaults to true at runtime; the schema only needs
 // to know the field exists.
+//
+// #2202 Phase 2: `suppressionRequireRulesMatch` opts in to the project-rules
+// match gate in applySuppressions — a suppression whose recorded
+// `context.rulesDigest` differs from the current `.river/rules.md` (+ rules.d)
+// stops suppressing. Off unless exactly `true`.
 export const memoryConfigSchema = z
   .object({
     suppressionEnabled: z.boolean().optional(),
+    suppressionRequireRulesMatch: z.boolean().optional(),
   })
   .strict();
 

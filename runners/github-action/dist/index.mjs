@@ -47971,8 +47971,14 @@ const securityConfigSchema = schemas/* object */.Ikc({
 // `false`, the suppression gate is bypassed entirely (debugging /
 // emergency disable). Defaults to true at runtime; the schema only needs
 // to know the field exists.
+//
+// #2202 Phase 2: `suppressionRequireRulesMatch` opts in to the project-rules
+// match gate in applySuppressions — a suppression whose recorded
+// `context.rulesDigest` differs from the current `.river/rules.md` (+ rules.d)
+// stops suppressing. Off unless exactly `true`.
 const memoryConfigSchema = schemas/* object */.Ikc({
     suppressionEnabled: schemas/* boolean */.zMY().optional(),
+    suppressionRequireRulesMatch: schemas/* boolean */.zMY().optional(),
   })
   .strict();
 
@@ -60578,11 +60584,14 @@ function expireEntries(
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   CT: () => (/* binding */ RULES_DIGEST_ALGOS),
 /* harmony export */   DB: () => (/* binding */ ProjectRulesError),
+/* harmony export */   De: () => (/* binding */ CURRENT_RULES_DIGEST_ALGO),
 /* harmony export */   LJ: () => (/* binding */ loadProjectRulesDigest),
-/* harmony export */   TR: () => (/* binding */ loadProjectRules)
+/* harmony export */   TR: () => (/* binding */ loadProjectRules),
+/* harmony export */   nR: () => (/* binding */ computeRulesDigest)
 /* harmony export */ });
-/* unused harmony export computeRulesDigest */
+/* unused harmony export normalizeRulesTextV2 */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /* harmony import */ var node_fs_promises__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(1455);
 /* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(6760);
@@ -60686,6 +60695,38 @@ async function loadProjectRules(repoRoot, options = {}) {
 }
 
 /**
+ * Rules digest algorithms (#2202 Phase 2). A suppression records which one
+ * produced its `context.rulesDigest` in `context.rulesDigestAlgo`; an absent
+ * value is read as `'v1'`, the pre-Phase-2 digest. The digest cannot be
+ * normalized after the fact, so normalization is introduced as a new version
+ * rather than by changing `'v1'` — the same shape as `fingerprintAlgo` (#1797).
+ *
+ * - `'v1'`: sha256 of `rulesText` exactly as loaded (no normalization).
+ * - `'v2'`: sha256 of `rulesText` after {@link normalizeRulesTextV2}.
+ */
+const RULES_DIGEST_ALGOS = Object.freeze(['v1', 'v2']);
+
+/** The algorithm new suppressions record (#2202 Phase 2). */
+const CURRENT_RULES_DIGEST_ALGO = 'v2';
+
+/**
+ * The `'v2'` normalization: line endings unified to LF (CRLF and lone CR), and
+ * trailing whitespace removed from every line. Nothing else changes — the
+ * `## <file>` headers `loadProjectRules` inserts for `.river/rules.d/` stay in
+ * the text, because they are part of the string the review prompt receives.
+ *
+ * @param {string} rulesText
+ * @returns {string}
+ */
+function normalizeRulesTextV2(rulesText) {
+  return rulesText
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n');
+}
+
+/**
  * Content digest of the project rules text returned by {@link loadProjectRules}.
  *
  * The digest is taken over `rulesText` — the exact string the review prompt
@@ -60694,12 +60735,25 @@ async function loadProjectRules(repoRoot, options = {}) {
  * change. Returns null when there are no rules, so callers can omit the field
  * instead of recording an empty value (#2202 Phase 0).
  *
+ * `options.algo` selects the version (#2202 Phase 2). The default stays `'v1'`
+ * (the unnormalized digest) so every existing caller and every digest already
+ * recorded keeps its meaning; `'v2'` hashes {@link normalizeRulesTextV2}'s
+ * output instead, so a CRLF checkout or trailing whitespace does not change it.
+ * An algorithm outside {@link RULES_DIGEST_ALGOS} throws: callers decide what
+ * an unknown recorded version means before asking for a digest.
+ *
  * @param {string | null | undefined} rulesText
+ * @param {{ algo?: 'v1' | 'v2' }} [options]
  * @returns {string | null} lowercase hex sha256, or null when there are no rules
  */
-function computeRulesDigest(rulesText) {
+function computeRulesDigest(rulesText, { algo = 'v1' } = {}) {
+  if (!RULES_DIGEST_ALGOS.includes(algo)) {
+    throw new TypeError(`Unsupported rules digest algorithm: ${JSON.stringify(algo)}`);
+  }
   if (typeof rulesText !== 'string' || rulesText.length === 0) return null;
-  return node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash('sha256').update(rulesText, 'utf8').digest('hex');
+  const text = algo === 'v2' ? normalizeRulesTextV2(rulesText) : rulesText;
+  if (text.length === 0) return null;
+  return node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
 /**
@@ -60708,12 +60762,14 @@ function computeRulesDigest(rulesText) {
  * path, rules.d/ scan, outside-repo guard, error semantics) applies.
  *
  * @param {string} repoRoot
- * @param {{ rulesPath?: string }} [options]
+ * @param {{ rulesPath?: string, algo?: 'v1' | 'v2' }} [options] `algo` is passed
+ *   to {@link computeRulesDigest}; the rest to {@link loadProjectRules}
  * @returns {Promise<string | null>}
  */
 async function loadProjectRulesDigest(repoRoot, options = {}) {
-  const { rulesText } = await loadProjectRules(repoRoot, options);
-  return computeRulesDigest(rulesText);
+  const { algo, ...loadOptions } = options ?? {};
+  const { rulesText } = await loadProjectRules(repoRoot, loadOptions);
+  return computeRulesDigest(rulesText, algo === undefined ? {} : { algo });
 }
 
 
@@ -62519,10 +62575,13 @@ async function planSkills({ skills, context, llmPlan, appendRemaining = true }) 
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   CO: () => (/* binding */ formatUnknownRulesDigestAlgoWarning),
 /* harmony export */   Df: () => (/* binding */ formatUnknownFingerprintAlgoWarning),
 /* harmony export */   RL: () => (/* binding */ formatUnparseableExpiresAtWarning),
 /* harmony export */   createSuppression: () => (/* binding */ createSuppression),
+/* harmony export */   dG: () => (/* binding */ evaluateSuppressionRulesMatch),
 /* harmony export */   lq: () => (/* binding */ isSuppressionExpired),
+/* harmony export */   rW: () => (/* binding */ formatRulesDigestMismatchWarning),
 /* harmony export */   resolveSuppressionProvenance: () => (/* binding */ resolveSuppressionProvenance),
 /* harmony export */   vU: () => (/* binding */ hasUnparseableSuppressionExpiresAt)
 /* harmony export */ });
@@ -62571,11 +62630,15 @@ function inferSubsystem(filePath) {
  * `skillId`, `skillVersion` and `rulesDigest` (#2202 Phase 0) record the
  * provenance of the review criteria at issuance time: which skill produced the
  * suppressed finding, that skill's `version`, and the digest of the project
- * rules. They are RECORDED ONLY — `isSuppressionExpired` does not read them.
+ * rules. `isSuppressionExpired` does not read them. `rulesDigest` is read by
+ * the opt-in rules-match gate (#2202 Phase 2, `evaluateSuppressionRulesMatch`),
+ * which needs `rulesDigestAlgo` to know which digest version it holds.
  * Like the other optional fields, each is written only when it is a non-empty
  * string; an absent value leaves the key out entirely (no null, no ""), so an
  * entry without provenance is indistinguishable from one written before
- * #2202. Use `resolveSuppressionProvenance` to derive the three values.
+ * #2202. `rulesDigestAlgo` is written only together with `rulesDigest`; when
+ * it is left out the digest is read as `'v1'`. Use
+ * `resolveSuppressionProvenance` to derive the values.
  *
  * @param {object} options
  * @returns {object} The created suppression entry
@@ -62599,6 +62662,7 @@ function createSuppression({
   skillId,
   skillVersion,
   rulesDigest,
+  rulesDigestAlgo,
   author = 'river-review',
 }) {
   if (!rationale) throw new Error('Suppression requires a rationale');
@@ -62628,7 +62692,10 @@ function createSuppression({
   }
   if (isNonEmptyString(skillId)) context.skillId = skillId;
   if (isNonEmptyString(skillVersion)) context.skillVersion = skillVersion;
-  if (isNonEmptyString(rulesDigest)) context.rulesDigest = rulesDigest;
+  if (isNonEmptyString(rulesDigest)) {
+    context.rulesDigest = rulesDigest;
+    if (isNonEmptyString(rulesDigestAlgo)) context.rulesDigestAlgo = rulesDigestAlgo;
+  }
 
   const entry = {
     id: 'suppression-' + idSeed + '-' + Date.now(),
@@ -62663,7 +62730,9 @@ function isNonEmptyString(value) {
  * - `skillVersion` is the `version` of that skill's metadata as loaded by
  *   `loadAllSkillMetadata` (runners/core/skill-loader.mjs), or from the
  *   already-loaded `skills` list when the caller has one.
- * - `rulesDigest` is `loadProjectRulesDigest` (rules.mjs) over `repoRoot`.
+ * - `rulesDigest` is `loadProjectRulesDigest` (rules.mjs) over `repoRoot`,
+ *   computed with `CURRENT_RULES_DIGEST_ALGO` (`'v2'`, normalized, #2202
+ *   Phase 2) and returned together with `rulesDigestAlgo` naming that version.
  *
  * A value that cannot be determined is left out of the result (never null),
  * so spreading the result into `createSuppression` omits the key.
@@ -62675,7 +62744,7 @@ function isNonEmptyString(value) {
  *   already-loaded skills; loaded via `loadAllSkillMetadata` when omitted
  * @param {string} [options.skillsDir] - passed to `loadAllSkillMetadata`
  * @param {{ rulesPath?: string }} [options.rulesOptions] - passed to `loadProjectRulesDigest`
- * @returns {Promise<{ skillId?: string, skillVersion?: string, rulesDigest?: string }>}
+ * @returns {Promise<{ skillId?: string, skillVersion?: string, rulesDigest?: string, rulesDigestAlgo?: string }>}
  */
 async function resolveSuppressionProvenance({
   ruleId,
@@ -62694,8 +62763,14 @@ async function resolveSuppressionProvenance({
     if (isNonEmptyString(version)) provenance.skillVersion = version;
   }
   if (isNonEmptyString(repoRoot)) {
-    const digest = await (0,_rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .loadProjectRulesDigest */ .LJ)(repoRoot, rulesOptions);
-    if (isNonEmptyString(digest)) provenance.rulesDigest = digest;
+    const digest = await (0,_rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .loadProjectRulesDigest */ .LJ)(repoRoot, {
+      ...rulesOptions,
+      algo: _rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .CURRENT_RULES_DIGEST_ALGO */ .De,
+    });
+    if (isNonEmptyString(digest)) {
+      provenance.rulesDigest = digest;
+      provenance.rulesDigestAlgo = _rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .CURRENT_RULES_DIGEST_ALGO */ .De;
+    }
   }
   return provenance;
 }
@@ -62902,6 +62977,90 @@ function formatUnknownFingerprintAlgoWarning({ id, fingerprintAlgo }) {
     `(${JSON.stringify(fingerprintAlgo)}); it is ignored and no longer suppresses findings. ` +
     'Repair the value to "v1" (line-independent) or "v2" (line-anchored).'
   );
+}
+
+/**
+ * The operator-facing sentence for one suppression whose
+ * `context.rulesDigestAlgo` is not a value this version understands
+ * (#2202 Phase 2). Same shape as `formatUnknownFingerprintAlgoWarning`, but
+ * the consequence is the opposite direction: an unknown digest version makes
+ * the rules-match gate unable to judge the entry, so the entry is NOT judged
+ * on that axis and keeps suppressing. The warning is what keeps that silent
+ * pass-through visible.
+ *
+ * @param {{ id: string, rulesDigestAlgo: unknown }} entry
+ * @returns {string}
+ */
+function formatUnknownRulesDigestAlgoWarning({ id, rulesDigestAlgo }) {
+  return (
+    `Warning: suppression ${id} declares an unsupported context.rulesDigestAlgo ` +
+    `(${JSON.stringify(rulesDigestAlgo)}); its rulesDigest is not compared with the current project rules. ` +
+    'Repair the value to "v1" (unnormalized) or "v2" (line endings and trailing whitespace normalized).'
+  );
+}
+
+/**
+ * The operator-facing sentence for one suppression that the opt-in rules-match
+ * gate stopped (#2202 Phase 2): its `context.rulesDigest` was recorded under
+ * project rules that differ from the current ones. Like the other suppression
+ * warnings it carries the entry id only; the digests themselves are not
+ * repairable values and stay out of the warning stream.
+ *
+ * @param {{ id: string }} entry
+ * @returns {string}
+ */
+function formatRulesDigestMismatchWarning({ id }) {
+  return (
+    `Warning: suppression ${id} was issued under different project rules ` +
+    '(context.rulesDigest does not match the current .river/rules.md and .river/rules.d/); ' +
+    'it no longer suppresses findings because memory.suppressionRequireRulesMatch is enabled. ' +
+    'Re-issue the suppression if it still applies under the current rules.'
+  );
+}
+
+/**
+ * Whether a suppression's recorded `context.rulesDigest` matches the current
+ * project rules (#2202 Phase 2). This is a SEPARATE predicate from
+ * `isSuppressionExpired` on purpose: the expiry rule fails safe to "expired"
+ * on an unreadable value, which is the safe direction for a calendar deadline
+ * but the destructive one here (#1756 has the same shape). Every case this
+ * function cannot decide therefore answers `'undetermined'`, never
+ * `'mismatch'`:
+ *
+ * - no `rulesDigest` on the entry (written before #2202, or in a repo without
+ *   rules): `'undetermined'` — no provenance is not a stale provenance;
+ * - an unknown `rulesDigestAlgo`: `'unknown-algo'` — the caller reports it and
+ *   treats it as undetermined (the `fingerprintAlgo` precedent, #1797);
+ * - no current rules text (no `.river/rules.md`, or the caller has none):
+ *   `'undetermined'`.
+ *
+ * The comparison uses the entry's own version: an absent `rulesDigestAlgo` is
+ * `'v1'`, so a digest recorded before Phase 2 is compared against the current
+ * rules hashed the Phase-0 way, and `'v2'` against the normalized digest.
+ *
+ * @param {{ id?: string, context?: { rulesDigest?: unknown, rulesDigestAlgo?: unknown } }} suppression
+ * @param {string | null | undefined} rulesText current rules text, as returned
+ *   by `loadProjectRules` (`rulesText`)
+ * @param {{ digests?: Map<string, string | null> }} [options] per-call memo of
+ *   the current digest by algorithm, so a batch hashes the rules once per version
+ * @returns {{ status: 'match' | 'mismatch' | 'undetermined' | 'unknown-algo', rulesDigestAlgo?: unknown }}
+ */
+function evaluateSuppressionRulesMatch(suppression, rulesText, { digests } = {}) {
+  const recorded = suppression?.context?.rulesDigest;
+  if (!isNonEmptyString(recorded)) return { status: 'undetermined' };
+  const algo = suppression?.context?.rulesDigestAlgo ?? 'v1';
+  if (!_rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .RULES_DIGEST_ALGOS */ .CT.includes(algo)) {
+    return { status: 'unknown-algo', rulesDigestAlgo: algo };
+  }
+  let current;
+  if (digests?.has(algo)) {
+    current = digests.get(algo);
+  } else {
+    current = (0,_rules_mjs__WEBPACK_IMPORTED_MODULE_2__/* .computeRulesDigest */ .nR)(rulesText, { algo });
+    digests?.set(algo, current);
+  }
+  if (!isNonEmptyString(current)) return { status: 'undetermined' };
+  return { status: current === recorded ? 'match' : 'mismatch' };
 }
 
 /**
@@ -90744,6 +90903,25 @@ async function runFeedbackCommand(parsed, targetPath) {
 
 
 
+
+/**
+ * Whether `error` is a failure to READ the skill metadata that `--skill`
+ * looks its version up in (#2401), as opposed to a bug.
+ *
+ * loadAllSkillMetadata logs and skips a broken individual skill file, so what
+ * escapes it is the schema (`loadSchema`: an fs error, or SkillLoaderError on
+ * a JSON parse failure) or the skills directory itself (`listSkillFiles`: an
+ * fs error from readdir). Node fs errors carry both `code` and `syscall`,
+ * which is what separates them from a TypeError raised by a real bug.
+ *
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isSkillMetadataReadError(error) {
+  if (error instanceof skill_loader/* SkillLoaderError */.vN) return true;
+  return typeof error?.code === 'string' && typeof error?.syscall === 'string';
+}
+
 /**
  * Handle the `suppression` command (suppression add).
  *
@@ -90792,6 +90970,18 @@ async function runSuppressionCommand(parsed, targetPath) {
     console.error('Error: --scope must be one of: global, subsystem, file.');
     return 1;
   }
+  // #2401: `--skill` takes the same argv as `feedback add --skill` (one parse
+  // helper) and the same value rule: trimmed, blank rejected, and an id that
+  // no skill carries still recorded as given (feedback add does not check it
+  // against the registry either).
+  let skillId;
+  if (typeof parsed.suppressionSkillId === 'string') {
+    skillId = parsed.suppressionSkillId.trim();
+    if (!skillId) {
+      console.error('Error: --skill must not be blank.');
+      return 1;
+    }
+  }
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
   const indexPath = external_node_path_.resolve(repoRoot, '.river', 'memory', 'index.json');
   const { createSuppression, resolveSuppressionProvenance } =
@@ -90800,13 +90990,34 @@ async function runSuppressionCommand(parsed, targetPath) {
   // Provenance is record-only, so a failure to read the project rules must not
   // fail the suppression itself: only ProjectRulesError is caught, the key is
   // left out, and the user is told why. Anything else is a real bug and throws.
-  // skillId / skillVersion need a skill selector this command does not have.
   let provenance = {};
   try {
     provenance = await resolveSuppressionProvenance({ repoRoot });
   } catch (error) {
     if (!(error instanceof rules/* ProjectRulesError */.DB)) throw error;
     console.warn(`Warning: rulesDigest not recorded on this suppression: ${error.message}`);
+  }
+  // #2401: skillId / skillVersion from `--skill`, resolved separately from the
+  // digest so that a failure on one side never drops the other. Same policy:
+  // a failure to read the skill metadata only drops skillVersion (skillId is
+  // the caller's own input and is still resolved through the SSoT, with no
+  // skills to look the version up in); anything else throws.
+  if (skillId === 'unknown') {
+    // resolveSuppressionProvenance never records 'unknown': it is the ruleId of
+    // a finding that no skill produced, not the id of a skill.
+    console.warn(
+      'Warning: skillId not recorded on this suppression: "unknown" is the placeholder for a finding with no skill, not a skill id.'
+    );
+  } else if (skillId !== undefined) {
+    let skillProvenance;
+    try {
+      skillProvenance = await resolveSuppressionProvenance({ ruleId: skillId });
+    } catch (error) {
+      if (!isSkillMetadataReadError(error)) throw error;
+      console.warn(`Warning: skillVersion not recorded on this suppression: ${error.message}`);
+      skillProvenance = await resolveSuppressionProvenance({ ruleId: skillId, skills: [] });
+    }
+    provenance = { ...provenance, ...skillProvenance };
   }
   const entry = createSuppression({
     indexPath,
@@ -90832,6 +91043,8 @@ async function runSuppressionCommand(parsed, targetPath) {
   console.log('  feedbackType: ' + entry.context.feedbackType);
   console.log('  scope: ' + entry.context.scope);
   if (entry.context.severity) console.log('  severity: ' + entry.context.severity);
+  if (entry.context.skillId) console.log('  skillId: ' + entry.context.skillId);
+  if (entry.context.skillVersion) console.log('  skillVersion: ' + entry.context.skillVersion);
   if (entry.context.rulesDigest) console.log('  rulesDigest: ' + entry.context.rulesDigest);
   console.log('  written to: ' + indexPath);
   return 0;
@@ -92405,6 +92618,19 @@ var suppression = __nccwpck_require__(3528);
 //     `warn` sink, so a suppression that silently stopped working is visible
 //     the same way an unparseable `expiresAt` is (#1780/#1801).
 //
+// Project-rules match (#2202 Phase 2, opt-in): when
+// `config.memory.suppressionRequireRulesMatch === true`, a suppression whose
+// `context.rulesDigest` was recorded under different project rules no longer
+// suppresses anything. The verdict comes from `evaluateSuppressionRulesMatch`
+// (src/lib/suppression.mjs), a predicate kept apart from `isSuppressionExpired`
+// because the two fail safe in opposite directions: an entry this gate cannot
+// judge (no rulesDigest, no current rules, or an unknown `rulesDigestAlgo`)
+// keeps suppressing. An unknown `rulesDigestAlgo` is reported through `warn`
+// exactly like an unknown `fingerprintAlgo`; a mismatch is recorded in
+// `applied` as `reason: 'rules-digest-mismatch'` and warned once per entry.
+// With the option off (the default) the predicate is never called, so the
+// result is identical to the pre-Phase-2 gate.
+//
 // Not evaluated here: revocation via `resurface` entries
 // (`collectRevokedSuppressionIds`). `revokeSuppression` never flips the
 // original's `context.active`, and the revoking entry is a separate memory
@@ -92415,6 +92641,18 @@ var suppression = __nccwpck_require__(3528);
 
 
 const HIGH_SEVERITY = new Set(['major', 'critical']);
+
+/**
+ * Whether the opt-in project-rules match gate (#2202 Phase 2) is on. Checked
+ * strictly (`=== true`) so no near-miss value turns off suppressions that are
+ * in force today; the default (absent) is off.
+ *
+ * @param {object | undefined} config effective config
+ * @returns {boolean}
+ */
+function isSuppressionRulesMatchEnabled(config) {
+  return config?.memory?.suppressionRequireRulesMatch === true;
+}
 
 function severityOf(finding) {
   return String(finding.severity || 'info').toLowerCase();
@@ -92437,6 +92675,11 @@ function severityOf(finding) {
  *   `console.warn` — the same contract as `findActiveSuppressions`.
  * @param {Date} [opts.now]         Reference instant for the expiry decision.
  *   Injectable for tests, defaults to `new Date()`.
+ * @param {string | null} [opts.rulesText] Current project rules text
+ *   (`loadProjectRules(...).rulesText`). Read only when
+ *   `config.memory.suppressionRequireRulesMatch === true` (#2202 Phase 2);
+ *   absent or null means the rules cannot be compared, and no entry is stopped
+ *   on that axis.
  * @returns {{ keptFindings: Array<object>, suppressedFindings: Array<object>, applied: Array<object> }}
  *   `applied` is the observability log. Each entry: `{ fingerprint, suppressionId,
  *   feedbackType, severity, action: 'suppressed' | 'skipped', reason? }`. Findings
@@ -92462,17 +92705,41 @@ function applySuppressions(findings, memoryContext, opts = {}) {
   const warn = opts?.warn ?? ((m) => console.warn(m));
   const byFingerprintV1 = new Map();
   const byFingerprintV2 = new Map();
+  // #2202 Phase 2: rules-match verdicts, filled only when the gate is opted in.
+  // With the gate off this stays null and nothing below reads the rules.
+  const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
+  const rulesDigests = new Map();
   for (const s of suppressions) {
     const fp = s?.context?.fingerprint;
     if (typeof fp !== 'string' || fp.length !== 16) continue;
     const algo = s?.context?.fingerprintAlgo ?? 'v1';
-    if (algo === 'v1') byFingerprintV1.set(fp, s);
-    else if (algo === 'v2') byFingerprintV2.set(fp, s);
-    // The entry is otherwise usable (it carries a canonical fingerprint) and
-    // stops taking effect only because of the algo value. Report it through
-    // the same `warn` sink as the expiry stop (#1780/#1801) rather than
-    // dropping it in silence; the value is repairable.
-    else warn((0,suppression/* formatUnknownFingerprintAlgoWarning */.Df)({ id: s.id, fingerprintAlgo: algo }));
+    let target;
+    if (algo === 'v1') target = byFingerprintV1;
+    else if (algo === 'v2') target = byFingerprintV2;
+    else {
+      // The entry is otherwise usable (it carries a canonical fingerprint) and
+      // stops taking effect only because of the algo value. Report it through
+      // the same `warn` sink as the expiry stop (#1780/#1801) rather than
+      // dropping it in silence; the value is repairable.
+      warn((0,suppression/* formatUnknownFingerprintAlgoWarning */.Df)({ id: s.id, fingerprintAlgo: algo }));
+      continue;
+    }
+    if (rulesMismatched) {
+      const verdict = (0,suppression/* evaluateSuppressionRulesMatch */.dG)(s, opts?.rulesText, { digests: rulesDigests });
+      if (verdict.status === 'mismatch') rulesMismatched.add(s);
+      // Unknown digest version: not judged on this axis (the entry keeps
+      // suppressing), reported through the same sink as an unknown
+      // fingerprintAlgo so the pass-through is visible.
+      else if (verdict.status === 'unknown-algo') {
+        warn(
+          (0,suppression/* formatUnknownRulesDigestAlgoWarning */.CO)({
+            id: s.id,
+            rulesDigestAlgo: verdict.rulesDigestAlgo,
+          })
+        );
+      }
+    }
+    target.set(fp, s);
   }
   if (byFingerprintV1.size === 0 && byFingerprintV2.size === 0) return result;
 
@@ -92481,6 +92748,7 @@ function applySuppressions(findings, memoryContext, opts = {}) {
   const applied = [];
   const now = opts?.now ?? new Date();
   const warnedIds = new Set();
+  const rulesWarnedIds = new Set();
 
   for (const finding of list) {
     // v2 (line-anchored) is consulted first: it is the more specific claim.
@@ -92524,6 +92792,27 @@ function applySuppressions(findings, memoryContext, opts = {}) {
         warn(
           (0,suppression/* formatUnparseableExpiresAtWarning */.RL)({ id: match.id, expiresAt: match.context.expiresAt })
         );
+      }
+      continue;
+    }
+
+    // Project-rules gate (#2202 Phase 2, opt-in). After the expiry gate so an
+    // expired entry keeps its pre-Phase-2 `applied` record; before the
+    // severity gates so `applied` names the reason the entry did nothing.
+    if (rulesMismatched?.has(match)) {
+      kept.push(finding);
+      applied.push({
+        fingerprint: fp,
+        suppressionId: match.id,
+        fingerprintAlgo: matchedAlgo,
+        feedbackType,
+        severity: sev,
+        action: 'skipped',
+        reason: 'rules-digest-mismatch',
+      });
+      if (!rulesWarnedIds.has(match.id)) {
+        rulesWarnedIds.add(match.id);
+        warn((0,suppression/* formatRulesDigestMismatchWarning */.rW)({ id: match.id }));
       }
       continue;
     }
@@ -93206,12 +93495,18 @@ async function runLocalReview({
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
   // config.memory.suppressionEnabled === false (see suppression-apply.mjs).
+  // #2202 Phase 2: the current project rules are handed over for the opt-in
+  // rules-match gate (config.memory.suppressionRequireRulesMatch); with the
+  // option off applySuppressions does not read them.
   const annotatedFindings = (0,finding_factory/* annotateFingerprints */.ic)(review.findings ?? []);
   const {
     keptFindings,
     suppressedFindings,
     applied: suppressionsApplied,
-  } = applySuppressions(annotatedFindings, memoryContext, { config: context.config });
+  } = applySuppressions(annotatedFindings, memoryContext, {
+    config: context.config,
+    rulesText: context.projectRules,
+  });
 
   // Epic #1347 S4 (#1351): deterministic strict_block gate. Computed over the
   // PRE-suppression finding set joined with the selected skills so a suppressed
@@ -94110,6 +94405,17 @@ function isLlmlessEmptyReview(result) {
   return llmKeyMissing && noFindings;
 }
 
+function isLlmFailedEmptyReview(result) {
+  const debug = result?.reviewDebug ?? {};
+  const llmFailed =
+    debug.llmUsed === false &&
+    typeof debug.llmError === 'string' &&
+    debug.llmError.trim().length > 0;
+  const noComments = !Array.isArray(result?.comments) || result.comments.length === 0;
+  const noFindings = !Array.isArray(result?.findings) || result.findings.length === 0;
+  return llmFailed && noComments && noFindings;
+}
+
 function printMarkdownReport(result, phase) {
   if (isLlmlessEmptyReview(result)) {
     console.log(
@@ -94138,17 +94444,30 @@ function printMarkdownReport(result, phase) {
   const decisionSurface = formatHumanDecisionSurfaceMarkdown(decisionSurfaceModel);
   const findingSections = formatFindingsSectionsMarkdown(rendered);
 
-  const header = `${COMMENT_MARKER}
+  const llmFailedEmpty = isLlmFailedEmptyReview(result);
+  const header = llmFailedEmpty
+    ? `${COMMENT_MARKER}
+## River Review
+
+- フェーズ: \`${phase}\`
+- ⚠️ **LLM semantic review は未完了です。** LLM 実行エラー後の静的チェックでは最終指摘がありませんでした。
+- この結果は「指摘なし」「auto-approve」「マージ可能」を意味しません。LLM 経路を復旧して再レビューしてください。
+`
+    : `${COMMENT_MARKER}
 ## River Review
 
 ${formatHeadlineMarkdown(rendered, phase, score)}
 `;
-  const noBlockerNote = formatNoBlockerNoteMarkdown(rendered, decisionSurfaceModel);
+  const noBlockerNote = llmFailedEmpty
+    ? null
+    : formatNoBlockerNoteMarkdown(rendered, decisionSurfaceModel);
   const riskSection = formatRiskSummaryMarkdown(result.plan);
   const humanReviewSection = formatHumanReviewFilesMarkdown(result);
   const teamLeadSection = formatTeamLeadReportMarkdown(result.teamLeadReport);
-  const prioritySummary = formatPrioritySummaryMarkdown(rendered, result.classified);
-  const scoreSection = formatScoreSectionMarkdown(score);
+  const prioritySummary = llmFailedEmpty
+    ? null
+    : formatPrioritySummaryMarkdown(rendered, result.classified);
+  const scoreSection = llmFailedEmpty ? null : formatScoreSectionMarkdown(score);
   const executionSection = formatExecutionDetailsMarkdown(result);
   console.log(
     [
@@ -97233,7 +97552,7 @@ Commands:
   eval                  Run review fixtures evaluation (must_include checks)
   suppression add       Create a Riverbed Memory suppression entry
                         (--fingerprint --feedback --rationale [--scope]
-                         [--severity] [--files] [--expires] [--pr]
+                         [--severity] [--files] [--expires] [--pr] [--skill]
                          [--fingerprint-algo v1|v2]; v2 = line-anchored,
                          suppresses only the occurrence at that line but
                          stops matching once the line shifts)
@@ -98196,6 +98515,29 @@ function parseRunsOption(arg, args, parsed) {
 }
 
 /**
+ * Value of `--skill <id>`, shared by `feedback add` and `suppression add`
+ * (#2401) so that the two options accept and reject exactly the same argv.
+ *
+ * `--skill --pr 123` used to record skillId:"--pr" on `feedback add`: a flag
+ * is a non-empty string, so buildFeedbackEntry's "skillId is required."
+ * check accepted it and wrote the entry. A missing value / a following flag
+ * is therefore a usage error here, before any handler runs.
+ *
+ * @param {string[]} args
+ * @param {Record<string, any>} parsed
+ * @returns {string|null} the value, or null once the usage error is reported
+ */
+function takeSkillIdValue(args, parsed) {
+  const value = args.shift();
+  if (!value || value.startsWith('-')) {
+    console.error('Error: --skill option requires a value.');
+    usageError(parsed);
+    return null;
+  }
+  return value;
+}
+
+/**
  * `feedback` options.
  * @param {string} arg
  * @param {string[]} args
@@ -98223,15 +98565,8 @@ function parseFeedbackOption(arg, args, parsed) {
     return 'continue';
   }
   if (arg === '--skill') {
-    const value = args.shift();
-    // `--skill --pr 123` used to record skillId:"--pr": a flag is a
-    // non-empty string, so buildFeedbackEntry's "skillId is required."
-    // check accepted it and wrote the entry.
-    if (!value || value.startsWith('-')) {
-      console.error('Error: --skill option requires a value.');
-      usageError(parsed);
-      return 'break';
-    }
+    const value = takeSkillIdValue(args, parsed);
+    if (value === null) return 'break';
     parsed.feedbackSkillId = value;
     return 'continue';
   }
@@ -98397,6 +98732,15 @@ function parseSuppressionOption(arg, args, parsed) {
       return 'break';
     }
     parsed.suppressionFingerprintAlgo = algo;
+    return 'continue';
+  }
+  if (arg === '--skill') {
+    // #2401: same option as `feedback add --skill`, parsed by the same helper.
+    // The handler records it as context.skillId / skillVersion through
+    // resolveSuppressionProvenance.
+    const value = takeSkillIdValue(args, parsed);
+    if (value === null) return 'break';
+    parsed.suppressionSkillId = value;
     return 'continue';
   }
   if (arg === '--finding') {
@@ -98601,6 +98945,8 @@ function parseArgs(argv) {
     suppressionFiles: null,
     suppressionExpiresAt: null,
     suppressionPrNumber: null,
+    // #2401: `suppression add --skill <id>`; null = do not record skillId.
+    suppressionSkillId: null,
     // promote subcommand fields (#1622 / #1568-B)
     promoteSubcommand: null,
     promoteId: null,

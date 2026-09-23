@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.123.0](https://github.com/s977043/river-review/compare/v1.122.0...v1.123.0) (2026-09-23)
+
+
+### Features
+
+* **review:** add deterministic Human Decision Surface ([#2370](https://github.com/s977043/river-review/issues/2370)) ([3a03f90](https://github.com/s977043/river-review/commit/3a03f90a2fa7827dc5b59108805687e4535efab6))
+* **suppression:** record rulesDigest from river suppression add ([#2401](https://github.com/s977043/river-review/issues/2401)) ([#2405](https://github.com/s977043/river-review/issues/2405)) ([09f7d44](https://github.com/s977043/river-review/commit/09f7d44081df4fa397cfec379d654f2b880cf882))
+* **suppression:** record skill and rules provenance at issuance ([#2202](https://github.com/s977043/river-review/issues/2202) phase 0) ([#2400](https://github.com/s977043/river-review/issues/2400)) ([5b88782](https://github.com/s977043/river-review/commit/5b88782a7f2a4d849372a62b91b53075e2fd0318))
+
 ## [1.122.0](https://github.com/s977043/river-review/compare/v1.121.0...v1.122.0) (2026-09-23)
 
 

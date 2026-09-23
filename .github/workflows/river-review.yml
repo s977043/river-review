@@ -10,7 +10,6 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
-  models: read # GitHub Models 推論を組み込み GITHUB_TOKEN に許可（キーレス化）
 
 concurrency:
   group: river-review-${{ github.ref }}
@@ -38,11 +37,13 @@ jobs:
           gate: false # advisory only — never fail the job
           max_cost: '0.50' # safety cap (OPENAI_MODEL とセットで有効)
         env:
-          # GitHub Models 切替（キーレス化。設計書参照。ロールバックはこの env ブロックを戻す）
-          OPENAI_API_KEY: ${{ secrets.GITHUB_TOKEN }} # Bearer として GitHub Models に渡る
-          RIVER_OPENAI_BASE_URL: https://models.github.ai/inference/chat/completions # CI レビュー経路が読む endpoint（review-engine.mjs）
-          RIVER_OPENAI_MODEL: openai/gpt-4o-mini # 実 API 呼び出しモデル ID（GitHub Models カタログ形式）
-          OPENAI_MODEL: gpt-4o-mini # max_cost の見積単価を実モデルに一致させる（見積器既定 gpt-4-turbo のままだと大型PRを誤abortするため必須の結合。prefix無しで併設）
+          # GitHub Models は 2026-07-30 にretire済み。repository standardの
+          # OpenAI secret + core default endpointへ戻す。secret未設定時は
+          # review-engineの既存 fail-closed skip reason が明示される。
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RIVER_OPENAI_MODEL: gpt-4o-mini
+          # max_cost 見積器も同じモデル名を参照する。
+          OPENAI_MODEL: gpt-4o-mini
       # #1600: the CLI auto-saves a run record (findings + calibration debug —
       # verifierStats/verifierAllRejected/findingFormat.recommendedGaps) to
       # .river/runs/*.json under GITHUB_ACTIONS, but nothing uploaded it as a
