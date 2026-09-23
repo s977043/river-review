@@ -753,6 +753,76 @@
         "note": { "type": "string" }
       }
     },
+    "promotionHandoff": {
+      "description": "Optional read-only bridge from a paired replay experiment to the existing #1568 promotion lifecycle. Null when the experiment declares no improvementCandidate. Observation only: no verdict and no write side effect.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "candidateId",
+            "manifestId",
+            "experimentKey",
+            "manifestHash",
+            "manifestVerified",
+            "experimentKeyMatchesInputs",
+            "activationVerified",
+            "acceptanceEvaluable",
+            "profiles",
+            "criticalRegressionCount",
+            "independentVerifierVerified",
+            "terminalReason",
+            "requiresHumanJudgment",
+            "writeEffects"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "candidateId": { "type": "string", "pattern": "^RR-PC-[0-9a-f]{12}$" },
+            "manifestId": { "type": "string", "pattern": "^RR-EXP-[0-9a-f]{12}$" },
+            "experimentKey": { "$ref": "#/$defs/sha256" },
+            "manifestHash": { "$ref": "#/$defs/sha256" },
+            "manifestVerified": { "type": "boolean" },
+            "experimentKeyMatchesInputs": { "type": "boolean" },
+            "activationVerified": {
+              "type": "boolean",
+              "description": "Observation copied from the activation check, never an adoption verdict."
+            },
+            "acceptanceEvaluable": { "type": "boolean" },
+            "profiles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "profile",
+                  "allRequiredSatisfied",
+                  "sampleSizeSatisfied",
+                  "failedMetrics"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "profile": { "type": "string" },
+                  "allRequiredSatisfied": {
+                    "type": "boolean",
+                    "description": "Per-profile observation only; it must not be interpreted as an aggregate promotion decision."
+                  },
+                  "sampleSizeSatisfied": { "type": ["boolean", "null"] },
+                  "failedMetrics": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            },
+            "criticalRegressionCount": { "type": ["integer", "null"], "minimum": 0 },
+            "independentVerifierVerified": {
+              "type": "boolean",
+              "const": false,
+              "description": "P2 has no trusted verifier attestation yet."
+            },
+            "terminalReason": { "type": "string", "enum": ["success", "no_progress"] },
+            "requiresHumanJudgment": { "type": "boolean", "const": true },
+            "writeEffects": { "type": "array", "maxItems": 0 }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
     "verification": {
       "type": "object",
       "required": [
