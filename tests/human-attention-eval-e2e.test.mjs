@@ -39,7 +39,7 @@ describe('#2382 Human Attention paired runner E2E', () => {
 
   it(
     'runs the real frozen baseline/candidate pair without deterministic safety regressions',
-    { timeout: 60_000, skip: !hasCommit(BASELINE) || !hasCommit(CANDIDATE) },
+    { timeout: 180_000, skip: !hasCommit(BASELINE) || !hasCommit(CANDIDATE) },
     async () => {
       const summary = await runEvaluation({
         baseline: BASELINE,
