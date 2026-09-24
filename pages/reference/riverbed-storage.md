@@ -40,7 +40,7 @@ Riverbed Memory は、過去の判断やパターンを LLM レビューに活�
 
 1. `npm run eval:all -- --persist-memory` を実行すると、eval 結果が `eval_result` エントリとして `.river/memory/index.json` に追記される。
 2. 手動で追加する場合は `src/lib/riverbed-memory.mjs` の `appendEntry(indexPath, entry)` を呼び出す。古いエントリを論理的に置き換える場合は `supersede(indexPath, oldId, newId)`、期限切れエントリの一括アーカイブには `expireEntries(indexPath)` を使う。
-3. レビュー時には `loadMemory` + `queryMemory` で該当エントリを検索し、プロンプトへ組み込む。
+3. レビュー時には `runLocalReview`（`src/lib/local-runner.mjs`）が `loadReviewMemory`（`src/lib/memory-context.mjs`）を呼ぶ。`loadReviewMemory` は `loadMemory` で読み込んだエントリを phase と変更ファイルで絞り込み、種別ごとに振り分ける。結果はプロンプトへ組み込まれ、`applySuppressions`（`src/lib/suppression-apply.mjs`）による suppression の適用にも使われる。`queryMemory` は regression-eval（`src/lib/regression-eval.mjs`）の検索に使われる。
 4. CI では `.github/workflows/riverbed-persist.yml` が GitHub Artifact 経由で `index.json` を 90 日間永続化する。
 
 ### ストレージポリシー
