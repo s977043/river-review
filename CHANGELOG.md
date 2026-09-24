@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.124.4](https://github.com/s977043/river-review/compare/v1.124.3...v1.124.4) (2026-09-24)
+
+
+### Bug Fixes
+
+* **review:** escalate --reviewers runs whose every role's LLM call failed ([#2443](https://github.com/s977043/river-review/issues/2443)) ([e0cb606](https://github.com/s977043/river-review/commit/e0cb606d22cc7fb3b11c1f41d8760efa34649802)), closes [#2436](https://github.com/s977043/river-review/issues/2436)
+* **review:** omit reviewCoverage when every --reviewers unit skips the LLM ([#2440](https://github.com/s977043/river-review/issues/2440)) ([8e205b2](https://github.com/s977043/river-review/commit/8e205b299d95aefb62362624eed09a6de76cdb08)), closes [#2436](https://github.com/s977043/river-review/issues/2436)
+
 ## [1.124.3](https://github.com/s977043/river-review/compare/v1.124.2...v1.124.3) (2026-09-24)
 
 
