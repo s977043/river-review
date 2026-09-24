@@ -68,6 +68,7 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
       'human-attention',
       `test-${process.pid}-actual-pair`
     );
+    const worktreesBefore = new Set(listHaWorktrees());
 
     try {
       const result = spawnSync(
@@ -146,10 +147,8 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
 
       // The runner must remove its detached worktrees even after evaluating
       // historical commits; otherwise repeated evaluations contaminate the repo.
-      const worktreeList = execFileSync('git', ['worktree', 'list', '--porcelain'], {
-        encoding: 'utf8',
-      });
-      assert.doesNotMatch(worktreeList, /river-review-ha-/);
+      const leftover = listHaWorktrees().filter((p) => !worktreesBefore.has(p));
+      assert.deepStrictEqual(leftover, []);
     } finally {
       rmSync(outputDir, { recursive: true, force: true });
     }
