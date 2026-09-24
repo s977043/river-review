@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.124.0](https://github.com/s977043/river-review/compare/v1.123.0...v1.124.0) (2026-09-24)
+
+
+### Features
+
+* **evolve:** emit read-only promotion handoff from paired replay ([#2409](https://github.com/s977043/river-review/issues/2409)) ([3974395](https://github.com/s977043/river-review/commit/397439510d90eac4504d957d1d89417f84068413))
+* **suppression:** record skillId / skillVersion via river suppression add --skill ([#2411](https://github.com/s977043/river-review/issues/2411)) ([6737f15](https://github.com/s977043/river-review/commit/6737f1561ca1bbd50d8a8a370569cd205c15d2f5))
+* **suppression:** stop suppressions issued under different project rules (opt-in, [#2202](https://github.com/s977043/river-review/issues/2202) phase 2) ([#2417](https://github.com/s977043/river-review/issues/2417)) ([639154b](https://github.com/s977043/river-review/commit/639154bf2c5fb56ed2164fba8d54daf3bba598b1))
+
+
+### Bug Fixes
+
+* **ci:** exclude bot-blocked MIT license URL from Lychee ([#2420](https://github.com/s977043/river-review/issues/2420)) ([#2421](https://github.com/s977043/river-review/issues/2421)) ([db960df](https://github.com/s977043/river-review/commit/db960df085a8c9496dc009d7d7f0b83854a99604))
+* **ci:** replace retired GitHub Models review endpoint ([#2410](https://github.com/s977043/river-review/issues/2410)) ([6d378d9](https://github.com/s977043/river-review/commit/6d378d9b7e19691715636bc5fa94afbd76670508))
+* **review:** record failed single LLM review as incomplete coverage ([#2410](https://github.com/s977043/river-review/issues/2410)) ([#2422](https://github.com/s977043/river-review/issues/2422)) ([c01050a](https://github.com/s977043/river-review/commit/c01050a59e53f5123b0d857c5392718264ceab14))
+* **review:** show failed empty LLM review as incomplete ([#2410](https://github.com/s977043/river-review/issues/2410)) ([c7a4328](https://github.com/s977043/river-review/commit/c7a4328662fd41e1216d45e3a401d04afec408be))
+* **suppression:** load phase-less suppressions in every review phase ([#2424](https://github.com/s977043/river-review/issues/2424)) ([1d9e6ea](https://github.com/s977043/river-review/commit/1d9e6ea424cb5bee06fda4e52b39da9746d7fa4c)), closes [#2418](https://github.com/s977043/river-review/issues/2418)
+
 ## [1.123.0](https://github.com/s977043/river-review/compare/v1.122.0...v1.123.0) (2026-09-23)
 
 
