@@ -55,11 +55,19 @@
 // With the option off (the default) the predicate is never called, so the
 // result is identical to the pre-Phase-2 gate.
 //
-// Not evaluated here: revocation via `resurface` entries
-// (`collectRevokedSuppressionIds`). `revokeSuppression` never flips the
-// original's `context.active`, and the revoking entry is a separate memory
-// entry this function does not receive; matching by fingerprint only is the
-// pre-#1802 behavior, kept as-is.
+// Turned-off entries (#2425): a suppression with `context.active === false`,
+// or one revoked by a `resurface` entry, is not in force and is dropped before
+// fingerprint indexing, so it can neither gate a finding nor shadow another
+// entry with the same fingerprint. Only an explicit `false` counts: an entry
+// that has no `active` field keeps suppressing as before (createSuppression
+// always writes `active: true`, so a missing field is a hand-written entry,
+// and treating it as off would silently disable it). The revoked ids come
+// from `memoryContext.revokedSuppressionIds`, which `loadReviewMemory` builds
+// from the whole index with `collectRevokedSuppressionIds` — the revoking
+// entry has no phase, so it never reaches the `suppressions` bucket.
+// `revokeSuppression` does not flip the original's `context.active`, which is
+// why both checks are needed. Entry `status` (superseded / archived) is not
+// filtered, like `findActiveSuppressions`.
 
 import { SEVERITY_RANK } from './finding-factory.mjs';
 import {
@@ -96,7 +104,9 @@ function severityOf(finding) {
  * @param {Array<object>} findings  Findings already annotated with `.fingerprint`
  *   by `annotateFingerprints` (src/lib/finding-factory.mjs).
  * @param {object} memoryContext    Bucketed memory from `loadReviewMemory`.
- *   Only `memoryContext.suppressions` is consulted.
+ *   `memoryContext.suppressions` is consulted, and
+ *   `memoryContext.revokedSuppressionIds` (string[], optional) names the
+ *   suppressions to skip as revoked (#2425).
  * @param {object} [opts]
  * @param {object} [opts.config]    Effective config; `config.memory.suppressionEnabled === false`
  *   bypasses suppression entirely (returns all findings as-is).
@@ -141,7 +151,12 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
   // With the gate off this stays null and nothing below reads the rules.
   const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
   const rulesDigests = new Map();
+  const revokedIds = new Set(
+    Array.isArray(memoryContext?.revokedSuppressionIds) ? memoryContext.revokedSuppressionIds : []
+  );
   for (const s of suppressions) {
+    // #2425: turned off explicitly, or revoked by a resurface entry.
+    if (s?.context?.active === false || revokedIds.has(s?.id)) continue;
     const fp = s?.context?.fingerprint;
     if (typeof fp !== 'string' || fp.length !== 16) continue;
     const algo = s?.context?.fingerprintAlgo ?? 'v1';

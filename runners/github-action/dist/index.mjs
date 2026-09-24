@@ -62634,12 +62634,13 @@ async function planSkills({ skills, context, llmPlan, appendRemaining = true }) 
 /* harmony export */   RL: () => (/* binding */ formatUnparseableExpiresAtWarning),
 /* harmony export */   createSuppression: () => (/* binding */ createSuppression),
 /* harmony export */   dG: () => (/* binding */ evaluateSuppressionRulesMatch),
+/* harmony export */   i$: () => (/* binding */ collectRevokedSuppressionIds),
 /* harmony export */   lq: () => (/* binding */ isSuppressionExpired),
 /* harmony export */   rW: () => (/* binding */ formatRulesDigestMismatchWarning),
 /* harmony export */   resolveSuppressionProvenance: () => (/* binding */ resolveSuppressionProvenance),
 /* harmony export */   vU: () => (/* binding */ hasUnparseableSuppressionExpiresAt)
 /* harmony export */ });
-/* unused harmony exports hashFinding, inferSubsystem, revokeSuppression, matchesScopeFiles, collectRevokedSuppressionIds, findUnparseableSuppressionExpiries, findActiveSuppressions */
+/* unused harmony exports hashFinding, inferSubsystem, revokeSuppression, matchesScopeFiles, findUnparseableSuppressionExpiries, findActiveSuppressions */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /* harmony import */ var _riverbed_memory_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4216);
 /* harmony import */ var _rules_mjs__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(1688);
@@ -92455,7 +92456,10 @@ function createOpenAIPlanner(options = {}) {
 var review_runner = __nccwpck_require__(2821);
 // EXTERNAL MODULE: ./src/lib/riverbed-memory.mjs
 var riverbed_memory = __nccwpck_require__(4216);
+// EXTERNAL MODULE: ./src/lib/suppression.mjs
+var suppression = __nccwpck_require__(3528);
 ;// CONCATENATED MODULE: ./src/lib/memory-context.mjs
+
 
 
 
@@ -92476,12 +92480,10 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
   // on its strict phase semantics.
   //
   // What happens after loading (suppression-apply.mjs): applySuppressions
+  // skips `context.active === false` and revoked suppressions (#2425), then
   // judges expiry (isSuppressionExpired) and, when opted in, the rules digest.
   // Entry `status` (superseded / archived) is deliberately not filtered, like
-  // findActiveSuppressions (includeInactive: true). `context.active === false`
-  // and revocation via `resurface` entries are NOT evaluated by
-  // applySuppressions — a pre-existing limitation that phase-less suppressions
-  // now share as well (#2425).
+  // findActiveSuppressions (includeInactive: true).
   const allEntries = phase ? filterByPhase(index, phase) : (index.entries ?? []);
   const relevant = changedFiles?.length
     ? allEntries.filter((e) => {
@@ -92502,7 +92504,13 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
     const bucket = typeMap[e.type];
     if (bucket) buckets[bucket].push(e);
   }
-  return { entries: relevant, ...buckets };
+  // Revocations (#2425) are keyed by suppression id and carry neither a phase
+  // nor relatedFiles, so the phase / relatedFiles filters above would drop
+  // them. They are collected from the whole, unfiltered index through the
+  // shared definition (collectRevokedSuppressionIds) and returned as a plain
+  // array so the value survives JSON serialization unchanged.
+  const revokedSuppressionIds = [...(0,suppression/* collectRevokedSuppressionIds */.i$)(index.entries)];
+  return { entries: relevant, ...buckets, revokedSuppressionIds };
 }
 
 function isPhaselessSuppression(entry) {
@@ -92648,8 +92656,6 @@ function resolveFullFileSupply({
   };
 }
 
-// EXTERNAL MODULE: ./src/lib/suppression.mjs
-var suppression = __nccwpck_require__(3528);
 ;// CONCATENATED MODULE: ./src/lib/suppression-apply.mjs
 // Apply Riverbed Memory suppressions to a list of findings (#687 PR-B).
 //
@@ -92708,11 +92714,19 @@ var suppression = __nccwpck_require__(3528);
 // With the option off (the default) the predicate is never called, so the
 // result is identical to the pre-Phase-2 gate.
 //
-// Not evaluated here: revocation via `resurface` entries
-// (`collectRevokedSuppressionIds`). `revokeSuppression` never flips the
-// original's `context.active`, and the revoking entry is a separate memory
-// entry this function does not receive; matching by fingerprint only is the
-// pre-#1802 behavior, kept as-is.
+// Turned-off entries (#2425): a suppression with `context.active === false`,
+// or one revoked by a `resurface` entry, is not in force and is dropped before
+// fingerprint indexing, so it can neither gate a finding nor shadow another
+// entry with the same fingerprint. Only an explicit `false` counts: an entry
+// that has no `active` field keeps suppressing as before (createSuppression
+// always writes `active: true`, so a missing field is a hand-written entry,
+// and treating it as off would silently disable it). The revoked ids come
+// from `memoryContext.revokedSuppressionIds`, which `loadReviewMemory` builds
+// from the whole index with `collectRevokedSuppressionIds` — the revoking
+// entry has no phase, so it never reaches the `suppressions` bucket.
+// `revokeSuppression` does not flip the original's `context.active`, which is
+// why both checks are needed. Entry `status` (superseded / archived) is not
+// filtered, like `findActiveSuppressions`.
 
 
 
@@ -92741,7 +92755,9 @@ function severityOf(finding) {
  * @param {Array<object>} findings  Findings already annotated with `.fingerprint`
  *   by `annotateFingerprints` (src/lib/finding-factory.mjs).
  * @param {object} memoryContext    Bucketed memory from `loadReviewMemory`.
- *   Only `memoryContext.suppressions` is consulted.
+ *   `memoryContext.suppressions` is consulted, and
+ *   `memoryContext.revokedSuppressionIds` (string[], optional) names the
+ *   suppressions to skip as revoked (#2425).
  * @param {object} [opts]
  * @param {object} [opts.config]    Effective config; `config.memory.suppressionEnabled === false`
  *   bypasses suppression entirely (returns all findings as-is).
@@ -92786,7 +92802,12 @@ function applySuppressions(findings, memoryContext, opts = {}) {
   // With the gate off this stays null and nothing below reads the rules.
   const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
   const rulesDigests = new Map();
+  const revokedIds = new Set(
+    Array.isArray(memoryContext?.revokedSuppressionIds) ? memoryContext.revokedSuppressionIds : []
+  );
   for (const s of suppressions) {
+    // #2425: turned off explicitly, or revoked by a resurface entry.
+    if (s?.context?.active === false || revokedIds.has(s?.id)) continue;
     const fp = s?.context?.fingerprint;
     if (typeof fp !== 'string' || fp.length !== 16) continue;
     const algo = s?.context?.fingerprintAlgo ?? 'v1';
