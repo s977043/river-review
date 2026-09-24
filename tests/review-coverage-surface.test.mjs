@@ -164,11 +164,17 @@ describe('Review Coverage surface propagation', () => {
 
   // #2423: the --reviewers path goes through the same real generateReview,
   // which catches the LLM failure and resolves. The unit must still be failed.
-  async function runWithFetch(t, prefix, fetchImpl, extra = {}) {
+  async function runWithFetch(
+    t,
+    prefix,
+    fetchImpl,
+    extra = {},
+    changedFiles = { 'src/app.js': 'export const value = 2;\n' }
+  ) {
     const { dir, cleanup } = await createTempGitRepo({
       prefix,
       initialFiles: { 'src/app.js': 'export const value = 1;\n' },
-      changedFiles: { 'src/app.js': 'export const value = 2;\n' },
+      changedFiles,
     });
     t.after(cleanup);
     await runGit(['add', '.'], dir);
@@ -207,6 +213,23 @@ describe('Review Coverage surface propagation', () => {
     assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, [
       'reviewer:security-scanner/chunk:1',
     ]);
+  });
+
+  it('reports findingsCount 0 for a failed --reviewers unit even when heuristics produce findings', async (t) => {
+    const result = await runWithFetch(
+      t,
+      'river-review-reviewers-coverage-failure-heuristic-',
+      async () => ({ ok: false, status: 400, text: async () => 'bad request' }),
+      { reviewers: ['security-scanner'] },
+      {
+        'src/app.js':
+          'export const value = 2;\nexport function test() {\n  try {\n    run();\n  } catch(e) {\n    return;\n  }\n}\n',
+      }
+    );
+
+    assert.ok(result.reviewerResults[0].findingsCount > 0);
+    assert.equal(result.reviewCoverage.units[0].status, 'failed');
+    assert.equal(result.reviewCoverage.units[0].findingsCount, 0);
   });
 
   it('keeps complete coverage when an explicit --reviewers role gets a valid LLM response', async (t) => {

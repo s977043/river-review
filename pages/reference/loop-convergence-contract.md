@@ -65,6 +65,7 @@ Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](ht
   - `RIVER_GATE_STAGING_UNRUNNABLE=1`: 決定論ゲートの subject file が sandbox へ揃わなかった run を `deterministicUnrunnable` として扱い、`ESCALATE`（`DETERMINISTIC_UNRUNNABLE`）へ倒す。空の sandbox を渡された checker は自力で exit 0 するため、その exit code は変更に対する verdict ではない。`strictBlock` には決して寄せない
   - `RIVER_GATE_COVERAGE=1`: `reviewCoverage.status` が `partial` / `not_executed` の run を `NO_GO`（`COVERAGE_INCOMPLETE`）へ倒す。これは `suggestedLoopSignal` の降格ではなく gate の**独立入力**である。降格経路にすると結果が `decision` に依存するため、coverage gap は独立入力として一様に止める。**実効があるのは現時点で `river run --gate` 経路のみであり、`review exec` 経路は engine が `reviewCoverage` を返すまで no-op となる**
     - #2410 以降、`reviewCoverage` は `--reviewers` orchestration だけでなく単一 reviewer 経路でも、LLM call を**実際に試行した場合だけ**生成される。有効な応答（`NO_ISSUES` を含む）は `complete`、transport / response-envelope / model-output parse failure は required unit `failed` → `not_executed` になる
+    - #2423 以降、`--reviewers` でも LLM 呼び出しに失敗した role × chunk は `completed` ではなく `failed`（`reviewer_error`）として記録し、集計は `partial` / `not_executed` になる
     - dry-run / offline / API key 未設定などの意図的 skip は coverage を生成しない。「LLM を試して失敗した」と「そもそも実行しなかった」を同一視しないためである
     - 発火条件は `RIVER_GATE_COVERAGE=1` + `river run --gate` + 不完全な coverage 観測の 3 つであり、`--reviewers` を必須としない。GitHub Action では `gate: true` と step の `env` に `RIVER_GATE_COVERAGE=1` を設定する。`reviewers` input は複数 reviewer coverage が必要な場合だけ指定する
   - coverage が**存在しない**ことは不完全とは読まない。「観測が無い」と「欠落を観測した」は別の事実であり、マージを止めてよいのは後者だけである
