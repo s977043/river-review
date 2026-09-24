@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.124.2](https://github.com/s977043/river-review/compare/v1.124.1...v1.124.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **suppression:** let in-force entries beat expired ones and skip falsy active ([#2432](https://github.com/s977043/river-review/issues/2432)) ([abc6baf](https://github.com/s977043/river-review/commit/abc6baf1a55359df8427296283fa89c9a0f780cb)), closes [#2430](https://github.com/s977043/river-review/issues/2430)
+
 ## [1.124.1](https://github.com/s977043/river-review/compare/v1.124.0...v1.124.1) (2026-09-24)
 
 
