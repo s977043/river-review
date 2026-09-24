@@ -220,7 +220,7 @@ describe('Review Coverage surface propagation', () => {
       { reviewers: ['security-scanner'] }
     );
 
-    assert.equal(result.reviewerResults[0].status, 'fulfilled');
+    assert.equal(result.reviewerResults[0].status, 'rejected');
     assert.equal(result.reviewCoverage.status, 'not_executed');
     assert.equal(result.reviewDebug.succeededReviewers, 0);
     assert.equal(result.reviewCoverage.units[0].id, 'reviewer:security-scanner/chunk:1');

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
+import { deriveRunGate } from '../src/lib/run-gate.mjs';
 import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
 
 const validateCoverage = compileReviewCoverageValidator();
@@ -134,6 +135,45 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(result.reviewCoverage.status, 'partial');
     assert.equal(result.reviewCoverage.units.filter((unit) => unit.status === 'failed').length, 1);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
+  });
+
+  // #2436: one completed chunk keeps the role fulfilled even if another chunk's
+  // LLM call failed, so the run is not escalated as "no reviewer succeeded".
+  it('keeps a role fulfilled when one chunk completes and another fails its LLM call', async () => {
+    const diff = chunkedDiff();
+    const result = await runReviewerOrchestration(
+      baseArgs({
+        diff,
+        generateReviewImpl: async ({ diff: chunk }) =>
+          okReview({
+            debug: chunk.files.some((entry) => entry.path.startsWith('slow/'))
+              ? { llmUsed: false, llmError: 'boom' }
+              : { llmUsed: true },
+          }),
+      })
+    );
+
+    assert.equal(result.reviewCoverage.status, 'partial');
+    assert.equal(result.reviewerResults[0].status, 'fulfilled');
+    const { gate } = deriveRunGate({
+      status: 'ok',
+      findings: result.findings,
+      reviewerResults: result.reviewerResults,
+      changedFiles: diff.changedFiles,
+    });
+    assert.notEqual(gate.decision, 'ESCALATE');
+  });
+
+  it('falls back to unknown when a failed role reports an empty llmError', async () => {
+    for (const llmError of ['', '   ']) {
+      const result = await runReviewerOrchestration(
+        baseArgs({
+          generateReviewImpl: async () => okReview({ debug: { llmUsed: false, llmError } }),
+        })
+      );
+      assert.equal(result.reviewerResults[0].status, 'rejected');
+      assert.equal(result.reviewerResults[0].error, 'unknown', JSON.stringify(llmError));
+    }
   });
 
   it('reports not_executed when all required work fails', async () => {

@@ -92278,6 +92278,11 @@ async function runReviewerOrchestration({
       .filter((i) => i >= 0);
     const roleSettled = roleIndices.map((i) => settled[i]);
     const roleSucceeded = roleSettled.filter((r) => r.status === 'fulfilled');
+    // #2436: a role whose every fulfilled task is an LLM failure did not review;
+    // a skipped (null) task still counts as succeeded here.
+    const roleReviewed = roleIndices.filter(
+      (i) => settled[i].status === 'fulfilled' && llmAttempts[i] !== 'failed'
+    );
     const roleOutcomes = roleIndices.map((i) => taskOutcomes[i]);
     const roleDurations = roleOutcomes
       .map((o) => o.durationMs)
@@ -92285,7 +92290,7 @@ async function runReviewerOrchestration({
     return {
       role: name,
       label: REVIEWER_ROLES[name].label,
-      status: roleSucceeded.length > 0 ? 'fulfilled' : 'rejected',
+      status: roleReviewed.length > 0 ? 'fulfilled' : 'rejected',
       findingsCount: roleSucceeded.reduce((sum, r) => sum + (r.value?.findings?.length ?? 0), 0),
       chunksRun: chunked ? diffsToProcess.length : null,
       // #1545 P1: why this role was auto-selected (only present in auto mode).
@@ -92296,7 +92301,12 @@ async function runReviewerOrchestration({
       timedOut: roleOutcomes.some((o) => o.timedOut),
       durationMs: roleDurations.length ? Math.max(...roleDurations) : null,
       error:
-        roleSucceeded.length === 0 ? String(roleSettled[0]?.reason?.message ?? 'unknown') : null,
+        roleReviewed.length > 0
+          ? null
+          : String(
+              roleSettled[0]?.reason?.message ??
+                (String(roleSucceeded[0]?.value?.debug?.llmError ?? '').trim() || 'unknown')
+            ),
     };
   });
 
@@ -92338,7 +92348,7 @@ async function runReviewerOrchestration({
     llmModel: succeeded[0]?.llmModel ?? null,
     debug: {
       succeededReviewers: llmAttempts.filter((attempt) => attempt === 'completed').length,
-      failedReviewers: failed.length,
+      failedReviewers: failed.length + llmAttempts.filter((attempt) => attempt === 'failed').length,
       deduplicatedCount: rawFindings.length - allFindings.length,
       // #2334: 既定 off では criticStage が null なので、この key 自体が
       // debug に現れない（既存の key 集合と同一）。

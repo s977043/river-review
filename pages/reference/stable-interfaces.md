@@ -115,7 +115,7 @@ severity の rank（低→高）: `info`=0 / `minor`=1 / `major`=2 / `critical`=
 | gate 判定（`--fail-on` / `--warn-on` / `--gate` が返す `0` / `1` / `2` / `3`） | Stable   | major                                          |
 | usage error（引数の解釈失敗）                                                  | Internal | CLI サーフェス全体のラベルに従う（minor で可） |
 
-gate 判定用の終了コードは CI のジョブ成否へ直結します。閾値の意味が黙って変わると、利用者は失敗を検知できません。そのため Stable Contract に含めます。変更には major version bump が必要です。なお `--gate` の `3` は ESCALATE（人間の承認が必要）を表します。`river review` 系では、ハンドラ層の設定エラーにも `3` を割り当てています（[`river review plan` 仕様](./cli-review-plan-spec.md)）。
+gate 判定用の終了コードは CI のジョブ成否へ直結します。閾値の意味が黙って変わると、利用者は失敗を検知できません。そのため Stable Contract に含めます。変更には major version bump が必要です。なお `--gate` の `3` は ESCALATE（人間の承認が必要）を表します。`river review` 系では、ハンドラ層の設定エラーにも `3` を割り当てています（[`river review plan` 仕様](./cli-review-plan-spec.md)）。#2436 以降、`--reviewers` で全 role の LLM 呼び出しが失敗した run は ESCALATE（exit 3）になります。その role の `reviewerResults[].status` を `rejected` と記録し、「reviewer が 1 つも成功しなかった run」として扱うためです。一部の role だけが失敗した run の gate は変わりません。LLM を skip した role は `fulfilled` のままです。
 
 usage error の終了コードはレビュー結果を含みません。表すのは「引数が受理されなかった」ことだけです。誤用の検出漏れを塞ぐたびに検出層と粒度が動きます。そのため CLI サーフェス全体の Internal ラベルへ従わせます。実例として #1709 では、引数エラーを exit 0 から exit 1 へ横断統一しました。粒度はさらに、parse 層の `1` とハンドラ層の設定エラーの `3` へ整理されています。この一連の変更は v1.71.0（#1735）と v1.72.0（#1746）という minor リリースで入りました。
 
