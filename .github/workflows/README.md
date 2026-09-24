@@ -1,6 +1,6 @@
 # GitHub Actions ワークフロー
 
-`.github/workflows/` にある 28 本のワークフローの入口ドキュメントです。「どのワークフローが何をするのか」「どれが必須チェックなのか」「新しく 1 本追加するときに何をすべきか」をここから辿れます。
+`.github/workflows/` にある 29 本のワークフローの入口ドキュメントです。「どのワークフローが何をするのか」「どれが必須チェックなのか」「新しく 1 本追加するときに何をすべきか」をここから辿れます。
 
 各行の内容は実際の YAML の `on:` とジョブ定義から転記しています。ワークフローを追加・削除・改名したときは、この README も同じ PR で更新してください。
 
@@ -46,7 +46,7 @@ gh api repos/s977043/river-review/rulesets/<id> --jq '[.rules[].type]'
 
 必須チェックは classic branch protection 側にのみ定義されています。ruleset「Main Branch Protection」が持つルールは `deletion` と `non_fast_forward` の 2 つだけで、`required_status_checks` は含みません（2026-08-02 時点）。
 
-## ワークフロー一覧（28 本）
+## ワークフロー一覧（29 本）
 
 ファイル名の昇順です。「必須」列の `-` は branch protection の必須チェックではないことを示します。
 
@@ -62,6 +62,7 @@ gh api repos/s977043/river-review/rulesets/<id> --jq '[.rules[].type]'
 | `diataxis-docs-check.yml`                | Diátaxis Docs Check                | `pull_request`（opened / edited / synchronize）                                                                                      | `pages/` を触る PR に Diátaxis 種別の記載を促すコメントを付ける                                                                                             | -          |
 | `doc-quality.yml`                        | Doc Quality                        | `pull_request`（`*.md` 系）/ `schedule`（`30 2 * * 1`）/ `workflow_dispatch`                                                         | `check:bilingual` と `check:doc-placement` を実行する。ジョブを落とすのは配置違反のみ                                                                       | -          |
 | `hol-plugin-scanner.yml`                 | HOL Plugin Scanner                 | `push`（main）/ `pull_request`（main）                                                                                               | AI プラグインスキャナで走査し、SARIF を GitHub Security へ送る                                                                                              | -          |
+| `human-attention-phase-a.yml`            | Human Attention Phase A            | `workflow_dispatch` / `pull_request`（Human Attention eval 関連パス）                                                                | #2378 Phase A の固定 baseline / candidate を paired 実行し、deterministic summary と raw evidence を artifact に保存する                                    | -          |
 | `link-check.yml`                         | Link Check                         | `pull_request`（`**/*.md` / `.lychee.toml` / `.lycheeignore`）/ `schedule`（`0 2 * * 1`）/ `workflow_dispatch`                       | lychee で Markdown のリンク切れを検出する                                                                                                                   | -          |
 | `nightly-audit.yml`                      | Nightly Measure & Audit            | `schedule`（`0 18 * * *` = 毎日 18:00 UTC / 03:00 JST）/ `workflow_dispatch`                                                         | レビュー品質シグナルを計測し、監査レポートと台帳を artifact に残す                                                                                          | -          |
 | `nightly-eval.yml`                       | Nightly Eval                       | `schedule`（`0 19 * * *` = 毎日 19:00 UTC / 04:00 JST）/ `workflow_dispatch`                                                         | 統合 eval を実行し、KPI 退行を検出したら Issue を作る                                                                                                       | -          |
@@ -150,11 +151,11 @@ JSON
 
 ## 共通の約束事
 
-- Node をセットアップするのは 28 本中 15 本で、うち 13 本は `./.github/actions/setup-node-deps`（composite action）を使う
+- Node をセットアップするのは 29 本中 16 本で、うち 14 本は `./.github/actions/setup-node-deps`（composite action）を使う
 - ただし composite の既定は `.nvmrc` ではなくリテラル `22.x` である（`.nvmrc` は `22.22.2`）。ncc の出力が Node メジャーで変わるため、dist を再ビルドする `auto-rebuild-action-dist.yml` と `test.yml`（`dist-check` / `engine-install`）だけは `node-version-file: '.nvmrc'` を厳密に指定する。composite を使わない `promptfoo-eval.yml` も同じ指定である
 - サードパーティ action は commit SHA でピン留めする。現状 `scorecard.yml` の `ossf/scorecard-action@v2.4.4` だけがタグ参照である
-- `permissions:` は 28 本すべてが top-level で宣言している。読み取りだけで済むものには `read-all` か `contents: read` を置き、書き込みが要るジョブにだけスコープを足す。`auto-milestone.yml` は `issues: write` のみを与える最小例である
-- 共有状態（ref・デプロイ・Issue・外部リソース）に触れるワークフローには `concurrency:` グループを設定する。読み取り専用のジョブでは省略してよい。現状 28 本中 26 本が設定済みで、例外は `hol-plugin-scanner.yml` と `blocked-label-guard.yml` の 2 本である
+- `permissions:` は 29 本すべてが top-level で宣言している。読み取りだけで済むものには `read-all` か `contents: read` を置き、書き込みが要るジョブにだけスコープを足す。`auto-milestone.yml` は `issues: write` のみを与える最小例である
+- 共有状態（ref・デプロイ・Issue・外部リソース）に触れるワークフローには `concurrency:` グループを設定する。読み取り専用のジョブでは省略してよい。現状 29 本中 26 本が設定済みで、例外は `human-attention-phase-a.yml` / `hol-plugin-scanner.yml` / `blocked-label-guard.yml` の 3 本である
 - **必須チェックの `concurrency` グループは commit 単位で分ける。** 同じ commit について報告する run どうしが 1 グループへ入ると事故になる。グループ内で cancel された run は `cancelled` の check-run を残し、pass でも fail でもない結論として必須チェックの判定を止める（#1778）。`cancel-in-progress: false` にしても避けられない。グループ内に pending の run がある状態で新しい run が queue へ入ると、既存の pending は cancel される。出典は [workflow-syntax#concurrency](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency) である。cancel されるタイミングが in-progress から pending へ移るだけで、`cancelled` の check-run は残る。
   - 害になる条件は「**cancel された run と生き残る run が同じ commit について報告する**」ことである。`blocked-label-guard.yml` は `labeled` / `unlabeled` を購読しており、同じ head sha に対して複数の run が立つ。グループを共有すると現在の head の判定が `cancelled` になるため、このワークフローは `concurrency:` を持たない（#1778 の事故そのもの）。
   - `test.yml` は `concurrency:` を持つが、この条件に当たらない。購読しているのは `push`（main）/ `pull_request` / `merge_group` / `workflow_dispatch` で、`pull_request` で cancel が起きるのは push によって head が進んだときだけである。cancel される run は**古い commit**について報告するので、現在の head の必須チェックには影響しない。
