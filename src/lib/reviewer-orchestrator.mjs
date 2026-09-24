@@ -9,7 +9,7 @@ import {
 } from './finding-factory.mjs';
 import { buildLlmDiffView, renderDiffText } from './diff-processor.mjs';
 import { synthesizeTeamLeadReport } from './team-lead-synthesizer.mjs';
-import { deriveReviewCoverage } from './review-coverage.mjs';
+import { classifyLlmAttempt, deriveReviewCoverage } from './review-coverage.mjs';
 // #2334 / #1978 Phase 3: Finding Critic の配線段。ADR-011 が前提として挙げた
 // 「findings のマージ後」がここであり、per-reviewer の generateReview 側は
 // deferFindingCritic で抑止して二重実行を避ける。既定 off。
@@ -872,7 +872,16 @@ export async function runReviewerOrchestration({
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const task = settled[taskIdx];
     const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
-    const status = task?.status === 'fulfilled' ? 'completed' : timedOut ? 'timed_out' : 'failed';
+    // #2423: generateReview catches LLM transport / parse failures and still
+    // resolves, so a fulfilled task is completed only if the LLM did not fail.
+    const status =
+      task?.status === 'fulfilled'
+        ? classifyLlmAttempt(task.value?.debug) === 'failed'
+          ? 'failed'
+          : 'completed'
+        : timedOut
+          ? 'timed_out'
+          : 'failed';
     return {
       id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
       kind: 'diff-chunk',
@@ -886,7 +895,7 @@ export async function runReviewerOrchestration({
           : status === 'timed_out'
             ? 'reviewer_timeout'
             : 'reviewer_error',
-      findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
+      findingsCount: status === 'completed' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
   const reviewCoverage = deriveReviewCoverage(reviewUnits);

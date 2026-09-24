@@ -91,6 +91,33 @@ export function deriveReviewCoverage(units = []) {
 }
 
 /**
+ * Classify how one generateReview call used the LLM (#2423).
+ *
+ * The single source for "was the LLM attempted, and did it fail". Both the
+ * Review Coverage derivations (single-reviewer and reviewer orchestration) and
+ * the Markdown "LLM semantic review incomplete" header import this.
+ *
+ * - `llmUsed === true` => 'completed' (a partial-batch warning in llmError does
+ *   not demote it: usable semantic output was produced)
+ * - `llmUsed === false` with a skip reason in `llmSkipped` => null (intentional
+ *   skip: dry-run, offline, missing key, unsupported provider)
+ * - `llmUsed === false` without a skip reason => 'failed' (transport /
+ *   response / parse failure). generateReview sets `llmSkipped` only on the
+ *   branch that does not call the LLM, so this does not depend on how
+ *   llmError is worded — an empty or missing message is still a failure
+ * - `llmUsed` not a boolean => null (not a generateReview debug)
+ *
+ * @param {object|null|undefined} debug generateReview debug
+ * @returns {'completed'|'failed'|null}
+ */
+export function classifyLlmAttempt(debug) {
+  if (debug?.llmUsed === true) return 'completed';
+  if (debug?.llmUsed !== false) return null;
+  const skipped = typeof debug.llmSkipped === 'string' && debug.llmSkipped.trim().length > 0;
+  return skipped ? null : 'failed';
+}
+
+/**
  * Build Review Coverage for the legacy single-reviewer LLM path.
  *
  * The observation exists only when an LLM call was actually attempted:
@@ -109,13 +136,8 @@ export function deriveReviewCoverage(units = []) {
  * @returns {ReturnType<typeof deriveReviewCoverage>|null}
  */
 export function deriveSingleReviewerLlmCoverage({ debug, subjects = [], findingsCount = 0 } = {}) {
-  const llmCompleted = debug?.llmUsed === true;
-  const llmFailed =
-    debug?.llmUsed === false &&
-    typeof debug?.llmError === 'string' &&
-    debug.llmError.trim().length > 0;
-
-  if (!llmCompleted && !llmFailed) return null;
+  const status = classifyLlmAttempt(debug);
+  if (status === null) return null;
 
   const normalizedSubjects = [
     ...new Set(
@@ -125,7 +147,6 @@ export function deriveSingleReviewerLlmCoverage({ debug, subjects = [], findings
     ),
   ];
 
-  const status = llmCompleted ? 'completed' : 'failed';
   return deriveReviewCoverage([
     {
       id: 'reviewer:single/chunk:1',

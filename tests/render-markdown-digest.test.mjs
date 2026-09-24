@@ -182,6 +182,22 @@ describe('#1713 Slice 1: markdown headline and progressive disclosure', () => {
     assert.ok(markdown.includes('src/app\\.js'));
   });
 
+  it('shows the incomplete header for an attempted LLM failure with an empty message (#2423)', () => {
+    const markdown = renderMarkdown(
+      makeResult({
+        reviewDebug: {
+          llmUsed: false,
+          llmError: '',
+          heuristicsUsed: true,
+          heuristicsCount: 0,
+        },
+      })
+    );
+
+    assert.match(markdown, /LLM semantic review は未完了/);
+    assert.doesNotMatch(markdown, /指摘 0 件/);
+  });
+
   it('keeps a successful empty LLM review on the normal clean surface (#2410)', () => {
     const markdown = renderMarkdown(
       makeResult({
