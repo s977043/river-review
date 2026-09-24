@@ -869,6 +869,16 @@ export async function runReviewerOrchestration({
   const failed = settled.filter((r) => r.status === 'rejected');
 
   const requiredRoles = new Set(autoSelection ? (autoSelection.required ?? []) : roles);
+  // #2436: a fulfilled task whose LLM was intentionally skipped (null) did not
+  // review anything. When every task is fulfilled and skipped, emit no coverage,
+  // same as the single-reviewer path; any other mix counts a skip as failed.
+  // A reviewer that reports no `llmUsed` at all keeps its pre-#2436 completed.
+  const llmAttempts = settled.map((task) => {
+    if (task.status !== 'fulfilled') return undefined;
+    const debug = task.value?.debug;
+    return debug?.llmUsed === undefined ? 'completed' : classifyLlmAttempt(debug);
+  });
+  const allSkipped = llmAttempts.every((attempt) => attempt === null);
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const task = settled[taskIdx];
     const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
@@ -876,9 +886,9 @@ export async function runReviewerOrchestration({
     // resolves, so a fulfilled task is completed only if the LLM did not fail.
     const status =
       task?.status === 'fulfilled'
-        ? classifyLlmAttempt(task.value?.debug) === 'failed'
-          ? 'failed'
-          : 'completed'
+        ? llmAttempts[taskIdx] === 'completed'
+          ? 'completed'
+          : 'failed'
         : timedOut
           ? 'timed_out'
           : 'failed';
@@ -898,7 +908,7 @@ export async function runReviewerOrchestration({
       findingsCount: status === 'completed' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
-  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+  const reviewCoverage = allSkipped ? null : deriveReviewCoverage(reviewUnits);
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
@@ -1013,7 +1023,7 @@ export async function runReviewerOrchestration({
     promptTruncated: succeeded.some((r) => r.promptTruncated),
     llmModel: succeeded[0]?.llmModel ?? null,
     debug: {
-      succeededReviewers: succeeded.length,
+      succeededReviewers: llmAttempts.filter((attempt) => attempt === 'completed').length,
       failedReviewers: failed.length,
       deduplicatedCount: rawFindings.length - allFindings.length,
       // #2334: 既定 off では criticStage が null なので、この key 自体が
