@@ -19,8 +19,9 @@ export function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
   // on its strict phase semantics.
   //
   // What happens after loading (suppression-apply.mjs): applySuppressions
-  // skips `context.active === false` and revoked suppressions (#2425), then
-  // judges expiry (isSuppressionExpired) and, when opted in, the rules digest.
+  // skips suppressions whose `context.active` is present but falsy
+  // (false / 0 / null / '', #2430) and revoked ones (#2425), then judges
+  // expiry (isSuppressionExpired) and, when opted in, the rules digest.
   // Entry `status` (superseded / archived) is deliberately not filtered, like
   // findActiveSuppressions (includeInactive: true).
   const allEntries = phase ? filterByPhase(index, phase) : (index.entries ?? []);
