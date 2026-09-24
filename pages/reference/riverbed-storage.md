@@ -24,6 +24,7 @@ Riverbed Memory は、過去の判断やパターンを LLM レビューに活�
   - `createdAt` (ISO8601), `updatedAt` (任意)
   - `author`
   - `phase` (`upstream | midstream | downstream`, 任意)
+    - `river run` などのレビューは、自分のフェーズと一致する `phase` のエントリだけを読み込む。ただし `phase` を持たない `suppression` エントリは全フェーズで読み込む（`river suppression add` は `phase` を書かない）
   - `tags`, `relatedFiles`, `links`, `summary`
 - `context`: 任意の追加情報（PR 番号、関連 ADR ID など）
 - `status`: `active | superseded | archived` (省略時 `active`、`archived` は `expireEntries` で遷移)

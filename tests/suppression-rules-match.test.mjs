@@ -372,14 +372,9 @@ describe('runLocalReview wiring (issuance → .river/memory → review)', () => 
       rationale: 'wiring',
       ...provenance,
     });
-    // loadReviewMemory (memory-context.mjs) keeps only entries whose
-    // metadata.phase equals the review phase, and createSuppression writes no
-    // metadata.phase — so without this line the entry is never loaded on the
-    // runLocalReview path at all (pre-existing, reproduced on the base commit;
-    // reported separately, out of scope for #2202 Phase 2).
-    const index = JSON.parse(readFileSync(indexPath, 'utf8'));
-    index.entries[0].metadata.phase = 'midstream';
-    writeFileSync(indexPath, JSON.stringify(index));
+    // createSuppression writes no metadata.phase; since #2418 loadReviewMemory
+    // loads such a suppression in every phase, so the entry is used as issued.
+    assert.equal(JSON.parse(readFileSync(indexPath, 'utf8')).entries[0].metadata.phase, undefined);
 
     const isSuppressed = (r) =>
       r.suppressedFindings.some((f) => f.fingerprint === target.fingerprint);
@@ -404,5 +399,68 @@ describe('runLocalReview wiring (issuance → .river/memory → review)', () => 
         (a) => a.fingerprint === target.fingerprint && a.reason === 'rules-digest-mismatch'
       )
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2418: phase filter on the runLocalReview path
+// ---------------------------------------------------------------------------
+
+describe('runLocalReview phase filter for suppressions (#2418)', () => {
+  async function reviewOnce(dir) {
+    writeFileSync(path.join(dir, '.river-review.json'), JSON.stringify({}));
+    const context = await planLocalReview({ cwd: dir, dryRun: true });
+    assert.equal(context.status, 'ok');
+    return runLocalReview({ cwd: dir, context, dryRun: true, quiet: true });
+  }
+
+  async function issueFor(dir, target) {
+    const indexPath = path.join(dir, '.river', 'memory', 'index.json');
+    createSuppression({
+      indexPath,
+      fingerprint: target.fingerprint,
+      feedbackType: 'accepted_risk',
+      filePaths: [target.file],
+      rationale: 'phase filter',
+      ...(await resolveSuppressionProvenance({ repoRoot: dir })),
+    });
+    return indexPath;
+  }
+
+  const isSuppressed = (r, fp) => r.suppressedFindings.some((f) => f.fingerprint === fp);
+
+  test('a suppression issued by createSuppression (no phase) suppresses on the midstream review', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange({
+      prefix: 'river-2418-nophase-',
+    });
+    t.after(cleanup);
+    const target = (await reviewOnce(dir)).findings[0];
+    assert.ok(target, 'dry-run must yield a finding for this diff');
+    const indexPath = await issueFor(dir, target);
+    assert.equal(JSON.parse(readFileSync(indexPath, 'utf8')).entries[0].metadata.phase, undefined);
+
+    const result = await reviewOnce(dir);
+    assert.ok(isSuppressed(result, target.fingerprint));
+    assert.equal(
+      result.findings.some((f) => f.fingerprint === target.fingerprint),
+      false
+    );
+  });
+
+  test('a suppression that names a different phase is still excluded', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange({
+      prefix: 'river-2418-otherphase-',
+    });
+    t.after(cleanup);
+    const target = (await reviewOnce(dir)).findings[0];
+    assert.ok(target, 'dry-run must yield a finding for this diff');
+    const indexPath = await issueFor(dir, target);
+    const index = JSON.parse(readFileSync(indexPath, 'utf8'));
+    index.entries[0].metadata.phase = 'upstream';
+    writeFileSync(indexPath, JSON.stringify(index));
+
+    const result = await reviewOnce(dir);
+    assert.equal(isSuppressed(result, target.fingerprint), false);
+    assert.ok(result.findings.some((f) => f.fingerprint === target.fingerprint));
   });
 });

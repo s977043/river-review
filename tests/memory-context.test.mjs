@@ -77,6 +77,36 @@ test('loadReviewMemory filters by phase', () => {
   }
 });
 
+test('loadReviewMemory keeps a phase-less suppression in every phase (#2418)', () => {
+  const dir = createTempDir({ prefix: 'river-mem-ctx-' });
+  try {
+    const meta = (extra = {}) => ({ createdAt: '2026-01-01T00:00:00Z', author: 't', ...extra });
+    writeIndexSync(dir, [
+      makeEntry({ id: 's-none', type: 'suppression', metadata: meta() }),
+      makeEntry({ id: 's-up', type: 'suppression', metadata: meta({ phase: 'upstream' }) }),
+      makeEntry({ id: 's-mid', type: 'suppression', metadata: meta({ phase: 'midstream' }) }),
+      makeEntry({ id: 'p-none', type: 'pattern', metadata: meta() }),
+      makeEntry({ id: 'w-none', type: 'wontfix', metadata: meta() }),
+      makeEntry({ id: 's-null', type: 'suppression', metadata: meta({ phase: null }) }),
+      makeEntry({ id: 's-empty', type: 'suppression', metadata: meta({ phase: '' }) }),
+    ]);
+    for (const phase of ['upstream', 'midstream', 'downstream']) {
+      const ctx = loadReviewMemory(dir, { phase });
+      const ids = ctx.entries.map((e) => e.id);
+      assert.ok(ids.includes('s-none'), phase + ': phase-less suppression must load');
+      assert.equal(ids.includes('s-up'), phase === 'upstream', phase + ': s-up');
+      assert.equal(ids.includes('s-mid'), phase === 'midstream', phase + ': s-mid');
+      assert.equal(ids.includes('p-none'), false, phase + ': phase-less pattern stays excluded');
+      assert.equal(ids.includes('w-none'), false, phase + ': phase-less wontfix stays excluded');
+      assert.equal(ids.includes('s-null'), false, phase + ': phase null is not phase-less');
+      assert.equal(ids.includes('s-empty'), false, phase + ": phase '' is not phase-less");
+      assert.ok(ctx.suppressions.some((e) => e.id === 's-none'));
+    }
+  } finally {
+    cleanupTempDir(dir);
+  }
+});
+
 test('loadReviewMemory filters by relatedFiles overlap', () => {
   const dir = createTempDir({ prefix: 'river-mem-ctx-' });
   try {
