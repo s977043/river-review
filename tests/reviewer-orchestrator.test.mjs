@@ -194,8 +194,9 @@ describe('runReviewerOrchestration', () => {
   it('counts every valid explicit reviewer in Review Coverage (#2363)', async () => {
     const result = await runReviewerOrchestration({
       diff: makeDiff(),
-      dryRun: true,
       reviewers: ['bug-hunter', 'security-scanner'],
+      // #2436: a dry-run skips the LLM and emits no coverage, so stub an executed review.
+      generateReviewImpl: async () => ({ findings: [], comments: [], debug: { llmUsed: true } }),
     });
 
     assert.equal(result.reviewCoverage.status, 'complete');
@@ -212,8 +213,9 @@ describe('runReviewerOrchestration', () => {
   it('keeps duplicate valid explicit roles deduplicated in Review Coverage (#2363)', async () => {
     const result = await runReviewerOrchestration({
       diff: makeDiff(),
-      dryRun: true,
       reviewers: ['bug-hunter', 'bug-hunter', 'security-scanner'],
+      // #2436: a dry-run skips the LLM and emits no coverage, so stub an executed review.
+      generateReviewImpl: async () => ({ findings: [], comments: [], debug: { llmUsed: true } }),
     });
 
     assert.equal(result.reviewCoverage.expectedUnits, 2);
