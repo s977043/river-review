@@ -55,13 +55,16 @@
 // With the option off (the default) the predicate is never called, so the
 // result is identical to the pre-Phase-2 gate.
 //
-// Turned-off entries (#2425): a suppression with `context.active === false`,
-// or one revoked by a `resurface` entry, is not in force and is dropped before
-// fingerprint indexing, so it can neither gate a finding nor shadow another
-// entry with the same fingerprint. Only an explicit `false` counts: an entry
-// that has no `active` field keeps suppressing as before (createSuppression
-// always writes `active: true`, so a missing field is a hand-written entry,
-// and treating it as off would silently disable it). The revoked ids come
+// Turned-off entries (#2425, #2430): a suppression whose `context.active` is
+// present but falsy (false / 0 / null / ''), or one revoked by a `resurface`
+// entry, is not in force and is dropped before fingerprint indexing, so it can
+// neither gate a finding nor shadow another entry with the same fingerprint.
+// An entry whose `active` is missing or undefined keeps suppressing as before
+// (createSuppression always writes `active: true`, so a missing field is a
+// hand-written entry, and treating it as off would silently disable it).
+// Expired entries (#2430) are still indexed, so `applied` can record
+// `suppression-expired` when no in-force entry exists, but an expired entry
+// never replaces an in-force one with the same fingerprint, whatever the order. The revoked ids come
 // from `memoryContext.revokedSuppressionIds`, which `loadReviewMemory` builds
 // from the whole index with `collectRevokedSuppressionIds` — the revoking
 // entry has no phase, so it never reaches the `suppressions` bucket.
@@ -151,12 +154,14 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
   // With the gate off this stays null and nothing below reads the rules.
   const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
   const rulesDigests = new Map();
+  const now = opts?.now ?? new Date();
   const revokedIds = new Set(
     Array.isArray(memoryContext?.revokedSuppressionIds) ? memoryContext.revokedSuppressionIds : []
   );
   for (const s of suppressions) {
     // #2425: turned off explicitly, or revoked by a resurface entry.
-    if (s?.context?.active === false || revokedIds.has(s?.id)) continue;
+    const active = s?.context?.active;
+    if ((active !== undefined && !active) || revokedIds.has(s?.id)) continue;
     const fp = s?.context?.fingerprint;
     if (typeof fp !== 'string' || fp.length !== 16) continue;
     const algo = s?.context?.fingerprintAlgo ?? 'v1';
@@ -186,14 +191,16 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
         );
       }
     }
-    target.set(fp, s);
+    const prev = target.get(fp);
+    if (!prev || !isSuppressionExpired(s, now) || isSuppressionExpired(prev, now)) {
+      target.set(fp, s);
+    }
   }
   if (byFingerprintV1.size === 0 && byFingerprintV2.size === 0) return result;
 
   const kept = [];
   const suppressed = [];
   const applied = [];
-  const now = opts?.now ?? new Date();
   const warnedIds = new Set();
   const rulesWarnedIds = new Set();
 

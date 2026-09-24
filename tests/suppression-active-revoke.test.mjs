@@ -146,3 +146,53 @@ describe('applySuppressions turned-off entries (#2425)', () => {
     assert.equal(r.suppressedFindings.length, 1);
   });
 });
+
+describe('applySuppressions active / expiry precedence (#2430)', () => {
+  const fp = 'bbbbbbbbbbbbbbbb';
+  const finding = { fingerprint: fp, severity: 'minor', file: 'a.js' };
+  const now = new Date('2026-09-24T00:00:00Z');
+  const make = (id, context) => ({
+    id,
+    type: 'suppression',
+    context: { fingerprint: fp, feedbackType: 'false_positive', ...context },
+  });
+  const run = (suppressions) =>
+    applySuppressions([finding], { suppressions }, { warn: () => {}, now });
+
+  for (const [label, ctx, suppresses] of [
+    ['missing', {}, true],
+    ['undefined', { active: undefined }, true],
+    ['null', { active: null }, false],
+    ['0', { active: 0 }, false],
+    ["''", { active: '' }, false],
+    ['false', { active: false }, false],
+    ['true', { active: true }, true],
+  ]) {
+    test(`context.active ${label} -> ${suppresses ? 'suppresses' : 'skipped'}`, () => {
+      const r = run([make('s', ctx)]);
+      assert.equal(r.suppressedFindings.length, suppresses ? 1 : 0);
+    });
+  }
+
+  const live = make('live', { active: true });
+  const expired = make('exp', { active: true, expiresAt: '2026-01-01T00:00:00Z' });
+  for (const [label, order] of [
+    ['live then expired', [live, expired]],
+    ['expired then live', [expired, live]],
+  ]) {
+    test(`in-force entry wins over an expired one (${label})`, () => {
+      const r = run(order);
+      assert.equal(r.suppressedFindings.length, 1);
+      assert.equal(r.suppressedFindings[0].suppressionRef, 'live');
+    });
+  }
+
+  test('expired entry alone is recorded as suppression-expired', () => {
+    const r = run([expired]);
+    assert.equal(r.suppressedFindings.length, 0);
+    assert.deepEqual(
+      r.applied.map((a) => [a.suppressionId, a.action, a.reason]),
+      [['exp', 'skipped', 'suppression-expired']]
+    );
+  });
+});
