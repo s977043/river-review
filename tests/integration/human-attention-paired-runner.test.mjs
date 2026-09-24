@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -184,35 +184,43 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
     if (!(commitExists(BASELINE) && commitExists(CANDIDATE))) return;
     const outputDir = artifactOutputDir('not-ancestor');
 
-    const result = runRunner([
-      '--baseline',
-      CANDIDATE,
-      '--candidate',
-      BASELINE,
-      '--output',
-      outputDir,
-    ]);
+    try {
+      const result = runRunner([
+        '--baseline',
+        CANDIDATE,
+        '--candidate',
+        BASELINE,
+        '--output',
+        outputDir,
+      ]);
 
-    assert.strictEqual(result.status, 1);
-    assert.match(result.stderr, /^INCONCLUSIVE_SCOPE: baseline commit is not an ancestor/m);
-    assert.strictEqual(existsSync(outputDir), false);
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^INCONCLUSIVE_SCOPE: baseline commit is not an ancestor/m);
+      assert.strictEqual(existsSync(outputDir), false);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 
   it('rejects a commit/ref that does not exist as MISSING_COMMIT', () => {
     const outputDir = artifactOutputDir('missing-commit');
 
-    const result = runRunner([
-      '--baseline',
-      '0000000000000000000000000000000000000000',
-      '--candidate',
-      'HEAD',
-      '--output',
-      outputDir,
-    ]);
+    try {
+      const result = runRunner([
+        '--baseline',
+        '0000000000000000000000000000000000000000',
+        '--candidate',
+        'HEAD',
+        '--output',
+        outputDir,
+      ]);
 
-    assert.strictEqual(result.status, 1);
-    assert.match(result.stderr, /^MISSING_COMMIT: baseline commit\/ref not found/m);
-    assert.strictEqual(existsSync(outputDir), false);
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^MISSING_COMMIT: baseline commit\/ref not found/m);
+      assert.strictEqual(existsSync(outputDir), false);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 
   it('rejects an existing --output directory as OUTPUT_EXISTS', () => {
@@ -253,11 +261,23 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
       assert.match(result.stderr, /^INCONCLUSIVE_ENVIRONMENT: npm ci failed/m);
       assert.strictEqual(existsSync(outputDir), false);
 
+      // npm writes its debug log into the cache dir; the log names the baseline
+      // worktree as cwd, proving the failure happened after worktrees were added.
+      const logDir = path.join(emptyCache, '_logs');
+      const npmLog = existsSync(logDir)
+        ? readdirSync(logDir)
+            .map((name) => readFileSync(path.join(logDir, name), 'utf8'))
+            .join('\n')
+        : '';
+      const baselineWorktree = npmLog.match(/\/river-review-ha-[^/\s'"]+\/baseline(?=\/)/);
+      assert.ok(baselineWorktree, 'npm ci must have run inside the baseline worktree');
+
       const worktreeList = execFileSync('git', ['worktree', 'list', '--porcelain'], {
         encoding: 'utf8',
       });
       assert.doesNotMatch(worktreeList, /river-review-ha-/);
     } finally {
+      rmSync(outputDir, { recursive: true, force: true });
       rmSync(emptyCache, { recursive: true, force: true });
     }
   });
