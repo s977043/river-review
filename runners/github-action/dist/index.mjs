@@ -92472,9 +92472,16 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
   // phase match would drop every such suppression before applySuppressions
   // sees it. Only that shape is let through here — a suppression naming a
   // different phase, and any non-suppression entry without a phase, are still
-  // excluded. Expiry, inactive status and the rules-digest gate stay in
-  // applySuppressions (suppression-apply.mjs); queryMemory is left unchanged
-  // because regression-eval.mjs relies on its strict phase semantics.
+  // excluded. queryMemory is left unchanged because regression-eval.mjs relies
+  // on its strict phase semantics.
+  //
+  // What happens after loading (suppression-apply.mjs): applySuppressions
+  // judges expiry (isSuppressionExpired) and, when opted in, the rules digest.
+  // Entry `status` (superseded / archived) is deliberately not filtered, like
+  // findActiveSuppressions (includeInactive: true). `context.active === false`
+  // and revocation via `resurface` entries are NOT evaluated by
+  // applySuppressions — a pre-existing limitation that phase-less suppressions
+  // now share as well (#2425).
   const allEntries = phase ? filterByPhase(index, phase) : (index.entries ?? []);
   const relevant = changedFiles?.length
     ? allEntries.filter((e) => {
