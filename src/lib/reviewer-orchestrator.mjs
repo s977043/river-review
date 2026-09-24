@@ -991,8 +991,7 @@ export async function runReviewerOrchestration({
           ? null
           : String(
               roleSettled[0]?.reason?.message ??
-                roleSucceeded[0]?.value?.debug?.llmError ??
-                'unknown'
+                (String(roleSucceeded[0]?.value?.debug?.llmError ?? '').trim() || 'unknown')
             ),
     };
   });
