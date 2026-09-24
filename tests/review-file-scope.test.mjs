@@ -113,10 +113,21 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
       ],
     });
 
+    // #2436: an all-skipped (dry-run) orchestrated run now emits no coverage,
+    // so the orchestrated call below executes a mocked LLM instead.
+    const originalFetch = global.fetch;
+    t.after(() => {
+      global.fetch = originalFetch;
+    });
+    global.fetch = async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: 'NO_ISSUES' } }] }),
+    });
     const result = await runLocalReview({
       cwd: dir,
       context,
-      dryRun: true,
+      dryRun: false,
+      apiKey: 'test-key',
       reviewers: ['bug-hunter'],
       quiet: true,
     });

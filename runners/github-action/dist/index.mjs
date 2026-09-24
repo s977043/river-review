@@ -57587,6 +57587,7 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   dD: () => (/* binding */ isIncompleteCoverage),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
+/* harmony export */   l1: () => (/* binding */ classifyLlmAttempt),
 /* harmony export */   mz: () => (/* binding */ deriveSingleReviewerLlmCoverage),
 /* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
 /* harmony export */   or: () => (/* binding */ deriveReviewFileScope)
@@ -57685,6 +57686,33 @@ function deriveReviewCoverage(units = []) {
 }
 
 /**
+ * Classify how one generateReview call used the LLM (#2423).
+ *
+ * The single source for "was the LLM attempted, and did it fail". Both the
+ * Review Coverage derivations (single-reviewer and reviewer orchestration) and
+ * the Markdown "LLM semantic review incomplete" header import this.
+ *
+ * - `llmUsed === true` => 'completed' (a partial-batch warning in llmError does
+ *   not demote it: usable semantic output was produced)
+ * - `llmUsed === false` with a skip reason in `llmSkipped` => null (intentional
+ *   skip: dry-run, offline, missing key, unsupported provider)
+ * - `llmUsed === false` without a skip reason => 'failed' (transport /
+ *   response / parse failure). generateReview sets `llmSkipped` only on the
+ *   branch that does not call the LLM, so this does not depend on how
+ *   llmError is worded — an empty or missing message is still a failure
+ * - `llmUsed` not a boolean => null (not a generateReview debug)
+ *
+ * @param {object|null|undefined} debug generateReview debug
+ * @returns {'completed'|'failed'|null}
+ */
+function classifyLlmAttempt(debug) {
+  if (debug?.llmUsed === true) return 'completed';
+  if (debug?.llmUsed !== false) return null;
+  const skipped = typeof debug.llmSkipped === 'string' && debug.llmSkipped.trim().length > 0;
+  return skipped ? null : 'failed';
+}
+
+/**
  * Build Review Coverage for the legacy single-reviewer LLM path.
  *
  * The observation exists only when an LLM call was actually attempted:
@@ -57703,13 +57731,8 @@ function deriveReviewCoverage(units = []) {
  * @returns {ReturnType<typeof deriveReviewCoverage>|null}
  */
 function deriveSingleReviewerLlmCoverage({ debug, subjects = [], findingsCount = 0 } = {}) {
-  const llmCompleted = debug?.llmUsed === true;
-  const llmFailed =
-    debug?.llmUsed === false &&
-    typeof debug?.llmError === 'string' &&
-    debug.llmError.trim().length > 0;
-
-  if (!llmCompleted && !llmFailed) return null;
+  const status = classifyLlmAttempt(debug);
+  if (status === null) return null;
 
   const normalizedSubjects = [
     ...new Set(
@@ -57719,7 +57742,6 @@ function deriveSingleReviewerLlmCoverage({ debug, subjects = [], findingsCount =
     ),
   ];
 
-  const status = llmCompleted ? 'completed' : 'failed';
   return deriveReviewCoverage([
     {
       id: 'reviewer:single/chunk:1',
@@ -62634,12 +62656,13 @@ async function planSkills({ skills, context, llmPlan, appendRemaining = true }) 
 /* harmony export */   RL: () => (/* binding */ formatUnparseableExpiresAtWarning),
 /* harmony export */   createSuppression: () => (/* binding */ createSuppression),
 /* harmony export */   dG: () => (/* binding */ evaluateSuppressionRulesMatch),
+/* harmony export */   i$: () => (/* binding */ collectRevokedSuppressionIds),
 /* harmony export */   lq: () => (/* binding */ isSuppressionExpired),
 /* harmony export */   rW: () => (/* binding */ formatRulesDigestMismatchWarning),
 /* harmony export */   resolveSuppressionProvenance: () => (/* binding */ resolveSuppressionProvenance),
 /* harmony export */   vU: () => (/* binding */ hasUnparseableSuppressionExpiresAt)
 /* harmony export */ });
-/* unused harmony exports hashFinding, inferSubsystem, revokeSuppression, matchesScopeFiles, collectRevokedSuppressionIds, findUnparseableSuppressionExpiries, findActiveSuppressions */
+/* unused harmony exports hashFinding, inferSubsystem, revokeSuppression, matchesScopeFiles, findUnparseableSuppressionExpiries, findActiveSuppressions */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /* harmony import */ var _riverbed_memory_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4216);
 /* harmony import */ var _rules_mjs__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(1688);
@@ -92160,10 +92183,29 @@ async function runReviewerOrchestration({
   const failed = settled.filter((r) => r.status === 'rejected');
 
   const requiredRoles = new Set(autoSelection ? (autoSelection.required ?? []) : roles);
+  // #2436: a fulfilled task whose LLM was intentionally skipped (null) did not
+  // review anything. When every task is fulfilled and skipped, emit no coverage,
+  // same as the single-reviewer path; any other mix counts a skip as failed.
+  // A reviewer that reports no `llmUsed` at all keeps its pre-#2436 completed.
+  const llmAttempts = settled.map((task) => {
+    if (task.status !== 'fulfilled') return undefined;
+    const debug = task.value?.debug;
+    return debug?.llmUsed === undefined ? 'completed' : (0,review_coverage/* classifyLlmAttempt */.l1)(debug);
+  });
+  const allSkipped = llmAttempts.every((attempt) => attempt === null);
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const task = settled[taskIdx];
     const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
-    const status = task?.status === 'fulfilled' ? 'completed' : timedOut ? 'timed_out' : 'failed';
+    // #2423: generateReview catches LLM transport / parse failures and still
+    // resolves, so a fulfilled task is completed only if the LLM did not fail.
+    const status =
+      task?.status === 'fulfilled'
+        ? llmAttempts[taskIdx] === 'completed'
+          ? 'completed'
+          : 'failed'
+        : timedOut
+          ? 'timed_out'
+          : 'failed';
     return {
       id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
       kind: 'diff-chunk',
@@ -92177,10 +92219,10 @@ async function runReviewerOrchestration({
           : status === 'timed_out'
             ? 'reviewer_timeout'
             : 'reviewer_error',
-      findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
+      findingsCount: status === 'completed' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
-  const reviewCoverage = (0,review_coverage/* deriveReviewCoverage */.Ix)(reviewUnits);
+  const reviewCoverage = allSkipped ? null : (0,review_coverage/* deriveReviewCoverage */.Ix)(reviewUnits);
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
@@ -92236,6 +92278,11 @@ async function runReviewerOrchestration({
       .filter((i) => i >= 0);
     const roleSettled = roleIndices.map((i) => settled[i]);
     const roleSucceeded = roleSettled.filter((r) => r.status === 'fulfilled');
+    // #2436: a role whose every fulfilled task is an LLM failure did not review;
+    // a skipped (null) task still counts as succeeded here.
+    const roleReviewed = roleIndices.filter(
+      (i) => settled[i].status === 'fulfilled' && llmAttempts[i] !== 'failed'
+    );
     const roleOutcomes = roleIndices.map((i) => taskOutcomes[i]);
     const roleDurations = roleOutcomes
       .map((o) => o.durationMs)
@@ -92243,7 +92290,7 @@ async function runReviewerOrchestration({
     return {
       role: name,
       label: REVIEWER_ROLES[name].label,
-      status: roleSucceeded.length > 0 ? 'fulfilled' : 'rejected',
+      status: roleReviewed.length > 0 ? 'fulfilled' : 'rejected',
       findingsCount: roleSucceeded.reduce((sum, r) => sum + (r.value?.findings?.length ?? 0), 0),
       chunksRun: chunked ? diffsToProcess.length : null,
       // #1545 P1: why this role was auto-selected (only present in auto mode).
@@ -92254,7 +92301,12 @@ async function runReviewerOrchestration({
       timedOut: roleOutcomes.some((o) => o.timedOut),
       durationMs: roleDurations.length ? Math.max(...roleDurations) : null,
       error:
-        roleSucceeded.length === 0 ? String(roleSettled[0]?.reason?.message ?? 'unknown') : null,
+        roleReviewed.length > 0
+          ? null
+          : String(
+              roleSettled[0]?.reason?.message ??
+                (String(roleSucceeded[0]?.value?.debug?.llmError ?? '').trim() || 'unknown')
+            ),
     };
   });
 
@@ -92295,8 +92347,8 @@ async function runReviewerOrchestration({
     promptTruncated: succeeded.some((r) => r.promptTruncated),
     llmModel: succeeded[0]?.llmModel ?? null,
     debug: {
-      succeededReviewers: succeeded.length,
-      failedReviewers: failed.length,
+      succeededReviewers: llmAttempts.filter((attempt) => attempt === 'completed').length,
+      failedReviewers: failed.length + llmAttempts.filter((attempt) => attempt === 'failed').length,
       deduplicatedCount: rawFindings.length - allFindings.length,
       // #2334: 既定 off では criticStage が null なので、この key 自体が
       // debug に現れない（既存の key 集合と同一）。
@@ -92455,7 +92507,10 @@ function createOpenAIPlanner(options = {}) {
 var review_runner = __nccwpck_require__(2821);
 // EXTERNAL MODULE: ./src/lib/riverbed-memory.mjs
 var riverbed_memory = __nccwpck_require__(4216);
+// EXTERNAL MODULE: ./src/lib/suppression.mjs
+var suppression = __nccwpck_require__(3528);
 ;// CONCATENATED MODULE: ./src/lib/memory-context.mjs
+
 
 
 
@@ -92476,12 +92531,11 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
   // on its strict phase semantics.
   //
   // What happens after loading (suppression-apply.mjs): applySuppressions
-  // judges expiry (isSuppressionExpired) and, when opted in, the rules digest.
+  // skips suppressions whose `context.active` is present but falsy
+  // (false / 0 / null / '', #2430) and revoked ones (#2425), then judges
+  // expiry (isSuppressionExpired) and, when opted in, the rules digest.
   // Entry `status` (superseded / archived) is deliberately not filtered, like
-  // findActiveSuppressions (includeInactive: true). `context.active === false`
-  // and revocation via `resurface` entries are NOT evaluated by
-  // applySuppressions — a pre-existing limitation that phase-less suppressions
-  // now share as well (#2425).
+  // findActiveSuppressions (includeInactive: true).
   const allEntries = phase ? filterByPhase(index, phase) : (index.entries ?? []);
   const relevant = changedFiles?.length
     ? allEntries.filter((e) => {
@@ -92502,7 +92556,13 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
     const bucket = typeMap[e.type];
     if (bucket) buckets[bucket].push(e);
   }
-  return { entries: relevant, ...buckets };
+  // Revocations (#2425) are keyed by suppression id and carry neither a phase
+  // nor relatedFiles, so the phase / relatedFiles filters above would drop
+  // them. They are collected from the whole, unfiltered index through the
+  // shared definition (collectRevokedSuppressionIds) and returned as a plain
+  // array so the value survives JSON serialization unchanged.
+  const revokedSuppressionIds = [...(0,suppression/* collectRevokedSuppressionIds */.i$)(index.entries)];
+  return { entries: relevant, ...buckets, revokedSuppressionIds };
 }
 
 function isPhaselessSuppression(entry) {
@@ -92648,8 +92708,6 @@ function resolveFullFileSupply({
   };
 }
 
-// EXTERNAL MODULE: ./src/lib/suppression.mjs
-var suppression = __nccwpck_require__(3528);
 ;// CONCATENATED MODULE: ./src/lib/suppression-apply.mjs
 // Apply Riverbed Memory suppressions to a list of findings (#687 PR-B).
 //
@@ -92708,11 +92766,22 @@ var suppression = __nccwpck_require__(3528);
 // With the option off (the default) the predicate is never called, so the
 // result is identical to the pre-Phase-2 gate.
 //
-// Not evaluated here: revocation via `resurface` entries
-// (`collectRevokedSuppressionIds`). `revokeSuppression` never flips the
-// original's `context.active`, and the revoking entry is a separate memory
-// entry this function does not receive; matching by fingerprint only is the
-// pre-#1802 behavior, kept as-is.
+// Turned-off entries (#2425, #2430): a suppression whose `context.active` is
+// present but falsy (false / 0 / null / ''), or one revoked by a `resurface`
+// entry, is not in force and is dropped before fingerprint indexing, so it can
+// neither gate a finding nor shadow another entry with the same fingerprint.
+// An entry whose `active` is missing or undefined keeps suppressing as before
+// (createSuppression always writes `active: true`, so a missing field is a
+// hand-written entry, and treating it as off would silently disable it).
+// Expired entries (#2430) are still indexed, so `applied` can record
+// `suppression-expired` when no in-force entry exists, but an expired entry
+// never replaces an in-force one with the same fingerprint, whatever the
+// order. The revoked ids come from `memoryContext.revokedSuppressionIds`,
+// which `loadReviewMemory` builds from the whole index with
+// `collectRevokedSuppressionIds` — the revoking entry has no phase, so it never reaches the `suppressions` bucket.
+// `revokeSuppression` does not flip the original's `context.active`, which is
+// why both checks are needed. Entry `status` (superseded / archived) is not
+// filtered, like `findActiveSuppressions`.
 
 
 
@@ -92741,7 +92810,9 @@ function severityOf(finding) {
  * @param {Array<object>} findings  Findings already annotated with `.fingerprint`
  *   by `annotateFingerprints` (src/lib/finding-factory.mjs).
  * @param {object} memoryContext    Bucketed memory from `loadReviewMemory`.
- *   Only `memoryContext.suppressions` is consulted.
+ *   `memoryContext.suppressions` is consulted, and
+ *   `memoryContext.revokedSuppressionIds` (string[], optional) names the
+ *   suppressions to skip as revoked (#2425).
  * @param {object} [opts]
  * @param {object} [opts.config]    Effective config; `config.memory.suppressionEnabled === false`
  *   bypasses suppression entirely (returns all findings as-is).
@@ -92786,7 +92857,14 @@ function applySuppressions(findings, memoryContext, opts = {}) {
   // With the gate off this stays null and nothing below reads the rules.
   const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
   const rulesDigests = new Map();
+  const now = opts?.now ?? new Date();
+  const revokedIds = new Set(
+    Array.isArray(memoryContext?.revokedSuppressionIds) ? memoryContext.revokedSuppressionIds : []
+  );
   for (const s of suppressions) {
+    // #2425: turned off explicitly, or revoked by a resurface entry.
+    const active = s?.context?.active;
+    if ((active !== undefined && !active) || revokedIds.has(s?.id)) continue;
     const fp = s?.context?.fingerprint;
     if (typeof fp !== 'string' || fp.length !== 16) continue;
     const algo = s?.context?.fingerprintAlgo ?? 'v1';
@@ -92816,14 +92894,16 @@ function applySuppressions(findings, memoryContext, opts = {}) {
         );
       }
     }
-    target.set(fp, s);
+    const prev = target.get(fp);
+    if (!prev || !(0,suppression/* isSuppressionExpired */.lq)(s, now) || (0,suppression/* isSuppressionExpired */.lq)(prev, now)) {
+      target.set(fp, s);
+    }
   }
   if (byFingerprintV1.size === 0 && byFingerprintV2.size === 0) return result;
 
   const kept = [];
   const suppressed = [];
   const applied = [];
-  const now = opts?.now ?? new Date();
   const warnedIds = new Set();
   const rulesWarnedIds = new Set();
 
@@ -93919,6 +93999,7 @@ var dist = __nccwpck_require__(2815);
 
 
 
+
 const MAX_PROMPT_PREVIEW_LENGTH = 800;
 const MAX_RAW_LLM_OUTPUT_PREVIEW_LENGTH = 1500;
 const MAX_DIFF_PREVIEW_LINES = 200;
@@ -94496,11 +94577,7 @@ function isLlmlessEmptyReview(result) {
 }
 
 function isLlmFailedEmptyReview(result) {
-  const debug = result?.reviewDebug ?? {};
-  const llmFailed =
-    debug.llmUsed === false &&
-    typeof debug.llmError === 'string' &&
-    debug.llmError.trim().length > 0;
+  const llmFailed = (0,review_coverage/* classifyLlmAttempt */.l1)(result?.reviewDebug) === 'failed';
   const noComments = !Array.isArray(result?.comments) || result.comments.length === 0;
   const noFindings = !Array.isArray(result?.findings) || result.findings.length === 0;
   return llmFailed && noComments && noFindings;

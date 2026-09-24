@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.124.3](https://github.com/s977043/river-review/compare/v1.124.2...v1.124.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **review:** record --reviewers LLM failure as failed coverage ([#2435](https://github.com/s977043/river-review/issues/2435)) ([e5a5c26](https://github.com/s977043/river-review/commit/e5a5c26a46fc125924a178a1c5e56c8ec7d4bdc2)), closes [#2423](https://github.com/s977043/river-review/issues/2423)
+
+## [1.124.2](https://github.com/s977043/river-review/compare/v1.124.1...v1.124.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **suppression:** let in-force entries beat expired ones and skip falsy active ([#2432](https://github.com/s977043/river-review/issues/2432)) ([abc6baf](https://github.com/s977043/river-review/commit/abc6baf1a55359df8427296283fa89c9a0f780cb)), closes [#2430](https://github.com/s977043/river-review/issues/2430)
+
+## [1.124.1](https://github.com/s977043/river-review/compare/v1.124.0...v1.124.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **suppression:** skip inactive and revoked suppressions on the review path ([#2428](https://github.com/s977043/river-review/issues/2428)) ([2ecff31](https://github.com/s977043/river-review/commit/2ecff31bacea5fd2d4a9655c69e89b21a8e6ee42)), closes [#2425](https://github.com/s977043/river-review/issues/2425)
+
 ## [1.124.0](https://github.com/s977043/river-review/compare/v1.123.0...v1.124.0) (2026-09-24)
 
 

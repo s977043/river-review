@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -16,8 +16,36 @@ function commitExists(ref) {
   );
 }
 
+function listHaWorktrees() {
+  return execFileSync('git', ['worktree', 'list', '--porcelain'], { encoding: 'utf8' })
+    .split('\n')
+    .filter((line) => line.startsWith('worktree ') && line.includes('river-review-ha-'))
+    .map((line) => line.slice('worktree '.length));
+}
+
+function runRunner(args, env = process.env) {
+  return spawnSync(process.execPath, ['scripts/evaluate-human-attention.mjs', ...args], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env,
+  });
+}
+
+function artifactOutputDir(suffix) {
+  const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  }).trim();
+  return path.join(
+    repoRoot,
+    'artifacts',
+    'evals',
+    'human-attention',
+    `test-${process.pid}-${suffix}`
+  );
+}
+
 describe('#2382 actual #2370 baseline/candidate pair', () => {
-  it('passes deterministic safety checks against the frozen material reference', () => {
+  it('passes deterministic safety checks against the frozen material reference', (t) => {
     const havePair = commitExists(BASELINE) && commitExists(CANDIDATE);
 
     if (!havePair) {
@@ -26,6 +54,7 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
           'GitHub Actions must check out full history so the frozen #2370 pair is available'
         );
       }
+      t.skip('the frozen #2370 baseline/candidate pair is not available in this clone');
       return;
     }
 
@@ -39,6 +68,7 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
       'human-attention',
       `test-${process.pid}-actual-pair`
     );
+    const worktreesBefore = new Set(listHaWorktrees());
 
     try {
       const result = spawnSync(
@@ -117,18 +147,19 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
 
       // The runner must remove its detached worktrees even after evaluating
       // historical commits; otherwise repeated evaluations contaminate the repo.
-      const worktreeList = execFileSync('git', ['worktree', 'list', '--porcelain'], {
-        encoding: 'utf8',
-      });
-      assert.doesNotMatch(worktreeList, /river-review-ha-/);
+      const leftover = listHaWorktrees().filter((p) => !worktreesBefore.has(p));
+      assert.deepStrictEqual(leftover, []);
     } finally {
       rmSync(outputDir, { recursive: true, force: true });
     }
   });
 
-  it('rejects output paths outside the canonical Human Attention artifact root', () => {
+  it('rejects output paths outside the canonical Human Attention artifact root', (t) => {
     const havePair = commitExists(BASELINE) && commitExists(CANDIDATE);
-    if (!havePair) return;
+    if (!havePair) {
+      t.skip('the frozen #2370 baseline/candidate pair is not available in this clone');
+      return;
+    }
 
     const outputDir = path.join(tmpdir(), `river-review-ha-outside-${process.pid}`);
     rmSync(outputDir, { recursive: true, force: true });
@@ -157,5 +188,115 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
       /--output must be a new child directory under artifacts\/evals\/human-attention\//
     );
     assert.strictEqual(existsSync(outputDir), false);
+  });
+
+  it('rejects a baseline that is not an ancestor of the candidate as INCONCLUSIVE_SCOPE', (t) => {
+    if (!(commitExists(BASELINE) && commitExists(CANDIDATE))) {
+      t.skip('the frozen #2370 baseline/candidate pair is not available in this clone');
+      return;
+    }
+    const outputDir = artifactOutputDir('not-ancestor');
+
+    try {
+      const result = runRunner([
+        '--baseline',
+        CANDIDATE,
+        '--candidate',
+        BASELINE,
+        '--output',
+        outputDir,
+      ]);
+
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^INCONCLUSIVE_SCOPE: baseline commit is not an ancestor/m);
+      assert.strictEqual(existsSync(outputDir), false);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a commit/ref that does not exist as MISSING_COMMIT', () => {
+    const outputDir = artifactOutputDir('missing-commit');
+
+    try {
+      const result = runRunner([
+        '--baseline',
+        '0000000000000000000000000000000000000000',
+        '--candidate',
+        'HEAD',
+        '--output',
+        outputDir,
+      ]);
+
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^MISSING_COMMIT: baseline commit\/ref not found/m);
+      assert.strictEqual(existsSync(outputDir), false);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an existing --output directory as OUTPUT_EXISTS', (t) => {
+    if (!(commitExists(BASELINE) && commitExists(CANDIDATE))) {
+      t.skip('the frozen #2370 baseline/candidate pair is not available in this clone');
+      return;
+    }
+    const outputDir = artifactOutputDir('output-exists');
+    mkdirSync(outputDir, { recursive: true });
+
+    try {
+      const result = runRunner([
+        '--baseline',
+        BASELINE,
+        '--candidate',
+        CANDIDATE,
+        '--output',
+        outputDir,
+      ]);
+
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^OUTPUT_EXISTS: output directory already exists/m);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('removes its temporary worktrees when evaluation fails midway', (t) => {
+    if (!(commitExists(BASELINE) && commitExists(CANDIDATE))) {
+      t.skip('the frozen #2370 baseline/candidate pair is not available in this clone');
+      return;
+    }
+    const outputDir = artifactOutputDir('midway-failure');
+    const emptyCache = mkdtempSync(path.join(tmpdir(), 'river-review-ha-test-cache-'));
+    const worktreesBefore = new Set(listHaWorktrees());
+
+    try {
+      // An empty offline npm cache makes `npm ci` fail after both worktrees are added.
+      const result = runRunner(
+        ['--baseline', BASELINE, '--candidate', CANDIDATE, '--output', outputDir],
+        { ...process.env, npm_config_cache: emptyCache, npm_config_offline: 'true' }
+      );
+
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^INCONCLUSIVE_ENVIRONMENT: npm ci failed/m);
+      assert.strictEqual(existsSync(outputDir), false);
+
+      // npm writes its debug log into the cache dir; the log names the baseline
+      // worktree as cwd, proving the failure happened after worktrees were added.
+      const logDir = path.join(emptyCache, '_logs');
+      const npmLog = existsSync(logDir)
+        ? readdirSync(logDir)
+            .map((name) => readFileSync(path.join(logDir, name), 'utf8'))
+            .join('\n')
+        : '';
+      const baselineWorktree = npmLog.match(/\/river-review-ha-[^/\s'"]+\/baseline(?=\/)/);
+      assert.ok(baselineWorktree, 'npm ci must have run inside the baseline worktree');
+
+      const leftover = listHaWorktrees().filter((p) => !worktreesBefore.has(p));
+      assert.deepStrictEqual(leftover, []);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+      rmSync(emptyCache, { recursive: true, force: true });
+    }
   });
 });

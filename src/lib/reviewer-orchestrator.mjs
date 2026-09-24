@@ -9,7 +9,7 @@ import {
 } from './finding-factory.mjs';
 import { buildLlmDiffView, renderDiffText } from './diff-processor.mjs';
 import { synthesizeTeamLeadReport } from './team-lead-synthesizer.mjs';
-import { deriveReviewCoverage } from './review-coverage.mjs';
+import { classifyLlmAttempt, deriveReviewCoverage } from './review-coverage.mjs';
 // #2334 / #1978 Phase 3: Finding Critic の配線段。ADR-011 が前提として挙げた
 // 「findings のマージ後」がここであり、per-reviewer の generateReview 側は
 // deferFindingCritic で抑止して二重実行を避ける。既定 off。
@@ -869,10 +869,29 @@ export async function runReviewerOrchestration({
   const failed = settled.filter((r) => r.status === 'rejected');
 
   const requiredRoles = new Set(autoSelection ? (autoSelection.required ?? []) : roles);
+  // #2436: a fulfilled task whose LLM was intentionally skipped (null) did not
+  // review anything. When every task is fulfilled and skipped, emit no coverage,
+  // same as the single-reviewer path; any other mix counts a skip as failed.
+  // A reviewer that reports no `llmUsed` at all keeps its pre-#2436 completed.
+  const llmAttempts = settled.map((task) => {
+    if (task.status !== 'fulfilled') return undefined;
+    const debug = task.value?.debug;
+    return debug?.llmUsed === undefined ? 'completed' : classifyLlmAttempt(debug);
+  });
+  const allSkipped = llmAttempts.every((attempt) => attempt === null);
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const task = settled[taskIdx];
     const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
-    const status = task?.status === 'fulfilled' ? 'completed' : timedOut ? 'timed_out' : 'failed';
+    // #2423: generateReview catches LLM transport / parse failures and still
+    // resolves, so a fulfilled task is completed only if the LLM did not fail.
+    const status =
+      task?.status === 'fulfilled'
+        ? llmAttempts[taskIdx] === 'completed'
+          ? 'completed'
+          : 'failed'
+        : timedOut
+          ? 'timed_out'
+          : 'failed';
     return {
       id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
       kind: 'diff-chunk',
@@ -886,10 +905,10 @@ export async function runReviewerOrchestration({
           : status === 'timed_out'
             ? 'reviewer_timeout'
             : 'reviewer_error',
-      findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
+      findingsCount: status === 'completed' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
-  const reviewCoverage = deriveReviewCoverage(reviewUnits);
+  const reviewCoverage = allSkipped ? null : deriveReviewCoverage(reviewUnits);
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
   let nextId = 1;
@@ -945,6 +964,11 @@ export async function runReviewerOrchestration({
       .filter((i) => i >= 0);
     const roleSettled = roleIndices.map((i) => settled[i]);
     const roleSucceeded = roleSettled.filter((r) => r.status === 'fulfilled');
+    // #2436: a role whose every fulfilled task is an LLM failure did not review;
+    // a skipped (null) task still counts as succeeded here.
+    const roleReviewed = roleIndices.filter(
+      (i) => settled[i].status === 'fulfilled' && llmAttempts[i] !== 'failed'
+    );
     const roleOutcomes = roleIndices.map((i) => taskOutcomes[i]);
     const roleDurations = roleOutcomes
       .map((o) => o.durationMs)
@@ -952,7 +976,7 @@ export async function runReviewerOrchestration({
     return {
       role: name,
       label: REVIEWER_ROLES[name].label,
-      status: roleSucceeded.length > 0 ? 'fulfilled' : 'rejected',
+      status: roleReviewed.length > 0 ? 'fulfilled' : 'rejected',
       findingsCount: roleSucceeded.reduce((sum, r) => sum + (r.value?.findings?.length ?? 0), 0),
       chunksRun: chunked ? diffsToProcess.length : null,
       // #1545 P1: why this role was auto-selected (only present in auto mode).
@@ -963,7 +987,12 @@ export async function runReviewerOrchestration({
       timedOut: roleOutcomes.some((o) => o.timedOut),
       durationMs: roleDurations.length ? Math.max(...roleDurations) : null,
       error:
-        roleSucceeded.length === 0 ? String(roleSettled[0]?.reason?.message ?? 'unknown') : null,
+        roleReviewed.length > 0
+          ? null
+          : String(
+              roleSettled[0]?.reason?.message ??
+                (String(roleSucceeded[0]?.value?.debug?.llmError ?? '').trim() || 'unknown')
+            ),
     };
   });
 
@@ -1004,8 +1033,8 @@ export async function runReviewerOrchestration({
     promptTruncated: succeeded.some((r) => r.promptTruncated),
     llmModel: succeeded[0]?.llmModel ?? null,
     debug: {
-      succeededReviewers: succeeded.length,
-      failedReviewers: failed.length,
+      succeededReviewers: llmAttempts.filter((attempt) => attempt === 'completed').length,
+      failedReviewers: failed.length + llmAttempts.filter((attempt) => attempt === 'failed').length,
       deduplicatedCount: rawFindings.length - allFindings.length,
       // #2334: 既定 off では criticStage が null なので、この key 自体が
       // debug に現れない（既存の key 集合と同一）。

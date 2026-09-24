@@ -17,6 +17,7 @@ import {
 import { resolveVerdict, scoreReview } from '../lib/scoring/engine.mjs';
 import { AXES, AXIS_LABELS_JA } from '../lib/scoring/rubric.mjs';
 import { deriveRunGate } from '../lib/run-gate.mjs';
+import { classifyLlmAttempt } from '../lib/review-coverage.mjs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
@@ -597,11 +598,7 @@ export function isLlmlessEmptyReview(result) {
 }
 
 function isLlmFailedEmptyReview(result) {
-  const debug = result?.reviewDebug ?? {};
-  const llmFailed =
-    debug.llmUsed === false &&
-    typeof debug.llmError === 'string' &&
-    debug.llmError.trim().length > 0;
+  const llmFailed = classifyLlmAttempt(result?.reviewDebug) === 'failed';
   const noComments = !Array.isArray(result?.comments) || result.comments.length === 0;
   const noFindings = !Array.isArray(result?.findings) || result.findings.length === 0;
   return llmFailed && noComments && noFindings;
