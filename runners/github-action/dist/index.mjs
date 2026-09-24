@@ -92480,8 +92480,9 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
   // on its strict phase semantics.
   //
   // What happens after loading (suppression-apply.mjs): applySuppressions
-  // skips `context.active === false` and revoked suppressions (#2425), then
-  // judges expiry (isSuppressionExpired) and, when opted in, the rules digest.
+  // skips suppressions whose `context.active` is present but falsy
+  // (false / 0 / null / '', #2430) and revoked ones (#2425), then judges
+  // expiry (isSuppressionExpired) and, when opted in, the rules digest.
   // Entry `status` (superseded / archived) is deliberately not filtered, like
   // findActiveSuppressions (includeInactive: true).
   const allEntries = phase ? filterByPhase(index, phase) : (index.entries ?? []);
@@ -92723,10 +92724,10 @@ function resolveFullFileSupply({
 // hand-written entry, and treating it as off would silently disable it).
 // Expired entries (#2430) are still indexed, so `applied` can record
 // `suppression-expired` when no in-force entry exists, but an expired entry
-// never replaces an in-force one with the same fingerprint, whatever the order. The revoked ids come
-// from `memoryContext.revokedSuppressionIds`, which `loadReviewMemory` builds
-// from the whole index with `collectRevokedSuppressionIds` — the revoking
-// entry has no phase, so it never reaches the `suppressions` bucket.
+// never replaces an in-force one with the same fingerprint, whatever the
+// order. The revoked ids come from `memoryContext.revokedSuppressionIds`,
+// which `loadReviewMemory` builds from the whole index with
+// `collectRevokedSuppressionIds` — the revoking entry has no phase, so it never reaches the `suppressions` bucket.
 // `revokeSuppression` does not flip the original's `context.active`, which is
 // why both checks are needed. Entry `status` (superseded / archived) is not
 // filtered, like `findActiveSuppressions`.

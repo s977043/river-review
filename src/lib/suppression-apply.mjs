@@ -64,10 +64,10 @@
 // hand-written entry, and treating it as off would silently disable it).
 // Expired entries (#2430) are still indexed, so `applied` can record
 // `suppression-expired` when no in-force entry exists, but an expired entry
-// never replaces an in-force one with the same fingerprint, whatever the order. The revoked ids come
-// from `memoryContext.revokedSuppressionIds`, which `loadReviewMemory` builds
-// from the whole index with `collectRevokedSuppressionIds` — the revoking
-// entry has no phase, so it never reaches the `suppressions` bucket.
+// never replaces an in-force one with the same fingerprint, whatever the
+// order. The revoked ids come from `memoryContext.revokedSuppressionIds`,
+// which `loadReviewMemory` builds from the whole index with
+// `collectRevokedSuppressionIds` — the revoking entry has no phase, so it never reaches the `suppressions` bucket.
 // `revokeSuppression` does not flip the original's `context.active`, which is
 // why both checks are needed. Entry `status` (superseded / archived) is not
 // filtered, like `findActiveSuppressions`.
