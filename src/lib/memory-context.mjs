@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { loadMemory, queryMemory } from './riverbed-memory.mjs';
+import { collectRevokedSuppressionIds } from './suppression.mjs';
 
 const DEFAULT_MEMORY_PATH = path.join('.river', 'memory', 'index.json');
 
@@ -18,12 +19,10 @@ export function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
   // on its strict phase semantics.
   //
   // What happens after loading (suppression-apply.mjs): applySuppressions
+  // skips `context.active === false` and revoked suppressions (#2425), then
   // judges expiry (isSuppressionExpired) and, when opted in, the rules digest.
   // Entry `status` (superseded / archived) is deliberately not filtered, like
-  // findActiveSuppressions (includeInactive: true). `context.active === false`
-  // and revocation via `resurface` entries are NOT evaluated by
-  // applySuppressions — a pre-existing limitation that phase-less suppressions
-  // now share as well (#2425).
+  // findActiveSuppressions (includeInactive: true).
   const allEntries = phase ? filterByPhase(index, phase) : (index.entries ?? []);
   const relevant = changedFiles?.length
     ? allEntries.filter((e) => {
@@ -44,7 +43,13 @@ export function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
     const bucket = typeMap[e.type];
     if (bucket) buckets[bucket].push(e);
   }
-  return { entries: relevant, ...buckets };
+  // Revocations (#2425) are keyed by suppression id and carry neither a phase
+  // nor relatedFiles, so the phase / relatedFiles filters above would drop
+  // them. They are collected from the whole, unfiltered index through the
+  // shared definition (collectRevokedSuppressionIds) and returned as a plain
+  // array so the value survives JSON serialization unchanged.
+  const revokedSuppressionIds = [...collectRevokedSuppressionIds(index.entries)];
+  return { entries: relevant, ...buckets, revokedSuppressionIds };
 }
 
 function isPhaselessSuppression(entry) {
