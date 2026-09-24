@@ -1,6 +1,8 @@
 # Claude Code Project Guide (river-review)
 
-> **Repo rules**: Follow all sections in [AGENTS.md](./AGENTS.md). This file adds only Claude Code-specific work policy.
+> **Repo rules**: Follow all sections in [AGENTS.md](./AGENTS.md), imported below so Claude Code loads it even though this CLAUDE.md exists. This file adds only Claude Code-specific work policy.
+
+@AGENTS.md
 
 <!-- Maintenance: repo-wide rules belong in AGENTS.md.
      Only Claude Code behavior policy belongs here.

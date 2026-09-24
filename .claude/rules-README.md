@@ -1,6 +1,8 @@
 # .claude/rules/
 
-Auto-applied rules for Claude Code sessions. Each rule file has a `globs` field in its frontmatter that determines when it is loaded.
+Auto-applied rules for Claude Code sessions. Claude Code scopes a rule only by the `paths` field in its frontmatter. A rule without `paths` loads in every session. `review-core` declares `globs`, not `paths`, so it loads in every session. That is the intended scope (see below).
+
+This README lives outside `.claude/rules/` on purpose. Every `.md` under that directory is loaded as a rule. A README there would be injected into every session.
 
 | Rule        | Glob   | Purpose                                         |
 | ----------- | ------ | ----------------------------------------------- |
