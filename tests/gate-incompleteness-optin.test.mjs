@@ -39,6 +39,7 @@ import {
   deriveGateDecision,
   isCoverageGateEnabled,
 } from '../src/lib/gate-decision.mjs';
+import { deriveSingleReviewerLlmCoverage } from '../src/lib/review-coverage.mjs';
 import { runReviewPlan } from '../src/lib/review-plan.mjs';
 import { deriveRunGate } from '../src/lib/run-gate.mjs';
 
@@ -83,6 +84,28 @@ describe('#2320/#2337 — the default gate output is unchanged', () => {
     assert.equal(incomplete, false);
     const gate = deriveGateDecision(cleanRun({ coverageIncomplete: incomplete }));
     assert.deepEqual(gate, deriveGateDecision(cleanRun()));
+  });
+
+  test('single-reviewer LLM failure preserves default GO but becomes COVERAGE_INCOMPLETE when opted in (#2410)', () => {
+    // Pin the new observation to the already-published default-off Gate contract.
+    const failedCoverage = deriveSingleReviewerLlmCoverage({
+      debug: { llmUsed: false, llmError: 'response envelope parse failed' },
+      subjects: ['src/app.js'],
+    });
+
+    assert.equal(failedCoverage.status, 'not_executed');
+
+    const defaultIncomplete = coverageIncompleteForGate(failedCoverage, {});
+    const defaultGate = deriveGateDecision(cleanRun({ coverageIncomplete: defaultIncomplete }));
+    assert.equal(defaultGate.decision, 'GO');
+    assert.equal(defaultGate.reasonCode, 'CONVERGED_CLEAN');
+
+    const optedIn = coverageIncompleteForGate(failedCoverage, {
+      RIVER_GATE_COVERAGE: '1',
+    });
+    const guardedGate = deriveGateDecision(cleanRun({ coverageIncomplete: optedIn }));
+    assert.equal(guardedGate.decision, 'NO_GO');
+    assert.equal(guardedGate.reasonCode, 'COVERAGE_INCOMPLETE');
   });
 
   test('the opt-in is strict: only the exact string "1" turns it on', () => {

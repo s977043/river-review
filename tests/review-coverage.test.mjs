@@ -6,6 +6,7 @@ import {
   REVIEW_COVERAGE_STATUSES,
   REVIEW_UNIT_STATUSES,
   deriveReviewCoverage,
+  deriveSingleReviewerLlmCoverage,
 } from '../src/lib/review-coverage.mjs';
 import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
 
@@ -101,6 +102,66 @@ describe('deriveReviewCoverage', () => {
   });
 });
 
+describe('deriveSingleReviewerLlmCoverage', () => {
+  it('marks a successful semantic LLM review complete, including zero findings', () => {
+    const result = deriveSingleReviewerLlmCoverage({
+      debug: { llmUsed: true },
+      subjects: ['src/a.js', 'src/a.js'],
+      findingsCount: 0,
+    });
+
+    assert.equal(result.status, 'complete');
+    assert.equal(result.expectedUnits, 1);
+    assert.equal(result.units[0].status, 'completed');
+    assert.deepEqual(result.units[0].subjects, ['src/a.js']);
+    assert.equal(result.units[0].findingsCount, 0);
+    assert.equal(validateCoverage(result), true, validationErrors());
+  });
+
+  it('marks a transport or response parse failure not_executed', () => {
+    const result = deriveSingleReviewerLlmCoverage({
+      debug: { llmUsed: false, llmError: 'Unexpected token O in JSON' },
+      subjects: ['src/a.js'],
+    });
+
+    assert.equal(result.status, 'not_executed');
+    assert.equal(result.completedRequiredUnits, 0);
+    assert.equal(result.units[0].status, 'failed');
+    assert.equal(result.units[0].reasonCode, 'reviewer_error');
+    assert.equal(result.units[0].findingsCount, 0);
+    assert.equal(validateCoverage(result), true, validationErrors());
+  });
+
+  it('keeps intentional skips unobserved for backward compatibility', () => {
+    assert.equal(
+      deriveSingleReviewerLlmCoverage({
+        debug: { llmUsed: false, llmSkipped: 'dry-run enabled' },
+        subjects: ['src/a.js'],
+      }),
+      null
+    );
+    assert.equal(
+      deriveSingleReviewerLlmCoverage({
+        debug: { llmUsed: false, llmSkipped: 'LLM API key not set' },
+        subjects: ['src/a.js'],
+      }),
+      null
+    );
+  });
+
+  it('treats llmUsed=true as completed even when debug also carries a partial-batch warning', () => {
+    const result = deriveSingleReviewerLlmCoverage({
+      debug: { llmUsed: true, llmError: 'dropped 1 malformed finding' },
+      subjects: [],
+      findingsCount: 2,
+    });
+
+    assert.equal(result.status, 'complete');
+    assert.deepEqual(result.units[0].subjects, ['<unknown-diff>']);
+    assert.equal(result.units[0].findingsCount, 2);
+    assert.equal(validateCoverage(result), true, validationErrors());
+  });
+});
 describe('review coverage schema', () => {
   const validCoverage = () => deriveReviewCoverage([unit('a')]);
 

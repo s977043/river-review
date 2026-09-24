@@ -35,7 +35,7 @@
       }
     },
     "reviewCoverage": {
-      "description": "Observe-only Review Coverage for reviewer orchestration (#2212 Phase 1). Additive/optional. Its absence is not equivalent to complete coverage, and this field MUST NOT change decision or gate behavior in Phase 1.",
+      "description": "Review execution coverage observation (#2212; single-reviewer attempted-LLM wiring #2410). Additive/optional. Its absence is not equivalent to complete coverage. By default it does not change decision or gate; the existing RIVER_GATE_COVERAGE=1 opt-in may treat incomplete coverage as a gate input.",
       "$ref": "https://river-review.the3396.com/schemas/review-coverage.schema.json"
     },
     "teamLeadReport": {
