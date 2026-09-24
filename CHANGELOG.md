@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.124.1](https://github.com/s977043/river-review/compare/v1.124.0...v1.124.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **suppression:** skip inactive and revoked suppressions on the review path ([#2428](https://github.com/s977043/river-review/issues/2428)) ([2ecff31](https://github.com/s977043/river-review/commit/2ecff31bacea5fd2d4a9655c69e89b21a8e6ee42)), closes [#2425](https://github.com/s977043/river-review/issues/2425)
+
 ## [1.124.0](https://github.com/s977043/river-review/compare/v1.123.0...v1.124.0) (2026-09-24)
 
 
