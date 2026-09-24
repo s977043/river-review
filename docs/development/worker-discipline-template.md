@@ -181,6 +181,10 @@
   textlint と `fix:dashes` が両方 exit 0 でも prettier だけ落ちる。**とくに Markdown の表へ
   セルを追記すると区切り線の桁がずれて落ちる**。2026-09-22 の PR #2362 がこれで失敗し、
   ワーカーの完了報告には textlint と `fix:dashes` の exit 0 しか載っていなかった。
+- **他セッションの PR を引き継いだ場合は、自分が変えたファイルだけでなく `npm run format:check`（CI と同じリポジトリ全体）を実行すること。**
+  引き継いだ PR には、自分が触っていないファイルの違反が残っていることがある。2026-09-24 の PR #2403 では、
+  ワーカーが変更した 2 ファイルだけに prettier を流して exit 0 と報告し、PR にもともと含まれていた
+  `scripts/evaluate-human-attention.mjs` の整形違反で CI の `Lint` が落ちた。
 - シェルスクリプト（`scripts/*.sh` / `.claude/hooks/*.sh` / `hooks/*.sh`）を編集した場合は `npm run lint:sh`（shellcheck）が exit 0 であることを確認すること。
 - 読み取り専用の検証であっても、旧版の CLI を実行する場合は書き込み副作用を先に確認すること。
   `git archive` で展開した旧版でも書き込み先は現在の作業ツリーであり、`skills import` /
