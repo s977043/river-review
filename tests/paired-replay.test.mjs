@@ -621,6 +621,41 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
     assert.equal(result.manifestVerification.experimentKeyMatchesInputs, true);
     assert.equal(result.promotionHandoff, null);
   });
+
+  test('an unactivated replay reaches the handoff as activationVerified false with its caveats', () => {
+    const candidate = {
+      clusterKey: 'secret-scanner::false_positive',
+      sourceFeedbackRefs: evidence,
+    };
+    // Configuration differs but the output does not: only observedDifference
+    // is false, so a handoff that ignored it would wrongly report activation.
+    const noDiff = spec({ dataset: { heldOutCaseKeys: [] }, improvementCandidate: candidate });
+    noDiff.candidate.runs = noDiff.baseline.runs.map((r) => ({ ...r, runId: `${r.runId}-copy` }));
+    const quiet = buildPairedReplay(noDiff, { now: NOW });
+    assert.equal(quiet.activationCheck.configurationDiffers, true);
+    assert.equal(quiet.activationCheck.observedDifference, false);
+    assert.ok(quiet.promotionHandoff);
+    assert.equal(quiet.promotionHandoff.activationVerified, false);
+    assert.ok(
+      quiet.promotionHandoff.activationReasons.some((r) => r.includes('paired diff に差分がなく')),
+      JSON.stringify(quiet.promotionHandoff.activationReasons)
+    );
+
+    // Identical configuration and identical output: neither signal holds.
+    const same = spec({ dataset: { heldOutCaseKeys: [] }, improvementCandidate: candidate });
+    same.candidate.commitSha = same.baseline.commitSha;
+    same.candidate.skillRegistryCommit = same.baseline.skillRegistryCommit;
+    same.candidate.runs = same.baseline.runs.map((r) => ({ ...r, runId: `${r.runId}-copy` }));
+    const idle = buildPairedReplay(same, { now: NOW });
+    assert.equal(idle.activationCheck.configurationDiffers, false);
+    assert.ok(idle.promotionHandoff);
+    assert.equal(idle.promotionHandoff.activationVerified, false);
+    assert.ok(
+      idle.promotionHandoff.activationReasons.some((r) => r.includes('変更経路が存在しない')),
+      JSON.stringify(idle.promotionHandoff.activationReasons)
+    );
+    assert.equal(validateReplay(idle), true, JSON.stringify(validateReplay.errors, null, 2));
+  });
 });
 
 // ---------------------------------------------------------------------------
