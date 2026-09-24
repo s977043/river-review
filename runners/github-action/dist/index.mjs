@@ -57587,6 +57587,7 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   dD: () => (/* binding */ isIncompleteCoverage),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
+/* harmony export */   l1: () => (/* binding */ classifyLlmAttempt),
 /* harmony export */   mz: () => (/* binding */ deriveSingleReviewerLlmCoverage),
 /* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
 /* harmony export */   or: () => (/* binding */ deriveReviewFileScope)
@@ -57685,6 +57686,33 @@ function deriveReviewCoverage(units = []) {
 }
 
 /**
+ * Classify how one generateReview call used the LLM (#2423).
+ *
+ * The single source for "was the LLM attempted, and did it fail". Both the
+ * Review Coverage derivations (single-reviewer and reviewer orchestration) and
+ * the Markdown "LLM semantic review incomplete" header import this.
+ *
+ * - `llmUsed === true` => 'completed' (a partial-batch warning in llmError does
+ *   not demote it: usable semantic output was produced)
+ * - `llmUsed === false` with a skip reason in `llmSkipped` => null (intentional
+ *   skip: dry-run, offline, missing key, unsupported provider)
+ * - `llmUsed === false` without a skip reason => 'failed' (transport /
+ *   response / parse failure). generateReview sets `llmSkipped` only on the
+ *   branch that does not call the LLM, so this does not depend on how
+ *   llmError is worded — an empty or missing message is still a failure
+ * - `llmUsed` not a boolean => null (not a generateReview debug)
+ *
+ * @param {object|null|undefined} debug generateReview debug
+ * @returns {'completed'|'failed'|null}
+ */
+function classifyLlmAttempt(debug) {
+  if (debug?.llmUsed === true) return 'completed';
+  if (debug?.llmUsed !== false) return null;
+  const skipped = typeof debug.llmSkipped === 'string' && debug.llmSkipped.trim().length > 0;
+  return skipped ? null : 'failed';
+}
+
+/**
  * Build Review Coverage for the legacy single-reviewer LLM path.
  *
  * The observation exists only when an LLM call was actually attempted:
@@ -57703,13 +57731,8 @@ function deriveReviewCoverage(units = []) {
  * @returns {ReturnType<typeof deriveReviewCoverage>|null}
  */
 function deriveSingleReviewerLlmCoverage({ debug, subjects = [], findingsCount = 0 } = {}) {
-  const llmCompleted = debug?.llmUsed === true;
-  const llmFailed =
-    debug?.llmUsed === false &&
-    typeof debug?.llmError === 'string' &&
-    debug.llmError.trim().length > 0;
-
-  if (!llmCompleted && !llmFailed) return null;
+  const status = classifyLlmAttempt(debug);
+  if (status === null) return null;
 
   const normalizedSubjects = [
     ...new Set(
@@ -57719,7 +57742,6 @@ function deriveSingleReviewerLlmCoverage({ debug, subjects = [], findingsCount =
     ),
   ];
 
-  const status = llmCompleted ? 'completed' : 'failed';
   return deriveReviewCoverage([
     {
       id: 'reviewer:single/chunk:1',
@@ -92164,7 +92186,16 @@ async function runReviewerOrchestration({
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const task = settled[taskIdx];
     const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
-    const status = task?.status === 'fulfilled' ? 'completed' : timedOut ? 'timed_out' : 'failed';
+    // #2423: generateReview catches LLM transport / parse failures and still
+    // resolves, so a fulfilled task is completed only if the LLM did not fail.
+    const status =
+      task?.status === 'fulfilled'
+        ? (0,review_coverage/* classifyLlmAttempt */.l1)(task.value?.debug) === 'failed'
+          ? 'failed'
+          : 'completed'
+        : timedOut
+          ? 'timed_out'
+          : 'failed';
     return {
       id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
       kind: 'diff-chunk',
@@ -92178,7 +92209,7 @@ async function runReviewerOrchestration({
           : status === 'timed_out'
             ? 'reviewer_timeout'
             : 'reviewer_error',
-      findingsCount: task?.status === 'fulfilled' ? (task.value?.findings?.length ?? 0) : 0,
+      findingsCount: status === 'completed' ? (task.value?.findings?.length ?? 0) : 0,
     };
   });
   const reviewCoverage = (0,review_coverage/* deriveReviewCoverage */.Ix)(reviewUnits);
@@ -93948,6 +93979,7 @@ var dist = __nccwpck_require__(2815);
 
 
 
+
 const MAX_PROMPT_PREVIEW_LENGTH = 800;
 const MAX_RAW_LLM_OUTPUT_PREVIEW_LENGTH = 1500;
 const MAX_DIFF_PREVIEW_LINES = 200;
@@ -94525,11 +94557,7 @@ function isLlmlessEmptyReview(result) {
 }
 
 function isLlmFailedEmptyReview(result) {
-  const debug = result?.reviewDebug ?? {};
-  const llmFailed =
-    debug.llmUsed === false &&
-    typeof debug.llmError === 'string' &&
-    debug.llmError.trim().length > 0;
+  const llmFailed = (0,review_coverage/* classifyLlmAttempt */.l1)(result?.reviewDebug) === 'failed';
   const noComments = !Array.isArray(result?.comments) || result.comments.length === 0;
   const noFindings = !Array.isArray(result?.findings) || result.findings.length === 0;
   return llmFailed && noComments && noFindings;

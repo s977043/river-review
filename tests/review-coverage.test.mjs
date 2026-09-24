@@ -6,6 +6,7 @@ import {
   REVIEW_COVERAGE_STATUSES,
   REVIEW_UNIT_STATUSES,
   deriveReviewCoverage,
+  classifyLlmAttempt,
   deriveSingleReviewerLlmCoverage,
 } from '../src/lib/review-coverage.mjs';
 import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
@@ -162,6 +163,41 @@ describe('deriveSingleReviewerLlmCoverage', () => {
     assert.equal(validateCoverage(result), true, validationErrors());
   });
 });
+describe('classifyLlmAttempt (#2423)', () => {
+  it('decides failure from the absence of a skip reason, not from the llmError text', () => {
+    for (const llmError of ['', '  ', undefined, null, 'timeout']) {
+      assert.equal(
+        classifyLlmAttempt({ llmUsed: false, llmError }),
+        'failed',
+        `llmError=${JSON.stringify(llmError)}`
+      );
+    }
+    for (const llmSkipped of ['', '  ', undefined, null]) {
+      assert.equal(
+        classifyLlmAttempt({ llmUsed: false, llmSkipped }),
+        'failed',
+        `llmSkipped=${JSON.stringify(llmSkipped)}`
+      );
+    }
+  });
+
+  it('keeps an intentional skip unobserved', () => {
+    assert.equal(classifyLlmAttempt({ llmUsed: false, llmSkipped: 'dry-run enabled' }), null);
+  });
+
+  it('treats llmUsed=true as completed even with a skip reason or error text', () => {
+    assert.equal(classifyLlmAttempt({ llmUsed: true, llmError: 'dropped 1' }), 'completed');
+    assert.equal(classifyLlmAttempt({ llmUsed: true, llmSkipped: 'x' }), 'completed');
+  });
+
+  it('does not classify a debug object without a boolean llmUsed', () => {
+    for (const llmUsed of [undefined, null, 0, 'false']) {
+      assert.equal(classifyLlmAttempt({ llmUsed, llmError: 'boom' }), null);
+    }
+    assert.equal(classifyLlmAttempt(undefined), null);
+  });
+});
+
 describe('review coverage schema', () => {
   const validCoverage = () => deriveReviewCoverage([unit('a')]);
 

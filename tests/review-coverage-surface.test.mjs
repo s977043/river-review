@@ -162,6 +162,88 @@ describe('Review Coverage surface propagation', () => {
     assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, ['reviewer:single/chunk:1']);
   });
 
+  // #2423: the --reviewers path goes through the same real generateReview,
+  // which catches the LLM failure and resolves. The unit must still be failed.
+  async function runWithFetch(t, prefix, fetchImpl, extra = {}) {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix,
+      initialFiles: { 'src/app.js': 'export const value = 1;\n' },
+      changedFiles: { 'src/app.js': 'export const value = 2;\n' },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const context = await planLocalReview({ cwd: dir, dryRun: true });
+    const originalFetch = global.fetch;
+    t.after(() => {
+      global.fetch = originalFetch;
+    });
+    global.fetch = fetchImpl;
+
+    return runLocalReview({
+      cwd: dir,
+      context,
+      dryRun: false,
+      apiKey: 'test-key',
+      quiet: true,
+      ...extra,
+    });
+  }
+
+  it('emits not_executed coverage when an explicit --reviewers role hits an LLM transport failure', async (t) => {
+    const result = await runWithFetch(
+      t,
+      'river-review-reviewers-coverage-failure-',
+      async () => ({ ok: false, status: 400, text: async () => 'bad request' }),
+      { reviewers: ['security-scanner'] }
+    );
+
+    assert.equal(result.reviewerResults[0].status, 'fulfilled');
+    assert.equal(result.reviewCoverage.status, 'not_executed');
+    assert.equal(result.reviewCoverage.units[0].id, 'reviewer:security-scanner/chunk:1');
+    assert.equal(result.reviewCoverage.units[0].status, 'failed');
+    assert.equal(result.reviewCoverage.units[0].reasonCode, 'reviewer_error');
+    assert.equal(result.reviewCoverage.units[0].findingsCount, 0);
+    assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, [
+      'reviewer:security-scanner/chunk:1',
+    ]);
+  });
+
+  it('keeps complete coverage when an explicit --reviewers role gets a valid LLM response', async (t) => {
+    const result = await runWithFetch(
+      t,
+      'river-review-reviewers-coverage-success-',
+      async () => ({
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'NO_ISSUES' } }] }),
+      }),
+      { reviewers: ['security-scanner'] }
+    );
+
+    assert.equal(result.reviewCoverage.status, 'complete');
+    assert.equal(result.reviewCoverage.units[0].status, 'completed');
+  });
+
+  for (const [label, thrown] of [
+    ["Error('')", () => new Error('')],
+    ['a thrown string', () => 'boom'],
+  ]) {
+    it(`treats an LLM failure thrown as ${label} as not_executed on both paths`, async (t) => {
+      const fail = async () => {
+        throw thrown();
+      };
+      const single = await runWithFetch(t, 'river-review-single-empty-error-', fail);
+      assert.equal(single.reviewDebug.llmSkipped, undefined);
+      assert.equal(single.reviewDebug.llmUsed, false);
+      assert.equal(single.reviewCoverage.status, 'not_executed');
+
+      const orchestrated = await runWithFetch(t, 'river-review-reviewers-empty-error-', fail, {
+        reviewers: ['security-scanner'],
+      });
+      assert.equal(orchestrated.reviewCoverage.status, 'not_executed');
+    });
+  }
+
   it('emits schema-valid JSON Review Coverage only when present', () => {
     const coverage = deriveReviewCoverage([unit()]);
     const artifact = formatJsonOutput(baseResult({ reviewCoverage: coverage }), 'midstream');
