@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.124.3](https://github.com/s977043/river-review/compare/v1.124.2...v1.124.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **review:** record --reviewers LLM failure as failed coverage ([#2435](https://github.com/s977043/river-review/issues/2435)) ([e5a5c26](https://github.com/s977043/river-review/commit/e5a5c26a46fc125924a178a1c5e56c8ec7d4bdc2)), closes [#2423](https://github.com/s977043/river-review/issues/2423)
+
 ## [1.124.2](https://github.com/s977043/river-review/compare/v1.124.1...v1.124.2) (2026-09-24)
 
 
