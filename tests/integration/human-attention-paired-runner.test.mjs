@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -13,6 +13,27 @@ function commitExists(ref) {
     spawnSync('git', ['cat-file', '-e', `${ref}^{commit}`], {
       encoding: 'utf8',
     }).status === 0
+  );
+}
+
+function runRunner(args, env = process.env) {
+  return spawnSync(process.execPath, ['scripts/evaluate-human-attention.mjs', ...args], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env,
+  });
+}
+
+function artifactOutputDir(suffix) {
+  const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  }).trim();
+  return path.join(
+    repoRoot,
+    'artifacts',
+    'evals',
+    'human-attention',
+    `test-${process.pid}-${suffix}`
   );
 }
 
@@ -157,5 +178,87 @@ describe('#2382 actual #2370 baseline/candidate pair', () => {
       /--output must be a new child directory under artifacts\/evals\/human-attention\//
     );
     assert.strictEqual(existsSync(outputDir), false);
+  });
+
+  it('rejects a baseline that is not an ancestor of the candidate as INCONCLUSIVE_SCOPE', () => {
+    if (!(commitExists(BASELINE) && commitExists(CANDIDATE))) return;
+    const outputDir = artifactOutputDir('not-ancestor');
+
+    const result = runRunner([
+      '--baseline',
+      CANDIDATE,
+      '--candidate',
+      BASELINE,
+      '--output',
+      outputDir,
+    ]);
+
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /^INCONCLUSIVE_SCOPE: baseline commit is not an ancestor/m);
+    assert.strictEqual(existsSync(outputDir), false);
+  });
+
+  it('rejects a commit/ref that does not exist as MISSING_COMMIT', () => {
+    const outputDir = artifactOutputDir('missing-commit');
+
+    const result = runRunner([
+      '--baseline',
+      '0000000000000000000000000000000000000000',
+      '--candidate',
+      'HEAD',
+      '--output',
+      outputDir,
+    ]);
+
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /^MISSING_COMMIT: baseline commit\/ref not found/m);
+    assert.strictEqual(existsSync(outputDir), false);
+  });
+
+  it('rejects an existing --output directory as OUTPUT_EXISTS', () => {
+    if (!(commitExists(BASELINE) && commitExists(CANDIDATE))) return;
+    const outputDir = artifactOutputDir('output-exists');
+    mkdirSync(outputDir, { recursive: true });
+
+    try {
+      const result = runRunner([
+        '--baseline',
+        BASELINE,
+        '--candidate',
+        CANDIDATE,
+        '--output',
+        outputDir,
+      ]);
+
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^OUTPUT_EXISTS: output directory already exists/m);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('removes its temporary worktrees when evaluation fails midway', () => {
+    if (!(commitExists(BASELINE) && commitExists(CANDIDATE))) return;
+    const outputDir = artifactOutputDir('midway-failure');
+    const emptyCache = mkdtempSync(path.join(tmpdir(), 'river-review-ha-test-cache-'));
+
+    try {
+      // An empty offline npm cache makes `npm ci` fail after both worktrees are added.
+      const result = runRunner(
+        ['--baseline', BASELINE, '--candidate', CANDIDATE, '--output', outputDir],
+        { ...process.env, npm_config_cache: emptyCache, npm_config_offline: 'true' }
+      );
+
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /^INCONCLUSIVE_ENVIRONMENT: npm ci failed/m);
+      assert.strictEqual(existsSync(outputDir), false);
+
+      const worktreeList = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+        encoding: 'utf8',
+      });
+      assert.doesNotMatch(worktreeList, /river-review-ha-/);
+    } finally {
+      rmSync(emptyCache, { recursive: true, force: true });
+    }
   });
 });
