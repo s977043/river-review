@@ -24,6 +24,7 @@ What counts as a valid `expiresAt` is defined in exactly one place, `parseExpire
   - `createdAt` (ISO8601), `updatedAt` (Optional)
   - `author`
   - `phase` (`upstream | midstream | downstream`, Optional)
+    - A review such as `river run` loads only entries whose `phase` matches its own phase. A `suppression` entry without `phase` is loaded in every phase (`river suppression add` does not write `phase`)
   - `tags`, `relatedFiles`, `links`, `summary`
 - `context`: Arbitrary additional info (PR number, related ADR ID, etc.)
 - `status`: `active | superseded | archived` (defaults to `active`; `archived` is set by `expireEntries`)

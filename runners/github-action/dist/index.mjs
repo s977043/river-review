@@ -92466,9 +92466,16 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
   const index = (0,riverbed_memory/* loadMemory */.ab)(indexPath);
   // includeInactive: true keeps the phase and no-phase branches symmetric and
   // preserves pre-lifecycle semantics where historical entries were surfaced.
-  const allEntries = phase
-    ? (0,riverbed_memory/* queryMemory */.qU)(index, { phase, includeInactive: true })
-    : (index.entries ?? []);
+  //
+  // A suppression without metadata.phase applies to every phase (#2418):
+  // `river suppression add` (createSuppression) writes no phase, so a strict
+  // phase match would drop every such suppression before applySuppressions
+  // sees it. Only that shape is let through here — a suppression naming a
+  // different phase, and any non-suppression entry without a phase, are still
+  // excluded. Expiry, inactive status and the rules-digest gate stay in
+  // applySuppressions (suppression-apply.mjs); queryMemory is left unchanged
+  // because regression-eval.mjs relies on its strict phase semantics.
+  const allEntries = phase ? filterByPhase(index, phase) : (index.entries ?? []);
   const relevant = changedFiles?.length
     ? allEntries.filter((e) => {
         const related = e.metadata?.relatedFiles ?? [];
@@ -92489,6 +92496,15 @@ function loadReviewMemory(repoRoot, { phase, changedFiles } = {}) {
     if (bucket) buckets[bucket].push(e);
   }
   return { entries: relevant, ...buckets };
+}
+
+function isPhaselessSuppression(entry) {
+  return entry.type === 'suppression' && entry.metadata?.phase === undefined;
+}
+
+function filterByPhase(index, phase) {
+  const inPhase = new Set((0,riverbed_memory/* queryMemory */.qU)(index, { phase, includeInactive: true }));
+  return (index.entries ?? []).filter((e) => inPhase.has(e) || isPhaselessSuppression(e));
 }
 
 function formatMemoryForPrompt(memoryContext, { maxChars = 1500 } = {}) {
