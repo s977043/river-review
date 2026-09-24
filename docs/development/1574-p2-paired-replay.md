@@ -49,6 +49,35 @@ experiment spec (JSON)
                                 └─▶ stdout（JSON / Markdown）
 ```
 
+## 3.1 Promotion handoff（#2408 / #2372-G1）
+
+paired replay が `improvementCandidate` を含む場合、result は `promotionHandoff` を追加で返します。これは #1568 Judgment Promotion Loop へ渡すための**採用前の実験証拠**であり、採否 verdict ではありません。
+
+`promotionHandoff` は、既存の観測値だけを再掲します。
+
+- #1568 と同じ content-addressed `candidateId`、および full `contentHash`
+- Experiment Manifest の ID / hash と integrity 結果
+- activation が観測できたか、および provenance / configuration の注意理由
+- dataset pairing の警告
+- acceptance が評価可能だったか
+- profile ごとの `allRequiredSatisfied` / sample-size 状態 / failed metric / 観測不能 metric
+- critical regression 件数
+- independent verifier が実際に検証済みか
+- terminal reason
+
+candidate が宣言されていない場合、または Experiment Manifest の改変検知・current inputs との `experimentKey` 不一致がある場合は `promotionHandoff: null` です。後者は fail-closed です。candidate と別実験の manifest を同じ機械可読 handoff に結合すると、下流が integrity flag を見落としただけで証拠を誤帰属できるためです。既存 schemaVersion 1 artifact との互換性を維持するため、schema 上は optional field とします。
+
+### post-adoption effectiveness とは分ける
+
+`promotionHandoff` と `reviewPromotionEffectiveness` は同じ意味ではありません。
+
+| Artifact / mechanism               | 時点                     | 観測対象                                   |
+| ---------------------------------- | ------------------------ | ------------------------------------------ |
+| paired replay / `promotionHandoff` | promotion 採用前         | baseline と candidate の統制された実験差分 |
+| `reviewPromotionEffectiveness`     | approval / activation 後 | 実運用 feedback の recurrence / reversal   |
+
+採用前の replay metrics を `context.effectivenessHistory` へ直接混ぜません。G1 は read-only の証拠受け渡しまでとし、candidate への永続化や approve / reject / retarget / Keep / Rollback / Retire は行いません。後続の G2 で、Human-invoked な #1568 操作として接続します。
+
 ## 4. ファイル配置
 
 | ファイル                            | 役割                                                          |

@@ -753,6 +753,119 @@
         "note": { "type": "string" }
       }
     },
+    "promotionHandoff": {
+      "description": "Optional read-only bridge from a paired replay experiment to the existing #1568 promotion lifecycle. Null when the experiment declares no improvementCandidate, when manifest integrity verification fails, or when the supplied manifest does not describe the current inputs. Observation only: no verdict and no write side effect.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "candidateId",
+            "candidateContentHash",
+            "manifestId",
+            "experimentKey",
+            "manifestHash",
+            "manifestVerified",
+            "experimentKeyMatchesInputs",
+            "activationVerified",
+            "activationReasons",
+            "pairingWarnings",
+            "acceptanceEvaluable",
+            "evaluatedOn",
+            "profiles",
+            "criticalRegressionCount",
+            "overallCriticalRegressionCount",
+            "independentVerifierVerified",
+            "terminalReason",
+            "requiresHumanJudgment",
+            "writeEffects"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "candidateId": { "type": "string", "pattern": "^RR-PC-[0-9a-f]{12}$" },
+            "candidateContentHash": {
+              "$ref": "#/$defs/sha256",
+              "description": "Full content hash from the same #1568 candidate derivation. G2 must match both this hash and candidateId before attaching evidence."
+            },
+            "manifestId": { "type": "string", "pattern": "^RR-EXP-[0-9a-f]{12}$" },
+            "experimentKey": { "$ref": "#/$defs/sha256" },
+            "manifestHash": { "$ref": "#/$defs/sha256" },
+            "manifestVerified": {
+              "type": "boolean",
+              "const": true,
+              "description": "A non-null handoff exists only for an integrity-verified Experiment Manifest."
+            },
+            "experimentKeyMatchesInputs": {
+              "type": "boolean",
+              "const": true,
+              "description": "A non-null handoff exists only when the manifest describes the current replay inputs."
+            },
+            "activationVerified": {
+              "type": "boolean",
+              "description": "Observation copied from the activation check, never an adoption verdict."
+            },
+            "activationReasons": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Provenance/configuration caveats copied from activationCheck so the handoff cannot silently drop weak-evidence signals."
+            },
+            "pairingWarnings": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Dataset pairing gaps copied from pairing.warnings."
+            },
+            "acceptanceEvaluable": { "type": "boolean" },
+            "evaluatedOn": {
+              "type": "string",
+              "enum": ["heldOut", "overall"],
+              "description": "Scope used for criticalRegressionCount and profile observations."
+            },
+            "profiles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "profile",
+                  "allRequiredSatisfied",
+                  "sampleSizeSatisfied",
+                  "failedMetrics",
+                  "unevaluableMetrics"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "profile": { "type": "string" },
+                  "allRequiredSatisfied": {
+                    "type": "boolean",
+                    "description": "Per-profile observation only; it must not be interpreted as an aggregate promotion decision."
+                  },
+                  "sampleSizeSatisfied": { "type": ["boolean", "null"] },
+                  "failedMetrics": { "type": "array", "items": { "type": "string" } },
+                  "unevaluableMetrics": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Metrics that could not be observed. Kept separate from failedMetrics so missing evidence never looks like an observed failure."
+                  }
+                }
+              }
+            },
+            "criticalRegressionCount": { "type": ["integer", "null"], "minimum": 0 },
+            "overallCriticalRegressionCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Critical regressions across all paired cases, surfaced so a clean held-out scope cannot hide an overall regression."
+            },
+            "independentVerifierVerified": {
+              "type": "boolean",
+              "const": false,
+              "description": "P2 has no trusted verifier attestation yet."
+            },
+            "terminalReason": { "type": "string", "enum": ["success", "no_progress"] },
+            "requiresHumanJudgment": { "type": "boolean", "const": true },
+            "writeEffects": { "type": "array", "maxItems": 0 }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
     "verification": {
       "type": "object",
       "required": [

@@ -457,6 +457,205 @@ describe('paired-replay 契約4: content-addressed candidate id', () => {
       /does not match the id derived from its evidence/
     );
   });
+
+  test('paired replay emits a read-only promotion handoff for the same candidate id', () => {
+    const result = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    const handoff = result.promotionHandoff;
+    assert.ok(handoff);
+    assert.equal(handoff.candidateId, result.manifest.improvementCandidate.candidateId);
+    assert.equal(handoff.candidateContentHash, result.manifest.improvementCandidate.contentHash);
+    // Cross-path guard: the handoff must name the same candidate that
+    // `river promote propose` persists, not only echo the manifest.
+    const proposed = buildProposedCandidate({
+      entries: evidence,
+      clusterKey: 'secret-scanner::false_positive',
+      now: NOW,
+    });
+    assert.equal(handoff.candidateId, proposed.candidateId);
+    assert.equal(handoff.candidateContentHash, proposed.contentHash);
+    assert.equal(handoff.manifestId, result.manifest.manifestId);
+    assert.equal(handoff.experimentKey, result.manifest.experimentKey);
+    assert.equal(handoff.manifestHash, result.manifest.manifestHash);
+    assert.equal(handoff.manifestVerified, true);
+    assert.equal(handoff.experimentKeyMatchesInputs, true);
+    assert.equal(handoff.activationVerified, result.activationCheck.verified);
+    assert.deepEqual(handoff.activationReasons, result.activationCheck.reasons);
+    assert.deepEqual(handoff.pairingWarnings, result.pairing.warnings);
+    assert.equal(handoff.acceptanceEvaluable, result.acceptance.evaluable);
+    assert.equal(handoff.evaluatedOn, result.acceptance.evaluatedOn);
+    assert.equal(
+      handoff.criticalRegressionCount,
+      result.acceptance.contract6.criticalRegressionCount
+    );
+    assert.equal(
+      handoff.overallCriticalRegressionCount,
+      result.acceptance.contract6.overallCriticalRegressionCount
+    );
+    assert.equal(handoff.independentVerifierVerified, false);
+    assert.equal(handoff.requiresHumanJudgment, true);
+    assert.deepEqual(handoff.writeEffects, []);
+    // A profile may meet its finding criteria while still missing its declared
+    // sample-size floor. The handoff reports both facts; it never collapses them
+    // into a "pass" or promotion decision.
+    assert.deepEqual(handoff.profiles, [
+      {
+        profile: 'standard',
+        allRequiredSatisfied: true,
+        sampleSizeSatisfied: false,
+        failedMetrics: [],
+        unevaluableMetrics: [],
+      },
+    ]);
+    assert.equal(result.acceptance.decision, null);
+    assert.deepEqual(result.writeEffects, []);
+    assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
+  });
+
+  test('an unevaluable replay never turns zero-looking metrics into a handoff pass', () => {
+    const noPair = spec({
+      dataset: { heldOutCaseKeys: [] },
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    noPair.baseline.runs = [
+      runRecord({ runId: 'base-only', caseId: 'baseline-case', findings: [] }),
+    ];
+    noPair.candidate.runs = [
+      runRecord({ runId: 'candidate-only', caseId: 'candidate-case', findings: [] }),
+    ];
+    const result = buildPairedReplay(noPair, { now: NOW });
+    assert.equal(result.acceptance.evaluable, false);
+    assert.equal(result.promotionHandoff.acceptanceEvaluable, false);
+    assert.equal(result.promotionHandoff.evaluatedOn, 'overall');
+    assert.equal(result.promotionHandoff.criticalRegressionCount, null);
+    assert.equal(result.promotionHandoff.overallCriticalRegressionCount, 0);
+    assert.equal(result.promotionHandoff.profiles[0].allRequiredSatisfied, false);
+    assert.equal(result.promotionHandoff.profiles[0].sampleSizeSatisfied, null);
+    assert.ok(result.promotionHandoff.profiles[0].unevaluableMetrics.length > 0);
+    assert.ok(result.promotionHandoff.pairingWarnings.length > 0);
+    assert.equal(result.promotionHandoff.requiresHumanJudgment, true);
+    assert.deepEqual(result.promotionHandoff.writeEffects, []);
+  });
+
+  test('a clean held-out scope cannot hide an overall critical regression in the handoff', () => {
+    const withRegression = spec({
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    // case-2 is held out and remains unchanged. Remove the critical FP_A only
+    // from case-1 so the evaluated held-out scope is clean while overall is not.
+    withRegression.candidate.runs[0].findings = [finding(FP_D)];
+    const result = buildPairedReplay(withRegression, { now: NOW });
+    assert.equal(result.promotionHandoff.evaluatedOn, 'heldOut');
+    assert.equal(result.promotionHandoff.criticalRegressionCount, 0);
+    assert.equal(result.promotionHandoff.overallCriticalRegressionCount, 1);
+    assert.equal(result.acceptance.contract6.overallCriticalRegressionCount, 1);
+    assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
+  });
+
+  test('schema rejects a non-null handoff whose integrity flags are false', () => {
+    const result = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    result.promotionHandoff.manifestVerified = false;
+    assert.equal(validateReplay(result), false);
+
+    const second = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    second.promotionHandoff.experimentKeyMatchesInputs = false;
+    assert.equal(validateReplay(second), false);
+  });
+
+  test('a supplied manifest for another experiment suppresses the handoff (fail closed)', () => {
+    const current = spec({
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    const stale = buildExperimentManifest(spec({ hypothesis: '別実験' }), { now: NOW }).manifest;
+    const result = buildPairedReplay(current, { now: NOW, manifest: stale });
+    assert.equal(result.manifestVerification.verified, true);
+    assert.equal(result.manifestVerification.experimentKeyMatchesInputs, false);
+    assert.equal(result.promotionHandoff, null);
+    assert.match(formatPairedReplayMarkdown(result), /Promotion handoff \(read-only\)/);
+    assert.match(formatPairedReplayMarkdown(result), /機械可読に結合しない/);
+  });
+
+  test('a tampered manifest suppresses the handoff even when a candidate is present', () => {
+    const current = spec({
+      improvementCandidate: {
+        clusterKey: 'secret-scanner::false_positive',
+        sourceFeedbackRefs: evidence,
+      },
+    });
+    const valid = buildExperimentManifest(current, { now: NOW }).manifest;
+    const tampered = { ...valid, manifestHash: '0'.repeat(64) };
+    const result = buildPairedReplay(current, { now: NOW, manifest: tampered });
+    assert.equal(result.manifestVerification.verified, false);
+    assert.equal(result.manifestVerification.experimentKeyMatchesInputs, true);
+    assert.equal(result.promotionHandoff, null);
+  });
+
+  test('an unactivated replay reaches the handoff as activationVerified false with its caveats', () => {
+    const candidate = {
+      clusterKey: 'secret-scanner::false_positive',
+      sourceFeedbackRefs: evidence,
+    };
+    // Configuration differs but the output does not: only observedDifference
+    // is false, so a handoff that ignored it would wrongly report activation.
+    const noDiff = spec({ dataset: { heldOutCaseKeys: [] }, improvementCandidate: candidate });
+    noDiff.candidate.runs = noDiff.baseline.runs.map((r) => ({ ...r, runId: `${r.runId}-copy` }));
+    const quiet = buildPairedReplay(noDiff, { now: NOW });
+    assert.equal(quiet.activationCheck.configurationDiffers, true);
+    assert.equal(quiet.activationCheck.observedDifference, false);
+    assert.ok(quiet.promotionHandoff);
+    assert.equal(quiet.promotionHandoff.activationVerified, false);
+    assert.ok(
+      quiet.promotionHandoff.activationReasons.some((r) => r.includes('paired diff に差分がなく')),
+      JSON.stringify(quiet.promotionHandoff.activationReasons)
+    );
+
+    // Identical configuration and identical output: neither signal holds.
+    const same = spec({ dataset: { heldOutCaseKeys: [] }, improvementCandidate: candidate });
+    same.candidate.commitSha = same.baseline.commitSha;
+    same.candidate.skillRegistryCommit = same.baseline.skillRegistryCommit;
+    same.candidate.runs = same.baseline.runs.map((r) => ({ ...r, runId: `${r.runId}-copy` }));
+    const idle = buildPairedReplay(same, { now: NOW });
+    assert.equal(idle.activationCheck.configurationDiffers, false);
+    assert.ok(idle.promotionHandoff);
+    assert.equal(idle.promotionHandoff.activationVerified, false);
+    assert.ok(
+      idle.promotionHandoff.activationReasons.some((r) => r.includes('変更経路が存在しない')),
+      JSON.stringify(idle.promotionHandoff.activationReasons)
+    );
+    assert.equal(validateReplay(idle), true, JSON.stringify(validateReplay.errors, null, 2));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1466,6 +1665,14 @@ describe('paired-replay #1724: cross-side source_commit_sha', () => {
 describe('paired-replay: artifact', () => {
   test('validates against schemas/paired-replay.schema.json', () => {
     const result = buildPairedReplay(spec(), { now: NOW });
+    assert.equal(result.promotionHandoff, null);
+    assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
+  });
+
+  test('schemaVersion 1 stays backward-compatible when promotionHandoff is absent', () => {
+    const result = buildPairedReplay(spec(), { now: NOW });
+    delete result.promotionHandoff;
+    assert.equal(result.schemaVersion, 1);
     assert.equal(validateReplay(result), true, JSON.stringify(validateReplay.errors, null, 2));
   });
 
@@ -1483,6 +1690,38 @@ describe('paired-replay: artifact', () => {
     assert.match(text, /Paired replay \(read-only\)/);
     assert.match(text, /decision は常に null/);
     assert.match(text, /Critical regressions \| 0/);
+    assert.doesNotMatch(text, /Promotion handoff/);
+  });
+
+  test('the Markdown renders a candidate handoff as observation, not a verdict', () => {
+    const evidence = [
+      {
+        skillId: 'secret-scanner',
+        feedbackType: 'false_positive',
+        findingFingerprint: FP_A,
+        pr: 1,
+      },
+      {
+        skillId: 'secret-scanner',
+        feedbackType: 'false_positive',
+        findingFingerprint: FP_B,
+        pr: 2,
+      },
+    ];
+    const result = buildPairedReplay(
+      spec({
+        improvementCandidate: {
+          clusterKey: 'secret-scanner::false_positive',
+          sourceFeedbackRefs: evidence,
+        },
+      }),
+      { now: NOW }
+    );
+    const text = formatPairedReplayMarkdown(result);
+    assert.match(text, /Promotion handoff \(read-only\)/);
+    assert.match(text, new RegExp(result.promotionHandoff.candidateId));
+    assert.match(text, /Human judgment required/);
+    assert.doesNotMatch(text, /recommended decision|promotion decision: (approve|reject)/i);
   });
 
   test('the Markdown distinguishes satisfied / failed / unobservable criteria', () => {

@@ -1290,6 +1290,56 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
   }
 
   const terminalReason = cases.length === 0 ? 'no_progress' : 'success';
+  // G1 (#2408): bridge PRE-adoption paired replay evidence to the existing
+  // #1568 promotion lifecycle without writing into it. This is deliberately a
+  // factual handoff, not a verdict: profile observations stay per-profile and
+  // no aggregate pass/fail/keep/rollback decision is invented here.
+  const independentVerifierVerified = false;
+  // A handoff is only meaningful when the supplied/stored manifest both
+  // verifies and describes these exact replay inputs. Otherwise pairing the
+  // freshly-derived candidateId with another experiment's manifest would
+  // create a machine-readable false association even though the mismatch flags
+  // are visible elsewhere in the result.
+  const promotionHandoffEligible =
+    built.manifest.improvementCandidate != null &&
+    manifestVerification.verified &&
+    experimentKeyMatchesInputs;
+  const promotionHandoff = promotionHandoffEligible
+    ? {
+        candidateId: built.manifest.improvementCandidate.candidateId,
+        candidateContentHash: built.manifest.improvementCandidate.contentHash,
+        manifestId: manifest.manifestId,
+        experimentKey: manifest.experimentKey,
+        manifestHash: manifest.manifestHash,
+        manifestVerified: manifestVerification.verified,
+        experimentKeyMatchesInputs,
+        activationVerified: configurationDiffers && observedDifference,
+        activationReasons: [...activationReasons],
+        pairingWarnings: [...pairingWarnings],
+        acceptanceEvaluable,
+        evaluatedOn,
+        profiles: evaluations.map((evaluation) => ({
+          profile: evaluation.profile,
+          allRequiredSatisfied: evaluation.allRequiredSatisfied,
+          sampleSizeSatisfied: evaluation.sampleSizeSatisfied,
+          failedMetrics: [...evaluation.failedMetrics],
+          unevaluableMetrics: evaluation.criteria
+            .filter((criterion) => criterion.satisfied === null)
+            .map((criterion) => criterion.metric)
+            .sort(compareStrings),
+        })),
+        criticalRegressionCount: acceptanceEvaluable
+          ? acceptanceMetrics.criticalRegressionCount
+          : null,
+        // Never let a clean held-out scope hide a critical regression observed
+        // elsewhere in the paired dataset. This mirrors acceptance.contract6.
+        overallCriticalRegressionCount: overall.criticalRegressionCount,
+        independentVerifierVerified,
+        terminalReason,
+        requiresHumanJudgment: true,
+        writeEffects: [],
+      }
+    : null;
 
   return {
     schemaVersion: PAIRED_REPLAY_SCHEMA_VERSION,
@@ -1368,12 +1418,13 @@ export function buildPairedReplay(spec, { now = new Date(), manifest: providedMa
     },
     verification: {
       independentVerifierClaimed: built.manifest.verifier.independent,
-      independentVerifierVerified: false,
+      independentVerifierVerified,
       trustedEvidenceCount: allEvidence.filter((e) => e.trust_level === 'trusted').length,
       untrustedEvidenceCount: allEvidence.filter((e) => e.trust_level !== 'trusted').length,
       canaryEligible: false,
       reasons: trustReasons,
     },
+    promotionHandoff,
     terminalReason,
     requiresHumanApproval: true,
     autoActions: ['observe'],
@@ -1484,6 +1535,45 @@ export function formatPairedReplayMarkdown(result) {
     }
   }
   lines.push('');
+  if (result.promotionHandoff) {
+    const handoff = result.promotionHandoff;
+    lines.push('### Promotion handoff (read-only)');
+    lines.push(`- candidate: \`${handoff.candidateId}\``);
+    lines.push(`- manifest: \`${handoff.manifestId}\``);
+    lines.push(
+      `- manifest integrity: verified ${handoff.manifestVerified ? 'yes' : 'NO'} / matches current inputs ${handoff.experimentKeyMatchesInputs ? 'yes' : 'NO'}`
+    );
+    lines.push(`- activation verified: ${handoff.activationVerified ? 'yes' : 'no'}`);
+    lines.push(`- activation caveats: ${handoff.activationReasons.length}`);
+    lines.push(`- pairing warnings: ${handoff.pairingWarnings.length}`);
+    lines.push(`- acceptance evaluated on: ${handoff.evaluatedOn}`);
+    lines.push(
+      `- critical regressions: ${handoff.criticalRegressionCount ?? '観測不可'} (evaluated scope) / ${handoff.overallCriticalRegressionCount} (overall)`
+    );
+    if (handoff.profiles.length === 0) {
+      lines.push('- acceptance profiles: none declared');
+    } else {
+      for (const profile of handoff.profiles) {
+        lines.push(
+          `- profile \`${profile.profile}\`: allRequiredSatisfied ${tick(profile.allRequiredSatisfied)} / sampleSizeSatisfied ${tick(profile.sampleSizeSatisfied)} / failedMetrics ${profile.failedMetrics.length ? profile.failedMetrics.join(', ') : 'なし'} / unevaluableMetrics ${profile.unevaluableMetrics.length ? profile.unevaluableMetrics.join(', ') : 'なし'}`
+        );
+      }
+    }
+    lines.push(
+      `- independent verifier verified: ${handoff.independentVerifierVerified ? 'yes' : 'no'}`
+    );
+    lines.push('- Human judgment required; this handoff applies no promotion decision.');
+    lines.push('');
+  } else if (
+    !result.manifestVerification.verified ||
+    !result.manifestVerification.experimentKeyMatchesInputs
+  ) {
+    lines.push('### Promotion handoff (read-only)');
+    lines.push(
+      '- unavailable: Experiment Manifest の integrity 検証または current inputs との一致確認に失敗したため、candidate と実験証拠を機械可読に結合しない。'
+    );
+    lines.push('');
+  }
   lines.push(
     'このコマンドは読み取り専用で、レビューの再実行も採否の適用も行いません。decision は常に null です。'
   );
