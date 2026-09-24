@@ -40,7 +40,7 @@ See `schemas/riverbed-entry.schema.json` for details.
 
 1. Running `npm run eval:all -- --persist-memory` appends eval results as `eval_result` entries to `.river/memory/index.json`.
 2. To add entries manually, call `appendEntry(indexPath, entry)` from `src/lib/riverbed-memory.mjs`. Use `supersede(indexPath, oldId, newId)` to logically replace an older entry, or `expireEntries(indexPath)` to batch-archive entries past their `expiresAt`.
-3. During a review, use `loadMemory` + `queryMemory` to search relevant entries and inject them into the prompt.
+3. During a review, `runLocalReview` (`src/lib/local-runner.mjs`) calls `loadReviewMemory` (`src/lib/memory-context.mjs`). `loadReviewMemory` reads entries with `loadMemory`, narrows them by phase and changed files, and buckets them by type. The result is injected into the prompt and also drives suppression through `applySuppressions` (`src/lib/suppression-apply.mjs`). `queryMemory` is used for lookups in regression-eval (`src/lib/regression-eval.mjs`).
 4. In CI, `.github/workflows/riverbed-persist.yml` persists `index.json` via GitHub Artifacts with 90-day retention.
 
 ### Storage Policy
