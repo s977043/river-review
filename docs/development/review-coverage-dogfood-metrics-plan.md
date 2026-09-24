@@ -28,7 +28,7 @@ saved run に保存済みの `reviewCoverage` から、次を集計する。
 
 ### Observed / classified runs
 
-`reviewCoverage` object を持つ run を observed とする。coverage が存在しない legacy / single-reviewer run を incomplete とみなさない。
+`reviewCoverage` object を持つ run を observed とする。coverage が存在しない legacy run、または dry-run / offline / credential missing で意図的に未実行の single-reviewer run を incomplete とみなさない。#2410 以降、LLM call を実際に試行した single-reviewer run は成功時 `complete`、transport / response / parse failure 時 `not_executed` の observation を持つ。
 
 `status` が current v1 vocabulary (`complete` / `partial` / `not_executed`) に入らない observation は unclassified として明示し、rate の分母や required-unit 集計へ混ぜない。これにより self-reported / stale / future-shaped record が現在の dogfood rate を黙って歪めるのを避ける。
 

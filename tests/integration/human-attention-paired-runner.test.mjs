@@ -1,0 +1,161 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { describe, it } from 'node:test';
+
+const BASELINE = '53e7a9e89139827709da90c2a37c928a582e0b0d';
+const CANDIDATE = '3a03f90a2fa7827dc5b59108805687e4535efab6';
+
+function commitExists(ref) {
+  return (
+    spawnSync('git', ['cat-file', '-e', `${ref}^{commit}`], {
+      encoding: 'utf8',
+    }).status === 0
+  );
+}
+
+describe('#2382 actual #2370 baseline/candidate pair', () => {
+  it('passes deterministic safety checks against the frozen material reference', () => {
+    const havePair = commitExists(BASELINE) && commitExists(CANDIDATE);
+
+    if (!havePair) {
+      if (process.env.GITHUB_ACTIONS === 'true') {
+        assert.fail(
+          'GitHub Actions must check out full history so the frozen #2370 pair is available'
+        );
+      }
+      return;
+    }
+
+    const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+    }).trim();
+    const outputDir = path.join(
+      repoRoot,
+      'artifacts',
+      'evals',
+      'human-attention',
+      `test-${process.pid}-actual-pair`
+    );
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          'scripts/evaluate-human-attention.mjs',
+          '--baseline',
+          BASELINE,
+          '--candidate',
+          CANDIDATE,
+          '--output',
+          outputDir,
+          '--measurement-mode',
+          'unavailable',
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: 'utf8',
+          env: process.env,
+        }
+      );
+
+      assert.strictEqual(
+        result.status,
+        0,
+        `paired runner failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+      );
+
+      const summaryPath = path.join(outputDir, 'summary.json');
+      assert.ok(existsSync(summaryPath), 'summary.json must be preserved');
+      const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
+
+      assert.strictEqual(summary.caseCount, 10);
+      assert.strictEqual(summary.deterministicStatus, 'PASS');
+      assert.deepStrictEqual(summary.safetyRegressionCaseIds, []);
+      assert.strictEqual(summary.humanAttentionImprovementClaimed, false);
+
+      const manifest = JSON.parse(readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+      assert.strictEqual(manifest.baselineCommit, BASELINE);
+      assert.strictEqual(manifest.candidateCommit, CANDIDATE);
+      assert.strictEqual(manifest.measurementMode, 'unavailable');
+      assert.ok(manifest.runnerSha256);
+      assert.ok(manifest.fixtureSha256);
+      assert.ok(manifest.adapterSha256);
+      assert.ok(manifest.fixtureHelperSha256);
+      assert.ok(manifest.rubricSha256);
+      assert.ok(manifest.scorecardSha256);
+      assert.strictEqual(
+        manifest.conditionDependencyInstall,
+        'baseline-lock/npm-ci-omit-dev-ignore-scripts'
+      );
+      assert.strictEqual(manifest.candidateNodeModules, 'shared-from-baseline-worktree');
+
+      for (const caseId of [
+        'HA-01-clean',
+        'HA-02-critical-major',
+        'HA-03-minor-info-only',
+        'HA-04-human-review-required',
+        'HA-05-partial-coverage',
+        'HA-06-not-executed',
+        'HA-07-timeout-failure',
+        'HA-08-team-lead-blind-spot',
+        'HA-09-mixed-risk-and-coverage',
+        'HA-10-legacy-no-coverage',
+      ]) {
+        const caseDir = path.join(outputDir, caseId);
+        assert.ok(existsSync(path.join(caseDir, 'baseline.md')), `${caseId}: baseline output`);
+        assert.ok(existsSync(path.join(caseDir, 'candidate.md')), `${caseId}: candidate output`);
+
+        const score = JSON.parse(
+          readFileSync(path.join(caseDir, 'deterministic-score.json'), 'utf8')
+        );
+        assert.strictEqual(score.safetyRegression, false, `${caseId}: safety regression`);
+        assert.deepStrictEqual(score.materialFailures, [], `${caseId}: material failures`);
+      }
+
+      // The runner must remove its detached worktrees even after evaluating
+      // historical commits; otherwise repeated evaluations contaminate the repo.
+      const worktreeList = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+        encoding: 'utf8',
+      });
+      assert.doesNotMatch(worktreeList, /river-review-ha-/);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects output paths outside the canonical Human Attention artifact root', () => {
+    const havePair = commitExists(BASELINE) && commitExists(CANDIDATE);
+    if (!havePair) return;
+
+    const outputDir = path.join(tmpdir(), `river-review-ha-outside-${process.pid}`);
+    rmSync(outputDir, { recursive: true, force: true });
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        'scripts/evaluate-human-attention.mjs',
+        '--baseline',
+        BASELINE,
+        '--candidate',
+        CANDIDATE,
+        '--output',
+        outputDir,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        env: process.env,
+      }
+    );
+
+    assert.strictEqual(result.status, 1);
+    assert.match(
+      result.stderr,
+      /--output must be a new child directory under artifacts\/evals\/human-attention\//
+    );
+    assert.strictEqual(existsSync(outputDir), false);
+  });
+});

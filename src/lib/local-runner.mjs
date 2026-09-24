@@ -5,7 +5,11 @@ import { hasSelection, resolveSelectionSkillIds } from './selection.mjs';
 import { collectRepoDiff, renderDiffText } from './diff-processor.mjs';
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
-import { attachReviewFileScope, deriveReviewFileScope } from './review-coverage.mjs';
+import {
+  attachReviewFileScope,
+  deriveReviewFileScope,
+  deriveSingleReviewerLlmCoverage,
+} from './review-coverage.mjs';
 import {
   detectDefaultBranch,
   ensureGitRepo,
@@ -629,11 +633,24 @@ export async function runLocalReview({
     ? await runReviewerOrchestration({ ...reviewArgs, reviewers, quiet })
     : await generateReview(reviewArgs);
 
-  // Slice C enriches an existing orchestration observation with the selection
+  // Orchestrated review already owns its role/chunk coverage. The legacy
+  // single-reviewer path emits the same execution-completeness contract only
+  // when the LLM was actually attempted. Intentional skips keep the legacy
+  // no-observation shape.
+  const baseReviewCoverage =
+    review.reviewCoverage ??
+    (!reviewers?.length
+      ? deriveSingleReviewerLlmCoverage({
+          debug: review.debug,
+          subjects: context.reviewFileScope?.selected ?? [],
+          findingsCount: review.findings?.length ?? 0,
+        })
+      : null);
+
+  // Slice C enriches an existing execution observation with the selection
   // ledger from the boundary that actually filtered the diff. Counters/status/
-  // units are never recomputed here, and callers that provide an older context
-  // without the ledger keep the exact pre-Slice-C Review Coverage object.
-  const reviewCoverage = attachReviewFileScope(review.reviewCoverage, context.reviewFileScope);
+  // units are never recomputed here.
+  const reviewCoverage = attachReviewFileScope(baseReviewCoverage, context.reviewFileScope);
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical

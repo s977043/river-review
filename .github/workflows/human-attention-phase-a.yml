@@ -1,0 +1,56 @@
+name: Human Attention Phase A
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/evaluate-human-attention.mjs'
+      - 'tests/fixtures/human-attention/**'
+      - 'tests/helpers/render-result-fixtures.mjs'
+      - 'tests/human-attention-paired-runner*.test.mjs'
+      - '.github/workflows/human-attention-phase-a.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  paired-evaluation:
+    name: Frozen paired evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-node-deps
+        with:
+          node-version: 22.x
+
+      - name: Run frozen Phase A pair
+        run: |
+          node scripts/evaluate-human-attention.mjs \
+            --baseline 53e7a9e89139827709da90c2a37c928a582e0b0d \
+            --candidate 3a03f90a2fa7827dc5b59108805687e4535efab6 \
+            --output artifacts/evals/human-attention/phase-a
+
+      - name: Publish deterministic summary
+        if: always() && hashFiles('artifacts/evals/human-attention/phase-a/summary.json') != ''
+        run: |
+          {
+            echo '## Human Attention Phase A deterministic result'
+            echo
+            echo '\`\`\`json'
+            cat artifacts/evals/human-attention/phase-a/summary.json
+            echo '\`\`\`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Phase A evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: human-attention-phase-a-${{ github.run_id }}
+          path: artifacts/evals/human-attention/phase-a/
+          if-no-files-found: warn
+          retention-days: 30
