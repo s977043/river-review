@@ -714,6 +714,15 @@ function reviewUnitSubjects(chunkDiff) {
   return subjects.length > 0 ? subjects : ['<unknown-diff>'];
 }
 
+function firstRoleError(roleSettled) {
+  for (const task of roleSettled) {
+    const message = task.status === 'rejected' ? task.reason?.message : task.value?.debug?.llmError;
+    const text = String(message ?? '').trim();
+    if (text) return text;
+  }
+  return 'unknown';
+}
+
 export async function runReviewerOrchestration({
   diff,
   plan,
@@ -872,11 +881,11 @@ export async function runReviewerOrchestration({
   // #2436: a fulfilled task whose LLM was intentionally skipped (null) did not
   // review anything. When every task is fulfilled and skipped, emit no coverage,
   // same as the single-reviewer path; any other mix counts a skip as failed.
-  // A reviewer that reports no `llmUsed` at all keeps its pre-#2436 completed.
+  // A reviewer that reports no boolean `llmUsed` keeps its pre-#2436 completed.
   const llmAttempts = settled.map((task) => {
     if (task.status !== 'fulfilled') return undefined;
     const debug = task.value?.debug;
-    return debug?.llmUsed === undefined ? 'completed' : classifyLlmAttempt(debug);
+    return typeof debug?.llmUsed !== 'boolean' ? 'completed' : classifyLlmAttempt(debug);
   });
   const allSkipped = llmAttempts.every((attempt) => attempt === null);
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
@@ -986,13 +995,7 @@ export async function runReviewerOrchestration({
       // the surviving chunks' findings are kept (fail-soft).
       timedOut: roleOutcomes.some((o) => o.timedOut),
       durationMs: roleDurations.length ? Math.max(...roleDurations) : null,
-      error:
-        roleReviewed.length > 0
-          ? null
-          : String(
-              roleSettled[0]?.reason?.message ??
-                (String(roleSucceeded[0]?.value?.debug?.llmError ?? '').trim() || 'unknown')
-            ),
+      error: roleReviewed.length > 0 ? null : firstRoleError(roleSettled),
     };
   });
 

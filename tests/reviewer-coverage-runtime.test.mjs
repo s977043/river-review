@@ -176,6 +176,34 @@ describe('reviewCoverage runtime wiring', () => {
     }
   });
 
+  it('reports the first non-empty role error across chunks', async () => {
+    const result = await runReviewerOrchestration(
+      baseArgs({
+        diff: chunkedDiff(),
+        generateReviewImpl: async ({ diff: chunk }) => {
+          if (chunk.files.some((entry) => entry.path.startsWith('slow/'))) {
+            return okReview({ debug: { llmUsed: false, llmError: '' } });
+          }
+          throw new Error('second chunk failed');
+        },
+      })
+    );
+
+    assert.equal(result.reviewerResults[0].status, 'rejected');
+    assert.equal(result.reviewerResults[0].error, 'second chunk failed');
+  });
+
+  it('treats a reviewer reporting llmUsed: null as completed', async () => {
+    const result = await runReviewerOrchestration(
+      baseArgs({
+        generateReviewImpl: async () => okReview({ debug: { llmUsed: null } }),
+      })
+    );
+
+    assert.equal(result.reviewCoverage.status, 'complete');
+    assert.equal(result.reviewCoverage.units[0].status, 'completed');
+  });
+
   it('reports not_executed when all required work fails', async () => {
     const result = await runReviewerOrchestration(
       baseArgs({

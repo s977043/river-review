@@ -103,6 +103,16 @@ A unit that completes with `findingsCount: 0` is still completed. Finding count 
 
 The current v1 reviewer selection always produces at least one required role when reviewer orchestration runs. `deriveReviewCoverage()` still includes a defensive `requiredUnits === 0` branch for a future all-optional policy. In that case, coverage falls back to whether all, some, or none of the planned optional units completed.
 
+### Reviewer counts in `debug`
+
+`debug.succeededReviewers` and `debug.failedReviewers` count tasks (role × chunk), not roles:
+
+- `succeededReviewers`: tasks whose LLM call completed.
+- `failedReviewers`: rejected tasks plus fulfilled tasks whose LLM call failed.
+- A task that skipped the LLM is counted in neither, so the sum can be smaller than the total number of tasks.
+
+The coverage units treat skips differently: when skipped and executed tasks are mixed, a skipped unit counts as `failed` (#2440).
+
 ## File scope ledger
 
 Phase 1 / Slice C adds an optional `fileScope` ledger to the same Review Coverage object:
