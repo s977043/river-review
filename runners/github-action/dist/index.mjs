@@ -52952,9 +52952,10 @@ function resolveFlowEntry(entryName, options) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   QS: () => (/* binding */ GATE_REASON_CODES),
 /* harmony export */   RF: () => (/* binding */ deriveGateDecision),
-/* harmony export */   p4: () => (/* binding */ coverageIncompleteForGate)
+/* harmony export */   p4: () => (/* binding */ coverageIncompleteForGate),
+/* harmony export */   us: () => (/* binding */ llmNotExecutedForGate)
 /* harmony export */ });
-/* unused harmony exports GATE_DECISIONS, gateConfigChanged, computeGateInputsHash, isCoverageGateEnabled */
+/* unused harmony exports GATE_DECISIONS, gateConfigChanged, computeGateInputsHash, isCoverageGateEnabled, isRequireLlmGateEnabled */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
 /**
  * Gate-decision derivation (Epic #1347 S2 / #1349).
@@ -52998,6 +52999,8 @@ function resolveFlowEntry(entryName, options) {
  *     resolution must not obtain a GO — escalation rules 0-4 still fire)
  *  6c. review coverage incomplete            → NO_GO     COVERAGE_INCOMPLETE
  *     (#2337, opt-in: the review ran but not over every required unit)
+ *  6d. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
+ *     (#2441, opt-in: every generateReview call skipped the LLM)
  *  7. loopSignal REVISE_REQUIRED             → NO_GO     BLOCKING_FINDINGS
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
@@ -53044,6 +53047,7 @@ const GATE_REASON_CODES = /** @type {const} */ ([
   'SKIPPED_BY_POLICY',
   'NOT_EXECUTED',
   'COVERAGE_INCOMPLETE',
+  'LLM_NOT_EXECUTED',
   'BLOCKING_FINDINGS',
   'MINOR_FINDINGS_OBSERVE',
   'UNDETERMINED',
@@ -53120,6 +53124,8 @@ function computeGateInputsHash(inputs) {
   // reproduces both the decision and the hash. A true value produces a distinct
   // hash so the S3 "same inputs, different decision" regression check stays sound.
   if (inputs?.coverageIncomplete === true) canonical.coverageIncomplete = true;
+  // #2441: same "only when true" scheme; the opt-in is OFF by default.
+  if (inputs?.llmNotExecuted === true) canonical.llmNotExecuted = true;
   return (0,node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash)('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
 }
 
@@ -53155,6 +53161,30 @@ function coverageIncompleteForGate(reviewCoverage, env) {
   if (!isCoverageGateEnabled(env)) return false;
   const status = reviewCoverage?.status;
   return status === 'partial' || status === 'not_executed';
+}
+
+/**
+ * Require-LLM gate opt-in predicate (#2441). Same strict `'1'` check and the
+ * same purity as isCoverageGateEnabled.
+ *
+ * @param {Record<string, string | undefined> | undefined} env process.env-like object
+ * @returns {boolean}
+ */
+function isRequireLlmGateEnabled(env) {
+  return env?.RIVER_GATE_REQUIRE_LLM === '1';
+}
+
+/**
+ * Reduce the run's "no unit reached the LLM" fact (`allLlmAttemptsSkipped` in
+ * review-coverage.mjs) to the gate's `llmNotExecuted` input (#2441). False
+ * unless the host opted in, so the default gate is unchanged.
+ *
+ * @param {boolean | undefined} llmNotExecuted
+ * @param {Record<string, string | undefined> | undefined} env
+ * @returns {boolean}
+ */
+function llmNotExecutedForGate(llmNotExecuted, env) {
+  return isRequireLlmGateEnabled(env) && llmNotExecuted === true;
 }
 
 /**
@@ -53211,6 +53241,11 @@ function coverageIncompleteForGate(reviewCoverage, env) {
  *   precedes both and every verdict lands on NO_GO. Opt-in and OFF by default:
  *   the caller sets it only when the host opted in, so the default gate output
  *   is unchanged bit for bit.
+ * @param {boolean} [opts.llmNotExecuted] - #2441: every generateReview call
+ *   intentionally skipped the LLM (missing key / offline / unsupported
+ *   provider), so no semantic review ran. Forces ESCALATE (LLM_NOT_EXECUTED).
+ *   Placed after 6b so a dry-run keeps NO_GO NOT_EXECUTED, and after 6c.
+ *   Opt-in and OFF by default: the caller sets it only when the host opted in.
  * @param {object} [opts.config] - effective config; gate.observation / gate.circuitBreaker read here
  * @returns {{ decision: GateDecisionValue, reasonCode: string, tier: GateTier,
  *   inputs: object, inputsHash: string, configSnapshot: object, observation?: object,
@@ -53232,6 +53267,7 @@ function deriveGateDecision({
   strictBlock = false,
   deterministicUnrunnable = false,
   coverageIncomplete = false,
+  llmNotExecuted = false,
   config = {},
 } = {}) {
   const configChanged =
@@ -53262,6 +53298,8 @@ function deriveGateDecision({
   // means "the coverage gate did not fire", which is exactly what a pre-#2337
   // artifact means by having no such key — so replay is total in both directions.
   if (coverageIncomplete === true) inputs.coverageIncomplete = true;
+  // #2441: echoed only when true, for the same reason.
+  if (llmNotExecuted === true) inputs.llmNotExecuted = true;
 
   const expiresInHours =
     config?.gate?.observation?.expiresInHours ?? DEFAULT_OBSERVATION_EXPIRES_IN_HOURS;
@@ -53332,6 +53370,10 @@ function deriveGateDecision({
     // coverage first describes the run more honestly than naming a finding
     // count derived from it. Pinned in tests/gate-incompleteness-optin.test.mjs.
     if (inputs.coverageIncomplete) return ['NO_GO', 'COVERAGE_INCOMPLETE'];
+    // 6d. No unit reached the LLM (#2441, opt-in). The host asked for a
+    // semantic review, and none ran, so a human decides. After 6b so a dry-run
+    // keeps its existing NO_GO NOT_EXECUTED.
+    if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
     // 7. Blocking findings → revise.
     if (loopSignal === 'REVISE_REQUIRED') return ['NO_GO', 'BLOCKING_FINDINGS'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.
@@ -57590,7 +57632,8 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   l1: () => (/* binding */ classifyLlmAttempt),
 /* harmony export */   mz: () => (/* binding */ deriveSingleReviewerLlmCoverage),
 /* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
-/* harmony export */   or: () => (/* binding */ deriveReviewFileScope)
+/* harmony export */   or: () => (/* binding */ deriveReviewFileScope),
+/* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped)
 /* harmony export */ });
 /* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
 
@@ -57710,6 +57753,24 @@ function classifyLlmAttempt(debug) {
   if (debug?.llmUsed !== false) return null;
   const skipped = typeof debug.llmSkipped === 'string' && debug.llmSkipped.trim().length > 0;
   return skipped ? null : 'failed';
+}
+
+/**
+ * True when every generateReview call of a run intentionally skipped the LLM
+ * (#2441): the run never executed a semantic review. The single predicate both
+ * the single-reviewer path and reviewer orchestration use.
+ *
+ * An entry counts as a skip only when `llmUsed === false` and
+ * classifyLlmAttempt returns null. A missing debug (rejected task), a failure,
+ * a completed call, or a debug without a boolean `llmUsed` is not a skip. An
+ * empty list is false: nothing was observed.
+ *
+ * @param {Array<object|null|undefined>} debugs generateReview debug per unit
+ * @returns {boolean}
+ */
+function allLlmAttemptsSkipped(debugs) {
+  if (!Array.isArray(debugs) || debugs.length === 0) return false;
+  return debugs.every((debug) => debug?.llmUsed === false && classifyLlmAttempt(debug) === null);
 }
 
 /**
@@ -92201,7 +92262,9 @@ async function runReviewerOrchestration({
     const debug = task.value?.debug;
     return typeof debug?.llmUsed !== 'boolean' ? 'completed' : (0,review_coverage/* classifyLlmAttempt */.l1)(debug);
   });
-  const allSkipped = llmAttempts.every((attempt) => attempt === null);
+  const allSkipped = (0,review_coverage/* allLlmAttemptsSkipped */.rC)(
+    settled.map((task) => (task.status === 'fulfilled' ? task.value?.debug : undefined))
+  );
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const task = settled[taskIdx];
     const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
@@ -92338,6 +92401,8 @@ async function runReviewerOrchestration({
     classified,
     reviewerResults,
     reviewCoverage,
+    // #2441: every role × chunk skipped the LLM; the run reviewed nothing.
+    llmNotExecuted: allSkipped,
     invalidRoles: invalid,
     autoSelectedRoles: reviewers?.length === 1 && reviewers[0] === 'auto' ? roles : null,
     // #1545 P1: explainable auto-selection — reasons per role, the always-on
@@ -93659,6 +93724,12 @@ async function runLocalReview({
         })
       : null);
 
+  // #2441: same predicate on both paths. Orchestration computes it over its
+  // role × chunk units; the single reviewer has one generateReview call.
+  const llmNotExecuted = reviewers?.length
+    ? review.llmNotExecuted === true
+    : (0,review_coverage/* allLlmAttemptsSkipped */.rC)([review.debug]);
+
   // Slice C enriches an existing execution observation with the selection
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here.
@@ -93722,6 +93793,9 @@ async function runLocalReview({
     // not run to a verdict (opt-in only; false unless double-gated). deriveRunGate
     // forwards this to deriveGateDecision → rule 5c ESCALATE.
     deterministicUnrunnable,
+    // #2441: no generateReview call reached the LLM. deriveRunGate reads it
+    // only under the RIVER_GATE_REQUIRE_LLM=1 opt-in.
+    llmNotExecuted,
     repoRoot: external_node_path_.resolve(context.repoRoot),
     defaultBranch: context.defaultBranch,
     mergeBase: context.mergeBase,
@@ -93972,6 +94046,8 @@ function deriveRunGate(result) {
       // REQUIRED review unit is not a clean review. Reduced by the SSoT
       // predicate so this site and review-plan's gateContext cannot drift.
       coverageIncomplete: (0,gate_decision/* coverageIncompleteForGate */.p4)(result.reviewCoverage, process.env),
+      // #2441 (opt-in RIVER_GATE_REQUIRE_LLM=1, default OFF).
+      llmNotExecuted: (0,gate_decision/* llmNotExecutedForGate */.us)(result.llmNotExecuted, process.env),
       config: result.config ?? {},
     });
   } catch {
