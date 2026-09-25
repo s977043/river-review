@@ -69,6 +69,11 @@ Above `suggestedLoopSignal` sits `gate`, a machine-readable signal that composes
     - Intentional skips such as dry-run, offline mode, or a missing API key still emit no coverage observation. Since #2436 this holds for `--reviewers` too when every unit skipped; in a run that mixes skipped and executed units, a skipped unit counts as `failed`. This keeps "attempted and failed" distinct from "not attempted by policy/configuration"
     - The opt-in therefore requires `RIVER_GATE_COVERAGE=1` + `river run --gate` + an observed incomplete coverage state; `--reviewers` is no longer mandatory. From GitHub Actions, set `gate: true` and `RIVER_GATE_COVERAGE=1`; provide `reviewers` only when multi-reviewer coverage is desired
   - An ABSENT coverage object is never read as incomplete. "No observation" and "observed a gap" are different facts, and only the second one may block a merge
+  - `RIVER_GATE_REQUIRE_LLM=1` (#2441): a run in which every unit skipped the LLM lands on `ESCALATE` (`LLM_NOT_EXECUTED`). The skip reasons are a missing API key, offline mode, or an unsupported provider. The single-reviewer and `--reviewers` paths use the same predicate, and the fact is also kept in the saved run as `llmNotExecuted: true`
+    - A dry-run keeps its existing `NO_GO` (`NOT_EXECUTED`), which takes precedence. `COVERAGE_INCOMPLETE` and `BLOCKING_FINDINGS` are also checked before this rule, which sits ahead of every rule that can emit `GO` / `GO_WITH_OBSERVATION`
+    - Offline mode counts as "the LLM did not run". To reproduce the Auto-approve verdict offline, leave this variable unset
+    - Today this takes effect on the `river run --gate` path only; on the `review exec` path it is a no-op
+    - From GitHub Actions, set `gate: true` and `RIVER_GATE_REQUIRE_LLM: '1'` in the step's `env`
 
 `gate` is advisory. Enforcement (`--gate` mode, strict_block routing) lands in Epic #1347 S4.
 

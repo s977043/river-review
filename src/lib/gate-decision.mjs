@@ -41,6 +41,9 @@
  *  6c. review coverage incomplete            → NO_GO     COVERAGE_INCOMPLETE
  *     (#2337, opt-in: the review ran but not over every required unit)
  *  7. loopSignal REVISE_REQUIRED             → NO_GO     BLOCKING_FINDINGS
+ *  7b. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
+ *     (#2441, opt-in: every generateReview call skipped the LLM; placed
+ *     before every rule that can emit GO / GO_WITH_OBSERVATION)
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
  *  9. NO_SIGNAL (decision absent/unknown)    → NO_GO     UNDETERMINED
@@ -86,6 +89,7 @@ export const GATE_REASON_CODES = /** @type {const} */ ([
   'SKIPPED_BY_POLICY',
   'NOT_EXECUTED',
   'COVERAGE_INCOMPLETE',
+  'LLM_NOT_EXECUTED',
   'BLOCKING_FINDINGS',
   'MINOR_FINDINGS_OBSERVE',
   'UNDETERMINED',
@@ -162,6 +166,8 @@ export function computeGateInputsHash(inputs) {
   // reproduces both the decision and the hash. A true value produces a distinct
   // hash so the S3 "same inputs, different decision" regression check stays sound.
   if (inputs?.coverageIncomplete === true) canonical.coverageIncomplete = true;
+  // #2441: same "only when true" scheme; the opt-in is OFF by default.
+  if (inputs?.llmNotExecuted === true) canonical.llmNotExecuted = true;
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
 }
 
@@ -197,6 +203,30 @@ export function coverageIncompleteForGate(reviewCoverage, env) {
   if (!isCoverageGateEnabled(env)) return false;
   const status = reviewCoverage?.status;
   return status === 'partial' || status === 'not_executed';
+}
+
+/**
+ * Require-LLM gate opt-in predicate (#2441). Same strict `'1'` check and the
+ * same purity as isCoverageGateEnabled.
+ *
+ * @param {Record<string, string | undefined> | undefined} env process.env-like object
+ * @returns {boolean}
+ */
+export function isRequireLlmGateEnabled(env) {
+  return env?.RIVER_GATE_REQUIRE_LLM === '1';
+}
+
+/**
+ * Reduce the run's "no unit reached the LLM" fact (`allLlmAttemptsSkipped` in
+ * review-coverage.mjs) to the gate's `llmNotExecuted` input (#2441). False
+ * unless the host opted in, so the default gate is unchanged.
+ *
+ * @param {boolean | undefined} llmNotExecuted
+ * @param {Record<string, string | undefined> | undefined} env
+ * @returns {boolean}
+ */
+export function llmNotExecutedForGate(llmNotExecuted, env) {
+  return isRequireLlmGateEnabled(env) && llmNotExecuted === true;
 }
 
 /**
@@ -253,6 +283,12 @@ export function coverageIncompleteForGate(reviewCoverage, env) {
  *   precedes both and every verdict lands on NO_GO. Opt-in and OFF by default:
  *   the caller sets it only when the host opted in, so the default gate output
  *   is unchanged bit for bit.
+ * @param {boolean} [opts.llmNotExecuted] - #2441: every generateReview call
+ *   intentionally skipped the LLM (missing key / offline / unsupported
+ *   provider), so no semantic review ran. Forces ESCALATE (LLM_NOT_EXECUTED).
+ *   Placed as rule 7b: after 6b / 6c / 7 so an existing NO_GO wins, and
+ *   before rules 8-11 so the run can never reach GO / GO_WITH_OBSERVATION.
+ *   Opt-in and OFF by default: the caller sets it only when the host opted in.
  * @param {object} [opts.config] - effective config; gate.observation / gate.circuitBreaker read here
  * @returns {{ decision: GateDecisionValue, reasonCode: string, tier: GateTier,
  *   inputs: object, inputsHash: string, configSnapshot: object, observation?: object,
@@ -274,6 +310,7 @@ export function deriveGateDecision({
   strictBlock = false,
   deterministicUnrunnable = false,
   coverageIncomplete = false,
+  llmNotExecuted = false,
   config = {},
 } = {}) {
   const configChanged =
@@ -304,6 +341,8 @@ export function deriveGateDecision({
   // means "the coverage gate did not fire", which is exactly what a pre-#2337
   // artifact means by having no such key — so replay is total in both directions.
   if (coverageIncomplete === true) inputs.coverageIncomplete = true;
+  // #2441: echoed only when true, for the same reason.
+  if (llmNotExecuted === true) inputs.llmNotExecuted = true;
 
   const expiresInHours =
     config?.gate?.observation?.expiresInHours ?? DEFAULT_OBSERVATION_EXPIRES_IN_HOURS;
@@ -376,6 +415,11 @@ export function deriveGateDecision({
     if (inputs.coverageIncomplete) return ['NO_GO', 'COVERAGE_INCOMPLETE'];
     // 7. Blocking findings → revise.
     if (loopSignal === 'REVISE_REQUIRED') return ['NO_GO', 'BLOCKING_FINDINGS'];
+    // 7b. No unit reached the LLM (#2441, opt-in). The host asked for a
+    // semantic review, and none ran, so a human decides. After 6b and 7 so a
+    // confirmed NO_GO (dry-run NOT_EXECUTED, BLOCKING_FINDINGS) is never traded
+    // for it; before 8-11 so it can never yield GO / GO_WITH_OBSERVATION.
+    if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.
     if (loopSignal === 'NO_SIGNAL') {
       if (decision === 'human-review-recommended' && inputs.blockingFindings === 0) {

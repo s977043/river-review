@@ -81,6 +81,20 @@ Review Coverage is opt-in. To make incomplete reviewer execution fail the GitHub
 
 `reviewers: auto` is also supported. Reviewer names are forwarded to the CLI unchanged, so the CLI remains the validation and vocabulary source of truth.
 
+### Require-LLM Gate
+
+Also opt-in (#2441). With `RIVER_GATE_REQUIRE_LLM: '1'`, a run in which no unit reached the LLM lands on `ESCALATE` (`LLM_NOT_EXECUTED`). The job then exits with 3. The LLM is skipped when the API key is missing, in offline mode, or for an unsupported provider:
+
+```yaml
+- name: Run River Review with require-LLM gate
+  uses: s977043/river-review/runners/github-action@main
+  with:
+    gate: true
+  env:
+    RIVER_GATE_REQUIRE_LLM: '1'
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
 ## Phases
 
 River Review operates in three distinct phases:
