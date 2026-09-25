@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.124.5](https://github.com/s977043/river-review/compare/v1.124.4...v1.124.5) (2026-09-25)
+
+
+### Bug Fixes
+
+* **review:** address range review minors for --reviewers failure reporting ([#2444](https://github.com/s977043/river-review/issues/2444)) ([4035629](https://github.com/s977043/river-review/commit/40356292eb1b47d9341eb4ca6cf625e26e8bca79))
+
 ## [1.124.4](https://github.com/s977043/river-review/compare/v1.124.3...v1.124.4) (2026-09-24)
 
 
