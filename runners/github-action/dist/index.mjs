@@ -52999,9 +52999,10 @@ function resolveFlowEntry(entryName, options) {
  *     resolution must not obtain a GO — escalation rules 0-4 still fire)
  *  6c. review coverage incomplete            → NO_GO     COVERAGE_INCOMPLETE
  *     (#2337, opt-in: the review ran but not over every required unit)
- *  6d. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
- *     (#2441, opt-in: every generateReview call skipped the LLM)
  *  7. loopSignal REVISE_REQUIRED             → NO_GO     BLOCKING_FINDINGS
+ *  7b. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
+ *     (#2441, opt-in: every generateReview call skipped the LLM; placed
+ *     before every rule that can emit GO / GO_WITH_OBSERVATION)
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
  *  9. NO_SIGNAL (decision absent/unknown)    → NO_GO     UNDETERMINED
@@ -53244,7 +53245,8 @@ function llmNotExecutedForGate(llmNotExecuted, env) {
  * @param {boolean} [opts.llmNotExecuted] - #2441: every generateReview call
  *   intentionally skipped the LLM (missing key / offline / unsupported
  *   provider), so no semantic review ran. Forces ESCALATE (LLM_NOT_EXECUTED).
- *   Placed after 6b so a dry-run keeps NO_GO NOT_EXECUTED, and after 6c.
+ *   Placed as rule 7b: after 6b / 6c / 7 so an existing NO_GO wins, and
+ *   before rules 8-11 so the run can never reach GO / GO_WITH_OBSERVATION.
  *   Opt-in and OFF by default: the caller sets it only when the host opted in.
  * @param {object} [opts.config] - effective config; gate.observation / gate.circuitBreaker read here
  * @returns {{ decision: GateDecisionValue, reasonCode: string, tier: GateTier,
@@ -53370,12 +53372,13 @@ function deriveGateDecision({
     // coverage first describes the run more honestly than naming a finding
     // count derived from it. Pinned in tests/gate-incompleteness-optin.test.mjs.
     if (inputs.coverageIncomplete) return ['NO_GO', 'COVERAGE_INCOMPLETE'];
-    // 6d. No unit reached the LLM (#2441, opt-in). The host asked for a
-    // semantic review, and none ran, so a human decides. After 6b so a dry-run
-    // keeps its existing NO_GO NOT_EXECUTED.
-    if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
     // 7. Blocking findings → revise.
     if (loopSignal === 'REVISE_REQUIRED') return ['NO_GO', 'BLOCKING_FINDINGS'];
+    // 7b. No unit reached the LLM (#2441, opt-in). The host asked for a
+    // semantic review, and none ran, so a human decides. After 6b and 7 so a
+    // confirmed NO_GO (dry-run NOT_EXECUTED, BLOCKING_FINDINGS) is never traded
+    // for it; before 8-11 so it can never yield GO / GO_WITH_OBSERVATION.
+    if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.
     if (loopSignal === 'NO_SIGNAL') {
       if (decision === 'human-review-recommended' && inputs.blockingFindings === 0) {

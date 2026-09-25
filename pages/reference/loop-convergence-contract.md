@@ -70,9 +70,10 @@ Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](ht
     - 発火条件は `RIVER_GATE_COVERAGE=1` + `river run --gate` + 不完全な coverage 観測の 3 つであり、`--reviewers` を必須としない。GitHub Action では `gate: true` と step の `env` に `RIVER_GATE_COVERAGE=1` を設定する。`reviewers` input は複数 reviewer coverage が必要な場合だけ指定する
   - coverage が**存在しない**ことは不完全とは読まない。「観測が無い」と「欠落を観測した」は別の事実であり、マージを止めてよいのは後者だけである
   - `RIVER_GATE_REQUIRE_LLM=1`（#2441）: 全 unit が LLM を skip した run を `ESCALATE`（`LLM_NOT_EXECUTED`）へ倒す。skip の理由は API key 未設定 / offline / 未対応 provider である。単一 reviewer と `--reviewers` の両経路で同じ述語を使い、その事実は saved run の `llmNotExecuted: true` にも残る
-    - dry-run は従来どおり `NO_GO`（`NOT_EXECUTED`）が優先する。`COVERAGE_INCOMPLETE` もこの規則より先に判定する
+    - dry-run は従来どおり `NO_GO`（`NOT_EXECUTED`）が優先する。`COVERAGE_INCOMPLETE` と `BLOCKING_FINDINGS` もこの規則より先に判定する。この規則は `GO` / `GO_WITH_OBSERVATION` を出しうる規則より前にある
     - offline も「LLM を実行していない」に含む。offline で Auto-approve 判定を再現したい場合は、この変数を設定しない
     - 実効があるのは現時点で `river run --gate` 経路のみであり、`review exec` 経路では no-op となる
+    - GitHub Action では `gate: true` と step の `env` に `RIVER_GATE_REQUIRE_LLM: '1'` を設定する
 
 `gate` は advisory です。判定の執行（`--gate` モード、strict_block ルーティング）は Epic #1347 S4 で導入されます。
 

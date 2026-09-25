@@ -179,6 +179,31 @@ describe('require-LLM gate contract (#2441)', () => {
     assert.equal(gate.reasonCode, 'COVERAGE_INCOMPLETE');
   });
 
+  it('blocking findings keep NO_GO BLOCKING_FINDINGS ahead of the require-LLM rule', () => {
+    const gate = deriveGateDecision({
+      ...clean,
+      loopSignal: 'REVISE_REQUIRED',
+      decision: 'human-review-required',
+      blockingFindings: 1,
+      llmNotExecuted: true,
+    });
+    assert.equal(gate.decision, 'NO_GO');
+    assert.equal(gate.reasonCode, 'BLOCKING_FINDINGS');
+  });
+
+  for (const loopSignal of ['CONVERGED', 'NO_SIGNAL']) {
+    it(`${loopSignal} + human-review-recommended escalates instead of a GO-family outcome`, () => {
+      const gate = deriveGateDecision({
+        ...clean,
+        loopSignal,
+        decision: 'human-review-recommended',
+        llmNotExecuted: true,
+      });
+      assert.equal(gate.decision, 'ESCALATE');
+      assert.equal(gate.reasonCode, 'LLM_NOT_EXECUTED');
+    });
+  }
+
   it('only an all-skip list counts as "not executed"', () => {
     const skip = { llmUsed: false, llmSkipped: 'offline (rules-only) mode enabled' };
     assert.equal(allLlmAttemptsSkipped([skip, skip]), true);
