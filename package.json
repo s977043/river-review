@@ -89,9 +89,9 @@
     "skills:validate:refs": "node scripts/check-skill-id-references.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.125.0",
+    "@anthropic-ai/sdk": "^0.128.0",
     "@google/generative-ai": "^0.24.1",
-    "@inquirer/prompts": "^8.7.1",
+    "@inquirer/prompts": "^8.7.2",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.80.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
@@ -109,7 +109,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.2",
+    "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.2",
     "@docusaurus/core": "^3.10.2",
     "@docusaurus/preset-classic": "^3.10.2",
@@ -120,7 +120,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
     "markdownlint-cli": "^0.49.1",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.9",
     "prh": "^6.1.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

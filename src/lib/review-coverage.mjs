@@ -118,6 +118,24 @@ export function classifyLlmAttempt(debug) {
 }
 
 /**
+ * True when every generateReview call of a run intentionally skipped the LLM
+ * (#2441): the run never executed a semantic review. The single predicate both
+ * the single-reviewer path and reviewer orchestration use.
+ *
+ * An entry counts as a skip only when `llmUsed === false` and
+ * classifyLlmAttempt returns null. A missing debug (rejected task), a failure,
+ * a completed call, or a debug without a boolean `llmUsed` is not a skip. An
+ * empty list is false: nothing was observed.
+ *
+ * @param {Array<object|null|undefined>} debugs generateReview debug per unit
+ * @returns {boolean}
+ */
+export function allLlmAttemptsSkipped(debugs) {
+  if (!Array.isArray(debugs) || debugs.length === 0) return false;
+  return debugs.every((debug) => debug?.llmUsed === false && classifyLlmAttempt(debug) === null);
+}
+
+/**
  * Build Review Coverage for the legacy single-reviewer LLM path.
  *
  * The observation exists only when an LLM call was actually attempted:
