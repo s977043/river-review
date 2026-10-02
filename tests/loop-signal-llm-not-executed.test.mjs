@@ -56,10 +56,11 @@ async function captureStdout(fn) {
 }
 
 /**
- * Run two reviews of the same change, save both records the way `river run
- * --save` does, and return the `runs diff` signal plus the in-run gate.
+ * Run one review per id in `runIds` against the same change, save each record
+ * the way `river run --save` does, and return the `runs diff` signal plus the
+ * in-run gates. Three or more ids take the multi-run `runs diff` path.
  */
-async function runTwiceAndDiff(t, { reviewers, apiKey, env = {} }) {
+async function runAndDiff(t, { reviewers, apiKey, env = {}, runIds = ['run-1', 'run-2'] }) {
   isolateEnv(t, env);
   const { dir, cleanup } = await createTempGitRepo({
     prefix: 'river-review-loop-llm-',
@@ -78,7 +79,7 @@ async function runTwiceAndDiff(t, { reviewers, apiKey, env = {} }) {
   const storeDir = resolveStoreDir(dir);
   const gates = [];
   const records = [];
-  for (const [i, runId] of ['run-1', 'run-2'].entries()) {
+  for (const [i, runId] of runIds.entries()) {
     const context = await planLocalReview({ cwd: dir, dryRun: true });
     const result = await runLocalReview({
       cwd: dir,
@@ -101,9 +102,9 @@ async function runTwiceAndDiff(t, { reviewers, apiKey, env = {} }) {
     const code = await runRunsCommand(
       {
         runsSubcommand: 'diff',
-        runsId1: 'run-1',
-        runsId2: 'run-2',
-        runsIds: ['run-1', 'run-2'],
+        runsId1: runIds[0],
+        runsId2: runIds[1],
+        runsIds: runIds,
         output: 'json',
       },
       dir
@@ -119,7 +120,7 @@ for (const [pathName, reviewers] of [
 ]) {
   describe(`runs diff loop signal on the ${pathName} path (#2441)`, () => {
     it('no key: NO_SIGNAL, while the default in-run gate stays GO', async (t) => {
-      const { signal, gates, records } = await runTwiceAndDiff(t, { reviewers });
+      const { signal, gates, records } = await runAndDiff(t, { reviewers });
 
       assert.equal(records[1].llmNotExecuted, true);
       assert.equal(records[1].decision, 'auto-approve');
@@ -132,7 +133,7 @@ for (const [pathName, reviewers] of [
     });
 
     it('offline with a key: NO_SIGNAL', async (t) => {
-      const { signal } = await runTwiceAndDiff(t, {
+      const { signal } = await runAndDiff(t, {
         reviewers,
         apiKey: 'test-key',
         env: { RIVER_OFFLINE: '1' },
@@ -141,13 +142,31 @@ for (const [pathName, reviewers] of [
     });
 
     it('a run that reached the LLM keeps CONVERGED', async (t) => {
-      const { signal, records } = await runTwiceAndDiff(t, { reviewers, apiKey: 'test-key' });
+      const { signal, records } = await runAndDiff(t, { reviewers, apiKey: 'test-key' });
 
       assert.equal('llmNotExecuted' in records[1], false);
       assert.equal(signal, 'CONVERGED');
     });
   });
 }
+
+describe('runs diff loop signal on the 3+-run path (#2441)', () => {
+  const runIds = ['run-1', 'run-2', 'run-3'];
+
+  it('no key: NO_SIGNAL', async (t) => {
+    const { signal, records } = await runAndDiff(t, { runIds });
+
+    assert.equal(records[2].llmNotExecuted, true);
+    assert.equal(signal, 'NO_SIGNAL');
+  });
+
+  it('a run that reached the LLM keeps CONVERGED', async (t) => {
+    const { signal, records } = await runAndDiff(t, { runIds, apiKey: 'test-key' });
+
+    assert.equal('llmNotExecuted' in records[2], false);
+    assert.equal(signal, 'CONVERGED');
+  });
+});
 
 describe('deriveLoopSignalFromRunsDiff llmNotExecuted qualification (#2441)', () => {
   const clean = { decision: 'auto-approve', findings: [] };
