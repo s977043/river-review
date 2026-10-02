@@ -30,6 +30,8 @@ River Review helps you answer questions like:
 
 ⭐ If this helps your team's review workflow in AI-assisted development, please [Star the repo](https://github.com/s977043/river-review). It keeps you posted on updates and helps other teams with the same problem find River Review.
 
+For the problems River Review addresses, its design intent, and its relationship to PlanGate and Harness Engineering, see [Design philosophy](docs/philosophy.md).
+
 ## Why River Review?
 
 | Axis                    | Existing AI review tools | River Review                                                              |
@@ -83,19 +85,19 @@ The shortest no-install path is the bundled plugin: add the marketplace and ask 
 
 > **Two distribution channels: the bundled plugin (Claude Code / Codex) and GitHub Actions.** River Review is not published to npm (project policy). Contributors can run the CLI inside the repo with `npm run river -- ...` (to try it locally: `npm run river -- run . --dry-run`). The CLI is kept because it is also the GitHub Action's execution engine.
 
-| Goal                                    | Destination                                                                                |
-| --------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Try it in 5 minutes                     | [Quick start (GitHub Actions)](#quick-start-github-actions)                                |
-| Install as a Claude Code / Codex plugin | [Installing the plugin](#installing-the-river-review-plugin)                               |
-| Add to an existing repo                 | [Setup guide](https://river-review.the3396.com/guides/github-actions.en/)                  |
-| Start with a bundled Skill Pack         | [Using Skill Packs](pages/guides/use-skill-packs.en.md)                                    |
-| Create your first skill                 | [Skill tutorial](https://river-review.the3396.com/tutorials/creating-your-first-skill.en/) |
-| Estimate run cost                       | [Cost estimation guide](pages/guides/cost-estimation.en.md)                                |
-| Use W-check (double review)             | [W-check guide](pages/guides/w-check.en.md)                                                |
-| Use from an AI agent                    | [Agent workflow guide](pages/guides/agent-workflow.en.md)                                  |
-| Repo-wide aware review                  | [Repo-wide review guide](pages/guides/repo-wide-review.en.md)                              |
-| Understand the concept                  | [Concept page](https://river-review.the3396.com/explanation/concept-en/)                   |
-| Understand the design                   | [Architecture docs](https://river-review.the3396.com/explanation/river-architecture.en/)   |
+| Goal                                    | Destination                                                                                                                        |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Try it in 5 minutes                     | [Quick start (GitHub Actions)](#quick-start-github-actions)                                                                        |
+| Install as a Claude Code / Codex plugin | [Installing the plugin](#installing-the-river-review-plugin)                                                                       |
+| Add to an existing repo                 | [Setup guide](https://river-review.the3396.com/guides/github-actions.en/)                                                          |
+| Start with a bundled Skill Pack         | [Using Skill Packs](pages/guides/use-skill-packs.en.md)                                                                            |
+| Create your first skill                 | [Skill tutorial](https://river-review.the3396.com/tutorials/creating-your-first-skill.en/)                                         |
+| Estimate run cost                       | [Cost estimation guide](pages/guides/cost-estimation.en.md)                                                                        |
+| Use W-check (double review)             | [W-check guide](pages/guides/w-check.en.md)                                                                                        |
+| Use from an AI agent                    | [Agent workflow guide](pages/guides/agent-workflow.en.md)                                                                          |
+| Repo-wide aware review                  | [Repo-wide review guide](pages/guides/repo-wide-review.en.md)                                                                      |
+| Understand the concept                  | [Concept page](https://river-review.the3396.com/explanation/concept-en/)                                                           |
+| Understand the design                   | [Design philosophy](docs/philosophy.md) / [Architecture docs](https://river-review.the3396.com/explanation/river-architecture.en/) |
 
 See [docs/runbook/dev.md](docs/runbook/dev.md) for the development runbook. License details are at the [bottom of this file](#license).
 
@@ -140,64 +142,6 @@ Treat skills like CI jobs.
 Run cheap deterministic checks first. Run River Review only on the artifacts and skills that matter for the change. Start with a small official skill pack, then add repository-specific skills where human review cost or regression risk is high.
 
 Good skills should include fixtures and golden outputs so teams can measure whether the review signal is worth the runtime cost. With the Anthropic provider, prompt caching is applied automatically, and `RIVER_USAGE_TELEMETRY=1` persists usage as JSONL.
-
-<a id="philosophy"></a>
-
-## The Philosophy (Why we built it)
-
-> **We stopped believing "polish the prompt and you win."**
-
-The biggest barrier to production AI review is not prompt quality but repeatability of review findings and operating cost.
-River Review is not just a tool that lets an AI read code.
-
-We define team-specific judgment criteria and review procedures as reusable **Agent Skills (a toolbox with manuals)**, so they can be grown as durable organizational assets.
-
-🔗 **Read the full story (Japanese):**
-[「プロンプトを磨けば勝てる」をやめた：AIレビューを運用に乗せる“Agent Skills”設計](https://note.com/mine_unilabo/n/nd21c3f1df22e)
-
-## Flow story
-
-- **Upstream (design)**: ADR-aware checks keep architecture decisions aligned before code drifts.
-- **Midstream (implementation)**: style and maintainability guardrails guide everyday coding.
-- **Downstream (tests/QA)**: test-focused skills highlight coverage gaps and failure paths.
-- **Phase-aware routing**: skills are selected by `phase` and file metadata, so feedback matches where you are in the stream.
-
-## Positioning: artifact-driven review agent
-
-River Review is an **artifact-driven review agent**. It consumes externally supplied artifacts (`plan` / `diff` / `test-cases` / `junit`, etc.) and produces review results that include `findings`. The input contract is defined in the [Artifact Input Contract](pages/reference/artifact-input-contract.en.md), and the output schema in the [Review Artifact](pages/reference/review-artifact.en.md) reference.
-
-The primary integration today is with **PlanGate v6**: River Review receives `plan` / `pbi-input` artifacts produced by PlanGate and inspects them for design integrity and implementation conformance using dedicated skills.
-
-### Four use cases
-
-> **Note**: The `river review plan` and `river review exec` CLI commands are stable as of v0.53.0. `river review exec --plan` replay execution shipped in v0.68.0 (#935). The `river review verify` command is not yet implemented (placeholder only).
-
-- **Design review**: pass `pbi-input` / `plan` to check plan integrity and completeness with upstream skills (e.g. `skills/upstream/plangate-plan-integrity/`).
-- **Implementation review**: pass `plan` + `diff` to check that the code change matches the plan (e.g. `skills/upstream/plangate-exec-conformance/`).
-- **QA review**: pass `test-cases` / `junit` / `coverage` so downstream skills can surface coverage gaps and failure paths.
-- **Double-check (W-check)**: pass existing AI or human review output as `review-self` / `review-external` to review the review itself.
-
-### CLI examples
-
-See [`river review plan` CLI spec](pages/reference/cli-review-plan-spec.en.md) and [`river review exec` CLI spec](pages/reference/cli-review-exec-spec.en.md) for full details.
-
-This CLI is not published to npm; it is a surface for developers who cloned the repository and ran `npm install`. The entry points for users are the GitHub Action and the Claude Code / Codex plugins.
-
-```bash
-# Design review: inspect the plan alone
-river review plan --artifact plan=./artifacts/plan.md
-
-# Implementation review: check the diff against the plan
-river review exec \
-  --artifact plan=./artifacts/plan.md \
-  --artifact diff=./artifacts/diff.patch
-
-# QA review: add test-related artifacts
-river review exec \
-  --artifact diff=./artifacts/diff.patch \
-  --artifact test-cases=./artifacts/test-cases.md \
-  --artifact junit=./artifacts/junit.xml
-```
 
 ## Quick start (GitHub Actions)
 
