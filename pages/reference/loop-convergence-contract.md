@@ -27,9 +27,9 @@ Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](ht
 
 Issue #2441 以降は、最新 run の saved record にある `llmNotExecuted: true` も同じ降格の条件になります。これは全 unit が LLM を skip した run を表します（API key 未設定 / offline / dry-run / 未対応 provider）。この run は coverage を生成しないため、coverage による降格は効きません。それでも「blocking findings 0 件 + auto-approve」になるので、降格しないと caller は一度も意味的レビューを実行していない run を根拠にループを止めてしまいます。降格対象は coverage と同じく `CONVERGED` のみです。決定論的な検査が出した blocking finding による `REVISE_REQUIRED` などはそのまま返します。`llmNotExecuted` を持たない run record（#2441 より前の記録、または LLM に到達した run）は降格しません。coverage と同じく gate 側は opt-in で、後述の `RIVER_GATE_REQUIRE_LLM=1` を設定したときだけ止まります。
 
-この降格により、`partial` / `not_executed` の run では `CONVERGED` を根拠とした停止が起きなくなります。不完全な run が続く限りループは終わらないので、**caller は Layer 3 の `STOP_MAX_ITERATIONS` など上限側の停止条件を必ず併せて持ってください**。
+この降格により、`partial` / `not_executed` の run と `llmNotExecuted: true` の run では、`CONVERGED` を根拠とした停止が起きなくなります。API key を設定しない環境では Layer 2 の signal が毎回降格し、`CONVERGED` に戻りません。不完全な run が続く限りループは終わらないので、**caller は Layer 3 の `STOP_MAX_ITERATIONS` など上限側の停止条件を必ず併せて持ってください**。
 
-この降格が効く範囲は Layer 2 の signal だけです。artifact が `gate` ブロックを持つ場合、下記の参照実装は gate を signal より優先します。そのため既定では、Layer 1 由来の `GO` により `partial` の run でも停止しえます（#2337）。gate 側でも止めたい場合は、後述の `RIVER_GATE_COVERAGE=1` を有効にしてください。**Layer 2 の降格は既定で有効、gate 側の不完全性判定は opt-in** という非対称は意図したものです。
+この降格が効く範囲は Layer 2 の signal だけです。`river run` の artifact（Layer 1）の `suggestedLoopSignal` は降格しません。artifact が `gate` ブロックを持つ場合、下記の参照実装は gate を signal より優先します。そのため既定では、Layer 1 由来の `GO` により `partial` の run でも停止しえます（#2337）。gate 側でも止めたい場合は、後述の `RIVER_GATE_COVERAGE=1` を有効にしてください。**Layer 2 の降格は既定で有効、gate 側の不完全性判定は opt-in** という非対称は意図したものです。
 
 `oscillated` の判定側にも coverage の条件が入りました（PR #2365）。`oscillated` は present → absent → present という並びで検知しますが、この absent は「fingerprint がその run に無い」という測定でしかありません。reviewer がタイムアウトした run は finding を落とすため、完走した 2 つの run に挟まれた不完全な run 1 件だけで偽の振動が成立していました。そこで absent の run の coverage が `partial` / `not_executed` のときは、その absent を振動の根拠として数えません。coverage が `complete` または `unknown` の absent はこれまでどおり数えます。
 
