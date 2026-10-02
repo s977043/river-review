@@ -25,6 +25,8 @@ River Review は各アーティファクトおよび `runs diff --output json` �
 
 Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](https://github.com/s977043/river-review/blob/main/src/lib/review-coverage.mjs)）による qualification が入ります（PR #2335）。`river runs diff` の 2 run 経路と 3 run 以上の経路の両方が対象です。最新 run の coverage が `partial` または `not_executed` のとき、`CONVERGED` は `NO_SIGNAL` に降格します。レビュー単位がタイムアウトした run は「blocking findings 0 件 + auto-approve」という点で完走した run と区別がつかないため、そのまま `CONVERGED` を返すと caller は未完了のレビューを根拠にループを止めてしまいます。降格対象は `CONVERGED` のみで、他の値はもともと停止・受理の方向を示しません。`reviewCoverage` を持たない run record は `unknown` 扱いとし、降格しません（観測の欠落は不完全の観測ではないため）。
 
+Issue #2441 以降は、最新 run の saved record にある `llmNotExecuted: true` も同じ降格の条件になります。これは全 unit が LLM を skip した run を表します（API key 未設定 / offline / dry-run / 未対応 provider）。この run は coverage を生成しないため、coverage による降格は効きません。それでも「blocking findings 0 件 + auto-approve」になるので、降格しないと caller は一度も意味的レビューを実行していない run を根拠にループを止めてしまいます。降格対象は coverage と同じく `CONVERGED` のみです。決定論的な検査が出した blocking finding による `REVISE_REQUIRED` などはそのまま返します。`llmNotExecuted` を持たない run record（#2441 より前の記録、または LLM に到達した run）は降格しません。coverage と同じく gate 側は opt-in で、後述の `RIVER_GATE_REQUIRE_LLM=1` を設定したときだけ止まります。
+
 この降格により、`partial` / `not_executed` の run では `CONVERGED` を根拠とした停止が起きなくなります。不完全な run が続く限りループは終わらないので、**caller は Layer 3 の `STOP_MAX_ITERATIONS` など上限側の停止条件を必ず併せて持ってください**。
 
 この降格が効く範囲は Layer 2 の signal だけです。artifact が `gate` ブロックを持つ場合、下記の参照実装は gate を signal より優先します。そのため既定では、Layer 1 由来の `GO` により `partial` の run でも停止しえます（#2337）。gate 側でも止めたい場合は、後述の `RIVER_GATE_COVERAGE=1` を有効にしてください。**Layer 2 の降格は既定で有効、gate 側の不完全性判定は opt-in** という非対称は意図したものです。
@@ -69,6 +71,7 @@ Layer 2 ではさらに、最新 run の `reviewCoverage`（[Review Coverage](ht
     - dry-run / offline / API key 未設定などの意図的 skip は coverage を生成しない。#2436 以降は `--reviewers` でも、全 unit が skip した run は coverage を生成しない。skip と実行が混在した run では、skip した unit を `failed` と数える。「LLM を試して失敗した」と「そもそも実行しなかった」を同一視しないためである
     - 発火条件は `RIVER_GATE_COVERAGE=1` + `river run --gate` + 不完全な coverage 観測の 3 つであり、`--reviewers` を必須としない。GitHub Action では `gate: true` と step の `env` に `RIVER_GATE_COVERAGE=1` を設定する。`reviewers` input は複数 reviewer coverage が必要な場合だけ指定する
   - coverage が**存在しない**ことは不完全とは読まない。「観測が無い」と「欠落を観測した」は別の事実であり、マージを止めてよいのは後者だけである
+    - 「LLM を一度も実行しなかった」は coverage の欠落からは推定せず、別の観測 `llmNotExecuted` として記録する。Layer 2 の loop signal はこの観測を既定で読み、`CONVERGED` を `NO_SIGNAL` に降格する（#2441）。gate は既定では読まず、下記の `RIVER_GATE_REQUIRE_LLM=1` を設定したときだけ読む
   - `RIVER_GATE_REQUIRE_LLM=1`（#2441）: 全 unit が LLM を skip した run を `ESCALATE`（`LLM_NOT_EXECUTED`）へ倒す。skip の理由は API key 未設定 / offline / 未対応 provider である。単一 reviewer と `--reviewers` の両経路で同じ述語を使い、その事実は saved run の `llmNotExecuted: true` にも残る
     - dry-run は従来どおり `NO_GO`（`NOT_EXECUTED`）が優先する。`COVERAGE_INCOMPLETE` と `BLOCKING_FINDINGS` もこの規則より先に判定する。この規則は `GO` / `GO_WITH_OBSERVATION` を出しうる規則より前にある
     - offline も「LLM を実行していない」に含む。offline で Auto-approve 判定を再現したい場合は、この変数を設定しない

@@ -72,7 +72,9 @@ export function deriveLoopSignalFromArtifact(artifact) {
  *
  * The derived signal is then qualified by the latest run's `reviewCoverage`
  * (see `qualifyLoopSignalForCoverage`): a run that did not complete its planned
- * review work cannot report CONVERGED.
+ * review work cannot report CONVERGED. It is also qualified by the latest run's
+ * recorded `llmNotExecuted` (see `qualifyLoopSignalForLlmExecution`): a run in
+ * which no unit reached the LLM cannot report CONVERGED either.
  *
  * Otherwise, derives from the latest run's artifact:
  * 1. `latestArtifact` parameter (explicit, preferred for 2-run and multi-run CLI paths)
@@ -91,9 +93,12 @@ export function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
 
   // Prefer the explicitly passed latest artifact.
   if (latestArtifact != null && typeof latestArtifact === 'object') {
-    return qualifyLoopSignalForCoverage(
-      deriveLoopSignalFromArtifact(latestArtifact),
-      latestArtifact.reviewCoverage
+    return qualifyLoopSignalForLlmExecution(
+      qualifyLoopSignalForCoverage(
+        deriveLoopSignalFromArtifact(latestArtifact),
+        latestArtifact.reviewCoverage
+      ),
+      latestArtifact.llmNotExecuted
     );
   }
 
@@ -103,9 +108,12 @@ export function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
     const latest = runs[runs.length - 1];
     const embedded = latest?.artifact ?? latest;
     if (embedded && typeof embedded === 'object') {
-      return qualifyLoopSignalForCoverage(
-        deriveLoopSignalFromArtifact(embedded),
-        embedded.reviewCoverage ?? latest?.reviewCoverage
+      return qualifyLoopSignalForLlmExecution(
+        qualifyLoopSignalForCoverage(
+          deriveLoopSignalFromArtifact(embedded),
+          embedded.reviewCoverage ?? latest?.reviewCoverage
+        ),
+        embedded.llmNotExecuted ?? latest?.llmNotExecuted
       );
     }
   }
@@ -154,5 +162,36 @@ export function deriveLoopSignalFromRunsDiff(diff, latestArtifact) {
 export function qualifyLoopSignalForCoverage(signal, coverage) {
   if (signal !== 'CONVERGED') return signal;
   if (isIncompleteCoverage(coverage)) return 'NO_SIGNAL';
+  return signal;
+}
+
+/**
+ * Demote `CONVERGED` to `NO_SIGNAL` when no unit of the run reached the LLM
+ * (#2441): every generateReview call was intentionally skipped (missing key,
+ * offline, dry-run, unsupported provider), so the empty finding list is the
+ * absence of a semantic review, not a clean one.
+ *
+ * The input is the `llmNotExecuted` fact the saved run record carries
+ * (`buildRunRecord` in result-store.mjs, set from `allLlmAttemptsSkipped` in
+ * review-coverage.mjs). This function does not re-derive it.
+ *
+ * Only `CONVERGED` is qualified, for the same reason as
+ * `qualifyLoopSignalForCoverage`: the other signals already point away from
+ * "stop and accept". A record without the key (written before #2441, or by a
+ * run that did reach the LLM) keeps its signal.
+ *
+ * The in-run gate input (`deriveRunGate` in run-gate.mjs) is deliberately NOT
+ * routed through this function. In `deriveGateDecision` a NO_SIGNAL with an
+ * auto-approve decision lands on rule 9 (NO_GO), so demoting there would change
+ * the default gate and exit code. The gate side is the opt-in rule 7b
+ * (`RIVER_GATE_REQUIRE_LLM=1`).
+ *
+ * @param {string} signal  A signal from `deriveLoopSignalFromArtifact`.
+ * @param {unknown} llmNotExecuted  The run record's `llmNotExecuted` field.
+ * @returns {string} The qualified signal.
+ */
+export function qualifyLoopSignalForLlmExecution(signal, llmNotExecuted) {
+  if (signal !== 'CONVERGED') return signal;
+  if (llmNotExecuted === true) return 'NO_SIGNAL';
   return signal;
 }
