@@ -164,6 +164,13 @@ describe('require-LLM gate contract (#2441)', () => {
     );
   });
 
+  it('llmNotExecuted: true produces a distinct inputsHash', () => {
+    assert.notEqual(
+      deriveGateDecision({ ...clean, llmNotExecuted: true }).inputsHash,
+      deriveGateDecision(clean).inputsHash
+    );
+  });
+
   it('the opt-in is strict: only the exact string "1" turns it on', () => {
     for (const value of ['true', '0', ' 1', '', 'yes', undefined]) {
       assert.equal(isRequireLlmGateEnabled({ RIVER_GATE_REQUIRE_LLM: value }), false, `${value}`);
