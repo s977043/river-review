@@ -9,7 +9,11 @@ import {
 } from './finding-factory.mjs';
 import { buildLlmDiffView, renderDiffText } from './diff-processor.mjs';
 import { synthesizeTeamLeadReport } from './team-lead-synthesizer.mjs';
-import { classifyLlmAttempt, deriveReviewCoverage } from './review-coverage.mjs';
+import {
+  allLlmAttemptsSkipped,
+  classifyLlmAttempt,
+  deriveReviewCoverage,
+} from './review-coverage.mjs';
 // #2334 / #1978 Phase 3: Finding Critic の配線段。ADR-011 が前提として挙げた
 // 「findings のマージ後」がここであり、per-reviewer の generateReview 側は
 // deferFindingCritic で抑止して二重実行を避ける。既定 off。
@@ -887,7 +891,9 @@ export async function runReviewerOrchestration({
     const debug = task.value?.debug;
     return typeof debug?.llmUsed !== 'boolean' ? 'completed' : classifyLlmAttempt(debug);
   });
-  const allSkipped = llmAttempts.every((attempt) => attempt === null);
+  const allSkipped = allLlmAttemptsSkipped(
+    settled.map((task) => (task.status === 'fulfilled' ? task.value?.debug : undefined))
+  );
   const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
     const task = settled[taskIdx];
     const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
@@ -1024,6 +1030,8 @@ export async function runReviewerOrchestration({
     classified,
     reviewerResults,
     reviewCoverage,
+    // #2441: every role × chunk skipped the LLM; the run reviewed nothing.
+    llmNotExecuted: allSkipped,
     invalidRoles: invalid,
     autoSelectedRoles: reviewers?.length === 1 && reviewers[0] === 'auto' ? roles : null,
     // #1545 P1: explainable auto-selection — reasons per role, the always-on
