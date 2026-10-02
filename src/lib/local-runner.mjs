@@ -8,6 +8,7 @@ import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import {
   attachReviewFileScope,
   deriveReviewFileScope,
+  allLlmAttemptsSkipped,
   deriveSingleReviewerLlmCoverage,
 } from './review-coverage.mjs';
 import {
@@ -647,6 +648,12 @@ export async function runLocalReview({
         })
       : null);
 
+  // #2441: same predicate on both paths. Orchestration computes it over its
+  // role × chunk units; the single reviewer has one generateReview call.
+  const llmNotExecuted = reviewers?.length
+    ? review.llmNotExecuted === true
+    : allLlmAttemptsSkipped([review.debug]);
+
   // Slice C enriches an existing execution observation with the selection
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here.
@@ -710,6 +717,9 @@ export async function runLocalReview({
     // not run to a verdict (opt-in only; false unless double-gated). deriveRunGate
     // forwards this to deriveGateDecision → rule 5c ESCALATE.
     deterministicUnrunnable,
+    // #2441: no generateReview call reached the LLM. deriveRunGate reads it
+    // only under the RIVER_GATE_REQUIRE_LLM=1 opt-in.
+    llmNotExecuted,
     repoRoot: path.resolve(context.repoRoot),
     defaultBranch: context.defaultBranch,
     mergeBase: context.mergeBase,

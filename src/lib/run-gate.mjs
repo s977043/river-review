@@ -12,7 +12,11 @@
 
 import { scoreReview, resolveVerdict } from './scoring/engine.mjs';
 import { deriveLoopSignalFromArtifact } from './loop-signal.mjs';
-import { coverageIncompleteForGate, deriveGateDecision } from './gate-decision.mjs';
+import {
+  coverageIncompleteForGate,
+  deriveGateDecision,
+  llmNotExecutedForGate,
+} from './gate-decision.mjs';
 
 /**
  * True when reviewer-role orchestration ran but NOT ONE role produced a result
@@ -102,6 +106,8 @@ export function deriveRunGate(result) {
       // REQUIRED review unit is not a clean review. Reduced by the SSoT
       // predicate so this site and review-plan's gateContext cannot drift.
       coverageIncomplete: coverageIncompleteForGate(result.reviewCoverage, process.env),
+      // #2441 (opt-in RIVER_GATE_REQUIRE_LLM=1, default OFF).
+      llmNotExecuted: llmNotExecutedForGate(result.llmNotExecuted, process.env),
       config: result.config ?? {},
     });
   } catch {
