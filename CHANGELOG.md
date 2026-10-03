@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.125.0](https://github.com/s977043/river-review/compare/v1.124.5...v1.125.0) (2026-10-03)
+
+
+### Features
+
+* **gate:** add opt-in RIVER_GATE_REQUIRE_LLM to escalate runs that never reached the LLM ([#2441](https://github.com/s977043/river-review/issues/2441)) ([#2447](https://github.com/s977043/river-review/issues/2447)) ([da85b44](https://github.com/s977043/river-review/commit/da85b44e3219247cd2645ffdeb653fd4cbff7cb9))
+
+
+### Bug Fixes
+
+* **loop-signal:** report NO_SIGNAL for a run that never reached the LLM ([#2441](https://github.com/s977043/river-review/issues/2441)) ([#2462](https://github.com/s977043/river-review/issues/2462)) ([c202dd6](https://github.com/s977043/river-review/commit/c202dd6ea49c1e499570b0a669d334e6c4a38714))
+
 ## [1.124.5](https://github.com/s977043/river-review/compare/v1.124.4...v1.124.5) (2026-09-25)
 
 
