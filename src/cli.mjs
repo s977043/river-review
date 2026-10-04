@@ -128,6 +128,11 @@ Commands:
                         criteria. Never re-runs a review and never decides
                         adoption (--spec <file> --expect-manifest <id>;
                         --output json)
+  evolve verify-replay  Verify a detached independent-verifier attestation
+                        against an out-of-band trusted Ed25519 public key
+                        (#1574 P3 foundation). Read-only; never starts a canary
+                        or decides adoption (--replay <file> --attestation <file>
+                        --trusted-key <pem>; --output json)
   evolve prompt-compare <path>
                         Read-only paired comparison of the legacy prompt vs the
                         compiled prompt over saved observe-mode runs
@@ -634,6 +639,9 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--month',
   '--spec',
   '--expect-manifest',
+  '--replay',
+  '--attestation',
+  '--trusted-key',
   // shared / review
   '--plan-only',
   '--fail-on',
