@@ -59,6 +59,7 @@ module.exports = {
           type: 'category',
           label: 'スキルを扱う',
           items: [
+            'guides/starter-cookbook',
             'guides/choose-skills',
             'guides/use-skill-packs',
             'guides/representative-skills',

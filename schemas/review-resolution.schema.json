@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/review-resolution.schema.json",
+  "title": "River Review Review Resolution",
+  "description": "Experimental sidecar contract for tracking how humans/authors handle review findings and how those outcomes are verified on a later revision. Review Artifact remains immutable; this document does not own finding discovery, system disposition, gate decisions, merge authority, or canonical feedback.",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "resolutionId", "source", "items"],
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "artifactRef": {
+      "type": "object",
+      "required": ["name", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "revisionRef": {
+      "type": "object",
+      "required": ["reviewRunId", "executionManifestId", "artifactRefs"],
+      "additionalProperties": false,
+      "properties": {
+        "reviewRunId": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "executionManifestId": { "type": "string", "pattern": "^RR-EXM-[0-9a-f]{12}$" },
+        "artifactRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/artifactRef" }
+        }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "required": ["ref", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+      }
+    },
+    "sourceFindingRef": {
+      "type": "object",
+      "required": ["findingId", "reviewerId"],
+      "additionalProperties": false,
+      "properties": {
+        "findingId": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "reviewerId": { "type": "string", "minLength": 1, "maxLength": 300 }
+      }
+    },
+    "decisionRef": {
+      "type": "object",
+      "required": ["kind", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["adr", "pr", "issue", "external", "other"] },
+        "ref": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1" },
+    "kind": { "type": "string", "const": "review-resolution" },
+    "resolutionId": { "type": "string", "pattern": "^RR-RES-[A-Za-z0-9._:-]{1,200}$" },
+    "source": { "$ref": "#/$defs/revisionRef" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "findingRef",
+          "systemJudgment",
+          "authorResponse",
+          "resolution",
+          "verification"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "findingRef": {
+            "type": "object",
+            "required": ["findingId", "fingerprint", "fingerprintAlgo", "sources"],
+            "additionalProperties": false,
+            "properties": {
+              "findingId": { "type": "string", "minLength": 1, "maxLength": 300 },
+              "fingerprint": { "type": "string", "minLength": 1, "maxLength": 500 },
+              "fingerprintAlgo": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "sources": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/$defs/sourceFindingRef" }
+              }
+            }
+          },
+          "systemJudgment": {
+            "type": "object",
+            "required": ["disposition", "source"],
+            "additionalProperties": false,
+            "properties": {
+              "disposition": {
+                "type": "string",
+                "enum": ["blocking", "advisory", "suppressed", "unknown"]
+              },
+              "source": {
+                "type": "string",
+                "enum": ["semantic-precision", "legacy-policy", "unavailable"]
+              }
+            },
+            "description": "Read-only projection of the system-owned disposition. Review Resolution does not recompute it."
+          },
+          "authorResponse": {
+            "type": "object",
+            "required": ["state", "rationale"],
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "will_fix",
+                  "disputes",
+                  "accepts_risk",
+                  "postpones",
+                  "wont_fix",
+                  "escalates",
+                  "agrees_spec_decision"
+                ]
+              },
+              "rationale": { "type": ["string", "null"], "minLength": 1, "maxLength": 4000 }
+            }
+          },
+          "resolution": {
+            "type": "object",
+            "required": ["state", "target", "decisionRefs"],
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "action_submitted",
+                  "risk_accepted",
+                  "human_dismissed",
+                  "postponed",
+                  "decision_agreed",
+                  "needs_human"
+                ]
+              },
+              "target": { "anyOf": [{ "$ref": "#/$defs/revisionRef" }, { "type": "null" }] },
+              "decisionRefs": { "type": "array", "items": { "$ref": "#/$defs/decisionRef" } }
+            }
+          },
+          "verification": {
+            "type": "object",
+            "required": ["state", "verifier", "coverageStatus", "evidenceRefs"],
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "not_requested",
+                  "pending",
+                  "not_reproduced",
+                  "verified_resolved",
+                  "persists",
+                  "inconclusive"
+                ]
+              },
+              "verifier": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+              "coverageStatus": {
+                "type": "string",
+                "enum": ["complete", "partial", "not_executed", "unknown"]
+              },
+              "evidenceRefs": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

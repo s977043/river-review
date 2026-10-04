@@ -34,6 +34,29 @@ Harness Engineering は、エージェントに良い指示を与えるだけで
 
 この位置づけは、エージェント実行環境や開発 harness 全体を置き換えるという主張ではありません。River Review はレビューを読み取り専用で行い、コードを自動修正せず、承認・停止・マージの最終制御も引き受けません。
 
+### Harness 内での責務境界
+
+River Review では、外部の固定的な「N 層」を新しい taxonomy や owner table として導入しません。既存コンポーネントが Harness のどの責務を補強するかを説明する lens として、次のように整理します。
+
+| Harness の責務             | River Review が担う範囲                                                          | River Review が所有しないもの                                  |
+| -------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Capabilities               | repo-owned Skills、review agent、reviewer lens                                   | 汎用実装エージェントの能力全体                                 |
+| Context / steering         | diff、artifact、rules、memory の選択と review context 構築                       | プロジェクト全体の agent context / task planning               |
+| Coordination               | Review Team の role 選択、fan-out、finding merge                                 | project-wide agent orchestration、worker scheduling            |
+| State / memory             | Riverbed、saved run、review evidence                                             | 汎用 long-term agent memory の正本                             |
+| Evaluation / observability | fixtures、evals、Review Coverage、Evidence / provenance surface                  | 実装 agent 全体の observability platform                       |
+| Judgment / signals         | Review Judgment as Code、Judgment Placement、review verdict、Gate recommendation | project-wide task decision や不可逆な実行判断                  |
+| Enforcement adapter        | `--gate` / GitHub Action `gate:` による exit code / CI status への写像           | signal の意味変更、merge / release policy の正本               |
+| Execution authority        | none                                                                             | Host / Human が所有する merge / release / production promotion |
+
+この表は ownership を新設するものではありません。各 contract の正本は既存 schema / ADR / reference docs に置き、同じ artifact に値が入っていても責務を統合しません。
+
+### Agent Team Topology との関係
+
+Review Team は「誰がレビュー作業を行うか」という実行 topology です。一方、[Judgment Placement](../pages/explanation/judgment-placement.md) は「その判断を Deterministic / Heuristic / Agentic Review / Human Judgment のどこで実行するか」を決めます。さらに、承認・merge・release など不可逆な実行 authority は Host / Human に残します。
+
+したがって、River Review では **Role ≠ Judgment Placement ≠ Authority** を維持します。reviewer role の数や多数決で truth / authority を強めません。Evidence と Agent role の分離は [ADR-013](adr/013-evidence-architecture.md#relationship-to-agent-team-topology) に従います。
+
 ## PlanGate との関係
 
 River Review は PlanGate に依存せず、特定の計画手法も要求しません。artifact-based な入力契約により、plan がないチームは diff やテスト成果物から始められる。plan ゲートは利用できますが、verify ゲートの実行は現時点で未実装です。

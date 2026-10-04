@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { generateReview, resolveRedactOptions } from './review-engine.mjs';
 import { mergeConfig } from '../config/loader.mjs';
 import { defaultConfig } from '../config/default.mjs';
@@ -118,6 +119,22 @@ export const REVIEWER_TIMEOUT_ENV = 'RIVER_REVIEWER_TIMEOUT';
  * producing a zero-finding "clean" run.
  */
 export const REVIEWER_TIMEOUT_MAX_MS = 3_600_000;
+
+/**
+ * Host-assigned logical execution id for one reviewer role × chunk task.
+ *
+ * This is provenance only. It is not actor identity, a signature, a trust
+ * signal, or proof that two executions are independent in the #1760 sense.
+ */
+function defaultCreateReviewerExecutionId() {
+  return `reviewer-exec-${randomUUID()}`;
+}
+
+function normalizeReviewerExecutionId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized === '' ? null : normalized;
+}
 
 /** Error thrown when a reviewer role exceeds the per-role timeout. */
 export class ReviewerTimeoutError extends Error {
@@ -446,6 +463,14 @@ function computeConsensusLevel(agreement) {
   return 'single';
 }
 
+function addSourceExecutionIds(target, values) {
+  for (const executionId of Array.isArray(values) ? values : []) {
+    if (typeof executionId === 'string' && executionId.length > 0) {
+      target.add(executionId);
+    }
+  }
+}
+
 function maxSeverity(a, b) {
   const na = normalizeSeverity(a);
   const nb = normalizeSeverity(b);
@@ -545,6 +570,7 @@ export function findingsOverlap(a, b) {
  *   - severity = max of cluster (after normalization of blocker/warning/nit)
  *   - evidence = deduplicated union of all evidence arrays
  *   - agreement = array of all reviewerRole values in the cluster
+ *   - sourceExecutionIds = deduplicated union of reviewer execution provenance
  *   - scope = `in-diff` when any member is in-diff, else `pre-existing`
  *     (mergeScope; omitted when no member carried a scope)
  *   - mergedLineStarts = every line the cluster absorbed, ascending and
@@ -599,11 +625,15 @@ export function mergeFindings(findings) {
       const agreementSet = new Set(existingAgreement);
       if (role) agreementSet.add(role);
       const passthroughAgreement = [...agreementSet];
+      const sourceExecutionIdSet = new Set();
+      addSourceExecutionIds(sourceExecutionIdSet, canonical.sourceExecutionIds);
+      const sourceExecutionIds = [...sourceExecutionIdSet];
       return {
         ...canonical,
         severity: normalizeSeverity(canonical.severity),
         agreement: passthroughAgreement,
         consensusLevel: computeConsensusLevel(passthroughAgreement),
+        ...(sourceExecutionIds.length > 0 ? { sourceExecutionIds } : {}),
       };
     }
 
@@ -611,6 +641,8 @@ export function mergeFindings(findings) {
     let mergedSeverity = canonical.severity;
     const evidenceSet = new Set(Array.isArray(canonical.evidence) ? canonical.evidence : []);
     const agreementSet = new Set(Array.isArray(canonical.agreement) ? canonical.agreement : []);
+    const sourceExecutionIdSet = new Set();
+    addSourceExecutionIds(sourceExecutionIdSet, canonical.sourceExecutionIds);
     if (canonical.reviewerRole) agreementSet.add(canonical.reviewerRole);
 
     for (const idx of indices.slice(1)) {
@@ -618,6 +650,7 @@ export function mergeFindings(findings) {
       mergedSeverity = maxSeverity(mergedSeverity, m.severity);
       for (const e of Array.isArray(m.evidence) ? m.evidence : []) evidenceSet.add(e);
       for (const a of Array.isArray(m.agreement) ? m.agreement : []) agreementSet.add(a);
+      addSourceExecutionIds(sourceExecutionIdSet, m.sourceExecutionIds);
       if (m.reviewerRole) agreementSet.add(m.reviewerRole);
     }
 
@@ -630,6 +663,7 @@ export function mergeFindings(findings) {
       evidence: [...evidenceSet],
       agreement: mergedAgreement,
       consensusLevel: computeConsensusLevel(mergedAgreement),
+      ...(sourceExecutionIdSet.size > 0 ? { sourceExecutionIds: [...sourceExecutionIdSet] } : {}),
       // Only materialise `scope` when at least one member carried it. A cluster
       // where nobody classified the scope stays without the field — schema
       // readers already treat an absent scope as `in-diff`
@@ -696,11 +730,11 @@ function editDistance(a, b) {
 // `buildLlmDiffView` is the single source of truth for that view (it re-optimizes
 // the raw chunk alias, #2230), so routing through it keeps the ledger's
 // `excluded` and `units[].subjects` sets disjoint by construction.
-function reviewUnitSubjects(chunkDiff) {
+function reviewUnitSubjects(chunkDiff, phase) {
   const hadInputFiles =
     (Array.isArray(chunkDiff?.filesForReview) && chunkDiff.filesForReview.length > 0) ||
     (Array.isArray(chunkDiff?.files) && chunkDiff.files.length > 0);
-  const filePaths = (buildLlmDiffView(chunkDiff).files ?? [])
+  const filePaths = (buildLlmDiffView(chunkDiff, { phase }).files ?? [])
     .map((file) => file?.path)
     .filter((value) => typeof value === 'string');
   // Only fall back to `changedFiles` when the chunk carried no file objects at
@@ -757,6 +791,9 @@ export async function runReviewerOrchestration({
   progressSink,
   env = process.env,
   generateReviewImpl = generateReview,
+  // #2481: injectable host-side logical execution id producer. The id is
+  // assigned before the reviewer task starts and is observation-only.
+  createExecutionId = defaultCreateReviewerExecutionId,
 } = {}) {
   const {
     valid: roles,
@@ -821,8 +858,24 @@ export async function runReviewerOrchestration({
   // alongside the promises lets the per-role summary index into `settled`
   // directly instead of recomputing the role-per-task mapping.
   const taskDescriptors = roles.flatMap((roleName) =>
-    diffsToProcess.map((chunkDiff, chunkIdx) => ({ roleName, chunkDiff, chunkIdx }))
+    diffsToProcess.map((chunkDiff, chunkIdx) => {
+      const unitId = `reviewer:${roleName}/chunk:${chunkIdx + 1}`;
+      const executionId = normalizeReviewerExecutionId(
+        createExecutionId({ roleName, chunkIdx, unitId })
+      );
+      if (executionId === null) {
+        throw new Error(`Reviewer execution id is missing for ${unitId}`);
+      }
+      return { roleName, chunkDiff, chunkIdx, unitId, executionId };
+    })
   );
+  const executionIds = new Set();
+  for (const descriptor of taskDescriptors) {
+    if (executionIds.has(descriptor.executionId)) {
+      throw new Error(`Duplicate reviewer execution id: ${descriptor.executionId}`);
+    }
+    executionIds.add(descriptor.executionId);
+  }
   /** Per-task outcome, filled in by the progress handlers before allSettled resolves. */
   const taskOutcomes = taskDescriptors.map(() => ({ durationMs: null, timedOut: false }));
 
@@ -831,8 +884,10 @@ export async function runReviewerOrchestration({
 
   const orchestrationStartedAt = nowMs();
 
-  // Fan out: each role × each diff chunk runs in parallel
-  const tasks = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
+  // Fan out: each role × each diff chunk runs in parallel.
+  // executionId is assigned by the orchestrator before the task starts, so a
+  // failed/timed-out task still has provenance even when it returns no result.
+  const tasks = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx, executionId }, taskIdx) => {
     const role = REVIEWER_ROLES[roleName];
     const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
     const taskStartedAt = nowMs();
@@ -844,6 +899,7 @@ export async function runReviewerOrchestration({
     }).then((result) => ({
       ...result,
       reviewerRole: roleName,
+      executionId,
       chunkIdx: chunked ? chunkIdx : null,
       chunkLabel: chunked ? (chunkDiff._chunkLabel ?? `chunk-${chunkIdx}`) : null,
     }));
@@ -894,35 +950,38 @@ export async function runReviewerOrchestration({
   const allSkipped = allLlmAttemptsSkipped(
     settled.map((task) => (task.status === 'fulfilled' ? task.value?.debug : undefined))
   );
-  const reviewUnits = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx }, taskIdx) => {
-    const task = settled[taskIdx];
-    const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
-    // #2423: generateReview catches LLM transport / parse failures and still
-    // resolves, so a fulfilled task is completed only if the LLM did not fail.
-    const status =
-      task?.status === 'fulfilled'
-        ? llmAttempts[taskIdx] === 'completed'
-          ? 'completed'
-          : 'failed'
-        : timedOut
-          ? 'timed_out'
-          : 'failed';
-    return {
-      id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
-      kind: 'diff-chunk',
-      subjects: reviewUnitSubjects(chunkDiff),
-      reviewerRole: roleName,
-      required: requiredRoles.has(roleName),
-      status,
-      reasonCode:
-        status === 'completed'
-          ? null
-          : status === 'timed_out'
-            ? 'reviewer_timeout'
-            : 'reviewer_error',
-      findingsCount: status === 'completed' ? (task.value?.findings?.length ?? 0) : 0,
-    };
-  });
+  const reviewUnits = taskDescriptors.map(
+    ({ roleName, chunkDiff, unitId, executionId }, taskIdx) => {
+      const task = settled[taskIdx];
+      const timedOut = taskOutcomes[taskIdx]?.timedOut === true;
+      // #2423: generateReview catches LLM transport / parse failures and still
+      // resolves, so a fulfilled task is completed only if the LLM did not fail.
+      const status =
+        task?.status === 'fulfilled'
+          ? llmAttempts[taskIdx] === 'completed'
+            ? 'completed'
+            : 'failed'
+          : timedOut
+            ? 'timed_out'
+            : 'failed';
+      return {
+        id: unitId,
+        executionId,
+        kind: 'diff-chunk',
+        subjects: reviewUnitSubjects(chunkDiff, phase),
+        reviewerRole: roleName,
+        required: requiredRoles.has(roleName),
+        status,
+        reasonCode:
+          status === 'completed'
+            ? null
+            : status === 'timed_out'
+              ? 'reviewer_timeout'
+              : 'reviewer_error',
+        findingsCount: status === 'completed' ? (task.value?.findings?.length ?? 0) : 0,
+      };
+    }
+  );
   const reviewCoverage = allSkipped ? null : deriveReviewCoverage(reviewUnits);
 
   // Merge findings, deduplicate across chunks/roles, then assign stable IDs
@@ -932,6 +991,7 @@ export async function runReviewerOrchestration({
       ...f,
       reviewerRole: r.reviewerRole,
       chunkLabel: r.chunkLabel ?? null,
+      sourceExecutionIds: [r.executionId],
     }))
   );
   const deduped = mergeFindings(rawFindings);
@@ -957,7 +1017,7 @@ export async function runReviewerOrchestration({
         diff: renderDiffText(diff),
         plan,
         fileTypes,
-        diffFiles: buildLlmDiffView(diff).files,
+        diffFiles: buildLlmDiffView(diff, { phase }).files,
         originalAsk: prBody ?? '',
         reviewConfig: mergedConfig.review,
         llm: { apiKey, model },

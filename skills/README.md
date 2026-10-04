@@ -65,6 +65,30 @@ priority: 10
 - Include Non-goals and False-positive guards to control noise.
 ```
 
+## Progressive Disclosure and Context Health
+
+For Agent Skills under `skills/agent-skills/`, treat `SKILL.md` as the entrypoint, not as the complete knowledge base.
+
+Keep these in `SKILL.md` because they are needed to activate and execute the skill safely:
+
+- activation / when-to-use criteria
+- responsibility and scope boundaries
+- routing and delegation rules
+- hard safety or policy guards
+- output contract and required verification
+
+Move optional or situational material to `references/` and load it only when the task requires it:
+
+- long examples and counterexamples
+- troubleshooting and failure histories
+- detailed rationale and background
+- provider- or framework-specific notes
+- rare exceptions and deep operational guidance
+
+`npm run agent-skills:validate` reports a **warning-only** context-health advisory when an Agent Skill entrypoint exceeds either **12 KiB of UTF-8 text** or **250 lines**. These values are review signals, not correctness limits or token estimates. Exceeding them is allowed when the always-needed contract genuinely requires the space; document the reason in review instead of deleting hard guards or verification merely to satisfy the advisory.
+
+The validator intentionally uses deterministic bytes / lines rather than pretending to infer exact model token cost. Re-evaluate the thresholds from dogfood and paired evaluations before considering any hard gate. See #2372 and #2483.
+
 ## Creating a New Skill
 
 ### Using the Scaffolding Tool (Recommended)

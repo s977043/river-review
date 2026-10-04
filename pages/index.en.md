@@ -1,41 +1,89 @@
 ---
 id: index-en
-title: River Review docs (English)
+title: River Review
 ---
 
-[日本語版はこちら](/)—Japanese is the default and source of truth.
+**Turn review into an organizational judgment asset.**
 
-River Review documentation follows the [Diátaxis documentation framework](https://diataxis.fr/). English editions use the same filename with a `.en.md` suffix and may lag behind the Japanese originals.
+River Review is an OSS framework that codifies review standards as **versioned, repo-owned Skills** and applies the same team judgment from local Claude Code / Codex reviews through post-PR GitHub Actions checks.
 
-We group docs into four types:
+## River Review in 30 seconds
 
-- Tutorials—step-by-step lessons for new users
-- Guides—recipes for specific tasks
-- Reference—technical specifications, APIs, and schemas
-- Explanation—background, design decisions, and concepts
+```mermaid
+flowchart LR
+  S["repo-owned Skills<br/>team judgment"] --> L["Local<br/>Claude Code / Codex"]
+  S --> C["CI<br/>GitHub Actions"]
+  L --> P["Pull Request"]
+  P --> C
+  C --> H["Human Review<br/>final judgment"]
+```
 
-Docs live under `pages/` and are served at `/docs`. Diátaxis is expressed via directories; language is expressed via filenames:
+**Remove noise locally before the PR, then re-check the PR with shared team standards.**  
+AI produces findings and decision inputs; the caller or a human keeps ownership of GO / NO-GO and final approval.
 
-- `tutorials/getting-started.md` (ja) / `tutorials/getting-started.en.md` (en)
-- `guides/quickstart.md` / `guides/quickstart.en.md`
-- `reference/skill-schema-reference.md` / `reference/skill-schema-reference.en.md`
-- `explanation/riverbed-memory.md` / `explanation/riverbed-memory.en.md`
+- **Try River Review in five minutes**: [Quickstart](/guides/quickstart.en)
+- **Start from reusable review knowledge**: [Starter Cookbook](/guides/starter-cookbook.en)
+- **Run the pre-PR + post-PR two-stage pattern**: [Two-stage review gate](/guides/two-stage-review-gate.en)
+- **Compare with other AI review tools**: [AI code review comparison](/comparison/ai-code-review-tools-en/)
+- **Measure quality, regressions, and cost**: [Run store / regression](/guides/track-runs-and-regressions.en), [Cost estimation](/guides/cost-estimation.en), and [Dashboard](/dashboard)
+
+## Fastest trial
+
+### Claude Code
+
+```text
+/plugin marketplace add s977043/river-review
+/plugin install river-review@river-review-marketplace
+/reload-plugins
+/river-review:review-local
+```
+
+Normal plugin usage needs **no additional River Review LLM API key**. Claude Code's own model applies the Skills.
+
+### Codex
+
+```text
+codex plugin marketplace add s977043/river-review
+```
+
+After adding the marketplace, River Review's specialist review skills are available to Codex. See the [Quickstart](/guides/quickstart.en) for the full path.
+
+## What changes in practice
+
+A generic instruction such as "check error handling" can produce vague advice and leave the team to re-decide what matters. A River Review Skill carries **scope, evidence expectations, severity, and false-positive avoidance rules**.
+
+- **Make vague findings concrete**: `logging-observability` points to the changed location and returns a finding about swallowed errors, observability impact, and a concrete fix.
+- **Reduce review-lens drift**: fixture + golden output tests pin expected behavior and regression evals verify changes.
+- **Control low-value repetition**: confidence / severity / suppression memory / review coverage reduce noise.
+
+See [Representative Skills](/guides/representative-skills.en) for real fixtures and expected outputs.
+
+## Quality and operational capabilities available after adoption
+
+River Review already provides the following foundations for team use:
+
+- **Skill quality**: fixture + golden output tests, regression evals, and per-skill false-positive evaluation.
+- **Noise control**: severity (critical / major / minor / info), confidence, suppression memory, and review coverage.
+- **Multi-review synthesis**: consensus, Team Lead synthesis, and blind-spot reporting.
+- **Operational measurement**: Run store, regression comparison, usage telemetry, cost estimation, and dashboard views.
+- **Adoption evidence**: competitive comparison, known limitations, and FAQ.
+
+Start with existing Skills and measurement. Codify new team-specific judgment only after real usage shows a gap.
 
 ## Understand the concept
 
-- [Concept: turning review into an organizational judgment asset](./explanation/concept.en.md) — the problems, the core model, the review targets, the responsibility boundary, and the non-goals.
-- [Welcome to River Review](./explanation/intro.en.md) — a short introduction for first-time readers.
-- [What is River Review](./explanation/what-is-river-review.en.md) — a product overview covering features, usage, and the execution model.
+- [Concept: turning review into an organizational judgment asset](./explanation/concept.en.md)
+- [Welcome to River Review](./explanation/intro.en.md)
+- [What is River Review](./explanation/what-is-river-review.en.md)
+- [Human Judgment Focus](./explanation/human-judgment-focus.en.md)
 
-## Get started
+## Documentation structure
 
-- [Getting started with River Review](/tutorials/getting-started.en)
-- [Quickstart](/guides/quickstart.en)
+The official docs follow [Diátaxis](https://diataxis.fr/).
 
-## Advanced usage
+- **Tutorials**: step-by-step first success.
+- **Guides**: task-oriented procedures.
+- **Reference**: CLI, schemas, and output contracts.
+- **Explanation**: concepts and design decisions.
 
-- [W-check (double review)](/guides/w-check.en) — feed review results from other AI or human reviewers back in for re-verification, and check whether each finding is real.
-- [Repo-wide review](/guides/repo-wide-review.en) — how to adopt and tune a review that reads repository context around the changed files, not just the PR diff.
-- [Cost estimation and optimization](/guides/cost-estimation.en) — estimating monthly cost with `--estimate` and `--max-cost`, then validating the estimate against measured usage.
-- [Agent workflow (`--reviewers auto`)](/guides/agent-workflow.en) — choosing between the entry points that call River Review from an AI agent (CLI, sub-agent, `/review-local`).
-- [Independent review synthesis](/guides/use-independent-review-synthesis.en) — the synthesis pattern that merges several AI and human review results to support a merge decision.
+Japanese is the source of truth, with English companions in corresponding `.en.md` files. [日本語版はこちら](/).

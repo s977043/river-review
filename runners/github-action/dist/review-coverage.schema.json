@@ -69,6 +69,11 @@
       ],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Opaque logical execution id assigned by the orchestration host before this reviewer task starts. Observation-only provenance: it is not actor identity, a signature, a trust signal, or proof of independent verification."
+        },
         "kind": { "type": "string", "enum": ["diff-chunk"] },
         "subjects": {
           "type": "array",

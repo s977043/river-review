@@ -99,6 +99,27 @@ const ALLOWLIST_RE = new RegExp(
 const REPLACEMENT = (category) => `<REDACTED:${category}>`;
 
 /**
+ * Resolve the canonical redaction options from effective River Review config.
+ *
+ * This lives beside redactText so every artifact/debug producer can share the
+ * same option derivation without importing the higher-level review engine.
+ *
+ * @param {object} effectiveConfig merged config
+ * @returns {object}
+ */
+export function resolveRedactOptions(effectiveConfig) {
+  return {
+    allowlist: effectiveConfig?.security?.redact?.allowlist ?? [],
+    ...(effectiveConfig?.security?.redact?.entropyThreshold != null
+      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
+      : {}),
+    ...(effectiveConfig?.security?.redact?.categories?.highEntropy === false
+      ? { highEntropy: false }
+      : {}),
+  };
+}
+
+/**
  * Pattern categories. Order matters — more specific / longer alternatives
  * come first so they win over weaker patterns and don't get partly eaten by
  * the high-entropy fallback.

@@ -161,6 +161,7 @@
       "promote approve",
       "promote reject",
       "promote retarget",
+      "promote attach-replay",
       "promote template",
       "promote retire",
       "promote review-effectiveness"

@@ -46,6 +46,7 @@ Change only one major unit per proposal.
 Inspect:
 
 - current `SKILL.md`
+- current `SKILL.md` entrypoint size (UTF-8 bytes / lines) and whether optional knowledge is eagerly loaded
 - current supporting files
 - invocation settings
 - current examples
@@ -88,6 +89,7 @@ Classify failures into:
 - skipped verification
 - unnecessary tool use
 - high token or step cost
+- entrypoint context bloat / optional knowledge that should be progressively disclosed
 
 ## Phase 2.5: Pattern mismatch diagnosis
 
@@ -124,6 +126,8 @@ For each proposed change, output:
 
 Prefer the smallest useful change.
 
+For context-health failures, move optional examples, troubleshooting, rationale, rare exceptions, or provider-specific detail to supporting references before rewriting behavior. Keep activation, responsibility, routing, hard guards, output contracts, and required verification in the main entrypoint unless an eval proves a safer boundary. In River Review Agent Skills, inspect the warning-only 12 KiB / 250-line advisory from `npm run agent-skills:validate`; do not optimize to the number alone.
+
 ## Phase 4: Eval plan
 
 For the recommended next change, define:
@@ -155,6 +159,7 @@ Before finalizing, verify:
 - no hidden assumptions
 - no unverifiable claims
 - no changes that weaken safety or review steps
+- no context reduction that hides always-required routing, hard guards, output contracts, or verification
 - no new ambiguity in the description
 
 ## Output format

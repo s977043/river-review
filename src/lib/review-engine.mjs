@@ -18,7 +18,7 @@ import {
 import { isOfflineMode } from './utils.mjs';
 import { getReviewDepthConfig } from './review-plan-generator.mjs';
 import { buildRepoContextSection } from './repo-context.mjs';
-import { redactText } from './secret-redactor.mjs';
+import { redactText, resolveRedactOptions } from './secret-redactor.mjs';
 import { callChatCompletion } from './llm-pipeline.mjs';
 import { buildLlmDiffView, isGeneratedArtifactPath } from './diff-processor.mjs';
 // プロンプトの節生成は src/prompt/sections.mjs が SSoT。ADR-006 の Prompt
@@ -56,26 +56,8 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
 /**
  * スキル名のサニタイズ: Markdown インジェクション対策
  */
-/**
- * Redaction options for anything that leaves process memory (prompt previews,
- * artifact writes, Critic traces). The SSoT for the shape: every caller that
- * needs these options imports this rather than rebuilding the object, so a
- * second call site cannot quietly redact under different settings
- * (#2339 review, Minor 4).
- *
- * @param {object} effectiveConfig merged config
- */
-export function resolveRedactOptions(effectiveConfig) {
-  return {
-    allowlist: effectiveConfig?.security?.redact?.allowlist ?? [],
-    ...(effectiveConfig?.security?.redact?.entropyThreshold != null
-      ? { entropyThreshold: effectiveConfig.security.redact.entropyThreshold }
-      : {}),
-    ...(effectiveConfig?.security?.redact?.categories?.highEntropy === false
-      ? { highEntropy: false }
-      : {}),
-  };
-}
+// Backward-compatible internal export. The SSoT now lives with redactText.
+export { resolveRedactOptions };
 
 function sanitizeSkillName(name) {
   if (!name) return '';
@@ -463,7 +445,7 @@ export async function generateReview({
   // maps) from BOTH the diff body and the "Changed files" summary. `diff` itself
   // stays raw so heuristics/fallback below keep seeing every changed file
   // (#1543/#1547).
-  const llmDiff = buildLlmDiffView(diff);
+  const llmDiff = buildLlmDiffView(diff, { phase });
   const viewpointStage = await runReviewViewpointStage({
     reviewConfig: effectiveConfig.review,
     diff,

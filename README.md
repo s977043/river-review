@@ -87,19 +87,21 @@ River Review には、レビューに特化した 3 つの実行形態があり�
 
 > **配布は 2 チャネル: 同梱プラグイン（Claude Code / Codex）と GitHub Actions**。River Review は npm パッケージを公開しません（プロジェクト方針）。コントリビューターはリポジトリ内で `npm run river -- ...` として CLI を実行できます（ローカルで試すなら `npm run river -- run . --dry-run`）。CLI は GitHub Action の実行エンジンでもあるため維持されます。
 
-| やりたいこと                               | 行き先                                                                                                                  |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| 5分で試す                                  | [クイックスタート（GitHub Actions）](#クイックスタートgithub-actions)                                                   |
-| Claude Code / Codex プラグインとして入れる | [プラグインの導入](#river-review-プラグインの導入)                                                                      |
-| 既存リポジトリに導入する                   | [セットアップガイド](https://river-review.the3396.com/guides/github-actions/)                                           |
-| 梱包済み Skill Pack で始める               | [Skill Pack を使う](pages/guides/use-skill-packs.md)                                                                    |
-| スキルを1個作る                            | [スキル作成チュートリアル](https://river-review.the3396.com/tutorials/creating-your-first-skill/)                       |
-| コストを見積もる                           | [コスト見積もりガイド](pages/guides/cost-estimation.md)                                                                 |
-| W チェック（二重レビュー）を使う           | [W チェックガイド](pages/guides/w-check.md)                                                                             |
-| AI エージェントから使う                    | [エージェント連携ガイド](pages/guides/agent-workflow.md)                                                                |
-| リポジトリ全体を踏まえたレビュー           | [リポジトリ全体レビューガイド](pages/guides/repo-wide-review.md)                                                        |
-| コンセプトを理解する                       | [コンセプト解説](https://river-review.the3396.com/explanation/concept/)                                                 |
-| 設計思想を理解する                         | [設計思想](docs/philosophy.md) / [アーキテクチャ解説](https://river-review.the3396.com/explanation/river-architecture/) |
+| やりたいこと                               | 行き先                                                                                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 5分で試す                                  | [クイックスタート（plugin-first）](https://river-review.the3396.com/guides/quickstart/)                                   |
+| Claude Code / Codex プラグインとして入れる | [プラグインの導入](#river-review-プラグインの導入)                                                                        |
+| 既存リポジトリに導入する                   | [セットアップガイド](https://river-review.the3396.com/guides/github-actions/)                                             |
+| 梱包済み Skill Pack で始める               | [Skill Pack を使う](pages/guides/use-skill-packs.md)                                                                      |
+| 用途別の定番レビューから始める             | [Starter Cookbook](pages/guides/starter-cookbook.md)                                                                      |
+| スキルを1個作る                            | [スキル作成チュートリアル](https://river-review.the3396.com/tutorials/creating-your-first-skill/)                         |
+| コストを見積もる                           | [コスト見積もりガイド](pages/guides/cost-estimation.md)                                                                   |
+| W チェック（二重レビュー）を使う           | [W チェックガイド](pages/guides/w-check.md)                                                                               |
+| AI エージェントから使う                    | [エージェント連携ガイド](pages/guides/agent-workflow.md)                                                                  |
+| リポジトリ全体を踏まえたレビュー           | [リポジトリ全体レビューガイド](pages/guides/repo-wide-review.md)                                                          |
+| CLI でレビューを計画・実行する             | [review plan 仕様](pages/reference/cli-review-plan-spec.md) / [review exec 仕様](pages/reference/cli-review-exec-spec.md) |
+| コンセプトを理解する                       | [コンセプト解説](https://river-review.the3396.com/explanation/concept/)                                                   |
+| 設計思想を理解する                         | [設計思想](docs/philosophy.md) / [アーキテクチャ解説](https://river-review.the3396.com/explanation/river-architecture/)   |
 
 開発手順は [docs/runbook/dev.md](docs/runbook/dev.md) を参照してください。ライセンスは [本ファイル末尾](#ライセンス) に記載しています。
 
@@ -361,7 +363,7 @@ river-review は同一リポジトリ内のマーケットプレイスから Cla
    /plugin marketplace add s977043/river-review
    ```
 
-   再現可能なインストールが必要ならタグを固定: `/plugin marketplace add s977043/river-review@v1.14.0`。
+   再現可能なインストールが必要なら、利用時点の具体的なリリースタグへ固定してください。
 
 2. プラグインをインストール:
 
@@ -399,7 +401,7 @@ Codex も Claude Code と同じプラグインマーケットプレイスに対�
 codex plugin marketplace add s977043/river-review
 ```
 
-再現可能なインストールが必要ならタグを固定します: `codex plugin marketplace add s977043/river-review@v1.14.0`。
+再現可能なインストールが必要なら、利用時点の具体的なリリースタグへ固定してください。
 
 Codex は skills と interface メタデータをリポジトリ同梱の `.codex-plugin/plugin.json`（Codex ネイティブ manifest）から読み込みます。マーケットプレイス追加時に、専門レビュー skill（`river-review-code` / `-security` / `-performance` / `-architecture` / `-testing` / `adversarial-review` / `-docs`）がネイティブに登録されます。
 

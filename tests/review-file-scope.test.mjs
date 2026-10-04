@@ -160,6 +160,55 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
     assert.deepEqual(scope.excluded, []);
   });
 
+  it('keeps a Markdown-only diff reviewable in upstream phase (#2473)', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-review-upstream-markdown-',
+      changedFiles: {
+        'docs/adr/013-example.md': '# Evidence Architecture\n\nPhase 0 ADR\n',
+      },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const context = await planLocalReview({ cwd: dir, phase: 'upstream', dryRun: true });
+
+    assert.equal(context.status, 'ok');
+    assert.deepEqual(context.changedFiles, ['docs/adr/013-example.md']);
+    assert.match(context.diff.rawDiffText, /--- \/dev\/null/);
+    assert.match(context.diff.rawDiffText, /docs\/adr\/013-example\.md/);
+    assert.deepEqual(
+      context.diff.filesForReview.map((entry) => entry.path),
+      ['docs/adr/013-example.md']
+    );
+    assert.match(context.diff.diffText, /\+# Evidence Architecture/);
+    assert.deepEqual(context.reviewFileScope, {
+      selected: ['docs/adr/013-example.md'],
+      excluded: [],
+    });
+  });
+
+  it('preserves Markdown optimization outside upstream (#2473)', async (t) => {
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: 'river-review-midstream-markdown-',
+      initialFiles: {
+        'docs/notes.md': '# Before\n',
+      },
+      changedFiles: {
+        'docs/notes.md': '# After\n',
+      },
+    });
+    t.after(cleanup);
+    await runGit(['add', '.'], dir);
+
+    const context = await planLocalReview({ cwd: dir, phase: 'midstream', dryRun: true });
+
+    assert.equal(context.status, 'no-changes');
+    assert.deepEqual(context.reviewFileScope, {
+      selected: [],
+      excluded: [{ path: 'docs/notes.md', reasonCode: 'diff_optimization' }],
+    });
+  });
+
   it('propagates the file scope ledger on the no-changes path when every change is excluded', async (t) => {
     const { dir, cleanup } = await createTempGitRepo({
       prefix: 'river-review-file-scope-no-changes-',

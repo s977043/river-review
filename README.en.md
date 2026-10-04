@@ -30,7 +30,7 @@ River Review helps you answer questions like:
 
 ⭐ If this helps your team's review workflow in AI-assisted development, please [Star the repo](https://github.com/s977043/river-review). It keeps you posted on updates and helps other teams with the same problem find River Review.
 
-For the problems River Review addresses, its design intent, and its relationship to PlanGate and Harness Engineering, see [Design philosophy](docs/philosophy.md).
+For the problems River Review addresses, its design intent, and its relationship to PlanGate and Harness Engineering, see [Design philosophy (Japanese)](docs/philosophy.md).
 
 ## Why River Review?
 
@@ -85,19 +85,20 @@ The shortest no-install path is the bundled plugin: add the marketplace and ask 
 
 > **Two distribution channels: the bundled plugin (Claude Code / Codex) and GitHub Actions.** River Review is not published to npm (project policy). Contributors can run the CLI inside the repo with `npm run river -- ...` (to try it locally: `npm run river -- run . --dry-run`). The CLI is kept because it is also the GitHub Action's execution engine.
 
-| Goal                                    | Destination                                                                                                                        |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Try it in 5 minutes                     | [Quick start (GitHub Actions)](#quick-start-github-actions)                                                                        |
-| Install as a Claude Code / Codex plugin | [Installing the plugin](#installing-the-river-review-plugin)                                                                       |
-| Add to an existing repo                 | [Setup guide](https://river-review.the3396.com/guides/github-actions.en/)                                                          |
-| Start with a bundled Skill Pack         | [Using Skill Packs](pages/guides/use-skill-packs.en.md)                                                                            |
-| Create your first skill                 | [Skill tutorial](https://river-review.the3396.com/tutorials/creating-your-first-skill.en/)                                         |
-| Estimate run cost                       | [Cost estimation guide](pages/guides/cost-estimation.en.md)                                                                        |
-| Use W-check (double review)             | [W-check guide](pages/guides/w-check.en.md)                                                                                        |
-| Use from an AI agent                    | [Agent workflow guide](pages/guides/agent-workflow.en.md)                                                                          |
-| Repo-wide aware review                  | [Repo-wide review guide](pages/guides/repo-wide-review.en.md)                                                                      |
-| Understand the concept                  | [Concept page](https://river-review.the3396.com/explanation/concept-en/)                                                           |
-| Understand the design                   | [Design philosophy](docs/philosophy.md) / [Architecture docs](https://river-review.the3396.com/explanation/river-architecture.en/) |
+| Goal                                    | Destination                                                                                                                                   |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Try it in 5 minutes                     | [Quick start (GitHub Actions)](#quick-start-github-actions)                                                                                   |
+| Install as a Claude Code / Codex plugin | [Installing the plugin](#installing-the-river-review-plugin)                                                                                  |
+| Add to an existing repo                 | [Setup guide](https://river-review.the3396.com/guides/github-actions.en/)                                                                     |
+| Start with a bundled Skill Pack         | [Using Skill Packs](pages/guides/use-skill-packs.en.md)                                                                                       |
+| Create your first skill                 | [Skill tutorial](https://river-review.the3396.com/tutorials/creating-your-first-skill.en/)                                                    |
+| Estimate run cost                       | [Cost estimation guide](pages/guides/cost-estimation.en.md)                                                                                   |
+| Use W-check (double review)             | [W-check guide](pages/guides/w-check.en.md)                                                                                                   |
+| Use from an AI agent                    | [Agent workflow guide](pages/guides/agent-workflow.en.md)                                                                                     |
+| Repo-wide aware review                  | [Repo-wide review guide](pages/guides/repo-wide-review.en.md)                                                                                 |
+| Plan and run a review from the CLI      | [review plan spec](pages/reference/cli-review-plan-spec.en.md) / [review exec spec](pages/reference/cli-review-exec-spec.en.md)               |
+| Understand the concept                  | [Concept page](https://river-review.the3396.com/explanation/concept-en/)                                                                      |
+| Understand the design                   | [Design philosophy (Japanese)](docs/philosophy.md) / [Architecture docs](https://river-review.the3396.com/explanation/river-architecture.en/) |
 
 See [docs/runbook/dev.md](docs/runbook/dev.md) for the development runbook. License details are at the [bottom of this file](#license).
 
