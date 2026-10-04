@@ -119,6 +119,6 @@ Claude Code:
 - suppression の傾向: Run store / suppression analytics
 - false-positive: fixture / guard case / per-skill eval
 - 実行コスト: [コスト見積もりと最適化](./cost-estimation.md)
-- 全体傾向: [ダッシュボード](/dashboard)
+- 全体傾向: [ダッシュボード](../dashboard.md)
 
 これらの結果を見てから、Skill を増やすか、狭めるか、廃止するかを判断してください。
