@@ -8,9 +8,11 @@
 //   river evolve prompt-compare [<path>] [--output json|text]
 //   river evolve prompt-ab [<path>] [--output json|text]
 //
-// All four subcommands only READ. `aggregate` reads `.river/runs/` and
+// All five subcommands only READ. `aggregate` reads `.river/runs/` and
 // `.river/feedback/*.jsonl`; `replay` reads a single experiment spec file that
-// already contains the baseline and candidate runs; `prompt-compare` reads
+// already contains the baseline and candidate runs; `verify-replay` reads
+// an existing replay, detached attestation, and caller-supplied trusted public
+// key; `prompt-compare` reads
 // `.river/runs/` and pairs the legacy prompt against the compiled prompt from
 // the observe-mode records those runs already carry (ADR-006 / #1860) — it
 // never sends the compiled prompt anywhere. `prompt-ab` reads the same store but
@@ -113,8 +115,8 @@ function missingTargetPathError(targetPath, rawTarget, subcommand) {
  * Reject options that belong to another evolve subcommand (#1860 / #1880).
  *
  * Shared by `prompt-compare` and `prompt-ab`: both read the saved runs under
- * `.river/runs`, so `--spec` / `--expect-manifest` (replay) and `--min` /
- * `--month` (aggregate) would silently look honoured while changing nothing.
+ * `.river/runs`, so replay / verification / aggregate-only options would
+ * silently look honoured while changing nothing unless rejected here.
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} subcommand - the subcommand name to name in the message.
@@ -143,7 +145,7 @@ function misplacedStoreOptionError(parsed, subcommand) {
 }
 
 /**
- * Handle the `evolve` command (aggregate | replay | prompt-compare | prompt-ab).
+ * Handle the `evolve` command (aggregate | replay | verify-replay | prompt-compare | prompt-ab).
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} targetPath - resolved repo target path.
@@ -167,7 +169,7 @@ export async function runEvolveCommand(parsed, targetPath) {
     );
     return 1;
   }
-  // Neither subcommand has a yaml/html renderer; accepting the flag and silently
+  // Evolve subcommands have no yaml/html renderer; accepting the flag and silently
   // emitting text would misreport the format to a downstream consumer.
   const output = parsed.output ?? 'text';
   if (output !== 'text' && output !== 'json') {
