@@ -29,9 +29,9 @@ function baseName(path) {
   return parts[parts.length - 1];
 }
 
-function isExcludedFile(path) {
+function isExcludedFile(path, { includeMarkdown = false } = {}) {
   const ext = extension(path);
-  if (EXCLUDED_EXTENSIONS.has(ext)) return true;
+  if (!includeMarkdown && EXCLUDED_EXTENSIONS.has(ext)) return true;
   if (EXCLUDED_FILES.has(baseName(path))) return true;
   if (EXCLUDED_DIR_RE.test(path)) return true;
   return false;
@@ -98,14 +98,15 @@ function compressHunkLines(lines) {
 /**
  * Filter and compress parsed diff files.
  * @param {{files: Array<{path: string, hunks: Array<{header: string, lines: string[]}>}>, diffText?: string}} diff
+ * @param {{includeMarkdown?: boolean}} [options]
  * @returns {{files: Array, diffText: string, tokenEstimate: number, reduction: number, rawTokenEstimate: number}}
  */
-export function optimizeDiff(diff) {
+export function optimizeDiff(diff, { includeMarkdown = false } = {}) {
   const rawTokenEstimate = Math.ceil((diff.diffText ?? '').length / 4);
   const optimizedFiles = [];
 
   for (const file of diff.files ?? []) {
-    if (isExcludedFile(file.path)) continue;
+    if (isExcludedFile(file.path, { includeMarkdown })) continue;
 
     const keptHunks = [];
     for (const hunk of file.hunks ?? []) {
@@ -161,17 +162,33 @@ export function optimizeDiff(diff) {
  *    re-rendered only when a file was actually excluded, so the common
  *    no-artifact case passes the caller's `diffText` through unchanged.
  *
- * @param {{files?: Array, filesForReview?: Array, diffText?: string}} diff
+ * @param {{files?: Array, filesForReview?: Array, rawDiffText?: string, diffText?: string}} diff
+ * @param {{phase?: string}} [options]
  * @returns {{files: Array, diffText: string}}
  */
-export function buildLlmDiffView(diff) {
+export function buildLlmDiffView(diff, { phase } = {}) {
+  const includeMarkdown = phase === 'upstream';
+
   if (Array.isArray(diff?.filesForReview)) {
     const isRawChunkAlias = Array.isArray(diff?.files) && diff.filesForReview === diff.files;
-    if (isRawChunkAlias) {
-      const optimized = optimizeDiff({
-        files: diff.filesForReview,
-        diffText: diff.diffText ?? renderDiffText(diff.filesForReview),
-      });
+    // A precomputed default view may already have removed Markdown. Upstream
+    // reviews intentionally inspect ADR / requirements / specs Markdown, so
+    // rebuild from the raw files for that phase instead of trusting an
+    // optimization computed without phase context (#2473).
+    if (isRawChunkAlias || includeMarkdown) {
+      const sourceFiles =
+        includeMarkdown && Array.isArray(diff?.files) ? diff.files : diff.filesForReview;
+      const sourceDiffText =
+        includeMarkdown && typeof diff?.rawDiffText === 'string'
+          ? diff.rawDiffText
+          : (diff.diffText ?? renderDiffText(sourceFiles));
+      const optimized = optimizeDiff(
+        {
+          files: sourceFiles,
+          diffText: sourceDiffText,
+        },
+        { includeMarkdown }
+      );
       return { files: optimized.files, diffText: optimized.diffText };
     }
     return {
@@ -180,7 +197,9 @@ export function buildLlmDiffView(diff) {
     };
   }
   const rawFiles = Array.isArray(diff?.files) ? diff.files : [];
-  const files = rawFiles.filter((file) => !isExcludedFile(file?.path ?? ''));
+  const files = rawFiles.filter((file) =>
+    !isExcludedFile(file?.path ?? '', { includeMarkdown })
+  );
   const diffText =
     files.length === rawFiles.length
       ? (diff?.diffText ?? renderDiffText(files))
