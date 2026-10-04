@@ -1,8 +1,6 @@
 ---
-title: Starter Cookbook
+title: Starter Cookbook — start from existing review knowledge
 ---
-
-# Starter Cookbook — start from existing review knowledge
 
 You do not need to author custom Skills on day one. Start with bundled specialist review skills and existing repo-owned Skills, then **add only the judgment that real usage proves is missing**.
 
