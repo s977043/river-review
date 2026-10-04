@@ -68,7 +68,13 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["findingRef", "systemJudgment", "authorResponse", "resolution", "verification"],
+        "required": [
+          "findingRef",
+          "systemJudgment",
+          "authorResponse",
+          "resolution",
+          "verification"
+        ],
         "additionalProperties": false,
         "properties": {
           "findingRef": {
