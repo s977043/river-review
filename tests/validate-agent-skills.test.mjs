@@ -61,9 +61,7 @@ test('context health measures UTF-8 bytes instead of character count', () => {
 
 test('context health byte budget warns only after the advisory threshold', () => {
   const atBudget = assessAgentSkillContextHealth('a'.repeat(AGENT_SKILL_CONTEXT_WARN_BYTES));
-  const overBudget = assessAgentSkillContextHealth(
-    'a'.repeat(AGENT_SKILL_CONTEXT_WARN_BYTES + 1)
-  );
+  const overBudget = assessAgentSkillContextHealth('a'.repeat(AGENT_SKILL_CONTEXT_WARN_BYTES + 1));
 
   assert.equal(atBudget.exceedsBytes, false);
   assert.equal(atBudget.shouldWarn, false);
