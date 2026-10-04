@@ -25,7 +25,7 @@ one pull request
 file / role / chunk 単位の execution coverage は、これらの「意味上の論点」を直接表現しない。
 大きな diff では、一部の変更だけが深く調査されても、semantic blind spot を review planning の時点で明示しにくい。
 
-`akkie76/code-review-skills` の review workflow は、詳細レビューの前に complete diff から change map を作り、変更を independently reviewable な concern へ分解する。
+`akkie76/code-review-skills` v0.1.0-beta.2（2026-10-04、release commit `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8`）の review workflow は、詳細レビューの前に complete diff から change map を作り、変更を independently reviewable な concern へ分解する。
 同 workflow は changed lines だけでなく caller / consumer / shared contract を追跡し、複数 concern がある場合は concern ごとの review depth と interaction を確認する。
 
 River Review には後段の能力の多くが既に存在する。
@@ -146,7 +146,11 @@ concerns:
       - src/auth/session.ts
       - src/auth/token.ts
     affectedSubjects:
-      - src/api/session-controller.ts
+      - path: src/api/session-controller.ts
+        evidenceRefs:
+          - path: src/api/session-controller.ts
+            lineStart: 42
+            lineEnd: 68
     evidenceRefs:
       - path: src/auth/session.ts
         lineStart: 20
@@ -159,8 +163,16 @@ analysis:
   limitations: []
 ```
 
-`affectedSubjects` は、caller / consumer / shared contract を実際に確認できた場合だけ追加する。
+`affectedSubjects` は、caller / consumer / shared contract を実際に確認できた場合だけ追加する。各 affected subject は、その対象を affected と判断した inspected evidence へ追跡できる形を Phase 1 schema で要求する。
 推測だけで repository-wide impact を断定しない。
+
+`analysis.status` の意味は execution / input completeness に限定する。
+
+- `completed`: analyzer が契約上供給された対象入力の処理を完了した
+- `partial`: input budget、tooling、dynamic dispatch 等により調査が不完全
+- `failed`: usable な Concern Map を生成できなかった
+
+`completed` は「全 concern を発見した」という semantic completeness を意味しない。
 
 この ADR は schema file の追加を承認しない。
 上記は Phase 1 PoC の design contract である。
@@ -378,6 +390,39 @@ Rejected.
 Rejected.
 外部 repository の更新追従と River Review 固有 contract の二重管理が必要になる。
 
+## Codify-then-validate
+
+本 ADR が追加する Review Concern 規約について、AGENTS.md の self-review 条件を次のように満たす。
+
+### 失敗・誤適用シナリオ
+
+1. **過分割**: 1つの coherent change を test / docs / implementation のファイル種別ごとに別 concern として水増しする。
+2. **入力欠落**: Diff Optimizer が落とした changed file を analyzer が知らず、存在する concern を「無い」と扱う。
+3. **過大な影響主張**: dynamic dispatch / external consumer を列挙できないのに、affected surface を exhaustive と断定する。
+
+これらはそれぞれ、Concern 定義、raw changed-file manifest、`partial + limitations` / evidence-backed affectedSubjects で防ぐ。
+
+### Reopen / exception condition
+
+次の場合は本判断を再検討できる。
+
+- paired evaluation で semantic blind spot / downstream finding quality の改善が確認できない
+- token / latency cost が改善量に見合わない
+- deterministic planning だけで同等以上の obligation recall を達成できる
+- Concern Map の非決定性が human correction burden を増やす
+
+この場合、Concern Map を runtime routing へ昇格させず analysis/debug-only に留めるか、PoC 自体を廃止する。
+
+### Soft-violation / gray zone
+
+次は機械的に1つの正解へ固定しない。
+
+- auth lifecycle と session persistence を1 concernにするか、2 interacting concernsにするか
+- migration と application change が1つの rollout concernか、独立 concernsか
+- docs / tests / config が supporting artifactか、独立 operational / contract concernか
+
+評価は exact partition match ではなく must-detect review obligation と downstream review quality を優先する。
+
 ## Follow-up
 
 Phase 0 の current-source gap analysis は `docs/development/2455-phase0-gap-analysis.md` に記録する。
@@ -401,4 +446,5 @@ Phase 1 では runtime / schema 変更を一度に広げず、explicit opt-in �
 - `docs/development/review-coverage-contract.md`
 - `docs/development/review-mode-router-design.md`
 - `pages/reference/artifact-input-contract.md`
-- https://github.com/akkie76/code-review-skills
+- https://github.com/akkie76/code-review-skills/releases/tag/v0.1.0-beta.2
+- https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/workflow.md
