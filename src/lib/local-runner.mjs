@@ -5,6 +5,7 @@ import { hasSelection, resolveSelectionSkillIds } from './selection.mjs';
 import { buildLlmDiffView, collectRepoDiff, renderDiffText } from './diff-processor.mjs';
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
+import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
 import {
   attachReviewFileScope,
   deriveReviewFileScope,
@@ -249,6 +250,7 @@ async function collectLocalContext({
     commitSha,
     dirty,
     diff,
+    rawChangedFiles: rawDiff.changedFiles ?? [],
     reviewFiles,
     reviewFileScope,
     availableContexts: contexts,
@@ -301,6 +303,7 @@ export async function planLocalReview({
     commitSha,
     dirty,
     diff,
+    rawChangedFiles,
     reviewFiles,
     reviewFileScope,
     availableContexts: contexts,
@@ -368,6 +371,7 @@ export async function planLocalReview({
       dirty,
       projectRules,
       diff,
+      rawChangedFiles,
       reviewFileScope,
       availableContexts: contexts,
       availableDependencies: dependencies,
@@ -429,6 +433,7 @@ export async function planLocalReview({
     commitSha,
     dirty,
     changedFiles: reviewFiles,
+    rawChangedFiles,
     plan: augmentedPlan,
     diff,
     reviewFileScope,
@@ -442,6 +447,55 @@ export async function planLocalReview({
     configPath,
     configSource,
   };
+}
+
+function hasChangedProjectRules(rawChangedFiles = []) {
+  return rawChangedFiles.some(
+    (filePath) =>
+      filePath === '.river/rules.md' ||
+      filePath.startsWith('.river/rules.d/')
+  );
+}
+
+function resolveRawChangedFilesFromContext(context = {}) {
+  if (Array.isArray(context.rawChangedFiles) && context.rawChangedFiles.length > 0) {
+    return context.rawChangedFiles;
+  }
+  return [
+    ...(context.reviewFileScope?.selected ?? []),
+    ...(context.reviewFileScope?.excluded ?? []).map((entry) => entry.path),
+  ];
+}
+
+async function observeReviewConcerns({
+  context,
+  dryRun,
+  phase,
+  model,
+  apiKey,
+  repoContext = null,
+}) {
+  const rawChangedFiles = resolveRawChangedFilesFromContext(context);
+  if (rawChangedFiles.length === 0) return null;
+
+  const projectRulesTrusted = !hasChangedProjectRules(rawChangedFiles);
+
+  return runReviewConcernAnalyzer({
+    dryRun,
+    phase: normalizePhase(phase),
+    mergeBase: context.mergeBase,
+    commitSha: context.commitSha ?? null,
+    dirty: context.dirty ?? null,
+    rawChangedFiles,
+    reviewFileScope: context.reviewFileScope ?? null,
+    rawDiffText: context.diff?.rawDiffText ?? context.diff?.diffText ?? '',
+    projectRules: context.projectRules ?? '',
+    projectRulesTrusted,
+    repoContext,
+    model,
+    apiKey,
+    config: context.config ?? {},
+  });
 }
 
 /**
@@ -579,6 +633,16 @@ export async function runLocalReview({
       manualReviewMode,
     }));
   if (context.status === 'no-changes') {
+    // A raw change can become "no-changes" after the LLM diff optimizer drops
+    // every file. #2455 must still be able to observe that semantic surface,
+    // without changing the legacy no-changes status or any Gate behavior.
+    const reviewConcernMap = await observeReviewConcerns({
+      context,
+      dryRun,
+      phase,
+      model,
+      apiKey,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -586,6 +650,7 @@ export async function runLocalReview({
       mergeBase: context.mergeBase,
       commitSha: context.commitSha ?? null,
       dirty: context.dirty ?? null,
+      ...(reviewConcernMap ? { reviewDebug: { reviewConcernMap } } : {}),
       config: context.config,
       configPath: context.configPath,
       configSource: context.configSource,
@@ -623,6 +688,19 @@ export async function runLocalReview({
     security: context.config?.security,
     context: context.config?.context,
   }).catch(() => null);
+
+  // #2455 Phase 1: observe-only semantic change decomposition.
+  // This result is deliberately NOT passed into reviewArgs, routing, Gate, or
+  // reviewer selection. It is debug/run-record evidence only until paired
+  // evaluation justifies promotion.
+  const reviewConcernMap = await observeReviewConcerns({
+    context,
+    dryRun,
+    phase,
+    model,
+    apiKey,
+    repoContext,
+  });
 
   const reviewArgs = {
     diff: context.diff,
@@ -766,6 +844,7 @@ export async function runLocalReview({
     prompt: review.prompt,
     reviewDebug: {
       ...(review.debug ?? {}),
+      ...(reviewConcernMap ? { reviewConcernMap } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
