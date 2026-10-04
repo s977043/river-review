@@ -146,7 +146,8 @@ export function validateReviewResolutionSemantics(document) {
     const prefix = `items[${index}]`;
     const fingerprint = item?.findingRef?.fingerprint;
     const algo = item?.findingRef?.fingerprintAlgo;
-    const key =\n      nonEmptyString(fingerprint) && nonEmptyString(algo) ? `${algo}:${fingerprint}` : null;
+    const key =
+      nonEmptyString(fingerprint) && nonEmptyString(algo) ? `${algo}:${fingerprint}` : null;
     if (key && fingerprints.has(key)) {
       errors.push(`${prefix} duplicates finding fingerprint ${key}`);
     }
