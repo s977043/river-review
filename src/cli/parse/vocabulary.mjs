@@ -33,6 +33,7 @@ export const PROMOTE_ID_SUBCOMMANDS = new Set([
   'approve',
   'reject',
   'retarget',
+  'attach-replay',
   'template',
   'review-effectiveness',
 ]);
