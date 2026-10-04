@@ -119,6 +119,36 @@ describe('applyPromotionReplayAttachment', () => {
     );
   });
 
+  test('attaches negative replay observations without turning G2 into an adoption gate', () => {
+    const entry = makeCandidate();
+    const base = makeReplay();
+    const replay = {
+      ...base,
+      activationCheck: { verified: false },
+      metrics: { overall: { criticalRegressionCount: 2 } },
+      promotionHandoff: {
+        ...base.promotionHandoff,
+        activationVerified: false,
+        activationReasons: ['candidate path did not activate'],
+        criticalRegressionCount: 2,
+        overallCriticalRegressionCount: 2,
+      },
+    };
+
+    const result = applyPromotionReplayAttachment(entry, {
+      replay,
+      approver: 'alice',
+      reason: 'retain failed experiment as evidence',
+      now: ATTACHED_AT,
+    });
+
+    assert.equal(result.changed, true);
+    assert.equal(result.record.handoff.activationVerified, false);
+    assert.equal(result.record.handoff.overallCriticalRegressionCount, 2);
+    assert.equal(entry.context.promotionCandidate.promotionStatus, 'candidate');
+    assert.equal(entry.context.approval, undefined);
+  });
+
   test('same manifestHash is idempotent', () => {
     const entry = makeCandidate();
     const opts = {
