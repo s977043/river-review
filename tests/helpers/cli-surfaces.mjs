@@ -32,6 +32,7 @@ export const PROMOTE_SUBCOMMANDS = [
   'approve',
   'reject',
   'retarget',
+  'attach-replay',
   'template',
   'retire',
   'review-effectiveness',
