@@ -87,10 +87,11 @@ The shortest no-install path is the bundled plugin: add the marketplace and ask 
 
 | Goal                                    | Destination                                                                                                                                   |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Try it in 5 minutes                     | [Quick start (GitHub Actions)](#quick-start-github-actions)                                                                                   |
+| Try it in 5 minutes                     | [Plugin-first Quickstart](https://river-review.the3396.com/guides/quickstart-en/)                                                              |
 | Install as a Claude Code / Codex plugin | [Installing the plugin](#installing-the-river-review-plugin)                                                                                  |
 | Add to an existing repo                 | [Setup guide](https://river-review.the3396.com/guides/github-actions.en/)                                                                     |
 | Start with a bundled Skill Pack         | [Using Skill Packs](pages/guides/use-skill-packs.en.md)                                                                                       |
+| Start from use-case recipes             | [Starter Cookbook](pages/guides/starter-cookbook.en.md)                                                                                       |
 | Create your first skill                 | [Skill tutorial](https://river-review.the3396.com/tutorials/creating-your-first-skill.en/)                                                    |
 | Estimate run cost                       | [Cost estimation guide](pages/guides/cost-estimation.en.md)                                                                                   |
 | Use W-check (double review)             | [W-check guide](pages/guides/w-check.en.md)                                                                                                   |
@@ -255,7 +256,7 @@ river-review ships as a Claude Code plugin from a same-repo marketplace.
    /plugin marketplace add s977043/river-review
    ```
 
-   Pin to a tag if you want reproducible installs: `/plugin marketplace add s977043/river-review@v1.14.0`.
+   For reproducible installs, pin the marketplace to a concrete release tag available at adoption time.
 
 2. Install the plugin:
 
@@ -293,7 +294,7 @@ Codex also supports the same plugin marketplace. Both tools share the same `.cla
 codex plugin marketplace add s977043/river-review
 ```
 
-Pin to a tag if you want reproducible installs: `codex plugin marketplace add s977043/river-review@v1.14.0`.
+For reproducible installs, pin the marketplace to a concrete release tag available at adoption time.
 
 Codex reads its skills and interface metadata from the repo's `.codex-plugin/plugin.json` (the Codex-native manifest). Adding the marketplace natively registers the specialist review skills (`river-review-code` / `-security` / `-performance` / `-architecture` / `-testing` / `adversarial-review` / `-docs`).
 
