@@ -224,6 +224,26 @@ Derived projections     Advisory signals
 - **Trust / integrity:** execution observationでありsemantic correctnessではありません。
 - **Authority:** none。
 
+### E3 — `deterministicUnrunnable`
+
+- **Evidence reference:** `src/lib/deterministic-command-orchestrator.mjs`、`src/lib/run-gate.mjs::deriveRunGate`、`src/lib/gate-decision.mjs::deriveGateDecision`、`pages/reference/loop-convergence-contract.md`。
+- **Runtime path:** deterministic execution gate → `river run --gate` / Gate derivation。
+- **Producer / owner:** deterministic command orchestratorがstaging incompletenessを観測し、run gateがGate inputへ渡します。
+- **Runtime availability:** opt-in。
+- **Activation / default:** `RIVER_GATE_STAGING_UNRUNNABLE=1` のときだけstaging incompleteを `deterministicUnrunnable: true` としてGateへ持ち込みます。既定はoffです。
+- **Stability / compatibility:** Gateの独立入力です。Review Coverage vocabularyへ統合しません。
+- **Source of truth / persistence:** runtime Gate input。`strictBlock` とは別fieldです。
+- **Transformation / lineage:** staging incomplete observation → boolean Gate input → `ESCALATE / DETERMINISTIC_UNRUNNABLE`。
+- **Observed or derived:** execution incompleteness observation。
+- **Consumer:** deterministic Gate derivation。
+- **Missing semantics:** false / absentを「deterministic checkが完全に実行された証明」として一般化しません。opt-inがoffならGateへ持ち込まれないためです。
+- **Failure behavior:** empty / incomplete sandboxのchecker exit 0を変更へのPASSとして扱わず、opt-in時は `ESCALATE` へ倒します。
+- **Failure visibility:** Gate `reasonCode=DETERMINISTIC_UNRUNNABLE`。
+- **Human surface / fallback:** Gate / Decision Surface / L3 inputs。
+- **Gate relationship:** independent Gate input。`strictBlock` や Review Coverageへfoldしません。
+- **Trust / integrity:** staging observationの完全性に依存します。
+- **Authority:** none。
+
 ### P1 — Review Artifact `trace.run_id`
 
 - **Evidence reference:** `schemas/review-artifact.schema.json::trace.run_id`。
@@ -272,10 +292,10 @@ Derived projections     Advisory signals
 - **Activation / default:** supported pathがmanifest specをbuildできる場合。
 - **Stability / compatibility:** Experimental。
 - **Source of truth / persistence:** `executionManifest` block + separate schema。
-- **Transformation / lineage:** resolved execution inputs → canonicalized manifest + hashes。
-- **Observed or derived:** execution provenance / replayability metadata。
+- **Transformation / lineage:** resolved execution inputs → canonicalized manifest + hashes。`review plan` / `review exec` のproduction testでは `manifest.reviewRunId === artifact.trace.run_id` を固定しています。
+- **Observed or derived:** execution provenance / replayability metadata。saved-run側のcanonical `review_run_id` は `deriveReviewRunId()` が `review_run_id` → `reviewRunId` → legacy `runId` の順でread-side解決します。artifact trace idとsaved-run idの普遍的な同一性は仮定しません。
 - **Consumer:** `verifyExecutionManifest` / replayability assessment。
-- **Missing semantics:** absent artifactはmanifest-backed replayabilityを主張できません。
+- **Missing semantics:** absent artifactはmanifest-backed replayabilityを主張できません。`reviewRunId` がnullの場合も、別identityを推測して補完しません。
 - **Failure behavior:** integrity verificationとreplayability assessmentを分離します。
 - **Failure visibility:** verifier / artifact。
 - **Human surface / fallback:** L3 artifact / manifest references。
@@ -645,14 +665,14 @@ PR #2471の実運用では、#2474適用後にMarkdown ADRがupstream review inp
 | B — Finding Critic / Evidence State unavailable | PASS | Critic default off。validation absentをtruthにしません。Evidence State helperはmissing statusをunresolvedへ倒します。 |
 | C — Gate enforced with `--gate` | PASS | Gate derivation、gate exit adapter、Host/Human authorityを別rowで表現できました。 |
 | D — Review Resolution not implemented | PASS | ownerはADR-011、runtime evidence sourceはplanned/unavailableとして分離しました。 |
-| E — historical / omitted fields | PASS | coverage欠損をcompleteとせず、`llmNotExecuted` 欠損をexecutedの証拠とせず、run idsも別identityとして保持します。 |
+| E — historical / omitted fields | PASS | coverage欠損をcompleteとせず、`llmNotExecuted` 欠損をexecutedの証拠とせず、trace / manifest / saved-run identityをpath-specificに保持します。 |
 | F — provenance exists but trust absent | PASS | saved-run provenanceはself-reported。Manifest integrityとauthenticityを分離し、`inputsHash`もsecurity controlにしません。 |
 | G — path-specific availability | PASS | `river run --gate` と `review exec` のcoverage Gate pathを分離しました。 |
 | H — surface composition / fallback | PASS | L1 builder外のLLM failure headerを含め、final rendererとL3 fallbackを追跡しました。 |
 | I — evidence lineage / no double counting | PASS | coverage observation → saved copy → Layer 2 qualification / L1 projectionを1 lineageとして扱います。 |
 | J — owner extension compatibility | PASS | Stable gate exit semanticsとExperimental Coverage / Manifestを別compatibility costとして扱います。 |
 | K — activation / default asymmetry | PASS | Critic env>config + kill switch、Gate coverage / require-LLM opt-in、Layer 2 default qualificationを分離しました。 |
-| L — failure-policy asymmetry | PASS | Critic retain+escalate、provenance drop-with-warning、coverage incompleteness、preserve-unknown、conservative Gateを別policyとして記録しました。 |
+| L — failure-policy asymmetry | PASS | Critic retain+escalate、provenance drop-with-warning、coverage incompleteness、deterministic staging incompleteness、preserve-unknown、conservative Gateを別policyとして記録しました。 |
 | M — truth vocabulary collision | PASS | `validation.finalStatus != validatedStatus != Evidence State != Security Audit evidenceState` を保持しました。 |
 
 13シナリオすべてで、新しいrun-level projectionを必須とするfailureは再現しませんでした。
@@ -778,6 +798,7 @@ Phase 2を再検討するのは、次をすべて示せるときです。
 - [x] existing Decision Surfaceとの重複を確認
 - [x] L1 / L2 / L3 / renderer fallbackを追跡
 - [x] current Gate inputs / enforcement pathを確認
+- [x] `deterministicUnrunnable` をcoverageとは別のopt-in incompleteness inputとして確認
 - [x] helper-only / opt-in / plannedを分離
 - [x] activation condition / default / precedenceを記録
 - [x] stability / compatibility impactを評価
