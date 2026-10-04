@@ -61,6 +61,34 @@ function coveredSubjects(reviewCoverage) {
   return [...new Set(reviewCoverage.units.flatMap((unit) => unit.subjects))].sort();
 }
 
+describe('reviewCoverage executionId compatibility (#2481)', () => {
+  it('keeps pre-#2481 units without executionId schema-valid', () => {
+    const legacyCoverage = {
+      schemaVersion: '1',
+      status: 'complete',
+      expectedUnits: 1,
+      completedUnits: 1,
+      requiredUnits: 1,
+      completedRequiredUnits: 1,
+      incompleteRequiredUnitIds: [],
+      units: [
+        {
+          id: 'reviewer:bug-hunter/chunk:1',
+          kind: 'diff-chunk',
+          subjects: ['src/a.js'],
+          reviewerRole: 'bug-hunter',
+          required: true,
+          status: 'completed',
+          reasonCode: null,
+          findingsCount: 0,
+        },
+      ],
+    };
+
+    assert.equal(validateCoverage(legacyCoverage), true, validationErrors());
+  });
+});
+
 describe('reviewCoverage runtime wiring', () => {
   it('reports complete for a successful non-chunked required review', async () => {
     const result = await runReviewerOrchestration(baseArgs());
