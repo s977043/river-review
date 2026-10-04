@@ -128,9 +128,9 @@ Review Evidence Projection は次を行わない。
 Projection != Judgment
 ```
 
-### D5—truth / materiality / caller action を再統合しない
+### D5—truth / materiality / derived signals / authority を再統合しない
 
-既存 responsibility order を維持する。
+既存 responsibility order と derived signal の違いを維持する。
 
 ```text
 Is it true?
@@ -139,12 +139,24 @@ Is it true?
 Is it material?
   -> Semantic Precision
 
-What should caller do?
+What is the top-level review verdict?
+  -> decision
+     auto-approve | human-review-recommended | human-review-required
+
+What is the Layer-1 loop hint?
+  -> suggestedLoopSignal
+     derived from existing review state; not a GO/NO-GO gate
+
+What should a loop-running host do?
   -> Gate
+     derived recommendation from its existing inputs
 
 Who executes / approves?
   -> Host / Human
 ```
+
+`decision`、`suggestedLoopSignal`、`gate` は既存 contract のまま維持する。
+Review Evidence Projection はこれらを再計算・統合・置換せず、必要な surface で参照・表示するだけである。
 
 Review Evidence Projection はこれらの軸を1つの confidence scoreや総合判定へ潰さない。
 
@@ -186,6 +198,9 @@ finderRunId != verifierRunId
 
 本 ADR は model / prompt / provider diversity を新しい correctness rule として追加しない。
 
+これは「独立 evidence 数」を新しい metric / schema field として導入する決定でもない。
+現時点では、既存 contract が証明できる以上の independence を推論・加算しない、という禁止事項だけを固定する。
+
 ### D8—Unavailable / Unknown / Partial を PASS に射影しない
 
 以下を clean / established / complete 相当に変換しない。
@@ -206,6 +221,9 @@ evidence of absence
 ```
 
 Evidence Projection が情報を圧縮する場合でも、不完全性と uncertainty は残す。
+
+上記は新しい共通 enum を定義するものではない。
+各状態は Review Coverage / Evidence State / Resolution / provider failure 等の owning contract の既存 vocabulary のまま保持し、Projection が `unknown` / `stale` 等の第二語彙へ勝手に正規化しない。
 
 ### D9—Provenance before trust
 
@@ -292,25 +310,30 @@ Existing domain contracts / artifacts
 ├─ reviewer run provenance
 │    └─ Reviewer Independence projection
 ├─ Execution Manifest
-└─ Review Resolution
+├─ Review Resolution
+├─ decision
+└─ suggestedLoopSignal
              │
-        ┌────┴───────────────────────┐
-        │                            │
-        v                            v
-Review Evidence Projection      Existing Gate inputs
-        │                            │
-        v                            v
-Decision Surface                    Gate
-        │                     derived recommendation
-        v                            │
-Human attention                     v
-        └───────────────>       Host / Human
-                              execution authority
+        ┌────┴─────────────────────────────┐
+        │                                  │
+        v                                  v
+Review Evidence Projection      Existing Gate derivation
+        │                       decision + suggestedLoopSignal
+        v                       + current gate inputs
+Decision Surface                          │
+        │                                 v
+        v                                Gate
+Human attention                   derived recommendation
+        │                                 │
+        └─────────────────┬───────────────┘
+                          v
+                     Host / Human
+                   execution authority
 ```
 
 この図は storage hierarchy を意味しない。
 特に **Review Evidence Projection は Gate の入力層ではない**。
-Projection と Gate は existing domain contracts から別々に導出され、Projection が Gate decision を生成・補正・上書きすることはない。
+Projection と Gate は existing domain contracts から別々に導出され、Projection が `decision` / `suggestedLoopSignal` / Gate decision を生成・補正・上書きすることはない。
 
 ## Relationship to Agent Team Topology
 
@@ -335,7 +358,7 @@ Phase 1 以降の実装を検討する場合も最低限以下を守る。
 
 1. Review Evidence Projection が既存 truth state を再計算しない
 2. Semantic Precision disposition を再計算しない
-3. Gate decision を再計算・上書きしない
+3. `decision` / `suggestedLoopSignal` / Gate decision を再計算・上書きしない
 4. blocking / critical / major finding を projection で消さない
 5. partial / timeout / unknown coverage を clean と表示しない
 6. provenance link を失わない
