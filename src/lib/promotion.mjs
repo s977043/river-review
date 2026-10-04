@@ -590,7 +590,9 @@ export function applyReplayEvidenceAttachment(
   entry.context = entry.context ?? {};
   const history = entry.context.experimentHistory ?? [];
   if (!Array.isArray(history)) {
-    throw new Error(`Candidate ${entry.id} has invalid context.experimentHistory; expected an array.`);
+    throw new Error(
+      `Candidate ${entry.id} has invalid context.experimentHistory; expected an array.`
+    );
   }
   const existing = history.find((item) => item?.handoff?.manifestHash === handoff.manifestHash);
   if (existing) {
