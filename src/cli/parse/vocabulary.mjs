@@ -24,7 +24,7 @@ export const SKILLS_SUBCOMMANDS = new Set(['import', 'export', 'list', 'resolve'
  * `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
  * "first non-flag token") keeps `river evolve <path>` working.
  */
-export const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'prompt-ab']);
+export const EVOLVE_SUBCOMMANDS = new Set([\n  'aggregate',\n  'replay',\n  'verify-replay',\n  'prompt-compare',\n  'prompt-ab',\n]);
 
 /**
  * `promote` subcommands that take an optional positional candidate id.
