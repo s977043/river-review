@@ -77,6 +77,14 @@ The initial set contains 15 cases:
 
 The fixture set and oracle are frozen before an evaluation run.
 
+Failure-oriented fixtures also freeze an `executionScenario` so a future runner cannot silently reinterpret the case. The initial scenarios are:
+
+- `dynamic-dispatch-partial`
+- `timeout`
+- `malformed-output`
+
+These cases carry an `analysisExpectation` in the oracle. The evaluator checks the expected analyzer status and required limitation codes separately from obligation recall.
+
 ## Adjudication contract
 
 An evaluation run supplies human adjudication separately from the fixture:
@@ -123,8 +131,11 @@ This preserves the ADR-014 gray zone where two obligations may be represented as
 - unmapped concern count
 - human correction count
 - analyzer status and limitations
+- expected analyzer-status / limitation match when the fixture freezes one
 
 A zero denominator is `null`, not a perfect score.
+
+Timeout, malformed-output, and explicit partial-observation fixtures can therefore verify failure semantics even when no concern is produced. A successful map for a fixture that expects `failed` is recorded as an analysis-expectation mismatch rather than accepted because its concern grouping looks plausible.
 
 Examples:
 
@@ -217,7 +228,7 @@ No metric in this module is Gate authority.
 
 The next useful slice is an evaluation runner that:
 
-- executes the frozen fixture inputs against baseline and candidate analyzer configurations
+- executes the frozen fixture inputs and their `executionScenario` against baseline and candidate analyzer configurations
 - stores raw maps
 - stores human adjudication separately
 - emits deterministic Phase 2 scorecards
