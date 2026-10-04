@@ -32,8 +32,8 @@ River Review には後段の能力の多くが既に存在する。
 
 - candidate generation / fan-out: `src/lib/reviewer-orchestrator.mjs`
 - deterministic verification: `src/lib/verifier.mjs`
-- finding adversarial verification: #1978 / `src/lib/finding-critic.mjs`
-- materiality / disposition: #1857 / ADR-007
+- finding adversarial verification: #1978 / `src/lib/finding-critic.mjs`（runtime stage は opt-in）
+- materiality / disposition architecture: #1857 / ADR-007（default runtime writer は別途段階導入）
 - execution coverage: #2212 / `src/lib/review-coverage.mjs`
 - author / human resolution: #2322 / ADR-011
 - evidence architecture: ADR-013
@@ -330,8 +330,8 @@ River Review は同 repository を dependency / fork / vendor source of truth �
 | semantic change decomposition | #2455 / future Review Concern Map | 新規 |
 | reviewer role execution | `reviewer-orchestrator.mjs` | 再利用 |
 | execution coverage | #2212 / `review-coverage.mjs` | 再利用 |
-| candidate finding truth | #1978 / `finding-critic.mjs` | 再利用 |
-| materiality / disposition | #1857 / ADR-007 | 再利用 |
+| candidate finding truth | #1978 / `finding-critic.mjs`（opt-in runtime stage） | 再利用 |
+| materiality / disposition | #1857 / ADR-007（architecture owner） | 再利用 |
 | author / human resolution | #2322 / ADR-011 | 再利用 |
 | evidence / authority boundary | ADR-013 | 維持 |
 | security semantic coverage | #2267 / ADR-010 | 別責務 |
