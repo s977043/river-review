@@ -180,7 +180,7 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
       context.diff.filesForReview.map((entry) => entry.path),
       ['docs/adr/013-example.md']
     );
-    assert.match(context.diff.diffText, /Evidence Architecture/);
+    assert.match(context.diff.diffText, /\+# Evidence Architecture/);
     assert.deepEqual(context.reviewFileScope, {
       selected: ['docs/adr/013-example.md'],
       excluded: [],
