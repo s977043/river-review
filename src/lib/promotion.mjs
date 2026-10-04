@@ -391,8 +391,25 @@ function assertReplayAttachmentArtifact(artifact) {
   if (artifact.mode !== 'paired-replay' || artifact.readOnly !== true) {
     throw new Error('input is not a read-only paired replay artifact.');
   }
+  if (artifact.schemaVersion !== 1) {
+    throw new Error('paired replay artifact must use schemaVersion 1.');
+  }
   if (!Array.isArray(artifact.writeEffects) || artifact.writeEffects.length !== 0) {
     throw new Error('paired replay artifact must declare writeEffects: [].');
+  }
+  if (
+    artifact.requiresHumanApproval !== true ||
+    artifact.acceptance?.decision !== null ||
+    artifact.acceptance?.applied !== false ||
+    artifact.acceptance?.autoPromotion !== false
+  ) {
+    throw new Error('paired replay artifact violates the human-judgment boundary.');
+  }
+  if (
+    artifact.manifestVerification?.verified !== true ||
+    artifact.manifestVerification?.experimentKeyMatchesInputs !== true
+  ) {
+    throw new Error('paired replay manifest is not verified against the current inputs.');
   }
   const handoff = artifact.promotionHandoff;
   if (!handoff || typeof handoff !== 'object' || Array.isArray(handoff)) {
@@ -418,6 +435,24 @@ function assertReplayAttachmentArtifact(artifact) {
     if (typeof handoff[key] !== 'string' || !handoff[key]) {
       throw new Error(`promotionHandoff is missing ${key}.`);
     }
+  }
+
+  const manifest = artifact.manifest;
+  const improvementCandidate = manifest?.improvementCandidate;
+  if (
+    !manifest ||
+    handoff.manifestId !== manifest.manifestId ||
+    handoff.experimentKey !== manifest.experimentKey ||
+    handoff.manifestHash !== manifest.manifestHash
+  ) {
+    throw new Error('promotionHandoff does not match the paired replay Experiment Manifest.');
+  }
+  if (
+    !improvementCandidate ||
+    handoff.candidateId !== improvementCandidate.candidateId ||
+    handoff.candidateContentHash !== improvementCandidate.contentHash
+  ) {
+    throw new Error('promotionHandoff does not match manifest.improvementCandidate.');
   }
   return handoff;
 }
