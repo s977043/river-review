@@ -128,7 +128,7 @@ PlanGate は Experience Knowledge / Reference promotion の **optional consumer*
 - River Review の `promotion_candidate` を PlanGate の canonical candidate schema とみなさない
 - cross-repository shared DB や direct runtime dependency は導入しない
 
-直接 adapter を追加するのは、PlanGate 側に stable な input contract が確定した場合に限る。加えて、River Review の artifact を機械可読に消費する具体的ユースケースが必要である。その場合も additive adapter とし、River Review 単体で review / promotion / effectiveness が閉じる性質を壊さない。
+直接 adapter を追加するのは、PlanGate 側に stable な input contract が確定した場合に限る。加えて、River Review の artifact を機械可読に消費する具体的ユースケースが必要となる。その場合も additive adapter とし、River Review 単体で review / promotion / effectiveness が閉じる性質を壊さない。
 
 integration payload に raw session transcript、hidden CoT、秘密情報、認証情報、個人情報を要求しない。
 
