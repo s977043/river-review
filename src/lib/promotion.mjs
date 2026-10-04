@@ -375,6 +375,182 @@ export function retargetPromotion({
 }
 
 // ---------------------------------------------------------------------------
+// #2372-G2 / #2485: Human-invoked paired replay evidence attachment.
+//
+// Paired replay is PRE-adoption evidence. Attaching it records observations only:
+// it never approves, rejects, activates, or changes effectiveness state.
+// ---------------------------------------------------------------------------
+
+const PRE_ADOPTION_REPLAY_STATUSES = new Set(['candidate', 'pending']);
+const SHA256_RE = /^[0-9a-f]{64}$/;
+
+function assertReplayBinding(replay, entry, pc) {
+  if (!replay || typeof replay !== 'object' || Array.isArray(replay)) {
+    throw new Error('paired replay input must be a JSON object.');
+  }
+  if (replay.mode !== 'paired-replay' || replay.readOnly !== true) {
+    throw new Error('input is not a read-only paired replay artifact.');
+  }
+  const handoff = replay.promotionHandoff;
+  if (!handoff || typeof handoff !== 'object' || Array.isArray(handoff)) {
+    throw new Error('paired replay artifact has no usable promotionHandoff.');
+  }
+  if (!SHA256_RE.test(String(pc.contentHash ?? ''))) {
+    throw new Error(
+      `Candidate ${entry.id} has no valid contentHash; legacy candidates cannot attach replay evidence.`
+    );
+  }
+  if (handoff.candidateId !== entry.id) {
+    throw new Error(
+      `promotionHandoff candidateId mismatch: expected ${entry.id}, got ${handoff.candidateId ?? '(none)'}.`
+    );
+  }
+  if (handoff.candidateContentHash !== pc.contentHash) {
+    throw new Error('promotionHandoff candidateContentHash does not match the stored candidate.');
+  }
+  if (
+    handoff.requiresHumanJudgment !== true ||
+    !Array.isArray(handoff.writeEffects) ||
+    handoff.writeEffects.length !== 0
+  ) {
+    throw new Error('promotionHandoff must remain human-judged and write-effect free.');
+  }
+  if (!Array.isArray(replay.writeEffects) || replay.writeEffects.length !== 0) {
+    throw new Error('paired replay artifact must declare zero writeEffects.');
+  }
+  if (
+    replay.acceptance?.decision !== null ||
+    replay.acceptance?.applied !== false ||
+    replay.acceptance?.autoPromotion !== false
+  ) {
+    throw new Error('paired replay artifact contains an adoption decision or applied promotion.');
+  }
+  if (
+    replay.manifestVerification?.verified !== true ||
+    replay.manifestVerification?.experimentKeyMatchesInputs !== true ||
+    handoff.manifestVerified !== true ||
+    handoff.experimentKeyMatchesInputs !== true
+  ) {
+    throw new Error('paired replay manifest is not verified against the current experiment inputs.');
+  }
+
+  const manifest = replay.manifest ?? {};
+  const bindings = [
+    ['manifestId', manifest.manifestId],
+    ['experimentKey', manifest.experimentKey],
+    ['manifestHash', manifest.manifestHash],
+  ];
+  for (const [field, expected] of bindings) {
+    if (!expected || handoff[field] !== expected) {
+      throw new Error(`promotionHandoff ${field} does not match the paired replay manifest.`);
+    }
+  }
+  if (!SHA256_RE.test(String(handoff.manifestHash ?? ''))) {
+    throw new Error('promotionHandoff manifestHash must be a sha256 value.');
+  }
+  if (handoff.terminalReason !== replay.terminalReason) {
+    throw new Error('promotionHandoff terminalReason does not match the paired replay result.');
+  }
+  if (handoff.activationVerified !== replay.activationCheck?.verified) {
+    throw new Error('promotionHandoff activation state does not match the paired replay result.');
+  }
+  if (handoff.acceptanceEvaluable !== replay.acceptance?.evaluable) {
+    throw new Error('promotionHandoff acceptance state does not match the paired replay result.');
+  }
+  if (
+    handoff.overallCriticalRegressionCount !== replay.metrics?.overall?.criticalRegressionCount
+  ) {
+    throw new Error(
+      'promotionHandoff critical-regression count does not match the paired replay result.'
+    );
+  }
+  return handoff;
+}
+
+/**
+ * Attach PRE-adoption paired replay evidence to a promotion candidate.
+ *
+ * The transition is intentionally evidence-only. The candidate must still be
+ * candidate/pending, and promotionStatus / approval / effectiveness are not
+ * touched. Duplicate manifestHash attachments are idempotent.
+ */
+export function applyPromotionReplayAttachment(
+  entry,
+  { replay, approver, reason, now = new Date() }
+) {
+  const pc = getPromotionCandidate(entry);
+  if (!pc) throw new Error(`Entry ${entry?.id} is not a promotion_candidate.`);
+  if (!approver || !String(approver).trim()) {
+    throw new Error('approver is required to attach paired replay evidence.');
+  }
+  if (!reason || !String(reason).trim()) {
+    throw new Error('reason is required to attach paired replay evidence.');
+  }
+  if ((entry.status ?? 'active') !== 'active' || !PRE_ADOPTION_REPLAY_STATUSES.has(pc.promotionStatus)) {
+    throw new Error(
+      `Candidate ${entry.id} is not in a pre-adoption state (promotionStatus=${pc.promotionStatus}, status=${entry.status ?? 'active'}); attach replay evidence before approval.`
+    );
+  }
+
+  const handoff = assertReplayBinding(replay, entry, pc);
+  const history = entry.context?.experimentHistory;
+  if (history != null && !Array.isArray(history)) {
+    throw new Error('context.experimentHistory must be an array when present.');
+  }
+  const existing = (history ?? []).find(
+    (record) =>
+      record?.source === 'paired-replay' && record?.handoff?.manifestHash === handoff.manifestHash
+  );
+  if (existing) {
+    return { changed: false, entry, record: existing };
+  }
+
+  const attachedAt = now.toISOString();
+  const record = {
+    source: 'paired-replay',
+    attachedAt,
+    attachedBy: String(approver).trim(),
+    reason: String(reason).trim(),
+    candidateTargetAtAttachment: {
+      kind: pc.proposedTarget?.kind ?? 'human_judgment',
+      id: pc.proposedTarget?.id ?? null,
+    },
+    handoff: JSON.parse(JSON.stringify(handoff)),
+  };
+  entry.context.experimentHistory = history ?? [];
+  entry.context.experimentHistory.push(record);
+  entry.metadata = entry.metadata ?? {};
+  entry.metadata.updatedAt = attachedAt;
+  return { changed: true, entry, record };
+}
+
+/** Persisting wrapper for applyPromotionReplayAttachment(). */
+export function attachPromotionReplayEvidence({
+  indexPath,
+  id,
+  replay,
+  approver,
+  reason,
+  now = new Date(),
+}) {
+  const index = loadMemory(indexPath);
+  const target = listPromotionCandidates(index, { includeInactive: true }).find((e) => e.id === id);
+  if (!target) {
+    throw new Error(`No promotion_candidate entry with id: ${id}`);
+  }
+
+  // Avoid rewriting the Riverbed index for an idempotent duplicate attachment.
+  const preview = applyPromotionReplayAttachment(target, { replay, approver, reason, now });
+  if (!preview.changed) return preview;
+
+  let result;
+  const entry = updateEntry(indexPath, id, (live) => {
+    result = applyPromotionReplayAttachment(live, { replay, approver, reason, now });
+  });
+  return { ...result, entry };
+}
+
+// ---------------------------------------------------------------------------
 // Phase 3 (#1568-C / #1623): Retire lifecycle
 //
 // Two deterministic, human-triggered CLI operations over promoted candidates:
