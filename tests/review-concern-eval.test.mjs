@@ -93,6 +93,37 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
     }
   });
 
+  it('freezes executable analysis scenarios for partial, timeout, and malformed output', () => {
+    const cases = new Map(manifest.cases.map((item) => [item.id, item]));
+
+    assert.deepEqual(cases.get('RC-11-dynamic-dispatch-partial').executionScenario, {
+      mode: 'dynamic-dispatch-partial',
+    });
+    assert.deepEqual(
+      cases.get('RC-11-dynamic-dispatch-partial').oracle.analysisExpectation,
+      {
+        status: 'partial',
+        limitationIncludes: [],
+      }
+    );
+
+    assert.deepEqual(cases.get('RC-14-timeout').executionScenario, {
+      mode: 'timeout',
+    });
+    assert.deepEqual(cases.get('RC-14-timeout').oracle.analysisExpectation, {
+      status: 'failed',
+      limitationIncludes: ['analyzer-failed:runtime-error'],
+    });
+
+    assert.deepEqual(cases.get('RC-15-malformed-output').executionScenario, {
+      mode: 'malformed-output',
+    });
+    assert.deepEqual(cases.get('RC-15-malformed-output').oracle.analysisExpectation, {
+      status: 'failed',
+      limitationIncludes: ['analyzer-failed:invalid-json'],
+    });
+  });
+
   it('keeps each fixture executable and obligation-oriented', () => {
     for (const item of manifest.cases) {
       assert.ok(Array.isArray(item.input?.rawChangedFiles), `${item.id}: changed files`);
@@ -237,6 +268,51 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
     assert.equal(result.metrics.nonActionableConcernRatio, null);
     assert.equal(result.metrics.groupingWithinRange, false);
     assert.equal(result.analysisStatus, 'failed');
+  });
+
+  it('scores frozen analyzer-status expectations without turning them into a verdict', () => {
+    const expectedFailureFixture = fixture({
+      oracle: {
+        obligations: [{ id: 'OB-a', description: 'obligation A' }],
+        knownInteractions: [],
+        acceptableGrouping: { minConcerns: 0, maxConcerns: 1 },
+        analysisExpectation: {
+          status: 'failed',
+          limitationIncludes: ['analyzer-failed:invalid-json'],
+        },
+      },
+    });
+
+    const matching = evaluateReviewConcernMap({
+      fixture: expectedFailureFixture,
+      map: map([], {
+        status: 'failed',
+        limitations: ['analyzer-failed:invalid-json'],
+      }),
+      adjudication: {
+        obligationMatches: { 'OB-a': [] },
+        humanCorrectionCount: 0,
+      },
+    });
+    assert.equal(matching.metrics.analysisExpectationMet, true);
+    assert.deepEqual(matching.metrics.analysisExpectationFailures, []);
+
+    const mismatching = evaluateReviewConcernMap({
+      fixture: expectedFailureFixture,
+      map: map([], {
+        status: 'completed',
+        limitations: [],
+      }),
+      adjudication: {
+        obligationMatches: { 'OB-a': [] },
+        humanCorrectionCount: 0,
+      },
+    });
+    assert.equal(mismatching.metrics.analysisExpectationMet, false);
+    assert.deepEqual(mismatching.metrics.analysisExpectationFailures, [
+      'status:failed',
+      'limitation:analyzer-failed:invalid-json',
+    ]);
   });
 
   it('treats an absent observation as unavailable rather than zero recall', () => {
