@@ -87,6 +87,20 @@ function isRevisionRef(value) {
   );
 }
 
+function revisionArtifactKey(value) {
+  if (!isRevisionRef(value)) return null;
+  return value.artifactRefs
+    .map((ref) => `${ref?.name ?? ''}:${ref?.sha256 ?? ''}`)
+    .sort()
+    .join('|');
+}
+
+function isSameRevision(left, right) {
+  const leftKey = revisionArtifactKey(left);
+  const rightKey = revisionArtifactKey(right);
+  return leftKey !== null && rightKey !== null && leftKey === rightKey;
+}
+
 function hasVerificationEvidence(item) {
   return (
     nonEmptyString(item?.verification?.verifier) &&
@@ -173,6 +187,9 @@ export function validateReviewResolutionSemantics(document) {
       if (coverageStatus !== 'complete') {
         errors.push(`${prefix}.not_reproduced requires complete review coverage`);
       }
+      if (isSameRevision(document?.source, target)) {
+        errors.push(`${prefix}.not_reproduced requires a revision different from source`);
+      }
     }
 
     if (coverageStatus === 'partial' || coverageStatus === 'not_executed') {
@@ -183,15 +200,27 @@ export function validateReviewResolutionSemantics(document) {
       }
     }
 
-    if (item?.resolution?.state === 'action_submitted' && !isRevisionRef(target)) {
-      errors.push(`${prefix}.action_submitted requires a target revision`);
+    if (item?.resolution?.state === 'action_submitted') {
+      if (!isRevisionRef(target)) {
+        errors.push(`${prefix}.action_submitted requires a target revision`);
+      } else if (isSameRevision(document?.source, target)) {
+        errors.push(`${prefix}.action_submitted requires a revision different from source`);
+      }
     }
 
-    if (target && isRevisionRef(document?.source)) {
-      const sameRun = target.reviewRunId === document.source.reviewRunId;
-      const sameManifest = target.executionManifestId === document.source.executionManifestId;
-      if (sameRun && sameManifest && verificationState === 'verified_resolved') {
-        errors.push(`${prefix}.verified_resolved requires a revision different from source`);
+    if (verificationState === 'verified_resolved' && isSameRevision(document?.source, target)) {
+      errors.push(`${prefix}.verified_resolved requires a revision different from source`);
+    }
+
+    if (item?.resolution?.state === 'decision_agreed') {
+      if (item?.authorResponse?.state !== 'agrees_spec_decision') {
+        errors.push(`${prefix}.decision_agreed requires authorResponse agrees_spec_decision`);
+      }
+      if (
+        !Array.isArray(item?.resolution?.decisionRefs) ||
+        item.resolution.decisionRefs.length === 0
+      ) {
+        errors.push(`${prefix}.decision_agreed requires at least one human decision reference`);
       }
     }
   });
