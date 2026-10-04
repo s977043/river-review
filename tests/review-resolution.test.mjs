@@ -111,7 +111,7 @@ describe('Review Resolution semantic invariants', () => {
 
   test('schema vocabularies stay pinned to implementation constants', () => {
     const itemProperties = schema.properties.items.items.properties;
-    assert.deepEqual(itemProperties.authorResponse.properties.state.enum, [...AUTHOR_RESPONSE_STATES]);
+    assert.deepEqual(itemProperties.authorResponse.properties.state.enum, [\n      ...AUTHOR_RESPONSE_STATES,\n    ]);
     assert.deepEqual(itemProperties.resolution.properties.state.enum, [...RESOLUTION_STATES]);
     assert.deepEqual(itemProperties.verification.properties.state.enum, [...VERIFICATION_STATES]);
     assert.deepEqual(itemProperties.systemJudgment.properties.disposition.enum, [
