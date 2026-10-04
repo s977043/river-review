@@ -196,6 +196,19 @@ Review / Feedback / Fix
 
 Reference promotion でも candidate proposer と採用判断を分離し、source evidence / scope / exceptions を失わない。
 
+
+### Pre-adoption / post-adoption boundary
+
+Reference promotion の実験証拠と採用後の効果測定は、別の履歴として扱う。
+
+- paired replay の採用前証拠は `context.experimentHistory[]` に保持する
+- Human approval 後の実運用 feedback は既存 effectiveness review で評価する
+- threshold 超過時は既存 lifecycle に従って `needs_review` へ戻す
+- 採用前の replay metrics を `context.effectivenessHistory[]` へコピーしない
+- Reference 専用の effectiveness 実装は持たず、#1568 の共通 lifecycle を再利用する
+
+#2372 Phase G では、この境界を #2408/#2409、#2485/#2487、#2490 の回帰契約で固定する。
+
 ## Evaluation
 
 Reference を追加したこと自体を成果にしない。可能な範囲で次を比較する。
