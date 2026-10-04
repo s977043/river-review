@@ -133,7 +133,7 @@ no concern
 Concern Map の最小 conceptual contract は、直接変更された対象と、evidence-backed tracing で影響が確認された未変更対象を分ける。
 
 ```yaml
-schemaVersion: "1"
+schemaVersion: '1'
 kind: review-concern-map
 
 subject:
@@ -143,7 +143,7 @@ subject:
 
 concerns:
   - id: concern-1
-    summary: "Refresh-token lifecycle change"
+    summary: 'Refresh-token lifecycle change'
     changedSubjects:
       - src/auth/session.ts
       - src/auth/token.ts
