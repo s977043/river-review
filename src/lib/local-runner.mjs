@@ -449,9 +449,7 @@ export async function planLocalReview({
 
 function hasChangedProjectRules(rawChangedFiles = []) {
   return rawChangedFiles.some(
-    (filePath) =>
-      filePath === '.river/rules.md' ||
-      filePath.startsWith('.river/rules.d/')
+    (filePath) => filePath === '.river/rules.md' || filePath.startsWith('.river/rules.d/')
   );
 }
 

@@ -35,7 +35,10 @@ const affectedSubjectSchema = z
 
 const concernSchema = z
   .object({
-    id: z.string().regex(/^concern-[1-9]\d*$/u).max(120),
+    id: z
+      .string()
+      .regex(/^concern-[1-9]\d*$/u)
+      .max(120),
     summary: z.string().min(1).max(500),
     changedSubjects: z.array(z.string().min(1).max(500)).min(1).max(50),
     affectedSubjects: z.array(affectedSubjectSchema).max(50).default([]),
@@ -383,11 +386,7 @@ export function parseReviewConcernResponse(
   { rawChangedFiles = [], evidencePaths = rawChangedFiles } = {}
 ) {
   const parsed = modelResponseSchema.parse(parseJsonObject(text));
-  return validateConcernSemantics(
-    normalizeConcernPaths(parsed),
-    rawChangedFiles,
-    evidencePaths
-  );
+  return validateConcernSemantics(normalizeConcernPaths(parsed), rawChangedFiles, evidencePaths);
 }
 
 function redactConcernSummaries(concerns, config) {
@@ -493,9 +492,7 @@ export async function runReviewConcernAnalyzer({
     });
     const parsed = parseReviewConcernResponse(output, {
       rawChangedFiles,
-      evidencePaths: [
-        ...collectInspectablePaths(rawChangedFiles, reviewFileScope, repoContext),
-      ],
+      evidencePaths: [...collectInspectablePaths(rawChangedFiles, reviewFileScope, repoContext)],
     });
     const limitations = [...built.limitations];
 
@@ -524,11 +521,6 @@ export async function runReviewConcernAnalyzer({
       reasonCode = 'semantic-validation';
     }
 
-    return buildFailedMap(
-      subject,
-      rawChangedFiles,
-      `analyzer-failed:${reasonCode}`,
-      built.input
-    );
+    return buildFailedMap(subject, rawChangedFiles, `analyzer-failed:${reasonCode}`, built.input);
   }
 }

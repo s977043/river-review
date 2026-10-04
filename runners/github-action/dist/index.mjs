@@ -96005,7 +96005,9 @@ const affectedSubjectSchema = src_schemas/* object */.Ikc({
   .strict();
 
 const concernSchema = src_schemas/* object */.Ikc({
-    id: src_schemas/* string */.YjP().regex(/^concern-[1-9]\d*$/u).max(120),
+    id: src_schemas/* string */.YjP()
+      .regex(/^concern-[1-9]\d*$/u)
+      .max(120),
     summary: src_schemas/* string */.YjP().min(1).max(500),
     changedSubjects: src_schemas/* array */.YOg(src_schemas/* string */.YjP().min(1).max(500)).min(1).max(50),
     affectedSubjects: src_schemas/* array */.YOg(affectedSubjectSchema).max(50).default([]),
@@ -96352,11 +96354,7 @@ function parseReviewConcernResponse(
   { rawChangedFiles = [], evidencePaths = rawChangedFiles } = {}
 ) {
   const parsed = modelResponseSchema.parse(parseJsonObject(text));
-  return validateConcernSemantics(
-    normalizeConcernPaths(parsed),
-    rawChangedFiles,
-    evidencePaths
-  );
+  return validateConcernSemantics(normalizeConcernPaths(parsed), rawChangedFiles, evidencePaths);
 }
 
 function redactConcernSummaries(concerns, config) {
@@ -96462,9 +96460,7 @@ async function runReviewConcernAnalyzer({
     });
     const parsed = parseReviewConcernResponse(output, {
       rawChangedFiles,
-      evidencePaths: [
-        ...collectInspectablePaths(rawChangedFiles, reviewFileScope, repoContext),
-      ],
+      evidencePaths: [...collectInspectablePaths(rawChangedFiles, reviewFileScope, repoContext)],
     });
     const limitations = [...built.limitations];
 
@@ -96493,12 +96489,7 @@ async function runReviewConcernAnalyzer({
       reasonCode = 'semantic-validation';
     }
 
-    return buildFailedMap(
-      subject,
-      rawChangedFiles,
-      `analyzer-failed:${reasonCode}`,
-      built.input
-    );
+    return buildFailedMap(subject, rawChangedFiles, `analyzer-failed:${reasonCode}`, built.input);
   }
 }
 
@@ -97592,9 +97583,7 @@ async function planLocalReview({
 
 function hasChangedProjectRules(rawChangedFiles = []) {
   return rawChangedFiles.some(
-    (filePath) =>
-      filePath === '.river/rules.md' ||
-      filePath.startsWith('.river/rules.d/')
+    (filePath) => filePath === '.river/rules.md' || filePath.startsWith('.river/rules.d/')
   );
 }
 

@@ -17,10 +17,7 @@ async function withEnv(name, value, fn) {
 }
 
 function rawPathsFromScope(scope) {
-  return [
-    ...(scope?.selected ?? []),
-    ...(scope?.excluded ?? []).map((entry) => entry.path),
-  ];
+  return [...(scope?.selected ?? []), ...(scope?.excluded ?? []).map((entry) => entry.path)];
 }
 
 function withoutConcernObservation(result) {
@@ -122,7 +119,6 @@ test('raw manifest survives optimizer and configured exclusions in plan context'
     ],
   });
 });
-
 
 test('optimized-away raw changes still produce an observe-only map on no-changes', async (t) => {
   const { dir, cleanup } = await createTempGitRepo({

@@ -194,7 +194,7 @@ Saved runs already persist `reviewDebug` as run-record `debug`, so no new top-le
 Conceptual shape:
 
 ```yaml
-schemaVersion: "1"
+schemaVersion: '1'
 kind: review-concern-map
 
 subject:
@@ -204,7 +204,7 @@ subject:
 
 concerns:
   - id: concern-1
-    summary: "Refresh-token lifecycle change"
+    summary: 'Refresh-token lifecycle change'
     changedSubjects:
       - src/auth/session.ts
     affectedSubjects:

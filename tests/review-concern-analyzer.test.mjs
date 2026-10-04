@@ -205,9 +205,7 @@ test('symbol-usage evidence canonicalizes ./ paths and accepts the real inspecte
         affectedSubjects: [
           {
             path: './src/api/session-controller.ts',
-            evidenceRefs: [
-              { path: './src/api/session-controller.ts', lineStart: 42, lineEnd: 42 },
-            ],
+            evidenceRefs: [{ path: './src/api/session-controller.ts', lineStart: 42, lineEnd: 42 }],
           },
         ],
         evidenceRefs: [{ path: './src/auth/session.ts', lineStart: 10 }],
@@ -233,10 +231,7 @@ test('symbol-usage evidence canonicalizes ./ paths and accepts the real inspecte
 
   assert.equal(result.analysis.status, 'completed');
   assert.equal(result.concerns[0].changedSubjects[0], 'src/auth/session.ts');
-  assert.equal(
-    result.concerns[0].affectedSubjects[0].path,
-    'src/api/session-controller.ts'
-  );
+  assert.equal(result.concerns[0].affectedSubjects[0].path, 'src/api/session-controller.ts');
 });
 
 test('instruction-like comment paths do not become inspected evidence', async () => {
@@ -344,7 +339,6 @@ test('raw changed-file manifest keeps optimizer exclusions visible to the analyz
   );
 });
 
-
 test('offline mode uses the injected environment and never calls the model', async () => {
   let called = false;
   const result = await runReviewConcernAnalyzer({
@@ -412,7 +406,6 @@ test('concern evidence cannot cite an unrelated uninspected path', async () => {
     /concern evidence is unrelated/
   );
 });
-
 
 test('persisted concern summary is redacted with the existing secret policy', async () => {
   const secret = 'sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
