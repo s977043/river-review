@@ -144,12 +144,6 @@
           "minLength": 1,
           "description": "Reviewer role that first raised this finding (a key of REVIEWER_ROLES in src/lib/reviewer-orchestrator.mjs, e.g. bug-hunter / security-scanner). Emitted only by multi-role runs (`--reviewers`); absent otherwise (#1700). Deliberately not an enum so adding a role does not turn every run's output into a schema violation."
         },
-        "sourceExecutionIds": {
-          "type": "array",
-          "description": "Opaque logical reviewer execution ids that produced members of this merged finding cluster (#2481). Additive/optional and emitted only by multi-reviewer orchestration. Provenance-only: count is not a vote, and different ids do not prove different actors, models, providers, correctness, or independent verification.",
-          "items": { "type": "string", "minLength": 1 },
-          "uniqueItems": true
-        },
         "actionability": {
           "type": "number",
           "minimum": 0,
