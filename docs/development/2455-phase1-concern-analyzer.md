@@ -340,7 +340,7 @@ It does not:
 - alter findings/comments
 - turn `no-changes` into a different review status
 
-Default-off behavior is pinned by integration tests.
+Default-off behavior is pinned by integration tests. The existing `planLocalReview()` result shape also remains unchanged; the raw changed-file manifest needed by the experiment is reconstructed from the existing `reviewFileScope` ledger rather than exposed as a new default-on planning field.
 
 When the feature is enabled under `dryRun`, the only allowed difference is the additive `reviewDebug.reviewConcernMap` observation.
 
