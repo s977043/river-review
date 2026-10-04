@@ -1,4 +1,4 @@
-# Evidence Architecture Phase 1 — Existing Surface / Ownership Map
+# Evidence Architecture Phase 1—Existing Surface / Ownership Map
 
 Issue #2472 / ADR-013 の Phase 1 調査結果です。
 
@@ -33,9 +33,9 @@ Phase 2 = not-needed-existing-surface
 
 理由は3つあります。
 
-1. 新projectionを必要とする concrete consumer が特定されていません。
-2. 現在の evidence / uncertainty / provenance は、既存 Review Artifact、saved run、Execution Manifest、Review Coverage、Decision Surface へ分散して保持できます。
-3. 見つかった不足は横断projection不足ではなく、Reviewer Independence、Review Resolution、Security Audit writer など既存 owner の availability / maturity の不足です。
+1. 新projectionを必要とする concrete consumer が特定されていない。
+2. 現在の evidence / uncertainty / provenance は、既存 Review Artifact、saved run、Execution Manifest、Review Coverage、Decision Surface へ分散して保持できる。
+3. 見つかった不足は横断projection不足ではなく、Reviewer Independence、Review Resolution、Security Audit writer など既存 owner の availability / maturity の不足である。
 
 したがって、現時点で新しい run-level projection を作ると、既存 owner の成熟前に第二の集約contractを作ることになります。
 
@@ -87,164 +87,164 @@ Derived projections     Advisory signals
 
 以下の各rowは #2472 の required mapping columns をまとめて記録します。
 
-### F1 — `findings[]` / severity / confidence / `validatedStatus`
+### F1—`findings[]` / severity / confidence / `validatedStatus`
 
 - **Evidence reference:** `schemas/review-artifact.schema.json::$defs.finding`。特に `severity`、`confidence`、`validatedStatus`。
 - **Runtime path:** `river run`、JSON / YAML / HTML / Markdown output、saved run、GitHub Action。
-- **Producer / owner:** reviewer + verifier / synthesis pipeline が finding を生成します。finding schema が field contract を所有します。
-- **Runtime availability / activation / default:** findings はartifact surfaceで通常利用できます。個別 optional field はproducer依存です。
-- **Stability / compatibility:** Review Artifact v1 の versioned public schemaです。既存fieldの意味変更は高コストです。optional metadata追加は additive です。
-- **Source of truth / persistence:** Review Artifact の finding と saved-run finding が各surfaceの記録です。
-- **Transformation / lineage:** observe → verify / synthesize → persist / render。表示コピーを独立Evidenceとして数えません。
-- **Observed or derived:** finding claim はreview outputです。`validatedStatus` は synthesis verdict であり `validation.finalStatus` とは別です。
+- **Producer / owner:** reviewer + verifier / synthesis pipeline が finding を生成する。finding schema が field contract を所有する。
+- **Runtime availability / activation / default:** findings はartifact surfaceで通常利用できる。個別 optional field はproducer依存である。
+- **Stability / compatibility:** Review Artifact v1 の versioned public schemaである。既存fieldの意味変更は高コストである。optional metadata追加は additive である。
+- **Source of truth / persistence:** Review Artifact の finding と saved-run finding が各surfaceの記録である。
+- **Transformation / lineage:** observe → verify / synthesize → persist / render。表示コピーを独立Evidenceとして数えない。
+- **Observed or derived:** finding claim はreview outputである。`validatedStatus` は synthesis verdict であり `validation.finalStatus` とは別である。
 - **Consumer:** renderer、saved-run digest/diff、caller。
-- **Missing semantics:** optional metadata欠損は「未観測」です。severity / confidence以外の欠損をPASSへ昇格しません。
-- **Failure behavior / visibility:** verifier/synthesis経路の各契約に従います。欠損metadataはartifact上で欠損として残ります。
-- **Human surface / fallback:** L1は件数中心です。finding本文はMarkdown details / L3 artifactに残ります。
-- **Gate relationship:** blocking finding countsはGate入力になり得ます。`validatedStatus` 自体はGateを上書きしません。
-- **Trust / integrity:** reviewer outputであり、provenance強度は別contractです。
+- **Missing semantics:** optional metadata欠損は「未観測」である。severity / confidence以外の欠損をPASSへ昇格しない。
+- **Failure behavior / visibility:** verifier/synthesis経路の各契約に従う。欠損metadataはartifact上で欠損として残る。
+- **Human surface / fallback:** L1は件数中心である。finding本文はMarkdown details / L3 artifactに残る。
+- **Gate relationship:** blocking finding countsはGate入力になり得る。`validatedStatus` 自体はGateを上書きしない。
+- **Trust / integrity:** reviewer outputであり、provenance強度は別contractである。
 - **Authority:** none。
 
-### F2 — `findings[].validation.finalStatus`
+### F2—`findings[].validation.finalStatus`
 
-- **Evidence reference:** `schemas/review-artifact.schema.json::$defs.finding.validation`、`src/lib/finding-critic.mjs::FINAL_STATUS`、`src/lib/finding-critic-stage.mjs::runFindingCriticStage`。
+- **Evidence reference:** `schemas/review-artifact.schema.json::$defs.finding.validation`。Finding Critic runtime は `src/lib/finding-critic.mjs::FINAL_STATUS` と `src/lib/finding-critic-stage.mjs::runFindingCriticStage`。
 - **Runtime path:** Finding Criticが有効な review engine / reviewer orchestration path。
-- **Producer / owner:** Finding Critic state machine がownerです。stageは配線だけを担当します。
-- **Runtime availability:** opt-in runtimeです。
-- **Activation condition:** `review.findingCritic.mode: active` または `RIVER_FINDING_CRITIC=1`。envがconfigより優先し、`RIVER_FINDING_CRITIC=0` はkill switchです。
+- **Producer / owner:** Finding Critic state machine がownerである。stageは配線だけを担当する。
+- **Runtime availability:** opt-in runtimeである。
+- **Activation condition:** `review.findingCritic.mode: active` または `RIVER_FINDING_CRITIC=1`。envがconfigより優先し、`RIVER_FINDING_CRITIC=0` はkill switchである。
 - **Default state:** off。
-- **Stability / compatibility:** additive optional Review Artifact metadataです。`FINAL_STATUS` vocabularyはownerに従います。
+- **Stability / compatibility:** additive optional Review Artifact metadataである。`FINAL_STATUS` vocabularyはownerに従う。
 - **Source of truth / persistence:** findingの `validation.finalStatus`。
-- **Transformation / lineage:** finding → adversarial validation → optional validation block。別のtruth vocabularyへ書き換えません。
-- **Observed or derived:** validation protocolのterminal stateです。
+- **Transformation / lineage:** finding → adversarial validation → optional validation block。別のtruth vocabularyへ書き換えない。
+- **Observed or derived:** validation protocolのterminal stateである。
 - **Consumer:** Finding Critic-aware reporting / Evidence State helper。
-- **Missing semantics:** default runではabsentです。absentはconfirmedでもrefutedでもありません。
-- **Failure behavior:** LLM unavailable / timeout / exceptionは clean にせず `critic-timeout`、retain finding、human reviewです。
+- **Missing semantics:** default runではabsentである。absentはconfirmed / refuted のどちらとも確定していない。
+- **Failure behavior:** LLM unavailable / timeout / exceptionは clean にせず `critic-timeout`、retain finding、human reviewである。
 - **Failure visibility:** finding validation / stage observation / debug surface。
-- **Human surface / fallback:** finding details / L3。Human Decision Surfaceはこのfieldから新しいjudgmentを作りません。
-- **Gate relationship:** display / triage metadata。severityやGateを直接上書きしません。
-- **Trust / integrity:** validation protocolの結果であり、actor provenanceとは別です。
+- **Human surface / fallback:** finding details / L3。Human Decision Surfaceはこのfieldから新しいjudgmentを作らない。
+- **Gate relationship:** display / triage metadata。severityやGateを直接上書きしない。
+- **Trust / integrity:** validation protocolの結果であり、actor provenanceとは別である。
 - **Authority:** none。
 
-### F3 — Finding-level Evidence State projection
+### F3—Finding-level Evidence State projection
 
 - **Evidence reference:** `src/lib/finding-evidence-state.mjs::projectFindingEvidenceState`。
-- **Runtime path:** helper consumerが明示的に呼ぶ場合のみです。
+- **Runtime path:** helper consumerが明示的に呼ぶ場合のみである。
 - **Producer / owner:** Evidence State helper。
-- **Runtime availability:** helper-only。general Review Artifactには `evidenceState` persisted fieldを仮定しません。
+- **Runtime availability:** helper-only。general Review Artifactには `evidenceState` persisted fieldを仮定しない。
 - **Activation / default:** explicit callのみ。default persistenceなし。
-- **Stability / compatibility:** owner-specific derived helperです。新しいcommon enumとして拡張しません。
+- **Stability / compatibility:** owner-specific derived helperである。新しいcommon enumとして拡張しない。
 - **Source of truth:** `validation.finalStatus` のみ。
 - **Persistence:** general reviewではnone。
 - **Transformation / lineage:** `validation.finalStatus` → deterministic projection。
 - **Observed or derived:** derived projection。
 - **Consumer:** Security Audit / structured reporting候補。
 - **Missing semantics:** missing / unknown source statusは fail-safeに `unresolved`。
-- **Failure behavior:** unknown vocabularyを established / refutedへ推測しません。
+- **Failure behavior:** unknown vocabularyを established / refutedへ推測しない。
 - **Failure visibility:** helper resultの reasonCode。
-- **Human surface / fallback:** general L1には直接出ません。元validationはfinding/L3に残ります。
+- **Human surface / fallback:** general L1には直接出ない。元validationはfinding/L3に残る。
 - **Gate relationship:** not consumed。
-- **Trust / integrity:** upstream validationを超えるtrustを追加しません。
+- **Trust / integrity:** upstream validationを超えるtrustを追加しない。
 - **Authority:** none。
 
-### F4 — Security Audit Run Record `evidenceState`
+### F4—Security Audit Run Record `evidenceState`
 
 - **Evidence reference:** `schemas/security-audit-run-record.schema.json`、`pages/reference/stable-interfaces.md`。
-- **Runtime path:** 現在のgeneral review pathにはありません。
+- **Runtime path:** 現在のgeneral review pathにはない。
 - **Producer / owner:** Security Audit Run Record contract。
 - **Runtime availability:** schema published / runtime writer未配線。
 - **Activation / default:** unavailable by default。
 - **Stability / compatibility:** Experimental。
 - **Source of truth / persistence:** 将来は `.river/security-audit/` artifact。現時点ではruntime emissionなし。
-- **Transformation / lineage:** finding Evidence Stateとのowner関係はあるが、general artifactへ横流ししません。
+- **Transformation / lineage:** finding Evidence Stateとのowner関係はあるが、general artifactへ横流ししない。
 - **Observed or derived:** structured audit artifact field。
 - **Consumer:** future security-audit consumer。
-- **Missing semantics:** general reviewでabsentなのが正常です。
-- **Failure behavior / visibility:** writer未配線のため current runtime evidence と数えません。
+- **Missing semantics:** general reviewでabsentなのが正常である。
+- **Failure behavior / visibility:** writer未配線のため current runtime evidence と数えない。
 - **Human surface / fallback:** current general surfaceなし。
 - **Gate relationship:** Gate integrationなし。
-- **Trust / integrity:** schema存在はruntime attestationを意味しません。
+- **Trust / integrity:** schema存在はruntime attestationを意味しない。
 - **Authority:** none。
 
-### F5 — Semantic Precision / disposition ownership
+### F5—Semantic Precision / disposition ownership
 
 - **Evidence reference:** ADR-007、#1857、および Review Artifact schemaの既存finding metadata。
-- **Runtime path:** current finding ranking / reporting pathの一部は存在しますが、ADR-013が想定する finding-level disposition main path は完全なowner surfaceとしては未成熟です。
+- **Runtime path:** current finding ranking / reporting pathの一部は存在するが、ADR-013が想定する finding-level disposition main path は完全なowner surfaceとしては未成熟である。
 - **Producer / owner:** Semantic Precision owner。
-- **Runtime availability:** partial / owner-defined。Evidence Architectureが再実装しません。
+- **Runtime availability:** partial / owner-defined。Evidence Architectureが再実装しない。
 - **Activation / default:** existing reporting policy依存。
-- **Stability / compatibility:** existing finding semanticsの意味変更はconsumer-visibleです。
+- **Stability / compatibility:** existing finding semanticsの意味変更はconsumer-visibleである。
 - **Source of truth:** owning contract。
-- **Persistence / transformation:** ownerが出したmetadataのみを使用します。
-- **Lineage:** dispositionを Evidence StateやGateへ再計算しません。
+- **Persistence / transformation:** ownerが出したmetadataのみを使用する。
+- **Lineage:** dispositionを Evidence StateやGateへ再計算しない。
 - **Consumer:** reporting / human attention。
-- **Missing semantics:** missing dispositionからmaterialityを推測しません。
-- **Failure behavior / visibility:** owning pathに従います。
+- **Missing semantics:** missing dispositionからmaterialityを推測しない。
+- **Failure behavior / visibility:** owning pathに従う。
 - **Human surface:** finding rendering / L2-L3。
 - **Gate relationship:** Evidence Architectureからはnot consumed / not recomputed。
 - **Trust / authority:** none。
 
-### E1 — Review Coverage
+### E1—Review Coverage
 
-- **Evidence reference:** `schemas/review-coverage.schema.json`、`src/lib/review-coverage.mjs::deriveReviewCoverage`、`classifyLlmAttempt`、`pages/reference/stable-interfaces.md`。
-- **Runtime path:** single reviewer、`--reviewers`、JSON、saved run、`runs diff`。Gate効果は `river run --gate` のopt-in時のみです。
+- **Evidence reference:** `schemas/review-coverage.schema.json` と `src/lib/review-coverage.mjs::deriveReviewCoverage`。LLM attempt 判定は `classifyLlmAttempt`、公開契約は `pages/reference/stable-interfaces.md`。
+- **Runtime path:** single reviewer、`--reviewers`、JSON、saved run、`runs diff`。Gate効果は `river run --gate` のopt-in時のみである。
 - **Producer / owner:** Review Coverage contract。
-- **Runtime availability:** LLM callを実際にattemptしたrunで観測されます。intentional skipだけのrunではfieldを生成しません。
-- **Activation / default:** observationはattempt依存。Gate input化は `RIVER_GATE_COVERAGE=1` のみです。
-- **Stability / compatibility:** Experimental。optional field追加は想定されます。
-- **Source of truth / persistence:** runtime `reviewCoverage` object。saved runは同じobjectをrecomputeせず保存します。
+- **Runtime availability:** LLM callを実際にattemptしたrunで観測される。intentional skipだけのrunではfieldを生成しない。
+- **Activation / default:** observationはattempt依存。Gate input化は `RIVER_GATE_COVERAGE=1` のみである。
+- **Stability / compatibility:** Experimental。optional field追加は想定される。
+- **Source of truth / persistence:** runtime `reviewCoverage` object。saved runは同じobjectをrecomputeせず保存する。
 - **Transformation / lineage:** review units → `deriveReviewCoverage` → artifact / saved-run copy → Layer 2 qualification / Decision Surface projection。
-- **Observed or derived:** execution completenessのderived observationです。finding countとは独立です。
+- **Observed or derived:** execution completenessのderived observationである。finding countとは独立である。
 - **Consumer:** saved-run analytics、`runs diff`、Decision Surface、optional Gate。
-- **Missing semantics:** absenceは `complete` でも `partial` でもありません。historical / skipped runでは observationなしです。
-- **Failure behavior:** required unit不完了は `partial` / `not_executed`。inconsistent stateはconsumer側でconservativeに扱います。
+- **Missing semantics:** absenceは `complete` でも `partial` でもない。historical / skipped runでは observationなしである。
+- **Failure behavior:** required unit不完了は `partial` / `not_executed`。inconsistent stateはconsumer側でconservativeに扱う。
 - **Failure visibility:** artifact / saved-run / Decision Surface / Gate reason when opt-in。
 - **Human surface / fallback:** L1 coverage observation、Markdown details、L3 object。
 - **Gate relationship:** defaultではdecision/Gate非影響。opt-inで `COVERAGE_INCOMPLETE`。
-- **Trust / integrity:** execution observation。review correctnessの証明ではありません。
+- **Trust / integrity:** execution observation。review correctnessの証明ではない。
 - **Authority:** none。
 
-### E2 — `llmNotExecuted` / deterministic-unrunnable observation
+### E2—`llmNotExecuted` / deterministic-unrunnable observation
 
-- **Evidence reference:** `src/lib/review-coverage.mjs::allLlmAttemptsSkipped`、`src/lib/result-store.mjs::buildRunRecord`、`pages/reference/loop-convergence-contract.md`。
+- **Evidence reference:** `src/lib/review-coverage.mjs::allLlmAttemptsSkipped` と `src/lib/result-store.mjs::buildRunRecord`。consumer contract は `pages/reference/loop-convergence-contract.md`。
 - **Runtime path:** review runtime → saved run → `runs diff`; optional Gate path。
 - **Producer / owner:** LLM-attempt classifier / run gate owner。
-- **Runtime availability:** `llmNotExecuted` はtrueのときsaved runへ出ます。falseはfieldとして永続化しません。
-- **Activation / default:** Layer 2 qualificationはrecordにtrueがあれば既定で有効。Gateは `RIVER_GATE_REQUIRE_LLM=1` のときだけ有効です。
+- **Runtime availability:** `llmNotExecuted` はtrueのときsaved runへ出る。falseはfieldとして永続化しない。
+- **Activation / default:** Layer 2 qualificationはrecordにtrueがあれば既定で有効。Gateは `RIVER_GATE_REQUIRE_LLM=1` のときだけ有効である。
 - **Stability / compatibility:** additive optional observation。
 - **Source of truth / persistence:** runtime observation / saved run。
 - **Transformation / lineage:** attempt debug → boolean observation → Layer 2 qualification / optional Gate input。
 - **Observed or derived:** derived execution observation。
 - **Consumer:** `runs diff`、Gate。
-- **Missing semantics:** absentは「LLM実行済み」の証拠ではありません。
-- **Failure behavior:** latest saved runがtrueなら Layer 2 `CONVERGED` を `NO_SIGNAL` へ降格します。
+- **Missing semantics:** absentは「LLM実行済み」の証拠ではない。
+- **Failure behavior:** latest saved runがtrueなら Layer 2 `CONVERGED` を `NO_SIGNAL` へ降格する。
 - **Failure visibility:** saved run / runs diff / Gate reason。
-- **Human surface / fallback:** Markdown rendererにはLLM未設定/失敗用の別fail-safe headerもあります。
-- **Gate relationship:** opt-inで `LLM_NOT_EXECUTED` → `ESCALATE`。dry-runの `NOT_EXECUTED` 等の先行規則を尊重します。
-- **Trust / integrity:** execution observationでありsemantic correctnessではありません。
+- **Human surface / fallback:** Markdown rendererにはLLM未設定/失敗用の別fail-safe headerもある。
+- **Gate relationship:** opt-inで `LLM_NOT_EXECUTED` → `ESCALATE`。dry-runの `NOT_EXECUTED` 等の先行規則を尊重する。
+- **Trust / integrity:** execution observationでありsemantic correctnessではない。
 - **Authority:** none。
 
-### E3 — `deterministicUnrunnable`
+### E3—`deterministicUnrunnable`
 
-- **Evidence reference:** `src/lib/deterministic-command-orchestrator.mjs`、`src/lib/run-gate.mjs::deriveRunGate`、`src/lib/gate-decision.mjs::deriveGateDecision`、`pages/reference/loop-convergence-contract.md`。
+- **Evidence reference:** `src/lib/deterministic-command-orchestrator.mjs` と `src/lib/run-gate.mjs::deriveRunGate`。Gate 導出は `src/lib/gate-decision.mjs::deriveGateDecision`、契約は `pages/reference/loop-convergence-contract.md`。
 - **Runtime path:** deterministic execution gate → `river run --gate` / Gate derivation。
-- **Producer / owner:** deterministic command orchestratorがstaging incompletenessを観測し、run gateがGate inputへ渡します。
+- **Producer / owner:** deterministic command orchestratorがstaging incompletenessを観測し、run gateがGate inputへ渡す。
 - **Runtime availability:** opt-in。
-- **Activation / default:** `RIVER_GATE_STAGING_UNRUNNABLE=1` のときだけstaging incompleteを `deterministicUnrunnable: true` としてGateへ持ち込みます。既定はoffです。
-- **Stability / compatibility:** Gateの独立入力です。Review Coverage vocabularyへ統合しません。
-- **Source of truth / persistence:** runtime Gate input。`strictBlock` とは別fieldです。
+- **Activation / default:** `RIVER_GATE_STAGING_UNRUNNABLE=1` のときだけstaging incompleteを `deterministicUnrunnable: true` としてGateへ持ち込む。既定はoffである。
+- **Stability / compatibility:** Gateの独立入力である。Review Coverage vocabularyへ統合しない。
+- **Source of truth / persistence:** runtime Gate input。`strictBlock` とは別fieldである。
 - **Transformation / lineage:** staging incomplete observation → boolean Gate input → `ESCALATE / DETERMINISTIC_UNRUNNABLE`。
 - **Observed or derived:** execution incompleteness observation。
 - **Consumer:** deterministic Gate derivation。
-- **Missing semantics:** false / absentを「deterministic checkが完全に実行された証明」として一般化しません。opt-inがoffならGateへ持ち込まれないためです。
-- **Failure behavior:** empty / incomplete sandboxのchecker exit 0を変更へのPASSとして扱わず、opt-in時は `ESCALATE` へ倒します。
+- **Missing semantics:** false / absentを「deterministic checkが完全に実行された証明」として一般化しない。opt-inがoffならGateへ持ち込まれないためである。
+- **Failure behavior:** empty / incomplete sandboxのchecker exit 0を変更へのPASSとして扱わず、opt-in時は `ESCALATE` へ倒す。
 - **Failure visibility:** Gate `reasonCode=DETERMINISTIC_UNRUNNABLE`。
 - **Human surface / fallback:** Gate / Decision Surface / L3 inputs。
-- **Gate relationship:** independent Gate input。`strictBlock` や Review Coverageへfoldしません。
-- **Trust / integrity:** staging observationの完全性に依存します。
+- **Gate relationship:** independent Gate input。`strictBlock` や Review Coverageへfoldしない。
+- **Trust / integrity:** staging observationの完全性に依存する。
 - **Authority:** none。
 
-### P1 — Review Artifact `trace.run_id`
+### P1—Review Artifact `trace.run_id`
 
 - **Evidence reference:** `schemas/review-artifact.schema.json::trace.run_id`。
 - **Runtime path:** finalized Review Artifact。
@@ -256,34 +256,34 @@ Derived projections     Advisory signals
 - **Transformation / lineage:** finalization-generated identifier。
 - **Observed or derived:** identity metadata。
 - **Consumer:** debugging / handoff。
-- **Missing semantics:** absentはolder artifact等を意味し得ます。
+- **Missing semantics:** absentはolder artifact等を意味し得る。
 - **Failure visibility:** absent。
 - **Human surface:**通常L3。
 - **Gate relationship:** not consumed。
-- **Trust / integrity:** identifierだけではattestationになりません。
+- **Trust / integrity:** identifierだけではattestationにならない。
 - **Authority:** none。
 
-### P2 — saved-run `runId` / provenance
+### P2—saved-run `runId` / provenance
 
 - **Evidence reference:** `src/lib/result-store.mjs::buildRunRecord`、`buildRunProvenance`、`normalizeProvenance`。
 - **Runtime path:** `river run --save` / GitHub Actions auto-save / `river runs *`。
 - **Producer / owner:** result store。
 - **Runtime availability:** save時のみ。
 - **Activation / default:** `--save` またはhost auto-save。
-- **Stability / compatibility:** result-store recordはaudit convenienceです。tamper-evident contractではありません。
+- **Stability / compatibility:** result-store recordはaudit convenienceである。tamper-evident contractではない。
 - **Source of truth / persistence:** `.river/runs/*.json`。
-- **Transformation / lineage:** runtime result → saved record copy。coverageはrecomputeしません。
-- **Observed or derived:** `runId` はstore identity。`trace.run_id` と同一性を仮定しません。
+- **Transformation / lineage:** runtime result → saved record copy。coverageはrecomputeしない。
+- **Observed or derived:** `runId` はstore identity。`trace.run_id` と同一性を仮定しない。
 - **Consumer:** runs list/diff/summary/digest。
-- **Missing semantics:** provenance absentはtrust verifiedを意味しません。`dirty: null` はunknownです。
-- **Failure behavior:** caller-supplied unknown `evidenceSource` は provenance blockをdropしstderr warningを出します。`trustedBy` は常にnullへrepinします。
+- **Missing semantics:** provenance absentはtrust verifiedを意味しない。`dirty: null` はunknownである。
+- **Failure behavior:** caller-supplied unknown `evidenceSource` は provenance blockをdropしstderr warningを出す。`trustedBy` は常にnullへrepinする。
 - **Failure visibility:** stderr + record omission。
 - **Human surface / fallback:** digest / L3 saved record。
-- **Gate relationship:** saved gateを記録できますがstore自体はGate authorityではありません。
-- **Trust / integrity:** SELF-REPORTED / untrusted。repo内storeはagent write authority内です。
+- **Gate relationship:** saved gateを記録できるがstore自体はGate authorityではない。
+- **Trust / integrity:** SELF-REPORTED / untrusted。repo内storeはagent write authority内である。
 - **Authority:** none。
 
-### P3 — Execution Manifest
+### P3—Execution Manifest
 
 - **Evidence reference:** `schemas/execution-manifest.schema.json`、`src/lib/execution-manifest.mjs`、`pages/reference/stable-interfaces.md`。
 - **Runtime path:** supported `river run --save`、`review plan`、`review exec` / replay。
@@ -292,18 +292,18 @@ Derived projections     Advisory signals
 - **Activation / default:** supported pathがmanifest specをbuildできる場合。
 - **Stability / compatibility:** Experimental。
 - **Source of truth / persistence:** `executionManifest` block + separate schema。
-- **Transformation / lineage:** resolved execution inputs → canonicalized manifest + hashes。`review plan` / `review exec` のproduction testでは `manifest.reviewRunId === artifact.trace.run_id` を固定しています。
-- **Observed or derived:** execution provenance / replayability metadata。saved-run側のcanonical `review_run_id` は `deriveReviewRunId()` が `review_run_id` → `reviewRunId` → legacy `runId` の順でread-side解決します。artifact trace idとsaved-run idの普遍的な同一性は仮定しません。
+- **Transformation / lineage:** resolved execution inputs → canonicalized manifest + hashes。`review plan` / `review exec` のproduction testでは `manifest.reviewRunId === artifact.trace.run_id` を固定している。
+- **Observed or derived:** execution provenance / replayability metadata。saved-run側のcanonical `review_run_id` は `deriveReviewRunId()` が `review_run_id` → `reviewRunId` → legacy `runId` の順でread-side解決する。artifact trace idとsaved-run idの普遍的な同一性は仮定しない。
 - **Consumer:** `verifyExecutionManifest` / replayability assessment。
-- **Missing semantics:** absent artifactはmanifest-backed replayabilityを主張できません。`reviewRunId` がnullの場合も、別identityを推測して補完しません。
-- **Failure behavior:** integrity verificationとreplayability assessmentを分離します。
+- **Missing semantics:** absent artifactはmanifest-backed replayabilityを主張できない。`reviewRunId` がnullの場合も、別identityを推測して補完しない。
+- **Failure behavior:** integrity verificationとreplayability assessmentを分離する。
 - **Failure visibility:** verifier / artifact。
 - **Human surface / fallback:** L3 artifact / manifest references。
-- **Gate relationship:** manifest自体はGate decisionを再計算しません。
-- **Trust / integrity:** content integrity / replayabilityとactor authenticityは別です。
+- **Gate relationship:** manifest自体はGate decisionを再計算しない。
+- **Trust / integrity:** content integrity / replayabilityとactor authenticityは別である。
 - **Authority:** none。
 
-### P4 — Reviewer Independence helper
+### P4—Reviewer Independence helper
 
 - **Evidence reference:** `src/lib/reviewer-independence.mjs`、`docs/development/2267-phase5a-reviewer-independence.md`。
 - **Runtime path:** current general review runtimeには未配線。
@@ -316,14 +316,14 @@ Derived projections     Advisory signals
 - **Transformation / lineage:** two run ids → same / distinct / unknown logical execution separation。
 - **Observed or derived:** derived independence state。
 - **Consumer:** future provenance-aware validation。
-- **Missing semantics:** unknownをindependentへ昇格しません。
+- **Missing semantics:** unknownをindependentへ昇格しない。
 - **Failure behavior:** missing id → unknown。
 - **Human surface:** none by default。
 - **Gate relationship:** not consumed。
-- **Trust / integrity:** distinct run idはdifferent actor/provider/model/correctnessを証明しません。
+- **Trust / integrity:** distinct run idはdifferent actor/provider/model/correctnessを証明しない。
 - **Authority:** none。
 
-### S1 — `decision`
+### S1—`decision`
 
 - **Evidence reference:** `schemas/review-artifact.schema.json::decision`、scoring engine。
 - **Runtime path:** Review Artifact / saved run / renderer。
@@ -335,14 +335,14 @@ Derived projections     Advisory signals
 - **Transformation / lineage:** findings/scoring → advisory verdict。
 - **Observed or derived:** advisory signal。
 - **Consumer:** renderer、Layer 1 signal、Gate。
-- **Missing semantics:** absentはauto-approveではありません。
+- **Missing semantics:** absentはauto-approveではない。
 - **Failure behavior:** downstream rules must preserve unknown / no signal。
 - **Human surface:** headline / L1。
-- **Gate relationship:** Gate inputの1つです。Gateと同一ではありません。
-- **Trust / integrity:** derivation contextのtrustに従います。
+- **Gate relationship:** Gate inputの1つである。Gateと同一ではない。
+- **Trust / integrity:** derivation contextのtrustに従う。
 - **Authority:** none。
 
-### S2 — Layer 1 `suggestedLoopSignal`
+### S2—Layer 1 `suggestedLoopSignal`
 
 - **Evidence reference:** `schemas/review-artifact.schema.json::suggestedLoopSignal`、`pages/reference/loop-convergence-contract.md`。
 - **Runtime path:** single Review Artifact。
@@ -354,91 +354,91 @@ Derived projections     Advisory signals
 - **Transformation / lineage:** decision + blocking counts → `NO_SIGNAL | REVISE_REQUIRED | CONVERGED | ESCALATE_HUMAN`。
 - **Observed or derived:** advisory signal。
 - **Consumer:** agentic fix loop / Gate input。
-- **Missing semantics:** absent / unknownはstop許可ではありません。
+- **Missing semantics:** absent / unknownはstop許可ではない。
 - **Failure behavior:** undeterminedは `NO_SIGNAL`。
-- **Human surface:** machine-readable / docs。必要に応じrendererがdecisionを表示します。
-- **Gate relationship:** inputでありGateそのものではありません。
-- **Trust / integrity:** Layer 1はcoverage / oscillationを内包しません。
+- **Human surface:** machine-readable / docs。必要に応じrendererがdecisionを表示する。
+- **Gate relationship:** inputでありGateそのものではない。
+- **Trust / integrity:** Layer 1はcoverage / oscillationを内包しない。
 - **Authority:** none。
 
-### S3 — Layer 2 `river runs diff` signal
+### S3—Layer 2 `river runs diff` signal
 
 - **Evidence reference:** `pages/reference/loop-convergence-contract.md`、saved-run `reviewCoverage` / `llmNotExecuted`、review differ。
 - **Runtime path:** `river runs diff <id...>`。
 - **Producer / owner:** saved-run differ / loop qualification。
-- **Runtime availability:** saved runsが必要です。
-- **Activation / default:** coverage / llm-not-executed qualificationはrecordが存在すれば既定で適用します。3+ runsではoscillationも評価します。
-- **Stability / compatibility:** caller-facing derived output。Layer 1とは別derivationです。
-- **Source of truth / persistence:** saved run records。Layer 2 output自体をcanonical truthとして再保存しません。
+- **Runtime availability:** saved runsが必要である。
+- **Activation / default:** coverage / llm-not-executed qualificationはrecordが存在すれば既定で適用する。3+ runsではoscillationも評価する。
+- **Stability / compatibility:** caller-facing derived output。Layer 1とは別derivationである。
+- **Source of truth / persistence:** saved run records。Layer 2 output自体をcanonical truthとして再保存しない。
 - **Transformation / lineage:** Layer 1-like base signal + latest coverage / llmNotExecuted + oscillation → qualified signal。
 - **Observed or derived:** advisory qualification。
 - **Consumer:** loop caller。
-- **Missing semantics:** missing coverageはowner-specific `unknown` として扱い、incompleteとは断定しません。missing `llmNotExecuted` もtrueとはみなしません。
-- **Failure behavior:** incomplete coverage / llmNotExecutedは `CONVERGED` のみ `NO_SIGNAL` へ降格します。oscillationはstop/escalate方向です。
+- **Missing semantics:** missing coverageはowner-specific `unknown` として扱い、incompleteとは断定しない。missing `llmNotExecuted` もtrueとはみなさない。
+- **Failure behavior:** incomplete coverage / llmNotExecutedは `CONVERGED` のみ `NO_SIGNAL` へ降格する。oscillationはstop/escalate方向である。
 - **Human surface:** CLI diff output。
-- **Gate relationship:** Gateとは別経路です。
-- **Trust / integrity:** saved-run storeのself-reported trust boundaryを継承します。
+- **Gate relationship:** Gateとは別経路である。
+- **Trust / integrity:** saved-run storeのself-reported trust boundaryを継承する。
 - **Authority:** none。
 
-### S4 — Gate
+### S4—Gate
 
 - **Evidence reference:** `schemas/review-artifact.schema.json::gate`、`src/lib/gate-decision.mjs::deriveGateDecision`、`src/lib/run-gate.mjs`。
 - **Runtime path:** `river run` / supported review pathでGate derivationが有効な場合。
 - **Producer / owner:** deterministic Gate derivation。
 - **Runtime availability:** path/config dependent。
-- **Activation / default:** Gateは複数existing inputからderiveします。coverage / require-LLMは別々のopt-inです。
-- **Stability / compatibility:** artifact gateはadditive machine-readable signal。Gate exit code意味はStableです。
+- **Activation / default:** Gateは複数existing inputからderiveする。coverage / require-LLMは別々のopt-inである。
+- **Stability / compatibility:** artifact gateはadditive machine-readable signal。Gate exit code意味はStableである。
 - **Source of truth / persistence:** artifact `gate` + deterministic replay through inputs。
 - **Transformation / lineage:** decision / loop signal / risk / execution / coverage opt-in等 → Gate。
 - **Observed or derived:** advisory signal。
 - **Consumer:** renderer / `--gate` / host。
-- **Missing semantics:** unknown inputをGOへ昇格しません。
+- **Missing semantics:** unknown inputをGOへ昇格しない。
 - **Failure behavior:** conservative `NO_GO` / `ESCALATE` rules。
 - **Failure visibility:** `reasonCode` / renderer / process exit when enforced。
 - **Human surface:** L1 Decision Surface can point to Gate escalation; full inputs remain L3。
 - **Gate relationship:** self。
-- **Trust / integrity:** `inputsHash` はregression summaryでありtamper-proofではありません。trusted hostはinputsをreplayできます。
+- **Trust / integrity:** `inputsHash` はregression summaryでありtamper-proofではない。trusted hostはinputsをreplayできる。
 - **Authority:** Gate derivation itself has none。
 
-### H1 — Human Decision Surface / Markdown renderer
+### H1—Human Decision Surface / Markdown renderer
 
 - **Evidence reference:** `src/cli/render.mjs::buildHumanDecisionSurface`、`formatHumanDecisionSurfaceMarkdown`、`printMarkdownReport`。
 - **Runtime path:** Markdown / GitHub comment。
 - **Producer / owner:** Human Attention renderer。
 - **Runtime availability:** renderer path。
-- **Activation / default:** attention-required stateがある場合L1を表示します。
-- **Stability / compatibility:** internal projection over existing state。新しいtruth / judgmentを所有しません。
-- **Source of truth / persistence:** input artifact/result。renderer outputはprojectionです。
+- **Activation / default:** attention-required stateがある場合L1を表示する。
+- **Stability / compatibility:** internal projection over existing state。新しいtruth / judgmentを所有しない。
+- **Source of truth / persistence:** input artifact/result。renderer outputはprojectionである。
 - **Transformation / lineage:** existing decision / gate / risk / coverage / blind spots → selective L1 display。
 - **Observed or derived:** presentation projection。
 - **Consumer:** human reviewer。
-- **Missing semantics:** L1に無い情報を「存在しない」とみなしません。
-- **Failure behavior:** LLM failed-empty / llmless-emptyにはL1 builder外のfail-safe headerがあります。
+- **Missing semantics:** L1に無い情報を「存在しない」とみなさない。
+- **Failure behavior:** LLM failed-empty / llmless-emptyにはL1 builder外のfail-safe headerがある。
 - **Failure visibility:** Markdown header / coverage observation。
 - **Human surface / fallback:** L1 → finding sections / Team Lead report / L3 artifact。
-- **Gate relationship:** Gateを表示しますが再計算しません。
-- **Trust / integrity:** underlying ownerを超えません。
+- **Gate relationship:** Gateを表示するが再計算しない。
+- **Trust / integrity:** underlying ownerを超えない。
 - **Authority:** none。
 
-### H2 — Team Lead summary / blind spots と L2 Resolution Summary
+### H2—Team Lead summary / blind spots と L2 Resolution Summary
 
 - **Evidence reference:** `src/cli/render.mjs::buildHumanDecisionSurface` の `teamLeadReport.blindSpots`、ADR-012、ADR-011。
 - **Runtime path:** reviewer orchestration / Markdown reporting。
-- **Producer / owner:** Team Lead reportはcurrent runtime owner。Resolution SummaryはReview Resolution architecture ownerです。
-- **Runtime availability:** Team Lead summaryはpath-dependent。L2 Resolution Summary sidecarは未実装です。
+- **Producer / owner:** Team Lead reportはcurrent runtime owner。Resolution SummaryはReview Resolution architecture ownerである。
+- **Runtime availability:** Team Lead summaryはpath-dependent。L2 Resolution Summary sidecarは未実装である。
 - **Activation / default:** reviewer orchestration等。
-- **Stability / compatibility:** current Team Lead surfaceとplanned Resolution surfaceは別contractです。
+- **Stability / compatibility:** current Team Lead surfaceとplanned Resolution surfaceは別contractである。
 - **Source of truth / persistence:** Team Lead result / future sidecar。
-- **Transformation / lineage:** blind spotsはcurrent reportからL1へprojectionされます。
+- **Transformation / lineage:** blind spotsはcurrent reportからL1へprojectionされる。
 - **Observed or derived:** summary / presentation。
 - **Consumer:** human reviewer。
-- **Missing semantics:** Team Lead summary absentからResolution stateを推測しません。
-- **Failure behavior / visibility:** current surfaceはblind spotを保持します。future resolutionは未利用です。
+- **Missing semantics:** Team Lead summary absentからResolution stateを推測しない。
+- **Failure behavior / visibility:** current surfaceはblind spotを保持する。future resolutionは未利用である。
 - **Human surface:** L1/L2候補。
-- **Gate relationship:** blind spotsをGateの新inputへ変換しません。
+- **Gate relationship:** blind spotsをGateの新inputへ変換しない。
 - **Trust / authority:** none。
 
-### R1 — Review Resolution sidecar
+### R1—Review Resolution sidecar
 
 - **Evidence reference:** ADR-011 / #2322。
 - **Runtime path:** current runtimeなし。
@@ -446,48 +446,48 @@ Derived projections     Advisory signals
 - **Runtime availability:** planned / schema未実装。
 - **Activation / default:** unavailable。
 - **Stability / compatibility:** not published。
-- **Source of truth / persistence:** future sidecar。現時点では存在しません。
-- **Transformation / lineage:** author/human handling + later verificationを所有する予定です。
+- **Source of truth / persistence:** future sidecar。現時点では存在しない。
+- **Transformation / lineage:** author/human handling + later verificationを所有する予定である。
 - **Consumer:** future L2 Resolution Summary。
-- **Missing semantics:** current absenceはunresolved findingを意味しません。単にcontract未実装です。
-- **Failure behavior / visibility:** current evidence sourceとして数えません。
+- **Missing semantics:** current absenceはunresolved findingを意味しない。単にcontract未実装である。
+- **Failure behavior / visibility:** current evidence sourceとして数えない。
 - **Human surface:** future L2。
-- **Gate relationship:** current Gate inputではありません。
-- **Trust / authority:** future owner contractに従います。merge authorityは持たせません。
+- **Gate relationship:** current Gate inputではない。
+- **Trust / authority:** future owner contractに従う。merge authorityは持たせない。
 
-### A1 — `--gate` / GitHub Action `gate:` enforcement
+### A1—`--gate` / GitHub Action `gate:` enforcement
 
 - **Evidence reference:** `src/lib/gate-exit.mjs::gateDecisionExitCode`、`pages/reference/stable-interfaces.md`。
 - **Runtime path:** CLI / GitHub Action。
 - **Producer / owner:** enforcement adapter。
 - **Runtime availability:** opt-in。
 - **Activation / default:** `--gate` または Action `gate:`。
-- **Stability / compatibility:** gate decision exit code `0/1/2/3` semanticsはStableで、意味変更はmajor対象です。
-- **Source of truth / persistence:** Gate decision。exit code自体はprocess stateです。
+- **Stability / compatibility:** gate decision exit code `0/1/2/3` semanticsはStableで、意味変更はmajor対象である。
+- **Source of truth / persistence:** Gate decision。exit code自体はprocess stateである。
 - **Transformation / lineage:** `GO | GO_WITH_OBSERVATION → 0`、`NO_GO → 1`、`ESCALATE → 3`。
 - **Observed or derived:** enforcement mapping。
 - **Consumer:** shell / CI runner / host。
-- **Missing semantics:** Gateなしで勝手にPASSを生成しません。
-- **Failure behavior:** non-GOをprocess statusへ反映します。
+- **Missing semantics:** Gateなしで勝手にPASSを生成しない。
+- **Failure behavior:** non-GOをprocess statusへ反映する。
 - **Failure visibility:** process exit / CI status。
 - **Human surface:** CI status + artifact reason。
-- **Gate relationship:** Gateを執行しますが意味を変えません。
-- **Trust / integrity:** host境界の強度に依存します。
-- **Authority:** process-control adapter。merge/release authorityそのものではありません。
+- **Gate relationship:** Gateを執行するが意味を変えない。
+- **Trust / integrity:** host境界の強度に依存する。
+- **Authority:** process-control adapter。merge/release authorityそのものではない。
 
-### A2 — Host / Human authority
+### A2—Host / Human authority
 
 - **Evidence reference:** ADR-013、Review Artifact Gate description、stable interface docs。
 - **Runtime path:** GitHub / CI / deployment / human review process。
 - **Producer / owner:** host policy / human。
 - **Runtime availability:** River Review外。
 - **Activation / default:** host policy。
-- **Stability / compatibility:** River Review artifact contract外です。
+- **Stability / compatibility:** River Review artifact contract外である。
 - **Source of truth / persistence:** host system。
-- **Transformation / lineage:** advisory signalを受けてactionを決めます。
+- **Transformation / lineage:** advisory signalを受けてactionを決める。
 - **Observed or derived:** authority decision。
 - **Consumer:** repository / release / production systems。
-- **Missing semantics:** River Review signalだけでmerge authorityが生まれません。
+- **Missing semantics:** River Review signalだけでmerge authorityが生まれない。
 - **Failure behavior / visibility:** host責務。
 - **Human surface:** host UI / approvals。
 - **Gate relationship:** Gate consumer。
@@ -562,7 +562,7 @@ ActionはRiver Review signalをCIへ接続します。Action / process statusは
 
 ## Surface mapping
 
-### L1 — Decision Surface
+### L1—Decision Surface
 
 現在の `buildHumanDecisionSurface()` は次を既存stateから直接読みます。
 
@@ -575,7 +575,7 @@ ActionはRiver Review signalをCIへ接続します。Action / process statusは
 
 Review Evidence Projectionを必須中間層にする必要はありません。
 
-### L2 — summary surfaces
+### L2—summary surfaces
 
 現在はfinding sections / Team Lead report等があります。
 
@@ -583,7 +583,7 @@ ADR-012 / ADR-011が想定する Review Resolution由来のL2 Resolution Summary
 
 Team Lead summaryをResolution Summaryとして扱いません。
 
-### L3 — canonical machine-readable surfaces
+### L3—canonical machine-readable surfaces
 
 - Review Artifact
 - saved run
@@ -598,10 +598,10 @@ L1に表示されない情報があっても、L3で保持されるならcomplet
 
 `buildRunProvenance()` が書く provenance は self-reported です。
 
-- `evidenceSource: CI` は「CIであると自己申告した」以上のattestationではありません。
-- `trustedBy` はnullに固定します。
-- `dirty: null` はunknownです。
-- repo内 `.river/runs/` はreviewed agentのwrite authority内です。
+- `evidenceSource: CI` は「CIであると自己申告した」以上のattestationではない。
+- `trustedBy` はnullに固定する。
+- `dirty: null` はunknownである。
+- repo内 `.river/runs/` はreviewed agentのwrite authority内である。
 
 ### Execution Manifest
 
@@ -617,7 +617,7 @@ tamper-proof security controlではありません。
 
 ## Source / docs drift register
 
-### Drift 1 — Review Resolution owner vs runtime availability
+### Drift 1—Review Resolution owner vs runtime availability
 
 ADR-011はReview Resolution sidecarのownerを定義します。
 
@@ -625,7 +625,7 @@ current repositoryには、そのsidecarをcurrent evidence sourceとして扱�
 
 **Disposition:** architecture ownerとして残し、Phase 1 mappingでは `planned / unavailable` とします。
 
-### Drift 2 — Reviewer Independence design vs runtime wiring
+### Drift 2—Reviewer Independence design vs runtime wiring
 
 Reviewer Independence helperはlogical run separationを定義しています。
 
@@ -633,7 +633,7 @@ current general runtime artifactへは配線されていません。
 
 **Disposition:** `helper-only`。distinct run idsをactor/model/provider independenceへ拡大解釈しません。
 
-### Drift 3 — Security Audit Run Record schema vs writer
+### Drift 3—Security Audit Run Record schema vs writer
 
 Security Audit Run RecordはExperimental schemaとしてpublishedです。
 
@@ -641,7 +641,7 @@ stable interfacesは runtime writer未配線を明記しています。
 
 **Disposition:** schema existenceをcurrent observationとして数えません。
 
-### Drift 4 — Review Coverage “observe-only” wording vs optional Gate use
+### Drift 4—Review Coverage “observe-only” wording vs optional Gate use
 
 Review Coverage自体はdecision/Gateのownerではありません。
 
@@ -649,7 +649,7 @@ Review Coverage自体はdecision/Gateのownerではありません。
 
 **Disposition:** “coverage owner does not decide” と “Gate may opt-in consume coverage” を分離します。
 
-### Drift 5 — upstream review execution availability
+### Drift 5—upstream review execution availability
 
 PR #2471の実運用では、#2474適用後にMarkdown ADRがupstream review inputへ入ることを確認しました。
 
@@ -679,7 +679,7 @@ PR #2471の実運用では、#2474適用後にMarkdown ADRがupstream review inp
 
 ## Gaps and duplication candidates
 
-### Gap 1 — Reviewer Independence runtime availability
+### Gap 1—Reviewer Independence runtime availability
 
 runtime availability の不足は確認できますが、current consumer gap は確認できません。
 
@@ -687,7 +687,7 @@ runtime availability の不足は確認できますが、current consumer gap �
 
 将来 consumer requirement が発生した場合は #1760 / owning provenance contract側でruntime wiringを検討します。
 
-### Gap 2 — Review Resolution runtime availability
+### Gap 2—Review Resolution runtime availability
 
 current runtimeには存在しませんが、Phase 1で必要とするconsumerも確認できません。
 
@@ -695,7 +695,7 @@ author / human resolutionをmachine-readableに扱うconsumerが具体化した�
 
 新projectionがresolution stateを独自に作ってはいけません。
 
-### Gap 3 — Security Audit writer
+### Gap 3—Security Audit writer
 
 schemaは存在しますが、current Phase 1 consumer requirementはありません。
 
@@ -703,7 +703,7 @@ Security Audit Run Recordをconsumerが必要とする場合だけ、そのowner
 
 general Review Artifactへ `evidenceState` をコピーする理由にはなりません。
 
-### Gap 4 — Human-facing cross-owner summary
+### Gap 4—Human-facing cross-owner summary
 
 現行Decision Surfaceは主要なattention signalを既に直接読めます。
 
@@ -725,7 +725,7 @@ general Review Artifactへ `evidenceState` をコピーする理由にはなり�
 
 ### 1. Concrete consumer が特定されている
 
-**NO**
+判定: **NO**
 
 現在のDecision Surface、saved-run consumer、Gate、CLIは既存ownerを直接消費できます。
 
@@ -733,7 +733,7 @@ general Review Artifactへ `evidenceState` をコピーする理由にはなり�
 
 ### 2. Current artifact / Decision Surface の不足をfixtureで再現できる
 
-**NO**
+判定: **NO**
 
 13シナリオはavailability / trust / path differenceを再現しましたが、いずれも既存owner stateを保持したまま説明できます。
 
@@ -741,7 +741,7 @@ general Review Artifactへ `evidenceState` をコピーする理由にはなり�
 
 ### 3. Existing owner の additive extensionだけでは解決しにくい理由がある
 
-**NO**
+判定: **NO**
 
 確認したgapはReviewer Independence、Review Resolution、Security Audit writerなどowner-specificです。
 
@@ -749,7 +749,7 @@ general Review Artifactへ `evidenceState` をコピーする理由にはなり�
 
 ### 4. Canonical input から expected projectionを決定論的に記述できる
 
-**NO — consumer未確定のため設計しない**
+**NO—consumer未確定のため設計しない**
 
 pure deterministic projection自体は技術的に可能です。
 
@@ -759,7 +759,7 @@ pure deterministic projection自体は技術的に可能です。
 
 ### 5. Gate / `decision` / `suggestedLoopSignal` の変更を必要としない
 
-**YES**
+判定: **YES**
 
 仮に将来projectionを追加しても、ADR-013によりこれらexisting signalを再計算・上書きしません。
 
