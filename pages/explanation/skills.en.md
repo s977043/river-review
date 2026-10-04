@@ -219,7 +219,15 @@ No deployment step needed—just commit to repository!
 
 ### 6. Improve
 
-Monitor skill effectiveness and iterate:
+Monitor skill effectiveness and iterate. Separate **being invoked** from **being useful**.
+
+`installed / selected / fired` are availability or activation evidence, not effectiveness evidence. Where practical, hold case / runtime / model / effort constant and compare **WITH skill vs WITHOUT skill** (or previous-version baseline vs candidate for a skill update). Use repeated trials for nondeterministic runs rather than concluding from a single success.
+
+At minimum compare detection, false positives, and critical regressions; add time / token / cost / human intervention when available. If the candidate did not activate, paired cases are missing, or the sample is insufficient, report `INCONCLUSIVE` instead of guessing FAIL.
+
+Re-evaluate after major model/runtime changes or material changes to skill responsibility, prompt, or routing. A stronger base model can absorb capability that previously required a skill. For River Review harness evolution, reuse the existing Experiment Manifest / paired-replay machinery rather than creating a parallel evaluator.
+
+Then iterate:
 
 ```bash
 # Run regression tests
