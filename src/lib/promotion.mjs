@@ -384,6 +384,10 @@ export function retargetPromotion({
 
 export const PRE_ADOPTION_PROMOTION_STATUSES = Object.freeze(['candidate', 'pending']);
 
+const PROMOTION_CANDIDATE_ID_RE = /^RR-PC-[0-9a-f]{12}$/;
+const EXPERIMENT_MANIFEST_ID_RE = /^RR-EXP-[0-9a-f]{12}$/;
+const SHA256_RE = /^[0-9a-f]{64}$/;
+
 function assertReplayAttachmentArtifact(artifact) {
   if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
     throw new Error('paired replay input must be a JSON object.');
@@ -435,6 +439,16 @@ function assertReplayAttachmentArtifact(artifact) {
     if (typeof handoff[key] !== 'string' || !handoff[key]) {
       throw new Error(`promotionHandoff is missing ${key}.`);
     }
+  }
+
+  if (
+    !PROMOTION_CANDIDATE_ID_RE.test(handoff.candidateId) ||
+    !EXPERIMENT_MANIFEST_ID_RE.test(handoff.manifestId) ||
+    !SHA256_RE.test(handoff.candidateContentHash) ||
+    !SHA256_RE.test(handoff.experimentKey) ||
+    !SHA256_RE.test(handoff.manifestHash)
+  ) {
+    throw new Error('promotionHandoff contains an invalid content-addressed id or hash.');
   }
 
   const manifest = artifact.manifest;
@@ -528,6 +542,13 @@ export function validateReplayEvidenceAttachment(entry, artifact) {
     throw new Error(
       `Candidate ${entry.id} has no contentHash; legacy candidates cannot accept replay evidence safely.`
     );
+  }
+  if (
+    !SHA256_RE.test(pc.contentHash) ||
+    !PROMOTION_CANDIDATE_ID_RE.test(entry.id) ||
+    entry.id !== `RR-PC-${pc.contentHash.slice(0, 12)}`
+  ) {
+    throw new Error(`Candidate ${entry.id} has an invalid content-addressed identity.`);
   }
   if (handoff.candidateContentHash !== pc.contentHash) {
     throw new Error(
