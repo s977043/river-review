@@ -161,13 +161,8 @@ describe('runReviewerOrchestration', () => {
       }),
     });
 
-    assert.equal(
-      result.reviewCoverage.units[0].executionId,
-      'exec:reviewer:bug-hunter/chunk:1'
-    );
-    assert.deepEqual(result.findings[0].sourceExecutionIds, [
-      'exec:reviewer:bug-hunter/chunk:1',
-    ]);
+    assert.equal(result.reviewCoverage.units[0].executionId, 'exec:reviewer:bug-hunter/chunk:1');
+    assert.deepEqual(result.findings[0].sourceExecutionIds, ['exec:reviewer:bug-hunter/chunk:1']);
   });
 
   it('rejects missing execution ids before tasks start (#2481)', async () => {
