@@ -309,95 +309,73 @@ describe('applyReplayEvidenceAttachment (#2485)', () => {
 });
 
 describe('reference promotion lifecycle integration (#2490)', () => {
-  test(
-    'keeps PRE-adoption replay evidence separate from post-adoption effectiveness',
-    () => {
-      const entry = makeReplayCandidate();
+  test('keeps PRE-adoption replay evidence separate from post-adoption effectiveness', () => {
+    const entry = makeReplayCandidate();
 
-      applyPromotionRetarget(entry, {
-        kind: 'reference',
-        targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
-        approver: 'alice',
-        reason: 'codify recurring experience knowledge',
-        now: decidedNow,
-      });
-      applyReplayEvidenceAttachment(entry, makeReplayArtifact(entry), {
-        approver: 'alice',
-        reason: 'paired replay reviewed before adoption',
-        now: decidedNow,
-      });
+    applyPromotionRetarget(entry, {
+      kind: 'reference',
+      targetId: 'skills/agent-skills/river-review-code/references/ERROR-HANDLING.md',
+      approver: 'alice',
+      reason: 'codify recurring experience knowledge',
+      now: decidedNow,
+    });
+    applyReplayEvidenceAttachment(entry, makeReplayArtifact(entry), {
+      approver: 'alice',
+      reason: 'paired replay reviewed before adoption',
+      now: decidedNow,
+    });
 
-      const approvedAt = new Date('2026-07-22T00:00:00.000Z');
-      applyPromotionDecision(entry, {
-        decision: 'approved',
-        approver: 'alice',
-        reason: 'replay evidence reviewed',
-        now: approvedAt,
-      });
+    const approvedAt = new Date('2026-07-22T00:00:00.000Z');
+    applyPromotionDecision(entry, {
+      decision: 'approved',
+      approver: 'alice',
+      reason: 'replay evidence reviewed',
+      now: approvedAt,
+    });
 
-      const result = applyEffectivenessReview(
-        entry,
-        [
-          {
-            timestamp: '2026-07-23T00:00:00.000Z',
-            trigger: 'pr-comment',
-            feedbackType: 'false_positive',
-            skillId: 'skill-a',
-            findingFingerprint: null,
-          },
-          {
-            timestamp: '2026-07-24T00:00:00.000Z',
-            trigger: 'pr-comment',
-            feedbackType: 'false_positive',
-            skillId: 'skill-a',
-            findingFingerprint: null,
-          },
-        ],
+    const result = applyEffectivenessReview(
+      entry,
+      [
         {
-          now: new Date('2026-07-25T00:00:00.000Z'),
-          threshold: 2,
-          reviewer: 'bob',
-        }
-      );
+          timestamp: '2026-07-23T00:00:00.000Z',
+          trigger: 'pr-comment',
+          feedbackType: 'false_positive',
+          skillId: 'skill-a',
+          findingFingerprint: null,
+        },
+        {
+          timestamp: '2026-07-24T00:00:00.000Z',
+          trigger: 'pr-comment',
+          feedbackType: 'false_positive',
+          skillId: 'skill-a',
+          findingFingerprint: null,
+        },
+      ],
+      {
+        now: new Date('2026-07-25T00:00:00.000Z'),
+        threshold: 2,
+        reviewer: 'bob',
+      }
+    );
 
-      assert.equal(
-        entry.context.promotionCandidate.proposedTarget.kind,
-        'reference'
-      );
-      assert.equal(result.changed, true);
-      assert.equal(result.eligible, true);
-      assert.equal(result.breached, true);
-      assert.equal(
-        entry.context.promotionCandidate.promotionStatus,
-        'needs_review'
-      );
+    assert.equal(entry.context.promotionCandidate.proposedTarget.kind, 'reference');
+    assert.equal(result.changed, true);
+    assert.equal(result.eligible, true);
+    assert.equal(result.breached, true);
+    assert.equal(entry.context.promotionCandidate.promotionStatus, 'needs_review');
 
-      assert.equal(entry.context.experimentHistory.length, 1);
-      assert.equal(
-        entry.context.experimentHistory[0].handoff.manifestHash,
-        REPLAY_MANIFEST_HASH
-      );
-      assert.equal(entry.context.experimentHistory[0].metrics, undefined);
+    assert.equal(entry.context.experimentHistory.length, 1);
+    assert.equal(entry.context.experimentHistory[0].handoff.manifestHash, REPLAY_MANIFEST_HASH);
+    assert.equal(entry.context.experimentHistory[0].metrics, undefined);
 
-      assert.equal(entry.context.effectivenessHistory.length, 1);
-      assert.equal(
-        entry.context.effectivenessHistory[0].decision,
-        'needs_review'
-      );
-      assert.equal(
-        entry.context.effectivenessHistory[0].metrics.negativeCount,
-        2
-      );
-      assert.equal(entry.context.effectivenessHistory[0].handoff, undefined);
+    assert.equal(entry.context.effectivenessHistory.length, 1);
+    assert.equal(entry.context.effectivenessHistory[0].decision, 'needs_review');
+    assert.equal(entry.context.effectivenessHistory[0].metrics.negativeCount, 2);
+    assert.equal(entry.context.effectivenessHistory[0].handoff, undefined);
 
-      assert.equal(entry.context.approval.decision, 'approved');
-      assert.equal(
-        validate(wrapIndex([entry])),
-        true,
-        JSON.stringify(validate.errors, null, 2)
-      );
-    }
-  );
+    assert.equal(entry.context.approval.decision, 'approved');
+    assert.equal(validate(wrapIndex([entry])), true, JSON.stringify(validate.errors, null, 2));
+  });
 });
 
 describe('applyPromotionDecision (pure transition)', () => {
