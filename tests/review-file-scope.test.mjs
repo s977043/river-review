@@ -163,11 +163,8 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
   it('keeps a Markdown-only diff reviewable in upstream phase (#2473)', async (t) => {
     const { dir, cleanup } = await createTempGitRepo({
       prefix: 'river-review-upstream-markdown-',
-      initialFiles: {
-        'docs/adr/013-example.md': '# Before\n',
-      },
       changedFiles: {
-        'docs/adr/013-example.md': '# After\n\nEvidence Architecture\n',
+        'docs/adr/013-example.md': '# Evidence Architecture\n\nPhase 0 ADR\n',
       },
     });
     t.after(cleanup);
@@ -177,6 +174,7 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
 
     assert.equal(context.status, 'ok');
     assert.deepEqual(context.changedFiles, ['docs/adr/013-example.md']);
+    assert.match(context.diff.rawDiffText, /--- \/dev\/null/);
     assert.match(context.diff.rawDiffText, /docs\/adr\/013-example\.md/);
     assert.deepEqual(
       context.diff.filesForReview.map((entry) => entry.path),
