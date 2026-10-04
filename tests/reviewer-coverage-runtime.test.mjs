@@ -97,10 +97,7 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(result.reviewCoverage.expectedUnits, 1);
     assert.equal(result.reviewCoverage.completedRequiredUnits, 1);
     assert.equal(result.reviewCoverage.units[0].id, 'reviewer:bug-hunter/chunk:1');
-    assert.equal(
-      result.reviewCoverage.units[0].executionId,
-      'exec:reviewer:bug-hunter/chunk:1'
-    );
+    assert.equal(result.reviewCoverage.units[0].executionId, 'exec:reviewer:bug-hunter/chunk:1');
     assert.deepEqual(result.reviewCoverage.units[0].subjects, ['src/a.js']);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
