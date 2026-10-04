@@ -38,14 +38,16 @@ Harness Engineering は、エージェントに良い指示を与えるだけで
 
 River Review では、外部の固定的な「N 層」を新しい taxonomy や owner table として導入しません。既存コンポーネントが Harness のどの責務を補強するかを説明する lens として、次のように整理します。
 
-| Harness の責務             | River Review が担う範囲                                                             | River Review が所有しないもの                           |
-| -------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Capabilities               | repo-owned Skills、review agent、reviewer lens                                      | 汎用実装エージェントの能力全体                          |
-| Context / steering         | diff、artifact、rules、memory の選択と review context 構築                          | プロジェクト全体の agent context / task planning        |
-| Coordination               | Review Team の role 選択、fan-out、finding merge                                    | project-wide agent orchestration、worker scheduling     |
-| State / memory             | Riverbed、saved run、review evidence                                                | 汎用 long-term agent memory の正本                      |
-| Evaluation / observability | fixtures、evals、Review Coverage、Evidence / provenance surface                     | 実装 agent 全体の observability platform                |
-| Judgment / enforcement     | Judgment Placement、review verdict、Gate recommendation、opt-in enforcement adapter | merge / release / production promotion の最終 authority |
+| Harness の責務             | River Review が担う範囲                                                          | River Review が所有しないもの                                  |
+| -------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Capabilities               | repo-owned Skills、review agent、reviewer lens                                   | 汎用実装エージェントの能力全体                                 |
+| Context / steering         | diff、artifact、rules、memory の選択と review context 構築                       | プロジェクト全体の agent context / task planning               |
+| Coordination               | Review Team の role 選択、fan-out、finding merge                                 | project-wide agent orchestration、worker scheduling            |
+| State / memory             | Riverbed、saved run、review evidence                                             | 汎用 long-term agent memory の正本                             |
+| Evaluation / observability | fixtures、evals、Review Coverage、Evidence / provenance surface                  | 実装 agent 全体の observability platform                       |
+| Judgment / signals         | Review Judgment as Code、Judgment Placement、review verdict、Gate recommendation | project-wide task decision や不可逆な実行判断                  |
+| Enforcement adapter        | `--gate` / GitHub Action `gate:` による exit code / CI status への写像           | signal の意味変更、merge / release policy の正本               |
+| Execution authority        | none                                                                             | Host / Human が所有する merge / release / production promotion |
 
 この表は ownership を新設するものではありません。各 contract の正本は既存 schema / ADR / reference docs に置き、同じ artifact に値が入っていても責務を統合しません。
 
