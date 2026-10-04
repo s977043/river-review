@@ -136,7 +136,8 @@
         },
         "independentVerifierVerified": {
           "type": "boolean",
-          "const": true
+          "const": true,
+          "description": "True means the replay's independent-verifier identity claim was authenticated by the caller-supplied trusted key and bound to this exact replay. Runtime/job isolation is outside this schema's claim."
         }
       }
     },
@@ -181,7 +182,8 @@
           "type": "array",
           "maxItems": 0
         }
-      }
+      },
+      "description": "Trust is relative to the Ed25519 public key explicitly supplied by the caller. This artifact verifies the signed attestation and its replay binding; it does not prove organizational key ownership, key rotation policy, or verifier-job isolation."
     },
     "canaryReadiness": {
       "type": "object",
@@ -237,7 +239,9 @@
       "items": {
         "type": "string",
         "const": "observe"
-      }
+      },
+      "minItems": 1,
+      "uniqueItems": true
     },
     "writeEffects": {
       "type": "array",
