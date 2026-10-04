@@ -663,9 +663,7 @@ export function mergeFindings(findings) {
       evidence: [...evidenceSet],
       agreement: mergedAgreement,
       consensusLevel: computeConsensusLevel(mergedAgreement),
-      ...(sourceExecutionIdSet.size > 0
-        ? { sourceExecutionIds: [...sourceExecutionIdSet] }
-        : {}),
+      ...(sourceExecutionIdSet.size > 0 ? { sourceExecutionIds: [...sourceExecutionIdSet] } : {}),
       // Only materialise `scope` when at least one member carried it. A cluster
       // where nobody classified the scope stays without the field — schema
       // readers already treat an absent scope as `in-diff`
@@ -889,8 +887,7 @@ export async function runReviewerOrchestration({
   // Fan out: each role × each diff chunk runs in parallel.
   // executionId is assigned by the orchestrator before the task starts, so a
   // failed/timed-out task still has provenance even when it returns no result.
-  const tasks = taskDescriptors.map(
-    ({ roleName, chunkDiff, chunkIdx, executionId }, taskIdx) => {
+  const tasks = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx, executionId }, taskIdx) => {
       const role = REVIEWER_ROLES[roleName];
       const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
       const taskStartedAt = nowMs();
@@ -931,8 +928,7 @@ export async function runReviewerOrchestration({
           throw err;
         }
       );
-    }
-  );
+    });
 
   // Run each role in parallel; partial failure is tolerated
   const settled = await Promise.allSettled(tasks);
