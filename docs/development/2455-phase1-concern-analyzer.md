@@ -268,6 +268,8 @@ For unchanged affected subjects:
 
 - the path must be visible in supplied repository context
 - the affected subject must carry same-path evidence
+- inspectable paths come only from structured `section.file` metadata or the machine-generated `Symbol usage references` section
+- arbitrary source, test, config, or comment text that merely looks like `path:line:` is never promoted into inspected-path provenance
 
 A known filename is not evidence.
 
