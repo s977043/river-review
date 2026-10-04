@@ -57,7 +57,7 @@ Evidence layer は GO / NO-GO、merge、release、production promotion を所有
 - Execution Manifest
 - Security Audit Run Record
 - Review Resolution sidecar
-- Finding Critic validation result / Evidence State
+- Finding Critic validation result (Evidence State is a derived projection of that contract)
 
 Evidence Architecture はこれらを概念的に接続するが、単一の authoritative artifact へ再統合しない。
 
@@ -89,7 +89,9 @@ Review Evidence Projection
 
 ### D4—Review Evidence Projection は Judge ではない
 
-Review Evidence Projection は既存 canonical state を選択的に表示・集約する derived view である。
+Review Evidence Projection は既存 canonical state と既存 derived contract view を選択的に表示・集約する view である。
+
+将来コード化する場合も pure deterministic projection を優先し、新しい保存先・mutable state・authority を持たせない。
 
 入力候補:
 
@@ -274,37 +276,41 @@ deterministic failure、unresolved evidence、coverage incompleteness 等は、�
 ## Target Architecture
 
 ```text
-Evidence Sources
-├─ deterministic verification
+Review / Verification producers
 ├─ reviewer findings
-├─ adversarial verification
-├─ Evidence State
+├─ deterministic verification
+├─ Finding Critic validation
+├─ review execution results
+├─ execution provenance
+└─ author / human resolution where available
+             ↓
+Existing domain contracts / artifacts
+├─ findings
+├─ validation.finalStatus
+│    └─ Evidence State projection
 ├─ Review Coverage
-├─ Reviewer Independence
-└─ Execution Manifest / provenance
-          ↓
-Canonical machine-readable artifacts
-          ↓
-Review Evidence Projection
-├─ evidence state visibility
-├─ coverage / blind spots
-├─ verification availability
-├─ independence state
-└─ provenance
-          │
-     ┌────┴────┐
-     ↓         ↓
-Decision    Gate
-Surface     derived signal
-     │         │
-     └────┬────┘
-          ↓
-      Host / Human
-      execution authority
+├─ reviewer run provenance
+│    └─ Reviewer Independence projection
+├─ Execution Manifest
+└─ Review Resolution
+             │
+        ┌────┴───────────────────────┐
+        │                            │
+        v                            v
+Review Evidence Projection      Existing Gate inputs
+        │                            │
+        v                            v
+Decision Surface                    Gate
+        │                     derived recommendation
+        v                            │
+Human attention                     v
+        └───────────────>       Host / Human
+                              execution authority
 ```
 
 この図は storage hierarchy を意味しない。
-Review Evidence Projection が canonical artifacts を所有することも、Decision Surface / Gate が同一 decision engine になることも意味しない。
+特に **Review Evidence Projection は Gate の入力層ではない**。
+Projection と Gate は existing domain contracts から別々に導出され、Projection が Gate decision を生成・補正・上書きすることはない。
 
 ## Relationship to Agent Team Topology
 
