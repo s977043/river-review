@@ -43,19 +43,9 @@ export const VERIFICATION_STATES = Object.freeze([
   'inconclusive',
 ]);
 
-export const SYSTEM_DISPOSITIONS = Object.freeze([
-  'blocking',
-  'advisory',
-  'suppressed',
-  'unknown',
-]);
+export const SYSTEM_DISPOSITIONS = Object.freeze(['blocking', 'advisory', 'suppressed', 'unknown']);
 
-export const COVERAGE_STATUSES = Object.freeze([
-  'complete',
-  'partial',
-  'not_executed',
-  'unknown',
-]);
+export const COVERAGE_STATUSES = Object.freeze(['complete', 'partial', 'not_executed', 'unknown']);
 
 // feedback.mjs owns this vocabulary. Review Resolution imports that SSoT so a
 // future feedback addition cannot silently collide with these state machines.
@@ -147,9 +137,7 @@ export function validateReviewResolutionSemantics(document) {
     const fingerprint = item?.findingRef?.fingerprint;
     const algo = item?.findingRef?.fingerprintAlgo;
     const key =
-      nonEmptyString(fingerprint) && nonEmptyString(algo)
-        ? `${algo}:${fingerprint}`
-        : null;
+      nonEmptyString(fingerprint) && nonEmptyString(algo) ? `${algo}:${fingerprint}` : null;
     if (key && fingerprints.has(key)) {
       errors.push(`${prefix} duplicates finding fingerprint ${key}`);
     }
