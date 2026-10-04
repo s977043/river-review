@@ -191,6 +191,48 @@ describe('#2510 signed replay verification', () => {
     );
   });
 
+  test('a valid signature for another candidate cannot be reused', () => {
+    const s = replaySpec();
+    s.improvementCandidate = {
+      clusterKey: 'test-skill::false_positive',
+      sourceFeedbackRefs: [
+        {
+          skillId: 'test-skill',
+          feedbackType: 'false_positive',
+          findingFingerprint: FP,
+          pr: 1,
+        },
+        {
+          skillId: 'test-skill',
+          feedbackType: 'false_positive',
+          findingFingerprint: 'fedcba9876543210',
+          pr: 2,
+        },
+      ],
+    };
+    const replay = buildPairedReplay(s, { now: NOW });
+    const pair = keyPair();
+    const attestation = signedAttestation(replay, pair, {
+      candidateId: 'RR-PC-000000000000',
+      candidateContentHash: '0'.repeat(64),
+    });
+    attestation.signature.value = sign(
+      null,
+      Buffer.from(canonicalJson(attestation.payload), 'utf8'),
+      pair.privateKey
+    ).toString('base64');
+
+    assert.throws(
+      () =>
+        buildReplayVerification({
+          replay,
+          attestation,
+          trustedPublicKeyPem: pair.publicKeyPem,
+        }),
+      /candidateId/
+    );
+  });
+
   test('a valid signature for another verifier id cannot be reused', () => {
     const replay = buildReplay();
     const pair = keyPair();
@@ -225,6 +267,27 @@ describe('#2510 signed replay verification', () => {
           trustedPublicKeyPem: pair.publicKeyPem,
         }),
       /verifier\.independent must be true/
+    );
+  });
+
+  test('issuedAt must be a full ISO-8601 date-time, not a date-only string', () => {
+    const replay = buildReplay();
+    const pair = keyPair();
+    const attestation = signedAttestation(replay, pair, { issuedAt: '2026-10-05' });
+    attestation.signature.value = sign(
+      null,
+      Buffer.from(canonicalJson(attestation.payload), 'utf8'),
+      pair.privateKey
+    ).toString('base64');
+
+    assert.throws(
+      () =>
+        buildReplayVerification({
+          replay,
+          attestation,
+          trustedPublicKeyPem: pair.publicKeyPem,
+        }),
+      /ISO-8601 date-time/
     );
   });
 
