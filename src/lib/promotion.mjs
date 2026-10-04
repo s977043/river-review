@@ -506,18 +506,13 @@ function assertReplayAttachmentArtifact(artifact) {
 }
 
 /**
- * Attach PRE-adoption paired replay evidence to one promotion_candidate.
- *
- * This transition deliberately changes no lifecycle or judgment field. It only
- * appends an auditable evidence record under context.experimentHistory.
- *
- * Binding validation is exposed separately as validateReplayEvidenceAttachment()
- * so callers/tests can verify attribution without mutating the entry.
+ * Validate that one paired replay artifact belongs to the supplied
+ * promotion_candidate and is still in the PRE-adoption lifecycle.
+ * This function has no side effects.
  *
  * @param {object} entry
  * @param {object} artifact paired-replay artifact
- * @param {{ approver: string, reason: string, now?: Date }} opts
- * @returns {{ changed: boolean, entry: object, record: object|null, note: string|null }}
+ * @returns {{ handoff: object }}
  */
 export function validateReplayEvidenceAttachment(entry, artifact) {
   const pc = getPromotionCandidate(entry);
@@ -544,9 +539,20 @@ export function validateReplayEvidenceAttachment(entry, artifact) {
       `Candidate ${entry.id} is not pre-adoption (promotionStatus=${pc.promotionStatus}); replay evidence must be attached before approval/activation.`
     );
   }
-  return { pc, handoff };
+  return { handoff };
 }
 
+/**
+ * Attach PRE-adoption paired replay evidence to one promotion_candidate.
+ *
+ * This transition deliberately changes no lifecycle or judgment field. It only
+ * appends an auditable evidence record under context.experimentHistory.
+ *
+ * @param {object} entry
+ * @param {object} artifact paired-replay artifact
+ * @param {{ approver: string, reason: string, now?: Date }} opts
+ * @returns {{ changed: boolean, entry: object, record: object|null, note: string|null }}
+ */
 export function applyReplayEvidenceAttachment(
   entry,
   artifact,
