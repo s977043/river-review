@@ -25,8 +25,9 @@ one pull request
 file / role / chunk 単位の execution coverage は、これらの「意味上の論点」を直接表現しない。
 大きな diff では、一部の変更だけが深く調査されても、semantic blind spot を review planning の時点で明示しにくい。
 
-`akkie76/code-review-skills` v0.1.0-beta.2（2026-10-04、release commit `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8`）の review workflow は、詳細レビューの前に complete diff から change map を作り、変更を independently reviewable な concern へ分解する。
-同 workflow は changed lines だけでなく caller / consumer / shared contract を追跡し、複数 concern がある場合は concern ごとの review depth と interaction を確認する。
+`akkie76/code-review-skills` v0.1.0-beta.2 の review workflow を参照します。対象は 2026-10-04 の release commit `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8` です。
+この workflow は詳細レビューの前に complete diff から change map を作り、変更を independently reviewable な concern へ分解します。
+changed lines だけでなく caller / consumer / shared contract も追跡します。複数 concern がある場合は、concern ごとの review depth と interaction を確認します。
 
 River Review には後段の能力の多くが既に存在する。
 
@@ -45,7 +46,7 @@ River Review には後段の能力の多くが既に存在する。
 
 ### D1—Review Concern を semantic change unit と定義する
 
-Review Concern は次のいずれか1つの coherent な変更単位である。
+Review Concern は次のいずれか1つの coherent な変更単位です。
 
 - behavior
 - invariant
@@ -57,7 +58,7 @@ Review Concern は次のいずれか1つの coherent な変更単位である。
 1 concern は複数ファイルに跨ってよい。
 1ファイルに複数 concern が存在してよい。
 
-test / docs / config は、原則としてファイル種別だけを理由に別 concern にしない。
+test / docs / config は、ファイル種別だけを理由とした別 concern にしない。
 対象 behavior を支える artifact として同じ concern に属し得る。
 独立した migration、public contract change、operational behavior change であれば別 concern にできる。
 
@@ -69,7 +70,7 @@ Concern != review viewpoint
 
 ### D2—Concern Map は per-run observation であり specification ではない
 
-Concern Map は LLM / analyzer が現在の review input から観測した semantic decomposition である。
+Concern Map は LLM / analyzer が現在の review input から観測した semantic decomposition です。
 完全な change specification や ground truth とみなさない。
 
 許容する状態:
@@ -111,7 +112,7 @@ Concern Analyzer instruction authority
 ### D4—post-optimization view だけを source にしない
 
 現行 runtime は `buildLlmDiffView()` で LLM-facing diff を最適化する。
-#2212 の `reviewCoverage.fileScope` は raw changed-file set と LLM-facing selected / excluded paths の境界を観測できる。
+Issue #2212 の `reviewCoverage.fileScope` は raw changed-file set と LLM-facing selected / excluded paths の境界を観測できる。
 
 Concern Analyzer が optimized diff だけを見ると、optimizer が落としたファイルの存在自体を semantic analysis から失う。
 そのため、将来の analyzer は少なくとも deterministic な raw changed-file manifest を必須入力とする。
@@ -163,7 +164,8 @@ analysis:
   limitations: []
 ```
 
-`affectedSubjects` は、caller / consumer / shared contract を実際に確認できた場合だけ追加する。各 affected subject は、その対象を affected と判断した inspected evidence へ追跡できる形を Phase 1 schema で要求する。
+`affectedSubjects` は、caller / consumer / shared contract を実際に確認できた場合だけ追加します。
+各 affected subject は inspected evidence へ追跡できる形にします。Phase 1 schema では、その evidence が affected 判定を支えることを要求します。
 推測だけで repository-wide impact を断定しない。
 
 `analysis.status` の意味は execution / input completeness に限定する。
@@ -175,7 +177,7 @@ analysis:
 `completed` は「全 concern を発見した」という semantic completeness を意味しない。
 
 この ADR は schema file の追加を承認しない。
-上記は Phase 1 PoC の design contract である。
+上記は Phase 1 PoC の design contract です。
 
 ### D6—既存 semantic axes を Concern Map へ複製しない
 
@@ -198,7 +200,7 @@ v1 Concern Map は以下を所有しない。
 
 ### D7—Review Coverage を拡張せず relationship から始める
 
-#2212 Review Coverage は execution completeness を所有する。
+Issue #2212 Review Coverage は execution completeness を所有する。
 
 ```text
 ReviewCoverage
@@ -239,7 +241,7 @@ Concern Analysis
 
 cross-concern integration check が将来 candidate finding を生成する場合も、同じ Finding Verification path へ流す。
 
-#2322 の Organizer / Resolution 層へ finding discovery を移さない。
+Issue #2322 の Organizer / Resolution 層へ finding discovery を移さない。
 
 ### D9—Concern-aware routing は additive promotion のみ検討する
 
@@ -323,20 +325,20 @@ River Review は同 repository を dependency / fork / vendor source of truth �
 
 ## Responsibility Matrix
 
-| Concern | Owner / SSoT | #2455 での扱い |
-| --- | --- | --- |
-| review target / base | existing local / artifact review input contracts | 再利用 |
-| deterministic review depth | `review-mode-router.mjs` / risk-map | 維持 |
-| semantic change decomposition | #2455 / future Review Concern Map | 新規 |
-| reviewer role execution | `reviewer-orchestrator.mjs` | 再利用 |
-| execution coverage | #2212 / `review-coverage.mjs` | 再利用 |
-| candidate finding truth | #1978 / `finding-critic.mjs`（opt-in runtime stage） | 再利用 |
-| materiality / disposition | #1857 / ADR-007（architecture owner） | 再利用 |
-| author / human resolution | #2322 / ADR-011 | 再利用 |
-| evidence / authority boundary | ADR-013 | 維持 |
-| security semantic coverage | #2267 / ADR-010 | 別責務 |
-| Gate / caller recommendation | existing Gate | 変更しない |
-| merge / irreversible authority | Host / Human | 変更しない |
+| Concern                        | Owner / SSoT                                         | #2455 での扱い |
+| ------------------------------ | ---------------------------------------------------- | -------------- |
+| review target / base           | existing local / artifact review input contracts     | 再利用         |
+| deterministic review depth     | `review-mode-router.mjs` / risk-map                  | 維持           |
+| semantic change decomposition  | #2455 / future Review Concern Map                    | 新規           |
+| reviewer role execution        | `reviewer-orchestrator.mjs`                          | 再利用         |
+| execution coverage             | #2212 / `review-coverage.mjs`                        | 再利用         |
+| candidate finding truth        | #1978 / `finding-critic.mjs`（opt-in runtime stage） | 再利用         |
+| materiality / disposition      | #1857 / ADR-007（architecture owner）                | 再利用         |
+| author / human resolution      | #2322 / ADR-011                                      | 再利用         |
+| evidence / authority boundary  | ADR-013                                              | 維持           |
+| security semantic coverage     | #2267 / ADR-010                                      | 別責務         |
+| Gate / caller recommendation   | existing Gate                                        | 変更しない     |
+| merge / irreversible authority | Host / Human                                         | 変更しない     |
 
 ## Consequences
 
@@ -383,7 +385,7 @@ Rejected for Phase 0.
 ### E. Finding Verification / Organizer まで #2455 で再実装する
 
 Rejected.
-#1978 / #1857 / #2322 が既に owner であり、責務重複になる。
+Issue #1978 / #1857 / #2322 が既に owner であり、責務重複になる。
 
 ### F. `code-review-skills` を vendor / fork する
 
@@ -427,7 +429,7 @@ Rejected.
 
 Phase 0 の current-source gap analysis は `docs/development/2455-phase0-gap-analysis.md` に記録する。
 
-次の実装候補は Phase 1 の observe-only Concern Analyzer PoC である。
+次の実装候補は Phase 1 の observe-only Concern Analyzer PoC です。
 Phase 1 では runtime / schema 変更を一度に広げず、explicit opt-in と thorough / team dogfood を優先する。
 
 ## References
@@ -446,5 +448,5 @@ Phase 1 では runtime / schema 変更を一度に広げず、explicit opt-in �
 - `docs/development/review-coverage-contract.md`
 - `docs/development/review-mode-router-design.md`
 - `pages/reference/artifact-input-contract.md`
-- https://github.com/akkie76/code-review-skills/releases/tag/v0.1.0-beta.2
-- https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/workflow.md
+- [code-review-skills v0.1.0-beta.2](https://github.com/akkie76/code-review-skills/releases/tag/v0.1.0-beta.2)
+- [code-review-skills workflow.md](https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/workflow.md)
