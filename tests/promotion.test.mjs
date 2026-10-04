@@ -9,6 +9,7 @@ import {
   decidePromotion,
   applyPromotionRetarget,
   retargetPromotion,
+  validateReplayEvidenceAttachment,
   applyReplayEvidenceAttachment,
   attachReplayEvidence,
   listPromotionCandidates,
@@ -92,6 +93,17 @@ function makeReplayArtifact(entry, overrides = {}) {
     },
   };
 }
+
+describe('validateReplayEvidenceAttachment (#2485)', () => {
+  test('validates candidate/handoff binding without mutating the entry', () => {
+    const entry = makeReplayCandidate();
+    const before = structuredClone(entry);
+    const { handoff } = validateReplayEvidenceAttachment(entry, makeReplayArtifact(entry));
+
+    assert.equal(handoff.candidateId, entry.id);
+    assert.deepEqual(entry, before);
+  });
+});
 
 describe('applyReplayEvidenceAttachment (#2485)', () => {
   test('attaches PRE-adoption replay evidence without changing judgment state', () => {
