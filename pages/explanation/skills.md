@@ -219,7 +219,13 @@ npm run validate:skill-yaml
 
 ### 6. 改善
 
-スキルの効果をモニタリングし反復改善します。
+スキルの効果をモニタリングし反復改善します。ここでは **「実行された」ことと「役に立った」ことを分離**します。
+
+`installed / selected / fired` は availability / activation evidence です。effectiveness は、可能な範囲で同じ case / runtime / model / effort を固定した **WITH skill vs WITHOUT skill**（既存 skill の更新では旧版 baseline vs candidate）として確認します。単発の成功例だけで判断せず、非決定的な実行では複数 trial を使います。
+
+比較では detection / false positive / critical regression を最低限確認し、取得可能なら time / token / cost / human intervention も合わせて見ます。candidate が発火していない、paired case が不足している、sample が足りない場合は `INCONCLUSIVE` とし、「効果なし」と推測しません。
+
+model / runtime の major update、skill の責務・prompt・routing の大幅変更時は再評価します。モデル本体の能力向上によって、以前は有効だった skill の限界寄与が小さくなる可能性があるためです。River Review 自身の Harness 改善では、既存の Experiment Manifest / paired replay を再利用します。
 
 ```bash
 # 回帰テスト実行
