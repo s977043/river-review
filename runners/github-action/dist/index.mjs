@@ -99870,7 +99870,9 @@ function assertReplayBinding(replay, entry, pc) {
     handoff.manifestVerified !== true ||
     handoff.experimentKeyMatchesInputs !== true
   ) {
-    throw new Error('paired replay manifest is not verified against the current experiment inputs.');
+    throw new Error(
+      'paired replay manifest is not verified against the current experiment inputs.'
+    );
   }
 
   const manifest = replay.manifest ?? {};
