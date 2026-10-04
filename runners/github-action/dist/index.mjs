@@ -33588,9 +33588,9 @@ function baseName(path) {
   return parts[parts.length - 1];
 }
 
-function isExcludedFile(path) {
+function isExcludedFile(path, { includeMarkdown = false } = {}) {
   const ext = extension(path);
-  if (EXCLUDED_EXTENSIONS.has(ext)) return true;
+  if (!includeMarkdown && EXCLUDED_EXTENSIONS.has(ext)) return true;
   if (EXCLUDED_FILES.has(baseName(path))) return true;
   if (EXCLUDED_DIR_RE.test(path)) return true;
   return false;
@@ -33657,14 +33657,15 @@ function compressHunkLines(lines) {
 /**
  * Filter and compress parsed diff files.
  * @param {{files: Array<{path: string, hunks: Array<{header: string, lines: string[]}>}>, diffText?: string}} diff
+ * @param {{includeMarkdown?: boolean}} [options]
  * @returns {{files: Array, diffText: string, tokenEstimate: number, reduction: number, rawTokenEstimate: number}}
  */
-function optimizeDiff(diff) {
+function optimizeDiff(diff, { includeMarkdown = false } = {}) {
   const rawTokenEstimate = Math.ceil((diff.diffText ?? '').length / 4);
   const optimizedFiles = [];
 
   for (const file of diff.files ?? []) {
-    if (isExcludedFile(file.path)) continue;
+    if (isExcludedFile(file.path, { includeMarkdown })) continue;
 
     const keptHunks = [];
     for (const hunk of file.hunks ?? []) {
@@ -33720,17 +33721,33 @@ function optimizeDiff(diff) {
  *    re-rendered only when a file was actually excluded, so the common
  *    no-artifact case passes the caller's `diffText` through unchanged.
  *
- * @param {{files?: Array, filesForReview?: Array, diffText?: string}} diff
+ * @param {{files?: Array, filesForReview?: Array, rawDiffText?: string, diffText?: string}} diff
+ * @param {{phase?: string}} [options]
  * @returns {{files: Array, diffText: string}}
  */
-function buildLlmDiffView(diff) {
+function buildLlmDiffView(diff, { phase } = {}) {
+  const includeMarkdown = phase === 'upstream';
+
   if (Array.isArray(diff?.filesForReview)) {
     const isRawChunkAlias = Array.isArray(diff?.files) && diff.filesForReview === diff.files;
-    if (isRawChunkAlias) {
-      const optimized = optimizeDiff({
-        files: diff.filesForReview,
-        diffText: diff.diffText ?? renderDiffText(diff.filesForReview),
-      });
+    // A precomputed default view may already have removed Markdown. Upstream
+    // reviews intentionally inspect ADR / requirements / specs Markdown, so
+    // rebuild from the raw files for that phase instead of trusting an
+    // optimization computed without phase context (#2473).
+    if (isRawChunkAlias || includeMarkdown) {
+      const sourceFiles =
+        includeMarkdown && Array.isArray(diff?.files) ? diff.files : diff.filesForReview;
+      const sourceDiffText =
+        includeMarkdown && typeof diff?.rawDiffText === 'string'
+          ? diff.rawDiffText
+          : (diff.diffText ?? renderDiffText(sourceFiles));
+      const optimized = optimizeDiff(
+        {
+          files: sourceFiles,
+          diffText: sourceDiffText,
+        },
+        { includeMarkdown }
+      );
       return { files: optimized.files, diffText: optimized.diffText };
     }
     return {
@@ -33739,7 +33756,9 @@ function buildLlmDiffView(diff) {
     };
   }
   const rawFiles = Array.isArray(diff?.files) ? diff.files : [];
-  const files = rawFiles.filter((file) => !isExcludedFile(file?.path ?? ''));
+  const files = rawFiles.filter((file) =>
+    !isExcludedFile(file?.path ?? '', { includeMarkdown })
+  );
   const diffText =
     files.length === rawFiles.length
       ? (diff?.diffText ?? renderDiffText(files))
@@ -44737,7 +44756,7 @@ async function generateReview({
   // maps) from BOTH the diff body and the "Changed files" summary. `diff` itself
   // stays raw so heuristics/fallback below keep seeing every changed file
   // (#1543/#1547).
-  const llmDiff = (0,diff_processor/* buildLlmDiffView */.wT)(diff);
+  const llmDiff = (0,diff_processor/* buildLlmDiffView */.wT)(diff, { phase });
   const viewpointStage = await runReviewViewpointStage({
     reviewConfig: effectiveConfig.review,
     diff,
@@ -95572,11 +95591,11 @@ function editDistance(a, b) {
 // `buildLlmDiffView` is the single source of truth for that view (it re-optimizes
 // the raw chunk alias, #2230), so routing through it keeps the ledger's
 // `excluded` and `units[].subjects` sets disjoint by construction.
-function reviewUnitSubjects(chunkDiff) {
+function reviewUnitSubjects(chunkDiff, phase) {
   const hadInputFiles =
     (Array.isArray(chunkDiff?.filesForReview) && chunkDiff.filesForReview.length > 0) ||
     (Array.isArray(chunkDiff?.files) && chunkDiff.files.length > 0);
-  const filePaths = ((0,diff_processor/* buildLlmDiffView */.wT)(chunkDiff).files ?? [])
+  const filePaths = ((0,diff_processor/* buildLlmDiffView */.wT)(chunkDiff, { phase }).files ?? [])
     .map((file) => file?.path)
     .filter((value) => typeof value === 'string');
   // Only fall back to `changedFiles` when the chunk carried no file objects at
@@ -95786,7 +95805,7 @@ async function runReviewerOrchestration({
     return {
       id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
       kind: 'diff-chunk',
-      subjects: reviewUnitSubjects(chunkDiff),
+      subjects: reviewUnitSubjects(chunkDiff, phase),
       reviewerRole: roleName,
       required: requiredRoles.has(roleName),
       status,
@@ -95833,7 +95852,7 @@ async function runReviewerOrchestration({
         diff: (0,diff_processor/* renderDiffText */.pQ)(diff),
         plan,
         fileTypes,
-        diffFiles: (0,diff_processor/* buildLlmDiffView */.wT)(diff).files,
+        diffFiles: (0,diff_processor/* buildLlmDiffView */.wT)(diff, { phase }).files,
         originalAsk: prBody ?? '',
         reviewConfig: mergedConfig.review,
         llm: { apiKey, model },
@@ -96733,6 +96752,7 @@ const resolveAvailableDependencies = (inputDependencies) =>
 
 async function collectLocalContext({
   cwd,
+  phase = 'midstream',
   debug = false,
   contextLines = 3,
   availableContexts,
@@ -96785,7 +96805,21 @@ async function collectLocalContext({
   const dirty = await (0,git/* isWorkingTreeDirty */.mM)(repoRoot);
   const rawDiff = await (0,diff_processor/* collectRepoDiff */.KD)(repoRoot, mergeBase, { contextLines });
   const exclusionPatterns = config.exclude?.files ?? [];
-  const diff = applyFileExclusions(rawDiff, exclusionPatterns);
+  const filteredDiff = applyFileExclusions(rawDiff, exclusionPatterns);
+  const normalizedPhase = normalizePhase(phase);
+  const llmView = (0,diff_processor/* buildLlmDiffView */.wT)(filteredDiff, { phase: normalizedPhase });
+  const tokenEstimate = Math.ceil(llmView.diffText.length / 4);
+  const rawTokenEstimate = filteredDiff.rawTokenEstimate ?? 0;
+  const diff = {
+    ...filteredDiff,
+    filesForReview: llmView.files,
+    diffText: llmView.diffText,
+    tokenEstimate,
+    reduction:
+      rawTokenEstimate === 0
+        ? 0
+        : Math.max(0, Math.round(((rawTokenEstimate - tokenEstimate) / rawTokenEstimate) * 100)),
+  };
   const reviewFileScope = (0,review_coverage/* deriveReviewFileScope */.or)(rawDiff, diff, exclusionPatterns);
   const reviewFiles = diff.filesForReview?.map((file) => file.path) ?? diff.changedFiles;
   // #1606: declare `fullFile` as an available input context when the runner can
@@ -96851,6 +96885,7 @@ async function planLocalReview({
 } = {}) {
   const base = await collectLocalContext({
     cwd,
+    phase,
     debug,
     contextLines: debug ? 10 : 3,
     availableContexts,
