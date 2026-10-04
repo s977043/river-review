@@ -183,8 +183,7 @@ describe('applyReplayEvidenceAttachment (#2485)', () => {
 
     const otherIdentityHash = `deadbeef0000${'d'.repeat(52)}`;
     const differentCandidate = makeReplayArtifact(entry);
-    differentCandidate.promotionHandoff.candidateId =
-      `RR-PC-${otherIdentityHash.slice(0, 12)}`;
+    differentCandidate.promotionHandoff.candidateId = `RR-PC-${otherIdentityHash.slice(0, 12)}`;
     differentCandidate.promotionHandoff.candidateContentHash = otherIdentityHash;
     differentCandidate.manifest.improvementCandidate.candidateId =
       differentCandidate.promotionHandoff.candidateId;
