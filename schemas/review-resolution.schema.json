@@ -4,7 +4,13 @@
   "title": "River Review Review Resolution",
   "description": "Experimental sidecar contract for tracking how humans/authors handle review findings and how those outcomes are verified on a later revision. Review Artifact remains immutable; this document does not own finding discovery, system disposition, gate decisions, merge authority, or canonical feedback.",
   "type": "object",
-  "required": ["schemaVersion", "kind", "resolutionId", "source", "items"],
+  "required": [
+    "schemaVersion",
+    "kind",
+    "resolutionId",
+    "source",
+    "items"
+  ],
   "additionalProperties": false,
   "$defs": {
     "sha256": {
@@ -13,19 +19,36 @@
     },
     "artifactRef": {
       "type": "object",
-      "required": ["name", "sha256"],
+      "required": [
+        "name",
+        "sha256"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "sha256": { "$ref": "#/$defs/sha256" }
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "revisionRef": {
       "type": "object",
-      "required": ["reviewRunId", "executionManifestId", "artifactRefs"],
+      "required": [
+        "reviewRunId",
+        "executionManifestId",
+        "artifactRefs"
+      ],
       "additionalProperties": false,
       "properties": {
-        "reviewRunId": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "reviewRunId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
         "executionManifestId": {
           "type": "string",
           "pattern": "^RR-EXM-[0-9a-f]{12}$"
@@ -33,39 +56,99 @@
         "artifactRefs": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/artifactRef" }
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
         }
       }
     },
     "evidenceRef": {
       "type": "object",
-      "required": ["ref", "sha256"],
+      "required": [
+        "ref",
+        "sha256"
+      ],
       "additionalProperties": false,
       "properties": {
-        "ref": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
         "sha256": {
-          "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
     "sourceFindingRef": {
       "type": "object",
-      "required": ["findingId", "reviewerId"],
+      "required": [
+        "findingId",
+        "reviewerId"
+      ],
       "additionalProperties": false,
       "properties": {
-        "findingId": { "type": "string", "minLength": 1, "maxLength": 300 },
-        "reviewerId": { "type": "string", "minLength": 1, "maxLength": 300 }
+        "findingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "reviewerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "decisionRef": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "adr",
+            "pr",
+            "issue",
+            "external",
+            "other"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
       }
     }
   },
   "properties": {
-    "schemaVersion": { "type": "string", "const": "1" },
-    "kind": { "type": "string", "const": "review-resolution" },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "review-resolution"
+    },
     "resolutionId": {
       "type": "string",
       "pattern": "^RR-RES-[A-Za-z0-9._:-]{1,200}$"
     },
-    "source": { "$ref": "#/$defs/revisionRef" },
+    "source": {
+      "$ref": "#/$defs/revisionRef"
+    },
     "items": {
       "type": "array",
       "items": {
@@ -81,38 +164,72 @@
         "properties": {
           "findingRef": {
             "type": "object",
-            "required": ["findingId", "fingerprint", "fingerprintAlgo", "sources"],
+            "required": [
+              "findingId",
+              "fingerprint",
+              "fingerprintAlgo",
+              "sources"
+            ],
             "additionalProperties": false,
             "properties": {
-              "findingId": { "type": "string", "minLength": 1, "maxLength": 300 },
-              "fingerprint": { "type": "string", "minLength": 1, "maxLength": 500 },
-              "fingerprintAlgo": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "findingId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "fingerprint": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "fingerprintAlgo": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
               "sources": {
                 "type": "array",
                 "minItems": 1,
-                "items": { "$ref": "#/$defs/sourceFindingRef" }
+                "items": {
+                  "$ref": "#/$defs/sourceFindingRef"
+                }
               }
             }
           },
           "systemJudgment": {
             "type": "object",
-            "required": ["disposition", "source"],
+            "required": [
+              "disposition",
+              "source"
+            ],
             "additionalProperties": false,
             "properties": {
               "disposition": {
                 "type": "string",
-                "enum": ["blocking", "advisory", "suppressed", "unknown"]
+                "enum": [
+                  "blocking",
+                  "advisory",
+                  "suppressed",
+                  "unknown"
+                ]
               },
               "source": {
                 "type": "string",
-                "enum": ["semantic-precision", "legacy-policy", "unavailable"]
+                "enum": [
+                  "semantic-precision",
+                  "legacy-policy",
+                  "unavailable"
+                ]
               }
             },
             "description": "Read-only projection of the system-owned disposition. Review Resolution does not recompute it."
           },
           "authorResponse": {
             "type": "object",
-            "required": ["state", "rationale"],
+            "required": [
+              "state",
+              "rationale"
+            ],
             "additionalProperties": false,
             "properties": {
               "state": {
@@ -129,7 +246,10 @@
                 ]
               },
               "rationale": {
-                "type": ["string", "null"],
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "minLength": 1,
                 "maxLength": 4000
               }
@@ -137,7 +257,11 @@
           },
           "resolution": {
             "type": "object",
-            "required": ["state", "target"],
+            "required": [
+              "state",
+              "target",
+              "decisionRefs"
+            ],
             "additionalProperties": false,
             "properties": {
               "state": {
@@ -153,13 +277,31 @@
                 ]
               },
               "target": {
-                "anyOf": [{ "$ref": "#/$defs/revisionRef" }, { "type": "null" }]
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/revisionRef"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "decisionRefs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/decisionRef"
+                }
               }
             }
           },
           "verification": {
             "type": "object",
-            "required": ["state", "verifier", "coverageStatus", "evidenceRefs"],
+            "required": [
+              "state",
+              "verifier",
+              "coverageStatus",
+              "evidenceRefs"
+            ],
             "additionalProperties": false,
             "properties": {
               "state": {
@@ -173,14 +315,28 @@
                   "inconclusive"
                 ]
               },
-              "verifier": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+              "verifier": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 300
+              },
               "coverageStatus": {
                 "type": "string",
-                "enum": ["complete", "partial", "not_executed", "unknown"]
+                "enum": [
+                  "complete",
+                  "partial",
+                  "not_executed",
+                  "unknown"
+                ]
               },
               "evidenceRefs": {
                 "type": "array",
-                "items": { "$ref": "#/$defs/evidenceRef" }
+                "items": {
+                  "$ref": "#/$defs/evidenceRef"
+                }
               }
             }
           }
