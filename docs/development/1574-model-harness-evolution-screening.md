@@ -66,6 +66,19 @@ Review capability observation
 
 現行 schema へ即時に新しい `harness` object を追加しない。まず既存 provenance / manifest / candidate field から envelope を導出できるかを優先する。
 
+## 3.1 Credit assignment / self-evaluation guards
+
+Model + Harness を評価単位にする場合でも、改善原因を誤帰属しないために次を守る。
+
+- **model-only claim** は、prompt / Skill / tool / context / routing / policy / evaluator が同一であることを確認できる場合だけ許す
+- model-aware prompt compiler 等で model ごとに prompt が派生する場合、比較対象は model 単体ではなく **joint system change** として記録する。各 side の compiled prompt hash / profile を provenance に残す
+- Harness surface の変更を評価するときは、provider / model / effort / temperature の差分を固定または明示する
+- `evaluation` surface 自体を candidate にする場合、candidate evaluator が自分自身を acceptance 判定してはならない。凍結した reference evaluator、sealed held-out set、deterministic oracle、または独立 verifier を使う
+- proposer / candidate implementation / verifier / final Human judgment の責務を可能な範囲で分離し、同一 agent の自己採点だけで adoption readiness を成立させない
+- side 間で fixture / dataset / reviewed source commit がずれた場合、その差分を candidate 効果として扱わない
+
+つまり「性能が上がった」ではなく、**どの条件差が観測結果へ寄与したと主張できるか**を experiment evidence の一部とする。
+
 ## 4. Existing artifact mapping
 
 Raven 型の自己改善ループを River Review-native に読み替えると次の対応になる。
