@@ -165,7 +165,9 @@ describe('runReviewerOrchestration', () => {
       result.reviewCoverage.units[0].executionId,
       'exec:reviewer:bug-hunter/chunk:1'
     );
-    assert.deepEqual(result.findings[0].sourceExecutionIds, ['exec:reviewer:bug-hunter/chunk:1']);
+    assert.deepEqual(result.findings[0].sourceExecutionIds, [
+      'exec:reviewer:bug-hunter/chunk:1',
+    ]);
   });
 
   it('rejects missing execution ids before tasks start (#2481)', async () => {
@@ -710,7 +712,11 @@ describe('mergeFindings', () => {
 
     const [merged] = mergeFindings([f1, f2]);
 
-    assert.deepEqual(merged.sourceExecutionIds, ['exec-a', 'shared-exec', 'exec-b']);
+    assert.deepEqual(merged.sourceExecutionIds, [
+      'exec-a',
+      'shared-exec',
+      'exec-b',
+    ]);
     assert.deepEqual(merged.agreement, ['bug-hunter', 'security-scanner']);
     assert.notEqual(merged.sourceExecutionIds.length, merged.agreement.length);
   });
