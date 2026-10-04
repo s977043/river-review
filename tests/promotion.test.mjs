@@ -21,9 +21,13 @@ import {
 import { buildPromotionCandidateEntry } from '../scripts/feedback-rule-candidates.mjs';
 import { loadMemory, appendEntry } from '../src/lib/riverbed-memory.mjs';
 import { createTempMemory } from './helpers/memory.mjs';
-import { compileRiverbedIndexValidator } from './helpers/schema-validator.mjs';
+import {
+  compileRiverbedIndexValidator,
+  compileSchemaFile,
+} from './helpers/schema-validator.mjs';
 
 const validate = compileRiverbedIndexValidator();
+const validatePlanGateHandoff = compileSchemaFile('plangate-promotion-handoff.schema.json');
 const wrapIndex = (entries) => ({ version: '1', entries });
 const now = new Date('2026-07-20T00:00:00.000Z');
 const decidedNow = new Date('2026-07-21T09:00:00.000Z');
@@ -897,6 +901,67 @@ describe('buildPrScaffold', () => {
     assert.match(s.branchName, /^promote\/plangate\//);
     assert.match(s.prBody, /PlanGate/);
     assert.match(s.note, /PlanGate approval required/);
+    assert.equal(
+      validatePlanGateHandoff(s.planGateHandoff),
+      true,
+      JSON.stringify(validatePlanGateHandoff.errors, null, 2)
+    );
+    assert.equal(s.planGateHandoff.readOnly, true);
+    assert.equal(s.planGateHandoff.requiresHumanJudgment, true);
+    assert.deepEqual(s.planGateHandoff.writeEffects, []);
+    assert.equal(s.planGateHandoff.sourceApproval.decision, 'approved');
+    assert.equal(s.planGateHandoff.sourceApproval.humanIntervention, true);
+    assert.equal(s.planGateHandoff.candidate.contentHash, null);
+    assert.equal(s.planGateHandoff.candidate.contentHashStatus, 'legacy-missing');
+    assert.equal(s.planGateHandoff.compatibility.adapterRequired, true);
+    assert.equal(s.planGateHandoff.compatibility.embeddedUpstreamContract, false);
+    assert.equal('rationale' in s.planGateHandoff.candidate, false);
+    assert.equal('approver' in s.planGateHandoff.sourceApproval, false);
+  });
+
+  test('PlanGate handoff carries content identity and PRE-adoption experiment refs only', () => {
+    const entry = makeCandidate('secret-scanner', 'missed_issue', [fp(1), fp(2)]);
+    const contentHash = 'd'.repeat(64);
+    entry.id = `RR-PC-${contentHash.slice(0, 12)}`;
+    entry.context.promotionCandidate.contentHash = contentHash;
+    entry.context.experimentHistory = [
+      {
+        attachedAt: '2026-07-20T12:00:00.000Z',
+        attachedBy: 'reviewer@example.invalid',
+        reason: 'free-form reason must not leave Riverbed',
+        handoff: {
+          candidateId: entry.id,
+          candidateContentHash: contentHash,
+          manifestId: 'RR-EXP-eeeeeeeeeeee',
+          experimentKey: 'f'.repeat(64),
+          manifestHash: 'a'.repeat(64),
+          manifestVerified: true,
+          experimentKeyMatchesInputs: true,
+          requiresHumanJudgment: true,
+          writeEffects: [],
+          activationVerified: true,
+          criticalRegressionCount: 0,
+          overallCriticalRegressionCount: 0,
+          terminalReason: null,
+        },
+      },
+    ];
+    approve(entry);
+
+    const handoff = buildPrScaffold(entry).planGateHandoff;
+    assert.equal(
+      validatePlanGateHandoff(handoff),
+      true,
+      JSON.stringify(validatePlanGateHandoff.errors, null, 2)
+    );
+    assert.equal(handoff.candidate.contentHash, contentHash);
+    assert.equal(handoff.candidate.contentHashStatus, 'present');
+    assert.equal(handoff.experiments.length, 1);
+    assert.equal(handoff.experiments[0].manifestId, 'RR-EXP-eeeeeeeeeeee');
+    assert.equal(handoff.experiments[0].activationVerified, true);
+    assert.equal(handoff.experiments[0].criticalRegressionCount, 0);
+    assert.equal(JSON.stringify(handoff).includes('reviewer@example.invalid'), false);
+    assert.equal(JSON.stringify(handoff).includes('free-form reason'), false);
   });
 
   test('human_judgment kind yields no mergeable scaffold', () => {
