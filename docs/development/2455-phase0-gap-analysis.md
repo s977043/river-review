@@ -7,13 +7,17 @@ Phase 0 implementation note for #2455.
 Baseline: `main` at `33fe4e7a558cb260ecfb83e59f2b52b28ce1fbc7` (2026-10-04).
 
 This phase is intentionally documentation-only.
-It changes no runtime review behavior or schema. Gate policy, reviewer selection, and Skill routing remain unchanged. Output contracts and merge authority also remain unchanged.
+It changes no runtime review behavior or schema.
+Gate policy, reviewer selection, and Skill routing remain unchanged.
+Output contracts and merge authority also remain unchanged.
 
 Architecture decision: [ADR-014](../adr/014-review-concern-map.md).
 
 ## 1. Why this is not a greenfield review feature
 
-The external `akkie76/code-review-skills` **v0.1.0-beta.2** workflow adds value primarily through review methodology. The referenced release is from 2026-10-04 at commit `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8`:
+The external `akkie76/code-review-skills` **v0.1.0-beta.2** workflow adds value primarily through review methodology.
+The referenced release is from 2026-10-04.
+Its commit is `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8`:
 
 1. establish the review contract
 2. inspect the complete change before line-level review
@@ -42,7 +46,9 @@ It is not a second Review Team or a second Finding Verification framework.
 
 ### 2.1 Review target and base resolution already exist
 
-Local review resolves repository state through `src/lib/local-runner.mjs`. It resolves `baseRef` and merge base. It also records commit SHA, changed files, and diff.
+Local review resolves repository state through `src/lib/local-runner.mjs`.
+It resolves `baseRef` and merge base.
+It also records commit SHA, changed files, and diff.
 
 Artifact-driven review has an explicit input contract in `pages/reference/artifact-input-contract.md`.
 Important existing behavior includes:
@@ -93,7 +99,9 @@ review execution coverage
 Review Unit subjects are defined as what the reviewer actually saw, not as the raw chunk.
 
 This existing boundary is reusable for Concern Analysis input completeness.
-It also creates a critical constraint. **The analyzer cannot receive only the optimized view.** Otherwise, a changed file removed by optimization can disappear from semantic analysis.
+It also creates a critical constraint.
+**The analyzer cannot receive only the optimized view.**
+Otherwise, a changed file removed by optimization can disappear from semantic analysis.
 
 ### 2.4 Review Team already owns reviewer decomposition
 
@@ -128,7 +136,9 @@ It does not answer whether the change's semantic concerns were all identified.
 
 ### 2.6 Finding validation already has an owner
 
-Issue #1978 and `src/lib/finding-critic.mjs` own Evidence-Grounded Finding Verification. The current `findings[].validation` runtime stage is opt-in (`RIVER_FINDING_CRITIC=1` or `review.findingCritic.mode: active`) and is absent on default runs.
+Issue #1978 and `src/lib/finding-critic.mjs` own Evidence-Grounded Finding Verification.
+The current `findings[].validation` runtime stage is opt-in.
+It activates through `RIVER_FINDING_CRITIC=1` or `review.findingCritic.mode: active` and is absent on default runs.
 
 Concern Analysis must not decide:
 
@@ -298,7 +308,8 @@ analysis:
   limitations: []
 ```
 
-Affected subjects are not plain inferred paths in the eventual schema. Each affected subject must retain inspectable evidence for why the unchanged subject is affected.
+Affected subjects are not plain inferred paths in the eventual schema.
+Each affected subject must retain inspectable evidence that explains why the unchanged subject is affected.
 
 `analysis.status` is deliberately not a semantic-completeness claim:
 
@@ -712,4 +723,4 @@ Promotion also requires acceptable cost and no Major / Critical recall regressio
 - [Stable Interfaces](../../pages/reference/stable-interfaces.md)
 - [code-review-skills v0.1.0-beta.2](https://github.com/akkie76/code-review-skills/releases/tag/v0.1.0-beta.2)
 - [code-review-skills workflow.md](https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/workflow.md)
-- [code-review-skills multi-agent-decomposition.md](https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/multi-agent-decomposition.md)
+- [multi-agent decomposition](https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/multi-agent-decomposition.md)
