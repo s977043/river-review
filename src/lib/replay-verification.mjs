@@ -44,6 +44,16 @@ function requireNullableString(value, label) {
   return requireString(value, label);
 }
 
+function requireIsoDateTime(value, label) {
+  const raw = requireString(value, label);
+  const dateTime =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
+  if (!dateTime.test(raw) || !Number.isFinite(Date.parse(raw))) {
+    throw new ReplayVerificationError(`${label} must be an ISO-8601 date-time.`);
+  }
+  return raw;
+}
+
 function requireExactKeys(value, keys, label) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
@@ -143,7 +153,7 @@ function normalizeAttestation(attestation) {
       'attestation.payload.candidateContentHash'
     ),
     verifierId: requireString(payload.verifierId, 'attestation.payload.verifierId'),
-    issuedAt: requireString(payload.issuedAt, 'attestation.payload.issuedAt'),
+    issuedAt: requireIsoDateTime(payload.issuedAt, 'attestation.payload.issuedAt'),
   };
 
   if (normalizedPayload.scope !== REPLAY_ATTESTATION_SCOPE) {
@@ -151,10 +161,6 @@ function normalizeAttestation(attestation) {
       `attestation.payload.scope must be "${REPLAY_ATTESTATION_SCOPE}".`
     );
   }
-  if (!Number.isFinite(Date.parse(normalizedPayload.issuedAt))) {
-    throw new ReplayVerificationError('attestation.payload.issuedAt must be an ISO-8601 timestamp.');
-  }
-
   const signature = requireObject(root.signature, 'attestation.signature');
   requireExactKeys(signature, ['algorithm', 'keyId', 'value'], 'attestation.signature');
   if (signature.algorithm !== 'ed25519') {
