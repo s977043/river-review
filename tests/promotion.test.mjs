@@ -206,8 +206,7 @@ describe('applyReplayEvidenceAttachment (#2485)', () => {
     const artifact = makeReplayArtifact(entry, { criticalRegressionCount: 1 });
 
     assert.throws(
-      () =>
-        validateReplayEvidenceAttachment(entry, artifact),
+      () => validateReplayEvidenceAttachment(entry, artifact),
       /criticalRegressionCount does not match the paired replay artifact/
     );
   });
