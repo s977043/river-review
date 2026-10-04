@@ -99925,7 +99925,10 @@ function applyPromotionReplayAttachment(
   if (!reason || !String(reason).trim()) {
     throw new Error('reason is required to attach paired replay evidence.');
   }
-  if ((entry.status ?? 'active') !== 'active' || !PRE_ADOPTION_REPLAY_STATUSES.has(pc.promotionStatus)) {
+  if (
+    (entry.status ?? 'active') !== 'active' ||
+    !PRE_ADOPTION_REPLAY_STATUSES.has(pc.promotionStatus)
+  ) {
     throw new Error(
       `Candidate ${entry.id} is not in a pre-adoption state (promotionStatus=${pc.promotionStatus}, status=${entry.status ?? 'active'}); attach replay evidence before approval.`
     );
