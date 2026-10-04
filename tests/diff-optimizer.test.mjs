@@ -236,7 +236,6 @@ test('buildLlmDiffView passes diffText through unchanged when nothing is exclude
   assert.equal(view.diffText, cleanDiff);
 });
 
-
 test('buildLlmDiffView restores Markdown from the raw files for upstream', () => {
   const parsed = parseUnifiedDiff(markdownDiff);
   const defaultOptimized = optimizeDiff({ files: parsed.files, diffText: markdownDiff });
