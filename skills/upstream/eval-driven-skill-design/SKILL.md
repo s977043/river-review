@@ -7,6 +7,8 @@ category: upstream
 phase: upstream
 applyTo:
   - 'skills/**/SKILL.md'
+  - 'skills/**/prompt/**'
+  - 'skills/**/scripts/**'
 inputContext:
   - diff
   - repoConfig
@@ -116,7 +118,7 @@ compare delta
 ## Non-goals / 扱わないこと
 
 - skill の **検出ロジックの妥当性** 自体（それは各 skill の領分）。
-- typo / wording / reference link だけの docs-like 変更など、skill の責務・trigger・判断ロジック・routing・modelHint を変えない軽微変更。
+- typo / wording / reference link だけの docs-like 変更など、skill の責務・trigger・判断ロジック・routing・modelHint・実行ロジックを変えない軽微変更。
 - `prompt/` や `golden/` 内容のスタイル指摘（fixture / eval の有無のみを確認する）。
 - 個別 fixture の diff 内容のレビュー（`scripts/evaluate-review-fixtures.mjs` などが回す）。
 
@@ -124,8 +126,8 @@ compare delta
 
 このスキルは以下を **すべて** 満たさない限り `NO_REVIEW` を返す。
 
-- [ ] 差分に **新規追加または実質変更された** `skills/**/SKILL.md` が含まれている
-- [ ] fixture / eval / paired contribution のいずれかに未確定がある、または責務・trigger・判断ロジック・routing・modelHint の変更によって既存 Evidence の再利用可否を確認する必要がある
+- [ ] 差分に新規 `skills/**/SKILL.md`、または **実質変更された** `SKILL.md` / `prompt/**` / `scripts/**` が含まれている
+- [ ] fixture / eval / paired contribution のいずれかに未確定がある、または責務・trigger・判断ロジック・routing・modelHint・実行ロジックの変更によって既存 Evidence の再利用可否を確認する必要がある
 
 ゲート不成立時の出力:
 
