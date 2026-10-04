@@ -25,7 +25,7 @@ current source code / JSON Schema
 
 Phase 1 の結論は **`not-needed-existing-surface`** です。
 
-現在の evidence は分散していますが、必要な truth / coverage / provenance / derived signal は既存 artifact、saved run、Decision Surface、renderer fallback、Gate contract から辿れます。新しい Review Evidence Projection を入れないと表現できない consumer gap は確認できませんでした。
+現在の evidence は分散しています。必要な truth / coverage / provenance / derived signal は既存 artifact、saved run、Decision Surface、renderer fallback、Gate contract から辿れます。新しい Review Evidence Projection を入れないと表現できない consumer gap は確認できませんでした。
 
 一方で、以下は current producer gap です。
 
