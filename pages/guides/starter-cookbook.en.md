@@ -119,6 +119,6 @@ Measure whether review judgment improved, not merely whether the tool was instal
 - Suppression trends: Run store / suppression analytics
 - False positives: fixture / guard cases / per-skill eval
 - Execution cost: [Cost estimation and optimization](./cost-estimation.en.md)
-- Overall trends: [Dashboard](/dashboard)
+- Overall trends: [Dashboard](../dashboard.md)
 
 Use those results to decide whether a Skill should be expanded, narrowed, or retired.
