@@ -10,7 +10,7 @@ The shortest way to try River Review is to **start from a local AI agent**. You 
 /plugin marketplace add s977043/river-review
 ```
 
-Pin a release tag when you need a reproducible installation.
+Pin the release tag available at the time when you need a reproducible installation.
 
 ### 2. Install the plugin
 
@@ -67,7 +67,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-For production use, pin a release tag such as `@v1.124.5`. See the [GitHub Actions guide](./github-actions.en.md) for details.
+For production use, pin the Action to a **concrete release tag available at adoption time** instead of the floating `@v1` major tag. See the [GitHub Actions guide](./github-actions.en.md) for details.
 
 ## What to do next
 
