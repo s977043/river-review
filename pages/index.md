@@ -53,9 +53,9 @@ codex plugin marketplace add s977043/river-review
 
 同じ「エラーハンドリングを見る」でも、汎用的な指示だけでは指摘が抽象的になりやすく、チーム内で採否を再判断するコストが残ります。River Review では Skill が **対象・根拠・重要度・false-positive 回避条件**を持ちます。
 
-- **抽象的な指摘を具体化**: `logging-observability` は差分位置を示し、例外の握りつぶし・観測可能性・修正案を finding として返します。
-- **観点の揺れを抑える**: fixture + golden output で期待挙動を固定し、回帰 Eval で変更を検証します。
-- **不要な指摘を抑える**: confidence / severity / suppression memory / review coverage でノイズを管理します。
+- **抽象的な指摘を具体化**: `logging-observability` は差分位置を示し、例外の握りつぶし・観測可能性・修正案を finding として返す。
+- **観点の揺れを抑える**: fixture + golden output で期待挙動を固定し、回帰 Eval で変更を検証する。
+- **不要な指摘を抑える**: confidence / severity / suppression memory / review coverage でノイズを管理する。
 
 実例は [代表スキルのショーケース](/guides/representative-skills) で fixture と期待出力まで確認できます。
 
