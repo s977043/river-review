@@ -9,7 +9,7 @@
 
 River Review の改善能力は、モデル単体ではなく **Model + Harness configuration** の組として観測する。
 
-ただし、ここでいう `Harness` は新しい runtime object、schema、workflow engine、または SSoT を意味しない。River Review が既に所有する次の実行面を、能力帰属と実験設計のためにまとめて呼ぶ分析上の語彙である。
+ただし、ここでいう `Harness` は新しい runtime object、schema、workflow engine、または SSoT を意味しない。River Review が既に所有する次の実行面を、能力帰属と実験設計のためにまとめて呼ぶ分析上の語彙です。
 
 - prompt / instruction
 - Skill / Reference / Rule
@@ -27,7 +27,7 @@ Model はこの envelope の一要素であり、Harness と別に version / pro
 
 Review Evolution Cycle はすでに、複数 run から candidate を作り、paired replay、Human approval、canary、post-adoption effectiveness を通して改善を検証する。
 
-不足していたのは、改善結果を「モデルが良くなった」「Skill が効いた」のように単一要因へ早計に帰属しないための明示的な **change envelope** と、既存 gate 群を一続きの **gated screening** として読む契約である。
+不足していたのは、改善結果を「モデルが良くなった」「Skill が効いた」のように単一要因へ早計に帰属しないための明示的な **change envelope** と、既存 gate 群を一続きの **gated screening** として読む契約です。
 
 能力評価は次の単位で扱う。
 
@@ -44,16 +44,14 @@ Review capability observation
 
 各 Evolution candidate / experiment は、少なくとも「何を変えたか」と「何を固定したか」を区別できなければならない。
 
-| Surface | 例 | 既存 owner |
-| --- | --- | --- |
-| `model` | provider / model / effort / temperature | Experiment Manifest / reviewer provenance |
-| `prompt` | system / review prompt / compiler output | prompt compiler / reviewer config |
-| `skill` | Skill / Reference / Rule | Skill Registry / #1568 |
-| `tool` | deterministic checker / verifier tool | verifier / checker |
-| `context` | inputContext / artifact packaging / section cap | review context |
-| `routing` | selected reviewer / owner skill / ordering | planner / routing |
-| `policy` | execution policy / budget / stop condition | runtime policy |
-| `evaluation` | rubric / held-out set / evaluator | eval / paired replay |
+- `model`: provider / model / effort / temperature。Owner は Experiment Manifest / reviewer provenance
+- `prompt`: system / review prompt / compiler output。Owner は prompt compiler / reviewer config
+- `skill`: Skill / Reference / Rule。Owner は Skill Registry / #1568
+- `tool`: deterministic checker / verifier tool。Owner は verifier / checker
+- `context`: inputContext / artifact packaging / section cap。Owner は review context
+- `routing`: selected reviewer / owner skill / ordering。Owner は planner / routing
+- `policy`: execution policy / budget / stop condition。Owner は runtime policy
+- `evaluation`: rubric / held-out set / evaluator。Owner は eval / paired replay
 
 ### Invariants
 
@@ -112,7 +110,7 @@ Regression response
 
 Gated screening は単一の新 gate ではない。既存の複数契約を順序付きで合成した **adoption readiness protocol** とする。
 
-### Gate A — Candidate integrity
+### Gate A—Candidate integrity
 
 - 1 candidate = 1 hypothesis
 - content-addressed candidate ID
@@ -121,7 +119,7 @@ Gated screening は単一の新 gate ではない。既存の複数契約を順�
 
 Fail: candidate を分割または evidence を追加する。自動 promotion しない。
 
-### Gate B — Experiment integrity
+### Gate B—Experiment integrity
 
 - immutable Experiment Manifest
 - baseline / candidate 条件を pin
@@ -131,7 +129,7 @@ Fail: candidate を分割または evidence を追加する。自動 promotion �
 
 Fail: 実験結果を adoption evidence として扱わない。
 
-### Gate C — Evaluation quality
+### Gate C—Evaluation quality
 
 - baseline / candidate paired comparison
 - should-detect / should-not-detect を含む
@@ -141,7 +139,7 @@ Fail: 実験結果を adoption evidence として扱わない。
 
 Fail: Human approval へ進める根拠にしない。
 
-### Gate D — Independence / trust
+### Gate D—Independence / trust
 
 - proposer と verifier の論理的分離
 - candidate の変更権限外で取得した trusted evidence を adoption の前提とする
@@ -149,7 +147,7 @@ Fail: Human approval へ進める根拠にしない。
 
 現状 P2 では `independentVerifierVerified=false` / `trust_level=untrusted` のため、paired replay 単独では canary eligibility を開かない。
 
-### Gate E — Human approval
+### Gate E—Human approval
 
 - replay evidence は `experimentHistory[]` に pre-adoption evidence として保持
 - approve / reject / retarget は Human-owned
@@ -158,7 +156,7 @@ Fail: Human approval へ進める根拠にしない。
 
 全評価が良好でも `acceptance.decision=null`、`autoPromotion=false` を維持する。
 
-### Gate F — Post-adoption effectiveness
+### Gate F—Post-adoption effectiveness
 
 adoption 後は replay metrics ではなく、実運用 feedback / recurrence / reversal を測定する。
 
@@ -175,7 +173,7 @@ adoption 後は replay metrics ではなく、実運用 feedback / recurrence / 
 - **human-review-ready**: deterministic な screening 条件を満たし、Human が採否判断できる
 - **post-adoption-observed**: Human approval 後に effectiveness evidence が得られている
 
-これらは既存 `promotionStatus` の代替ではなく、文書上の解釈である。
+これらは既存 `promotionStatus` の代替ではなく、文書上の解釈です。
 
 ## 7. Stop conditions
 
@@ -238,7 +236,7 @@ Raven / 外部 agent harness の benchmark は、この設計を考えるため�
 
 ## 10. Source inspiration
 
-- SBbit: https://www.sbbit.jp/article/cont1/187266
-- Raven paper: https://arxiv.org/abs/2609.33439
+- [SBbit article](https://www.sbbit.jp/article/cont1/187266)
+- [Raven paper](https://arxiv.org/abs/2609.33439)
 
 採用するのは「Model 単体ではなく Model + Harness で能力を捉える」「candidate improvement を評価 gate を通してから採用する」という設計原則であり、実装・語彙・runtime dependency のコピーではない。
