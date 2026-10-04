@@ -28,7 +28,7 @@ AI produces findings and decision inputs; the caller or a human keeps ownership 
 | Try River Review in five minutes | [Quickstart](/guides/quickstart.en) |
 | Start from reusable review knowledge | [Starter Cookbook](/guides/starter-cookbook.en) |
 | Run the pre-PR + post-PR two-stage pattern | [Two-stage review gate](/guides/two-stage-review-gate.en) |
-| Compare with other AI review tools | [AI code review comparison](/comparison/ai-code-review-tools.en) |
+| Compare with other AI review tools | [AI code review comparison](/comparison/ai-code-review-tools-en/) |
 | Measure quality, regressions, and cost | [Run store / regression](/guides/track-runs-and-regressions.en) / [Cost estimation](/guides/cost-estimation.en) / [Dashboard](/dashboard) |
 
 ## Fastest trial
