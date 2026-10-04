@@ -1,0 +1,62 @@
+name: PR format once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.head_ref == 'feat/2510-signed-replay-verification'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Apply repository formatting
+        run: |
+          node scripts/fix-dashes.mjs
+          npx --no-install prettier --write \
+            pages/reference/output-format-html.en.md \
+            pages/reference/output-format-html.md \
+            pages/reference/stable-interfaces.en.md \
+            pages/reference/stable-interfaces.md \
+            schemas/replay-verification.schema.json \
+            src/cli/commands/evolve.mjs \
+            src/lib/replay-verification.mjs \
+            tests/replay-verification-cli.test.mjs \
+            tests/replay-verification.test.mjs \
+            docs/development/1574-p3-signed-replay-verification.md
+          npm run build:action
+      - name: Commit formatted sources and generated dist
+        run: |
+          git rm .github/workflows/pr-format-once.yml
+          git add \
+            pages/reference/output-format-html.en.md \
+            pages/reference/output-format-html.md \
+            pages/reference/stable-interfaces.en.md \
+            pages/reference/stable-interfaces.md \
+            schemas/replay-verification.schema.json \
+            src/cli/commands/evolve.mjs \
+            src/lib/replay-verification.mjs \
+            tests/replay-verification-cli.test.mjs \
+            tests/replay-verification.test.mjs \
+            docs/development/1574-p3-signed-replay-verification.md \
+            runners/github-action/dist
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style: apply repository formatting"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
