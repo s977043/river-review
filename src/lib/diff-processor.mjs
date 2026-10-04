@@ -197,9 +197,7 @@ export function buildLlmDiffView(diff, { phase } = {}) {
     };
   }
   const rawFiles = Array.isArray(diff?.files) ? diff.files : [];
-  const files = rawFiles.filter((file) =>
-    !isExcludedFile(file?.path ?? '', { includeMarkdown })
-  );
+  const files = rawFiles.filter((file) => !isExcludedFile(file?.path ?? '', { includeMarkdown }));
   const diffText =
     files.length === rawFiles.length
       ? (diff?.diffText ?? renderDiffText(files))
