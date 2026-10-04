@@ -135,7 +135,7 @@ export function validateReviewResolutionSemantics(document) {
   }
 
   const feedbackWords = new Set(FEEDBACK_TYPES);
-  for (const state of [...AUTHOR_RESPONSE_STATES, ...RESOLUTION_STATES]) {
+  for (const state of [...AUTHOR_RESPONSE_STATES, ...RESOLUTION_STATES, ...VERIFICATION_STATES]) {
     if (feedbackWords.has(state)) {
       errors.push(`Review Resolution state collides with feedback taxonomy: ${state}`);
     }
