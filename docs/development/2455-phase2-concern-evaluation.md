@@ -4,7 +4,7 @@
 
 Implementation note for Issue #2455 Phase 2.
 
-Phase 1 added the opt-in, observe-only Review Concern Analyzer. Phase 2 adds a deterministic scoring layer for human-labeled review obligations. It does not change routing, Review Coverage, Gate behavior, reviewer selection, or merge authority.
+Phase 1 added the opt-in, observe-only Review Concern Analyzer. Phase 2 adds a deterministic scoring layer for human-labeled review obligations. Runtime routing and Review Coverage remain unchanged. Gate behavior, reviewer selection, and merge authority also remain unchanged.
 
 Tracking issue: #2507.
 
