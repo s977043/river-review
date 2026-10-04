@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test, { describe } from 'node:test';
 
 import { FEEDBACK_TYPES } from '../src/lib/feedback.mjs';
 import {
   AUTHOR_RESPONSE_STATES,
+  COVERAGE_STATUSES,
   RESOLUTION_STATES,
+  SYSTEM_DISPOSITIONS,
+  VERIFICATION_STATES,
   ReviewResolutionError,
   buildReviewResolution,
   validateReviewResolutionSemantics,
@@ -14,6 +18,9 @@ import { compileSchemaFile } from './helpers/schema-validator.mjs';
 const validateSchema = compileSchemaFile('review-resolution.schema.json', {
   ajvOptions: { allErrors: true },
 });
+const schema = JSON.parse(
+  readFileSync(new URL('../schemas/review-resolution.schema.json', import.meta.url), 'utf8')
+);
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
 
@@ -95,11 +102,24 @@ describe('review-resolution.schema.json', () => {
 });
 
 describe('Review Resolution semantic invariants', () => {
-  test('author/resolution states never overlap canonical feedback taxonomy', () => {
+  test('resolution state machines never overlap canonical feedback taxonomy', () => {
     const feedback = new Set(FEEDBACK_TYPES);
-    for (const state of [...AUTHOR_RESPONSE_STATES, ...RESOLUTION_STATES]) {
+    for (const state of [...AUTHOR_RESPONSE_STATES, ...RESOLUTION_STATES, ...VERIFICATION_STATES]) {
       assert.equal(feedback.has(state), false, `${state} must not collide with feedback taxonomy`);
     }
+  });
+
+  test('schema vocabularies stay pinned to implementation constants', () => {
+    const itemProperties = schema.properties.items.items.properties;
+    assert.deepEqual(itemProperties.authorResponse.properties.state.enum, [...AUTHOR_RESPONSE_STATES]);
+    assert.deepEqual(itemProperties.resolution.properties.state.enum, [...RESOLUTION_STATES]);
+    assert.deepEqual(itemProperties.verification.properties.state.enum, [...VERIFICATION_STATES]);
+    assert.deepEqual(itemProperties.systemJudgment.properties.disposition.enum, [
+      ...SYSTEM_DISPOSITIONS,
+    ]);
+    assert.deepEqual(itemProperties.verification.properties.coverageStatus.enum, [
+      ...COVERAGE_STATUSES,
+    ]);
   });
 
   test('author says fixed/action submitted is not verified_resolved', () => {
