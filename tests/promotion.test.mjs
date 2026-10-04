@@ -9,6 +9,8 @@ import {
   decidePromotion,
   applyPromotionRetarget,
   retargetPromotion,
+  applyReplayEvidenceAttachment,
+  attachReplayEvidence,
   listPromotionCandidates,
   isSecuritySensitive,
   buildPrScaffold,
@@ -28,6 +30,186 @@ const makeCandidate = (skillId, feedbackType, group) =>
   buildPromotionCandidateEntry({ skillId, feedbackType, group, now });
 
 const fp = (pr) => ({ pr, findingFingerprint: null, feedbackType: 'false_positive' });
+
+const REPLAY_CONTENT_HASH = 'a'.repeat(64);
+const REPLAY_EXPERIMENT_KEY = 'b'.repeat(64);
+const REPLAY_MANIFEST_HASH = 'c'.repeat(64);
+
+function makeReplayCandidate() {
+  const entry = makeCandidate('skill-a', 'false_positive', [fp(1), fp(2)]);
+  entry.id = `RR-PC-${REPLAY_CONTENT_HASH.slice(0, 12)}`;
+  entry.context.promotionCandidate.contentHash = REPLAY_CONTENT_HASH;
+  entry.context.promotionCandidate.promotionStatus = 'candidate';
+  return entry;
+}
+
+function makeReplayArtifact(entry, overrides = {}) {
+  return {
+    schemaVersion: 1,
+    mode: 'paired-replay',
+    readOnly: true,
+    writeEffects: [],
+    promotionHandoff: {
+      candidateId: entry.id,
+      candidateContentHash: entry.context.promotionCandidate.contentHash,
+      manifestId: `RR-EXP-${REPLAY_EXPERIMENT_KEY.slice(0, 12)}`,
+      experimentKey: REPLAY_EXPERIMENT_KEY,
+      manifestHash: REPLAY_MANIFEST_HASH,
+      manifestVerified: true,
+      experimentKeyMatchesInputs: true,
+      activationVerified: true,
+      activationReasons: [],
+      pairingWarnings: [],
+      acceptanceEvaluable: true,
+      evaluatedOn: 'overall',
+      profiles: [],
+      criticalRegressionCount: 0,
+      overallCriticalRegressionCount: 0,
+      independentVerifierVerified: false,
+      terminalReason: 'success',
+      requiresHumanJudgment: true,
+      writeEffects: [],
+      ...overrides,
+    },
+  };
+}
+
+describe('applyReplayEvidenceAttachment (#2485)', () => {
+  test('attaches PRE-adoption replay evidence without changing judgment state', () => {
+    const entry = makeReplayCandidate();
+    const artifact = makeReplayArtifact(entry);
+    const beforeStatus = entry.context.promotionCandidate.promotionStatus;
+
+    const result = applyReplayEvidenceAttachment(entry, artifact, {
+      approver: 'alice',
+      reason: 'paired replay reviewed',
+      now: decidedNow,
+    });
+
+    assert.equal(result.changed, true);
+    assert.equal(entry.context.promotionCandidate.promotionStatus, beforeStatus);
+    assert.equal(entry.context.approval, undefined);
+    assert.equal(entry.context.effectiveness, undefined);
+    assert.equal(entry.context.experimentHistory.length, 1);
+    assert.equal(entry.context.experimentHistory[0].attachedBy, 'alice');
+    assert.equal(entry.context.experimentHistory[0].reason, 'paired replay reviewed');
+    assert.equal(entry.context.experimentHistory[0].handoff.manifestHash, REPLAY_MANIFEST_HASH);
+    assert.equal(validate(wrapIndex([entry])), true, JSON.stringify(validate.errors, null, 2));
+  });
+
+  test('same manifestHash is idempotent and does not append twice', () => {
+    const entry = makeReplayCandidate();
+    const artifact = makeReplayArtifact(entry);
+
+    applyReplayEvidenceAttachment(entry, artifact, {
+      approver: 'alice',
+      reason: 'first attachment',
+      now: decidedNow,
+    });
+    const second = applyReplayEvidenceAttachment(entry, artifact, {
+      approver: 'bob',
+      reason: 'retry',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+
+    assert.equal(second.changed, false);
+    assert.match(second.note, /already attached/);
+    assert.equal(entry.context.experimentHistory.length, 1);
+    assert.equal(entry.context.experimentHistory[0].attachedBy, 'alice');
+  });
+
+  test('fails closed on candidate id or content hash mismatch', () => {
+    const entry = makeReplayCandidate();
+
+    assert.throws(
+      () =>
+        applyReplayEvidenceAttachment(
+          entry,
+          makeReplayArtifact(entry, { candidateId: 'RR-PC-deadbeef0000' }),
+          { approver: 'alice', reason: 'r' }
+        ),
+      /candidateId mismatch/
+    );
+    assert.throws(
+      () =>
+        applyReplayEvidenceAttachment(
+          entry,
+          makeReplayArtifact(entry, { candidateContentHash: 'd'.repeat(64) }),
+          { approver: 'alice', reason: 'r' }
+        ),
+      /contentHash mismatch/
+    );
+  });
+
+  test('rejects legacy, null-handoff, and post-adoption candidates', () => {
+    const legacy = makeReplayCandidate();
+    delete legacy.context.promotionCandidate.contentHash;
+    assert.throws(
+      () =>
+        applyReplayEvidenceAttachment(legacy, makeReplayArtifact(makeReplayCandidate()), {
+          approver: 'alice',
+          reason: 'r',
+        }),
+      /no contentHash/
+    );
+
+    const noHandoff = makeReplayCandidate();
+    const artifact = makeReplayArtifact(noHandoff);
+    artifact.promotionHandoff = null;
+    assert.throws(
+      () =>
+        applyReplayEvidenceAttachment(noHandoff, artifact, {
+          approver: 'alice',
+          reason: 'r',
+        }),
+      /no attachable promotionHandoff/
+    );
+
+    const approved = makeReplayCandidate();
+    approved.context.promotionCandidate.promotionStatus = 'approved';
+    assert.throws(
+      () =>
+        applyReplayEvidenceAttachment(approved, makeReplayArtifact(approved), {
+          approver: 'alice',
+          reason: 'r',
+        }),
+      /not pre-adoption/
+    );
+  });
+
+  test('persisting wrapper writes once and duplicate retry leaves one record', (t) => {
+    const entry = makeReplayCandidate();
+    const artifact = makeReplayArtifact(entry);
+    const { indexPath, cleanup } = createTempMemory({ layout: 'flat', entries: [entry] });
+    t.after(cleanup);
+
+    const first = attachReplayEvidence({
+      indexPath,
+      id: entry.id,
+      artifact,
+      approver: 'alice',
+      reason: 'reviewed replay',
+      now: decidedNow,
+    });
+    const second = attachReplayEvidence({
+      indexPath,
+      id: entry.id,
+      artifact,
+      approver: 'alice',
+      reason: 'retry',
+      now: new Date('2026-07-22T00:00:00.000Z'),
+    });
+
+    assert.equal(first.changed, true);
+    assert.equal(second.changed, false);
+    const stored = loadMemory(indexPath).entries[0];
+    assert.equal(stored.context.experimentHistory.length, 1);
+    assert.equal(stored.context.promotionCandidate.promotionStatus, 'candidate');
+    assert.equal(stored.context.approval, undefined);
+    assert.equal(stored.context.effectiveness, undefined);
+    assert.equal(validate(wrapIndex([stored])), true, JSON.stringify(validate.errors, null, 2));
+  });
+});
 
 describe('applyPromotionDecision (pure transition)', () => {
   test('candidate -> approved records auditable approval', () => {
