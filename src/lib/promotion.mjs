@@ -1154,6 +1154,59 @@ function renderBody({ pc, entry, kind, targetPaths }) {
   return lines.join('\n');
 }
 
+function buildPlanGateConsumerHandoff({ pc, entry }) {
+  const approval = entry.context?.approval ?? null;
+  const experiments = (entry.context?.experimentHistory ?? []).map((record) => ({
+    manifestId: record.handoff.manifestId,
+    experimentKey: record.handoff.experimentKey,
+    manifestHash: record.handoff.manifestHash,
+    attachedAt: record.attachedAt,
+    activationVerified: record.handoff.activationVerified ?? null,
+    criticalRegressionCount: record.handoff.criticalRegressionCount ?? null,
+    overallCriticalRegressionCount: record.handoff.overallCriticalRegressionCount ?? null,
+    terminalReason: record.handoff.terminalReason ?? null,
+  }));
+
+  return {
+    schemaVersion: 1,
+    producer: 'river-review',
+    consumer: 'plangate',
+    purpose: 'promotion-approval-handoff',
+    readOnly: true,
+    requiresHumanJudgment: true,
+    writeEffects: [],
+    candidate: {
+      id: entry.id,
+      contentHash: pc.contentHash ?? null,
+      contentHashStatus: pc.contentHash ? 'present' : 'legacy-missing',
+      clusterKey: pc.clusterKey,
+      recurrenceCount: pc.recurrenceCount,
+      proposedTarget: {
+        kind: pc.proposedTarget?.kind ?? 'human_judgment',
+        id: pc.proposedTarget?.id ?? null,
+      },
+      scopePaths: [...(pc.scope?.paths ?? [])],
+    },
+    evidence: (pc.evidence ?? []).map((item) => ({
+      pr: item.pr ?? null,
+      findingFingerprint: item.findingFingerprint ?? null,
+      feedbackType: item.feedbackType,
+      timestamp: item.timestamp ?? null,
+    })),
+    sourceApproval: {
+      decision: approval?.decision ?? null,
+      decidedAt: approval?.decidedAt ?? null,
+      humanIntervention: approval != null,
+    },
+    experiments,
+    compatibility: {
+      adapterRequired: true,
+      embeddedUpstreamContract: false,
+      planGateIssueRefs: ['s977043/PlanGate#811', 's977043/PlanGate#869'],
+    },
+  };
+}
+
 function renderPlanGateBody({ pc, entry }) {
   return [
     `## PlanGate delegation required`,
@@ -1188,6 +1241,7 @@ function renderPlanGateBody({ pc, entry }) {
  *   id: string, clusterKey: string, kind: string, eligible: boolean,
  *   requiresPlanGate: boolean, branchName: string|null, prTitle: string|null,
  *   prBody: string|null, targetPaths: string[], note: string|null,
+ *   planGateHandoff: object|null,
  * }}
  */
 export function buildPrScaffold(entry) {
@@ -1208,6 +1262,7 @@ export function buildPrScaffold(entry) {
     prBody: null,
     targetPaths: [],
     note: null,
+    planGateHandoff: null,
   };
 
   if (pc.promotionStatus !== 'approved') {
@@ -1226,6 +1281,7 @@ export function buildPrScaffold(entry) {
       prTitle: `chore(plangate): route ${clusterKey} promotion through PlanGate`,
       prBody: renderPlanGateBody({ pc, entry }),
       note: 'security/compliance promotion — PlanGate approval required (#1568 decision 5)',
+      planGateHandoff: buildPlanGateConsumerHandoff({ pc, entry }),
     };
   }
 
