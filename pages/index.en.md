@@ -1,9 +1,7 @@
 ---
 id: index-en
-title: River Review docs (English)
+title: River Review
 ---
-
-# River Review
 
 **Turn review into an organizational judgment asset.**
 
@@ -23,13 +21,11 @@ flowchart LR
 **Remove noise locally before the PR, then re-check the PR with shared team standards.**  
 AI produces findings and decision inputs; the caller or a human keeps ownership of GO / NO-GO and final approval.
 
-| Goal | Fastest path |
-| --- | --- |
-| Try River Review in five minutes | [Quickstart](/guides/quickstart.en) |
-| Start from reusable review knowledge | [Starter Cookbook](/guides/starter-cookbook.en) |
-| Run the pre-PR + post-PR two-stage pattern | [Two-stage review gate](/guides/two-stage-review-gate.en) |
-| Compare with other AI review tools | [AI code review comparison](/comparison/ai-code-review-tools-en/) |
-| Measure quality, regressions, and cost | [Run store / regression](/guides/track-runs-and-regressions.en) / [Cost estimation](/guides/cost-estimation.en) / [Dashboard](/dashboard) |
+- **Try River Review in five minutes**: [Quickstart](/guides/quickstart.en)
+- **Start from reusable review knowledge**: [Starter Cookbook](/guides/starter-cookbook.en)
+- **Run the pre-PR + post-PR two-stage pattern**: [Two-stage review gate](/guides/two-stage-review-gate.en)
+- **Compare with other AI review tools**: [AI code review comparison](/comparison/ai-code-review-tools-en/)
+- **Measure quality, regressions, and cost**: [Run store / regression](/guides/track-runs-and-regressions.en), [Cost estimation](/guides/cost-estimation.en), and [Dashboard](/dashboard)
 
 ## Fastest trial
 
@@ -56,11 +52,9 @@ After adding the marketplace, River Review's specialist review skills are availa
 
 A generic instruction such as "check error handling" can produce vague advice and leave the team to re-decide what matters. A River Review Skill carries **scope, evidence expectations, severity, and false-positive avoidance rules**.
 
-| Generic review instruction | River Review Skill |
-| --- | --- |
-| "Improve error handling." | `logging-observability` points to the changed location and returns a finding about swallowed errors, observability impact, and a concrete fix |
-| The review lens can drift from run to run | fixture + golden output tests pin expected behavior and regression evals verify changes |
-| Low-value findings can repeat | confidence / severity / suppression memory / review coverage control noise |
+- **Make vague findings concrete**: `logging-observability` points to the changed location and returns a finding about swallowed errors, observability impact, and a concrete fix.
+- **Reduce review-lens drift**: fixture + golden output tests pin expected behavior and regression evals verify changes.
+- **Control low-value repetition**: confidence / severity / suppression memory / review coverage reduce noise.
 
 See [Representative Skills](/guides/representative-skills.en) for real fixtures and expected outputs.
 
