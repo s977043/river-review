@@ -39,7 +39,7 @@ Phase 1 の結論は **`not-needed-existing-surface`** です。
 ### Reviewer execution provenance update
 
 Issue #2481 では Reviewer Independence の判定を配線せず、multi-reviewer orchestration の実行 provenance だけを runtime へ追加する。
-Review Unit の `executionId` と finding の `sourceExecutionIds[]` は observation-only である。actor identity、trust、vote、correctness、independent verification を表さない。
+Review Unit の `executionId` と finding の `sourceExecutionIds[]` は observation-only とする。actor identity、trust、vote、correctness、independent verification を表さない。
 
 この追加により「実際に別 execution が存在したか」は観測できるが、P4 Reviewer Independence state は引き続き helper-only / runtime 未配線のままとする。将来 P4 を配線する場合は、実 execution provenance と verifier trust model の両方を入力として検証する。
 
