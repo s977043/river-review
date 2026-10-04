@@ -13,7 +13,7 @@ Architecture decision: [ADR-014](../adr/014-review-concern-map.md).
 
 ## 1. Why this is not a greenfield review feature
 
-The external `akkie76/code-review-skills` workflow adds value primarily through review methodology:
+The external `akkie76/code-review-skills` **v0.1.0-beta.2** workflow (released 2026-10-04, commit `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8`) adds value primarily through review methodology:
 
 1. establish the review contract
 2. inspect the complete change before line-level review
@@ -272,7 +272,11 @@ concerns:
       - src/auth/token.ts
 
     affectedSubjects:
-      - src/api/session-controller.ts
+      - path: src/api/session-controller.ts
+        evidenceRefs:
+          - path: src/api/session-controller.ts
+            lineStart: 42
+            lineEnd: 68
 
     evidenceRefs:
       - path: src/auth/session.ts
@@ -286,6 +290,16 @@ analysis:
   status: completed | partial | failed
   limitations: []
 ```
+
+Affected subjects are not plain inferred paths in the eventual schema. Each affected subject must retain inspectable evidence for why the unchanged subject is affected.
+
+`analysis.status` is deliberately not a semantic-completeness claim:
+
+- `completed`: the analyzer completed processing of the input supplied under the contract
+- `partial`: input or investigation was incomplete
+- `failed`: no usable map was produced
+
+Even `completed` may omit a real concern.
 
 Do not add these fields without a separate proven gap:
 
@@ -485,7 +499,15 @@ The exact fixture schema is Phase 2 work.
 - human correction burden
 - previously-unreviewed obligation detection
 
-### 13.3 Cost / stability metrics
+### 13.3 External evaluation is supporting evidence, not River Review accuracy
+
+v0.1.0-beta.2 reports manually scored release-candidate runs that met exact fixture expectations in 25/29 Codex runs and 27/29 Claude Code runs.
+The upstream release explicitly states these are not general accuracy rates and records an unsupported supporting claim in the Claude Code evaluation.
+
+River Review therefore does not import those numbers as a performance guarantee.
+They strengthen the case for behavioral fixtures and evidence validation, while River Review still requires its own paired evaluation.
+
+### 13.4 Cost / stability metrics
 
 - input / output tokens
 - extra model calls
@@ -672,4 +694,6 @@ The Concern Map must remain optional and non-authoritative until paired evaluati
 - [Review Mode Router Design](./review-mode-router-design.md)
 - [Artifact Input Contract](../../pages/reference/artifact-input-contract.md)
 - [Stable Interfaces](../../pages/reference/stable-interfaces.md)
-- https://github.com/akkie76/code-review-skills
+- https://github.com/akkie76/code-review-skills/releases/tag/v0.1.0-beta.2
+- https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/workflow.md
+- https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/multi-agent-decomposition.md
