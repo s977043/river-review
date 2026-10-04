@@ -99823,6 +99823,10 @@ function retargetPromotion({
 
 const PRE_ADOPTION_PROMOTION_STATUSES = Object.freeze(['candidate', 'pending']);
 
+const PROMOTION_CANDIDATE_ID_RE = /^RR-PC-[0-9a-f]{12}$/;
+const EXPERIMENT_MANIFEST_ID_RE = /^RR-EXP-[0-9a-f]{12}$/;
+const SHA256_RE = /^[0-9a-f]{64}$/;
+
 function assertReplayAttachmentArtifact(artifact) {
   if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
     throw new Error('paired replay input must be a JSON object.');
@@ -99876,6 +99880,16 @@ function assertReplayAttachmentArtifact(artifact) {
     }
   }
 
+  if (
+    !PROMOTION_CANDIDATE_ID_RE.test(handoff.candidateId) ||
+    !EXPERIMENT_MANIFEST_ID_RE.test(handoff.manifestId) ||
+    !SHA256_RE.test(handoff.candidateContentHash) ||
+    !SHA256_RE.test(handoff.experimentKey) ||
+    !SHA256_RE.test(handoff.manifestHash)
+  ) {
+    throw new Error('promotionHandoff contains an invalid content-addressed id or hash.');
+  }
+
   const manifest = artifact.manifest;
   const improvementCandidate = manifest?.improvementCandidate;
   if (
@@ -99893,22 +99907,65 @@ function assertReplayAttachmentArtifact(artifact) {
   ) {
     throw new Error('promotionHandoff does not match manifest.improvementCandidate.');
   }
+
+  const expectedProfiles = (artifact.acceptance?.evaluations ?? []).map((evaluation) => ({
+    profile: evaluation.profile,
+    allRequiredSatisfied: evaluation.allRequiredSatisfied,
+    sampleSizeSatisfied: evaluation.sampleSizeSatisfied,
+    failedMetrics: [...(evaluation.failedMetrics ?? [])],
+    unevaluableMetrics: (evaluation.criteria ?? [])
+      .filter((criterion) => criterion.satisfied === null)
+      .map((criterion) => criterion.metric)
+      .sort(),
+  }));
+  const observationPairs = [
+    ['activationVerified', handoff.activationVerified, artifact.activationCheck?.verified],
+    ['acceptanceEvaluable', handoff.acceptanceEvaluable, artifact.acceptance?.evaluable],
+    ['evaluatedOn', handoff.evaluatedOn, artifact.acceptance?.evaluatedOn],
+    [
+      'criticalRegressionCount',
+      handoff.criticalRegressionCount,
+      artifact.acceptance?.contract6?.criticalRegressionCount,
+    ],
+    [
+      'overallCriticalRegressionCount',
+      handoff.overallCriticalRegressionCount,
+      artifact.acceptance?.contract6?.overallCriticalRegressionCount,
+    ],
+    [
+      'independentVerifierVerified',
+      handoff.independentVerifierVerified,
+      artifact.verification?.independentVerifierVerified,
+    ],
+    ['terminalReason', handoff.terminalReason, artifact.terminalReason],
+  ];
+  for (const [name, actual, expected] of observationPairs) {
+    if (actual !== expected) {
+      throw new Error(`promotionHandoff ${name} does not match the paired replay artifact.`);
+    }
+  }
+  const structuredPairs = [
+    ['activationReasons', handoff.activationReasons, artifact.activationCheck?.reasons],
+    ['pairingWarnings', handoff.pairingWarnings, artifact.pairing?.warnings],
+    ['profiles', handoff.profiles, expectedProfiles],
+  ];
+  for (const [name, actual, expected] of structuredPairs) {
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(`promotionHandoff ${name} does not match the paired replay artifact.`);
+    }
+  }
+
   return handoff;
 }
 
 /**
- * Attach PRE-adoption paired replay evidence to one promotion_candidate.
- *
- * This transition deliberately changes no lifecycle or judgment field. It only
- * appends an auditable evidence record under context.experimentHistory.
- *
- * Binding validation is exposed separately as validateReplayEvidenceAttachment()
- * so callers/tests can verify attribution without mutating the entry.
+ * Validate that one paired replay artifact belongs to the supplied
+ * promotion_candidate and is still in the PRE-adoption lifecycle.
+ * This function has no side effects.
  *
  * @param {object} entry
  * @param {object} artifact paired-replay artifact
- * @param {{ approver: string, reason: string, now?: Date }} opts
- * @returns {{ changed: boolean, entry: object, record: object|null, note: string|null }}
+ * @returns {{ handoff: object }}
  */
 function validateReplayEvidenceAttachment(entry, artifact) {
   const pc = getPromotionCandidate(entry);
@@ -99925,6 +99982,13 @@ function validateReplayEvidenceAttachment(entry, artifact) {
       `Candidate ${entry.id} has no contentHash; legacy candidates cannot accept replay evidence safely.`
     );
   }
+  if (
+    !SHA256_RE.test(pc.contentHash) ||
+    !PROMOTION_CANDIDATE_ID_RE.test(entry.id) ||
+    entry.id !== `RR-PC-${pc.contentHash.slice(0, 12)}`
+  ) {
+    throw new Error(`Candidate ${entry.id} has an invalid content-addressed identity.`);
+  }
   if (handoff.candidateContentHash !== pc.contentHash) {
     throw new Error(
       `promotionHandoff contentHash mismatch for ${entry.id}; replay evidence belongs to different candidate content.`
@@ -99935,9 +99999,20 @@ function validateReplayEvidenceAttachment(entry, artifact) {
       `Candidate ${entry.id} is not pre-adoption (promotionStatus=${pc.promotionStatus}); replay evidence must be attached before approval/activation.`
     );
   }
-  return { pc, handoff };
+  return { handoff };
 }
 
+/**
+ * Attach PRE-adoption paired replay evidence to one promotion_candidate.
+ *
+ * This transition deliberately changes no lifecycle or judgment field. It only
+ * appends an auditable evidence record under context.experimentHistory.
+ *
+ * @param {object} entry
+ * @param {object} artifact paired-replay artifact
+ * @param {{ approver: string, reason: string, now?: Date }} opts
+ * @returns {{ changed: boolean, entry: object, record: object|null, note: string|null }}
+ */
 function applyReplayEvidenceAttachment(
   entry,
   artifact,
