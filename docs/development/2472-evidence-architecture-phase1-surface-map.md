@@ -1,4 +1,4 @@
-# Evidence Architecture Phase 1 — current-state surface map
+# Evidence Architecture Phase 1—current-state surface map
 
 Issue: #2472
 
@@ -23,11 +23,11 @@ current source code / JSON Schema
 
 ## Executive result
 
-Phase 1 の結論は **`not-needed-existing-surface`** である。
+Phase 1 の結論は **`not-needed-existing-surface`** です。
 
-現在の evidence は分散しているが、必要な truth / coverage / provenance / derived signal は既存 artifact、saved run、Decision Surface、renderer fallback、Gate contract から辿れる。新しい Review Evidence Projection を入れないと表現できない consumer gap は確認できなかった。
+現在の evidence は分散していますが、必要な truth / coverage / provenance / derived signal は既存 artifact、saved run、Decision Surface、renderer fallback、Gate contract から辿れます。新しい Review Evidence Projection を入れないと表現できない consumer gap は確認できませんでした。
 
-一方で、以下は current producer gap である。
+一方で、以下は current producer gap です。
 
 - Reviewer Independence は helper-only で runtime 未配線。
 - Review Resolution sidecar は planned で schema 未実装。
@@ -67,10 +67,11 @@ Review Evidence Projection is NOT required in either path.
 Host / Human keeps merge, release, and production-promotion authority.
 ```
 
-## Mapping A — ownership / availability / stability
+## Mapping A—ownership / availability / stability
 
 同じ Row ID を Mapping A2 / B でも使う。3表を合わせて #2472 の required columns を満たす。
 
+<!-- prettier-ignore -->
 | ID | Concept / field | Evidence reference | Runtime path | Producer | Owner | Runtime availability | Activation condition | Default state | Stability | Compatibility impact |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | F1 | `findings[]` | `schemas/review-artifact.schema.json#$defs.finding`; review engine / orchestrator | `river run`, `review exec`, Action | review engine / reviewer orchestration | Review Artifact / finding contract | normal runtime | review path executes | path-dependent | not-published | consumer-visible |
@@ -83,9 +84,9 @@ Host / Human keeps merge, release, and production-promotion authority.
 | E1 | `reviewCoverage` / `units[]` / `fileScope` | `src/lib/review-coverage.mjs:deriveReviewCoverage/deriveReviewFileScope`; `schemas/review-coverage.schema.json` | `river run`, `--reviewers`, single reviewer; saved-run; `runs diff` | reviewer execution | Review Coverage | optional observation | actual LLM attempt / orchestration outcome | path-dependent | Experimental | additive-safe optional field; status meaning is consumer-visible |
 | E2 | `llmNotExecuted: true` | `src/lib/review-coverage.mjs:allLlmAttemptsSkipped`; `src/lib/result-store.mjs:buildRunRecord` | runtime result -> saved-run -> `runs diff`; optional Gate | review execution | LLM-execution observation | optional; emitted only when true | every observed unit intentionally skips LLM | absent-by-default | Experimental | additive-safe optional field; meaning is consumer-visible |
 | E3 | Team Lead `blindSpots` | `src/lib/team-lead-synthesizer.mjs:synthesizeTeamLeadReport`; `schemas/output.schema.json:teamLeadReport` | multi-reviewer path | deterministic Team Lead synthesizer | Team Lead report | path-dependent | reviewer orchestration | absent outside path | not-published | consumer-visible |
-| P1 | Review Artifact `trace.run_id` | Review Artifact schema; `src/lib/review-plan.mjs:defaultGenerateRunId` | `review plan|exec` artifact | Review Artifact finalization | Review Artifact trace | optional on older artifacts | artifact finalization | path-dependent | not-published | additive-safe optional field |
+| P1 | Review Artifact `trace.run_id` | Review Artifact schema; `src/lib/review-plan.mjs:defaultGenerateRunId` | `review plan\|exec` artifact | Review Artifact finalization | Review Artifact trace | optional on older artifacts | artifact finalization | path-dependent | not-published | additive-safe optional field |
 | P2 | saved-run `runId` + provenance | `src/lib/result-store.mjs:buildRunRecord/buildRunProvenance` | `river run --save` | result store | saved-run contract | only with save path | `--save` | off without save | Internal | internal-only storage; persisted semantics are consumer-visible to CLI tools |
-| P3 | Execution Manifest `reviewRunId` | Execution Manifest schema; `src/lib/execution-manifest.mjs:buildExecutionManifest/verifyExecutionManifest`; `deriveReviewRunId` | saved-run and `review plan|exec` when producer attaches manifest | execution-manifest producer | Execution Manifest | additive / optional | producer and required pins available | path-dependent | Experimental | additive-safe optional block; digest semantics consumer-visible |
+| P3 | Execution Manifest `reviewRunId` | Execution Manifest schema; `src/lib/execution-manifest.mjs:buildExecutionManifest/verifyExecutionManifest`; `deriveReviewRunId` | saved-run and `review plan\|exec` when producer attaches manifest | execution-manifest producer | Execution Manifest | additive / optional | producer and required pins available | path-dependent | Experimental | additive-safe optional block; digest semantics consumer-visible |
 | P4 | Reviewer Independence state | `src/lib/reviewer-independence.mjs:evaluateReviewerIndependence` | helper only | helper caller | Reviewer Independence | helper-only; runtime not wired | explicit call only | off by lack of wiring | not-published | internal-only until wired |
 | D1 | `decision` | `schemas/output.schema.json:decision`; Review Artifact schema; current finalization path | review result / artifact / saved-run | existing decision derivation | Review decision contract | normal runtime | review finalization | on | Stable | breaking-major for top-level JSON meaning changes |
 | D2 | Artifact `suggestedLoopSignal` Layer 1 | Review Artifact schema; loop-signal contract | `river run` / artifact | artifact finalization | Layer-1 loop signal | normal artifact path | artifact finalization | on for applicable artifact path | not-published | consumer-visible |
@@ -95,8 +96,9 @@ Host / Human keeps merge, release, and production-promotion authority.
 | H1 | Human Decision Surface | `src/cli/render.mjs:buildHumanDecisionSurface/formatHumanDecisionSurfaceMarkdown/printMarkdownReport` | CLI / GitHub comment / Markdown | renderer | Human Attention | normal human output path | human-readable output selected | path-dependent | Internal | internal-only renderer; PR comment marker behavior separately Stable |
 | R1 | Review Resolution sidecar | ADR-011 / ADR-013; no `schemas/review-resolution.schema.json` | none today | planned | Review Resolution | planned | none | off | not-published | future consumer-visible contract |
 
-## Mapping A2 — SSoT / persistence / lineage / consumer
+## Mapping A2—SSoT / persistence / lineage / consumer
 
+<!-- prettier-ignore -->
 | ID | Source of truth | Persistence | Transformation | Lineage | Observed or derived | Consumer |
 | --- | --- | --- | --- | --- | --- | --- |
 | F1 | emitted finding contract | Review Artifact / runtime JSON / saved-run copy | observe / normalize / merge / persist / project | producer finding -> artifact -> saved/display copies | review observation / judgment output | renderer, decision scoring, Gate inputs indirectly |
@@ -121,8 +123,9 @@ Host / Human keeps merge, release, and production-promotion authority.
 | H1 | no new SSoT; reads canonical values | human-rendered output only | project | D1/D4/E1/E3 + renderer fallbacks -> H1 | derived presentation projection | Human |
 | R1 | future Review Resolution sidecar | none | future persist | future author/human state | unavailable / planned | future author/human handling |
 
-## Mapping B — absence / failure / visibility / trust / authority
+## Mapping B—absence / failure / visibility / trust / authority
 
+<!-- prettier-ignore -->
 | ID | Missing semantics | Failure behavior | Failure visibility | Human surface | Visibility fallback | Gate relationship | Trust / integrity semantics | Authority |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | F1 | empty means no emitted findings; not proof every review dimension ran | finding pipeline keeps its own verifier/prefilter policies | findings sections / debug depending path | L1 count + L2 finding details | E1/E3/execution details prevent an empty list from becoming universal proof | blocking findings contribute through existing Gate inputs | finding content is review output, not external attestation | none |
@@ -191,6 +194,7 @@ This is an enforcement adapter. It does not transfer merge/release authority awa
 
 ## Availability matrix
 
+<!-- prettier-ignore -->
 | Capability | Default | Optional activation | Current state |
 | --- | --- | --- | --- |
 | Finding Critic | off | config `review.findingCritic.mode=active` or env `RIVER_FINDING_CRITIC=1`; env `0` overrides config | runtime wired, evaluation-gated |
@@ -235,6 +239,7 @@ Team Lead summary is not the future Review Resolution Summary. The names and own
 
 Phase 2 を必要とする可能性が高い4候補を逆方向から確認した。
 
+<!-- prettier-ignore -->
 | Candidate | Current visibility | Gap judgment | If a future consumer needs more |
 | --- | --- | --- | --- |
 | `llmNotExecuted` / semantic review not executed | saved-run and Layer-2 signal keep the machine observation. Markdown execution details expose LLM used/skipped/error state. Missing API-key empty runs have an explicit renderer fallback. | No projection-shaped loss found. It is not an L1 field, but the uncertainty is not erased. | Extend H1/L2 wording if user research requires a stronger L1 callout. |
@@ -242,10 +247,11 @@ Phase 2 を必要とする可能性が高い4候補を逆方向から確認し�
 | Finding Critic validation / Evidence State | `finding.validation` is persisted when the opt-in stage runs. Evidence State is derivable by its owner helper but is not a general persisted Review Artifact field. | No need for a new review-level projection. | Add finding-level display from F2/F4 only if a concrete human workflow requires it. |
 | Reviewer Independence | No runtime artifact field exists. The helper is not wired. | This is a producer gap, not a presentation gap. A projection cannot make the evidence exist. | Wire P4/#1760 first, then project only the owning output. |
 
-The challenge therefore preserves the Phase 1 recommendation: existing surfaces are sufficient for current consumers, while missing producers remain separate work.
+The challenge preserves the Phase 1 recommendation. Existing surfaces are sufficient for current consumers, while missing producers remain separate work.
 
 ## Source/docs drift register
 
+<!-- prettier-ignore -->
 | Drift | Source reality | Action |
 | --- | --- | --- |
 | ADR-011 says Finding Critic is pipeline-unwired and Review Artifact lacks `validation` | current `finding-critic-stage.mjs` is wired opt-in, and Review Artifact schema has optional `validation` | treat ADR-011 observation as historical; ADR-013/current source wins |
@@ -258,6 +264,7 @@ The challenge therefore preserves the Phase 1 recommendation: existing surfaces 
 
 This section is a static source/schema walkthrough at the pinned baseline. It does not claim that Phase 1 added or executed new runtime fixtures. A new fixture is required only if a concrete missing semantic is found.
 
+<!-- prettier-ignore -->
 | Scenario | Result | Evidence-backed judgment |
 | --- | --- | --- |
 | A clean findings + partial coverage | PASS | F1 empty cannot erase E1 partial. L1 shows incomplete coverage. Layer 2 demotes convergence. Gate reacts only with coverage opt-in. |
@@ -276,32 +283,33 @@ This section is a static source/schema walkthrough at the pinned baseline. It do
 
 ## Gaps and duplication candidates
 
-### G1 — Reviewer Independence is unavailable at runtime
+### G1—Reviewer Independence is unavailable at runtime
 
 This is a producer gap. A projection must not synthesize independence from generic provenance.
 
 Resolution path if needed: wire the existing owner/helper or complete #1760 provenance work.
 
-### G2 — Review Resolution is planned
+### G2—Review Resolution is planned
 
 This is a lifecycle/author-response producer gap. It is not a Review Evidence Projection gap.
 
 Resolution path if needed: implement the ADR-011 sidecar contract in its own workstream.
 
-### G3 — Semantic Precision disposition is reserved
+### G3—Semantic Precision disposition is reserved
 
 This is a semantic-owner gap. A projection must not infer disposition from severity, confidence, or Evidence State.
 
-### G4 — Security Audit writer is absent
+### G4—Security Audit writer is absent
 
 The schema cannot act as runtime evidence until a writer exists.
 
-### G5 — L1 does not show every provenance field
+### G5—L1 does not show every provenance field
 
-This is intentional compression, not evidence loss. L3 preserves the machine-readable source. If user research later proves that a specific provenance datum must move to L1, extend the existing Decision Surface additively rather than introducing a new decision/projection owner.
+This is intentional compression, not evidence loss. L3 preserves the machine-readable source. If user research later proves that a specific provenance datum must move to L1, extend the existing Decision Surface additively. Do not introduce a new decision/projection owner.
 
 ## Phase 2 entry-criteria scorecard
 
+<!-- prettier-ignore -->
 | Criterion | Yes / No | Evidence |
 | --- | --- | --- |
 | 1. concrete consumer for a new Review Evidence Projection is identified | **No** | Existing consumers are Decision Surface, renderer, saved-run/runs-diff, Gate, and hosts. None currently requires a new projection contract. |
@@ -334,7 +342,7 @@ Reopen Phase 2 only when a concrete consumer demonstrates a fixture where:
 - [x] producer -> persistence -> consumer chain traced by runtime path
 - [x] transformation and upstream lineage recorded
 - [x] copy / projection / qualification are not double-counted as independent evidence
-- [x] `river run` / saved-run / `runs diff` / `review plan|exec` / Gate path differences recorded
+- [x] `river run` / saved-run / `runs diff` / `review plan\|exec` / Gate path differences recorded
 - [x] each row has source path + symbol/schema evidence reference
 - [x] current runtime availability checked against source/schema
 - [x] source/docs drift recorded explicitly
