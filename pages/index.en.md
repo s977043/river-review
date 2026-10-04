@@ -52,9 +52,21 @@ codex plugin marketplace add s977043/river-review
 
 After adding the marketplace, River Review's specialist review skills are available to Codex. See the [Quickstart](/guides/quickstart.en) for the full path.
 
-## What River Review already provides
+## What changes in practice
 
-Common requests such as evals, noise suppression, comparison, cost controls, and operational metrics do not require brand-new infrastructure. River Review already has the following foundations:
+A generic instruction such as "check error handling" can produce vague advice and leave the team to re-decide what matters. A River Review Skill carries **scope, evidence expectations, severity, and false-positive avoidance rules**.
+
+| Generic review instruction | River Review Skill |
+| --- | --- |
+| "Improve error handling." | `logging-observability` points to the changed location and returns a finding about swallowed errors, observability impact, and a concrete fix |
+| The review lens can drift from run to run | fixture + golden output tests pin expected behavior and regression evals verify changes |
+| Low-value findings can repeat | confidence / severity / suppression memory / review coverage control noise |
+
+See [Representative Skills](/guides/representative-skills.en) for real fixtures and expected outputs.
+
+## Quality and operational capabilities available after adoption
+
+River Review already provides the following foundations for team use:
 
 - **Skill quality**: fixture + golden output tests, regression evals, and per-skill false-positive evaluation.
 - **Noise control**: severity (critical / major / minor / info), confidence, suppression memory, and review coverage.
@@ -62,7 +74,7 @@ Common requests such as evals, noise suppression, comparison, cost controls, and
 - **Operational measurement**: Run store, regression comparison, usage telemetry, cost estimation, and dashboard views.
 - **Adoption evidence**: competitive comparison, known limitations, and FAQ.
 
-The next adoption bottleneck is therefore less about adding features and more about making these capabilities **easy to discover and easy to try in a minimal setup**.
+Start with existing Skills and measurement. Codify new team-specific judgment only after real usage shows a gap.
 
 ## Understand the concept
 
