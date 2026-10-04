@@ -749,7 +749,7 @@ general Review Artifactへ `evidenceState` をコピーする理由にはなり�
 
 ### 4. Canonical input から expected projectionを決定論的に記述できる
 
-判定: **NO**—consumer未確定のため設計しない
+判定: **NO**—consumer未確定のため設計しない。
 
 pure deterministic projection自体は技術的に可能です。
 
