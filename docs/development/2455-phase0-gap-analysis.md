@@ -128,7 +128,7 @@ It does not answer whether the change's semantic concerns were all identified.
 
 ### 2.6 Finding validation already has an owner
 
-#1978 and `src/lib/finding-critic.mjs` own Evidence-Grounded Finding Verification.
+#1978 and `src/lib/finding-critic.mjs` own Evidence-Grounded Finding Verification. The current `findings[].validation` runtime stage is opt-in (`RIVER_FINDING_CRITIC=1` or `review.findingCritic.mode: active`) and is absent on default runs.
 
 Concern Analysis must not decide:
 
@@ -141,7 +141,7 @@ That candidate must enter the same verification path.
 
 ### 2.7 Materiality and author resolution already have owners
 
-- #1857 / ADR-007 owns future Semantic Precision / disposition.
+- #1857 / ADR-007 owns the Semantic Precision / disposition architecture; default finding-level runtime production is a separate staged concern.
 - #2322 / ADR-011 owns author / human Review Resolution and post-change verification.
 - ADR-013 separates Evidence / Projection / Decision / Authority.
 
@@ -525,7 +525,7 @@ They strengthen the case for behavioral fixtures and evidence validation, while 
 | Phase 2 | evaluation tooling | build obligation-oriented fixtures |
 | Phase 3 | current router / role selection | shadow recommendation only |
 | Phase 4 | #2212 Review Coverage | reuse ReviewUnit contract; do not duplicate |
-| Phase 5 | #1978 Finding Verification | cross-concern findings enter existing validation |
+| Phase 5 | #1978 Finding Verification | cross-concern findings enter the existing validation contract; runtime activation remains explicit / evaluation-gated |
 | downstream | #1857 | materiality / disposition owner |
 | downstream | #2322 | author / human resolution owner |
 | security audit | #2267 | security semantic coverage remains separate |
