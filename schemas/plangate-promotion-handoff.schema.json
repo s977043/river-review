@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlanGate Promotion Consumer Handoff",
+  "description": "River Review-owned, read-only handoff for optional external PlanGate adapters (#2372-H / #2493). This artifact is evidence/provenance only: it is not a PlanGate verdict, does not embed PlanGate-owned schemas, and has no write effects.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "producer",
+    "consumer",
+    "purpose",
+    "readOnly",
+    "requiresHumanJudgment",
+    "writeEffects",
+    "candidate",
+    "evidence",
+    "sourceApproval",
+    "experiments",
+    "compatibility"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "producer": {
+      "type": "string",
+      "const": "river-review"
+    },
+    "consumer": {
+      "type": "string",
+      "const": "plangate"
+    },
+    "purpose": {
+      "type": "string",
+      "const": "promotion-approval-handoff"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "const": true
+    },
+    "requiresHumanJudgment": {
+      "type": "boolean",
+      "const": true
+    },
+    "writeEffects": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "id",
+        "contentHash",
+        "contentHashStatus",
+        "clusterKey",
+        "recurrenceCount",
+        "proposedTarget",
+        "scopePaths"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "contentHashStatus": {
+          "type": "string",
+          "enum": [
+            "present",
+            "legacy-missing"
+          ]
+        },
+        "clusterKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recurrenceCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proposedTarget": {
+          "type": "object",
+          "required": [
+            "kind",
+            "id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "scopePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "pr",
+          "findingFingerprint",
+          "feedbackType",
+          "timestamp"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "pr": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "findingFingerprint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{16}$"
+          },
+          "feedbackType": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "sourceApproval": {
+      "type": "object",
+      "required": [
+        "decision",
+        "decidedAt",
+        "humanIntervention"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "const": "approved"
+        },
+        "decidedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "humanIntervention": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "experiments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "manifestId",
+          "experimentKey",
+          "manifestHash",
+          "attachedAt",
+          "activationVerified",
+          "criticalRegressionCount",
+          "overallCriticalRegressionCount",
+          "terminalReason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "manifestId": {
+            "type": "string",
+            "pattern": "^RR-EXP-[0-9a-f]{12}$"
+          },
+          "experimentKey": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "manifestHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "attachedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activationVerified": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "criticalRegressionCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "overallCriticalRegressionCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "terminalReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "required": [
+        "adapterRequired",
+        "embeddedUpstreamContract",
+        "planGateIssueRefs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "adapterRequired": {
+          "type": "boolean",
+          "const": true
+        },
+        "embeddedUpstreamContract": {
+          "type": "boolean",
+          "const": false
+        },
+        "planGateIssueRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}
