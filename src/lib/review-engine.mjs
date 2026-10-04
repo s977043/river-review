@@ -463,7 +463,7 @@ export async function generateReview({
   // maps) from BOTH the diff body and the "Changed files" summary. `diff` itself
   // stays raw so heuristics/fallback below keep seeing every changed file
   // (#1543/#1547).
-  const llmDiff = buildLlmDiffView(diff);
+  const llmDiff = buildLlmDiffView(diff, { phase });
   const viewpointStage = await runReviewViewpointStage({
     reviewConfig: effectiveConfig.review,
     diff,
