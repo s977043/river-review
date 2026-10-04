@@ -7,13 +7,13 @@ Phase 0 implementation note for #2455.
 Baseline: `main` at `33fe4e7a558cb260ecfb83e59f2b52b28ce1fbc7` (2026-10-04).
 
 This phase is intentionally documentation-only.
-It changes no runtime review behavior, schema, Gate policy, reviewer selection, Skill routing, output contract, or merge authority.
+It changes no runtime review behavior or schema. Gate policy, reviewer selection, and Skill routing remain unchanged. Output contracts and merge authority also remain unchanged.
 
 Architecture decision: [ADR-014](../adr/014-review-concern-map.md).
 
 ## 1. Why this is not a greenfield review feature
 
-The external `akkie76/code-review-skills` **v0.1.0-beta.2** workflow (released 2026-10-04, commit `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8`) adds value primarily through review methodology:
+The external `akkie76/code-review-skills` **v0.1.0-beta.2** workflow adds value primarily through review methodology. The referenced release is from 2026-10-04 at commit `6f6b54dda7850a4e6079c6f41f0edea83b4cb7e8`:
 
 1. establish the review contract
 2. inspect the complete change before line-level review
@@ -42,7 +42,7 @@ It is not a second Review Team or a second Finding Verification framework.
 
 ### 2.1 Review target and base resolution already exist
 
-Local review resolves repository state through `src/lib/local-runner.mjs`, including `baseRef`, merge base, commit SHA, changed files, and diff.
+Local review resolves repository state through `src/lib/local-runner.mjs`. It resolves `baseRef` and merge base. It also records commit SHA, changed files, and diff.
 
 Artifact-driven review has an explicit input contract in `pages/reference/artifact-input-contract.md`.
 Important existing behavior includes:
@@ -52,7 +52,7 @@ Important existing behavior includes:
 - fallback to `git diff <mergeBase>..HEAD`
 - changed-file discovery that can include binary changes and full renames when git derives the range
 
-#2455 must reuse those decisions.
+Issue #2455 must reuse those decisions.
 A Concern Analyzer must not independently choose a different target or base.
 
 ### 2.2 Review Mode Router is deterministic
@@ -75,7 +75,7 @@ Concern-derived signals must not silently replace it.
 `src/lib/local-runner.mjs` calls `buildLlmDiffView()`.
 The resulting `filesForReview` / optimized `diffText` represent what the LLM reviewer sees.
 
-#2212 explicitly distinguishes:
+Issue #2212 explicitly distinguishes:
 
 ```text
 raw repository change set
@@ -93,7 +93,7 @@ review execution coverage
 Review Unit subjects are defined as what the reviewer actually saw, not as the raw chunk.
 
 This existing boundary is reusable for Concern Analysis input completeness.
-It also creates a critical constraint: **the analyzer cannot receive only the optimized view**, or it can never identify a concern whose changed file was optimized away.
+It also creates a critical constraint. **The analyzer cannot receive only the optimized view.** Otherwise, a changed file removed by optimization can disappear from semantic analysis.
 
 ### 2.4 Review Team already owns reviewer decomposition
 
@@ -115,7 +115,7 @@ No new multi-agent orchestration engine is needed.
 
 ### 2.5 Review Coverage already owns execution completeness
 
-#2212 / `schemas/review-coverage.schema.json` owns `complete | partial | not_executed` for planned Review Units.
+Issue #2212 / `schemas/review-coverage.schema.json` owns `complete | partial | not_executed` for planned Review Units.
 
 Current unit semantics:
 
@@ -128,7 +128,7 @@ It does not answer whether the change's semantic concerns were all identified.
 
 ### 2.6 Finding validation already has an owner
 
-#1978 and `src/lib/finding-critic.mjs` own Evidence-Grounded Finding Verification. The current `findings[].validation` runtime stage is opt-in (`RIVER_FINDING_CRITIC=1` or `review.findingCritic.mode: active`) and is absent on default runs.
+Issue #1978 and `src/lib/finding-critic.mjs` own Evidence-Grounded Finding Verification. The current `findings[].validation` runtime stage is opt-in (`RIVER_FINDING_CRITIC=1` or `review.findingCritic.mode: active`) and is absent on default runs.
 
 Concern Analysis must not decide:
 
@@ -149,17 +149,17 @@ Concern Map remains upstream from all three.
 
 ## 3. External pattern -> River Review mapping
 
-| External review-workflow pattern | Existing River Review | #2455 decision |
-| --- | --- | --- |
-| establish review contract | local/artifact input contracts | reuse |
-| inspect complete change first | raw diff / changed-file set exists | strengthen analyzer input |
-| build change / concern map | no first-class semantic decomposition | **new capability** |
-| trace affected callers / consumers | repo context + reviewer investigation | represent evidence-backed affected subjects |
-| review by risk | risk-map / reviewer roles / skills | reuse; no new risk taxonomy |
-| validate each candidate | verifier / #1978 | reuse |
-| control false positives | review policy / verifier / #1857 direction | reuse |
-| multi-agent decomposition | reviewer-orchestrator | reuse |
-| final integration | merge / synthesis / #2322 | reuse; no new Organizer |
+| External review-workflow pattern   | Existing River Review                      | #2455 decision                              |
+| ---------------------------------- | ------------------------------------------ | ------------------------------------------- |
+| establish review contract          | local/artifact input contracts             | reuse                                       |
+| inspect complete change first      | raw diff / changed-file set exists         | strengthen analyzer input                   |
+| build change / concern map         | no first-class semantic decomposition      | **new capability**                          |
+| trace affected callers / consumers | repo context + reviewer investigation      | represent evidence-backed affected subjects |
+| review by risk                     | risk-map / reviewer roles / skills         | reuse; no new risk taxonomy                 |
+| validate each candidate            | verifier / #1978                           | reuse                                       |
+| control false positives            | review policy / verifier / #1857 direction | reuse                                       |
+| multi-agent decomposition          | reviewer-orchestrator                      | reuse                                       |
+| final integration                  | merge / synthesis / #2322                  | reuse; no new Organizer                     |
 
 ## 4. The actual gap
 
@@ -213,7 +213,14 @@ This cannot be represented faithfully as file coverage or reviewer-role coverage
 
 ## 5. Concern definition
 
-A Review Concern is one coherent behavior, invariant, refactor, fix, migration, or operational change.
+A Review Concern is one coherent change of one of these types:
+
+- behavior
+- invariant
+- refactor
+- fix
+- migration
+- operational change
 
 ### 5.1 One file may contain multiple concerns
 
@@ -222,8 +229,8 @@ Those can be distinct concerns even when implemented in one file.
 
 ### 5.2 One concern may span multiple files
 
-An API contract change may require implementation, serializer, caller, tests, and documentation.
-These are not automatically separate concerns.
+An API contract change may span implementation and serializer changes.
+It can also span callers, tests, and documentation. These are not automatically separate concerns.
 
 ### 5.3 Supporting artifacts do not inflate concern count
 
@@ -320,7 +327,14 @@ Do not add these fields without a separate proven gap:
 
 `concern-N` is a per-run opaque reference.
 
-It is not stable across model changes, prompt changes, reruns, context budgets, or alternate valid grouping.
+It is not stable across these conditions:
+
+- model changes
+- prompt changes
+- reruns
+- context budget changes
+- alternate valid grouping
+
 Do not join historical findings or Resolution records using Concern ID alone.
 
 ### 8.2 Run / artifact identity
@@ -380,8 +394,9 @@ Phase 0 does not add a new repository-instruction loader.
 
 The analyzer must distinguish authority from review data.
 
-Authoritative sources come from the review host / resolved repository policy contract.
-Code, comments, fixtures, logs, PR prose, and arbitrary artifact text are evidence to inspect, not instructions to execute merely because they contain imperative language.
+Authoritative sources come from the review host or resolved repository policy contract.
+Code and comments are evidence to inspect. Fixtures, logs, PR prose, and arbitrary artifact text are also review data.
+Imperative language inside those inputs does not grant instruction authority.
 
 Required Phase 1 regression case:
 
@@ -518,19 +533,19 @@ They strengthen the case for behavioral fixtures and evidence validation, while 
 
 ## 14. Dependency / ownership matrix
 
-| #2455 phase | Dependency / SSoT | Rule |
-| --- | --- | --- |
-| Phase 0 | current source | docs-only, no runtime dependency |
-| Phase 1 | existing review target / diff paths | explicit opt-in PoC can start independently |
-| Phase 2 | evaluation tooling | build obligation-oriented fixtures |
-| Phase 3 | current router / role selection | shadow recommendation only |
-| Phase 4 | #2212 Review Coverage | reuse ReviewUnit contract; do not duplicate |
-| Phase 5 | #1978 Finding Verification | cross-concern findings enter the existing validation contract; runtime activation remains explicit / evaluation-gated |
-| downstream | #1857 | materiality / disposition owner |
-| downstream | #2322 | author / human resolution owner |
-| security audit | #2267 | security semantic coverage remains separate |
+| #2455 phase    | Dependency / SSoT                   | Rule                                                                                                                  |
+| -------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Phase 0        | current source                      | docs-only, no runtime dependency                                                                                      |
+| Phase 1        | existing review target / diff paths | explicit opt-in PoC can start independently                                                                           |
+| Phase 2        | evaluation tooling                  | build obligation-oriented fixtures                                                                                    |
+| Phase 3        | current router / role selection     | shadow recommendation only                                                                                            |
+| Phase 4        | #2212 Review Coverage               | reuse ReviewUnit contract; do not duplicate                                                                           |
+| Phase 5        | #1978 Finding Verification          | cross-concern findings enter the existing validation contract; runtime activation remains explicit / evaluation-gated |
+| downstream     | #1857                               | materiality / disposition owner                                                                                       |
+| downstream     | #2322                               | author / human resolution owner                                                                                       |
+| security audit | #2267                               | security semantic coverage remains separate                                                                           |
 
-#2212 / #1978 / #1857 / #2322 do not block the Phase 1 observe-only PoC as a whole.
+Issue #2212 / #1978 / #1857 / #2322 do not block the Phase 1 observe-only PoC as a whole.
 They become dependencies only at the integration phase that consumes their owned contract.
 
 ## 15. Phase 1 entry conditions
@@ -679,7 +694,8 @@ Review Contract
   -> #2322 resolution
 ```
 
-The Concern Map must remain optional and non-authoritative until paired evaluation demonstrates measurable improvement without unacceptable cost or Major / Critical recall regression.
+The Concern Map must remain optional and non-authoritative until paired evaluation shows measurable improvement.
+Promotion also requires acceptable cost and no Major / Critical recall regression.
 
 ## References
 
@@ -694,6 +710,6 @@ The Concern Map must remain optional and non-authoritative until paired evaluati
 - [Review Mode Router Design](./review-mode-router-design.md)
 - [Artifact Input Contract](../../pages/reference/artifact-input-contract.md)
 - [Stable Interfaces](../../pages/reference/stable-interfaces.md)
-- https://github.com/akkie76/code-review-skills/releases/tag/v0.1.0-beta.2
-- https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/workflow.md
-- https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/multi-agent-decomposition.md
+- [code-review-skills v0.1.0-beta.2](https://github.com/akkie76/code-review-skills/releases/tag/v0.1.0-beta.2)
+- [code-review-skills workflow.md](https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/workflow.md)
+- [code-review-skills multi-agent-decomposition.md](https://github.com/akkie76/code-review-skills/blob/v0.1.0-beta.2/src/core/multi-agent-decomposition.md)
