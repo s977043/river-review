@@ -99898,9 +99898,7 @@ function assertReplayBinding(replay, entry, pc) {
   if (handoff.acceptanceEvaluable !== replay.acceptance?.evaluable) {
     throw new Error('promotionHandoff acceptance state does not match the paired replay result.');
   }
-  if (
-    handoff.overallCriticalRegressionCount !== replay.metrics?.overall?.criticalRegressionCount
-  ) {
+  if (handoff.overallCriticalRegressionCount !== replay.metrics?.overall?.criticalRegressionCount) {
     throw new Error(
       'promotionHandoff critical-regression count does not match the paired replay result.'
     );
