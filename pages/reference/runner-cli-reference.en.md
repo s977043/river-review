@@ -184,7 +184,7 @@ The POSIX `--` terminator works as well. A token placed after `--` is read as a 
 
 A token after `--` must be an existing path; if it does not exist, the command exits 1. This prevents a typo such as `river evolve aggregate -- ./typo` from exiting 0 as "a successful aggregation over zero records". A bare `--` with no token after it is accepted as a no-op on every command surface.
 
-Other surfaces (`skills list` / `runs list` / `promote list` / `eval` and so on) do not take a trailing path and exit 1 with a surplus positional. Subcommands that take several non-option tokens by design — `runs diff <id1> <id2> [<id3>...]` or `promote approve <id>` — are handled separately.
+Other surfaces (`skills list` / `runs list` / `promote list` / `eval` and so on) do not take a trailing path and exit 1 with a surplus positional. Subcommands that take several non-option tokens by design — `runs diff <id1> <id2> [<id3>...]`, `promote approve <id>`, or `promote attach-replay <id>` — are handled separately.
 
 ### `river review` / `river eval` (`runners/cli`)
 
