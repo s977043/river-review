@@ -36,11 +36,29 @@ function artifact(entry, overrides = {}) {
     readOnly: true,
     requiresHumanApproval: true,
     writeEffects: [],
+    activationCheck: {
+      verified: true,
+      reasons: [],
+    },
+    pairing: {
+      warnings: [],
+    },
     acceptance: {
       decision: null,
       applied: false,
       autoPromotion: false,
+      evaluable: true,
+      evaluatedOn: 'overall',
+      evaluations: [],
+      contract6: {
+        criticalRegressionCount: 0,
+        overallCriticalRegressionCount: 0,
+      },
     },
+    verification: {
+      independentVerifierVerified: false,
+    },
+    terminalReason: 'success',
     manifestVerification: {
       verified: true,
       experimentKeyMatchesInputs: true,
