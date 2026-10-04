@@ -16,6 +16,13 @@ async function withEnv(name, value, fn) {
   }
 }
 
+function rawPathsFromScope(scope) {
+  return [
+    ...(scope?.selected ?? []),
+    ...(scope?.excluded ?? []).map((entry) => entry.path),
+  ];
+}
+
 function withoutConcernObservation(result) {
   const cloned = structuredClone(result);
   if (cloned.reviewDebug) delete cloned.reviewDebug.reviewConcernMap;
@@ -46,14 +53,16 @@ test('local runner keeps Concern Analyzer observe-only and default off', async (
   );
 
   assert.equal(context.status, 'ok');
-  assert.equal(context.rawChangedFiles.length, 4);
+  assert.equal('rawChangedFiles' in context, false);
+  const rawChangedFiles = rawPathsFromScope(context.reviewFileScope);
+  assert.equal(rawChangedFiles.length, 4);
   for (const expected of [
     '.river/rules.md',
     'docs/notes.md',
     'generated/data.json',
     'src/app.js',
   ]) {
-    assert.ok(context.rawChangedFiles.includes(expected), expected);
+    assert.ok(rawChangedFiles.includes(expected), expected);
   }
 
   const off = await withEnv('RIVER_CONCERN_ANALYZER', undefined, () =>
@@ -72,7 +81,7 @@ test('local runner keeps Concern Analyzer observe-only and default off', async (
   ]);
   assert.equal(
     observed.reviewDebug.reviewConcernMap.analysis.input.rawChangedFileCount,
-    context.rawChangedFiles.length
+    rawChangedFiles.length
   );
 
   // Phase 1 invariant: the opt-in observation cannot modify findings, comments,
@@ -100,9 +109,11 @@ test('raw manifest survives optimizer and configured exclusions in plan context'
 
   const context = await planLocalReview({ cwd: dir, dryRun: true });
 
-  assert.ok(context.rawChangedFiles.includes('src/app.js'));
-  assert.ok(context.rawChangedFiles.includes('docs/notes.md'));
-  assert.ok(context.rawChangedFiles.includes('generated/data.json'));
+  assert.equal('rawChangedFiles' in context, false);
+  const rawChangedFiles = rawPathsFromScope(context.reviewFileScope);
+  assert.ok(rawChangedFiles.includes('src/app.js'));
+  assert.ok(rawChangedFiles.includes('docs/notes.md'));
+  assert.ok(rawChangedFiles.includes('generated/data.json'));
   assert.deepEqual(context.reviewFileScope, {
     selected: ['src/app.js'],
     excluded: [
@@ -128,7 +139,8 @@ test('optimized-away raw changes still produce an observe-only map on no-changes
 
   const context = await planLocalReview({ cwd: dir, phase: 'midstream', dryRun: true });
   assert.equal(context.status, 'no-changes');
-  assert.deepEqual(context.rawChangedFiles, ['docs/notes.md']);
+  assert.equal('rawChangedFiles' in context, false);
+  assert.deepEqual(rawPathsFromScope(context.reviewFileScope), ['docs/notes.md']);
   assert.deepEqual(context.reviewFileScope, {
     selected: [],
     excluded: [{ path: 'docs/notes.md', reasonCode: 'diff_optimization' }],
