@@ -52,6 +52,8 @@ It does not:
 
 The trusted public key is supplied out-of-band with `--trusted-key`.
 
+Here, `trusted` is relative to this invocation: the caller explicitly selected that public key as the trust root. This phase does not prove organizational ownership of the key, key lifecycle policy, or verifier-job isolation.
+
 The key is not accepted from:
 
 - the paired replay
