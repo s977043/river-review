@@ -463,24 +463,17 @@ function assertReplayAttachmentArtifact(artifact) {
  * This transition deliberately changes no lifecycle or judgment field. It only
  * appends an auditable evidence record under context.experimentHistory.
  *
+ * Binding validation is exposed separately as validateReplayEvidenceAttachment()
+ * so callers/tests can verify attribution without mutating the entry.
+ *
  * @param {object} entry
  * @param {object} artifact paired-replay artifact
  * @param {{ approver: string, reason: string, now?: Date }} opts
  * @returns {{ changed: boolean, entry: object, record: object|null, note: string|null }}
  */
-export function applyReplayEvidenceAttachment(
-  entry,
-  artifact,
-  { approver, reason, now = new Date() }
-) {
+export function validateReplayEvidenceAttachment(entry, artifact) {
   const pc = getPromotionCandidate(entry);
   if (!pc) throw new Error(`Entry ${entry?.id} is not a promotion_candidate.`);
-  if (!approver || !String(approver).trim()) {
-    throw new Error('approver is required to attach paired replay evidence.');
-  }
-  if (!reason || !String(reason).trim()) {
-    throw new Error('reason is required to attach paired replay evidence.');
-  }
 
   const handoff = assertReplayAttachmentArtifact(artifact);
   if (handoff.candidateId !== entry.id) {
@@ -503,9 +496,27 @@ export function applyReplayEvidenceAttachment(
       `Candidate ${entry.id} is not pre-adoption (promotionStatus=${pc.promotionStatus}); replay evidence must be attached before approval/activation.`
     );
   }
+  return { pc, handoff };
+}
 
+export function applyReplayEvidenceAttachment(
+  entry,
+  artifact,
+  { approver, reason, now = new Date() }
+) {
+  if (!approver || !String(approver).trim()) {
+    throw new Error('approver is required to attach paired replay evidence.');
+  }
+  if (!reason || !String(reason).trim()) {
+    throw new Error('reason is required to attach paired replay evidence.');
+  }
+
+  const { handoff } = validateReplayEvidenceAttachment(entry, artifact);
   entry.context = entry.context ?? {};
   const history = entry.context.experimentHistory ?? [];
+  if (!Array.isArray(history)) {
+    throw new Error(`Candidate ${entry.id} has invalid context.experimentHistory; expected an array.`);
+  }
   const existing = history.find((item) => item?.handoff?.manifestHash === handoff.manifestHash);
   if (existing) {
     return {
