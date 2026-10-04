@@ -206,9 +206,7 @@ function normalizeAdjudication(adjudication, obligationIds, concernIds) {
     adjudication.nonActionableConcernIds != null &&
     !Array.isArray(adjudication.nonActionableConcernIds)
   ) {
-    throw new ReviewConcernEvalError(
-      'adjudication.nonActionableConcernIds must be an array.'
-    );
+    throw new ReviewConcernEvalError('adjudication.nonActionableConcernIds must be an array.');
   }
   const nonActionableConcernIds = [...new Set(adjudication.nonActionableConcernIds ?? [])];
   for (const concernId of nonActionableConcernIds) {
@@ -370,11 +368,7 @@ export function evaluateReviewConcernMap({ fixture, map, adjudication } = {}) {
   };
 }
 
-export function buildPairedReviewConcernEvaluation({
-  fixture,
-  baseline,
-  candidate,
-} = {}) {
+export function buildPairedReviewConcernEvaluation({ fixture, baseline, candidate } = {}) {
   const normalizedFixture = normalizeReviewConcernFixture(fixture);
   const baselineEvaluation = evaluateReviewConcernMap({
     fixture: normalizedFixture,

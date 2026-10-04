@@ -148,10 +148,7 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
 
     const linked = evaluateReviewConcernMap({
       fixture: fixture(),
-      map: map([
-        concern('concern-1', { interactions: ['concern-2'] }),
-        concern('concern-2'),
-      ]),
+      map: map([concern('concern-1', { interactions: ['concern-2'] }), concern('concern-2')]),
       adjudication: {
         obligationMatches: {
           'OB-a': ['concern-1'],
@@ -177,10 +174,7 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
         },
       },
       candidate: {
-        map: map([
-          concern('concern-1', { interactions: ['concern-2'] }),
-          concern('concern-2'),
-        ]),
+        map: map([concern('concern-1', { interactions: ['concern-2'] }), concern('concern-2')]),
         adjudication: {
           obligationMatches: {
             'OB-a': ['concern-1'],
@@ -272,9 +266,7 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
             humanCorrectionCount: 0,
           },
         }),
-      (error) =>
-        error instanceof ReviewConcernEvalError &&
-        /unknown concern/.test(error.message)
+      (error) => error instanceof ReviewConcernEvalError && /unknown concern/.test(error.message)
     );
 
     assert.throws(
