@@ -56,6 +56,11 @@ function clipText(text, maxChars) {
   return { text: value.slice(0, maxChars), truncated: true };
 }
 
+function normalizeRepoPath(value) {
+  if (typeof value !== 'string') return value;
+  return value.replace(/\\/gu, '/').replace(/^\.\/+/u, '');
+}
+
 function uniqueStrings(values = []) {
   const seen = new Set();
   const result = [];
@@ -96,7 +101,7 @@ function renderRepoContext(repoContext) {
 }
 
 function collectInspectablePaths(rawChangedFiles, reviewFileScope, repoContext) {
-  const raw = uniqueStrings(rawChangedFiles);
+  const raw = uniqueStrings(rawChangedFiles).map(normalizeRepoPath);
   const configuredExcluded = new Set(
     (reviewFileScope?.excluded ?? [])
       .filter((entry) => entry?.reasonCode === 'configured_exclusion')
@@ -110,15 +115,14 @@ function collectInspectablePaths(rawChangedFiles, reviewFileScope, repoContext) 
 
   for (const section of sections) {
     if (typeof section?.file === 'string' && section.file.length > 0) {
-      paths.add(section.file);
+      paths.add(normalizeRepoPath(section.file));
     }
 
+    if (section?.label !== 'Symbol usage references') continue;
     const content = typeof section?.content === 'string' ? section.content : '';
     for (const line of content.split('\n')) {
-      const usageMatch = /^(.+?):\d+:/u.exec(line.trim());
-      if (usageMatch?.[1]) paths.add(usageMatch[1]);
-      const headerMatch = /^\/\/\s+(.+)$/u.exec(line.trim());
-      if (headerMatch?.[1] && !headerMatch[1].includes(' ')) paths.add(headerMatch[1]);
+      const usageMatch = /^(?:\.\/)?(.+?):\d+:/u.exec(line.trim());
+      if (usageMatch?.[1]) paths.add(normalizeRepoPath(usageMatch[1]));
     }
   }
 
@@ -294,9 +298,31 @@ function parseJsonObject(text) {
   throw new Error('analyzer output is not valid JSON');
 }
 
+function normalizeConcernPaths(response) {
+  return {
+    ...response,
+    concerns: response.concerns.map((concern) => ({
+      ...concern,
+      changedSubjects: concern.changedSubjects.map(normalizeRepoPath),
+      affectedSubjects: concern.affectedSubjects.map((affected) => ({
+        ...affected,
+        path: normalizeRepoPath(affected.path),
+        evidenceRefs: affected.evidenceRefs.map((ref) => ({
+          ...ref,
+          path: normalizeRepoPath(ref.path),
+        })),
+      })),
+      evidenceRefs: concern.evidenceRefs.map((ref) => ({
+        ...ref,
+        path: normalizeRepoPath(ref.path),
+      })),
+    })),
+  };
+}
+
 function validateConcernSemantics(response, rawChangedFiles, evidencePaths = rawChangedFiles) {
-  const changedSet = new Set(uniqueStrings(rawChangedFiles));
-  const evidenceSet = new Set(uniqueStrings(evidencePaths));
+  const changedSet = new Set(uniqueStrings(rawChangedFiles).map(normalizeRepoPath));
+  const evidenceSet = new Set(uniqueStrings(evidencePaths).map(normalizeRepoPath));
   const ids = new Set();
 
   for (const concern of response.concerns) {
@@ -357,7 +383,11 @@ export function parseReviewConcernResponse(
   { rawChangedFiles = [], evidencePaths = rawChangedFiles } = {}
 ) {
   const parsed = modelResponseSchema.parse(parseJsonObject(text));
-  return validateConcernSemantics(parsed, rawChangedFiles, evidencePaths);
+  return validateConcernSemantics(
+    normalizeConcernPaths(parsed),
+    rawChangedFiles,
+    evidencePaths
+  );
 }
 
 function redactConcernSummaries(concerns, config) {
