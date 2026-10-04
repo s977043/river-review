@@ -1,0 +1,451 @@
+{
+  "schemaVersion": "1",
+  "evaluationId": "rr-review-concern-phase2-v1",
+  "freezePolicy": {
+    "fixtureSet": "freeze-before-run",
+    "oracle": "freeze-before-run",
+    "baselineRef": "freeze-at-run-start",
+    "candidateRef": "freeze-at-run-start"
+  },
+  "cases": [
+    {
+      "schemaVersion": "1",
+      "id": "RC-01-multi-file-one-concern",
+      "category": "single-concern-many-files",
+      "description": "A coherent session-lifecycle change spans implementation, serializer, and tests.",
+      "input": {
+        "rawChangedFiles": [
+          "src/auth/session.ts",
+          "src/auth/token.ts",
+          "tests/auth/session.test.ts"
+        ],
+        "rawDiffText": "+ rotateRefreshToken(session)\n+ persistSession(session)\n+ expect(rotated).toBe(true)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-session-lifecycle",
+            "description": "Identify the session lifecycle behavior as one review obligation."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 2
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-02-one-file-multiple-concerns",
+      "category": "one-file-multiple-concerns",
+      "description": "One handler changes authorization timing and public error mapping independently.",
+      "input": {
+        "rawChangedFiles": ["src/api/session-handler.ts"],
+        "rawDiffText": "+ authorizeBeforeLoad(request)\n+ return mapAuthError(error)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-auth-order",
+            "description": "Authorization must happen before protected session state is loaded."
+          },
+          {
+            "id": "OB-error-contract",
+            "description": "The public API error mapping must remain compatible."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 2,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-03-independent-concerns",
+      "category": "independent-concerns",
+      "description": "Two unrelated changes share a pull request and should both remain visible.",
+      "input": {
+        "rawChangedFiles": ["src/cache/profile-cache.ts", "src/cli/report.ts"],
+        "rawDiffText": "+ ttlSeconds = 300\n+ renderJsonSummary(result)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-cache-ttl",
+            "description": "Profile cache expiration behavior changed."
+          },
+          {
+            "id": "OB-cli-output",
+            "description": "CLI report output behavior changed."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 2,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-04-cross-concern-interaction",
+      "category": "cross-concern-interaction",
+      "description": "Authentication state transition and error contract can fail only in combination.",
+      "input": {
+        "rawChangedFiles": ["src/auth/session.ts", "src/api/error.ts"],
+        "rawDiffText": "+ session.state = 'rotating'\n+ case TOKEN_ROTATING: return 409"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-auth-state",
+            "description": "The session state transition remains valid."
+          },
+          {
+            "id": "OB-api-error",
+            "description": "The API error contract remains valid during token rotation."
+          }
+        ],
+        "knownInteractions": [
+          {
+            "from": "OB-auth-state",
+            "to": "OB-api-error"
+          }
+        ],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-05-migration-app-change",
+      "category": "migration-plus-application",
+      "description": "A schema migration and application behavior must be reviewed as rollout-coupled obligations.",
+      "input": {
+        "rawChangedFiles": [
+          "migrations/20261005_add_session_state.sql",
+          "src/auth/session-repository.ts"
+        ],
+        "rawDiffText": "+ ALTER TABLE sessions ADD COLUMN state text\n+ row.state = session.state"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-schema-rollout",
+            "description": "The session state migration is rollout-safe."
+          },
+          {
+            "id": "OB-app-compatibility",
+            "description": "Application reads and writes remain compatible during rollout."
+          }
+        ],
+        "knownInteractions": [
+          {
+            "from": "OB-schema-rollout",
+            "to": "OB-app-compatibility"
+          }
+        ],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-06-auth-api-contract",
+      "category": "auth-plus-api-contract",
+      "description": "Authorization behavior and externally visible API compatibility both matter.",
+      "input": {
+        "rawChangedFiles": ["src/auth/policy.ts", "src/api/session-controller.ts"],
+        "rawDiffText": "+ requireScope('session:write')\n+ response.status = 403"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-auth-policy",
+            "description": "The new authorization policy is enforced at the intended boundary."
+          },
+          {
+            "id": "OB-public-contract",
+            "description": "The externally visible API status contract remains intentional."
+          }
+        ],
+        "knownInteractions": [
+          {
+            "from": "OB-auth-policy",
+            "to": "OB-public-contract"
+          }
+        ],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-07-refactor-plus-fix",
+      "category": "refactor-plus-behavior-fix",
+      "description": "A refactor is bundled with a user-visible behavior fix and must not hide the fix obligation.",
+      "input": {
+        "rawChangedFiles": ["src/order/price.ts"],
+        "rawDiffText": "+ const normalized = normalizePrice(input)\n+ return normalized < 0 ? 0 : normalized"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-refactor-preservation",
+            "description": "The extraction preserves existing pricing behavior."
+          },
+          {
+            "id": "OB-negative-price-fix",
+            "description": "Negative prices are clamped as the intended behavior fix."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-08-docs-tests-support",
+      "category": "docs-tests-only-support",
+      "description": "Documentation and tests support an existing behavior and should not inflate concern count by file type.",
+      "input": {
+        "rawChangedFiles": ["docs/session.md", "tests/auth/session.test.ts"],
+        "rawDiffText": "+ Refresh tokens rotate once per session.\n+ expect(rotationCount).toBe(1)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-session-contract",
+            "description": "The documented and tested session contract remains one coherent obligation."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 1
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-09-generated-vendor-noise",
+      "category": "generated-vendor-noise",
+      "description": "Generated output changes alongside a source change without creating a semantic concern of its own.",
+      "input": {
+        "rawChangedFiles": ["src/schema/user.ts", "generated/schema.json"],
+        "rawDiffText": "+ export const UserStatus = ['active', 'disabled']\n+ \"enum\": [\"active\", \"disabled\"]"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-user-status-contract",
+            "description": "The user status contract changed."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 1
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-10-affected-unchanged-caller",
+      "category": "affected-unchanged-caller",
+      "description": "A changed shared contract affects an unchanged caller that is explicitly inspected.",
+      "input": {
+        "rawChangedFiles": ["src/auth/token.ts"],
+        "rawDiffText": "+ export function parseToken(value) { return decodeV2(value); }",
+        "repoContext": {
+          "sections": [
+            {
+              "label": "Symbol usage references",
+              "file": null,
+              "content": "./src/api/session-controller.ts:42:parseToken(token)"
+            }
+          ]
+        }
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-token-parser",
+            "description": "The token parser contract changed."
+          },
+          {
+            "id": "OB-caller-impact",
+            "description": "The unchanged session controller remains compatible with the parser change."
+          }
+        ],
+        "knownInteractions": [
+          {
+            "from": "OB-token-parser",
+            "to": "OB-caller-impact"
+          }
+        ],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-11-dynamic-dispatch-partial",
+      "category": "dynamic-dispatch-incomplete",
+      "description": "Dynamic dispatch prevents exhaustive affected-subject enumeration and must remain explicitly partial.",
+      "input": {
+        "rawChangedFiles": ["src/events/registry.ts"],
+        "rawDiffText": "+ handlers[event.type]?.(event)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-dispatch-contract",
+            "description": "Dynamic handler dispatch remains compatible with registered consumers."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 2
+        },
+        "analysisExpectation": {
+          "status": "partial",
+          "limitationIncludes": []
+        }
+      },
+      "executionScenario": {
+        "mode": "dynamic-dispatch-partial"
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-12-missed-obligation",
+      "category": "missed-required-obligation",
+      "description": "The evaluation oracle contains two obligations so a missed obligation is mechanically visible.",
+      "input": {
+        "rawChangedFiles": ["src/payment/authorize.ts", "src/payment/audit.ts"],
+        "rawDiffText": "+ authorize(payment)\n+ writeAuditRecord(payment)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-payment-auth",
+            "description": "Payment authorization semantics remain correct."
+          },
+          {
+            "id": "OB-audit-write",
+            "description": "Audit recording remains complete for authorized payments."
+          }
+        ],
+        "knownInteractions": [
+          {
+            "from": "OB-payment-auth",
+            "to": "OB-audit-write"
+          }
+        ],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 3
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-13-over-split",
+      "category": "over-split-concern",
+      "description": "Implementation, tests, and config all support one coherent retry-policy change.",
+      "input": {
+        "rawChangedFiles": ["src/http/retry.ts", "tests/http/retry.test.ts", "config/retry.json"],
+        "rawDiffText": "+ maxAttempts = 4\n+ expect(attempts).toBe(4)\n+ \"maxAttempts\": 4"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-retry-policy",
+            "description": "The retry policy changes coherently across implementation, tests, and config."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 2
+        }
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-14-timeout",
+      "category": "analyzer-timeout",
+      "description": "The analyzer can time out; evaluation must preserve that failure rather than infer coverage.",
+      "input": {
+        "rawChangedFiles": ["src/search/query.ts"],
+        "rawDiffText": "+ buildQuery(filters)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-query-contract",
+            "description": "Search query construction remains correct."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 2
+        },
+        "analysisExpectation": {
+          "status": "failed",
+          "limitationIncludes": ["analyzer-failed:runtime-error"]
+        }
+      },
+      "executionScenario": {
+        "mode": "timeout"
+      }
+    },
+    {
+      "schemaVersion": "1",
+      "id": "RC-15-malformed-output",
+      "category": "malformed-analyzer-output",
+      "description": "Malformed analyzer output must remain a failed observation and never become semantic coverage.",
+      "input": {
+        "rawChangedFiles": ["src/export/csv.ts"],
+        "rawDiffText": "+ return serializeCsv(rows)"
+      },
+      "oracle": {
+        "obligations": [
+          {
+            "id": "OB-csv-contract",
+            "description": "CSV serialization remains compatible."
+          }
+        ],
+        "knownInteractions": [],
+        "acceptableGrouping": {
+          "minConcerns": 1,
+          "maxConcerns": 2
+        },
+        "analysisExpectation": {
+          "status": "failed",
+          "limitationIncludes": ["analyzer-failed:invalid-json"]
+        }
+      },
+      "executionScenario": {
+        "mode": "malformed-output"
+      }
+    }
+  ]
+}
