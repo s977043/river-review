@@ -49701,6 +49701,7 @@ const PROMOTE_ID_SUBCOMMANDS = new Set([
   'approve',
   'reject',
   'retarget',
+  'attach-replay',
   'template',
   'review-effectiveness',
 ]);
@@ -99813,6 +99814,207 @@ function retargetPromotion({
 }
 
 // ---------------------------------------------------------------------------
+// #2372-G2 / #2485: Human-invoked paired replay evidence attachment.
+//
+// A paired replay is PRE-adoption evidence. Attaching it must not approve,
+// activate, reject, scaffold, or evaluate a promotion candidate. The record is
+// append-only and keyed by manifestHash so retries are idempotent.
+// ---------------------------------------------------------------------------
+
+const PRE_ADOPTION_PROMOTION_STATUSES = Object.freeze(['candidate', 'pending']);
+
+function assertReplayAttachmentArtifact(artifact) {
+  if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
+    throw new Error('paired replay input must be a JSON object.');
+  }
+  if (artifact.mode !== 'paired-replay' || artifact.readOnly !== true) {
+    throw new Error('input is not a read-only paired replay artifact.');
+  }
+  if (artifact.schemaVersion !== 1) {
+    throw new Error('paired replay artifact must use schemaVersion 1.');
+  }
+  if (!Array.isArray(artifact.writeEffects) || artifact.writeEffects.length !== 0) {
+    throw new Error('paired replay artifact must declare writeEffects: [].');
+  }
+  if (
+    artifact.requiresHumanApproval !== true ||
+    artifact.acceptance?.decision !== null ||
+    artifact.acceptance?.applied !== false ||
+    artifact.acceptance?.autoPromotion !== false
+  ) {
+    throw new Error('paired replay artifact violates the human-judgment boundary.');
+  }
+  if (
+    artifact.manifestVerification?.verified !== true ||
+    artifact.manifestVerification?.experimentKeyMatchesInputs !== true
+  ) {
+    throw new Error('paired replay manifest is not verified against the current inputs.');
+  }
+  const handoff = artifact.promotionHandoff;
+  if (!handoff || typeof handoff !== 'object' || Array.isArray(handoff)) {
+    throw new Error('paired replay artifact has no attachable promotionHandoff.');
+  }
+  if (
+    handoff.manifestVerified !== true ||
+    handoff.experimentKeyMatchesInputs !== true ||
+    handoff.requiresHumanJudgment !== true
+  ) {
+    throw new Error('promotionHandoff does not satisfy the verified human-judgment contract.');
+  }
+  if (!Array.isArray(handoff.writeEffects) || handoff.writeEffects.length !== 0) {
+    throw new Error('promotionHandoff must declare writeEffects: [].');
+  }
+  for (const key of [
+    'candidateId',
+    'candidateContentHash',
+    'manifestId',
+    'experimentKey',
+    'manifestHash',
+  ]) {
+    if (typeof handoff[key] !== 'string' || !handoff[key]) {
+      throw new Error(`promotionHandoff is missing ${key}.`);
+    }
+  }
+
+  const manifest = artifact.manifest;
+  const improvementCandidate = manifest?.improvementCandidate;
+  if (
+    !manifest ||
+    handoff.manifestId !== manifest.manifestId ||
+    handoff.experimentKey !== manifest.experimentKey ||
+    handoff.manifestHash !== manifest.manifestHash
+  ) {
+    throw new Error('promotionHandoff does not match the paired replay Experiment Manifest.');
+  }
+  if (
+    !improvementCandidate ||
+    handoff.candidateId !== improvementCandidate.candidateId ||
+    handoff.candidateContentHash !== improvementCandidate.contentHash
+  ) {
+    throw new Error('promotionHandoff does not match manifest.improvementCandidate.');
+  }
+  return handoff;
+}
+
+/**
+ * Attach PRE-adoption paired replay evidence to one promotion_candidate.
+ *
+ * This transition deliberately changes no lifecycle or judgment field. It only
+ * appends an auditable evidence record under context.experimentHistory.
+ *
+ * Binding validation is exposed separately as validateReplayEvidenceAttachment()
+ * so callers/tests can verify attribution without mutating the entry.
+ *
+ * @param {object} entry
+ * @param {object} artifact paired-replay artifact
+ * @param {{ approver: string, reason: string, now?: Date }} opts
+ * @returns {{ changed: boolean, entry: object, record: object|null, note: string|null }}
+ */
+function validateReplayEvidenceAttachment(entry, artifact) {
+  const pc = getPromotionCandidate(entry);
+  if (!pc) throw new Error(`Entry ${entry?.id} is not a promotion_candidate.`);
+
+  const handoff = assertReplayAttachmentArtifact(artifact);
+  if (handoff.candidateId !== entry.id) {
+    throw new Error(
+      `promotionHandoff candidateId mismatch: expected ${entry.id}, got ${handoff.candidateId}.`
+    );
+  }
+  if (!pc.contentHash) {
+    throw new Error(
+      `Candidate ${entry.id} has no contentHash; legacy candidates cannot accept replay evidence safely.`
+    );
+  }
+  if (handoff.candidateContentHash !== pc.contentHash) {
+    throw new Error(
+      `promotionHandoff contentHash mismatch for ${entry.id}; replay evidence belongs to different candidate content.`
+    );
+  }
+  if (!PRE_ADOPTION_PROMOTION_STATUSES.includes(pc.promotionStatus)) {
+    throw new Error(
+      `Candidate ${entry.id} is not pre-adoption (promotionStatus=${pc.promotionStatus}); replay evidence must be attached before approval/activation.`
+    );
+  }
+  return { pc, handoff };
+}
+
+function applyReplayEvidenceAttachment(
+  entry,
+  artifact,
+  { approver, reason, now = new Date() }
+) {
+  if (!approver || !String(approver).trim()) {
+    throw new Error('approver is required to attach paired replay evidence.');
+  }
+  if (!reason || !String(reason).trim()) {
+    throw new Error('reason is required to attach paired replay evidence.');
+  }
+
+  const { handoff } = validateReplayEvidenceAttachment(entry, artifact);
+  entry.context = entry.context ?? {};
+  const history = entry.context.experimentHistory ?? [];
+  if (!Array.isArray(history)) {
+    throw new Error(`Candidate ${entry.id} has invalid context.experimentHistory; expected an array.`);
+  }
+  const existing = history.find((item) => item?.handoff?.manifestHash === handoff.manifestHash);
+  if (existing) {
+    return {
+      changed: false,
+      entry,
+      record: existing,
+      note: `manifestHash ${handoff.manifestHash} already attached`,
+    };
+  }
+
+  const attachedAt = now.toISOString();
+  const record = {
+    attachedAt,
+    attachedBy: String(approver).trim(),
+    reason: String(reason).trim(),
+    handoff: structuredClone(handoff),
+  };
+  entry.context.experimentHistory = [...history, record];
+  entry.metadata = entry.metadata ?? {};
+  entry.metadata.updatedAt = attachedAt;
+
+  return { changed: true, entry, record, note: null };
+}
+
+/**
+ * Persisting wrapper for applyReplayEvidenceAttachment(). A duplicate
+ * manifestHash is previewed first and does not rewrite the Riverbed index.
+ */
+function attachReplayEvidence({
+  indexPath,
+  id,
+  artifact,
+  approver,
+  reason,
+  now = new Date(),
+}) {
+  const index = (0,riverbed_memory/* loadMemory */.ab)(indexPath);
+  const target = listPromotionCandidates(index, { includeInactive: true }).find((e) => e.id === id);
+  if (!target) {
+    throw new Error(`No promotion_candidate entry with id: ${id}`);
+  }
+
+  const preview = applyReplayEvidenceAttachment(structuredClone(target), artifact, {
+    approver,
+    reason,
+    now,
+  });
+  if (!preview.changed) {
+    return { ...preview, entry: target };
+  }
+
+  let persisted;
+  const entry = (0,riverbed_memory/* updateEntry */.W8)(indexPath, id, (live) => {
+    persisted = applyReplayEvidenceAttachment(live, artifact, { approver, reason, now });
+  });
+  return { ...persisted, entry };
+}
+
+// ---------------------------------------------------------------------------
 // Phase 3 (#1568-C / #1623): Retire lifecycle
 //
 // Two deterministic, human-triggered CLI operations over promoted candidates:
@@ -100439,12 +100641,14 @@ var promotion_candidates = __nccwpck_require__(3077);
 //   river promote approve <id>         Approve a candidate (promotionStatus -> approved)
 //   river promote reject  <id>         Reject a candidate  (promotionStatus -> archived)
 //   river promote retarget <id>         Change proposedTarget with an audit trail
+//   river promote attach-replay <id>    Attach PRE-adoption paired replay evidence
 //   river promote template [<id>]      Emit PR scaffold(s) for approved candidate(s)
 //   river promote retire               Archive expired candidates + sync promotionStatus (Phase 3)
 //   river promote review-effectiveness Flag needs_review on negative post-activation feedback (Phase 3)
 //
 // The approval decision records who/when (context.approval) for auditability.
 // `now` is injected via RIVER_NOW (ISO string) so tests can pin it.
+
 
 
 
@@ -100534,13 +100738,14 @@ async function runPromoteCommand(parsed, targetPath) {
       'approve',
       'reject',
       'retarget',
+      'attach-replay',
       'template',
       'retire',
       'review-effectiveness',
     ].includes(sub)
   ) {
     console.error(
-      'Error: usage: river promote <propose|list|approve <id>|reject <id>|retarget <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <jsonl>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--target-kind <kind>] [--target-id <id>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
+      'Error: usage: river promote <propose|list|approve <id>|reject <id>|retarget <id>|attach-replay <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <file>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--target-kind <kind>] [--target-id <id>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
     );
     return 1;
   }
@@ -100745,6 +100950,73 @@ async function runPromoteCommand(parsed, targetPath) {
       console.log('  approval: reset; candidate must be approved again for the new target');
     }
     console.log(`  written to: ${indexPath}`);
+    return 0;
+  }
+
+  if (sub === 'attach-replay') {
+    if (!parsed.promoteId) {
+      console.error('Error: river promote attach-replay requires a candidate <id>.');
+      return 1;
+    }
+    if (!parsed.promoteInput) {
+      console.error('Error: river promote attach-replay requires --input <paired-replay.json>.');
+      return 1;
+    }
+    if (!parsed.promoteApprover) {
+      console.error('Error: river promote attach-replay requires --approver <name>.');
+      return 1;
+    }
+    if (!parsed.promoteReason) {
+      console.error('Error: river promote attach-replay requires --reason <text>.');
+      return 1;
+    }
+
+    let artifact;
+    const inputPath = external_node_path_.resolve(external_node_process_.cwd(), parsed.promoteInput);
+    try {
+      artifact = JSON.parse((0,external_node_fs_.readFileSync)(inputPath, 'utf8'));
+    } catch (err) {
+      console.error(`Error: failed to read paired replay artifact ${inputPath}: ${err.message}`);
+      return 1;
+    }
+
+    let result;
+    try {
+      result = attachReplayEvidence({
+        indexPath,
+        id: parsed.promoteId,
+        artifact,
+        approver: parsed.promoteApprover,
+        reason: parsed.promoteReason,
+        now,
+      });
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      return 1;
+    }
+
+    const summary = {
+      candidateId: result.entry.id,
+      changed: result.changed,
+      manifestHash: result.record?.handoff?.manifestHash ?? null,
+      attachedAt: result.record?.attachedAt ?? null,
+      attachedBy: result.record?.attachedBy ?? null,
+      note: result.note,
+    };
+    if (parsed.output === 'json') {
+      console.log(JSON.stringify(summary, null, 2));
+      return 0;
+    }
+    if (!result.changed) {
+      console.log(`Candidate ${summary.candidateId}: replay evidence already attached (no change).`);
+      console.log(`  manifestHash: ${summary.manifestHash}`);
+      return 0;
+    }
+    console.log(`Attached paired replay evidence to candidate ${summary.candidateId}.`);
+    console.log(`  manifestHash: ${summary.manifestHash}`);
+    console.log(`  attachedBy:  ${summary.attachedBy}`);
+    console.log(`  attachedAt:  ${summary.attachedAt}`);
+    console.log(`  written to:  ${indexPath}`);
     return 0;
   }
 
@@ -101363,6 +101635,10 @@ Commands:
   promote retarget <id> Change the proposed target with an auditable human decision
                         (--target-kind <kind> [--target-id <id>] --approver <name>
                          --reason <text> --index <path>)
+  promote attach-replay <id>
+                        Attach PRE-adoption paired replay evidence to a candidate
+                        (--input <paired-replay.json> --approver <name>
+                         --reason <text> [--index <path>] [--output json])
   promote template [<id>] Emit PR scaffold(s) for approved candidate(s) (text only)
                         (--approver <name> --reason <text> --index <path>
                          --include-inactive; --output json for machine output)
@@ -101471,7 +101747,7 @@ const COMMAND_USAGE = {
   suppression:
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
-    'river promote <propose|list|approve|reject|retarget|template|retire|review-effectiveness> [options]',
+    'river promote <propose|list|approve|reject|retarget|attach-replay|template|retire|review-effectiveness> [options]',
   evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
 };
 
@@ -102175,7 +102451,11 @@ function parsePromoteOption(arg, args, parsed) {
   if (arg === '--input') {
     const value = args.shift();
     if (!value || value.startsWith('-')) {
-      console.error('Error: --input option requires a JSONL path.');
+      console.error(
+        parsed.promoteSubcommand === 'attach-replay'
+          ? 'Error: --input option requires a paired replay JSON path.'
+          : 'Error: --input option requires a JSONL path.'
+      );
       usageError(parsed);
       return 'break';
     }
