@@ -28,6 +28,14 @@ const markdownDiff = `diff --git a/README.md b/README.md
 +hello world
 `;
 
+const markdownHeadingDiff = `diff --git a/docs/adr/013-example.md b/docs/adr/013-example.md
+--- a/docs/adr/013-example.md
++++ b/docs/adr/013-example.md
+@@ -1,1 +1,1 @@
+-# Before
++# Evidence Architecture
+`;
+
 function buildLargeDiff() {
   const before = Array.from({ length: 250 }, (_, i) => `${i + 1}`).join('\n');
   const after = Array.from({ length: 250 }, (_, i) => `${i + 1}`)
@@ -257,6 +265,24 @@ test('buildLlmDiffView restores Markdown from the raw files for upstream', () =>
   );
   assert.match(view.diffText, /README\.md/);
   assert.match(view.diffText, /hello world/);
+});
+
+test('upstream keeps Markdown heading-only changes that look like code comments (#2473)', () => {
+  const parsed = parseUnifiedDiff(markdownHeadingDiff);
+  const view = buildLlmDiffView(
+    {
+      files: parsed.files,
+      rawDiffText: markdownHeadingDiff,
+      diffText: markdownHeadingDiff,
+    },
+    { phase: 'upstream' }
+  );
+
+  assert.deepEqual(
+    view.files.map((file) => file.path),
+    ['docs/adr/013-example.md']
+  );
+  assert.match(view.diffText, /Evidence Architecture/);
 });
 
 test('buildLlmDiffView keeps Markdown excluded outside upstream', () => {
