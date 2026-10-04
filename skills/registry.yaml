@@ -1442,7 +1442,7 @@ skills:
     description: '.river-review.{yaml,json} の context.budget / ranking / reviewMode 設定をモデル仕様とリポジトリ規模に合わせて調整するレビュー観点'
 
   - id: eval-driven-skill-design
-    version: '0.1.0'
+    version: '0.2.0'
     name: 'Eval-Driven Skill Design'
     path: skills/upstream/eval-driven-skill-design/SKILL.md
     category: upstream
