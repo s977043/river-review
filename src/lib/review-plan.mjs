@@ -1124,5 +1124,14 @@ function normalizeFindingForArtifact(finding, index, phase) {
   if (finding.validation && typeof finding.validation === 'object') {
     out.validation = finding.validation;
   }
+  if (Array.isArray(finding.sourceExecutionIds) && finding.sourceExecutionIds.length > 0) {
+    out.sourceExecutionIds = [
+      ...new Set(
+        finding.sourceExecutionIds.filter(
+          (value) => typeof value === 'string' && value.trim().length > 0
+        )
+      ),
+    ];
+  }
   return out;
 }
