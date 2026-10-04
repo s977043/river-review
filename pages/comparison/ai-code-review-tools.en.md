@@ -97,7 +97,7 @@ Every profile uses the same template: what it is, best fit, notable strengths, l
 - **Notable strengths** — no extra integration, native GitHub UX, custom-instruction support, can act as a required reviewer.
 - **Limitations** — proprietary and GitHub-only (no self-host outside GitHub); context is primarily the diff rather than the whole repo; billing is contentious and volatile — premium-request consumption, a rising model multiplier (~13x reported for mid-2026), and Actions-minute usage make true per-review cost hard to pin down.
 - **License & pricing** _(billing volatile)_ — bundled with Copilot subscriptions (Pro ~$10/mo, Pro+ ~$20/mo, Business ~$19/user/mo, Enterprise ~$39/user/mo), but reviews increasingly consume premium requests/AI credits plus GitHub Actions minutes rather than being wholly free within the seat.
-- **Official link** — [https://docs.github.com/en/copilot/using-github-copilot/code-review](https://docs.github.com/en/copilot/using-github-copilot/code-review).
+- **Official link** — [https://docs.github.com/en/copilot/how-tos/copilot-on-github/use-copilot-agents/copilot-code-review](https://docs.github.com/en/copilot/how-tos/copilot-on-github/use-copilot-agents/copilot-code-review).
 
 ### Graphite Reviewer (Graphite Agent)
 
