@@ -1,3 +1,4 @@
+# One-shot formatter for PR #2511; deletes itself after committing canonical formatting.
 name: PR format once
 
 on:
