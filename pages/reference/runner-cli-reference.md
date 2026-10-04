@@ -192,7 +192,7 @@ POSIX の `--` 終端も使えます。`--` の後ろに置いたトークンは
 
 上記以外の面（`skills list` / `runs list` / `promote list` / `eval` など）は末尾のパスを受け取らず、余剰 positional として exit 1 になります。なお `runs diff <id1> <id2> [<id3>...]`、`promote approve <id>`、`promote attach-replay <id>` のように、非オプションのトークンを仕様として複数受け取るサブコマンドは別扱いです。
 
-`river promote attach-replay <id>` は、`river evolve replay --output json` などで保存した paired replay artifact を `--input <paired-replay.json>` から読み、対応する promotion candidate の `context.experimentHistory[]` へ採用前の実験証拠として追記します。`--approver <name>` と `--reason <text>` は必須です。同じ `manifestHash` の再添付は no-op です。このコマンドは `promotionStatus`、approval、post-adoption effectiveness を変更せず、candidate が `candidate` / `pending` 以外なら exit 1 で拒否します。
+`river promote attach-replay <id>` は、`river evolve replay --output json` などで保存した paired replay artifact を `--input <paired-replay.json>` から読みます。対応する promotion candidate の `context.experimentHistory[]` へ、採用前の実験証拠として追記します。`--approver <name>` と `--reason <text>` は必須です。同じ `manifestHash` の再添付は no-op です。`promotionStatus`、approval、post-adoption effectiveness は変更しません。candidate が `candidate` / `pending` 以外なら exit 1 で拒否します。
 
 ### `river review` / `river eval`（`runners/cli`）
 
