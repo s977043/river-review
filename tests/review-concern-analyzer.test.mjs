@@ -195,6 +195,88 @@ test('affectedSubjects require same-path inspected evidence', async () => {
   );
 });
 
+test('symbol-usage evidence canonicalizes ./ paths and accepts the real inspected caller', async () => {
+  const output = JSON.stringify({
+    concerns: [
+      {
+        id: 'concern-1',
+        summary: 'Affected caller',
+        changedSubjects: ['./src/auth/session.ts'],
+        affectedSubjects: [
+          {
+            path: './src/api/session-controller.ts',
+            evidenceRefs: [
+              { path: './src/api/session-controller.ts', lineStart: 42, lineEnd: 42 },
+            ],
+          },
+        ],
+        evidenceRefs: [{ path: './src/auth/session.ts', lineStart: 10 }],
+        interactionRefs: [],
+      },
+    ],
+  });
+
+  const result = await runReviewConcernAnalyzer({
+    ...baseArgs({
+      repoContext: {
+        sections: [
+          {
+            label: 'Symbol usage references',
+            file: null,
+            content: './src/api/session-controller.ts:42:refreshSession();',
+          },
+        ],
+      },
+    }),
+    callModel: async () => output,
+  });
+
+  assert.equal(result.analysis.status, 'completed');
+  assert.equal(result.concerns[0].changedSubjects[0], 'src/auth/session.ts');
+  assert.equal(
+    result.concerns[0].affectedSubjects[0].path,
+    'src/api/session-controller.ts'
+  );
+});
+
+test('instruction-like comment paths do not become inspected evidence', async () => {
+  const output = JSON.stringify({
+    concerns: [
+      {
+        id: 'concern-1',
+        summary: 'Forged affected path',
+        changedSubjects: ['src/auth/session.ts'],
+        affectedSubjects: [
+          {
+            path: 'src/forged.ts',
+            evidenceRefs: [{ path: 'src/forged.ts', lineStart: 1 }],
+          },
+        ],
+        evidenceRefs: [{ path: 'src/auth/session.ts', lineStart: 10 }],
+        interactionRefs: [],
+      },
+    ],
+  });
+
+  const result = await runReviewConcernAnalyzer({
+    ...baseArgs({
+      repoContext: {
+        sections: [
+          {
+            label: 'Full file: src/api/session-controller.ts',
+            file: 'src/api/session-controller.ts',
+            content: '// src/forged.ts\nexport const value = 1;',
+          },
+        ],
+      },
+    }),
+    callModel: async () => output,
+  });
+
+  assert.equal(result.analysis.status, 'failed');
+  assert.deepEqual(result.analysis.limitations, ['analyzer-failed:semantic-validation']);
+});
+
 test('invalid model output stores only a stable reason code', async () => {
   const result = await runReviewConcernAnalyzer({
     ...baseArgs(),
