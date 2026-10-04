@@ -67,21 +67,21 @@ Derived projections     Advisory signals
 
 ## Availability summary
 
-| Concept | Current availability | Default | Stability / compatibility |
-| --- | --- | --- | --- |
-| Review Artifact findings / decision / Layer 1 signal | runtime | on when artifact is emitted | versioned public schema |
-| Finding Critic validation | opt-in runtime | off | additive optional field |
-| Evidence State helper | helper-only derived view | not persisted by general review | internal helper / owner-specific |
-| Review Coverage | runtime observation when LLM attempt exists | path-dependent | Experimental |
-| `llmNotExecuted` | saved-run observation when true | omitted otherwise | additive optional |
-| Execution Manifest | runtime on supported paths | optional | Experimental |
-| Reviewer Independence | helper-only | not runtime-wired | internal helper |
-| Security Audit Run Record `evidenceState` | schema-only / writer not wired | unavailable | Experimental |
-| Review Resolution sidecar | planned architecture owner | unavailable | not published |
-| Human Decision Surface | runtime Markdown projection | on when renderer needs attention surface | internal renderer over public state |
-| Gate derivation | runtime advisory signal | path/config dependent | public artifact field; exit semantics separately Stable |
-| `--gate` / Action gate enforcement | runtime enforcement adapter | opt-in | exit code meaning Stable |
-| Host / Human merge/release authority | external to River Review | host policy | outside artifact schema |
+| Concept                                              | Current availability                        | Default                                  | Stability / compatibility                               |
+| ---------------------------------------------------- | ------------------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| Review Artifact findings / decision / Layer 1 signal | runtime                                     | on when artifact is emitted              | versioned public schema                                 |
+| Finding Critic validation                            | opt-in runtime                              | off                                      | additive optional field                                 |
+| Evidence State helper                                | helper-only derived view                    | not persisted by general review          | internal helper / owner-specific                        |
+| Review Coverage                                      | runtime observation when LLM attempt exists | path-dependent                           | Experimental                                            |
+| `llmNotExecuted`                                     | saved-run observation when true             | omitted otherwise                        | additive optional                                       |
+| Execution Manifest                                   | runtime on supported paths                  | optional                                 | Experimental                                            |
+| Reviewer Independence                                | helper-only                                 | not runtime-wired                        | internal helper                                         |
+| Security Audit Run Record `evidenceState`            | schema-only / writer not wired              | unavailable                              | Experimental                                            |
+| Review Resolution sidecar                            | planned architecture owner                  | unavailable                              | not published                                           |
+| Human Decision Surface                               | runtime Markdown projection                 | on when renderer needs attention surface | internal renderer over public state                     |
+| Gate derivation                                      | runtime advisory signal                     | path/config dependent                    | public artifact field; exit semantics separately Stable |
+| `--gate` / Action gate enforcement                   | runtime enforcement adapter                 | opt-in                                   | exit code meaning Stable                                |
+| Host / Human merge/release authority                 | external to River Review                    | host policy                              | outside artifact schema                                 |
 
 ## Mapping rows
 
@@ -659,21 +659,21 @@ PR #2471の実運用では、#2474適用後にMarkdown ADRがupstream review inp
 
 ## Scenario validation
 
-| Scenario | Result | Evidence / judgment |
-| --- | --- | --- |
-| A — clean findings + partial coverage | PASS | Review Coverageはfinding countと独立です。L1はcoverage gapを表示でき、Gate consumptionはopt-inです。 |
-| B — Finding Critic / Evidence State unavailable | PASS | Critic default off。validation absentをtruthにしません。Evidence State helperはmissing statusをunresolvedへ倒します。 |
-| C — Gate enforced with `--gate` | PASS | Gate derivation、gate exit adapter、Host/Human authorityを別rowで表現できました。 |
-| D — Review Resolution not implemented | PASS | ownerはADR-011、runtime evidence sourceはplanned/unavailableとして分離しました。 |
-| E — historical / omitted fields | PASS | coverage欠損をcompleteとせず、`llmNotExecuted` 欠損をexecutedの証拠とせず、trace / manifest / saved-run identityをpath-specificに保持します。 |
-| F — provenance exists but trust absent | PASS | saved-run provenanceはself-reported。Manifest integrityとauthenticityを分離し、`inputsHash`もsecurity controlにしません。 |
-| G — path-specific availability | PASS | `river run --gate` と `review exec` のcoverage Gate pathを分離しました。 |
-| H — surface composition / fallback | PASS | L1 builder外のLLM failure headerを含め、final rendererとL3 fallbackを追跡しました。 |
-| I — evidence lineage / no double counting | PASS | coverage observation → saved copy → Layer 2 qualification / L1 projectionを1 lineageとして扱います。 |
-| J — owner extension compatibility | PASS | Stable gate exit semanticsとExperimental Coverage / Manifestを別compatibility costとして扱います。 |
-| K — activation / default asymmetry | PASS | Critic env>config + kill switch、Gate coverage / require-LLM opt-in、Layer 2 default qualificationを分離しました。 |
-| L — failure-policy asymmetry | PASS | Critic retain+escalate、provenance drop-with-warning、coverage incompleteness、deterministic staging incompleteness、preserve-unknown、conservative Gateを別policyとして記録しました。 |
-| M — truth vocabulary collision | PASS | `validation.finalStatus != validatedStatus != Evidence State != Security Audit evidenceState` を保持しました。 |
+| Scenario                                        | Result | Evidence / judgment                                                                                                                                                                    |
+| ----------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — clean findings + partial coverage           | PASS   | Review Coverageはfinding countと独立です。L1はcoverage gapを表示でき、Gate consumptionはopt-inです。                                                                                   |
+| B — Finding Critic / Evidence State unavailable | PASS   | Critic default off。validation absentをtruthにしません。Evidence State helperはmissing statusをunresolvedへ倒します。                                                                  |
+| C — Gate enforced with `--gate`                 | PASS   | Gate derivation、gate exit adapter、Host/Human authorityを別rowで表現できました。                                                                                                      |
+| D — Review Resolution not implemented           | PASS   | ownerはADR-011、runtime evidence sourceはplanned/unavailableとして分離しました。                                                                                                       |
+| E — historical / omitted fields                 | PASS   | coverage欠損をcompleteとせず、`llmNotExecuted` 欠損をexecutedの証拠とせず、trace / manifest / saved-run identityをpath-specificに保持します。                                          |
+| F — provenance exists but trust absent          | PASS   | saved-run provenanceはself-reported。Manifest integrityとauthenticityを分離し、`inputsHash`もsecurity controlにしません。                                                              |
+| G — path-specific availability                  | PASS   | `river run --gate` と `review exec` のcoverage Gate pathを分離しました。                                                                                                               |
+| H — surface composition / fallback              | PASS   | L1 builder外のLLM failure headerを含め、final rendererとL3 fallbackを追跡しました。                                                                                                    |
+| I — evidence lineage / no double counting       | PASS   | coverage observation → saved copy → Layer 2 qualification / L1 projectionを1 lineageとして扱います。                                                                                   |
+| J — owner extension compatibility               | PASS   | Stable gate exit semanticsとExperimental Coverage / Manifestを別compatibility costとして扱います。                                                                                     |
+| K — activation / default asymmetry              | PASS   | Critic env>config + kill switch、Gate coverage / require-LLM opt-in、Layer 2 default qualificationを分離しました。                                                                     |
+| L — failure-policy asymmetry                    | PASS   | Critic retain+escalate、provenance drop-with-warning、coverage incompleteness、deterministic staging incompleteness、preserve-unknown、conservative Gateを別policyとして記録しました。 |
+| M — truth vocabulary collision                  | PASS   | `validation.finalStatus != validatedStatus != Evidence State != Security Audit evidenceState` を保持しました。                                                                         |
 
 13シナリオすべてで、新しいrun-level projectionを必須とするfailureは再現しませんでした。
 
@@ -711,15 +711,15 @@ general Review Artifactへ `evidenceState` をコピーする理由にはなり�
 
 ## Owner-extension compatibility assessment
 
-| Candidate | Stability | Preferred action |
-| --- | --- | --- |
-| Reviewer Independence | internal/helper-only | owner側runtime wiringが必要になった時だけadditiveに実装 |
-| Review Resolution | planned / not published | #2322 ownerでschema + sidecarを定義 |
-| Security Audit Run Record | Experimental | owner writerを配線。general artifactへ複製しない |
-| Review Coverage | Experimental | owner field追加は可能だが、Gate意味変更とは分離 |
-| Execution Manifest | Experimental | provenance/replayability ownerとしてadditiveに拡張可能 |
-| Gate exit semantics | Stable | Phase 2都合で意味変更しない |
-| Human Decision Surface | internal projection | existing stateの表示改善は可能。新truthは作らない |
+| Candidate                 | Stability               | Preferred action                                        |
+| ------------------------- | ----------------------- | ------------------------------------------------------- |
+| Reviewer Independence     | internal/helper-only    | owner側runtime wiringが必要になった時だけadditiveに実装 |
+| Review Resolution         | planned / not published | #2322 ownerでschema + sidecarを定義                     |
+| Security Audit Run Record | Experimental            | owner writerを配線。general artifactへ複製しない        |
+| Review Coverage           | Experimental            | owner field追加は可能だが、Gate意味変更とは分離         |
+| Execution Manifest        | Experimental            | provenance/replayability ownerとしてadditiveに拡張可能  |
+| Gate exit semantics       | Stable                  | Phase 2都合で意味変更しない                             |
+| Human Decision Surface    | internal projection     | existing stateの表示改善は可能。新truthは作らない       |
 
 ## Phase 2 entry criteria scorecard
 
@@ -749,7 +749,7 @@ general Review Artifactへ `evidenceState` をコピーする理由にはなり�
 
 ### 4. Canonical input から expected projectionを決定論的に記述できる
 
-**NO—consumer未確定のため設計しない**
+判定: **NO**—consumer未確定のため設計しない
 
 pure deterministic projection自体は技術的に可能です。
 
