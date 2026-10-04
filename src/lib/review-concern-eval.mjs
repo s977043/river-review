@@ -152,6 +152,21 @@ function normalizeConcernMap(map) {
     concernIds.add(id);
   }
 
+  for (const concern of map.concerns) {
+    if (concern.interactionRefs != null && !Array.isArray(concern.interactionRefs)) {
+      throw new ReviewConcernEvalError(
+        `map concern "${concern.id}" interactionRefs must be an array.`
+      );
+    }
+    for (const target of concern.interactionRefs ?? []) {
+      if (!concernIds.has(target)) {
+        throw new ReviewConcernEvalError(
+          `map concern "${concern.id}" references unknown interaction concern "${target}".`
+        );
+      }
+    }
+  }
+
   return { map, concernIds };
 }
 
@@ -187,6 +202,14 @@ function normalizeAdjudication(adjudication, obligationIds, concernIds) {
     }
   }
 
+  if (
+    adjudication.nonActionableConcernIds != null &&
+    !Array.isArray(adjudication.nonActionableConcernIds)
+  ) {
+    throw new ReviewConcernEvalError(
+      'adjudication.nonActionableConcernIds must be an array.'
+    );
+  }
   const nonActionableConcernIds = [...new Set(adjudication.nonActionableConcernIds ?? [])];
   for (const concernId of nonActionableConcernIds) {
     if (!concernIds.has(concernId)) {
