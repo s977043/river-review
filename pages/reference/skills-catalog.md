@@ -563,14 +563,15 @@ impacts.`
 ### `eval-driven-skill-design`
 
 - 名前: `Eval-Driven Skill Design`
-- 概要: `新規 skill SKILL.md PR で `fixtures/`と`eval/` の happy-path × guard ペアが揃っているかを確認し、欠けている場合は eval cycle (#688)
-に乗せる手順を案内する。`
+- 概要: `新規・変更 skill の fixture/eval と、WITH/WITHOUT の paired ablation による限界寄与の評価可能性を確認し、activation と effectiveness を分離して案内する。`
 - 対象:
   - `skills/**/SKILL.md`
+  - `skills/**/prompt/**`
+  - `skills/**/scripts/**`
 - 重要度: minor
 - タグ: skill-authoring / eval / process / upstream
 - 依存関係: repo_metadata
-- 適用条件: phase=upstream, inputContext=diff / repoConfig
+- 適用条件: phase=upstream, inputContext=diff
 
 チェック項目の例:
 
