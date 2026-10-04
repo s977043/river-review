@@ -235,3 +235,45 @@ test('buildLlmDiffView passes diffText through unchanged when nothing is exclude
   assert.equal(view.files.length, 1);
   assert.equal(view.diffText, cleanDiff);
 });
+
+
+test('buildLlmDiffView restores Markdown from the raw files for upstream', () => {
+  const parsed = parseUnifiedDiff(markdownDiff);
+  const defaultOptimized = optimizeDiff({ files: parsed.files, diffText: markdownDiff });
+  assert.equal(defaultOptimized.files.length, 0, 'default optimization should still drop Markdown');
+
+  const view = buildLlmDiffView(
+    {
+      files: parsed.files,
+      filesForReview: defaultOptimized.files,
+      rawDiffText: markdownDiff,
+      diffText: defaultOptimized.diffText,
+    },
+    { phase: 'upstream' }
+  );
+
+  assert.deepEqual(
+    view.files.map((file) => file.path),
+    ['README.md']
+  );
+  assert.match(view.diffText, /README\.md/);
+  assert.match(view.diffText, /hello world/);
+});
+
+test('buildLlmDiffView keeps Markdown excluded outside upstream', () => {
+  const parsed = parseUnifiedDiff(markdownDiff);
+  const defaultOptimized = optimizeDiff({ files: parsed.files, diffText: markdownDiff });
+
+  const view = buildLlmDiffView(
+    {
+      files: parsed.files,
+      filesForReview: defaultOptimized.files,
+      rawDiffText: markdownDiff,
+      diffText: defaultOptimized.diffText,
+    },
+    { phase: 'midstream' }
+  );
+
+  assert.deepEqual(view.files, []);
+  assert.equal(view.diffText, '');
+});
