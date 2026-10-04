@@ -48,42 +48,6 @@ export const NAME_MAX_LENGTH = 64;
 export const RESERVED_NAME_WORDS = ['anthropic', 'claude'];
 
 /**
- * Advisory entrypoint context budget for Agent Skills. These are deliberately
- * warning-only: size is a review signal, not a correctness gate (#2372, #2483).
- */
-export const AGENT_SKILL_CONTEXT_WARN_BYTES = 12 * 1024;
-export const AGENT_SKILL_CONTEXT_WARN_LINES = 250;
-
-/**
- * Measure deterministic entrypoint context health without pretending bytes are
- * tokens. The caller decides how to report the advisory; this helper never
- * changes validation pass/fail semantics.
- *
- * @param {unknown} content
- * @returns {{
- *   bytes: number,
- *   lines: number,
- *   exceedsBytes: boolean,
- *   exceedsLines: boolean,
- *   shouldWarn: boolean
- * }}
- */
-export function assessAgentSkillContextHealth(content) {
-  const text = String(content ?? '');
-  const bytes = Buffer.byteLength(text, 'utf8');
-  const lines = text.length === 0 ? 0 : text.split(/\r?\n/).length;
-  const exceedsBytes = bytes > AGENT_SKILL_CONTEXT_WARN_BYTES;
-  const exceedsLines = lines > AGENT_SKILL_CONTEXT_WARN_LINES;
-  return {
-    bytes,
-    lines,
-    exceedsBytes,
-    exceedsLines,
-    shouldWarn: exceedsBytes || exceedsLines,
-  };
-}
-
-/**
  * Return the prohibited organizational noun used as a hyphen-delimited word in
  * `name`, or null. Case-insensitive so an uppercase variant (e.g. `Foo-Team`)
  * cannot slip past the check (gemini review on PR #1468).
@@ -137,6 +101,47 @@ export function findHyphenVariantCollisions(names) {
     if (set.size > 1) collisions.push({ normalized, names: [...set].sort() });
   }
   return collisions;
+}
+
+// ---------------------------------------------------------------------------
+// Agent Skill entrypoint context health (#2372, #2483).
+// Size is an advisory review signal only; it never changes validation success.
+// ---------------------------------------------------------------------------
+
+/**
+ * Advisory entrypoint context budget for Agent Skills. These are deliberately
+ * warning-only: size is a review signal, not a correctness gate (#2372, #2483).
+ */
+export const AGENT_SKILL_CONTEXT_WARN_BYTES = 12 * 1024;
+export const AGENT_SKILL_CONTEXT_WARN_LINES = 250;
+
+/**
+ * Measure deterministic entrypoint context health without pretending bytes are
+ * tokens. The caller decides how to report the advisory; this helper never
+ * changes validation pass/fail semantics.
+ *
+ * @param {unknown} content
+ * @returns {{
+ *   bytes: number,
+ *   lines: number,
+ *   exceedsBytes: boolean,
+ *   exceedsLines: boolean,
+ *   shouldWarn: boolean
+ * }}
+ */
+export function assessAgentSkillContextHealth(content) {
+  const text = String(content ?? '');
+  const bytes = Buffer.byteLength(text, 'utf8');
+  const lines = text.length === 0 ? 0 : text.split(/\r?\n/).length;
+  const exceedsBytes = bytes > AGENT_SKILL_CONTEXT_WARN_BYTES;
+  const exceedsLines = lines > AGENT_SKILL_CONTEXT_WARN_LINES;
+  return {
+    bytes,
+    lines,
+    exceedsBytes,
+    exceedsLines,
+    shouldWarn: exceedsBytes || exceedsLines,
+  };
 }
 
 // ---------------------------------------------------------------------------
