@@ -140,6 +140,78 @@ describe('runReviewerOrchestration', () => {
     }
   });
 
+  it('attaches execution provenance to findings and coverage (#2481)', async () => {
+    const result = await runReviewerOrchestration({
+      diff: makeDiff(),
+      reviewers: ['bug-hunter'],
+      createExecutionId: ({ unitId }) => `exec:${unitId}`,
+      generateReviewImpl: async () => ({
+        findings: [
+          {
+            ruleId: 'some-rule',
+            file: 'src/foo.mjs',
+            lineStart: 1,
+            title: 'test finding',
+            message: 'test finding',
+            severity: 'major',
+          },
+        ],
+        comments: [],
+        debug: { llmUsed: true },
+      }),
+    });
+
+    assert.equal(
+      result.reviewCoverage.units[0].executionId,
+      'exec:reviewer:bug-hunter/chunk:1'
+    );
+    assert.deepEqual(result.findings[0].sourceExecutionIds, [
+      'exec:reviewer:bug-hunter/chunk:1',
+    ]);
+  });
+
+  it('rejects missing execution ids before tasks start (#2481)', async () => {
+    const generateReviewImpl = mock.fn(async () => ({
+      findings: [],
+      comments: [],
+      debug: { llmUsed: true },
+    }));
+
+    await assert.rejects(
+      () =>
+        runReviewerOrchestration({
+          diff: makeDiff(),
+          reviewers: ['bug-hunter'],
+          createExecutionId: () => '   ',
+          generateReviewImpl,
+        }),
+      /Reviewer execution id is missing/
+    );
+
+    assert.equal(generateReviewImpl.mock.callCount(), 0);
+  });
+
+  it('rejects duplicate execution ids before tasks start (#2481)', async () => {
+    const generateReviewImpl = mock.fn(async () => ({
+      findings: [],
+      comments: [],
+      debug: { llmUsed: true },
+    }));
+
+    await assert.rejects(
+      () =>
+        runReviewerOrchestration({
+          diff: makeDiff(),
+          reviewers: ['bug-hunter', 'security-scanner'],
+          createExecutionId: () => 'duplicate-exec',
+          generateReviewImpl,
+        }),
+      /Duplicate reviewer execution id: duplicate-exec/
+    );
+
+    assert.equal(generateReviewImpl.mock.callCount(), 0);
+  });
+
   it('assigns unique finding IDs across multiple reviewers', async () => {
     const result = await runReviewerOrchestration({
       diff: makeDiff(),
@@ -612,6 +684,37 @@ describe('mergeFindings', () => {
     const result = mergeFindings([f1, f2]);
     assert.equal(result.length, 1);
     assert.equal(result[0].severity, 'critical');
+  });
+
+  it('unions sourceExecutionIds independently from reviewer agreement (#2481)', () => {
+    const f1 = {
+      ...makeF(
+        'a.ts',
+        10,
+        'null pointer dereference in handleRequest',
+        'major',
+        'bug-hunter',
+        []
+      ),
+      sourceExecutionIds: ['exec-a', 'shared-exec'],
+    };
+    const f2 = {
+      ...makeF(
+        'a.ts',
+        10,
+        'null pointer dereference in handleRequest',
+        'major',
+        'security-scanner',
+        []
+      ),
+      sourceExecutionIds: ['exec-b', 'shared-exec'],
+    };
+
+    const [merged] = mergeFindings([f1, f2]);
+
+    assert.deepEqual(merged.sourceExecutionIds, ['exec-a', 'shared-exec', 'exec-b']);
+    assert.deepEqual(merged.agreement, ['bug-hunter', 'security-scanner']);
+    assert.notEqual(merged.sourceExecutionIds.length, merged.agreement.length);
   });
 
   it('unions evidence arrays and deduplicates', () => {

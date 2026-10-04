@@ -269,10 +269,16 @@ describe('formatJsonOutput teamLeadReport (#1700)', () => {
   /** Mirrors runReviewerOrchestration: merge across roles, then assign stable ids. */
   function buildReviewerRunResult() {
     const merged = mergeFindings([
-      makeRawFinding({ reviewerRole: 'bug-hunter' }),
+      makeRawFinding({
+        reviewerRole: 'bug-hunter',
+        sourceExecutionIds: ['exec-bug-hunter'],
+      }),
       // Same file and line: mergeFindings clusters it, so this finding ends up
       // with agreement.length 2 -> consensusLevel 'multi'.
-      makeRawFinding({ reviewerRole: 'security-scanner' }),
+      makeRawFinding({
+        reviewerRole: 'security-scanner',
+        sourceExecutionIds: ['exec-security-scanner'],
+      }),
       makeRawFinding({
         reviewerRole: 'bug-hunter',
         ruleId: 'logic-guard',
@@ -340,6 +346,10 @@ describe('formatJsonOutput teamLeadReport (#1700)', () => {
     // The other two properties #1700 had to declare live on the issues.
     assert.strictEqual(out.issues[0].consensusLevel, 'multi');
     assert.strictEqual(out.issues[0].reviewerRole, 'bug-hunter');
+    assert.deepStrictEqual(out.issues[0].sourceExecutionIds, [
+      'exec-bug-hunter',
+      'exec-security-scanner',
+    ]);
   });
 
   it('still warns when the report grows an undeclared field', () => {

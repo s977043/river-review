@@ -44,6 +44,7 @@ function baseArgs(overrides = {}) {
     reviewers: ['bug-hunter'],
     progress: false,
     env: {},
+    createExecutionId: ({ unitId }) => `exec:${unitId}`,
     generateReviewImpl: async () => okReview(),
     ...overrides,
   };
@@ -60,6 +61,34 @@ function coveredSubjects(reviewCoverage) {
   return [...new Set(reviewCoverage.units.flatMap((unit) => unit.subjects))].sort();
 }
 
+describe('reviewCoverage executionId compatibility (#2481)', () => {
+  it('keeps pre-#2481 units without executionId schema-valid', () => {
+    const legacyCoverage = {
+      schemaVersion: '1',
+      status: 'complete',
+      expectedUnits: 1,
+      completedUnits: 1,
+      requiredUnits: 1,
+      completedRequiredUnits: 1,
+      incompleteRequiredUnitIds: [],
+      units: [
+        {
+          id: 'reviewer:bug-hunter/chunk:1',
+          kind: 'diff-chunk',
+          subjects: ['src/a.js'],
+          reviewerRole: 'bug-hunter',
+          required: true,
+          status: 'completed',
+          reasonCode: null,
+          findingsCount: 0,
+        },
+      ],
+    };
+
+    assert.equal(validateCoverage(legacyCoverage), true, validationErrors());
+  });
+});
+
 describe('reviewCoverage runtime wiring', () => {
   it('reports complete for a successful non-chunked required review', async () => {
     const result = await runReviewerOrchestration(baseArgs());
@@ -68,6 +97,10 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(result.reviewCoverage.expectedUnits, 1);
     assert.equal(result.reviewCoverage.completedRequiredUnits, 1);
     assert.equal(result.reviewCoverage.units[0].id, 'reviewer:bug-hunter/chunk:1');
+    assert.equal(
+      result.reviewCoverage.units[0].executionId,
+      'exec:reviewer:bug-hunter/chunk:1'
+    );
     assert.deepEqual(result.reviewCoverage.units[0].subjects, ['src/a.js']);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
@@ -81,6 +114,11 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(result.reviewCoverage.completedUnits, 2);
     assert.equal(result.reviewCoverage.completedRequiredUnits, 2);
     assert.deepEqual(result.reviewCoverage.incompleteRequiredUnitIds, []);
+    assert.deepEqual(
+      result.reviewCoverage.units.map((unit) => unit.executionId),
+      ['exec:reviewer:bug-hunter/chunk:1', 'exec:reviewer:bug-hunter/chunk:2']
+    );
+    assert.equal(new Set(result.reviewCoverage.units.map((unit) => unit.executionId)).size, 2);
     assert.deepEqual(coveredSubjects(result.reviewCoverage), [...diff.changedFiles].sort());
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
@@ -112,10 +150,9 @@ describe('reviewCoverage runtime wiring', () => {
     assert.equal(result.reviewCoverage.expectedUnits, 2);
     assert.equal(result.reviewCoverage.completedRequiredUnits, 1);
     assert.equal(result.reviewCoverage.incompleteRequiredUnitIds.length, 1);
-    assert.equal(
-      result.reviewCoverage.units.filter((unit) => unit.status === 'timed_out').length,
-      1
-    );
+    const timedOut = result.reviewCoverage.units.filter((unit) => unit.status === 'timed_out');
+    assert.equal(timedOut.length, 1);
+    assert.match(timedOut[0].executionId, /^exec:reviewer:bug-hunter\/chunk:/);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
 
@@ -133,7 +170,9 @@ describe('reviewCoverage runtime wiring', () => {
     );
 
     assert.equal(result.reviewCoverage.status, 'partial');
-    assert.equal(result.reviewCoverage.units.filter((unit) => unit.status === 'failed').length, 1);
+    const failed = result.reviewCoverage.units.filter((unit) => unit.status === 'failed');
+    assert.equal(failed.length, 1);
+    assert.match(failed[0].executionId, /^exec:reviewer:bug-hunter\/chunk:/);
     assert.equal(validateCoverage(result.reviewCoverage), true, validationErrors());
   });
 

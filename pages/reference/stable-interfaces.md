@@ -58,6 +58,15 @@ River Review は OSS として成長中であり、内部実装は変更され�
 | Agent Skills bridge                                                                        | Experimental | v0.9.0 で追加、成熟途上。この bridge の受け入れフロントは `schemas/agent-skill-loose.schema.json` であり、`name` / `description` のみ必須で未知フィールドを許容する（`additionalProperties: true`）。この schema は片務契約である。外部 Agent Skills の受け入れ範囲を緩める変更は非破壊にあたる。締める変更は破壊的となる                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Riverbed Memory                                                                            | Experimental | v1 は実装済み（#474）。ラベルは Experimental のままで、予告なく変更・削除される可能性がある。v2（外部データストア連携）は将来計画。詳細は [Riverbed Memory](../explanation/riverbed-memory.md) を参照                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
+### Review Coverage execution provenance (#2481)
+
+`--reviewers` orchestration は、各 `reviewCoverage.units[]` に optional な `executionId` を記録できます。
+同じ reviewer task 由来の finding は、optional な `sourceExecutionIds[]` を保持できます。
+
+これらは実行 provenance の観測だけです。
+actor identity・署名・trust・独立検証の証明ではありません。
+Gate / `decision` / severity / consensus の入力にもなりません。
+
 ## CLI（`river`）リファレンス（最小）
 
 ### コマンド
