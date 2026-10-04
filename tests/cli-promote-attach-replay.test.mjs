@@ -34,7 +34,26 @@ function artifact(entry, overrides = {}) {
     schemaVersion: 1,
     mode: 'paired-replay',
     readOnly: true,
+    requiresHumanApproval: true,
     writeEffects: [],
+    acceptance: {
+      decision: null,
+      applied: false,
+      autoPromotion: false,
+    },
+    manifestVerification: {
+      verified: true,
+      experimentKeyMatchesInputs: true,
+    },
+    manifest: {
+      manifestId: `RR-EXP-${EXPERIMENT_KEY.slice(0, 12)}`,
+      experimentKey: EXPERIMENT_KEY,
+      manifestHash: MANIFEST_HASH,
+      improvementCandidate: {
+        candidateId: entry.id,
+        contentHash: CONTENT_HASH,
+      },
+    },
     promotionHandoff: {
       candidateId: entry.id,
       candidateContentHash: CONTENT_HASH,
