@@ -1450,7 +1450,7 @@ skills:
     tags: [skill-authoring, eval, process, upstream]
     severity: minor
     recommended: false
-    description: '新規 skill PR で fixtures/ と eval/ の happy-path × guard ペアが揃っているかを確認し、欠けている場合は eval cycle (#688) に乗せる手順を案内する'
+    description: '新規・変更 skill の fixture/eval と、WITH/WITHOUT の paired ablation による限界寄与の評価可能性を確認し、activation と effectiveness を分離して案内する'
 
 # ------------------------------------------------------------------
 # Skill Packs (distribution units for bundled open review knowledge)
