@@ -1,4 +1,4 @@
-# Review Evolution Cycle P3 foundation — Signed replay verification（#2510）
+# Review Evolution Cycle P3 foundation—Signed replay verification（#2510）
 
 > Status: Experimental implementation
 > Parent: #1574 Review Evolution Cycle
@@ -13,7 +13,7 @@ P2 paired replay intentionally leaves trust closed:
 - `trustedEvidenceCount=0`
 - `canaryEligible=false`
 
-A saved run or replay spec can claim `evidence_source: CI`, `trusted_by`, or `verifier.independent=true`, but those fields live under the reviewed repository's write boundary. They are useful provenance claims, not authenticity proof.
+A saved run or replay spec can claim `evidence_source: CI`, `trusted_by`, or `verifier.independent=true`. However, those fields live under the reviewed repository's write boundary. They are useful provenance claims, not authenticity proof.
 
 P3 foundation adds a separate verification step:
 
@@ -61,7 +61,7 @@ The key is not accepted from:
 - the attestation payload itself
 - a reviewed repository field such as `trusted_by`
 
-This is the key boundary: a candidate may edit repository files, but cannot make an arbitrary signing key trusted by adding it to the candidate artifact.
+This is the key boundary. A candidate may edit repository files. It cannot make an arbitrary signing key trusted by adding it to the candidate artifact.
 
 The verification artifact records:
 
@@ -231,7 +231,7 @@ Pre-adoption signed verification remains experiment evidence. It must not be cop
 
 River Review does not provide an attestation-signing command in this phase.
 
-The private key belongs to the independent verifier environment and must stay outside the candidate's write authority. Signing may be implemented later by CI/OIDC/Sigstore or another external verifier, but that is not a prerequisite for keeping this verification boundary sound.
+The private key belongs to the independent verifier environment and must stay outside the candidate's write authority. Signing may be implemented later by CI/OIDC/Sigstore or another external verifier. That later signing mechanism is not a prerequisite for keeping this verification boundary sound.
 
 ## 11. References
 
