@@ -17,12 +17,14 @@
 //   river promote approve <id>         Approve a candidate (promotionStatus -> approved)
 //   river promote reject  <id>         Reject a candidate  (promotionStatus -> archived)
 //   river promote retarget <id>         Change proposedTarget with an audit trail
+//   river promote attach-replay <id>    Attach PRE-adoption paired replay evidence
 //   river promote template [<id>]      Emit PR scaffold(s) for approved candidate(s)
 //   river promote retire               Archive expired candidates + sync promotionStatus (Phase 3)
 //   river promote review-effectiveness Flag needs_review on negative post-activation feedback (Phase 3)
 //
 // The approval decision records who/when (context.approval) for auditability.
 // `now` is injected via RIVER_NOW (ISO string) so tests can pin it.
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { ensureGitRepo } from '../../lib/git.mjs';
@@ -32,6 +34,7 @@ import {
   listPromotionCandidates,
   decidePromotion,
   retargetPromotion,
+  attachReplayEvidence,
   buildPrScaffold,
   getPromotionCandidate,
   retirePromotions,
@@ -126,13 +129,14 @@ export async function runPromoteCommand(parsed, targetPath) {
       'approve',
       'reject',
       'retarget',
+      'attach-replay',
       'template',
       'retire',
       'review-effectiveness',
     ].includes(sub)
   ) {
     console.error(
-      'Error: usage: river promote <propose|list|approve <id>|reject <id>|retarget <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <jsonl>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--target-kind <kind>] [--target-id <id>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
+      'Error: usage: river promote <propose|list|approve <id>|reject <id>|retarget <id>|attach-replay <id>|template [<id>]|retire|review-effectiveness [<id>]> [--input <file>] [--cluster-key <skillId::feedbackType>] [--policy-version <v>] [--target-kind <kind>] [--target-id <id>] [--approver <name>] [--reason <text>] [--index <path>] [--threshold <n>] [--feedback-root <path>] [--output json] [--include-inactive] [--dry-run].'
     );
     return 1;
   }
@@ -337,6 +341,73 @@ export async function runPromoteCommand(parsed, targetPath) {
       console.log('  approval: reset; candidate must be approved again for the new target');
     }
     console.log(`  written to: ${indexPath}`);
+    return 0;
+  }
+
+  if (sub === 'attach-replay') {
+    if (!parsed.promoteId) {
+      console.error('Error: river promote attach-replay requires a candidate <id>.');
+      return 1;
+    }
+    if (!parsed.promoteInput) {
+      console.error('Error: river promote attach-replay requires --input <paired-replay.json>.');
+      return 1;
+    }
+    if (!parsed.promoteApprover) {
+      console.error('Error: river promote attach-replay requires --approver <name>.');
+      return 1;
+    }
+    if (!parsed.promoteReason) {
+      console.error('Error: river promote attach-replay requires --reason <text>.');
+      return 1;
+    }
+
+    let artifact;
+    const inputPath = path.resolve(process.cwd(), parsed.promoteInput);
+    try {
+      artifact = JSON.parse(readFileSync(inputPath, 'utf8'));
+    } catch (err) {
+      console.error(`Error: failed to read paired replay artifact ${inputPath}: ${err.message}`);
+      return 1;
+    }
+
+    let result;
+    try {
+      result = attachReplayEvidence({
+        indexPath,
+        id: parsed.promoteId,
+        artifact,
+        approver: parsed.promoteApprover,
+        reason: parsed.promoteReason,
+        now,
+      });
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      return 1;
+    }
+
+    const summary = {
+      candidateId: result.entry.id,
+      changed: result.changed,
+      manifestHash: result.record?.handoff?.manifestHash ?? null,
+      attachedAt: result.record?.attachedAt ?? null,
+      attachedBy: result.record?.attachedBy ?? null,
+      note: result.note,
+    };
+    if (parsed.output === 'json') {
+      console.log(JSON.stringify(summary, null, 2));
+      return 0;
+    }
+    if (!result.changed) {
+      console.log(`Candidate ${summary.candidateId}: replay evidence already attached (no change).`);
+      console.log(`  manifestHash: ${summary.manifestHash}`);
+      return 0;
+    }
+    console.log(`Attached paired replay evidence to candidate ${summary.candidateId}.`);
+    console.log(`  manifestHash: ${summary.manifestHash}`);
+    console.log(`  attachedBy:  ${summary.attachedBy}`);
+    console.log(`  attachedAt:  ${summary.attachedAt}`);
+    console.log(`  written to:  ${indexPath}`);
     return 0;
   }
 
