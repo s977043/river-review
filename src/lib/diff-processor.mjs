@@ -109,10 +109,14 @@ export function optimizeDiff(diff, { includeMarkdown = false } = {}) {
     if (isExcludedFile(file.path, { includeMarkdown })) continue;
 
     const keptHunks = [];
+    const isIncludedMarkdown = includeMarkdown && extension(file.path) === '.md';
     for (const hunk of file.hunks ?? []) {
       const lines = hunk.lines ?? [];
       if (isWhitespaceOnlyChange(lines)) continue;
-      if (isCommentOnlyChange(lines)) continue;
+      // Markdown headings begin with '#', which the generic code-comment
+      // optimizer treats as a comment marker. Upstream explicitly reviews
+      // Markdown semantics, so do not apply comment-only filtering to Markdown.
+      if (!isIncludedMarkdown && isCommentOnlyChange(lines)) continue;
 
       const compressedLines = compressHunkLines(lines);
       keptHunks.push({
