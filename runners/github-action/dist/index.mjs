@@ -95361,6 +95361,14 @@ function computeConsensusLevel(agreement) {
   return 'single';
 }
 
+function addSourceExecutionIds(target, values) {
+  for (const executionId of Array.isArray(values) ? values : []) {
+    if (typeof executionId === 'string' && executionId.length > 0) {
+      target.add(executionId);
+    }
+  }
+}
+
 function maxSeverity(a, b) {
   const na = (0,finding_factory/* normalizeSeverity */.lv)(a);
   const nb = (0,finding_factory/* normalizeSeverity */.lv)(b);
@@ -95460,6 +95468,7 @@ function findingsOverlap(a, b) {
  *   - severity = max of cluster (after normalization of blocker/warning/nit)
  *   - evidence = deduplicated union of all evidence arrays
  *   - agreement = array of all reviewerRole values in the cluster
+ *   - sourceExecutionIds = deduplicated union of reviewer execution provenance
  *   - scope = `in-diff` when any member is in-diff, else `pre-existing`
  *     (mergeScope; omitted when no member carried a scope)
  *   - mergedLineStarts = every line the cluster absorbed, ascending and
@@ -95514,13 +95523,9 @@ function mergeFindings(findings) {
       const agreementSet = new Set(existingAgreement);
       if (role) agreementSet.add(role);
       const passthroughAgreement = [...agreementSet];
-      const sourceExecutionIds = [
-        ...new Set(
-          (Array.isArray(canonical.sourceExecutionIds) ? canonical.sourceExecutionIds : []).filter(
-            (value) => typeof value === 'string' && value.length > 0
-          )
-        ),
-      ];
+      const sourceExecutionIdSet = new Set();
+      addSourceExecutionIds(sourceExecutionIdSet, canonical.sourceExecutionIds);
+      const sourceExecutionIds = [...sourceExecutionIdSet];
       return {
         ...canonical,
         severity: (0,finding_factory/* normalizeSeverity */.lv)(canonical.severity),
@@ -95534,11 +95539,8 @@ function mergeFindings(findings) {
     let mergedSeverity = canonical.severity;
     const evidenceSet = new Set(Array.isArray(canonical.evidence) ? canonical.evidence : []);
     const agreementSet = new Set(Array.isArray(canonical.agreement) ? canonical.agreement : []);
-    const sourceExecutionIdSet = new Set(
-      (Array.isArray(canonical.sourceExecutionIds) ? canonical.sourceExecutionIds : []).filter(
-        (value) => typeof value === 'string' && value.length > 0
-      )
-    );
+    const sourceExecutionIdSet = new Set();
+    addSourceExecutionIds(sourceExecutionIdSet, canonical.sourceExecutionIds);
     if (canonical.reviewerRole) agreementSet.add(canonical.reviewerRole);
 
     for (const idx of indices.slice(1)) {
@@ -95546,11 +95548,7 @@ function mergeFindings(findings) {
       mergedSeverity = maxSeverity(mergedSeverity, m.severity);
       for (const e of Array.isArray(m.evidence) ? m.evidence : []) evidenceSet.add(e);
       for (const a of Array.isArray(m.agreement) ? m.agreement : []) agreementSet.add(a);
-      for (const executionId of Array.isArray(m.sourceExecutionIds) ? m.sourceExecutionIds : []) {
-        if (typeof executionId === 'string' && executionId.length > 0) {
-          sourceExecutionIdSet.add(executionId);
-        }
-      }
+      addSourceExecutionIds(sourceExecutionIdSet, m.sourceExecutionIds);
       if (m.reviewerRole) agreementSet.add(m.reviewerRole);
     }
 
