@@ -117,19 +117,18 @@ Workaround を Reference に追加する場合は、最低限次を記録する�
 
 security / compliance / privacy に関わる promotion は、既存の Human / PlanGate approval boundary を維持する。
 
-
 ## PlanGate integration boundary
 
 PlanGate は Experience Knowledge / Reference promotion の **optional consumer** であり、River Review runtime の必須依存ではない。
 
 - River Review は review / feedback / Riverbed / promotion evidence と versioned review asset の正本を保持する
 - security / compliance / privacy に関わる promotion は、既存の Human / PlanGate approval boundary を維持する
-- PlanGate が River Review の finding / evidence / versioned asset を利用する場合も、PlanGate 側の GO / NO-GO、canary、Trust Ledger、merge / release authority は PlanGate / Human が所有する
+- PlanGate が River Review の finding / evidence / versioned asset を利用しても、GO / NO-GO と canary の authority は PlanGate / Human が所有する。Trust Ledger、merge / release の authority も同様に PlanGate / Human が所有する
 - PlanGate #811 の Memory Promotion Gate、#869 の Evolution Loop の candidate / experiment / lifecycle を River Review 内へ複製しない
 - River Review の `promotion_candidate` を PlanGate の canonical candidate schema とみなさない
 - cross-repository shared DB や direct runtime dependency は導入しない
 
-直接 adapter を追加するのは、PlanGate 側に stable な input contract が確定し、River Review の artifact を機械可読に消費する具体的ユースケースが発生した場合に限る。その場合も additive adapter とし、River Review 単体で review / promotion / effectiveness が閉じる性質を壊さない。
+直接 adapter を追加するのは、PlanGate 側に stable な input contract が確定した場合に限る。加えて、River Review の artifact を機械可読に消費する具体的ユースケースが必要である。その場合も additive adapter とし、River Review 単体で review / promotion / effectiveness が閉じる性質を壊さない。
 
 integration payload に raw session transcript、hidden CoT、秘密情報、認証情報、個人情報を要求しない。
 
