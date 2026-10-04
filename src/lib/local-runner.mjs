@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ConfigLoader } from '../config/loader.mjs';
 import { hasSelection, resolveSelectionSkillIds } from './selection.mjs';
-import { collectRepoDiff, renderDiffText } from './diff-processor.mjs';
+import { buildLlmDiffView, collectRepoDiff, renderDiffText } from './diff-processor.mjs';
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import {
@@ -145,6 +145,7 @@ const resolveAvailableDependencies = (inputDependencies) =>
 
 async function collectLocalContext({
   cwd,
+  phase = 'midstream',
   debug = false,
   contextLines = 3,
   availableContexts,
@@ -197,7 +198,21 @@ async function collectLocalContext({
   const dirty = await isWorkingTreeDirty(repoRoot);
   const rawDiff = await collectRepoDiff(repoRoot, mergeBase, { contextLines });
   const exclusionPatterns = config.exclude?.files ?? [];
-  const diff = applyFileExclusions(rawDiff, exclusionPatterns);
+  const filteredDiff = applyFileExclusions(rawDiff, exclusionPatterns);
+  const normalizedPhase = normalizePhase(phase);
+  const llmView = buildLlmDiffView(filteredDiff, { phase: normalizedPhase });
+  const tokenEstimate = Math.ceil(llmView.diffText.length / 4);
+  const rawTokenEstimate = filteredDiff.rawTokenEstimate ?? 0;
+  const diff = {
+    ...filteredDiff,
+    filesForReview: llmView.files,
+    diffText: llmView.diffText,
+    tokenEstimate,
+    reduction:
+      rawTokenEstimate === 0
+        ? 0
+        : Math.max(0, Math.round(((rawTokenEstimate - tokenEstimate) / rawTokenEstimate) * 100)),
+  };
   const reviewFileScope = deriveReviewFileScope(rawDiff, diff, exclusionPatterns);
   const reviewFiles = diff.filesForReview?.map((file) => file.path) ?? diff.changedFiles;
   // #1606: declare `fullFile` as an available input context when the runner can
@@ -270,6 +285,7 @@ export async function planLocalReview({
 } = {}) {
   const base = await collectLocalContext({
     cwd,
+    phase,
     debug,
     contextLines: debug ? 10 : 3,
     availableContexts,
