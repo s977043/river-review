@@ -352,6 +352,34 @@ describe('river promote template', () => {
     assert.match(res.stdout, /promote\/plangate\//);
   });
 
+  test('security/compliance JSON scaffold exposes optional read-only PlanGate handoff', async (t) => {
+    const { cleanup, indexPath, securityId } = seed();
+    t.after(cleanup);
+    await runCliInProcess(
+      ['promote', 'approve', securityId, '--index', indexPath, '--approver', 'alice'],
+      { env: { RIVER_NOW: '2026-07-21T09:00:00.000Z' } }
+    );
+    const res = await runCliInProcess([
+      'promote',
+      'template',
+      securityId,
+      '--index',
+      indexPath,
+      '--output',
+      'json',
+    ]);
+    assert.equal(res.code, 0, res.stderr);
+    const parsed = JSON.parse(res.stdout);
+    assert.equal(parsed.count, 1);
+    const handoff = parsed.scaffolds[0].planGateHandoff;
+    assert.equal(handoff.producer, 'river-review');
+    assert.equal(handoff.consumer, 'plangate');
+    assert.equal(handoff.readOnly, true);
+    assert.equal(handoff.requiresHumanJudgment, true);
+    assert.deepEqual(handoff.writeEffects, []);
+    assert.equal(handoff.compatibility.adapterRequired, true);
+  });
+
   test('no approved candidates prints a friendly message', async (t) => {
     const { cleanup, indexPath } = seed();
     t.after(cleanup);
