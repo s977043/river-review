@@ -29,7 +29,7 @@ function requireNonNegativeInteger(value, label) {
 }
 
 function ratio(numerator, denominator) {
-  if (denominator === 0) return 1;
+  if (denominator === 0) return null;
   return numerator / denominator;
 }
 
