@@ -203,6 +203,28 @@ Effort != Autonomy
 
 River Review の責務は、どの topology を選ぶべきかを自動決定することではなく、選択された構成の変更が本当に review outcome を改善したかを evidence で検証することにある。
 
+## 8.1 Bounded authority / governance
+
+自己改善 candidate は review quality を改善できても、自分自身の権限境界を自動拡張してはならない。
+
+- tool write permission、network access、credential scope、sandbox boundary、repository mutation 権限の拡張は通常の Harness optimization と同列に自動採用しない
+- approval rule、independence rule、critical-regression floor、Human-owned merge / release boundary を candidate が自分で緩める変更は禁止する
+- evaluator を変更する candidate と、その candidate の adoption gate を変更する candidate を同一実験に混ぜない
+- security / compliance / privacy / external side effect を増やす変更は、paired replay が良好でも Human review を必須とする
+- rollback path を持たない変更は limited canary の候補にしない
+- cost / token / latency の改善だけで correctness / coverage / safety の regression を相殺しない
+
+Evolution loop が変更できるのは **能力の実装面**であり、最終 judgment authority ではない。
+
+## 8.2 External evidence boundary
+
+Raven / 外部 agent harness の benchmark は、この設計を考えるための参考 evidence であり、River Review candidate の adoption evidence ではない。
+
+- 外部 benchmark の改善値を River Review の acceptance threshold へ転用しない
+- 外部 system の成功を、River Review の Skill / routing / evaluator 改善の有効性証明にしない
+- adoption は River Review-native な paired replay、held-out、independent verification、Human approval、post-adoption effectiveness で判断する
+- 外部 source が更新・撤回されても、River Review の安全境界は本 repository の contract を SSoT とする
+
 ## 9. Non-goals
 
 - Raven runtime / dependency の導入
