@@ -32,10 +32,14 @@ export function consumeEagerCommand(parsed, arg, args) {
     if (args[0] && EVOLVE_SUBCOMMANDS.has(args[0])) {
       parsed.evolveSubcommand = args.shift();
     }
-    // `replay` takes NO positional: its dataset comes from --spec. Letting
-    // the first token become `parsed.target` would make the command accept
-    // and silently ignore it (`river evolve replay ./typo.json --spec x`).
-    if (\n      !['replay', 'verify-replay'].includes(parsed.evolveSubcommand) &&\n      args[0] &&\n      !args[0].startsWith('-')\n    ) {
+    // `replay` and `verify-replay` take NO positional: their inputs come from
+    // explicit file options. Letting the first token become `parsed.target`
+    // would make the command accept and silently ignore a typo'd positional.
+    if (
+      !['replay', 'verify-replay'].includes(parsed.evolveSubcommand) &&
+      args[0] &&
+      !args[0].startsWith('-')
+    ) {
       const token = args.shift();
       // A mistyped subcommand (`agregate`) must not be swallowed as a path
       // and reported as an empty, successful aggregate. Anything that is
