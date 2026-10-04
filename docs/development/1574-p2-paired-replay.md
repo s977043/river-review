@@ -76,7 +76,9 @@ candidate が宣言されていない場合、または Experiment Manifest の�
 | paired replay / `promotionHandoff` | promotion 採用前         | baseline と candidate の統制された実験差分 |
 | `reviewPromotionEffectiveness`     | approval / activation 後 | 実運用 feedback の recurrence / reversal   |
 
-採用前の replay metrics を `context.effectivenessHistory` へ直接混ぜません。G1 は read-only の証拠受け渡しまでとし、candidate への永続化や approve / reject / retarget / Keep / Rollback / Retire は行いません。後続の G2 で、Human-invoked な #1568 操作として接続します。
+採用前の replay metrics を `context.effectivenessHistory` へ直接混ぜません。G1 は read-only の証拠受け渡しまでとし、candidate への永続化や approve / reject / retarget / Keep / Rollback / Retire は行いません。
+
+G2 (#2485) は `river promote attach-replay <candidate-id>` でこの境界を接続します。人間が `--approver` / `--reason` を明示した場合だけ、`promotionHandoff` を candidate の `context.experimentHistory` へ append-only に保存します。添付できるのは `candidate` / `pending` の pre-adoption 状態だけで、promotionStatus・approval・post-adoption effectiveness は変更しません。
 
 ## 4. ファイル配置
 
