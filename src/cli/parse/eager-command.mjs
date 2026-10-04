@@ -67,7 +67,7 @@ export function consumeEagerCommand(parsed, arg, args) {
     parsed.feedbackSubcommand = args.shift(); // add (only one for now)
   } else if (arg === 'promote' && args[0] && !args[0].startsWith('-')) {
     parsed.promoteSubcommand = args.shift(); // propose | list | approve | reject | template | retire | review-effectiveness
-    // approve/reject/template/review-effectiveness take an optional positional candidate id.
+    // approve/reject/retarget/attach-replay/template/review-effectiveness take an optional positional candidate id.
     if (
       PROMOTE_ID_SUBCOMMANDS.has(parsed.promoteSubcommand) &&
       args[0] &&
