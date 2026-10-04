@@ -181,22 +181,34 @@ describe('applyReplayEvidenceAttachment (#2485)', () => {
   test('fails closed on candidate id or content hash mismatch', () => {
     const entry = makeReplayCandidate();
 
+    const otherIdentityHash = `deadbeef0000${'d'.repeat(52)}`;
+    const differentCandidate = makeReplayArtifact(entry);
+    differentCandidate.promotionHandoff.candidateId =
+      `RR-PC-${otherIdentityHash.slice(0, 12)}`;
+    differentCandidate.promotionHandoff.candidateContentHash = otherIdentityHash;
+    differentCandidate.manifest.improvementCandidate.candidateId =
+      differentCandidate.promotionHandoff.candidateId;
+    differentCandidate.manifest.improvementCandidate.contentHash = otherIdentityHash;
+
     assert.throws(
       () =>
-        applyReplayEvidenceAttachment(
-          entry,
-          makeReplayArtifact(entry, { candidateId: 'RR-PC-deadbeef0000' }),
-          { approver: 'alice', reason: 'r' }
-        ),
+        applyReplayEvidenceAttachment(entry, differentCandidate, {
+          approver: 'alice',
+          reason: 'r',
+        }),
       /candidateId mismatch/
     );
+
+    const differentContent = makeReplayArtifact(entry);
+    differentContent.promotionHandoff.candidateContentHash = 'd'.repeat(64);
+    differentContent.manifest.improvementCandidate.contentHash = 'd'.repeat(64);
+
     assert.throws(
       () =>
-        applyReplayEvidenceAttachment(
-          entry,
-          makeReplayArtifact(entry, { candidateContentHash: 'd'.repeat(64) }),
-          { approver: 'alice', reason: 'r' }
-        ),
+        applyReplayEvidenceAttachment(entry, differentContent, {
+          approver: 'alice',
+          reason: 'r',
+        }),
       /contentHash mismatch/
     );
   });
