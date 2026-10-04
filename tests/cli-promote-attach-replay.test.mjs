@@ -165,11 +165,10 @@ describe('river promote attach-replay', () => {
   test('fails closed when the replay belongs to different candidate content', async (t) => {
     const seeded = seed();
     t.after(seeded.cleanup);
-    writeFileSync(
-      seeded.inputPath,
-      JSON.stringify(artifact(seeded.entry, { candidateContentHash: 'd'.repeat(64) }), null, 2),
-      'utf8'
-    );
+    const mismatched = artifact(seeded.entry);
+    mismatched.promotionHandoff.candidateContentHash = 'd'.repeat(64);
+    mismatched.manifest.improvementCandidate.contentHash = 'd'.repeat(64);
+    writeFileSync(seeded.inputPath, JSON.stringify(mismatched, null, 2), 'utf8');
 
     const res = await runCliInProcess(args(seeded.entry, seeded.indexPath, seeded.inputPath), {
       env: { RIVER_NOW: NOW },
