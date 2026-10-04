@@ -330,6 +330,25 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
     );
   });
 
+  it('rejects contradictory human labels', () => {
+    assert.throws(
+      () =>
+        evaluateReviewConcernMap({
+          fixture: fixture(),
+          map: map([concern('concern-1')]),
+          adjudication: {
+            obligationMatches: {
+              'OB-a': ['concern-1'],
+              'OB-b': [],
+            },
+            nonActionableConcernIds: ['concern-1'],
+            humanCorrectionCount: 0,
+          },
+        }),
+      /cannot be both obligation-matched and non-actionable/
+    );
+  });
+
   it('rejects malformed oracle interactions before scoring', () => {
     assert.throws(
       () =>
