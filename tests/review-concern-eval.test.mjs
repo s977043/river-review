@@ -295,6 +295,41 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
     );
   });
 
+  it('fails closed on malformed map interactions and non-actionable labels', () => {
+    assert.throws(
+      () =>
+        evaluateReviewConcernMap({
+          fixture: fixture(),
+          map: map([concern('concern-1', { interactions: ['concern-404'] })]),
+          adjudication: {
+            obligationMatches: {
+              'OB-a': ['concern-1'],
+              'OB-b': [],
+            },
+            humanCorrectionCount: 0,
+          },
+        }),
+      /unknown interaction concern/
+    );
+
+    assert.throws(
+      () =>
+        evaluateReviewConcernMap({
+          fixture: fixture(),
+          map: map([concern('concern-1')]),
+          adjudication: {
+            obligationMatches: {
+              'OB-a': ['concern-1'],
+              'OB-b': [],
+            },
+            nonActionableConcernIds: 'concern-1',
+            humanCorrectionCount: 0,
+          },
+        }),
+      /nonActionableConcernIds must be an array/
+    );
+  });
+
   it('rejects malformed oracle interactions before scoring', () => {
     assert.throws(
       () =>
