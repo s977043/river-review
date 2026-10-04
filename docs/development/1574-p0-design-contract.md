@@ -255,12 +255,12 @@ P0 の完了条件は、6契約すべての「固定する契約内容」が本�
 
 Issue #2499 で、外部の agent harness 研究を参考にしつつ、#1574 の既存責務を変えない additive な能力帰属・screening 契約を追加しました。
 
-- 能力差は model 単体へ早計に帰属しません。Model + Harness configuration と固定した evaluation conditions の組で観測します。
-- `Harness` は prompt / Skill / tool / context / routing / policy / evaluation を差分確認する分析上の envelope とします。新しい runtime object / schema / SSoT ではありません。
-- 1 candidate = 1 hypothesis = minimal change を維持し、変更 surface と固定 surface を区別します。
-- adoption readiness は Candidate integrity → Experiment integrity → Evaluation quality → Independence / trust の順に確認します。その後、Human approval と Post-adoption effectiveness を既存 lifecycle 上で扱います。
-- pre-adoption evidence は `experimentHistory[]`、post-adoption evidence は `effectivenessHistory[]` に分離します。
-- paired replay 単独では adoption / canary を許可しません。Human-owned GO / NO-GO、merge、release 境界を維持します。
+- 能力差は model 単体へ早計に帰属せず、Model + Harness configuration と固定した evaluation conditions の組で観測する。
+- `Harness` は prompt / Skill / tool / context / routing / policy / evaluation を差分確認する分析上の envelope とする。新しい runtime object / schema / SSoT ではない。
+- 1 candidate = 1 hypothesis = minimal change を維持し、変更 surface と固定 surface を区別する。
+- adoption readiness は Candidate integrity → Experiment integrity → Evaluation quality → Independence / trust の順に確認する。その後、Human approval と Post-adoption effectiveness を既存 lifecycle 上で扱う。
+- pre-adoption evidence は `experimentHistory[]`、post-adoption evidence は `effectivenessHistory[]` に分離する。
+- paired replay 単独では adoption / canary を許可しない。Human-owned GO / NO-GO、merge、release 境界を維持する。
 
 詳細は `docs/development/1574-model-harness-evolution-screening.md` を参照してください。
 
