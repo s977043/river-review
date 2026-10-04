@@ -3,7 +3,12 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { parseExemptions } from '../scripts/validate-agent-skills.mjs';
+import {
+  AGENT_SKILL_CONTEXT_WARN_BYTES,
+  AGENT_SKILL_CONTEXT_WARN_LINES,
+  assessAgentSkillContextHealth,
+  parseExemptions,
+} from '../scripts/validate-agent-skills.mjs';
 import { parseFrontMatter, defaultPaths } from '../runners/core/skill-loader.mjs';
 import { expandApplyTo, analyzeCoverage } from '../scripts/lib/applyto-coverage.mjs';
 
@@ -43,6 +48,40 @@ test('parseExemptions requires non-empty skill and reason', () => {
   ]);
   assert.equal(valid.length, 0);
   assert.equal(errors.length, 4);
+});
+
+// --- Context health advisory (#2483) -----------------------------------------
+
+test('context health measures UTF-8 bytes instead of character count', () => {
+  const health = assessAgentSkillContextHealth('あ');
+  assert.equal(health.bytes, 3);
+  assert.equal(health.lines, 1);
+  assert.equal(health.shouldWarn, false);
+});
+
+test('context health byte budget warns only after the advisory threshold', () => {
+  const atBudget = assessAgentSkillContextHealth('a'.repeat(AGENT_SKILL_CONTEXT_WARN_BYTES));
+  const overBudget = assessAgentSkillContextHealth('a'.repeat(AGENT_SKILL_CONTEXT_WARN_BYTES + 1));
+
+  assert.equal(atBudget.exceedsBytes, false);
+  assert.equal(atBudget.shouldWarn, false);
+  assert.equal(overBudget.exceedsBytes, true);
+  assert.equal(overBudget.shouldWarn, true);
+});
+
+test('context health line budget warns only after the advisory threshold', () => {
+  const atBudget = assessAgentSkillContextHealth(
+    Array.from({ length: AGENT_SKILL_CONTEXT_WARN_LINES }, () => 'x').join('\n')
+  );
+  const overBudget = assessAgentSkillContextHealth(
+    Array.from({ length: AGENT_SKILL_CONTEXT_WARN_LINES + 1 }, () => 'x').join('\n')
+  );
+
+  assert.equal(atBudget.lines, AGENT_SKILL_CONTEXT_WARN_LINES);
+  assert.equal(atBudget.exceedsLines, false);
+  assert.equal(overBudget.lines, AGENT_SKILL_CONTEXT_WARN_LINES + 1);
+  assert.equal(overBudget.exceedsLines, true);
+  assert.equal(overBudget.shouldWarn, true);
 });
 
 // --- Canary: reference-only exemption (issue #1508) --------------------------
