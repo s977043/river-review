@@ -9,6 +9,7 @@
   },
   "cases": [
     {
+      "schemaVersion": "1",
       "id": "RC-01-multi-file-one-concern",
       "category": "single-concern-many-files",
       "description": "A coherent session-lifecycle change spans implementation, serializer, and tests.",
@@ -35,6 +36,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-02-one-file-multiple-concerns",
       "category": "one-file-multiple-concerns",
       "description": "One handler changes authorization timing and public error mapping independently.",
@@ -61,6 +63,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-03-independent-concerns",
       "category": "independent-concerns",
       "description": "Two unrelated changes share a pull request and should both remain visible.",
@@ -87,6 +90,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-04-cross-concern-interaction",
       "category": "cross-concern-interaction",
       "description": "Authentication state transition and error contract can fail only in combination.",
@@ -118,6 +122,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-05-migration-app-change",
       "category": "migration-plus-application",
       "description": "A schema migration and application behavior must be reviewed as rollout-coupled obligations.",
@@ -152,6 +157,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-06-auth-api-contract",
       "category": "auth-plus-api-contract",
       "description": "Authorization behavior and externally visible API compatibility both matter.",
@@ -183,6 +189,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-07-refactor-plus-fix",
       "category": "refactor-plus-behavior-fix",
       "description": "A refactor is bundled with a user-visible behavior fix and must not hide the fix obligation.",
@@ -209,6 +216,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-08-docs-tests-support",
       "category": "docs-tests-only-support",
       "description": "Documentation and tests support an existing behavior and should not inflate concern count by file type.",
@@ -231,6 +239,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-09-generated-vendor-noise",
       "category": "generated-vendor-noise",
       "description": "Generated output changes alongside a source change without creating a semantic concern of its own.",
@@ -253,6 +262,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-10-affected-unchanged-caller",
       "category": "affected-unchanged-caller",
       "description": "A changed shared contract affects an unchanged caller that is explicitly inspected.",
@@ -293,6 +303,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-11-dynamic-dispatch-partial",
       "category": "dynamic-dispatch-incomplete",
       "description": "Dynamic dispatch prevents exhaustive affected-subject enumeration and must remain explicitly partial.",
@@ -315,6 +326,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-12-missed-obligation",
       "category": "missed-required-obligation",
       "description": "The evaluation oracle contains two obligations so a missed obligation is mechanically visible.",
@@ -346,6 +358,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-13-over-split",
       "category": "over-split-concern",
       "description": "Implementation, tests, and config all support one coherent retry-policy change.",
@@ -368,6 +381,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-14-timeout",
       "category": "analyzer-timeout",
       "description": "The analyzer can time out; evaluation must preserve that failure rather than infer coverage.",
@@ -390,6 +404,7 @@
       }
     },
     {
+      "schemaVersion": "1",
       "id": "RC-15-malformed-output",
       "category": "malformed-analyzer-output",
       "description": "Malformed analyzer output must remain a failed observation and never become semantic coverage.",
