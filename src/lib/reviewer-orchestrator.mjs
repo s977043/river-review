@@ -888,47 +888,47 @@ export async function runReviewerOrchestration({
   // executionId is assigned by the orchestrator before the task starts, so a
   // failed/timed-out task still has provenance even when it returns no result.
   const tasks = taskDescriptors.map(({ roleName, chunkDiff, chunkIdx, executionId }, taskIdx) => {
-      const role = REVIEWER_ROLES[roleName];
-      const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
-      const taskStartedAt = nowMs();
-      logProgress(`Reviewer ${roleName}: start${chunkSuffix(chunkIdx)}`);
-      const run = generateReviewImpl({
-        ...generateArgs,
-        diff: chunkDiff,
-        projectRules: roleRules,
-      }).then((result) => ({
-        ...result,
-        reviewerRole: roleName,
-        executionId,
-        chunkIdx: chunked ? chunkIdx : null,
-        chunkLabel: chunked ? (chunkDiff._chunkLabel ?? `chunk-${chunkIdx}`) : null,
-      }));
-      return withReviewerTimeout(
-        run,
-        effectiveTimeoutMs,
-        () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs)
-      ).then(
-        (value) => {
-          const durationMs = Math.round(nowMs() - taskStartedAt);
-          taskOutcomes[taskIdx].durationMs = durationMs;
-          logProgress(
-            `Reviewer ${roleName}: done in ${formatElapsed(durationMs)} (${value.findings?.length ?? 0} findings)${chunkSuffix(chunkIdx)}`
-          );
-          return value;
-        },
-        (err) => {
-          const durationMs = Math.round(nowMs() - taskStartedAt);
-          taskOutcomes[taskIdx].durationMs = durationMs;
-          taskOutcomes[taskIdx].timedOut = err?.timedOut === true;
-          logProgress(
-            err?.timedOut === true
-              ? `Reviewer ${roleName}: timeout after ${formatElapsed(durationMs)} (other chunks/roles continue)${chunkSuffix(chunkIdx)}`
-              : `Reviewer ${roleName}: failed after ${formatElapsed(durationMs)} (${err?.message ?? 'unknown error'})${chunkSuffix(chunkIdx)}`
-          );
-          throw err;
-        }
-      );
-    });
+    const role = REVIEWER_ROLES[roleName];
+    const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
+    const taskStartedAt = nowMs();
+    logProgress(`Reviewer ${roleName}: start${chunkSuffix(chunkIdx)}`);
+    const run = generateReviewImpl({
+      ...generateArgs,
+      diff: chunkDiff,
+      projectRules: roleRules,
+    }).then((result) => ({
+      ...result,
+      reviewerRole: roleName,
+      executionId,
+      chunkIdx: chunked ? chunkIdx : null,
+      chunkLabel: chunked ? (chunkDiff._chunkLabel ?? `chunk-${chunkIdx}`) : null,
+    }));
+    return withReviewerTimeout(
+      run,
+      effectiveTimeoutMs,
+      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs)
+    ).then(
+      (value) => {
+        const durationMs = Math.round(nowMs() - taskStartedAt);
+        taskOutcomes[taskIdx].durationMs = durationMs;
+        logProgress(
+          `Reviewer ${roleName}: done in ${formatElapsed(durationMs)} (${value.findings?.length ?? 0} findings)${chunkSuffix(chunkIdx)}`
+        );
+        return value;
+      },
+      (err) => {
+        const durationMs = Math.round(nowMs() - taskStartedAt);
+        taskOutcomes[taskIdx].durationMs = durationMs;
+        taskOutcomes[taskIdx].timedOut = err?.timedOut === true;
+        logProgress(
+          err?.timedOut === true
+            ? `Reviewer ${roleName}: timeout after ${formatElapsed(durationMs)} (other chunks/roles continue)${chunkSuffix(chunkIdx)}`
+            : `Reviewer ${roleName}: failed after ${formatElapsed(durationMs)} (${err?.message ?? 'unknown error'})${chunkSuffix(chunkIdx)}`
+        );
+        throw err;
+      }
+    );
+  });
 
   // Run each role in parallel; partial failure is tolerated
   const settled = await Promise.allSettled(tasks);
