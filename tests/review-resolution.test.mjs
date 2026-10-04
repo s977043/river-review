@@ -38,7 +38,7 @@ function item(overrides = {}) {
       source: 'semantic-precision',
     },
     authorResponse: { state: 'none', rationale: null },
-    resolution: { state: 'open', target: null },
+    resolution: { state: 'open', target: null, decisionRefs: [] },
     verification: {
       state: 'not_requested',
       verifier: null,
@@ -110,7 +110,7 @@ describe('Review Resolution semantic invariants', () => {
       items: [
         item({
           authorResponse: { state: 'will_fix', rationale: 'validation moved to API boundary' },
-          resolution: { state: 'action_submitted', target },
+          resolution: { state: 'action_submitted', target, decisionRefs: [] },
           verification: {
             state: 'pending',
             verifier: null,
@@ -149,7 +149,7 @@ describe('Review Resolution semantic invariants', () => {
       items: [
         item({
           authorResponse: { state: 'will_fix', rationale: 'fixed' },
-          resolution: { state: 'action_submitted', target },
+          resolution: { state: 'action_submitted', target, decisionRefs: [] },
           verification: {
             state: 'verified_resolved',
             verifier: 'finding-critic',
@@ -169,7 +169,7 @@ describe('Review Resolution semantic invariants', () => {
       source: revision(),
       items: [
         item({
-          resolution: { state: 'action_submitted', target },
+          resolution: { state: 'action_submitted', target, decisionRefs: [] },
           verification: {
             state: 'not_reproduced',
             verifier: null,
@@ -188,7 +188,7 @@ describe('Review Resolution semantic invariants', () => {
           source: revision(),
           items: [
             item({
-              resolution: { state: 'action_submitted', target },
+              resolution: { state: 'action_submitted', target, decisionRefs: [] },
               verification: {
                 state: 'not_reproduced',
                 verifier: null,
@@ -210,7 +210,7 @@ describe('Review Resolution semantic invariants', () => {
         source: revision(),
         items: [
           item({
-            resolution: { state: 'action_submitted', target },
+            resolution: { state: 'action_submitted', target, decisionRefs: [] },
             verification: {
               state: 'inconclusive',
               verifier: 'review-coverage',
@@ -232,7 +232,7 @@ describe('Review Resolution semantic invariants', () => {
           source: revision(),
           items: [
             item({
-              resolution: { state: 'action_submitted', target: revision() },
+              resolution: { state: 'action_submitted', target: revision(), decisionRefs: [] },
               verification: {
                 state: 'verified_resolved',
                 verifier: 'finding-critic',
@@ -244,6 +244,45 @@ describe('Review Resolution semantic invariants', () => {
         }),
       ReviewResolutionError
     );
+  });
+
+  test('decision_agreed requires a human decision reference', () => {
+    assert.throws(
+      () =>
+        buildReviewResolution({
+          resolutionId: 'RR-RES-agreed-decision',
+          source: revision(),
+          items: [
+            item({
+              authorResponse: {
+                state: 'agrees_spec_decision',
+                rationale: 'Product owner agreed.',
+              },
+              resolution: { state: 'decision_agreed', target: null, decisionRefs: [] },
+            }),
+          ],
+        }),
+      ReviewResolutionError
+    );
+
+    const doc = buildReviewResolution({
+      resolutionId: 'RR-RES-agreed-decision-ref',
+      source: revision(),
+      items: [
+        item({
+          authorResponse: {
+            state: 'agrees_spec_decision',
+            rationale: 'Product owner agreed.',
+          },
+          resolution: {
+            state: 'decision_agreed',
+            target: null,
+            decisionRefs: [{ kind: 'adr', ref: 'docs/adr/042-intentional-behavior.md' }],
+          },
+        }),
+      ],
+    });
+    assert.equal(doc.items[0].resolution.state, 'decision_agreed');
   });
 
   test('builder does not mutate caller-owned source/items', () => {
