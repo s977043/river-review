@@ -48,7 +48,26 @@ function makeReplayArtifact(entry, overrides = {}) {
     schemaVersion: 1,
     mode: 'paired-replay',
     readOnly: true,
+    requiresHumanApproval: true,
     writeEffects: [],
+    acceptance: {
+      decision: null,
+      applied: false,
+      autoPromotion: false,
+    },
+    manifestVerification: {
+      verified: true,
+      experimentKeyMatchesInputs: true,
+    },
+    manifest: {
+      manifestId: `RR-EXP-${REPLAY_EXPERIMENT_KEY.slice(0, 12)}`,
+      experimentKey: REPLAY_EXPERIMENT_KEY,
+      manifestHash: REPLAY_MANIFEST_HASH,
+      improvementCandidate: {
+        candidateId: entry.id,
+        contentHash: entry.context.promotionCandidate.contentHash,
+      },
+    },
     promotionHandoff: {
       candidateId: entry.id,
       candidateContentHash: entry.context.promotionCandidate.contentHash,
@@ -138,6 +157,21 @@ describe('applyReplayEvidenceAttachment (#2485)', () => {
           { approver: 'alice', reason: 'r' }
         ),
       /contentHash mismatch/
+    );
+  });
+
+  test('rejects a handoff that disagrees with the Experiment Manifest', () => {
+    const entry = makeReplayCandidate();
+    const artifact = makeReplayArtifact(entry);
+    artifact.manifest.manifestHash = 'e'.repeat(64);
+
+    assert.throws(
+      () =>
+        applyReplayEvidenceAttachment(entry, artifact, {
+          approver: 'alice',
+          reason: 'r',
+        }),
+      /does not match the paired replay Experiment Manifest/
     );
   });
 
