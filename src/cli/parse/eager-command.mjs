@@ -66,7 +66,7 @@ export function consumeEagerCommand(parsed, arg, args) {
   } else if (arg === 'feedback' && args[0] && !args[0].startsWith('-')) {
     parsed.feedbackSubcommand = args.shift(); // add (only one for now)
   } else if (arg === 'promote' && args[0] && !args[0].startsWith('-')) {
-    parsed.promoteSubcommand = args.shift(); // propose | list | approve | reject | template | retire | review-effectiveness
+    parsed.promoteSubcommand = args.shift(); // propose | list | approve | reject | retarget | attach-replay | template | retire | review-effectiveness
     // approve/reject/retarget/attach-replay/template/review-effectiveness take an optional positional candidate id.
     if (
       PROMOTE_ID_SUBCOMMANDS.has(parsed.promoteSubcommand) &&
