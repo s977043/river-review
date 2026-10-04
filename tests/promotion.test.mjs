@@ -51,11 +51,29 @@ function makeReplayArtifact(entry, overrides = {}) {
     readOnly: true,
     requiresHumanApproval: true,
     writeEffects: [],
+    activationCheck: {
+      verified: true,
+      reasons: [],
+    },
+    pairing: {
+      warnings: [],
+    },
     acceptance: {
       decision: null,
       applied: false,
       autoPromotion: false,
+      evaluable: true,
+      evaluatedOn: 'overall',
+      evaluations: [],
+      contract6: {
+        criticalRegressionCount: 0,
+        overallCriticalRegressionCount: 0,
+      },
     },
+    verification: {
+      independentVerifierVerified: false,
+    },
+    terminalReason: 'success',
     manifestVerification: {
       verified: true,
       experimentKeyMatchesInputs: true,
@@ -169,6 +187,17 @@ describe('applyReplayEvidenceAttachment (#2485)', () => {
           { approver: 'alice', reason: 'r' }
         ),
       /contentHash mismatch/
+    );
+  });
+
+  test('rejects handoff observations that disagree with the parent replay artifact', () => {
+    const entry = makeReplayCandidate();
+    const artifact = makeReplayArtifact(entry, { criticalRegressionCount: 1 });
+
+    assert.throws(
+      () =>
+        validateReplayEvidenceAttachment(entry, artifact),
+      /criticalRegressionCount does not match the paired replay artifact/
     );
   });
 
