@@ -89,6 +89,41 @@ function normalizeKnownInteractions(oracle, obligationIds) {
   });
 }
 
+function normalizeAnalysisExpectation(oracle) {
+  if (oracle.analysisExpectation == null) return null;
+
+  const expectation = requireObject(
+    oracle.analysisExpectation,
+    'fixture.oracle.analysisExpectation'
+  );
+  const status = requireString(
+    expectation.status,
+    'fixture.oracle.analysisExpectation.status'
+  );
+  if (!['completed', 'partial', 'failed'].includes(status)) {
+    throw new ReviewConcernEvalError(
+      'fixture.oracle.analysisExpectation.status must be completed, partial, or failed.'
+    );
+  }
+
+  const limitationIncludes = expectation.limitationIncludes ?? [];
+  if (!Array.isArray(limitationIncludes)) {
+    throw new ReviewConcernEvalError(
+      'fixture.oracle.analysisExpectation.limitationIncludes must be an array.'
+    );
+  }
+
+  return {
+    status,
+    limitationIncludes: limitationIncludes.map((item, index) =>
+      requireString(
+        item,
+        `fixture.oracle.analysisExpectation.limitationIncludes[${index}]`
+      )
+    ),
+  };
+}
+
 function normalizeGrouping(oracle) {
   const grouping = requireObject(oracle.acceptableGrouping, 'fixture.oracle.acceptableGrouping');
   const minConcerns = requireNonNegativeInteger(
@@ -128,6 +163,7 @@ export function normalizeReviewConcernFixture(fixture) {
       obligations,
       knownInteractions: normalizeKnownInteractions(oracle, obligationIds),
       acceptableGrouping: normalizeGrouping(oracle),
+      analysisExpectation: normalizeAnalysisExpectation(oracle),
     },
   };
 }
@@ -260,6 +296,33 @@ function interactionDetected(interaction, matches, edges) {
   return false;
 }
 
+function evaluateAnalysisExpectation(expectation, map) {
+  if (expectation == null) {
+    return { met: null, failures: [] };
+  }
+
+  const actualStatus = map.analysis?.status ?? null;
+  const actualLimitations = Array.isArray(map.analysis?.limitations)
+    ? map.analysis.limitations
+    : [];
+  const failures = [];
+
+  if (actualStatus !== expectation.status) {
+    failures.push(`status:${expectation.status}`);
+  }
+
+  for (const limitation of expectation.limitationIncludes) {
+    if (!actualLimitations.includes(limitation)) {
+      failures.push(`limitation:${limitation}`);
+    }
+  }
+
+  return {
+    met: failures.length === 0,
+    failures,
+  };
+}
+
 function emptyEvaluation(fixture) {
   return {
     schemaVersion: EVALUATION_SCHEMA_VERSION,
@@ -283,6 +346,8 @@ function emptyEvaluation(fixture) {
       nonActionableConcernRatio: null,
       unmappedConcernCount: null,
       humanCorrectionCount: null,
+      analysisExpectationMet: null,
+      analysisExpectationFailures: [],
     },
   };
 }
@@ -327,6 +392,10 @@ export function evaluateReviewConcernMap({ fixture, map, adjudication } = {}) {
   );
   const concernCount = normalizedMap.map.concerns.length;
   const grouping = normalizedFixture.oracle.acceptableGrouping;
+  const analysisExpectation = evaluateAnalysisExpectation(
+    normalizedFixture.oracle.analysisExpectation,
+    normalizedMap.map
+  );
 
   return {
     schemaVersion: EVALUATION_SCHEMA_VERSION,
@@ -364,6 +433,8 @@ export function evaluateReviewConcernMap({ fixture, map, adjudication } = {}) {
         (concern) => !mappedConcernIds.has(concern.id)
       ).length,
       humanCorrectionCount: normalizedAdjudication.humanCorrectionCount,
+      analysisExpectationMet: analysisExpectation.met,
+      analysisExpectationFailures: analysisExpectation.failures,
     },
   };
 }
