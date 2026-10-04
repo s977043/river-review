@@ -399,7 +399,9 @@ export async function runPromoteCommand(parsed, targetPath) {
       return 0;
     }
     if (!result.changed) {
-      console.log(`Candidate ${summary.candidateId}: replay evidence already attached (no change).`);
+      console.log(
+        `Candidate ${summary.candidateId}: replay evidence already attached (no change).`
+      );
       console.log(`  manifestHash: ${summary.manifestHash}`);
       return 0;
     }
