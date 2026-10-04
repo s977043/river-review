@@ -96,10 +96,7 @@ function normalizeAnalysisExpectation(oracle) {
     oracle.analysisExpectation,
     'fixture.oracle.analysisExpectation'
   );
-  const status = requireString(
-    expectation.status,
-    'fixture.oracle.analysisExpectation.status'
-  );
+  const status = requireString(expectation.status, 'fixture.oracle.analysisExpectation.status');
   if (!['completed', 'partial', 'failed'].includes(status)) {
     throw new ReviewConcernEvalError(
       'fixture.oracle.analysisExpectation.status must be completed, partial, or failed.'
@@ -116,10 +113,7 @@ function normalizeAnalysisExpectation(oracle) {
   return {
     status,
     limitationIncludes: limitationIncludes.map((item, index) =>
-      requireString(
-        item,
-        `fixture.oracle.analysisExpectation.limitationIncludes[${index}]`
-      )
+      requireString(item, `fixture.oracle.analysisExpectation.limitationIncludes[${index}]`)
     ),
   };
 }

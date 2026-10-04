@@ -99,13 +99,10 @@ describe('#2507 Review Concern Phase 2 evaluation contract', () => {
     assert.deepEqual(cases.get('RC-11-dynamic-dispatch-partial').executionScenario, {
       mode: 'dynamic-dispatch-partial',
     });
-    assert.deepEqual(
-      cases.get('RC-11-dynamic-dispatch-partial').oracle.analysisExpectation,
-      {
-        status: 'partial',
-        limitationIncludes: [],
-      }
-    );
+    assert.deepEqual(cases.get('RC-11-dynamic-dispatch-partial').oracle.analysisExpectation, {
+      status: 'partial',
+      limitationIncludes: [],
+    });
 
     assert.deepEqual(cases.get('RC-14-timeout').executionScenario, {
       mode: 'timeout',
