@@ -1,8 +1,8 @@
 ---
 id: 'eval-driven-skill-design'
 name: 'Eval-Driven Skill Design'
-description: '新規 skill SKILL.md PR で `fixtures/` と `eval/` の happy-path × guard ペアが揃っているかを確認し、欠けている場合は eval cycle (#688) に乗せる手順を案内する。'
-version: 0.1.0
+description: '新規・変更 skill の fixture/eval と、WITH/WITHOUT の paired ablation による限界寄与の評価可能性を確認し、activation と effectiveness を分離して案内する。'
+version: 0.2.0
 category: upstream
 phase: upstream
 applyTo:
@@ -28,13 +28,15 @@ dependencies:
 
 Primary pattern: Reviewer
 Secondary patterns: Tool Wrapper
-Why: 新規 skill 追加時に happy-path / guard fixture と eval 配線の有無を診断し、欠けていれば repo-wide eval (#688) に組み込む手順を案内する educator スキル。既存 skill の改修や fixture-only PR では起動しない。
+Why: skill 追加・重要変更時に happy-path / guard fixture、eval 配線、paired ablation の評価可能性を診断し、存在・発火と実効性を混同しないための educator スキル。fixture-only / docs-only PR では起動しない。
 
 ## Goal / 目的
 
 - 新規 `skills/**/SKILL.md` を追加する PR が **検出ケース (happy-path) と抑制ケース (guard) のペア** を fixture として持つことを確認する。
 - `eval/promptfoo.yaml` 相当の評価設定または `tests/fixtures/repo-wide-eval/` への登録が用意されているかを確認する。
 - 欠けている場合は `npm run eval:fixtures` / `npm run eval:repo-context` をどう通すかを案内する。
+- 新規・重要変更された skill について、同じ case / runtime / model / effort で **WITH skill と WITHOUT skill（または旧版 baseline と candidate）** を比較できるか確認する。
+- `installed` / `selected` / `fired` を effectiveness の証拠にせず、寄与が不明なら `INCONCLUSIVE` として追加 Evidence を要求する。
 
 ## Guidance
 
@@ -51,6 +53,30 @@ new SKILL.md
 ```
 
 または `tests/fixtures/repo-wide-eval/` に同じ skill の {happy, guard} ケースを追加し、`tests/fixtures/repo-wide-eval/cases.json` に登録する形でも eval lift が測定できる。
+
+### Marginal contribution / paired ablation
+
+fixture / golden output は「壊れていないか」を見る regression evidence です。skill が**存在する価値そのもの**は、可能な範囲で baseline と candidate の差分として測ります。
+
+```text
+same case / runtime / model / effort
+  ├─ WITHOUT skill (or previous-version baseline)
+  └─ WITH skill    (or candidate)
+       ↓
+compare delta
+```
+
+原則:
+
+- **Usage != Effectiveness**: `installed` / `selected` / `fired` は availability / activation evidence であり、品質改善の証拠ではない。
+- 比較では skill 以外の条件を固定する。model / runtime / effort / input が違う結果を skill の寄与として扱わない。
+- 非決定的な実行は単発結果で断定せず、複数 trial と paired case を使う。
+- 最低限、detection / false positive / critical regression を比較し、取得可能なら time / token / cost / human intervention も見る。
+- candidate 側が実際に発火していない、paired case が不足している、sample が足りない場合は `INCONCLUSIVE`。自動的に「効果なし」へ倒さない。
+- River Review 内の Harness 改善では、独自比較器を増やさず既存の Experiment Manifest / paired replay（`src/lib/paired-replay.mjs`、`docs/development/1574-p2-paired-replay.md`）を優先して再利用する。
+- model / runtime の major update、skill の責務・prompt・routing の大幅変更時は再評価する。旧モデルで有効だった skill が新モデルでは冗長になる可能性を前提にする。
+
+判定は `PASS | FAIL | INCONCLUSIVE` とし、採用・廃止・自動 merge の authority はこのスキルに持たせません。
 
 ### happy-path × guard ペア convention
 
@@ -79,12 +105,18 @@ new SKILL.md
    - guard だけ / happy だけ → 片側欠落として指摘する。
 3. `eval/promptfoo.yaml` か `tests/fixtures/repo-wide-eval/cases.json` への配線があるか？
    - なし → どちらかを選んで配線する手順を提示する（per-skill promptfoo か repo-wide cases.json か）。
-4. すでに揃っている → 何も指摘しない（このスキルは silent でよい）。
+4. baseline / candidate の比較方法が定義されているか？
+   - 新規 skill なら WITHOUT skill、既存 skill の重要変更なら旧版を baseline にする。
+5. activation と effectiveness が分離されているか？
+   - `fired` だけを成功条件にしている場合は指摘する。
+6. paired comparison が実行不能または sample 不足か？
+   - `INCONCLUSIVE` と追加 Evidence の取得条件を明示する。推測で PASS / FAIL にしない。
+7. fixture / eval / contribution path が揃っている → 何も指摘しない（このスキルは silent でよい）。
 
 ## Non-goals / 扱わないこと
 
 - skill の **検出ロジックの妥当性** 自体（それは各 skill の領分）。
-- 既存 skill の SKILL.md 改修やドキュメント-only な PR（このスキルは新規 skill 追加 PR のみを対象）。
+- typo / wording / reference link だけの docs-like 変更など、skill の責務・trigger・判断ロジック・routing・modelHint を変えない軽微変更。
 - `prompt/` や `golden/` 内容のスタイル指摘（fixture / eval の有無のみを確認する）。
 - 個別 fixture の diff 内容のレビュー（`scripts/evaluate-review-fixtures.mjs` などが回す）。
 
@@ -92,13 +124,13 @@ new SKILL.md
 
 このスキルは以下を **すべて** 満たさない限り `NO_REVIEW` を返す。
 
-- [ ] 差分に **新規追加された** `skills/**/SKILL.md` が含まれている（既存 SKILL.md の編集のみは対象外）
-- [ ] その新規 skill の `fixtures/` または `eval/` の整備状況に未確定がある（差分が `prompt/system.md` のみなど、明らかに整っているケースは除外）
+- [ ] 差分に **新規追加または実質変更された** `skills/**/SKILL.md` が含まれている
+- [ ] fixture / eval / paired contribution のいずれかに未確定がある、または責務・trigger・判断ロジック・routing・modelHint の変更によって既存 Evidence の再利用可否を確認する必要がある
 
 ゲート不成立時の出力:
 
 ```text
-NO_REVIEW: eval-driven-skill-design — 新規 skill 追加が検出されない、または fixture / eval は既に整備済み
+NO_REVIEW: eval-driven-skill-design — skill の実質変更がない、または fixture / eval / contribution evidence が既に十分
 ```
 
 ## False-positive guards / 抑制条件
@@ -141,3 +173,4 @@ actions:
 - Fixture 構造の参考: `skills/midstream/security-basic/`
 - Schema: `schemas/skill.schema.json`
 - 改善ループ: `skills/agent-skills/river-review/references/IMPROVEMENT_LOOP.md`
+- paired comparison: `docs/development/1574-p2-paired-replay.md` / `src/lib/paired-replay.mjs`
