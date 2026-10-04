@@ -140,7 +140,7 @@ describe('runReviewerOrchestration', () => {
     }
   });
 
-  it('attaches host-assigned execution provenance to reviewer findings and coverage (#2481)', async () => {
+  it('attaches execution provenance to findings and coverage (#2481)', async () => {
     const result = await runReviewerOrchestration({
       diff: makeDiff(),
       reviewers: ['bug-hunter'],
@@ -161,13 +161,16 @@ describe('runReviewerOrchestration', () => {
       }),
     });
 
-    assert.equal(result.reviewCoverage.units[0].executionId, 'exec:reviewer:bug-hunter/chunk:1');
+    assert.equal(
+      result.reviewCoverage.units[0].executionId,
+      'exec:reviewer:bug-hunter/chunk:1'
+    );
     assert.deepEqual(result.findings[0].sourceExecutionIds, [
       'exec:reviewer:bug-hunter/chunk:1',
     ]);
   });
 
-  it('rejects a missing reviewer execution id before any reviewer task starts (#2481)', async () => {
+  it('rejects missing execution ids before tasks start (#2481)', async () => {
     const generateReviewImpl = mock.fn(async () => ({
       findings: [],
       comments: [],
@@ -188,7 +191,7 @@ describe('runReviewerOrchestration', () => {
     assert.equal(generateReviewImpl.mock.callCount(), 0);
   });
 
-  it('rejects duplicate reviewer execution ids before any reviewer task starts (#2481)', async () => {
+  it('rejects duplicate execution ids before tasks start (#2481)', async () => {
     const generateReviewImpl = mock.fn(async () => ({
       findings: [],
       comments: [],
