@@ -219,6 +219,16 @@ function normalizeAdjudication(adjudication, obligationIds, concernIds) {
     }
   }
 
+  const actionableConcernIds = new Set([...obligationMatches.values()].flatMap((items) => items));
+  const contradictory = nonActionableConcernIds.find((concernId) =>
+    actionableConcernIds.has(concernId)
+  );
+  if (contradictory) {
+    throw new ReviewConcernEvalError(
+      `adjudication concern "${contradictory}" cannot be both obligation-matched and non-actionable.`
+    );
+  }
+
   return {
     obligationMatches,
     nonActionableConcernIds,
