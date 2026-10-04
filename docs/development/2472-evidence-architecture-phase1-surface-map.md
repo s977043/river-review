@@ -28,7 +28,7 @@ Phase 2 の新しい `Review Evidence Projection` は、**現時点では実装�
 結論は次です。
 
 ```text
-Phase 2 = not-needed-owner-extension
+Phase 2 = not-needed-existing-surface
 ```
 
 理由は3つあります。
@@ -681,19 +681,25 @@ PR #2471の実運用では、#2474適用後にMarkdown ADRがupstream review inp
 
 ### Gap 1 — Reviewer Independence runtime availability
 
-不足はありますが、新projectionで補うべきではありません。
+runtime availability の不足は確認できますが、current consumer gap は確認できません。
 
-必要になった場合は #1760 / owning provenance contract側でruntime wiringを行うべきです。
+そのため Phase 1 の残タスクにはしません。
+
+将来 consumer requirement が発生した場合は #1760 / owning provenance contract側でruntime wiringを検討します。
 
 ### Gap 2 — Review Resolution runtime availability
 
-author / human resolutionをmachine-readableに扱うconsumerが具体化した場合は、#2322 / ADR-011 owner側を実装します。
+current runtimeには存在しませんが、Phase 1で必要とするconsumerも確認できません。
+
+author / human resolutionをmachine-readableに扱うconsumerが具体化した場合だけ、#2322 / ADR-011 owner側を実装します。
 
 新projectionがresolution stateを独自に作ってはいけません。
 
 ### Gap 3 — Security Audit writer
 
-Security Audit Run Recordをconsumerが必要とする場合は、そのowner writerを配線します。
+schemaは存在しますが、current Phase 1 consumer requirementはありません。
+
+Security Audit Run Recordをconsumerが必要とする場合だけ、そのowner writerを配線します。
 
 general Review Artifactへ `evidenceState` をコピーする理由にはなりません。
 
@@ -760,17 +766,20 @@ pure deterministic projection自体は技術的に可能です。
 ## Phase 2 recommendation
 
 ```text
-not-needed-owner-extension
+not-needed-existing-surface
 ```
 
-これは「今すぐowner extensionを実装する」という意味ではありません。
+現時点では concrete consumer gap を再現できず、current consumer needs は existing surfaces で満たせます。
 
-意味は次です。
+確認できた owner-specific maturity gap は、Phase 2 の残タスクとして自動的に実装しません。
 
-- current consumer needsはexisting surfacesで満たせる
-- current gapsはowner-specific
-- concrete consumer gapが出た場合は、まずexisting owner extensionで解けるか確認する
-- new Review Evidence Projectionは最後の選択肢にする
+将来 concrete consumer gap が発生した場合だけ、次の順で再評価します。
+
+1. existing surface で解決できるか
+2. existing owner の additive extension で解決できるか
+3. それでも不足する場合だけ Review Evidence Projection を検討する
+
+new Review Evidence Projection は最後の選択肢です。
 
 ## Reopen condition
 
@@ -817,6 +826,8 @@ Phase 2を再検討するのは、次をすべて示せるときです。
 ## Final decision
 
 Phase 1は完了です。
+
+current consumer needs は existing surfaces で満たせます。
 
 新しい Review Evidence Projection を作るより、既存ownerをcanonical sourceとして維持する方が安全です。
 
