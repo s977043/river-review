@@ -1,8 +1,6 @@
 ---
-title: Starter Cookbook
+title: Starter Cookbook — 既存のレビュー観点から始める
 ---
-
-# Starter Cookbook — 既存のレビュー観点から始める
 
 River Review は、最初から独自 Skill を書く必要はありません。まず同梱の専門 review skill と既存の repo-owned Skill を使い、**実際に不足した判断だけを後から追加**してください。
 
