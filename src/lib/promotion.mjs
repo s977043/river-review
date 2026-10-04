@@ -454,6 +454,54 @@ function assertReplayAttachmentArtifact(artifact) {
   ) {
     throw new Error('promotionHandoff does not match manifest.improvementCandidate.');
   }
+
+  const expectedProfiles = (artifact.acceptance?.evaluations ?? []).map((evaluation) => ({
+    profile: evaluation.profile,
+    allRequiredSatisfied: evaluation.allRequiredSatisfied,
+    sampleSizeSatisfied: evaluation.sampleSizeSatisfied,
+    failedMetrics: [...(evaluation.failedMetrics ?? [])],
+    unevaluableMetrics: (evaluation.criteria ?? [])
+      .filter((criterion) => criterion.satisfied === null)
+      .map((criterion) => criterion.metric)
+      .sort(),
+  }));
+  const observationPairs = [
+    ['activationVerified', handoff.activationVerified, artifact.activationCheck?.verified],
+    ['acceptanceEvaluable', handoff.acceptanceEvaluable, artifact.acceptance?.evaluable],
+    ['evaluatedOn', handoff.evaluatedOn, artifact.acceptance?.evaluatedOn],
+    [
+      'criticalRegressionCount',
+      handoff.criticalRegressionCount,
+      artifact.acceptance?.contract6?.criticalRegressionCount,
+    ],
+    [
+      'overallCriticalRegressionCount',
+      handoff.overallCriticalRegressionCount,
+      artifact.acceptance?.contract6?.overallCriticalRegressionCount,
+    ],
+    [
+      'independentVerifierVerified',
+      handoff.independentVerifierVerified,
+      artifact.verification?.independentVerifierVerified,
+    ],
+    ['terminalReason', handoff.terminalReason, artifact.terminalReason],
+  ];
+  for (const [name, actual, expected] of observationPairs) {
+    if (actual !== expected) {
+      throw new Error(`promotionHandoff ${name} does not match the paired replay artifact.`);
+    }
+  }
+  const structuredPairs = [
+    ['activationReasons', handoff.activationReasons, artifact.activationCheck?.reasons],
+    ['pairingWarnings', handoff.pairingWarnings, artifact.pairing?.warnings],
+    ['profiles', handoff.profiles, expectedProfiles],
+  ];
+  for (const [name, actual, expected] of structuredPairs) {
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(`promotionHandoff ${name} does not match the paired replay artifact.`);
+    }
+  }
+
   return handoff;
 }
 
