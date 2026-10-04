@@ -10,7 +10,7 @@ Architecture source:
 - [Phase 0 gap analysis](./2455-phase0-gap-analysis.md)
 
 This phase adds an experimental semantic decomposition observation to the local `river run` path.
-It does not change reviewer routing, Review Coverage, finding truth, disposition, Gate, or merge authority.
+It does not change reviewer routing, Review Coverage, or finding truth. It also leaves disposition, Gate, and merge authority unchanged.
 
 ## Goal
 
@@ -27,7 +27,7 @@ resolved local review context
   -> existing review pipeline unchanged
 ```
 
-The analyzer output is not passed into `generateReview`, reviewer orchestration, Skill selection, Gate derivation, or finding classification.
+The analyzer output is not passed into `generateReview` or reviewer orchestration. Skill selection, Gate derivation, and finding classification also remain unchanged.
 
 ## Activation
 
@@ -167,9 +167,9 @@ UNTRUSTED REVIEW DATA
 END UNTRUSTED REVIEW DATA
 ```
 
-The system instruction explicitly treats code, comments, fixtures, logs, and arbitrary repository content as review data.
+The system instruction treats code, comments, and fixtures as review data. Logs and arbitrary repository content are review data as well.
 
-If `.river/rules.md` or a file under `.river/rules.d/` is itself changed by the reviewed diff, the working-tree rules are **not** promoted into the `AUTHORITY` block for the Concern Analyzer. The observation records `authority-input-untrusted` and runs with that authority withheld. This prevents a pull request from modifying the policy file and then using the modified text to steer the semantic observation used for later evaluation.
+If `.river/rules.md` or a file under `.river/rules.d/` is changed by the reviewed diff, the working-tree rules are **not** promoted into the `AUTHORITY` block. The observation records `authority-input-untrusted`. It then runs with that authority withheld. This prevents a pull request from modifying the policy file and using the modified text to steer later semantic evaluation.
 
 An instruction-like string inside reviewed content does not gain authority merely because it says:
 
@@ -340,7 +340,7 @@ It does not:
 - alter findings/comments
 - turn `no-changes` into a different review status
 
-Default-off behavior is pinned by integration tests. The existing `planLocalReview()` result shape also remains unchanged; the raw changed-file manifest needed by the experiment is reconstructed from the existing `reviewFileScope` ledger rather than exposed as a new default-on planning field.
+Default-off behavior is pinned by integration tests. The existing `planLocalReview()` result shape also remains unchanged. The experiment reconstructs its raw changed-file manifest from the existing `reviewFileScope` ledger. It does not expose a new default-on planning field.
 
 When the feature is enabled under `dryRun`, the only allowed difference is the additive `reviewDebug.reviewConcernMap` observation.
 
@@ -408,7 +408,7 @@ Phase 1 observe-only analyzer
   -> promotion decision
 ```
 
-No routing promotion should happen until paired evaluation shows measurable benefit without unacceptable Major/Critical recall regression, false-positive growth, or latency/token cost.
+No routing promotion should happen until paired evaluation shows measurable benefit. Promotion must not introduce unacceptable Major/Critical recall regression or false-positive growth. Latency and token cost must also remain acceptable.
 
 ## References
 
