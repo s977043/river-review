@@ -167,6 +167,17 @@ describe('applyReplayEvidenceAttachment (#2485)', () => {
     assert.equal(entry.context.experimentHistory[0].attachedBy, 'alice');
   });
 
+  test('rejects a corrupted stored content-addressed candidate identity', () => {
+    const entry = makeReplayCandidate();
+    entry.id = 'RR-PC-deadbeef0000';
+    const artifact = makeReplayArtifact(entry);
+
+    assert.throws(
+      () => validateReplayEvidenceAttachment(entry, artifact),
+      /invalid content-addressed identity/
+    );
+  });
+
   test('fails closed on candidate id or content hash mismatch', () => {
     const entry = makeReplayCandidate();
 
