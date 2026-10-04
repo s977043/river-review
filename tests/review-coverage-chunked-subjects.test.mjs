@@ -156,7 +156,6 @@ test('chunk whose files are all optimizer-dropped claims no subject (#2233)', as
   assert.ok(subjects.has('src/x0.mjs'));
 });
 
-
 test('upstream orchestration keeps Markdown in reviewer coverage subjects (#2473)', async () => {
   const { units, excluded, subjects, intersection } = await runCoverage(
     ['docs/adr/013-example.md', 'src/helper.mjs'],
