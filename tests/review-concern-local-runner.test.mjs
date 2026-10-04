@@ -22,7 +22,10 @@ function rawPathsFromScope(scope) {
 
 function withoutConcernObservation(result) {
   const cloned = structuredClone(result);
-  if (cloned.reviewDebug) delete cloned.reviewDebug.reviewConcernMap;
+  if (cloned.reviewDebug) {
+    delete cloned.reviewDebug.reviewConcernMap;
+    if (Object.keys(cloned.reviewDebug).length === 0) delete cloned.reviewDebug;
+  }
   return cloned;
 }
 
