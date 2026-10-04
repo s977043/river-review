@@ -186,6 +186,8 @@ A token after `--` must be an existing path; if it does not exist, the command e
 
 Other surfaces (`skills list` / `runs list` / `promote list` / `eval` and so on) do not take a trailing path and exit 1 with a surplus positional. Subcommands that take several non-option tokens by design — `runs diff <id1> <id2> [<id3>...]`, `promote approve <id>`, or `promote attach-replay <id>` — are handled separately.
 
+`river promote attach-replay <id>` reads a saved paired replay artifact from `--input <paired-replay.json>` and appends it to the matching promotion candidate's `context.experimentHistory[]` as PRE-adoption experiment evidence. `--approver <name>` and `--reason <text>` are required. Reattaching the same `manifestHash` is a no-op. The command does not change `promotionStatus`, approval, or post-adoption effectiveness, and it exits 1 unless the candidate is still in `candidate` or `pending` state.
+
 ### `river review` / `river eval` (`runners/cli`)
 
 The commands in `runners/cli` currently collapse every error into code `1`. Code `3` never occurs.
