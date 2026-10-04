@@ -135,7 +135,7 @@ This preserves the ADR-014 gray zone where two obligations may be represented as
 
 A zero denominator is `null`, not a perfect score.
 
-Timeout, malformed-output, and explicit partial-observation fixtures can therefore verify failure semantics even when no concern is produced. A successful map for a fixture that expects `failed` is recorded as an analysis-expectation mismatch rather than accepted because its concern grouping looks plausible.
+Timeout, malformed-output, and explicit partial-observation fixtures can verify failure semantics even when no concern is produced. A successful map for a fixture that expects `failed` is recorded as an analysis-expectation mismatch. Plausible concern grouping does not override the frozen failure expectation.
 
 Examples:
 
