@@ -103,6 +103,11 @@ Commands:
   promote retarget <id> Change the proposed target with an auditable human decision
                         (--target-kind <kind> [--target-id <id>] --approver <name>
                          --reason <text> --index <path>)
+  promote attach-replay <id>
+                        Attach read-only paired replay evidence before adoption.
+                        Does not approve or change effectiveness state
+                        (--input <paired-replay.json> --approver <name>
+                         --reason <text> [--index <path>] [--output json])
   promote template [<id>] Emit PR scaffold(s) for approved candidate(s) (text only)
                         (--approver <name> --reason <text> --index <path>
                          --include-inactive; --output json for machine output)
@@ -915,7 +920,7 @@ function parsePromoteOption(arg, args, parsed) {
   if (arg === '--input') {
     const value = args.shift();
     if (!value || value.startsWith('-')) {
-      console.error('Error: --input option requires a JSONL path.');
+      console.error('Error: --input option requires a path.');
       usageError(parsed);
       return 'break';
     }
