@@ -177,6 +177,7 @@ describe('Review Coverage file scope ledger (#2212 Slice C)', () => {
 
     assert.equal(context.status, 'ok');
     assert.deepEqual(context.changedFiles, ['docs/adr/013-example.md']);
+    assert.match(context.diff.rawDiffText, /docs\/adr\/013-example\.md/);
     assert.deepEqual(
       context.diff.filesForReview.map((entry) => entry.path),
       ['docs/adr/013-example.md']
