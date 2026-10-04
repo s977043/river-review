@@ -51,9 +51,21 @@ codex plugin marketplace add s977043/river-review
 
 マーケットプレイス追加後、River Review の専門 review skill を Codex から利用できます。詳細は [クイックスタート](/guides/quickstart) を参照してください。
 
-## River Review がすでに提供しているもの
+## 何が変わるのか
 
-Gemini など外部レビューでよく挙がる「Eval」「ノイズ抑制」「比較」「コスト」「メトリクス」は、ゼロから追加する必要はありません。River Review には既に次の土台があります。
+同じ「エラーハンドリングを見る」でも、汎用的な指示だけでは指摘が抽象的になりやすく、チーム内で採否を再判断するコストが残ります。River Review では Skill が **対象・根拠・重要度・false-positive 回避条件**を持ちます。
+
+| 汎用的なレビュー指示 | River Review の Skill |
+| --- | --- |
+| 「エラーハンドリングを改善してください」 | `logging-observability` が差分位置を示し、例外の握りつぶし・観測可能性・修正案を finding として返す |
+| レビューごとに観点が揺れやすい | fixture + golden output で期待挙動を固定し、回帰 Eval で変更を検証する |
+| 不要な指摘も毎回出やすい | confidence / severity / suppression memory / review coverage でノイズを管理する |
+
+実例は [代表スキルのショーケース](/guides/representative-skills) で fixture と期待出力まで確認できます。
+
+## 導入後に使える品質・運用機能
+
+River Review には、チーム導入で必要になる次の土台があります。
 
 - **Skill の品質維持**: fixture + golden output、回帰 Eval、per-skill false-positive 評価。
 - **ノイズ抑制**: severity（critical / major / minor / info）、confidence、suppression memory、review coverage。
@@ -61,7 +73,7 @@ Gemini など外部レビューでよく挙がる「Eval」「ノイズ抑制」
 - **運用計測**: Run store、回帰比較、usage telemetry、コスト見積もり、ダッシュボード。
 - **導入判断**: 競合比較、既知の制限、FAQ。
 
-次に必要なのは「機能を増やすこと」より、これらを **見つけやすく、最小構成で試しやすくすること**です。
+まず既存の Skill と計測機能を使い、実データで不足が見えた判断だけを追加 Skill としてコード化するのが推奨です。
 
 ## コンセプトを理解する
 
