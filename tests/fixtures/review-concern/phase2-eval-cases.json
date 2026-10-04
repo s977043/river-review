@@ -41,7 +41,9 @@
       "category": "one-file-multiple-concerns",
       "description": "One handler changes authorization timing and public error mapping independently.",
       "input": {
-        "rawChangedFiles": ["src/api/session-handler.ts"],
+        "rawChangedFiles": [
+          "src/api/session-handler.ts"
+        ],
         "rawDiffText": "+ authorizeBeforeLoad(request)\n+ return mapAuthError(error)"
       },
       "oracle": {
@@ -68,7 +70,10 @@
       "category": "independent-concerns",
       "description": "Two unrelated changes share a pull request and should both remain visible.",
       "input": {
-        "rawChangedFiles": ["src/cache/profile-cache.ts", "src/cli/report.ts"],
+        "rawChangedFiles": [
+          "src/cache/profile-cache.ts",
+          "src/cli/report.ts"
+        ],
         "rawDiffText": "+ ttlSeconds = 300\n+ renderJsonSummary(result)"
       },
       "oracle": {
@@ -95,7 +100,10 @@
       "category": "cross-concern-interaction",
       "description": "Authentication state transition and error contract can fail only in combination.",
       "input": {
-        "rawChangedFiles": ["src/auth/session.ts", "src/api/error.ts"],
+        "rawChangedFiles": [
+          "src/auth/session.ts",
+          "src/api/error.ts"
+        ],
         "rawDiffText": "+ session.state = 'rotating'\n+ case TOKEN_ROTATING: return 409"
       },
       "oracle": {
@@ -162,7 +170,10 @@
       "category": "auth-plus-api-contract",
       "description": "Authorization behavior and externally visible API compatibility both matter.",
       "input": {
-        "rawChangedFiles": ["src/auth/policy.ts", "src/api/session-controller.ts"],
+        "rawChangedFiles": [
+          "src/auth/policy.ts",
+          "src/api/session-controller.ts"
+        ],
         "rawDiffText": "+ requireScope('session:write')\n+ response.status = 403"
       },
       "oracle": {
@@ -194,7 +205,9 @@
       "category": "refactor-plus-behavior-fix",
       "description": "A refactor is bundled with a user-visible behavior fix and must not hide the fix obligation.",
       "input": {
-        "rawChangedFiles": ["src/order/price.ts"],
+        "rawChangedFiles": [
+          "src/order/price.ts"
+        ],
         "rawDiffText": "+ const normalized = normalizePrice(input)\n+ return normalized < 0 ? 0 : normalized"
       },
       "oracle": {
@@ -221,7 +234,10 @@
       "category": "docs-tests-only-support",
       "description": "Documentation and tests support an existing behavior and should not inflate concern count by file type.",
       "input": {
-        "rawChangedFiles": ["docs/session.md", "tests/auth/session.test.ts"],
+        "rawChangedFiles": [
+          "docs/session.md",
+          "tests/auth/session.test.ts"
+        ],
         "rawDiffText": "+ Refresh tokens rotate once per session.\n+ expect(rotationCount).toBe(1)"
       },
       "oracle": {
@@ -244,7 +260,10 @@
       "category": "generated-vendor-noise",
       "description": "Generated output changes alongside a source change without creating a semantic concern of its own.",
       "input": {
-        "rawChangedFiles": ["src/schema/user.ts", "generated/schema.json"],
+        "rawChangedFiles": [
+          "src/schema/user.ts",
+          "generated/schema.json"
+        ],
         "rawDiffText": "+ export const UserStatus = ['active', 'disabled']\n+ \"enum\": [\"active\", \"disabled\"]"
       },
       "oracle": {
@@ -267,7 +286,9 @@
       "category": "affected-unchanged-caller",
       "description": "A changed shared contract affects an unchanged caller that is explicitly inspected.",
       "input": {
-        "rawChangedFiles": ["src/auth/token.ts"],
+        "rawChangedFiles": [
+          "src/auth/token.ts"
+        ],
         "rawDiffText": "+ export function parseToken(value) { return decodeV2(value); }",
         "repoContext": {
           "sections": [
@@ -308,7 +329,9 @@
       "category": "dynamic-dispatch-incomplete",
       "description": "Dynamic dispatch prevents exhaustive affected-subject enumeration and must remain explicitly partial.",
       "input": {
-        "rawChangedFiles": ["src/events/registry.ts"],
+        "rawChangedFiles": [
+          "src/events/registry.ts"
+        ],
         "rawDiffText": "+ handlers[event.type]?.(event)"
       },
       "oracle": {
@@ -322,7 +345,14 @@
         "acceptableGrouping": {
           "minConcerns": 1,
           "maxConcerns": 2
+        },
+        "analysisExpectation": {
+          "status": "partial",
+          "limitationIncludes": []
         }
+      },
+      "executionScenario": {
+        "mode": "dynamic-dispatch-partial"
       }
     },
     {
@@ -331,7 +361,10 @@
       "category": "missed-required-obligation",
       "description": "The evaluation oracle contains two obligations so a missed obligation is mechanically visible.",
       "input": {
-        "rawChangedFiles": ["src/payment/authorize.ts", "src/payment/audit.ts"],
+        "rawChangedFiles": [
+          "src/payment/authorize.ts",
+          "src/payment/audit.ts"
+        ],
         "rawDiffText": "+ authorize(payment)\n+ writeAuditRecord(payment)"
       },
       "oracle": {
@@ -363,7 +396,11 @@
       "category": "over-split-concern",
       "description": "Implementation, tests, and config all support one coherent retry-policy change.",
       "input": {
-        "rawChangedFiles": ["src/http/retry.ts", "tests/http/retry.test.ts", "config/retry.json"],
+        "rawChangedFiles": [
+          "src/http/retry.ts",
+          "tests/http/retry.test.ts",
+          "config/retry.json"
+        ],
         "rawDiffText": "+ maxAttempts = 4\n+ expect(attempts).toBe(4)\n+ \"maxAttempts\": 4"
       },
       "oracle": {
@@ -386,7 +423,9 @@
       "category": "analyzer-timeout",
       "description": "The analyzer can time out; evaluation must preserve that failure rather than infer coverage.",
       "input": {
-        "rawChangedFiles": ["src/search/query.ts"],
+        "rawChangedFiles": [
+          "src/search/query.ts"
+        ],
         "rawDiffText": "+ buildQuery(filters)"
       },
       "oracle": {
@@ -400,7 +439,16 @@
         "acceptableGrouping": {
           "minConcerns": 1,
           "maxConcerns": 2
+        },
+        "analysisExpectation": {
+          "status": "failed",
+          "limitationIncludes": [
+            "analyzer-failed:runtime-error"
+          ]
         }
+      },
+      "executionScenario": {
+        "mode": "timeout"
       }
     },
     {
@@ -409,7 +457,9 @@
       "category": "malformed-analyzer-output",
       "description": "Malformed analyzer output must remain a failed observation and never become semantic coverage.",
       "input": {
-        "rawChangedFiles": ["src/export/csv.ts"],
+        "rawChangedFiles": [
+          "src/export/csv.ts"
+        ],
         "rawDiffText": "+ return serializeCsv(rows)"
       },
       "oracle": {
@@ -423,7 +473,16 @@
         "acceptableGrouping": {
           "minConcerns": 1,
           "maxConcerns": 2
+        },
+        "analysisExpectation": {
+          "status": "failed",
+          "limitationIncludes": [
+            "analyzer-failed:invalid-json"
+          ]
         }
+      },
+      "executionScenario": {
+        "mode": "malformed-output"
       }
     }
   ]
