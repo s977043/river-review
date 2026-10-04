@@ -216,7 +216,7 @@ const COMMAND_USAGE = {
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
     'river promote <propose|list|approve|reject|retarget|attach-replay|template|retire|review-effectiveness> [options]',
-  evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
+  evolve: 'river evolve <aggregate|replay|verify-replay|prompt-compare|prompt-ab> [options]',
 };
 
 const GENERIC_USAGE = 'river <command> <path> [options]';
@@ -1017,6 +1017,36 @@ function parseEvolveOption(arg, args, parsed) {
     parsed.evolveExpectManifest = value;
     return 'continue';
   }
+  if (arg === '--replay') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --replay option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveReplay = value;
+    return 'continue';
+  }
+  if (arg === '--attestation') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --attestation option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveAttestation = value;
+    return 'continue';
+  }
+  if (arg === '--trusted-key') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --trusted-key option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveTrustedKey = value;
+    return 'continue';
+  }
   // Options that are not evolve's own and not handled by the shared parser
   // below must fail loudly instead of being ignored.
   if (arg.startsWith('-') && !EVOLVE_SHARED_OPTIONS.has(arg)) {
@@ -1505,6 +1535,9 @@ function parseArgs(argv) {
     evolveMonth: null,
     evolveSpec: null,
     evolveExpectManifest: null,
+    evolveReplay: null,
+    evolveAttestation: null,
+    evolveTrustedKey: null,
     evolveExtraArgs: [],
     evolveUnknownOption: null,
     // skills subcommand fields
