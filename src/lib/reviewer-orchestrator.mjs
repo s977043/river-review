@@ -696,11 +696,11 @@ function editDistance(a, b) {
 // `buildLlmDiffView` is the single source of truth for that view (it re-optimizes
 // the raw chunk alias, #2230), so routing through it keeps the ledger's
 // `excluded` and `units[].subjects` sets disjoint by construction.
-function reviewUnitSubjects(chunkDiff) {
+function reviewUnitSubjects(chunkDiff, phase) {
   const hadInputFiles =
     (Array.isArray(chunkDiff?.filesForReview) && chunkDiff.filesForReview.length > 0) ||
     (Array.isArray(chunkDiff?.files) && chunkDiff.files.length > 0);
-  const filePaths = (buildLlmDiffView(chunkDiff).files ?? [])
+  const filePaths = (buildLlmDiffView(chunkDiff, { phase }).files ?? [])
     .map((file) => file?.path)
     .filter((value) => typeof value === 'string');
   // Only fall back to `changedFiles` when the chunk carried no file objects at
@@ -910,7 +910,7 @@ export async function runReviewerOrchestration({
     return {
       id: `reviewer:${roleName}/chunk:${chunkIdx + 1}`,
       kind: 'diff-chunk',
-      subjects: reviewUnitSubjects(chunkDiff),
+      subjects: reviewUnitSubjects(chunkDiff, phase),
       reviewerRole: roleName,
       required: requiredRoles.has(roleName),
       status,
@@ -957,7 +957,7 @@ export async function runReviewerOrchestration({
         diff: renderDiffText(diff),
         plan,
         fileTypes,
-        diffFiles: buildLlmDiffView(diff).files,
+        diffFiles: buildLlmDiffView(diff, { phase }).files,
         originalAsk: prBody ?? '',
         reviewConfig: mergedConfig.review,
         llm: { apiKey, model },
