@@ -261,7 +261,9 @@ export function renderReviewResolutionMarkdown(projection) {
 
   if (coverage.incompleteRequiredUnitIds?.length > 0) {
     lines.push(
-      `Incomplete required units: ${coverage.incompleteRequiredUnitIds.map(markdownText).join(', ')}`
+      `Incomplete required units: ${coverage.incompleteRequiredUnitIds
+        .map(markdownText)
+        .join(', ')}`
     );
   }
 
@@ -305,7 +307,8 @@ export function renderReviewResolutionMarkdown(projection) {
   } else {
     for (const item of warnings) {
       lines.push(
-        `- ${markdownText(item?.code ?? 'unknown_warning')} (resolution item ${item?.resolutionIndex ?? '—'})`
+        `- ${markdownText(item?.code ?? 'unknown_warning')} ` +
+          `(resolution item ${item?.resolutionIndex ?? '—'})`
       );
     }
   }
