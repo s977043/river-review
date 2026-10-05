@@ -563,7 +563,8 @@ impacts.`
 ### `eval-driven-skill-design`
 
 - 名前: `Eval-Driven Skill Design`
-- 概要: `新規・変更 skill の fixture/eval と、WITH/WITHOUT の paired ablation による限界寄与の評価可能性を確認し、activation と effectiveness を分離して案内する。`
+- 概要: `新規・変更 skill の fixture/eval と、WITH/WITHOUT の paired ablation による限界寄与の評価可能性を確認し、activation と effectiveness
+を分離して案内する。`
 - 対象:
   - `skills/**/SKILL.md`
   - `skills/**/prompt/**`
