@@ -26,8 +26,9 @@ function pushMap(map, key, index) {
 }
 
 function findingFingerprintForAlgo(finding, algo) {
+  if (algo === 'v1') return finding?.fingerprint ?? null;
   if (algo === 'v2') return finding?.fingerprintV2 ?? null;
-  return finding?.fingerprint ?? null;
+  return null;
 }
 
 function top3RankForFinding(finding, top3Findings) {
@@ -72,7 +73,9 @@ function buildFindingIndexes(findings) {
 function fingerprintCandidates(indexes, findingRef) {
   const fingerprint = findingRef?.fingerprint;
   if (!nonEmptyString(fingerprint)) return [];
-  const map = findingRef?.fingerprintAlgo === 'v2' ? indexes.byV2Fingerprint : indexes.byV1Fingerprint;
+  const algo = findingRef?.fingerprintAlgo;
+  if (algo !== 'v1' && algo !== 'v2') return [];
+  const map = algo === 'v2' ? indexes.byV2Fingerprint : indexes.byV1Fingerprint;
   return map.get(fingerprint) ?? [];
 }
 
