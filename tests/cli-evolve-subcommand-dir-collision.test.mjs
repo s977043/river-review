@@ -64,6 +64,7 @@ describe('#1759 B1: evolve subcommand word wins over a same-named directory', ()
     // so the fix is pinned for the full vocabulary, not just `aggregate`.
     mkdirSync(join(dir, 'aggregate'));
     mkdirSync(join(dir, 'replay'));
+    mkdirSync(join(dir, 'verify-replay'));
     mkdirSync(join(dir, 'prompt-compare'));
     mkdirSync(join(dir, 'prompt-ab'));
     originalCwd = process.cwd();
@@ -107,6 +108,22 @@ describe('#1759 B1: evolve subcommand word wins over a same-named directory', ()
     assert.equal(flagFirst.evolveSubcommand, 'replay');
     assert.equal(pathFirst.target, DEFAULT_TARGET);
     assert.equal(flagFirst.target, DEFAULT_TARGET);
+  });
+
+  test('verify-replay stays a subcommand even when a same-named directory exists', () => {
+    const parsed = parseArgs([
+      'evolve',
+      '--replay',
+      'replay.json',
+      '--attestation',
+      'attestation.json',
+      '--trusted-key',
+      'verifier.pem',
+      'verify-replay',
+    ]);
+    assert.equal(parsed.usageError, false);
+    assert.equal(parsed.evolveSubcommand, 'verify-replay');
+    assert.equal(parsed.target, DEFAULT_TARGET);
   });
 
   test('`evolve prompt-compare .` and `evolve --output json prompt-compare` agree', () => {

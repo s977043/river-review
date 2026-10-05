@@ -186,6 +186,9 @@ export const OPTION_SAMPLES = {
   '--month': { value: ['2026-01'] },
   '--spec': { value: ['spec.json'] },
   '--expect-manifest': { value: ['manifest-1'] },
+  '--replay': { value: ['replay.json'] },
+  '--attestation': { value: ['attestation.json'] },
+  '--trusted-key': { value: ['verifier.pem'] },
   // shared / review
   '--fail-on': { value: ['major'] },
   '--warn-on': { value: ['minor'] },

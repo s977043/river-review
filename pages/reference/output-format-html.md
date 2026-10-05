@@ -15,7 +15,7 @@ River Review は `--output html` / `output_format: html` で自己完結型の H
 | `river run <path>`                                                                           | 対応            | レビューレポート（判定バナー・スコア・指摘一覧・リスク評価） |
 | `river runs diff <id1> <id2> [<id3>...]`                                                     | 対応            | Loop Dashboard（loop signal・churn・振動タイムライン）       |
 | `river review plan` / `river review exec`                                                    | 拒否（exit 3）  | `json` または `markdown` を指定する                          |
-| `river evolve aggregate` / `river evolve replay`                                             | 拒否（exit 1）  | `text` または `json` を指定する                              |
+| `river evolve aggregate` / `river evolve replay` / `river evolve verify-replay`                                             | 拒否（exit 1）  | `text` または `json` を指定する                              |
 | `river skills <path>`                                                                        | 拒否（exit 1）  | `text` / `markdown` / `json` のいずれかを指定する            |
 | 上記以外（`river review route`・`river runs list`・`river runs digest`・`river promote` 等） | 無視            | コマンドごとの既定の出力へフォールバックする                 |
 

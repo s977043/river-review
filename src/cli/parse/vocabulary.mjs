@@ -20,11 +20,17 @@ export const SUBCOMMAND_ONLY_COMMANDS = new Set(['runs', 'suppression', 'feedbac
 export const SKILLS_SUBCOMMANDS = new Set(['import', 'export', 'list', 'resolve']);
 
 /**
- * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay`, ADR-006
- * `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
+ * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay` / P3 foundation
+ * `verify-replay`, ADR-006 `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
  * "first non-flag token") keeps `river evolve <path>` working.
  */
-export const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'prompt-ab']);
+export const EVOLVE_SUBCOMMANDS = new Set([
+  'aggregate',
+  'replay',
+  'verify-replay',
+  'prompt-compare',
+  'prompt-ab',
+]);
 
 /**
  * `promote` subcommands that take an optional positional candidate id.
