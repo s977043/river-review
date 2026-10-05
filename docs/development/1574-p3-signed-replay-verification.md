@@ -233,7 +233,26 @@ River Review does not provide an attestation-signing command in this phase.
 
 The private key belongs to the independent verifier environment and must stay outside the candidate's write authority. Signing may be implemented later by CI/OIDC/Sigstore or another external verifier. That later signing mechanism is not a prerequisite for keeping this verification boundary sound.
 
-## 11. References
+## 11. Completion boundary
+
+This slice satisfies only the **signed replay verification foundation** for P3.
+
+It proves:
+
+- a caller-selected Ed25519 trust root authenticated the attestation
+- the attestation binds to the exact paired replay, manifest, candidate, and verifier ID
+- the verified evidence remains read-only and Human-owned
+
+It does **not** by itself prove:
+
+- verifier runtime / job isolation
+- key ownership, rotation, revocation, or organizational identity
+- that enough calibration evidence exists to resume every #1574 P3/P4 activity
+- that a canary may start automatically
+
+Therefore, a successful `verify-replay` result may satisfy the cryptographic-attestation prerequisite for an independent verifier, but it does not automatically clear the full #1574 Strategic Hold. Remaining resume conditions must be reviewed independently.
+
+## 12. References
 
 - #1574 Review Evolution Cycle
 - #2510 P3 foundation
