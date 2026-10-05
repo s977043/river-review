@@ -104,6 +104,8 @@ Resolution priority (CLI > config file > directory detection) follows the contra
 - The contract is the SSoT for required/optional, format, and size guidelines. This spec does not duplicate those.
 - The set of resolved artifacts is recorded in the Review Artifact `context` / `debug`.
 
+The PR body is not an artifact but an implicit input read from the runtime environment: `RIVER_PR_BODY` when it is non-empty, otherwise `pull_request.body` from the event JSON at `GITHUB_EVENT_PATH`. The PR body is not saved in the plan, so replaying the same plan with `--plan` in a different environment can produce a different prompt; the `exec` reproducibility stated above does not cover it. Only when an LLM runs is the PR body added to the prompt as the "PR Description" section (truncated at 4000 characters), and findings may then target `PR-DESCRIPTION:0`.
+
 ## Output (Review Artifact)
 
 The output of `river review exec` is JSON conforming to the [Review Artifact schema](./review-artifact.en.md) (`schemas/review-artifact.schema.json`, version `1`). The minimum fields `exec` is responsible for are:
