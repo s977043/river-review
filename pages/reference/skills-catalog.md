@@ -1866,7 +1866,7 @@ large tables (PostgreSQL); and asymmetric down().`
 ### `modern-web-a11y-interactive`
 
 - 名前: `Modern Web Accessibility for Interactive UI`
-- 概要: `キーボード操作 / focus 管理 / 動的コンテンツ更新 / ARIA role など、インタラクティブ UI のアクセシビリティ観点を suggestion で提示する。`
+- 概要: `キーボード操作 / focus 管理 / 動的コンテンツ更新 / ARIA role / フォームの自動遷移など、インタラクティブ UI のアクセシビリティ観点を suggestion で提示する。`
 - 対象:
   - `src/**/*.{ts,tsx,js,jsx,html,css}`
   - `app/**/*.{ts,tsx,js,jsx,html,css}`
@@ -2344,7 +2344,7 @@ code は実行しない。`
 ### `security-basic`
 
 - 名前: `Baseline Security Checks`
-- 概要: `Check common security risks in application code (SQLi; XSS; secrets).`
+- 概要: `Check common security risks in application code (SQLi; XSS; secrets; open redirect).`
 - 対象:
   - `**/{api,routes,db,ui,components,auth,security,config}/**/*.{ts,tsx,js,jsx}`
 - 重要度: major
