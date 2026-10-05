@@ -162,6 +162,30 @@ describe('run --baseline passes the current run coverage through (#2325)', () =>
   });
 });
 
+describe('run --baseline treats an llmNotExecuted run as not_executed (#2467)', () => {
+  it('names the not_executed coverage when no unit reached the LLM', () => {
+    const md = formatBaselineRegression(
+      { findings: [], llmNotExecuted: true },
+      { findings: [makeFinding()] },
+      diffReviews,
+      formatRegressionSummary
+    );
+    assert.ok(md.includes('Resolved findings'));
+    assert.ok(md.includes('Current run coverage is `not_executed`'));
+  });
+
+  it('control: a result without llmNotExecuted keeps unknown coverage', () => {
+    const md = formatBaselineRegression(
+      { findings: [] },
+      { findings: [makeFinding()] },
+      diffReviews,
+      formatRegressionSummary
+    );
+    assert.ok(md.includes('Current run coverage is `unknown`'));
+    assert.ok(!md.includes('`not_executed`'));
+  });
+});
+
 // #2467: a run in which no unit reached the LLM is saved with
 // `llmNotExecuted: true` and no `reviewCoverage`. Its empty finding list is not
 // an observation of absence, so both `runs diff` paths have to read the record
