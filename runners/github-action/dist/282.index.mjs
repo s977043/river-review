@@ -63,8 +63,7 @@ function requireNullableString(value, label) {
 
 function requireIsoDateTime(value, label) {
   const raw = requireString(value, label);
-  const dateTime =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
+  const dateTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
   if (!dateTime.test(raw) || !Number.isFinite(Date.parse(raw))) {
     throw new ReplayVerificationError(`${label} must be an ISO-8601 date-time.`);
   }
@@ -75,9 +74,7 @@ function requireExactKeys(value, keys, label) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
-    throw new ReplayVerificationError(
-      `${label} must contain exactly: ${expected.join(', ')}.`
-    );
+    throw new ReplayVerificationError(`${label} must contain exactly: ${expected.join(', ')}.`);
   }
 }
 
@@ -136,9 +133,7 @@ function normalizeAttestation(attestation) {
     throw new ReplayVerificationError('attestation.schemaVersion must be 1.');
   }
   if (root.kind !== REPLAY_ATTESTATION_KIND) {
-    throw new ReplayVerificationError(
-      `attestation.kind must be "${REPLAY_ATTESTATION_KIND}".`
-    );
+    throw new ReplayVerificationError(`attestation.kind must be "${REPLAY_ATTESTATION_KIND}".`);
   }
 
   const payload = requireObject(root.payload, 'attestation.payload');
@@ -210,7 +205,9 @@ function replayBindingMismatches(replay, payload) {
   const mismatches = [];
   for (const [field, value] of Object.entries(expected)) {
     if (payload[field] !== value) {
-      mismatches.push(`${field}: attested ${payload[field] ?? '(null)'}, replay ${value ?? '(null)'}`);
+      mismatches.push(
+        `${field}: attested ${payload[field] ?? '(null)'}, replay ${value ?? '(null)'}`
+      );
     }
   }
   return { expected, mismatches };
@@ -248,8 +245,7 @@ function buildCanaryReadiness(replay) {
     status: blockers.length === 0 ? 'human-review-ready' : 'not-ready',
     blockers,
     automaticCanary: false,
-    note:
-      'Observation only. Human approval is still required before any limited canary; this artifact never starts one.',
+    note: 'Observation only. Human approval is still required before any limited canary; this artifact never starts one.',
   };
 }
 

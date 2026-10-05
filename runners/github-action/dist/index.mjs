@@ -102385,11 +102385,8 @@ async function runVerifyReplay(parsed, output) {
   }
 
   const { readFile } = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 1455, 19));
-  const {
-    ReplayVerificationError,
-    buildReplayVerification,
-    formatReplayVerificationMarkdown,
-  } = await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(282)]).then(__nccwpck_require__.bind(__nccwpck_require__, 9282));
+  const { ReplayVerificationError, buildReplayVerification, formatReplayVerificationMarkdown } =
+    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(282)]).then(__nccwpck_require__.bind(__nccwpck_require__, 9282));
 
   async function readJson(path, label) {
     let value;
@@ -102453,9 +102450,7 @@ async function runAggregate(parsed, targetPath, output) {
     .filter(([, value]) => value != null)
     .map(([flag]) => flag);
   if (misplaced.length) {
-    console.error(
-      `${misplaced.join(', ')} is not valid for \`river evolve aggregate\`.`
-    );
+    console.error(`${misplaced.join(', ')} is not valid for \`river evolve aggregate\`.`);
     return 1;
   }
 
