@@ -31,8 +31,8 @@ var diff_processor = __webpack_require__(861);
 var review_runner = __webpack_require__(2821);
 // EXTERNAL MODULE: ./src/lib/review-engine.mjs + 13 modules
 var review_engine = __webpack_require__(5134);
-// EXTERNAL MODULE: ./src/lib/local-runner.mjs + 8 modules
-var local_runner = __webpack_require__(9884);
+// EXTERNAL MODULE: ./src/lib/pr-context.mjs
+var pr_context = __webpack_require__(1891);
 // EXTERNAL MODULE: ./src/lib/risk-map.mjs + 1 modules
 var risk_map = __webpack_require__(572);
 // EXTERNAL MODULE: ./src/lib/planner-utils.mjs
@@ -1368,7 +1368,7 @@ async function runReviewExecReplay({
           // it does not carry the diff. When neither source is set this stays
           // null and the Finding Critic sees an empty ask (fixture F12:
           // relevance undecidable → humanReview).
-          prBody: await (0,local_runner/* resolvePullRequestBody */.Xn)(),
+          prBody: await (0,pr_context/* resolvePullRequestBody */.X)(),
         });
       } catch (err) {
         throw new ReviewPlanError(`Failed to execute replay review skills: ${err.message}`);
@@ -1790,7 +1790,7 @@ async function runReviewPlan({
           // GITHUB_EVENT_PATH). null when neither is set; the Finding Critic
           // then sees an empty ask (fixture F12: relevance undecidable →
           // humanReview).
-          prBody: await (0,local_runner/* resolvePullRequestBody */.Xn)(),
+          prBody: await (0,pr_context/* resolvePullRequestBody */.X)(),
         });
       } catch (err) {
         throw new ReviewPlanError(`Failed to execute review skills: ${err.message}`);

@@ -33,7 +33,7 @@ import { resolveAllArtifacts as defaultResolveAllArtifacts } from '../config/art
 import { parseUnifiedDiff } from './diff-processor.mjs';
 import { buildExecutionPlan as defaultBuildExecutionPlan } from '../../runners/core/review-runner.mjs';
 import { generateReview as defaultGenerateReview } from './review-engine.mjs';
-import { resolvePullRequestBody } from './local-runner.mjs';
+import { resolvePullRequestBody } from './pr-context.mjs';
 import { loadRiskMap as defaultLoadRiskMap } from './risk-map.mjs';
 import { PHASES, PLANNER_MODES } from './planner-utils.mjs';
 import { resolveAvailableContexts, resolveAvailableDependencies } from './utils.mjs';
