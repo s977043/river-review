@@ -37,12 +37,36 @@ id: skill-lifecycle
 - 指摘の具体性があり、修正につながるか。
 - 影響度の説明が過不足ないか。
 
+### 限界寄与を評価する
+
+スキルが選択・実行された事実だけでは、有効性を証明できません。
+
+```text
+same case / runtime / model / effort
+  ├─ WITHOUT skill
+  └─ WITH skill
+       ↓
+paired comparison
+```
+
+新規スキルでは WITHOUT / WITH を比較します。既存スキルの重要変更では、旧版を baseline、変更版を candidate として比較できます。
+
+最低限、検出結果、誤検知、critical regression を確認します。取得できる場合は、time / token / cost / human intervention も比較します。
+
+candidate が発火していない場合や paired case が不足する場合は、`INCONCLUSIVE` とします。sample が不足する場合も同様です。Evidence 不足を「効果なし」と推測しません。
+
 ## 4. 反復運用
 
 - 変更履歴と評価結果を保持し、改善の根拠を残す。
 - トレンド悪化が見えたら、スキルを再訓練・再設計する。
+- model / runtime の major update 後は、既存スキルの限界寄与を再評価する。
+- 責務・prompt・routing を大きく変えた場合も再評価する。
+
+強い基盤モデルが、以前はスキルで補っていた能力を吸収する場合があります。その場合も、モデル更新だけを理由にスキルを外しません。WITH / WITHOUT の比較で品質と安全性を維持できることを確認してから、簡素化候補として扱います。
 
 ## 5. ガードレール
 
 - スキルが迷った時に返すシグナルを明示する。
 - 最終判断は人間が行う前提を崩さない。
+- `Usage != Effectiveness` として、activation と effectiveness を分離する。
+- model / runtime の更新を、スキル削除や安全境界緩和の許可として扱わない。
