@@ -33,6 +33,7 @@ import { resolveAllArtifacts as defaultResolveAllArtifacts } from '../config/art
 import { parseUnifiedDiff } from './diff-processor.mjs';
 import { buildExecutionPlan as defaultBuildExecutionPlan } from '../../runners/core/review-runner.mjs';
 import { generateReview as defaultGenerateReview } from './review-engine.mjs';
+import { resolvePullRequestBody } from './local-runner.mjs';
 import { loadRiskMap as defaultLoadRiskMap } from './risk-map.mjs';
 import { PHASES, PLANNER_MODES } from './planner-utils.mjs';
 import { resolveAvailableContexts, resolveAvailableDependencies } from './utils.mjs';
@@ -510,6 +511,13 @@ export async function runReviewExecReplay({
           relatedADRs: sourceSnapshot?.relatedADRs ?? undefined,
           reviewMode: sourceSnapshot?.reviewMode ?? undefined,
           riskAssessment: sourceSnapshot?.riskAssessment ?? undefined,
+          // #2342: the PR body is resolved from the replay-time environment
+          // (RIVER_PR_BODY / GITHUB_EVENT_PATH) by the same helper the local
+          // runner uses — the source plan's snapshot does not carry it, just as
+          // it does not carry the diff. When neither source is set this stays
+          // null and the Finding Critic sees an empty ask (fixture F12:
+          // relevance undecidable → humanReview).
+          prBody: await resolvePullRequestBody(),
         });
       } catch (err) {
         throw new ReviewPlanError(`Failed to execute replay review skills: ${err.message}`);
@@ -927,6 +935,11 @@ export async function runReviewPlan({
           relatedADRs: plan.relatedADRs ?? undefined,
           reviewMode: plan.reviewMode ?? undefined,
           riskAssessment: plan.riskAssessment ?? undefined,
+          // #2342: same source as the local runner (RIVER_PR_BODY /
+          // GITHUB_EVENT_PATH). null when neither is set; the Finding Critic
+          // then sees an empty ask (fixture F12: relevance undecidable →
+          // humanReview).
+          prBody: await resolvePullRequestBody(),
         });
       } catch (err) {
         throw new ReviewPlanError(`Failed to execute review skills: ${err.message}`);
