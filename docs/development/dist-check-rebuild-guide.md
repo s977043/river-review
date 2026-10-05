@@ -132,6 +132,27 @@ find runners/github-action/dist -maxdepth 1 -type d
 | merge 後に rebuild したのに dist に差分が出ない（stale なのに clean に見える）  | `git merge` で依存が更新されたのに `node_modules` が merge 前のまま | `git merge origin/main` の**後**に `npm ci` を実行してから `npm run build:action` |
 | dist に `river-review/` 以外のディレクトリ名が現れる                            | worktree など checkout 名が `river-review` でない場所で build した  | `npm run build:action` が自動で正規化する（詳細は本書の作業ディレクトリ名の節）   |
 
+## dist だけが conflict した PR の解消（`scripts/resolve-dist-conflict.sh`）
+
+dist を含む PR（dependabot の依存更新や `src/` の変更）は、別の dist 変更が main に入ると `runners/github-action/dist/` で conflict します。多くは `index.mjs.map` です。生成物なので解消は機械的にでき、`scripts/resolve-dist-conflict.sh` が一時 worktree で次の手順を実行します。
+
+```bash
+scripts/resolve-dist-conflict.sh 2465          # dry-run（既定）。push しない
+scripts/resolve-dist-conflict.sh --push 2465   # 解消した merge を PR ブランチへ fast-forward で push
+```
+
+- `gh pr view` で head と base を取得する。fork の PR、open でない PR、head ブランチが `main` または base と同じ PR は拒否する
+- `mktemp -d` 配下に PR head の detached worktree を作り、base を `--no-commit` で merge する
+- dist 以外のパスが conflict したら停止し、パスと worktree の場所を表示する（自動解消しない）
+- dist の conflict は `--theirs` を採り、`npm ci` の後に `npm run build:action` を実行して merge を commit する
+- commit 時のフック（lint-staged など）がファイルを書き換えたり追加したりした場合は停止する。commit 直前の `git write-tree` と commit 後の `HEAD^{tree}` を比べ、違えば差分のパスを表示して push しない
+- もう一度 rebuild し、`git status --porcelain -- runners/` が空であること（再現性）を確かめる
+- `--push` のときだけ force なしで push し、`git ls-remote` の SHA がローカル HEAD と一致することを確かめる
+
+push には `--push` の明示が必要です。dry-run は merge commit の SHA と、それを push するコマンドを表示します。Node の major が `.nvmrc` と違う場合と、同じ PR に対して別の実行がロックを持っている場合も拒否します。AI エージェントが実行するときは `CO_AUTHORED_BY="Name <email>"` を渡すと、merge commit に `Co-Authored-By:` trailer が付きます。
+
+成否は `git diff --name-only --diff-filter=U` で判定し、dist を `<<<<<<<` で grep しません。bundle のソースに conflict marker の検出器があり、正当な文字列として含まれるためです。
+
 ## 関連
 
 - CLAUDE.md § AI Misoperation Guards—"Match CI Node version for dist rebuilds"
