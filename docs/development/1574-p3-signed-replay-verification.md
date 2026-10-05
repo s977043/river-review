@@ -214,6 +214,14 @@ This is readiness evidence, not permission.
 
 Those require a separate trust-policy layer. This slice intentionally verifies only what its cryptographic inputs can prove.
 
+### Relationship to reviewer execution provenance
+
+#2481 records reviewer execution provenance as `executionId` / `sourceExecutionIds[]`. That evidence answers whether separate logical executions were observed.
+
+This P3 artifact answers a different question: whether a caller-trusted key authenticated an attestation that is bound to the exact replay and verifier ID.
+
+Neither signal alone proves verifier runtime isolation. A future stronger independence claim must combine explicit trust policy with execution-isolation evidence rather than infer isolation from IDs or signatures.
+
 ## 9. Relationship to P2 and #1568
 
 ```text
