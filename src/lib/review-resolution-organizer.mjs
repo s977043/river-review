@@ -240,11 +240,13 @@ function findingLabel(finding) {
 
 function renderMatchValues(matches, selector) {
   if (!Array.isArray(matches) || matches.length === 0) return '—';
-  return matches
-    .map((match) => selector(match?.item))
-    .filter((value) => value !== null && value !== undefined && value !== '')
-    .map(markdownText)
-    .join('; ') || '—';
+  return (
+    matches
+      .map((match) => selector(match?.item))
+      .filter((value) => value !== null && value !== undefined && value !== '')
+      .map(markdownText)
+      .join('; ') || '—'
+  );
 }
 
 export function renderReviewResolutionMarkdown(projection) {
@@ -286,7 +288,10 @@ export function renderReviewResolutionMarkdown(projection) {
         renderMatchValues(matches, (item) => item?.authorResponse?.state),
         renderMatchValues(matches, (item) => item?.resolution?.state),
         renderMatchValues(matches, (item) => item?.verification?.state),
-      ].join(' | ').replace(/^/, '| ').replace(/$/, ' |')
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |')
     );
   }
 
