@@ -98,6 +98,7 @@ export async function runRunsCommand(parsed, targetPath) {
       const diff = diffReviews(run1.findings ?? [], run2.findings ?? [], {
         // run2 is the current side: its coverage qualifies the absences (#2325).
         currentCoverage: run2.reviewCoverage ?? null,
+        currentLlmNotExecuted: run2.llmNotExecuted,
       });
       const runsSignal = deriveLoopSignalFromRunsDiff(diff, run2);
       if (parsed.output === 'json') {

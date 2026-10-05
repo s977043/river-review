@@ -1,6 +1,6 @@
 import { computeFindingBreakdown } from './scoring/breakdown.mjs';
 import { annotateFingerprints } from './finding-factory.mjs';
-import { isIncompleteCoverageStatus, normalizeCoverageStatus } from './review-coverage.mjs';
+import { isIncompleteCoverageStatus, normalizeRunCoverageStatus } from './review-coverage.mjs';
 
 /**
  * @typedef {'new'|'resolved'|'persisting'|'score_changed'|'oscillated'} FindingStatus
@@ -47,10 +47,16 @@ export const RESOLVED_BASIS = 'absent_from_current_run';
  *   run (see `review-coverage.mjs`). Supplying it lets the caller tell
  *   "absent because it was fixed" apart from "absent because the reviewer that
  *   would have reported it never completed". Omitted → `unknown`.
+ * @param {unknown} [options.currentLlmNotExecuted] — the current run record's
+ *   `llmNotExecuted`. `true` makes the coverage `not_executed`: no unit reached
+ *   the LLM, so the run observed no absence (#2467).
  * @returns {{ new: ComparedFinding[], resolved: ComparedFinding[], persisting: ComparedFinding[], scoreChanged: ComparedFinding[], summary: object }}
  */
 export function diffReviews(previousFindings, currentFindings, options = {}) {
-  const coverageStatus = normalizeCoverageStatus(options?.currentCoverage);
+  const coverageStatus = normalizeRunCoverageStatus({
+    reviewCoverage: options?.currentCoverage,
+    llmNotExecuted: options?.currentLlmNotExecuted,
+  });
   const prev = annotateFingerprints(previousFindings ?? []);
   const curr = annotateFingerprints(currentFindings ?? []);
 
@@ -176,7 +182,10 @@ export function diffRunHistory(runRecords) {
   // The latest run is the "current" side of the adjacent diff, so its coverage
   // is what qualifies the absences that diff reports (#2325).
   const latestRecord = sorted.length ? sorted[sorted.length - 1] : null;
-  const diffOptions = { currentCoverage: latestRecord?.reviewCoverage ?? null };
+  const diffOptions = {
+    currentCoverage: latestRecord?.reviewCoverage ?? null,
+    currentLlmNotExecuted: latestRecord?.llmNotExecuted,
+  };
   let lastDiff =
     sorted.length >= 2
       ? diffReviews(
@@ -203,8 +212,9 @@ export function diffRunHistory(runRecords) {
       runId: record.runId,
       fingerprints,
       // Carried so `_hasOscillation` can tell a real absence apart from a run
-      // that never produced the finding because its reviewer did not finish.
-      coverageStatus: normalizeCoverageStatus(record?.reviewCoverage),
+      // that never produced the finding because its reviewer did not finish
+      // or, with `llmNotExecuted`, never reached the LLM at all (#2467).
+      coverageStatus: normalizeRunCoverageStatus(record),
     };
   });
 
