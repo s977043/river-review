@@ -177,27 +177,24 @@ describe('organizeReviewResolution', () => {
     assert.equal(result.findings[1].resolutionMatches.length, 0);
   });
 
-  test(
-    'warns instead of silently choosing one when multiple resolution items join one finding',
-    () => {
-      const result = organizeReviewResolution({
-        findings: [finding('rr-1')],
-        reviewResolution: {
-          items: [
-            resolutionItem({ findingId: 'rr-1', fingerprint: 'fp-rr-1' }),
-            resolutionItem({
-              findingId: 'rr-1',
-              fingerprint: 'fp-rr-1',
-              author: 'disputes',
-            }),
-          ],
-        },
-      });
+  test('warns instead of silently choosing one when multiple resolution items join one finding', () => {
+    const result = organizeReviewResolution({
+      findings: [finding('rr-1')],
+      reviewResolution: {
+        items: [
+          resolutionItem({ findingId: 'rr-1', fingerprint: 'fp-rr-1' }),
+          resolutionItem({
+            findingId: 'rr-1',
+            fingerprint: 'fp-rr-1',
+            author: 'disputes',
+          }),
+        ],
+      },
+    });
 
-      assert.equal(result.findings[0].resolutionMatches.length, 2);
-      assert.ok(result.warnings.some((item) => item.code === 'multiple_resolution_items'));
-    }
-  );
+    assert.equal(result.findings[0].resolutionMatches.length, 2);
+    assert.ok(result.warnings.some((item) => item.code === 'multiple_resolution_items'));
+  });
 
   test('does not invent a system disposition when no Review Resolution item is joined', () => {
     const result = organizeReviewResolution({
@@ -221,9 +218,7 @@ describe('organizeReviewResolution', () => {
 
     assert.equal(result.coverage.status, 'unknown');
     assert.deepEqual(result.coverage.incompleteRequiredUnitIds, []);
-    assert.deepEqual(result.blindSpots, [
-      { role: 'security-scanner', label: 'Security Scanner' },
-    ]);
+    assert.deepEqual(result.blindSpots, [{ role: 'security-scanner', label: 'Security Scanner' }]);
   });
 
   test('projects partial coverage and incomplete required unit IDs', () => {
