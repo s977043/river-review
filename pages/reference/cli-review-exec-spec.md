@@ -99,6 +99,8 @@ river review exec --max-cost 0.50
 - 各 artifact の必須/任意・形式・サイズ目安は [Artifact Input Contract](./artifact-input-contract.md) を SSoT とし、本 spec では再掲しない。
 - 解決した artifact 一覧は Review Artifact の `context` / `debug` に記録される。
 
+PR 本文は artifact ではなく、実行時の環境から読み取る暗黙の入力です。`RIVER_PR_BODY` が空でなければその値を使い、無ければ `GITHUB_EVENT_PATH` が指すイベント JSON の `pull_request.body` を使います。PR 本文は plan に保存されないため、同じ plan を `--plan` で再生しても、実行環境が異なればプロンプトが変わり得ます。冒頭で述べた `exec` の再現性は、PR 本文には及びません。LLM を呼ぶ実行でのみ、PR 本文がプロンプトの「PR Description」節に入ります（4000 文字で切り詰め）。その場合、finding が `PR-DESCRIPTION:0` を対象とすることがあります。
+
 ## 出力（Review Artifact）
 
 `river review exec` の出力は [Review Artifact スキーマ](./review-artifact.md)（`schemas/review-artifact.schema.json`、version `1`）に従う JSON です。`exec` が責任を持って埋めるフィールドの最小セットは次の通りです。
