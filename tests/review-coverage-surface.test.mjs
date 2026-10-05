@@ -98,7 +98,23 @@ describe('Review Coverage surface propagation', () => {
     });
     const { fileScope, ...enriched } = withScope.reviewCoverage;
     assert.deepEqual(fileScope, context.reviewFileScope);
-    assert.deepEqual(enriched, withoutScope.reviewCoverage);
+    assert.notEqual(
+      enriched.units[0].executionId,
+      withoutScope.reviewCoverage.units[0].executionId,
+      'separate orchestration executions must keep distinct execution provenance'
+    );
+
+    const normalizeExecutionIds = (coverage) => ({
+      ...coverage,
+      units: coverage.units.map(({ executionId, ...unit }) => ({
+        ...unit,
+        executionId: executionId ? '<execution-id>' : executionId,
+      })),
+    });
+    assert.deepEqual(
+      normalizeExecutionIds(enriched),
+      normalizeExecutionIds(withoutScope.reviewCoverage)
+    );
 
     // No orchestration, no observation: local-runner does not synthesize one.
     const unorchestrated = await runLocalReview({

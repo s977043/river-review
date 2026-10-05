@@ -208,6 +208,26 @@ describe('review-artifact.schema.json', () => {
       assert.equal(ok, true, JSON.stringify(validate.errors));
     });
 
+    test('accepts unique sourceExecutionIds and rejects duplicates (#2481)', () => {
+      assert.equal(
+        validate(
+          minimalArtifact({
+            findings: [validFinding({ sourceExecutionIds: ['exec-a', 'exec-b'] })],
+          })
+        ),
+        true,
+        JSON.stringify(validate.errors)
+      );
+      assert.equal(
+        validate(
+          minimalArtifact({
+            findings: [validFinding({ sourceExecutionIds: ['exec-a', 'exec-a'] })],
+          })
+        ),
+        false
+      );
+    });
+
     test('rejects agreement with duplicate reviewer names', () => {
       const ok = validate(
         minimalArtifact({

@@ -1125,6 +1125,9 @@ export function formatJsonOutput(result, phase) {
         ? { artifactRefs: f.artifactRefs }
         : {}),
       ...(f.reviewerRole ? { reviewerRole: f.reviewerRole } : {}),
+      ...(Array.isArray(f.sourceExecutionIds) && f.sourceExecutionIds.length > 0
+        ? { sourceExecutionIds: f.sourceExecutionIds }
+        : {}),
     };
   });
 

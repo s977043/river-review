@@ -509,6 +509,12 @@
           "enum": ["single", "multi", "consensus"],
           "description": "Display-only metadata derived from agreement.length. 'consensus'=3+ reviewers, 'multi'=2, 'single'=0-1. MUST NOT be used to override severity."
         },
+        "sourceExecutionIds": {
+          "type": "array",
+          "description": "Opaque logical reviewer execution ids that produced members of this merged finding cluster (#2481). Additive/optional provenance only. Count is not a vote, and different ids do not prove different actors, models, providers, correctness, or independent verification.",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
         "validatedStatus": {
           "type": "string",
           "description": "Synthesis verdict for the finding. Distinct from `status` (which tracks lifecycle: open/suppressed/verified).",
