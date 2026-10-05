@@ -450,6 +450,7 @@ export function formatBaselineRegression(
   const diff = diffReviews(prevFindings, result?.findings ?? [], {
     // The current run's coverage qualifies its absences (#2325).
     currentCoverage: result?.reviewCoverage ?? null,
+    currentLlmNotExecuted: result?.llmNotExecuted,
   });
   return formatRegressionSummary(diff);
 }
