@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.126.0](https://github.com/s977043/river-review/compare/v1.125.1...v1.126.0) (2026-10-05)
+
+
+### Features
+
+* **pr:** resolve /pr target by PR number and handle external tickets ([#2531](https://github.com/s977043/river-review/issues/2531)) ([a984663](https://github.com/s977043/river-review/commit/a98466389e35f929cfc558dc4874a7bc68565963)), closes [#2457](https://github.com/s977043/river-review/issues/2457)
+* **skills:** add open-redirect backslash and radio auto-advance review patterns ([#2530](https://github.com/s977043/river-review/issues/2530)) ([7641a6b](https://github.com/s977043/river-review/commit/7641a6ba55373690851af71614795613cab80265))
+
 ## [1.125.1](https://github.com/s977043/river-review/compare/v1.125.0...v1.125.1) (2026-10-05)
 
 
