@@ -177,7 +177,9 @@ describe('organizeReviewResolution', () => {
     assert.equal(result.findings[1].resolutionMatches.length, 0);
   });
 
-  test('warns instead of silently choosing one when multiple resolution items join one finding', () => {
+  test(
+    'warns instead of silently choosing one when multiple resolution items join one finding',
+    () => {
     const result = organizeReviewResolution({
       findings: [finding('rr-1')],
       reviewResolution: {
@@ -194,7 +196,8 @@ describe('organizeReviewResolution', () => {
 
     assert.equal(result.findings[0].resolutionMatches.length, 2);
     assert.ok(result.warnings.some((item) => item.code === 'multiple_resolution_items'));
-  });
+    }
+  );
 
   test('does not invent a system disposition when no Review Resolution item is joined', () => {
     const result = organizeReviewResolution({
