@@ -7,7 +7,8 @@ is covered by the sibling skill `a11y-accessible-name`.
 ## Goal
 
 - Flag missing keyboard support, focus traps, and role/state regressions on
-  modal / popover / menu / tabs / live-region patterns.
+  modal / popover / menu / tabs / live-region patterns, and form steps that
+  auto-advance without checking `required`.
 - Suggestion-only. Severity `minor`.
 
 ## Non-goals
@@ -33,12 +34,16 @@ is covered by the sibling skill `a11y-accessible-name`.
   silently steal focus.
 - **Role / state**: `role="tab"` needs `aria-selected`; `role="menuitem"`
   needs the parent `role="menu"`; expand/collapse toggles need `aria-expanded`.
+- **Form flow**: a single-radio step that hides the Next button and advances
+  on selection must include `required` in its auto-advance condition. A radio
+  group cannot be cleared, so an optional question would become effectively
+  required. Suggest keeping the Next button for optional questions.
 
 ## Output contract
 
 - `Finding:` short statement
 - `Evidence:` diff snippet with line number
-- `Aspect:` Keyboard | Focus | Role/State
+- `Aspect:` Keyboard | Focus | Role/State | Form flow
 - `Suggestion:` minimal change (key handler, focus call, ARIA attribute)
 - `Severity:` `minor`
 - `Confidence:` `low` | `medium` | `high`

@@ -68,6 +68,13 @@ Evidence が `file:line` を指す以上、その周辺コメントは読める�
 | リポジトリ横断で繰り返し適用される規約・設計方針            | `.river/rules.md` |
 | 同じ指摘が 2 回以上出た（コメントだけでは止まらなかった）   | `.river/rules.md` |
 
+### 8. 統合時の照合ガード
+
+複数観点の finding を統合する段階で、次の 2 点を確認する。
+
+- **デザイン実値と照合済み**: UI・スタイルの規約違反を指摘する前に、デザインツール（Figma 等）の該当ノードの実値を確認する。デザインが指定している値に沿った実装（例: デザインが `font-feature-settings: "palt"` を指定している箇所の `palt`）を「規約違反」とする finding は出さない。デザインを確認できない場合は断定せず、`confidence: low` の質問として返す。
+- **テスト検出力だけの指摘は minor**: 実装側のガードは効いていて、テストケースがそのガードを外しても通る（変異を検出できない）ことだけを示す finding は、`major` ではなく `minor` にする。例: host を必須とするホスト判定とスキーム判定を併用する実装で、スキーム判定のテストに `javascript:alert(1)` だけを使うと、host が無いためホスト判定でも弾かれ、スキーム判定を消してもテストは通る。検出力を持たせるには `javascript://self.example/%0Aalert(1)` のような、ホスト判定を通る入力が要る。実装のガード自体が欠けている場合は、この降格の対象外とする。
+
 ## Reject conditions / 却下条件
 
 以下に該当する finding は出力しない。
@@ -83,6 +90,8 @@ Evidence が `file:line` を指す以上、その周辺コメントは読める�
 | 近傍コメントの意図が懸念を完全に解消     | 出力しない（nit / style 限定）    |
 | 近傍コメントの意図に触れない再提案       | 意図への反証を本文に明記する      |
 | intentional と書かれた security 等リスク | 取り下げない。必ず報告する        |
+| デザイン指定値に沿った実装への規約違反   | 出力しない                        |
+| テスト検出力だけを示す major             | severity を minor に下げる        |
 
 ## 自己点検フロー / Self-check flow
 
@@ -101,7 +110,10 @@ for each candidate_finding:
        → nit / style fully resolved by the intent → reject
        → intent mitigates only part of the risk   → downgrade + rebut the stated intent
        → comment contradicts the code             → keep (the contradiction is the finding)
-emit only findings that survived all seven checks
+  8. integration guards
+       → UI/style rule violation not checked against design values → check, or reject if the design specifies it
+       → only shows missing test detection power while the guard works → downgrade to minor
+emit only findings that survived all eight checks
 ```
 
 ## 関連リソース

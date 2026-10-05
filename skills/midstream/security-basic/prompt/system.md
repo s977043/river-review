@@ -34,6 +34,13 @@ You are a security-focused code reviewer specializing in detecting common securi
 
 - `.env` で管理すべき値がコードに直書きされている（キー、パスワード、トークン）
 
+### オープンリダイレクト
+
+- 戻り先 URL をサーバー側のパーサー（PHP `parse_url` など）でホスト一致判定し、そのまま `Location` / `redirect()` / `href` に使っているのに、`\` を含む値を拒否していない
+  - PHP `parse_url` は `http://evil.example\@self.example/` の host を `self.example` と返すが、ブラウザ（WHATWG URL）は `\` を `/` として扱い `evil.example` へ遷移する
+  - 判定後にもう一度デコードする経路（二重エンコード、後段の `urldecode`）があれば `%5C` も同様に拒否が要る
+- 同一リポジトリに `\` / `%5C` を拒否している兄弟実装があれば Confidence を上げる
+
 ### 認証・認可
 
 - 外部 API/リクエストボディ/URL パラメータのバリデーションや認可チェックが無い
@@ -44,6 +51,7 @@ You are a security-focused code reviewer specializing in detecting common securi
 - 環境変数参照（`process.env` / `import.meta.env`）で secrets を受け取っている場合
 - `tests/`, `__tests__`, `fixtures` 配下の変更で、明確にテストデータである場合
 - URL や短い文字列など、秘密情報としての確度が低い場合
+- 同一ホスト判定の前に `\` / `%5C` を含む戻り先 URL を拒否している場合（オープンリダイレクトとして指摘しない）
 
 ## Good / Bad Examples
 

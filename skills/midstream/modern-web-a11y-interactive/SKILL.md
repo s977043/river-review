@@ -1,7 +1,7 @@
 ---
 id: 'modern-web-a11y-interactive'
 name: Modern Web Accessibility for Interactive UI
-description: キーボード操作 / focus 管理 / 動的コンテンツ更新 / ARIA role など、インタラクティブ UI のアクセシビリティ観点を suggestion で提示する。
+description: キーボード操作 / focus 管理 / 動的コンテンツ更新 / ARIA role / フォームの自動遷移など、インタラクティブ UI のアクセシビリティ観点を suggestion で提示する。
 version: 0.1.0
 category: midstream
 phase: midstream
@@ -68,6 +68,11 @@ modelHint: balanced
 - 選択リスト (radio group, listbox, combobox) には role / `aria-selected` / `aria-checked` の整合を確認する。
 - 「装飾要素」と「操作要素」が混在しているマークアップでは `aria-hidden` / `pointer-events` の使い分けに触れる。
 
+### フォームの自動遷移
+
+- 単一選択（radio）1 問だけのステップで「次へ」ボタンを隠し、選択時に自動で次へ進める差分では、自動遷移の条件に `required` が含まれているかを確認する。
+- radio は未選択に戻せないため、任意の設問まで自動遷移の対象にすると、答えない限り先へ進めず、任意項目が実質必須になる。任意の設問では「次へ」ボタンを残すか、条件に `required` を加える案を示す。
+
 ### Focus visibility
 
 - 差分で `outline: none` / `:focus { outline: 0 }` を新たに追加する場合は、`:focus-visible` 代替の検討を強く促す。
@@ -87,6 +92,7 @@ modelHint: balanced
 - `aria-live` / `role="status"` 無しで動的にメッセージを差し込んでいる差分。
 - `outline: none` / `outline: 0` を新規追加。
 - positive `tabIndex` (1 以上) の使用。
+- radio の `onChange` から次ステップへ進める処理と「次へ」ボタンの非表示が同じ条件で切り替わり、その条件に `required` が無い。
 
 ## Actions / 改善案
 
@@ -96,7 +102,7 @@ modelHint: balanced
 
 ## Output / 出力
 
-- `Finding:` 該当 UI パターン名 + a11y 観点（keyboard / focus / live region / role / focus visibility）
+- `Finding:` 該当 UI パターン名 + a11y 観点（keyboard / focus / live region / role / form flow / focus visibility）
 - `Evidence:` 差分のコード抜粋 + 該当行
 - `Suggestion:` 代替 API / ARIA 属性 / library コンポーネント
 - `Severity:` minor 固定
@@ -104,7 +110,7 @@ modelHint: balanced
 
 ## 評価指標（Evaluation）
 
-- 合格基準: 差分の interactive UI に直接根拠があり、a11y 観点（keyboard / focus / role / live region / focus visibility）の 1 つ以上を具体的に指摘し、代替手段が示されている。
+- 合格基準: 差分の interactive UI に直接根拠があり、a11y 観点（keyboard / focus / role / live region / form flow / focus visibility）の 1 つ以上を具体的に指摘し、代替手段が示されている。
 - 不合格基準: 「アクセシビリティが心配です」のような曖昧表現、差分と無関係な一般論、強制トーン、false-positive guards 無視、accessible name の二重指摘（既存 skill のスコープ）。
 
 ## 人間に返す条件（Human Handoff）

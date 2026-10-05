@@ -40,3 +40,18 @@ tests:
           ARIA changes on the Radix Dialog. Acceptable outputs include
           "No findings" or an explicit reference to the library-component guard.
           Score 1 if no finding on the Dialog is produced; 0 otherwise.
+
+  - description: radio auto-advance without required must be flagged
+    vars:
+      diff: file://../fixtures/03-radio-auto-advance-ignores-required-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must include `Aspect: Form flow`, identify that the
+          `autoAdvance` condition does not check `question.required` while the
+          次へ button is hidden, explain that an optional radio question can no
+          longer be skipped, and suggest adding `required` to the condition or
+          keeping the button for optional questions.
+          Score 1 if all are present; 0 otherwise.
+      - type: contains
+        value: 'Severity: minor'
