@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.125.0](https://github.com/s977043/river-review/compare/v1.124.5...v1.125.0) (2026-10-05)
+
+
+### Features
+
+* **concern-eval:** add obligation-oriented Phase 2 harness ([#2508](https://github.com/s977043/river-review/issues/2508)) ([7bed219](https://github.com/s977043/river-review/commit/7bed219dae8a7209e482df292a95f7eebb35e060))
+* **evidence:** record reviewer execution provenance ([#2501](https://github.com/s977043/river-review/issues/2501)) ([1c859d4](https://github.com/s977043/river-review/commit/1c859d4b692d7ea81493bf3ead46c12ab5090f88))
+* **gate:** add opt-in RIVER_GATE_REQUIRE_LLM to escalate runs that never reached the LLM ([#2441](https://github.com/s977043/river-review/issues/2441)) ([#2447](https://github.com/s977043/river-review/issues/2447)) ([da85b44](https://github.com/s977043/river-review/commit/da85b44e3219247cd2645ffdeb653fd4cbff7cb9))
+* **promote:** attach paired replay evidence before adoption ([#2487](https://github.com/s977043/river-review/issues/2487)) ([33fe4e7](https://github.com/s977043/river-review/commit/33fe4e7a558cb260ecfb83e59f2b52b28ce1fbc7))
+* **review:** add observe-only Review Concern Analyzer ([#2498](https://github.com/s977043/river-review/issues/2498)) ([c41162e](https://github.com/s977043/river-review/commit/c41162e4d08e602ffec6ba7319a5cb576cabc5d3))
+* **review:** add Review Resolution sidecar contract ([#2506](https://github.com/s977043/river-review/issues/2506)) ([2fca03f](https://github.com/s977043/river-review/commit/2fca03ff99c084a9d3299abbae6a8c6acf0a1e4f))
+* **skills:** add warning-only context health for Agent Skills ([#2484](https://github.com/s977043/river-review/issues/2484)) ([95d1f7a](https://github.com/s977043/river-review/commit/95d1f7a3067f02d5a20bd92aef9b645680f26733))
+* **skills:** evaluate marginal skill contribution with paired ablation ([#2514](https://github.com/s977043/river-review/issues/2514)) ([4277a1a](https://github.com/s977043/river-review/commit/4277a1a07915c11101a5d326639cfaac7dcd73e6))
+
+
+### Bug Fixes
+
+* **loop-signal:** report NO_SIGNAL for a run that never reached the LLM ([#2441](https://github.com/s977043/river-review/issues/2441)) ([#2462](https://github.com/s977043/river-review/issues/2462)) ([c202dd6](https://github.com/s977043/river-review/commit/c202dd6ea49c1e499570b0a669d334e6c4a38714))
+* **review:** keep Markdown in upstream LLM diff ([#2473](https://github.com/s977043/river-review/issues/2473)) ([36581f7](https://github.com/s977043/river-review/commit/36581f7c7c61aab58b44409d6c36ba702539de59))
+* **review:** keep upstream Markdown reviewable ([1424c07](https://github.com/s977043/river-review/commit/1424c0779c743c3c317ae613684b26c6854aa396))
+* **review:** make local upstream view phase-aware ([#2473](https://github.com/s977043/river-review/issues/2473)) ([b98a54d](https://github.com/s977043/river-review/commit/b98a54d76c4c0c5eff8a6b5799a872c14a85c201))
+* **review:** preserve upstream Markdown heading changes ([#2473](https://github.com/s977043/river-review/issues/2473)) ([1a0676c](https://github.com/s977043/river-review/commit/1a0676c8ab83d5ce111a4c28079fb283a3320f90))
+* **review:** preserve upstream Markdown through orchestration ([#2473](https://github.com/s977043/river-review/issues/2473)) ([4749d6d](https://github.com/s977043/river-review/commit/4749d6d7148c76eb2200f78db8c16e3b1f96963c))
+* **review:** preserve upstream Markdown through review ([#2473](https://github.com/s977043/river-review/issues/2473)) ([d9aeb63](https://github.com/s977043/river-review/commit/d9aeb631afdee51ec5fae64989d2ef72f07bc834))
+
 ## [1.124.5](https://github.com/s977043/river-review/compare/v1.124.4...v1.124.5) (2026-09-25)
 
 
