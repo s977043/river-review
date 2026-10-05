@@ -130,6 +130,7 @@ Draft the skill with this order:
 
 Keep the main file compact.
 Move heavy references, examples, and templates into separate files.
+For River Review Agent Skills, keep activation, responsibility, routing, hard guards, and the output contract in `SKILL.md`; move optional examples, troubleshooting, rationale, and provider-specific detail to `references/`. Treat the repository's 12 KiB / 250-line context-health threshold as an advisory review signal, never as a reason to remove safety or verification.
 
 Use `${CLAUDE_SKILL_ROOT}/assets/basic-skill-template.md` as the starting skeleton.
 
@@ -168,10 +169,11 @@ After the skill files are written:
 
 1. verify the directory name matches the `name` field in frontmatter
 2. verify `description` is under 1024 characters and includes trigger keywords
-3. verify SKILL.md is under 500 lines
-4. verify all `${CLAUDE_SKILL_ROOT}/` references point to existing files
-5. check the repository CLAUDE.md or AGENTS.md for additional registration steps
-6. if the repository uses a skills index or registry, update it
+3. measure the `SKILL.md` entrypoint size and review whether optional knowledge should move to supporting files
+4. for River Review Agent Skills, run `npm run agent-skills:validate` and inspect any context-health advisory; exceeding 12 KiB / 250 lines is warning-only and requires judgment, not blind trimming
+5. verify all `${CLAUDE_SKILL_ROOT}/` references point to existing files
+6. check the repository CLAUDE.md or AGENTS.md for additional registration steps
+7. if the repository uses a skills index or registry, update it
 
 ## Output format
 

@@ -2,44 +2,89 @@
 slug: /
 ---
 
-# River Review docs
+# River Review
 
-英語版は [index-en](/index-en) を参照してください（日本語がソース・オブ・トゥルースです）。
+**レビューを、組織の判断資産へ。**
 
-River Review のドキュメントは、日本語を基本言語として提供し、
-[Diátaxis ドキュメントフレームワーク](https://diataxis.fr/) に基づいて構成しています。
-同じ内容の英語版がある場合は `.en.md` を付けたファイル名で管理し、差分がある場合は日本語版を真実として扱います。
+River Review は、AI 支援開発のレビュー基準を **versioned / repo-owned な Skill** としてコード化する OSS フレームワークです。Claude Code / Codex のローカルレビューから GitHub Actions の PR 後レビューまで、同じ判断基準を使えます。
 
-ドキュメントは次の 4 種類に分類されます。
+## 30 秒でわかる River Review
 
-- Tutorials（チュートリアル）: 学習志向。最初の成功体験を届けるステップバイステップ。
-- Guides（ハウツーガイド）: タスク志向。特定のゴールを達成するための手順。
-- Reference（リファレンス）: 仕様・API・スキーマなどの事実の一覧。
-- Explanation（解説）: 背景・設計判断・概念の説明。
+```mermaid
+flowchart LR
+  S["repo-owned Skills<br/>チームの判断基準"] --> L["Local<br/>Claude Code / Codex"]
+  S --> C["CI<br/>GitHub Actions"]
+  L --> P["Pull Request"]
+  P --> C
+  C --> H["Human Review<br/>最終判断"]
+```
 
-`pages/` 配下を Diátaxis で分け、言語はファイル名で表します（`/docs` に配信）。
-リポジトリの `docs/` は内部向けメモ/補助資料です（公式ドキュメントではありません）。
+**PR 前にローカルでノイズを落とし、PR 後にチーム共通の基準で再確認する。**  
+AI は findings と判断材料を出し、GO / NO-GO や最終承認は人間・呼び出し側が担います。
 
-- `tutorials/getting-started.md`（日本語） / `tutorials/getting-started.en.md`（英語）
-- `guides/quickstart.md` / `guides/quickstart.en.md`
-- `reference/skill-schema-reference.md` / `reference/skill-schema-reference.en.md`
-- `explanation/riverbed-memory.md` / `explanation/riverbed-memory.en.md`
+- **まず 5 分で試す**: [クイックスタート](/guides/quickstart)
+- **既存のレビュー観点から始める**: [Starter Cookbook](/guides/starter-cookbook)
+- **PR 前 + PR 後の 2 段構えで運用する**: [2 段構えレビューゲート](/guides/two-stage-review-gate)
+- **他の AI レビューツールと比較する**: [AI コードレビュー比較](/comparison/ai-code-review-tools)
+- **品質・回帰・コストを測る**: [Run store / 回帰比較](/guides/track-runs-and-regressions)、[コスト見積もり](/guides/cost-estimation)、[ダッシュボード](/dashboard)
 
-## コンセプトを知る
+## 最速で試す
 
-- [コンセプト（レビューを、組織の判断資産へ）](./explanation/concept.md) — 課題認識、コアモデル、レビュー対象、責任境界、目指さないものをまとめたコンセプトの解説。
-- [River Review へようこそ](./explanation/intro.md) — はじめての方向けの短い導入。
-- [River Review とは](./explanation/what-is-river-review.md) — 機能・利用方法・実行モデルを含むプロダクト概要。
+### Claude Code
 
-## はじめる
+```text
+/plugin marketplace add s977043/river-review
+/plugin install river-review@river-review-marketplace
+/reload-plugins
+/river-review:review-local
+```
 
-- [River Review をはじめる](/tutorials/getting-started)
-- [クイックスタート](/guides/quickstart)
+通常のプラグイン利用では **River Review 用の追加 LLM API キーは不要**です。Claude Code 自身のモデルが Skill を適用します。
 
-## 高度な使い方
+### Codex
 
-- [W チェック（二重レビュー）](/guides/w-check) — 他の AI レビュアーや人間レビュアーの結果を渡して再点検し、指摘の実在性を検証する機能。
-- [リポジトリ全体レビュー](/guides/repo-wide-review) — PR 差分だけでなく変更ファイル周辺のリポジトリ文脈を踏まえたレビューの導入とチューニング手順。
-- [コスト見積もりと最適化](/guides/cost-estimation) — `--estimate` と `--max-cost` を使った月額コストの試算と実測値による検証方法。
-- [エージェントワークフロー（`--reviewers auto`）](/guides/agent-workflow) — AI エージェントから River Review を呼び出す各エントリポイント（CLI・サブエージェント・`/review-local`）の使い分け。
-- [独立レビュー統合](/guides/use-independent-review-synthesis) — 複数の AI・人間レビュー結果を統合してマージ判断を支援する synthesis パターン。
+```text
+codex plugin marketplace add s977043/river-review
+```
+
+マーケットプレイス追加後、River Review の専門 review skill を Codex から利用できます。詳細は [クイックスタート](/guides/quickstart) を参照してください。
+
+## 何が変わるのか
+
+同じ「エラーハンドリングを見る」でも、汎用的な指示だけでは指摘が抽象的になりやすく、チーム内で採否を再判断するコストが残ります。River Review では Skill が **対象・根拠・重要度・false-positive 回避条件**を持ちます。
+
+- **抽象的な指摘を具体化**: `logging-observability` は差分位置を示し、例外の握りつぶし・観測可能性・修正案を finding として返す。
+- **観点の揺れを抑える**: fixture + golden output で期待挙動を固定し、回帰 Eval で変更を検証する。
+- **不要な指摘を抑える**: confidence / severity / suppression memory / review coverage でノイズを管理する。
+
+実例は [代表スキルのショーケース](/guides/representative-skills) で fixture と期待出力まで確認できます。
+
+## 導入後に使える品質・運用機能
+
+River Review には、チーム導入で必要になる次の土台があります。
+
+- **Skill の品質維持**: fixture + golden output、回帰 Eval、per-skill false-positive 評価。
+- **ノイズ抑制**: severity（critical / major / minor / info）、confidence、suppression memory、review coverage。
+- **複数レビューの整理**: consensus、Team Lead synthesis、blind spots。
+- **運用計測**: Run store、回帰比較、usage telemetry、コスト見積もり、ダッシュボード。
+- **導入判断**: 競合比較、既知の制限、FAQ。
+
+まず既存の Skill と計測機能を使い、実データで不足が見えた判断だけを追加 Skill としてコード化するのが推奨です。
+
+## コンセプトを理解する
+
+- [コンセプト（レビューを、組織の判断資産へ）](./explanation/concept.md)
+- [River Review へようこそ](./explanation/intro.md)
+- [River Review とは](./explanation/what-is-river-review.md)
+- [Human Judgment Focus](./explanation/human-judgment-focus.md)
+
+## ドキュメントの構成
+
+River Review の公式ドキュメントは [Diátaxis](https://diataxis.fr/) に沿って整理しています。
+
+- **Tutorials**: 最初の成功体験を作るステップバイステップ。
+- **Guides**: 特定のゴールを達成するための手順。
+- **Reference**: CLI / Schema / Output contract などの仕様。
+- **Explanation**: 背景・設計判断・概念。
+
+日本語をソース・オブ・トゥルースとし、英語版は対応する `.en.md` で管理します。[English docs](/index-en) も利用できます。

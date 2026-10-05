@@ -103,6 +103,10 @@ Commands:
   promote retarget <id> Change the proposed target with an auditable human decision
                         (--target-kind <kind> [--target-id <id>] --approver <name>
                          --reason <text> --index <path>)
+  promote attach-replay <id>
+                        Attach PRE-adoption paired replay evidence to a candidate
+                        (--input <paired-replay.json> --approver <name>
+                         --reason <text> [--index <path>] [--output json])
   promote template [<id>] Emit PR scaffold(s) for approved candidate(s) (text only)
                         (--approver <name> --reason <text> --index <path>
                          --include-inactive; --output json for machine output)
@@ -211,7 +215,7 @@ const COMMAND_USAGE = {
   suppression:
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
-    'river promote <propose|list|approve|reject|retarget|template|retire|review-effectiveness> [options]',
+    'river promote <propose|list|approve|reject|retarget|attach-replay|template|retire|review-effectiveness> [options]',
   evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
 };
 
@@ -915,7 +919,11 @@ function parsePromoteOption(arg, args, parsed) {
   if (arg === '--input') {
     const value = args.shift();
     if (!value || value.startsWith('-')) {
-      console.error('Error: --input option requires a JSONL path.');
+      console.error(
+        parsed.promoteSubcommand === 'attach-replay'
+          ? 'Error: --input option requires a paired replay JSON path.'
+          : 'Error: --input option requires a JSONL path.'
+      );
       usageError(parsed);
       return 'break';
     }

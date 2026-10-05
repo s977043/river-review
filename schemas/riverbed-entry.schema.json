@@ -245,6 +245,43 @@
         }
       }
     },
+    "promotionExperimentEvidence": {
+      "type": "object",
+      "description": "Human-attached PRE-adoption paired replay evidence (#2372-G2 / #2485). This is experiment provenance only and must not encode approval or post-adoption effectiveness.",
+      "required": ["attachedAt", "attachedBy", "reason", "handoff"],
+      "additionalProperties": false,
+      "properties": {
+        "attachedAt": { "type": "string", "format": "date-time" },
+        "attachedBy": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "handoff": {
+          "type": "object",
+          "required": [
+            "candidateId",
+            "candidateContentHash",
+            "manifestId",
+            "experimentKey",
+            "manifestHash",
+            "manifestVerified",
+            "experimentKeyMatchesInputs",
+            "requiresHumanJudgment",
+            "writeEffects"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "candidateId": { "type": "string", "pattern": "^RR-PC-[0-9a-f]{12}$" },
+            "candidateContentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "manifestId": { "type": "string", "pattern": "^RR-EXP-[0-9a-f]{12}$" },
+            "experimentKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "manifestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "manifestVerified": { "type": "boolean", "const": true },
+            "experimentKeyMatchesInputs": { "type": "boolean", "const": true },
+            "requiresHumanJudgment": { "type": "boolean", "const": true },
+            "writeEffects": { "type": "array", "maxItems": 0 }
+          }
+        }
+      }
+    },
     "phase": {
       "type": "string",
       "enum": ["upstream", "midstream", "downstream"]
@@ -360,7 +397,12 @@
             "type": "object",
             "required": ["promotionCandidate"],
             "properties": {
-              "promotionCandidate": { "$ref": "#/$defs/promotionCandidate" }
+              "promotionCandidate": { "$ref": "#/$defs/promotionCandidate" },
+              "experimentHistory": {
+                "type": "array",
+                "description": "Append-only PRE-adoption paired replay evidence attached by an explicit human-invoked command. Kept separate from approvalHistory and effectivenessHistory.",
+                "items": { "$ref": "#/$defs/promotionExperimentEvidence" }
+              }
             }
           }
         }

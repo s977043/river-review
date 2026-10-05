@@ -2,9 +2,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ConfigLoader } from '../config/loader.mjs';
 import { hasSelection, resolveSelectionSkillIds } from './selection.mjs';
-import { collectRepoDiff, renderDiffText } from './diff-processor.mjs';
+import { buildLlmDiffView, collectRepoDiff, renderDiffText } from './diff-processor.mjs';
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
+import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
 import {
   attachReviewFileScope,
   deriveReviewFileScope,
@@ -145,6 +146,7 @@ const resolveAvailableDependencies = (inputDependencies) =>
 
 async function collectLocalContext({
   cwd,
+  phase = 'midstream',
   debug = false,
   contextLines = 3,
   availableContexts,
@@ -197,7 +199,21 @@ async function collectLocalContext({
   const dirty = await isWorkingTreeDirty(repoRoot);
   const rawDiff = await collectRepoDiff(repoRoot, mergeBase, { contextLines });
   const exclusionPatterns = config.exclude?.files ?? [];
-  const diff = applyFileExclusions(rawDiff, exclusionPatterns);
+  const filteredDiff = applyFileExclusions(rawDiff, exclusionPatterns);
+  const normalizedPhase = normalizePhase(phase);
+  const llmView = buildLlmDiffView(filteredDiff, { phase: normalizedPhase });
+  const tokenEstimate = Math.ceil(llmView.diffText.length / 4);
+  const rawTokenEstimate = filteredDiff.rawTokenEstimate ?? 0;
+  const diff = {
+    ...filteredDiff,
+    filesForReview: llmView.files,
+    diffText: llmView.diffText,
+    tokenEstimate,
+    reduction:
+      rawTokenEstimate === 0
+        ? 0
+        : Math.max(0, Math.round(((rawTokenEstimate - tokenEstimate) / rawTokenEstimate) * 100)),
+  };
   const reviewFileScope = deriveReviewFileScope(rawDiff, diff, exclusionPatterns);
   const reviewFiles = diff.filesForReview?.map((file) => file.path) ?? diff.changedFiles;
   // #1606: declare `fullFile` as an available input context when the runner can
@@ -234,6 +250,7 @@ async function collectLocalContext({
     commitSha,
     dirty,
     diff,
+    rawChangedFiles: rawDiff.changedFiles ?? [],
     reviewFiles,
     reviewFileScope,
     availableContexts: contexts,
@@ -270,6 +287,7 @@ export async function planLocalReview({
 } = {}) {
   const base = await collectLocalContext({
     cwd,
+    phase,
     debug,
     contextLines: debug ? 10 : 3,
     availableContexts,
@@ -285,6 +303,7 @@ export async function planLocalReview({
     commitSha,
     dirty,
     diff,
+    rawChangedFiles,
     reviewFiles,
     reviewFileScope,
     availableContexts: contexts,
@@ -428,6 +447,53 @@ export async function planLocalReview({
   };
 }
 
+function hasChangedProjectRules(rawChangedFiles = []) {
+  return rawChangedFiles.some(
+    (filePath) => filePath === '.river/rules.md' || filePath.startsWith('.river/rules.d/')
+  );
+}
+
+function resolveRawChangedFilesFromContext(context = {}) {
+  if (Array.isArray(context.rawChangedFiles) && context.rawChangedFiles.length > 0) {
+    return context.rawChangedFiles;
+  }
+  return [
+    ...(context.reviewFileScope?.selected ?? []),
+    ...(context.reviewFileScope?.excluded ?? []).map((entry) => entry.path),
+  ];
+}
+
+async function observeReviewConcerns({
+  context,
+  dryRun,
+  phase,
+  model,
+  apiKey,
+  repoContext = null,
+}) {
+  const rawChangedFiles = resolveRawChangedFilesFromContext(context);
+  if (rawChangedFiles.length === 0) return null;
+
+  const projectRulesTrusted = !hasChangedProjectRules(rawChangedFiles);
+
+  return runReviewConcernAnalyzer({
+    dryRun,
+    phase: normalizePhase(phase),
+    mergeBase: context.mergeBase,
+    commitSha: context.commitSha ?? null,
+    dirty: context.dirty ?? null,
+    rawChangedFiles,
+    reviewFileScope: context.reviewFileScope ?? null,
+    rawDiffText: context.diff?.rawDiffText ?? context.diff?.diffText ?? '',
+    projectRules: context.projectRules ?? '',
+    projectRulesTrusted,
+    repoContext,
+    model,
+    apiKey,
+    config: context.config ?? {},
+  });
+}
+
 /**
  * Drop the PR comments whose findings were suppressed.
  *
@@ -563,6 +629,16 @@ export async function runLocalReview({
       manualReviewMode,
     }));
   if (context.status === 'no-changes') {
+    // A raw change can become "no-changes" after the LLM diff optimizer drops
+    // every file. #2455 must still be able to observe that semantic surface,
+    // without changing the legacy no-changes status or any Gate behavior.
+    const reviewConcernMap = await observeReviewConcerns({
+      context,
+      dryRun,
+      phase,
+      model,
+      apiKey,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -570,6 +646,7 @@ export async function runLocalReview({
       mergeBase: context.mergeBase,
       commitSha: context.commitSha ?? null,
       dirty: context.dirty ?? null,
+      ...(reviewConcernMap ? { reviewDebug: { reviewConcernMap } } : {}),
       config: context.config,
       configPath: context.configPath,
       configSource: context.configSource,
@@ -607,6 +684,19 @@ export async function runLocalReview({
     security: context.config?.security,
     context: context.config?.context,
   }).catch(() => null);
+
+  // #2455 Phase 1: observe-only semantic change decomposition.
+  // This result is deliberately NOT passed into reviewArgs, routing, Gate, or
+  // reviewer selection. It is debug/run-record evidence only until paired
+  // evaluation justifies promotion.
+  const reviewConcernMap = await observeReviewConcerns({
+    context,
+    dryRun,
+    phase,
+    model,
+    apiKey,
+    repoContext,
+  });
 
   const reviewArgs = {
     diff: context.diff,
@@ -750,6 +840,7 @@ export async function runLocalReview({
     prompt: review.prompt,
     reviewDebug: {
       ...(review.debug ?? {}),
+      ...(reviewConcernMap ? { reviewConcernMap } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).

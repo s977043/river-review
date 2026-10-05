@@ -49,20 +49,20 @@ AI が人間の可読量を超えるコードを生成できる時代におい�
 
 ### 次の具体タスク案（Phase 3 着手用）
 
-- [ ] ゴールデンケース（差分・期待出力）を fixtures として追加し、回帰を検知できるテストを追加
-- [ ] スキルごとの失敗パス（コンテキスト不足/依存不足）をテストで検知
-- [ ] Evals/回帰テストを CI へ組み込み、スキル変更時に必ず実行
+- [x] ゴールデンケース（差分・期待出力）を fixtures として追加し、回帰を検知できるテストを追加 — fixture / golden convention と pipeline-level regression eval を実装済み
+- [ ] スキルごとの失敗パス（コンテキスト不足/依存不足）をテストで検知 — 一部 Skill では guard case を持つが、全 Skill の共通要件にはしていない
+- [x] Evals/回帰テストを CI へ組み込む — 決定論的な Skill schema / fixture 検証は必須 CI。LLM ベースの Promptfoo eval は API key 不在時に設定検証へ縮退し、マージ必須ゲートではない
 - [ ] Harness Assessment Skill を追加し、テスト/型/Lint/静的解析/セキュリティチェックの有無を評価
 - [ ] Human Escalation Skill を追加し、高リスク変更を人間レビューへエスカレーション
 
 ## Phase 3: Reliability & Evals
 
-- [ ] Prompt/Evals 環境の整備（例: Promptfoo）とゴールデンケースの準備
-- [ ] スキルごとの「検出すべき/避けるべき」テストケースを追加し、回帰を検知
-- [ ] CI にスキル回帰テストを組み込み、失敗時はブロック
+- [x] Prompt/Evals 環境とゴールデンケースの基盤を整備 — `.github/workflows/skill-eval.yml`、fixture / golden、`eval:fixtures` / `eval:regression` / `eval:compare` を提供
+- [x] 「検出すべき/避けるべき」を表現する per-skill fixture convention を整備 — recommended Skill は eval または fixtures を持つことを決定論的 validator で確認（例外は grandfathered list で明示）
+- [ ] LLM ベースの Skill eval をマージ必須ゲートにする — 現在は意図的に optional。API key が無い CI では YAML / 参照ファイル検証へ縮退し、必須ゲートは `Skill schema validation`
 - [ ] 検証ハーネスの充足度を評価する Harness Assessment Skill を導入
 - [ ] 認証・認可、決済、データ削除、アーキテクチャ変更などを Human Escalation 対象として定義
-- Exit Criteria: スキル変更で自動評価が走り、デグレを防止できる。加えて、高リスク変更は自動的に人間レビューへ誘導される。
+- Exit Criteria: 決定論的な Skill / fixture 検証で基本的なデグレをブロックし、必要な環境では LLM eval も実行できる。残課題は LLM eval の merge-gate 化要否と、Harness / Human Escalation の運用契約を固めること。
 
 ## Phase 4: Riverbed Memory & Intelligence
 

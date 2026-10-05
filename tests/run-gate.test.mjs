@@ -41,6 +41,57 @@ describe('deriveRunGate — strict_block forwarding (Epic #1347 S4)', () => {
     assert.notEqual(gate.reasonCode, 'STRICT_BLOCK');
   });
 
+  test('reviewer execution provenance cannot change decision or Gate (#2481)', () => {
+    const baseline = deriveRunGate({
+      ...okResult,
+      findings: [
+        {
+          id: 'rr-1',
+          severity: 'minor',
+          file: 'src/lib/foo.mjs',
+        },
+      ],
+    });
+    const withProvenance = deriveRunGate({
+      ...okResult,
+      findings: [
+        {
+          id: 'rr-1',
+          severity: 'minor',
+          file: 'src/lib/foo.mjs',
+          sourceExecutionIds: ['exec-a', 'exec-b'],
+        },
+      ],
+      reviewCoverage: {
+        schemaVersion: '1',
+        status: 'complete',
+        expectedUnits: 1,
+        completedUnits: 1,
+        requiredUnits: 1,
+        completedRequiredUnits: 1,
+        incompleteRequiredUnitIds: [],
+        units: [
+          {
+            id: 'reviewer:bug-hunter/chunk:1',
+            executionId: 'exec-a',
+            kind: 'diff-chunk',
+            subjects: ['src/lib/foo.mjs'],
+            reviewerRole: 'bug-hunter',
+            required: true,
+            status: 'completed',
+            reasonCode: null,
+            findingsCount: 1,
+          },
+        ],
+      },
+    });
+
+    assert.equal(withProvenance.decision, baseline.decision);
+    assert.equal(withProvenance.gate.decision, baseline.gate.decision);
+    assert.equal(withProvenance.gate.reasonCode, baseline.gate.reasonCode);
+    assert.deepEqual(withProvenance.gate.inputs, baseline.gate.inputs);
+  });
+
   test('a null result yields the fail-soft shape (no throw)', () => {
     const { decision, gate } = deriveRunGate(null);
     assert.equal(decision, undefined);

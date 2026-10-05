@@ -41,10 +41,13 @@ function fileEntry(path, index) {
  * plus the optimizer's `filesForReview`, and the raw counterpart used as the
  * file-scope ledger's "before configured exclusions" input.
  */
-function buildDiffPair(paths) {
+function buildDiffPair(paths, { phase = 'midstream' } = {}) {
   const files = paths.map((path, index) => fileEntry(path, index));
   const rawDiffText = renderDiffText(files);
-  const optimized = optimizeDiff({ files, diffText: rawDiffText });
+  const optimized = optimizeDiff(
+    { files, diffText: rawDiffText },
+    { includeMarkdown: phase === 'upstream' }
+  );
   const rawDiff = { changedFiles: [...paths], files, diffText: rawDiffText };
   const filteredDiff = {
     ...rawDiff,
@@ -55,12 +58,12 @@ function buildDiffPair(paths) {
   return { rawDiff, filteredDiff };
 }
 
-async function runCoverage(paths) {
-  const { rawDiff, filteredDiff } = buildDiffPair(paths);
+async function runCoverage(paths, { phase = 'midstream' } = {}) {
+  const { rawDiff, filteredDiff } = buildDiffPair(paths, { phase });
   const fileScope = deriveReviewFileScope(rawDiff, filteredDiff, []);
   const result = await runReviewerOrchestration({
     diff: filteredDiff,
-    phase: 'midstream',
+    phase,
     dryRun: true,
     reviewers: ['bug-hunter'],
     quiet: true,
@@ -151,4 +154,20 @@ test('chunk whose files are all optimizer-dropped claims no subject (#2233)', as
   assert.ok(emptyUnit, 'expected one chunk with no reviewable subject');
   assert.deepEqual(emptyUnit.subjects, ['<unknown-diff>']);
   assert.ok(subjects.has('src/x0.mjs'));
+});
+
+test('upstream orchestration keeps Markdown in reviewer coverage subjects (#2473)', async () => {
+  const { units, excluded, subjects, intersection } = await runCoverage(
+    ['docs/adr/013-example.md', 'src/helper.mjs'],
+    { phase: 'upstream' }
+  );
+
+  assert.equal(units.length, 1, 'small diff must not be split');
+  assert.deepEqual(excluded, []);
+  assert.deepEqual(intersection, []);
+  assert.ok(
+    subjects.has('docs/adr/013-example.md'),
+    'upstream subjects must reflect the Markdown that reaches the LLM'
+  );
+  assert.ok(subjects.has('src/helper.mjs'));
 });

@@ -572,6 +572,7 @@ index 1111111..2222222 100644
               confidence: 'high',
               status: 'open',
               suggestion: 'Remove the debug log',
+              sourceExecutionIds: ['exec-reviewer-a'],
             },
           ],
           debug: { llmUsed: false, heuristicsUsed: true },
@@ -586,6 +587,7 @@ index 1111111..2222222 100644
     assert.equal(f.lineEnd, undefined, 'lineEnd is omitted when equal to lineStart');
     assert.equal(f.phase, 'midstream', 'phase falls back to artifact phase');
     assert.equal(f.severity, 'minor');
+    assert.deepEqual(f.sourceExecutionIds, ['exec-reviewer-a']);
     assert.equal(received.diff.diffText, sampleDiff);
     assert.equal(received.dryRun, false);
     assert.equal(received.plan.selected.length, 1);
