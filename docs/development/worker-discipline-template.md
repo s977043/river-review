@@ -195,6 +195,9 @@
 - textlint の exit 0 を報告する前に、ルールが有効なことを陽性対照で確かめること（ですます調とである調を混ぜた文書で exit 1 になるか）。
   `node_modules` のない worktree で `npx textlint` を実行すると、"No rules found" を出して exit 0 で終わる。
   2026-10-02 の PR #2466 では、この空振りを「textlint exit 0」として PR 本文に書いた（後で訂正）。
+- テストファイルの `beforeEach` / `afterEach` / `before` / `after` は `describe` の内側に置くこと。`npm test` は `--experimental-test-isolation=none` で全ファイルを 1 プロセスで実行するため、
+  トップレベルの hook は他ファイルのテストにも効く。2026-10-05 の PR #2519 では、env を消す hook が別ファイルの対照実行と食い違いを起こした。
+  `GITHUB_EVENT_PATH` を持つ CI でだけ必須の Unit tests が落ち、単独実行では緑のままだった。
 - **他セッションの PR を引き継いだ場合は、自分が変えたファイルだけでなく `npm run format:check`（CI と同じリポジトリ全体）を実行すること。**
   引き継いだ PR には、自分が触っていないファイルの違反が残っていることがある。2026-09-24 の PR #2403 では、
   ワーカーが変更した 2 ファイルだけに prettier を流して exit 0 と報告し、PR にもともと含まれていた
