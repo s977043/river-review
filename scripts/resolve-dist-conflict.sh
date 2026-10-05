@@ -8,8 +8,8 @@
 # take either side, reinstall, rebuild, and commit the merge. This script runs
 # that procedure in a throwaway worktree:
 #
-#   1. read the PR's head / base branch with `gh pr view`; refuse a fork PR or
-#      a PR that is not open
+#   1. read the PR's head / base branch with `gh pr view`; refuse a fork PR,
+#      a PR that is not open, and a head branch that is `main` or the base
 #   2. fetch both branches and add a detached worktree at the PR head under
 #      `mktemp -d`
 #   3. `git merge --no-ff --no-commit <remote>/<base>`; stop if any conflicted
@@ -18,7 +18,10 @@
 #   4. take `--theirs` for the conflicted dist files, then `npm ci` BEFORE
 #      `npm run build:action` (in the other order a stale node_modules bundles
 #      the old dependencies and the dist looks clean), stage the dist, check
-#      that no unmerged or non-dist change is left, and commit the merge
+#      that no unmerged or non-dist change is left, and commit the merge.
+#      The commit runs the repository's hooks (lint-staged can rewrite and
+#      re-stage files), so the committed tree must equal the `git write-tree`
+#      recorded just before the commit
 #   5. rebuild once more and require `git status --porcelain -- runners/` to be
 #      empty (the committed dist is reproducible)
 #   6. with --push only: push the merge to the PR branch as a fast-forward
@@ -45,11 +48,12 @@
 # Exit codes:
 #   0  resolved (and pushed with --push), or the head already contains the base
 #   1  stopped: a non-dist path conflicts, the rebuild is not reproducible, a
-#      non-dist file changed, or the push could not be verified. The worktree
-#      is kept and its path printed
-#   2  a gh or git read failed
-#   3  refused: Node major != .nvmrc major, fork PR, PR not open, or another
-#      run holds the lock for this PR
+#      non-dist file changed, the commit failed or a commit hook changed the
+#      committed tree, or the push could not be verified. The worktree is
+#      kept and its path printed
+#   2  a gh or git read failed (including an unparsable `gh pr view` answer)
+#   3  refused: Node major != .nvmrc major, fork PR, PR not open, head branch
+#      is `main` or the base, or another run holds the lock for this PR
 #   64 usage error
 
 set -euo pipefail
@@ -138,11 +142,15 @@ main() {
     exit 2
   fi
   local head base state cross owner
-  head=$(printf '%s' "${pr_json}" | jq -r '.headRefName')
-  base=$(printf '%s' "${pr_json}" | jq -r '.baseRefName')
-  state=$(printf '%s' "${pr_json}" | jq -r '.state')
-  cross=$(printf '%s' "${pr_json}" | jq -r '.isCrossRepository')
-  owner=$(printf '%s' "${pr_json}" | jq -r '.headRepositoryOwner.login')
+  if ! head=$(printf '%s' "${pr_json}" | jq -r '.headRefName') \
+    || ! base=$(printf '%s' "${pr_json}" | jq -r '.baseRefName') \
+    || ! state=$(printf '%s' "${pr_json}" | jq -r '.state') \
+    || ! cross=$(printf '%s' "${pr_json}" | jq -r '.isCrossRepository') \
+    || ! owner=$(printf '%s' "${pr_json}" | jq -r '.headRepositoryOwner.login'); then
+    echo "error: could not parse the gh pr view answer for #${pr}:" >&2
+    echo "${pr_json}" >&2
+    exit 2
+  fi
 
   if [ "${state}" != "OPEN" ]; then
     echo "refused: #${pr} is ${state}, not OPEN." >&2
@@ -151,6 +159,11 @@ main() {
   if [ "${cross}" != "false" ] || [ "${owner}" != "${repo%%/*}" ]; then
     echo "refused: #${pr} comes from a fork (${owner}:${head}); this script only" >&2
     echo "  pushes to branches of ${repo}." >&2
+    exit 3
+  fi
+  if [ "${head}" = "${base}" ] || [ "${head}" = "main" ]; then
+    echo "refused: #${pr} has head branch '${head}' (base '${base}'); this script" >&2
+    echo "  never pushes to main or to the base branch." >&2
     exit 3
   fi
   echo "#${pr}: ${head} <- ${base} (${repo}, remote ${remote})"
@@ -271,10 +284,25 @@ scripts/resolve-dist-conflict.sh (npm ci + npm run build:action)."
 
 Co-Authored-By: ${CO_AUTHORED_BY}"
   fi
-  git -C "${wt}" commit --quiet -m "${msg}"
-  local merge_sha
+  # The commit runs the repository's hooks, which can rewrite or add files
+  # after the checks above (lint-staged re-stages what it formats).
+  local tree
+  tree=$(git -C "${wt}" write-tree)
+  if ! git -C "${wt}" commit --quiet -m "${msg}"; then
+    echo "error: git commit failed." >&2
+    echo "${keep_msg}" >&2
+    exit 1
+  fi
+  local merge_sha committed
   merge_sha=$(git -C "${wt}" rev-parse HEAD)
   echo "merge commit ${merge_sha}"
+  committed=$(git -C "${wt}" rev-parse 'HEAD^{tree}')
+  if [ "${committed}" != "${tree}" ]; then
+    echo "stopped: a commit hook changed the committed tree; not pushed:" >&2
+    git -C "${wt}" diff --name-only "${tree}" "${committed}" | sed 's/^/  /' >&2
+    echo "${keep_msg}" >&2
+    exit 1
+  fi
 
   echo "npm run build:action (reproducibility check) ..."
   if ! (cd "${wt}" && npm run build:action > "${tmp}/build-2.log" 2>&1); then

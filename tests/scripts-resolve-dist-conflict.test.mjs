@@ -110,6 +110,25 @@ test('a failed gh read exits 2 with the account hint', () => {
   assert.match(r.stderr, /gh api user --jq \.login/);
 });
 
+for (const [name, over] of [
+  ['the head branch is main', { headRefName: 'main', baseRefName: 'release' }],
+  ['the head branch equals the base', { headRefName: 'dev', baseRefName: 'dev' }],
+]) {
+  test(`refuses (exit 3) when ${name}`, () => {
+    const stub = stubWithNode([{ match: PR_VIEW, body: prBody(over) }]);
+    const r = runScriptWithStub(SCRIPT, ['--push', '101'], stub);
+    assert.equal(r.status, 3, r.stderr);
+    assert.match(r.stderr, /never pushes to main or to the base branch/);
+  });
+}
+
+test('an unparsable gh pr view answer exits 2', () => {
+  const stub = stubWithNode([{ match: PR_VIEW, body: 'not json' }]);
+  const r = runScriptWithStub(SCRIPT, ['101'], stub);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /could not parse the gh pr view answer/);
+});
+
 test('refuses (exit 3) while another run holds the lock, and leaves that lock alone', (t) => {
   const tmp = createTempDir({ prefix: 'rdc-lock-' });
   t.after(() => cleanupTempDir(tmp));
@@ -158,7 +177,13 @@ function makeRepos(t, { headSrc, baseMoves = true }) {
   git(clone, 'config', 'user.name', 'test');
   commitFiles(
     clone,
-    { '.nvmrc': '22\n', 'package.json': '{"name":"demo"}\n', 'a.txt': 'a0\n', [MAP]: 'a0\n' },
+    {
+      '.nvmrc': '22\n',
+      'package.json': '{"name":"demo"}\n',
+      'package-lock.json': '{}\n',
+      'a.txt': 'a0\n',
+      [MAP]: 'a0\n',
+    },
     'init'
   );
   git(clone, 'push', '-q', 'origin', 'HEAD:refs/heads/main');
@@ -173,12 +198,21 @@ function makeRepos(t, { headSrc, baseMoves = true }) {
 
   const stub = stubWithNode([{ match: PR_VIEW, body: prBody() }]);
   // `npm run build:action` regenerates the map from every *.txt source.
+  // RDC_ON_CI runs a command during `npm ci`; RDC_DRIFT makes every build after
+  // the first one write a different map.
   writeExe(
     join(stub.dir, 'npm'),
     [
       '#!/bin/sh',
+      'if [ "$1" = ci ] && [ -n "${RDC_ON_CI:-}" ]; then',
+      '  sh -c "${RDC_ON_CI}" || exit 1',
+      'fi',
       'if [ "$1" = run ] && [ "$2" = build:action ]; then',
       `  mkdir -p runners/github-action/dist && cat *.txt > ${MAP}`,
+      '  n=$(cat "${GH_STUB}/builds" 2>/dev/null || echo 0)',
+      '  n=$((n + 1))',
+      '  echo "${n}" > "${GH_STUB}/builds"',
+      `  if [ "\${n}" -ge 2 ] && [ -n "\${RDC_DRIFT:-}" ]; then echo drift >> ${MAP}; fi`,
       'fi',
       'exit 0',
       '',
@@ -187,7 +221,7 @@ function makeRepos(t, { headSrc, baseMoves = true }) {
   return { bare, clone, work, stub };
 }
 
-function run(repos, args) {
+function run(repos, args, extraEnv = {}) {
   const r = spawnSyncGuarded('bash', [SCRIPT_PATH, ...args], {
     cwd: repos.clone,
     encoding: 'utf8',
@@ -202,6 +236,7 @@ function run(repos, args) {
       GIT_COMMITTER_NAME: 'test',
       GIT_COMMITTER_EMAIL: 'test@example.com',
       CO_AUTHORED_BY: 'Bot <bot@example.com>',
+      ...extraEnv,
     },
   });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
@@ -254,4 +289,81 @@ test('a head that already contains the base exits 0 without a worktree', (t) => 
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /already contains main; nothing to resolve/);
   assert.doesNotMatch(r.stdout, /worktree /);
+});
+
+// Exit 1 with the worktree kept, and the remote PR branch at `expected`.
+function assertStopped(repos, r, expected, pattern) {
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, pattern);
+  assert.equal(git(repos.bare, 'rev-parse', 'refs/heads/feat/x'), expected);
+  const kept = r.stderr.match(/worktree kept for inspection: (\S+)/)[1];
+  assert.ok(existsSync(kept));
+  git(repos.clone, 'worktree', 'remove', '--force', kept);
+}
+
+// A pre-commit hook for the sandbox clone (and so for the script's worktree).
+function installPreCommit(repos, body) {
+  const hooks = join(repos.work, 'hooks');
+  mkdirSync(hooks);
+  writeExe(join(hooks, 'pre-commit'), `#!/bin/sh\n${body}\n`);
+  git(repos.clone, 'config', 'core.hooksPath', hooks);
+}
+
+test('a PR branch that moves after the fetch is not overwritten (exit 1)', (t) => {
+  const repos = makeRepos(t, { headSrc: { 'b.txt': 'b1\n' } });
+  git(repos.clone, 'switch', '-q', 'feat/x');
+  git(repos.clone, 'switch', '-q', '-c', 'adv');
+  commitFiles(repos.clone, { 'c.txt': 'c1\n' }, 'pushed by someone else');
+  const moved = git(repos.clone, 'rev-parse', 'HEAD');
+  git(repos.clone, 'switch', '-q', 'main');
+  const r = run(repos, ['--push', '101'], {
+    RDC_ON_CI: `git -C '${repos.clone}' push -q origin adv:refs/heads/feat/x`,
+  });
+  assertStopped(repos, r, moved, /push to origin\/feat\/x was rejected/);
+});
+
+test('npm ci rewriting package-lock.json stops before the commit (exit 1)', (t) => {
+  const repos = makeRepos(t, { headSrc: { 'b.txt': 'b1\n' } });
+  const before = git(repos.bare, 'rev-parse', 'refs/heads/feat/x');
+  const r = run(repos, ['--push', '101'], { RDC_ON_CI: 'echo changed > package-lock.json' });
+  assertStopped(
+    repos,
+    r,
+    before,
+    /non-dist changes remain after the rebuild:\n {2}package-lock\.json/
+  );
+  assert.doesNotMatch(r.stdout, /merge commit/);
+});
+
+test('a second build that changes the dist stops (exit 1)', (t) => {
+  const repos = makeRepos(t, { headSrc: { 'b.txt': 'b1\n' } });
+  const before = git(repos.bare, 'rev-parse', 'refs/heads/feat/x');
+  const r = run(repos, ['--push', '101'], { RDC_DRIFT: '1' });
+  assertStopped(
+    repos,
+    r,
+    before,
+    /a second rebuild changed runners\/; the dist is not reproducible/
+  );
+});
+
+test('a commit hook that adds a non-dist file stops (exit 1) and pushes nothing', (t) => {
+  const repos = makeRepos(t, { headSrc: { 'b.txt': 'b1\n' } });
+  installPreCommit(repos, 'echo note > notes.md && git add notes.md');
+  const before = git(repos.bare, 'rev-parse', 'refs/heads/feat/x');
+  const r = run(repos, ['--push', '101']);
+  assertStopped(
+    repos,
+    r,
+    before,
+    /a commit hook changed the committed tree; not pushed:\n {2}notes\.md/
+  );
+});
+
+test('a failing commit hook exits 1 with the worktree kept', (t) => {
+  const repos = makeRepos(t, { headSrc: { 'b.txt': 'b1\n' } });
+  installPreCommit(repos, 'exit 1');
+  const before = git(repos.bare, 'rev-parse', 'refs/heads/feat/x');
+  const r = run(repos, ['--push', '101']);
+  assertStopped(repos, r, before, /git commit failed/);
 });

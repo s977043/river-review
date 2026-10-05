@@ -141,10 +141,11 @@ scripts/resolve-dist-conflict.sh 2465          # dry-run（既定）。push し�
 scripts/resolve-dist-conflict.sh --push 2465   # 解消した merge を PR ブランチへ fast-forward で push
 ```
 
-- `gh pr view` で head と base を取得する。fork の PR と open でない PR は拒否する
+- `gh pr view` で head と base を取得する。fork の PR、open でない PR、head ブランチが `main` または base と同じ PR は拒否する
 - `mktemp -d` 配下に PR head の detached worktree を作り、base を `--no-commit` で merge する
 - dist 以外のパスが conflict したら停止し、パスと worktree の場所を表示する（自動解消しない）
 - dist の conflict は `--theirs` を採り、`npm ci` の後に `npm run build:action` を実行して merge を commit する
+- commit 時のフック（lint-staged など）がファイルを書き換えたり追加したりした場合は停止する。commit 直前の `git write-tree` と commit 後の `HEAD^{tree}` を比べ、違えば差分のパスを表示して push しない
 - もう一度 rebuild し、`git status --porcelain -- runners/` が空であること（再現性）を確かめる
 - `--push` のときだけ force なしで push し、`git ls-remote` の SHA がローカル HEAD と一致することを確かめる
 
