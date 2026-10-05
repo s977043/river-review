@@ -180,22 +180,22 @@ describe('organizeReviewResolution', () => {
   test(
     'warns instead of silently choosing one when multiple resolution items join one finding',
     () => {
-    const result = organizeReviewResolution({
-      findings: [finding('rr-1')],
-      reviewResolution: {
-        items: [
-          resolutionItem({ findingId: 'rr-1', fingerprint: 'fp-rr-1' }),
-          resolutionItem({
-            findingId: 'rr-1',
-            fingerprint: 'fp-rr-1',
-            author: 'disputes',
-          }),
-        ],
-      },
-    });
-
-    assert.equal(result.findings[0].resolutionMatches.length, 2);
-    assert.ok(result.warnings.some((item) => item.code === 'multiple_resolution_items'));
+      const result = organizeReviewResolution({
+        findings: [finding('rr-1')],
+        reviewResolution: {
+          items: [
+            resolutionItem({ findingId: 'rr-1', fingerprint: 'fp-rr-1' }),
+            resolutionItem({
+              findingId: 'rr-1',
+              fingerprint: 'fp-rr-1',
+              author: 'disputes',
+            }),
+          ],
+        },
+      });
+  
+      assert.equal(result.findings[0].resolutionMatches.length, 2);
+      assert.ok(result.warnings.some((item) => item.code === 'multiple_resolution_items'));
     }
   );
 
