@@ -220,6 +220,24 @@ export function normalizeCoverageStatus(coverage) {
 }
 
 /**
+ * `normalizeCoverageStatus` for a saved run record, which carries a second
+ * fact about execution besides `reviewCoverage`: `llmNotExecuted: true` when
+ * no unit reached the LLM (#2441, written by `buildRunRecord` in
+ * result-store.mjs). Such a run has no `reviewCoverage`, so its coverage alone
+ * normalizes to `unknown` and its empty finding list would be read as an
+ * observed absence. It is `not_executed` instead (#2467).
+ *
+ * Reads the recorded fact; the predicate itself is `allLlmAttemptsSkipped`.
+ *
+ * @param {{ reviewCoverage?: object|null, llmNotExecuted?: unknown }|null|undefined} record
+ * @returns {'complete'|'partial'|'not_executed'|'unknown'}
+ */
+export function normalizeRunCoverageStatus(record) {
+  if (record?.llmNotExecuted === true) return 'not_executed';
+  return normalizeCoverageStatus(record?.reviewCoverage);
+}
+
+/**
  * True when a run's coverage says review work that was expected to run did not
  * finish (`partial` or `not_executed`).
  *
