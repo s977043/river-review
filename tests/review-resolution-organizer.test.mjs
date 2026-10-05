@@ -113,6 +113,48 @@ describe('organizeReviewResolution', () => {
     assert.deepEqual(result.warnings, []);
   });
 
+  test('does not guess a fingerprint algorithm when findingId is unavailable', () => {
+    const result = organizeReviewResolution({
+      findings: [finding('rr-1')],
+      reviewResolution: {
+        items: [
+          resolutionItem({
+            findingId: 'old-run-id',
+            fingerprint: 'fp-rr-1',
+            fingerprintAlgo: 'v9',
+          }),
+        ],
+      },
+    });
+
+    assert.equal(result.findings[0].resolutionMatches.length, 0);
+    const orphan = result.warnings.find((item) => item.code === 'orphan_resolution');
+    assert.equal(orphan?.fingerprintAlgo, 'v9');
+  });
+
+  test('reports an ambiguous fingerprint instead of selecting one candidate', () => {
+    const findings = [
+      finding('rr-1', { fingerprint: 'shared-fingerprint' }),
+      finding('rr-2', { fingerprint: 'shared-fingerprint' }),
+    ];
+    const result = organizeReviewResolution({
+      findings,
+      reviewResolution: {
+        items: [
+          resolutionItem({
+            findingId: 'old-run-id',
+            fingerprint: 'shared-fingerprint',
+            fingerprintAlgo: 'v1',
+          }),
+        ],
+      },
+    });
+
+    assert.ok(result.warnings.some((item) => item.code === 'ambiguous_fingerprint'));
+    assert.equal(result.findings[0].resolutionMatches.length, 0);
+    assert.equal(result.findings[1].resolutionMatches.length, 0);
+  });
+
   test('keeps orphan and ambiguous resolution items visible as warnings', () => {
     const duplicatedId = [
       finding('duplicate', { fingerprint: 'fp-a' }),
