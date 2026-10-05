@@ -193,7 +193,7 @@ describe('organizeReviewResolution', () => {
           ],
         },
       });
-  
+
       assert.equal(result.findings[0].resolutionMatches.length, 2);
       assert.ok(result.warnings.some((item) => item.code === 'multiple_resolution_items'));
     }
