@@ -216,11 +216,11 @@ Those require a separate trust-policy layer. This slice intentionally verifies o
 
 ### Relationship to reviewer execution provenance
 
-#2481 records reviewer execution provenance as `executionId` / `sourceExecutionIds[]`. That evidence answers whether separate logical executions were observed.
+Issue #2481 records reviewer execution provenance as `executionId` / `sourceExecutionIds[]`. The evidence answers whether separate logical executions were observed.
 
-This P3 artifact answers a different question: whether a caller-trusted key authenticated an attestation that is bound to the exact replay and verifier ID.
+This P3 artifact answers a different question. It records whether a caller-trusted key authenticated an attestation bound to the exact replay and verifier ID.
 
-Neither signal alone proves verifier runtime isolation. A future stronger independence claim must combine explicit trust policy with execution-isolation evidence rather than infer isolation from IDs or signatures.
+Neither signal alone proves verifier runtime isolation. A future stronger independence claim must combine explicit trust policy with execution-isolation evidence. It must not infer isolation from IDs or signatures.
 
 ## 9. Relationship to P2 and #1568
 
@@ -258,7 +258,7 @@ It does **not** by itself prove:
 - that enough calibration evidence exists to resume every #1574 P3/P4 activity
 - that a canary may start automatically
 
-Therefore, a successful `verify-replay` result may satisfy the cryptographic-attestation prerequisite for an independent verifier, but it does not automatically clear the full #1574 Strategic Hold. Remaining resume conditions must be reviewed independently.
+Therefore, a successful `verify-replay` result may satisfy the cryptographic-attestation prerequisite for an independent verifier. It does not automatically clear the full #1574 Strategic Hold. Remaining resume conditions must be reviewed independently.
 
 ## 12. References
 
