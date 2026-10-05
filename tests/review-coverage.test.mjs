@@ -8,6 +8,7 @@ import {
   deriveReviewCoverage,
   classifyLlmAttempt,
   deriveSingleReviewerLlmCoverage,
+  normalizeRunCoverageStatus,
 } from '../src/lib/review-coverage.mjs';
 import { compileReviewCoverageValidator } from './helpers/schema-validator.mjs';
 
@@ -195,6 +196,30 @@ describe('classifyLlmAttempt (#2423)', () => {
       assert.equal(classifyLlmAttempt({ llmUsed, llmError: 'boom' }), null);
     }
     assert.equal(classifyLlmAttempt(undefined), null);
+  });
+});
+
+describe('normalizeRunCoverageStatus (#2467)', () => {
+  const complete = deriveReviewCoverage([unit('a')]);
+
+  it('reads llmNotExecuted: true as not_executed, even next to a coverage object', () => {
+    assert.equal(normalizeRunCoverageStatus({ llmNotExecuted: true }), 'not_executed');
+    assert.equal(
+      normalizeRunCoverageStatus({ llmNotExecuted: true, reviewCoverage: complete }),
+      'not_executed'
+    );
+  });
+
+  it('falls back to the reviewCoverage status for every other llmNotExecuted value', () => {
+    for (const llmNotExecuted of [false, 'true', 1, null, undefined]) {
+      assert.equal(normalizeRunCoverageStatus({ llmNotExecuted }), 'unknown');
+      assert.equal(
+        normalizeRunCoverageStatus({ llmNotExecuted, reviewCoverage: complete }),
+        'complete'
+      );
+    }
+    assert.equal(normalizeRunCoverageStatus({ reviewCoverage: complete }), 'complete');
+    assert.equal(normalizeRunCoverageStatus(null), 'unknown');
   });
 });
 

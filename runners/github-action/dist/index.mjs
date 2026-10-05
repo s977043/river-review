@@ -46056,15 +46056,16 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   $J: () => (/* binding */ isIncompleteCoverageStatus),
 /* harmony export */   Ix: () => (/* binding */ deriveReviewCoverage),
 /* harmony export */   Vb: () => (/* binding */ REVIEW_COVERAGE_STATUSES),
-/* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   dD: () => (/* binding */ isIncompleteCoverage),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
 /* harmony export */   l1: () => (/* binding */ classifyLlmAttempt),
 /* harmony export */   mz: () => (/* binding */ deriveSingleReviewerLlmCoverage),
 /* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
 /* harmony export */   or: () => (/* binding */ deriveReviewFileScope),
-/* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped)
+/* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped),
+/* harmony export */   t4: () => (/* binding */ normalizeRunCoverageStatus)
 /* harmony export */ });
+/* unused harmony export normalizeCoverageStatus */
 /* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
 
 
@@ -46285,6 +46286,24 @@ function normalizeCoverageStatus(coverage) {
     }
   }
   return status;
+}
+
+/**
+ * `normalizeCoverageStatus` for a saved run record, which carries a second
+ * fact about execution besides `reviewCoverage`: `llmNotExecuted: true` when
+ * no unit reached the LLM (#2441, written by `buildRunRecord` in
+ * result-store.mjs). Such a run has no `reviewCoverage`, so its coverage alone
+ * normalizes to `unknown` and its empty finding list would be read as an
+ * observed absence. It is `not_executed` instead (#2467).
+ *
+ * Reads the recorded fact; the predicate itself is `allLlmAttemptsSkipped`.
+ *
+ * @param {{ reviewCoverage?: object|null, llmNotExecuted?: unknown }|null|undefined} record
+ * @returns {'complete'|'partial'|'not_executed'|'unknown'}
+ */
+function normalizeRunCoverageStatus(record) {
+  if (record?.llmNotExecuted === true) return 'not_executed';
+  return normalizeCoverageStatus(record?.reviewCoverage);
 }
 
 /**
@@ -98018,6 +98037,7 @@ async function runRunsCommand(parsed, targetPath) {
       const diff = diffReviews(run1.findings ?? [], run2.findings ?? [], {
         // run2 is the current side: its coverage qualifies the absences (#2325).
         currentCoverage: run2.reviewCoverage ?? null,
+        currentLlmNotExecuted: run2.llmNotExecuted,
       });
       const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.vD)(diff, run2);
       if (parsed.output === 'json') {
