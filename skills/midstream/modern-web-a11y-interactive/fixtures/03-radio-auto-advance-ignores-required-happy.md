@@ -64,6 +64,6 @@ index a92c49f..ca8a3de 100644
 - `Aspect: Form flow`.
 - A finding on `src/components/survey/QuestionStep.tsx:12` (the `autoAdvance` condition), citing the hidden 次へ button on lines 35-39 as the consequence.
 - The finding explains that an optional radio question cannot be skipped once the button is hidden, because a radio group cannot be returned to "no selection".
-- Suggestion: include `question.required` in the condition (e.g. `&& question.required`), or keep the 次へ button for optional questions.
+- Suggestion: prefer keeping the explicit 次へ button, because native radio groups fire `onChange` on arrow-key selection and would advance keyboard users on the first arrow key. If auto-advance is kept, limit it to required questions and trigger it from an explicit action (click / Enter), not from `onChange`.
 - `Severity: minor`.
 - `Confidence: high`.

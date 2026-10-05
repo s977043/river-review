@@ -426,7 +426,7 @@
     {
       "id": "modern-web-a11y-interactive",
       "path": "skills/midstream/modern-web-a11y-interactive",
-      "checksum": "sha256:3b67afda57f506377da8b97a34ab6818dfe6dc0eaf239395084f1a38524eb418",
+      "checksum": "sha256:5b7f068510534c6534afc80da871921314cf5f71cc05028f670b8b870f21460a",
       "files": 11
     },
     {
@@ -618,8 +618,8 @@
     {
       "id": "river-review",
       "path": "skills/agent-skills/river-review",
-      "checksum": "sha256:a16f88ceee54cad4a671364152d12aaf5051b9f69b03915945a3708e96e6bda7",
-      "files": 10
+      "checksum": "sha256:536d530b6b3f089fb5fa6d4863ee8a2b6d05bb82d055ffbc2f137bfd3dc99628",
+      "files": 11
     },
     {
       "id": "river-review-architecture",
@@ -678,8 +678,8 @@
     {
       "id": "security-basic",
       "path": "skills/midstream/security-basic",
-      "checksum": "sha256:eb339a04de623c9e7b2bb8f9a322b33661283551b43ac7ee7c6694ae1ecf61d0",
-      "files": 14
+      "checksum": "sha256:f59f3c29b80853df78463d0e2de9efe6f3c0ad97f70051e503bdd57c1f024e7d",
+      "files": 15
     },
     {
       "id": "security-privacy-design",

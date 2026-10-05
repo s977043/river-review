@@ -50,8 +50,8 @@ tests:
           The output must include `Aspect: Form flow`, identify that the
           `autoAdvance` condition does not check `question.required` while the
           次へ button is hidden, explain that an optional radio question can no
-          longer be skipped, and suggest adding `required` to the condition or
-          keeping the button for optional questions.
+          longer be skipped, and prefer keeping an explicit Next control
+          (arrow-key selection fires onChange and would advance keyboard users).
           Score 1 if all are present; 0 otherwise.
       - type: contains
         value: 'Severity: minor'

@@ -16,13 +16,19 @@ Evidence:
 
 Aspect: Form flow
 
-Suggestion: Auto-advance only when the answer is required, and keep the 次へ button for optional questions:
+Suggestion: Keep the explicit 次へ button for every question and drop the advance from `onChange`. Native radio groups move the selection with the arrow keys and fire `onChange` on each move, so advancing on selection change also sends keyboard users to the next step on their first arrow key:
 
 ```tsx
-const autoAdvance = step.questions.length === 1 && question.type === 'radio' && question.required;
+onChange={() => onAnswer(question.id, option.value)}
+...
+<button type="button" onClick={onNext}>
+  次へ
+</button>
 ```
 
-Reference: WCAG SC 3.2.2 On Input.
+If auto-advance must stay, limit it to required questions (`&& question.required`) and trigger it from an explicit action such as a click or Enter, not from `onChange`. An optional question that offers an explicit skip option (for example 「回答しない」) would not need this finding.
+
+Reference: WCAG SC 3.2.2 On Input — changing a radio selection should not change the context without warning.
 
 Severity: minor
 Confidence: high

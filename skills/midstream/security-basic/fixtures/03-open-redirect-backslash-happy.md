@@ -36,5 +36,5 @@ The skill should:
 
 1. Detect the open redirect on line 18 (`header('Location: ' . $back);`), with the host check on lines 12-16 as evidence
 2. Explain that `?back=http://evil.example\@self.example/` passes the `parse_url` host check but browsers navigate to `evil.example`
-3. Suggest rejecting values that contain `\` before the host check (and `%5C` if the value is decoded again later)
+3. Suggest an allowlist of same-site relative paths (a single leading `/`, not `//` or `/\`, no `\`, no control characters), or a WHATWG-equivalent parse compared by origin. Rejecting `\` alone is not a sufficient fix
 4. Set severity to "major"

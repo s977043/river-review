@@ -69,11 +69,17 @@ npx promptfoo eval
 
 - PHP `parse_url` でホスト一致を判定しているが、`\` を含む戻り先 URL を拒否していない
 
-### Edge Case (fixtures/04-open-redirect-backslash-rejected-guard.md)
+### Edge Case (fixtures/04-open-redirect-relative-path-allowlist-guard.md)
 
 偽陽性を避けるケース：
 
-- ホスト一致判定の前に `\` / `%5C` を含む戻り先 URL を拒否している
+- 戻り先 URL を、単一の `/` で始まり `\` と制御文字を含まない相対パスだけに制限している
+
+### Happy Path (fixtures/05-open-redirect-null-host-bypass-happy.md)
+
+検出するケース：
+
+- `\` / `%5C` は拒否しているが、`parse_url` のホストが無い値（`http:evil.example` など）を素通ししている
 
 ## 設計判断
 

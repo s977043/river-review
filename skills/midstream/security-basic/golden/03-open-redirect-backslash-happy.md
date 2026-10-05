@@ -6,10 +6,10 @@
 
 **Impact:** With `?back=http://evil.example\@self.example/`, PHP `parse_url` returns the host `self.example`, so the check passes. The browser parses the `Location` value with the WHATWG URL parser, treats `\` as `/`, and navigates to `evil.example`. An attacker can use the login flow to send users to an external site.
 
-**Fix:** Reject values that contain `\` before the host check. If the value is decoded again after the check, reject `%5C` as well:
+**Fix:** Rejecting `\` alone is not enough, because values without a `parse_url` host (`http:evil.example`, `/<TAB>/evil.example`) also pass this check. Accept only same-site relative paths: a single leading `/` (not `//` or `/\`), followed by printable ASCII without `\`:
 
 ```php
-if (preg_match('/\\\\|%5c/i', $back)) {
+if (!is_string($back) || !preg_match('#\A/(?![/\\\\])[\x21-\x5b\x5d-\x7e]*\z#', $back)) {
     $back = '/mypage';
 }
 ```

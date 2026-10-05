@@ -24,6 +24,8 @@ is covered by the sibling skill `a11y-accessible-name`.
 - `tabIndex` / `aria-*` already set deliberately in the diff → suppress.
 - CSS-only style tweaks with no interaction change → suppress.
 - `:focus-visible` / `outline` already explicit → suppress new focus findings.
+- Optional question that offers an explicit skip option (e.g. 「回答しない」)
+  → suppress the Form flow finding.
 
 ## Rules
 
@@ -37,7 +39,11 @@ is covered by the sibling skill `a11y-accessible-name`.
 - **Form flow**: a single-radio step that hides the Next button and advances
   on selection must include `required` in its auto-advance condition. A radio
   group cannot be cleared, so an optional question would become effectively
-  required. Suggest keeping the Next button for optional questions.
+  required. Prefer suggesting an explicit Next control: native radio groups
+  change selection on arrow keys and fire `onChange` each time, so advancing on
+  selection change moves keyboard users on the first arrow key (WCAG SC 3.2.2
+  On Input). If auto-advance is kept, limit it to required questions and
+  trigger it from an explicit action (click / Enter), not from `onChange`.
 
 ## Output contract
 

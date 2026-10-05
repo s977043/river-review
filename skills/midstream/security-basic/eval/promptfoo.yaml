@@ -71,7 +71,8 @@ tests:
           The output must identify an open redirect on `header('Location: ' . $back);`.
           Score 1 if it explains that a value containing `\` (e.g. `http://evil.example\@self.example/`)
           passes the `parse_url` host check while browsers navigate to `evil.example`,
-          and suggests rejecting `\` before the host check.
+          and suggests a same-site relative-path allowlist or an origin comparison
+          (rejecting `\` alone is not sufficient).
           Score 0 otherwise.
 
       - type: contains
@@ -81,18 +82,37 @@ tests:
         value: file://../golden/03-open-redirect-backslash-happy.md
         threshold: 0.7
 
-  - description: False Positive Avoidance (Backslash Rejected Before Same-Host Check)
+  - description: False Positive Avoidance (Same-Site Relative Path Allowlist)
     vars:
-      diff: file://../fixtures/04-open-redirect-backslash-rejected-guard.md
+      diff: file://../fixtures/04-open-redirect-relative-path-allowlist-guard.md
     assert:
       - type: llm-rubric
         value: |
-          The output should NOT report an open redirect, because values containing `\` or `%5C`
-          are rejected before the `parse_url` host check.
+          The output should NOT report an open redirect, because `$back` is limited to
+          same-site relative paths (a single leading `/`, not `//` or `/\`, no `\`, no control characters).
           Score 1 if no open redirect finding is produced; 0 otherwise.
 
       - type: not-contains
         value: 'Severity: major'
+
+  - description: Open Redirect via Null Host Despite Backslash Rejection (Happy Path)
+    vars:
+      diff: file://../fixtures/05-open-redirect-null-host-bypass-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must identify an open redirect on `header('Location: ' . $back);`
+          even though `\` and `%5C` are rejected. Score 1 if it explains that values
+          without a `parse_url` host (e.g. `http:evil.example` or a tab-prefixed `//evil.example`)
+          pass the check but resolve to `evil.example` in browsers, and suggests a
+          relative-path allowlist or an origin comparison. Score 0 otherwise.
+
+      - type: contains
+        value: 'Severity: major'
+
+      - type: similar
+        value: file://../golden/05-open-redirect-null-host-bypass-happy.md
+        threshold: 0.7
 
 defaultTest:
   options:
