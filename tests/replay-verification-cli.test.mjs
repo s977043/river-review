@@ -1,13 +1,6 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import {
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test, { describe } from 'node:test';
@@ -126,7 +119,9 @@ function fixture() {
     signature: {
       algorithm: 'ed25519',
       keyId,
-      value: sign(null, Buffer.from(canonicalJson(payload), 'utf8'), pair.privateKey).toString('base64'),
+      value: sign(null, Buffer.from(canonicalJson(payload), 'utf8'), pair.privateKey).toString(
+        'base64'
+      ),
     },
   };
 
@@ -177,12 +172,7 @@ describe('river evolve verify-replay', () => {
   test('requires every trust input', async (t) => {
     const f = fixture();
     t.after(f.cleanup);
-    const result = await runCliInProcess([
-      'evolve',
-      'verify-replay',
-      '--replay',
-      f.replayPath,
-    ]);
+    const result = await runCliInProcess(['evolve', 'verify-replay', '--replay', f.replayPath]);
     assert.equal(result.code, 1);
     assert.match(result.stderr, /requires --attestation, --trusted-key/);
   });

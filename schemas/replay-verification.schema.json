@@ -187,20 +187,12 @@
     },
     "canaryReadiness": {
       "type": "object",
-      "required": [
-        "status",
-        "blockers",
-        "automaticCanary",
-        "note"
-      ],
+      "required": ["status", "blockers", "automaticCanary", "note"],
       "additionalProperties": false,
       "properties": {
         "status": {
           "type": "string",
-          "enum": [
-            "human-review-ready",
-            "not-ready"
-          ]
+          "enum": ["human-review-ready", "not-ready"]
         },
         "blockers": {
           "type": "array",

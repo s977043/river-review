@@ -117,7 +117,9 @@ function signedAttestation(replay, pair, overrides = {}) {
     signature: {
       algorithm: 'ed25519',
       keyId: pair.keyId,
-      value: sign(null, Buffer.from(canonicalJson(payload), 'utf8'), pair.privateKey).toString('base64'),
+      value: sign(null, Buffer.from(canonicalJson(payload), 'utf8'), pair.privateKey).toString(
+        'base64'
+      ),
     },
   };
 }
