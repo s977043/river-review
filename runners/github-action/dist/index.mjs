@@ -96820,11 +96820,7 @@ function concernMapLimitations(reviewConcernMap) {
     : [];
 }
 
-function buildUnavailableObservation({
-  reviewConcernMap,
-  reviewCoverage,
-  reason,
-}) {
+function buildUnavailableObservation({ reviewConcernMap, reviewCoverage, reason }) {
   return {
     schemaVersion: SCHEMA_VERSION,
     kind: 'review-concern-coverage-observation',
@@ -96847,10 +96843,7 @@ function validateConcernIds(reviewConcernMap) {
   const ids = [];
 
   for (const concern of reviewConcernMap.concerns) {
-    const id =
-      typeof concern?.id === 'string' && concern.id.trim()
-        ? concern.id.trim()
-        : null;
+    const id = typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
     if (!id || seen.has(id)) return null;
     seen.add(id);
     ids.push(id);
@@ -96873,10 +96866,7 @@ function mappedUnitsForConcern(reviewCoverage, concernRef) {
  *
  * @returns {object|null}
  */
-function buildReviewConcernCoverageObservation({
-  reviewConcernMap,
-  reviewCoverage,
-} = {}) {
+function buildReviewConcernCoverageObservation({ reviewConcernMap, reviewCoverage } = {}) {
   if (!reviewConcernMap) return null;
 
   if (
@@ -96954,9 +96944,7 @@ function buildReviewConcernCoverageObservation({
       concernRef,
       mappingStatus: 'mapped',
       mappedReviewUnitIds: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.id)),
-      mappedReviewerRoles: review_concern_coverage_uniqueStrings(
-        mappedUnits.map((unit) => unit?.reviewerRole)
-      ),
+      mappedReviewerRoles: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.reviewerRole)),
       executionCoverage: projected.status,
       requiredMappedUnits: projected.requiredUnits,
       completedRequiredMappedUnits: projected.completedRequiredUnits,
@@ -96969,9 +96957,7 @@ function buildReviewConcernCoverageObservation({
     .filter((concern) => concern.blindSpotCandidate)
     .map((concern) => concern.concernRef);
   const mapped = concerns.filter((concern) => concern.mappingStatus === 'mapped');
-  const incompleteMapped = mapped.filter(
-    (concern) => concern.executionCoverage !== 'complete'
-  );
+  const incompleteMapped = mapped.filter((concern) => concern.executionCoverage !== 'complete');
 
   return {
     schemaVersion: SCHEMA_VERSION,
