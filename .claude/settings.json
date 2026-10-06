@@ -26,7 +26,9 @@
       "Bash(cp:*)",
       "Bash(ln:*)",
       "mcp__plugin_github_github__pull_request_read",
-      "mcp__plugin_github_github__list_pull_requests"
+      "mcp__plugin_github_github__list_pull_requests",
+      "Bash(vm_stat)",
+      "Bash(bc)"
     ],
     "ask": [],
     "deny": [
