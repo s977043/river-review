@@ -194,6 +194,10 @@ The Phase 3 implementation passed three explicit review loops before merge:
 
 Blocking findings after the third loop: **0**.
 
+## Final delivery check
+
+Repository formatting was applied after the third review loop, and the generated GitHub Action dist was rebuilt from the formatted source. The final CI pass therefore evaluates a user-authored docs-only head on top of a fresh generated dist.
+
 ## References
 
 - #2455
