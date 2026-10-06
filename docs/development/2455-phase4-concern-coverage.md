@@ -203,7 +203,7 @@ Missing execution evidence is never interpreted as covered or unmapped.
 
 The projection reuses `normalizeCoverageStatus()`.
 
-An inconsistent `complete` label is therefore demoted to the existing safer `partial` / `not_executed` interpretation rather than creating a new Phase 4 rule.
+An inconsistent `complete` label is demoted by the existing coverage normalizer. Phase 4 reuses the safer `partial` / `not_executed` interpretation instead of creating a new rule.
 
 If the status is outside the Review Coverage vocabulary and normalizes to `unknown`, the projection becomes:
 
@@ -277,7 +277,7 @@ Phase 4 does not:
 - duplicate Concern ids
 - input immutability
 
-`tests/review-concern-local-runner.test.mjs` keeps the default-off isolation invariant and checks failed-map propagation on both normal and optimizer-created `no-changes` paths.
+`tests/review-concern-local-runner.test.mjs` keeps the default-off isolation invariant. It also checks failed-map propagation on normal and optimizer-created `no-changes` paths.
 
 ## Promotion boundary
 
