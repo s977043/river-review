@@ -42640,6 +42640,7 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   $J: () => (/* binding */ isIncompleteCoverageStatus),
 /* harmony export */   Ix: () => (/* binding */ deriveReviewCoverage),
 /* harmony export */   Vb: () => (/* binding */ REVIEW_COVERAGE_STATUSES),
+/* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   dD: () => (/* binding */ isIncompleteCoverage),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
 /* harmony export */   l1: () => (/* binding */ classifyLlmAttempt),
@@ -42649,7 +42650,6 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped),
 /* harmony export */   t4: () => (/* binding */ normalizeRunCoverageStatus)
 /* harmony export */ });
-/* unused harmony export normalizeCoverageStatus */
 /* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
 
 
@@ -96799,6 +96799,202 @@ async function runReviewConcernAnalyzer({
   }
 }
 
+;// CONCATENATED MODULE: ./src/lib/review-concern-coverage.mjs
+
+
+const SCHEMA_VERSION = '1';
+
+function review_concern_coverage_uniqueStrings(values = []) {
+  return [
+    ...new Set(
+      (Array.isArray(values) ? values : []).filter(
+        (value) => typeof value === 'string' && value.length > 0
+      )
+    ),
+  ];
+}
+
+function concernMapLimitations(reviewConcernMap) {
+  return Array.isArray(reviewConcernMap?.analysis?.limitations)
+    ? [...reviewConcernMap.analysis.limitations]
+    : [];
+}
+
+function buildUnavailableObservation({
+  reviewConcernMap,
+  reviewCoverage,
+  reason,
+}) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: 'unavailable',
+    source: {
+      concernMapStatus: reviewConcernMap?.analysis?.status ?? null,
+      reviewCoverageStatus: (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage),
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason,
+    },
+    concerns: [],
+    summary: null,
+    blindSpotConcernRefs: [],
+    applied: false,
+  };
+}
+
+function validateConcernIds(reviewConcernMap) {
+  const seen = new Set();
+  const ids = [];
+
+  for (const concern of reviewConcernMap.concerns) {
+    const id =
+      typeof concern?.id === 'string' && concern.id.trim()
+        ? concern.id.trim()
+        : null;
+    if (!id || seen.has(id)) return null;
+    seen.add(id);
+    ids.push(id);
+  }
+
+  return ids;
+}
+
+function mappedUnitsForConcern(reviewCoverage, concernRef) {
+  return reviewCoverage.units.filter((unit) =>
+    review_concern_coverage_uniqueStrings(unit?.concernRefs).includes(concernRef)
+  );
+}
+
+/**
+ * Project existing Review Coverage execution evidence onto observed Concerns.
+ *
+ * This is observation-only. It does not mutate Review Coverage, does not infer
+ * semantic completeness, and has no Gate or routing authority.
+ *
+ * @returns {object|null}
+ */
+function buildReviewConcernCoverageObservation({
+  reviewConcernMap,
+  reviewCoverage,
+} = {}) {
+  if (!reviewConcernMap) return null;
+
+  if (
+    reviewConcernMap.kind !== 'review-concern-map' ||
+    reviewConcernMap.schemaVersion !== '1' ||
+    !Array.isArray(reviewConcernMap.concerns)
+  ) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map',
+    });
+  }
+
+  const concernMapStatus = reviewConcernMap.analysis?.status ?? null;
+  if (concernMapStatus === 'failed') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'concern-map-failed',
+    });
+  }
+  if (concernMapStatus !== 'completed' && concernMapStatus !== 'partial') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map-status',
+    });
+  }
+
+  const concernIds = validateConcernIds(reviewConcernMap);
+  if (!concernIds) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-id',
+    });
+  }
+
+  if (!reviewCoverage || !Array.isArray(reviewCoverage.units)) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-unavailable',
+    });
+  }
+
+  const reviewCoverageStatus = (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage);
+  if (reviewCoverageStatus === 'unknown') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-invalid',
+    });
+  }
+
+  const concerns = concernIds.map((concernRef) => {
+    const mappedUnits = mappedUnitsForConcern(reviewCoverage, concernRef);
+    if (mappedUnits.length === 0) {
+      return {
+        concernRef,
+        mappingStatus: 'unmapped',
+        mappedReviewUnitIds: [],
+        mappedReviewerRoles: [],
+        executionCoverage: null,
+        requiredMappedUnits: 0,
+        completedRequiredMappedUnits: 0,
+        incompleteRequiredUnitIds: [],
+        blindSpotCandidate: true,
+      };
+    }
+
+    const projected = (0,review_coverage/* deriveReviewCoverage */.Ix)(mappedUnits);
+    return {
+      concernRef,
+      mappingStatus: 'mapped',
+      mappedReviewUnitIds: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.id)),
+      mappedReviewerRoles: review_concern_coverage_uniqueStrings(
+        mappedUnits.map((unit) => unit?.reviewerRole)
+      ),
+      executionCoverage: projected.status,
+      requiredMappedUnits: projected.requiredUnits,
+      completedRequiredMappedUnits: projected.completedRequiredUnits,
+      incompleteRequiredUnitIds: [...projected.incompleteRequiredUnitIds],
+      blindSpotCandidate: false,
+    };
+  });
+
+  const blindSpotConcernRefs = concerns
+    .filter((concern) => concern.blindSpotCandidate)
+    .map((concern) => concern.concernRef);
+  const mapped = concerns.filter((concern) => concern.mappingStatus === 'mapped');
+  const incompleteMapped = mapped.filter(
+    (concern) => concern.executionCoverage !== 'complete'
+  );
+
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: concernMapStatus === 'partial' ? 'partial' : 'observed',
+    source: {
+      concernMapStatus,
+      reviewCoverageStatus,
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason: null,
+    },
+    concerns,
+    summary: {
+      observedConcerns: concerns.length,
+      mappedConcerns: mapped.length,
+      unmappedConcerns: blindSpotConcernRefs.length,
+      incompleteMappedConcerns: incompleteMapped.length,
+    },
+    blindSpotConcernRefs,
+    applied: false,
+  };
+}
+
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
 var file_classifier = __nccwpck_require__(4673);
 ;// CONCATENATED MODULE: ./src/lib/review-concern-planning-bridge.mjs
@@ -96807,7 +97003,7 @@ var file_classifier = __nccwpck_require__(4673);
 
 
 
-const SCHEMA_VERSION = '1';
+const review_concern_planning_bridge_SCHEMA_VERSION = '1';
 
 function review_concern_planning_bridge_normalizePath(value) {
   return typeof value === 'string'
@@ -96863,9 +97059,9 @@ function baselineRoles({ fileTypes, riskAssessment, signals }) {
   return selectRolesAuto(fileTypes, riskAssessment ?? null, signals);
 }
 
-function buildUnavailableObservation(reviewConcernMap, existingRoles, reason) {
+function review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, reason) {
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
     kind: 'review-concern-planning-observation',
     status: 'unavailable',
     source: {
@@ -96903,12 +97099,12 @@ function buildReviewConcernPlanningObservation({
     reviewConcernMap.schemaVersion !== '1' ||
     !Array.isArray(reviewConcernMap.concerns)
   ) {
-    return buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-map');
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-map');
   }
 
   const mapStatus = reviewConcernMap.analysis?.status ?? null;
   if (mapStatus === 'failed') {
-    return buildUnavailableObservation(reviewConcernMap, existingRoles, 'concern-map-failed');
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'concern-map-failed');
   }
 
   const seenConcernIds = new Set();
@@ -96917,7 +97113,7 @@ function buildReviewConcernPlanningObservation({
     const concernRef =
       typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
     if (!concernRef || seenConcernIds.has(concernRef)) {
-      return buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-id');
+      return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-id');
     }
     seenConcernIds.add(concernRef);
 
@@ -96957,7 +97153,7 @@ function buildReviewConcernPlanningObservation({
   const recommendedSet = new Set(recommendedRoles);
 
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
     kind: 'review-concern-planning-observation',
     status: mapStatus === 'partial' ? 'partial' : 'observed',
     source: {
@@ -97733,6 +97929,7 @@ var pr_context = __nccwpck_require__(1891);
 
 
 
+
 function normalizePhase(phase) {
   const normalized = (phase || '').toLowerCase();
   if (planner_utils/* PHASES */.ZG.includes(normalized)) return normalized;
@@ -98291,6 +98488,10 @@ async function runLocalReview({
       signals: context.plan?.reviewSignals,
       selectedSkills: context.plan?.selected ?? [],
     });
+    const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+      reviewConcernMap,
+      reviewCoverage: null,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -98303,6 +98504,7 @@ async function runLocalReview({
             reviewDebug: {
               reviewConcernMap,
               ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+              ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
             },
           }
         : {}),
@@ -98421,6 +98623,14 @@ async function runLocalReview({
     reviewConcernMap
   );
 
+  // #2541 Phase 4: project existing Review Coverage onto observed Concerns.
+  // This is debug-only evidence. It does not change Review Coverage, Gate,
+  // routing, findings, or the meaning of a completed Review Unit.
+  const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+    reviewConcernMap,
+    reviewCoverage,
+  });
+
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
@@ -98514,6 +98724,7 @@ async function runLocalReview({
       ...(review.debug ?? {}),
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+      ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
