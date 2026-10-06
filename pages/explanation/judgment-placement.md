@@ -99,6 +99,36 @@ Caller / Human
 
 River Review は Findings / Evidence / Verdict を提供します。GO / NO-GO、反復、停止、承認、merge は Caller / PlanGate / Human の責務です。
 
+## Action Review は成果物レビューと分ける
+
+AI エージェントが command、repository write、network、deployment などを実行する場合、
+「その action を実行してよいか」と「生成された成果物が妥当か」は別の判断です。
+
+River Review では、次の 3 層を混同しません。
+
+```text
+Action Review
+  = proposed action を今実行してよいか
+
+Artifact Review
+  = plan / design / diff / report 等が妥当か
+
+Verification
+  = claim / behavior / evidence が成立するか
+```
+
+Artifact Review と Verification は River Review の中核責務です。
+Action Review は判断材料を提供できますが、permission broker や execution authority は Caller / PlanGate / Host / Human に残します。
+
+Action Review 自体も Judgment Placement の対象です。
+機械的な policy check は Deterministic、高文脈な risk judgment は Agentic Review、不可逆性や責任を伴う承認は Human Judgment へ配置できます。
+
+deny 後は、同じ結果を別 tool で実現するだけの迂回を safer alternative と見なしません。
+retry loop を持つ consumer は circuit breaker、stop reason、escalation target、reopen condition を明示します。
+具体的な閾値は host / risk policy に依存するため、River Review core では固定しません。
+
+関連: [Issue #2545](https://github.com/s977043/river-review/issues/2545)
+
 ## レビュー判断を promotion する
 
 Judgment Placement は固定された分類ではありません。
