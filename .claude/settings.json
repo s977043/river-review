@@ -24,7 +24,9 @@
       "Bash(mkdir:*)",
       "Bash(chmod:*)",
       "Bash(cp:*)",
-      "Bash(ln:*)"
+      "Bash(ln:*)",
+      "mcp__plugin_github_github__pull_request_read",
+      "mcp__plugin_github_github__list_pull_requests"
     ],
     "ask": [],
     "deny": [
