@@ -1,0 +1,51 @@
+name: Temporary format PR 2525
+
+on:
+  push:
+    branches:
+      - feat/2523-concern-planning-bridge
+    paths:
+      - src/lib/review-concern-planning-bridge.mjs
+      - tests/review-concern-planning-bridge.test.mjs
+      - .github/workflows/tmp-format-pr-2525.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/2523-concern-planning-bridge
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format target files
+        run: npx --no-install prettier --write src/lib/review-concern-planning-bridge.mjs tests/review-concern-planning-bridge.test.mjs
+
+      - name: Verify formatter output
+        run: npx --no-install prettier --check src/lib/review-concern-planning-bridge.mjs tests/review-concern-planning-bridge.test.mjs
+
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/review-concern-planning-bridge.mjs tests/review-concern-planning-bridge.test.mjs
+          git commit -m "style(concern): apply repository formatting"
+          git push origin HEAD:feat/2523-concern-planning-bridge
