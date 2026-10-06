@@ -3,10 +3,7 @@ import {
   renderReviewResolutionMarkdown,
   resolveReviewResolutionFindingRef,
 } from './review-resolution-organizer.mjs';
-import {
-  AUTHOR_RESPONSE_STATES,
-  assertReviewResolutionSemantics,
-} from './review-resolution.mjs';
+import { AUTHOR_RESPONSE_STATES, assertReviewResolutionSemantics } from './review-resolution.mjs';
 
 export const REVIEW_RESOLUTION_HOST_MARKER = '<!-- river-review-resolution -->';
 
