@@ -33552,6 +33552,7 @@ function computeStrictBlock({ findings, selected } = {}) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   KD: () => (/* binding */ collectRepoDiff),
 /* harmony export */   So: () => (/* binding */ extractDiffMeta),
+/* harmony export */   bJ: () => (/* binding */ classifyHunkBodyLine),
 /* harmony export */   pQ: () => (/* binding */ renderDiffText),
 /* harmony export */   rj: () => (/* binding */ parseUnifiedDiff),
 /* harmony export */   vS: () => (/* binding */ isGeneratedArtifactPath),
@@ -33948,6 +33949,21 @@ function classifyCombinedBodyLine(line, parentCount) {
 }
 
 /**
+ * Classify one hunk body line exactly as `parseUnifiedDiff` does when it builds
+ * `addedLines`. Exported so a consumer that needs the TEXT of added lines reads
+ * them through the parse layer's own classifier instead of re-deriving it.
+ *
+ * @param {string} line
+ * @param {number} parentCount the hunk's `parentCount`
+ * @returns {'added' | 'removed' | 'context'}
+ */
+function classifyHunkBodyLine(line, parentCount) {
+  return parentCount > 1
+    ? classifyCombinedBodyLine(line, parentCount)
+    : classifyUnifiedBodyLine(line);
+}
+
+/**
  * Parse a unified diff into a structured representation.
  * Returns files with hunks and added line hints so downstream consumers
  * can locate where to attach review comments.
@@ -34075,10 +34091,7 @@ function parseUnifiedDiff(diffText) {
     // instead of a single prefix character, so the one-character test above
     // would read the second parent's column as file content. The column rules
     // are counted instead — see `classifyCombinedBodyLine` (#2294).
-    const classified =
-      currentHunk.parentCount > 1
-        ? classifyCombinedBodyLine(line, currentHunk.parentCount)
-        : classifyUnifiedBodyLine(line);
+    const classified = classifyHunkBodyLine(line, currentHunk.parentCount);
     if (classified === 'added') {
       currentFile.addedLines.push(newLineNumber);
       currentHunk.addedLines.push(newLineNumber);
@@ -42991,7 +43004,7 @@ function attachReviewFileScope(coverage, fileScope) {
 
 /***/ }),
 
-/***/ 5134:
+/***/ 7156:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
@@ -43785,6 +43798,167 @@ function detectApiCompatibilitySignals({ diff } = {}) {
   return signals;
 }
 
+;// CONCATENATED MODULE: ./src/lib/async-correctness-signals.mjs
+
+
+const SOURCE_PATH_RE = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/i;
+const async_correctness_signals_TEST_PATH_RE =
+  /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
+const ASYNC_DECLARATION_RES = [
+  /\basync\s+function\s*\*?\s*(?<name>[A-Za-z_$][\w$]*)\s*\(/g,
+  /\b(?:const|let|var)\s+(?<name>[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*async\b/g,
+];
+const ASYNC_ITERATION_CALLBACK_RE =
+  /\.(?:forEach|filter|reduce|some|every|find|findIndex)\s*\(\s*async\b/;
+const TRY_OPEN_RE = /\btry\s*\{/;
+const TRY_CLOSE_RE = /\b(?:catch|finally)\b/;
+const PROMISE_COMBINATOR_RE = /\bPromise\.(?:all|allSettled|race|any)\s*\(/;
+
+function async_correctness_signals_markerWidth(hunk) {
+  const parentCount = hunk?.parentCount;
+  return Number.isInteger(parentCount) && parentCount > 1 ? parentCount : 1;
+}
+
+function stripLineComment(text) {
+  const index = text.indexOf('//');
+  return index === -1 ? text : text.slice(0, index);
+}
+
+/**
+ * Body lines of every hunk, classified by the parse layer's own classifier.
+ * Added and context lines carry their new-side line number; removed lines are
+ * dropped because they are absent from the code under review.
+ */
+function collectVisibleLines(file) {
+  const hunks = [];
+  for (const hunk of file?.hunks ?? []) {
+    const width = async_correctness_signals_markerWidth(hunk);
+    let newLine = Number.isInteger(hunk?.newStart) ? hunk.newStart : 1;
+    const rows = [];
+    for (const rawLine of hunk?.lines ?? []) {
+      const line = String(rawLine);
+      const classified = (0,diff_processor/* classifyHunkBodyLine */.bJ)(line, hunk?.parentCount);
+      if (classified === 'removed') continue;
+      rows.push({ added: classified === 'added', line: newLine, text: line.slice(width) });
+      newLine += 1;
+    }
+    hunks.push(rows);
+  }
+  return hunks;
+}
+
+function collectAsyncNames(hunks) {
+  const names = new Set();
+  for (const rows of hunks) {
+    for (const { text } of rows) {
+      const code = stripLineComment(text);
+      for (const re of ASYNC_DECLARATION_RES) {
+        for (const match of code.matchAll(re)) names.add(match.groups.name);
+      }
+    }
+  }
+  return names;
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isInsideOpenTry(rows, index) {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const code = stripLineComment(rows[i].text);
+    if (TRY_CLOSE_RE.test(code)) return false;
+    if (TRY_OPEN_RE.test(code)) return true;
+  }
+  return false;
+}
+
+/**
+ * Classify one call to a known async function on an added line.
+ * Returns the signal kind, or null when the call site is not one this v1
+ * producer can classify without type information.
+ */
+function classifyAsyncCall(code, name, rows, index) {
+  const callRe = new RegExp(`(^|[^\\w$.])(${escapeRegExp(name)})\\s*\\(`);
+  const match = callRe.exec(code);
+  if (!match) return null;
+
+  const before = code.slice(0, match.index + match[1].length);
+  if (/\b(?:await|void)\s*$/.test(before)) return null;
+  // The declaration line of the function itself is not a call site.
+  if (/\bfunction\s*\*?\s*$/.test(before) || /\b(?:const|let|var)\s*$/.test(before)) {
+    return null;
+  }
+  if (PROMISE_COMBINATOR_RE.test(code)) return null;
+
+  const after = code.slice(match.index + match[0].length);
+  if (/\)\s*\.\s*(?:then|catch|finally)\s*\(/.test(after)) return null;
+
+  if (/\breturn\s*$/.test(before)) {
+    return isInsideOpenTry(rows, index) ? 'async-return-in-try' : null;
+  }
+  if (
+    /^\s*(?:\}\s*else\s+)?(?:if|while)\s*\(/.test(code) ||
+    /!\s*$/.test(before) ||
+    /\)\s*\?(?![?.])/.test(after)
+  ) {
+    return 'async-call-in-condition';
+  }
+  if (/^\s*$/.test(before)) return 'async-call-floating';
+  if (/\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*(?::[^=]+)?=\s*$/.test(before)) {
+    return 'async-result-assigned-unawaited';
+  }
+  return null;
+}
+
+/**
+ * Extract neutral, deterministic facts that can activate async-correctness
+ * Review Viewpoints. These are signals, not findings: no severity, policy,
+ * violation decision, or gate behavior is attached here.
+ *
+ * Whether a callee returns a Promise is only known when the same file's visible
+ * diff lines (added or context) declare it `async`. Calls to functions declared
+ * elsewhere emit nothing, so this v1 producer trades recall for precision
+ * rather than guessing from names. Test and fixture files are excluded because
+ * un-awaited assertions belong to a different Skill.
+ *
+ * @param {{diff?: {files?: Array<object>}}} options
+ * @returns {Array<{kind: string, file: string, line: number}>}
+ */
+function detectAsyncCorrectnessSignals({ diff } = {}) {
+  const signals = [];
+
+  for (const file of diff?.files ?? []) {
+    const filePath = typeof file?.path === 'string' ? file.path : '';
+    if (!filePath || filePath === '/dev/null') continue;
+    if (!SOURCE_PATH_RE.test(filePath) || async_correctness_signals_TEST_PATH_RE.test(filePath)) continue;
+
+    const hunks = collectVisibleLines(file);
+    const asyncNames = collectAsyncNames(hunks);
+    const seen = new Set();
+    const emit = (kind, line) => {
+      const key = `${kind}\u0000${line}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      signals.push({ kind, file: filePath, line });
+    };
+
+    for (const rows of hunks) {
+      for (const [index, row] of rows.entries()) {
+        if (!row.added) continue;
+        const code = stripLineComment(row.text);
+        if (ASYNC_ITERATION_CALLBACK_RE.test(code)) emit('async-callback-in-iteration', row.line);
+        for (const name of asyncNames) {
+          const kind = classifyAsyncCall(code, name, rows, index);
+          if (kind) emit(kind, row.line);
+        }
+      }
+    }
+  }
+
+  return signals;
+}
+
 ;// CONCATENATED MODULE: ./src/lib/review-viewpoint-observer.mjs
 function assertViewpointDocument(document) {
   if (!document || typeof document !== 'object' || Array.isArray(document)) {
@@ -44118,6 +44292,7 @@ async function loadReviewViewpoints(viewpointsPath, { expectedSkillId } = {}) {
 
 
 
+
 // Skill discovery already resolves the River Review package root, including the
 // GitHub Action/ncc RIVER_REPO_ROOT override. Reuse that SSoT instead of
 // re-deriving it from this module's __dirname, which changes after bundling.
@@ -44126,6 +44301,7 @@ const REVIEW_VIEWPOINT_MODES = new Set(['off', 'observe', 'active']);
 
 const NEUTRAL_SIGNAL_PRODUCERS = new Map([
   ['api-compatibility', ({ diff }) => detectApiCompatibilitySignals({ diff })],
+  ['async-correctness', ({ diff }) => detectAsyncCorrectnessSignals({ diff })],
 ]);
 
 class ReviewViewpointStageError extends Error {
@@ -95047,8 +95223,8 @@ async function resolveSelectionSkillIds(
   });
 }
 
-// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 13 modules
-var review_engine = __nccwpck_require__(5134);
+// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 14 modules
+var review_engine = __nccwpck_require__(7156);
 // EXTERNAL MODULE: ./src/config/default.mjs
 var config_default = __nccwpck_require__(4807);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
