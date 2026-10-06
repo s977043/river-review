@@ -1,7 +1,7 @@
 ---
 id: 'async-correctness'
 name: 'Async Correctness 非同期処理の正しさ検証'
-version: 0.1.0
+version: 0.2.0
 description: 'await 漏れ・floating promise・並行競合など、非同期処理の correctness バグを検出する。並列化の効率提案（SIMPLIFY Efficiency）や配線断点（e2e-wiring）ではなく、「await を忘れて結果・順序・エラー伝播が壊れる」実装バグに限定する'
 category: midstream
 phase: [midstream]

@@ -946,7 +946,7 @@ skills:
     description: '宣言した処理（計測 / 通知 / 保存 / 検証 / 例外通知）が起点から末端まで途切れず配線されているかを確認し、「実装したつもり」で経路が途中で止まっている欠落を検出する'
 
   - id: async-correctness
-    version: '0.1.0'
+    version: '0.2.0'
     name: 'Async Correctness 非同期処理の正しさ検証'
     path: skills/midstream/async-correctness/SKILL.md
     category: midstream
