@@ -92,11 +92,19 @@ export function buildReviewConcernCoverageObservation({
     });
   }
 
-  if (reviewConcernMap.analysis?.status === 'failed') {
+  const concernMapStatus = reviewConcernMap.analysis?.status ?? null;
+  if (concernMapStatus === 'failed') {
     return buildUnavailableObservation({
       reviewConcernMap,
       reviewCoverage,
       reason: 'concern-map-failed',
+    });
+  }
+  if (concernMapStatus !== 'completed' && concernMapStatus !== 'partial') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map-status',
     });
   }
 
@@ -169,10 +177,9 @@ export function buildReviewConcernCoverageObservation({
   return {
     schemaVersion: SCHEMA_VERSION,
     kind: 'review-concern-coverage-observation',
-    status:
-      reviewConcernMap.analysis?.status === 'partial' ? 'partial' : 'observed',
+    status: concernMapStatus === 'partial' ? 'partial' : 'observed',
     source: {
-      concernMapStatus: reviewConcernMap.analysis?.status ?? null,
+      concernMapStatus,
       reviewCoverageStatus,
       limitations: concernMapLimitations(reviewConcernMap),
       reason: null,
