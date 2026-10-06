@@ -3,10 +3,7 @@ import { describe, it } from 'node:test';
 
 import { buildReviewConcernCoverageObservation } from '../src/lib/review-concern-coverage.mjs';
 
-function map(
-  ids,
-  analysis = { status: 'completed', limitations: [] }
-) {
+function map(ids, analysis = { status: 'completed', limitations: [] }) {
   return {
     schemaVersion: '1',
     kind: 'review-concern-map',
@@ -51,9 +48,7 @@ function unit({
 function coverage(units, status = null) {
   const requiredUnits = units.filter((entry) => entry.required !== false);
   const completedUnits = units.filter((entry) => entry.status === 'completed');
-  const completedRequiredUnits = requiredUnits.filter(
-    (entry) => entry.status === 'completed'
-  );
+  const completedRequiredUnits = requiredUnits.filter((entry) => entry.status === 'completed');
   const resolvedStatus =
     status ??
     (units.length === 0
