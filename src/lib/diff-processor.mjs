@@ -385,6 +385,21 @@ function classifyCombinedBodyLine(line, parentCount) {
 }
 
 /**
+ * Classify one hunk body line exactly as `parseUnifiedDiff` does when it builds
+ * `addedLines`. Exported so a consumer that needs the TEXT of added lines reads
+ * them through the parse layer's own classifier instead of re-deriving it.
+ *
+ * @param {string} line
+ * @param {number} parentCount the hunk's `parentCount`
+ * @returns {'added' | 'removed' | 'context'}
+ */
+export function classifyHunkBodyLine(line, parentCount) {
+  return parentCount > 1
+    ? classifyCombinedBodyLine(line, parentCount)
+    : classifyUnifiedBodyLine(line);
+}
+
+/**
  * Parse a unified diff into a structured representation.
  * Returns files with hunks and added line hints so downstream consumers
  * can locate where to attach review comments.
@@ -512,10 +527,7 @@ export function parseUnifiedDiff(diffText) {
     // instead of a single prefix character, so the one-character test above
     // would read the second parent's column as file content. The column rules
     // are counted instead — see `classifyCombinedBodyLine` (#2294).
-    const classified =
-      currentHunk.parentCount > 1
-        ? classifyCombinedBodyLine(line, currentHunk.parentCount)
-        : classifyUnifiedBodyLine(line);
+    const classified = classifyHunkBodyLine(line, currentHunk.parentCount);
     if (classified === 'added') {
       currentFile.addedLines.push(newLineNumber);
       currentHunk.addedLines.push(newLineNumber);

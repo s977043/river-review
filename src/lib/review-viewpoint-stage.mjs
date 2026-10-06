@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { defaultPaths } from '../../runners/core/skill-loader.mjs';
 import { detectApiCompatibilitySignals } from './api-compatibility-signals.mjs';
+import { detectAsyncCorrectnessSignals } from './async-correctness-signals.mjs';
 import { collectHeuristicDetections } from './heuristic-review.mjs';
 import { observeReviewViewpoints } from './review-viewpoint-observer.mjs';
 import { loadReviewViewpoints } from './review-viewpoints.mjs';
@@ -15,6 +16,7 @@ const REVIEW_VIEWPOINT_MODES = new Set(['off', 'observe', 'active']);
 
 const NEUTRAL_SIGNAL_PRODUCERS = new Map([
   ['api-compatibility', ({ diff }) => detectApiCompatibilitySignals({ diff })],
+  ['async-correctness', ({ diff }) => detectAsyncCorrectnessSignals({ diff })],
 ]);
 
 export class ReviewViewpointStageError extends Error {

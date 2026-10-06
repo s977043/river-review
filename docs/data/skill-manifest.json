@@ -96,8 +96,8 @@
     {
       "id": "async-correctness",
       "path": "skills/midstream/async-correctness",
-      "checksum": "sha256:3c05d7b721fff339d103e89cde93446d47cc051a23b70ca278a2a500059bb66b",
-      "files": 3
+      "checksum": "sha256:7fa45ce30567d49a2bc67b402b6bdac07363e5ca5d19845057a1a877ca0e0291",
+      "files": 4
     },
     {
       "id": "availability-architecture",
