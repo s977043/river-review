@@ -99,6 +99,36 @@ Caller / Human
 
 River Review produces Findings / Evidence / Verdict. GO / NO-GO, retry, stop, approval, and merge remain responsibilities of the caller, PlanGate, or humans.
 
+## Keep Action Review separate from artifact review
+
+When an AI agent can execute commands, repository writes, network operations, or deployments,
+“may this action execute now?” is a different judgment from “is the produced artifact correct?”
+
+River Review keeps three responsibilities distinct:
+
+```text
+Action Review
+  = may the proposed action execute now?
+
+Artifact Review
+  = is the plan / design / diff / report acceptable?
+
+Verification
+  = does the claim / behavior / evidence actually hold?
+```
+
+Artifact Review and Verification are core River Review responsibilities.
+Action Review may consume River Review material or recommendations, but permission brokering and execution authority stay with the caller, PlanGate, the host, or humans.
+
+Action Review itself is subject to Judgment Placement.
+Mechanical policy checks can be Deterministic, contextual risk decisions can use Agentic Review, and approvals involving responsibility or irreversibility stay in Human Judgment.
+
+After a denial, changing tools while pursuing the same effective action is not automatically a safer alternative.
+A consumer that retries must define a circuit breaker, stop reason, escalation target, and reopen condition.
+Thresholds depend on host and risk policy, so River Review core does not hard-code a universal value.
+
+Related: [Issue #2545](https://github.com/s977043/river-review/issues/2545)
+
 ## Promoting review judgments
 
 Judgment Placement is not a static classification.
