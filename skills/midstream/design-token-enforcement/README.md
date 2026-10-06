@@ -1,6 +1,6 @@
 # Figma Design Drift Detector
 
-**Status**: fixtures + eval scaffolding only. `golden/` intentionally empty.
+**Status**: fixtures + golden + eval scaffolding. `golden/` has 2 outputs (01–02); promptfoo eval is not run in CI (no API keys, config validation only).
 
 ## 概要 (Japanese)
 
