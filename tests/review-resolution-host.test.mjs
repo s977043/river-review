@@ -189,8 +189,7 @@ describe('proposeAuthorResponseUpdate', () => {
           target: { findingId: 'rr-1', fingerprint: 'fp-rr-1', fingerprintAlgo: 'v1' },
           response: { state: 'will_fix', rationale: null },
         }),
-      (error) =>
-        error instanceof ReviewResolutionHostError && error.code === 'ambiguous_resolution'
+      (error) => error instanceof ReviewResolutionHostError && error.code === 'ambiguous_resolution'
     );
   });
 
