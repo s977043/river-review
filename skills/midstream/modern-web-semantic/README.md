@@ -1,6 +1,6 @@
 # Modern Web Semantic + Platform-Native — eval scaffolding
 
-Status: **fixtures + eval scaffolding only**. `golden/` is intentionally empty.
+Status: **fixtures + golden + eval scaffolding**. `golden/` has 2 outputs (01–02); promptfoo eval is not run in CI (no API keys, config validation only).
 
 ## Why no golden output yet
 
