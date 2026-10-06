@@ -83,81 +83,111 @@ function warning(code, resolutionIndex, details = {}) {
   return { code, resolutionIndex, ...details };
 }
 
+export function resolveReviewResolutionFindingRef(findings = [], findingRef = {}) {
+  const sourceFindings = Array.isArray(findings) ? findings : [];
+  const indexes = buildFindingIndexes(sourceFindings);
+  const findingIdCandidates = nonEmptyString(findingRef.findingId)
+    ? (indexes.byId.get(findingRef.findingId) ?? [])
+    : [];
+
+  if (findingIdCandidates.length > 1) {
+    return {
+      status: 'ambiguous',
+      reason: 'finding_id',
+      candidateFindingIndexes: [...findingIdCandidates],
+    };
+  }
+
+  if (findingIdCandidates.length === 1) {
+    const findingIndex = findingIdCandidates[0];
+    const finding = sourceFindings[findingIndex];
+    const expectedFingerprint = findingFingerprintForAlgo(finding, findingRef.fingerprintAlgo);
+    const identityMismatch =
+      nonEmptyString(findingRef.fingerprint) &&
+      nonEmptyString(expectedFingerprint) &&
+      findingRef.fingerprint !== expectedFingerprint;
+    return {
+      status: 'matched',
+      findingIndex,
+      matchBasis: 'finding_id',
+      identityMismatch,
+    };
+  }
+
+  const fingerprintMatches = fingerprintCandidates(indexes, findingRef);
+  if (fingerprintMatches.length > 1) {
+    return {
+      status: 'ambiguous',
+      reason: 'fingerprint',
+      candidateFindingIndexes: [...fingerprintMatches],
+    };
+  }
+
+  if (fingerprintMatches.length === 1) {
+    return {
+      status: 'matched',
+      findingIndex: fingerprintMatches[0],
+      matchBasis: 'fingerprint',
+      identityMismatch: false,
+    };
+  }
+
+  return { status: 'orphan' };
+}
+
 function joinResolutionItems(findings, resolutionItems) {
-  const indexes = buildFindingIndexes(findings);
   const matchesByFinding = findings.map(() => []);
   const warnings = [];
 
   resolutionItems.forEach((item, resolutionIndex) => {
     const findingRef = item?.findingRef ?? {};
-    const findingIdCandidates = nonEmptyString(findingRef.findingId)
-      ? (indexes.byId.get(findingRef.findingId) ?? [])
-      : [];
+    const resolved = resolveReviewResolutionFindingRef(findings, findingRef);
 
-    if (findingIdCandidates.length > 1) {
+    if (resolved.status === 'ambiguous') {
       warnings.push(
-        warning('ambiguous_finding_id', resolutionIndex, {
+        warning(
+          resolved.reason === 'finding_id' ? 'ambiguous_finding_id' : 'ambiguous_fingerprint',
+          resolutionIndex,
+          {
+            ...(resolved.reason === 'finding_id'
+              ? { findingId: findingRef.findingId }
+              : {
+                  fingerprint: findingRef.fingerprint,
+                  fingerprintAlgo: findingRef.fingerprintAlgo,
+                }),
+            candidateFindingIndexes: resolved.candidateFindingIndexes,
+          }
+        )
+      );
+      return;
+    }
+
+    if (resolved.status === 'orphan') {
+      warnings.push(
+        warning('orphan_resolution', resolutionIndex, {
+          findingId: findingRef.findingId ?? null,
+          fingerprint: findingRef.fingerprint ?? null,
+          fingerprintAlgo: findingRef.fingerprintAlgo ?? null,
+        })
+      );
+      return;
+    }
+
+    if (resolved.identityMismatch) {
+      warnings.push(
+        warning('identity_mismatch', resolutionIndex, {
+          findingIndex: resolved.findingIndex,
           findingId: findingRef.findingId,
-          candidateFindingIndexes: [...findingIdCandidates],
-        })
-      );
-      return;
-    }
-
-    if (findingIdCandidates.length === 1) {
-      const findingIndex = findingIdCandidates[0];
-      const finding = findings[findingIndex];
-      const expectedFingerprint = findingFingerprintForAlgo(finding, findingRef.fingerprintAlgo);
-      if (
-        nonEmptyString(findingRef.fingerprint) &&
-        nonEmptyString(expectedFingerprint) &&
-        findingRef.fingerprint !== expectedFingerprint
-      ) {
-        warnings.push(
-          warning('identity_mismatch', resolutionIndex, {
-            findingIndex,
-            findingId: findingRef.findingId,
-            fingerprintAlgo: findingRef.fingerprintAlgo,
-          })
-        );
-      }
-      matchesByFinding[findingIndex].push({
-        matchBasis: 'finding_id',
-        resolutionIndex,
-        item: clone(item),
-      });
-      return;
-    }
-
-    const fingerprintMatches = fingerprintCandidates(indexes, findingRef);
-    if (fingerprintMatches.length > 1) {
-      warnings.push(
-        warning('ambiguous_fingerprint', resolutionIndex, {
-          fingerprint: findingRef.fingerprint,
           fingerprintAlgo: findingRef.fingerprintAlgo,
-          candidateFindingIndexes: [...fingerprintMatches],
         })
       );
-      return;
     }
 
-    if (fingerprintMatches.length === 1) {
-      const findingIndex = fingerprintMatches[0];
-      matchesByFinding[findingIndex].push({
-        matchBasis: 'fingerprint',
-        resolutionIndex,
-        item: clone(item),
-      });
-      return;
-    }
-
-    warnings.push(
-      warning('orphan_resolution', resolutionIndex, {
-        findingId: findingRef.findingId ?? null,
-        fingerprint: findingRef.fingerprint ?? null,
-        fingerprintAlgo: findingRef.fingerprintAlgo ?? null,
-      })
-    );
+    matchesByFinding[resolved.findingIndex].push({
+      matchBasis: resolved.matchBasis,
+      resolutionIndex,
+      item: clone(item),
+    });
   });
 
   matchesByFinding.forEach((matches, findingIndex) => {
