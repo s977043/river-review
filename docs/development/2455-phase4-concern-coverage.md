@@ -201,7 +201,11 @@ Missing execution evidence is never interpreted as covered or unmapped.
 
 ### Invalid Review Coverage
 
-If the existing coverage status cannot be trusted, the projection becomes:
+The projection reuses `normalizeCoverageStatus()`.
+
+An inconsistent `complete` label is therefore demoted to the existing safer `partial` / `not_executed` interpretation rather than creating a new Phase 4 rule.
+
+If the status is outside the Review Coverage vocabulary and normalizes to `unknown`, the projection becomes:
 
 ```text
 status: unavailable
@@ -262,7 +266,8 @@ Phase 4 does not:
 - failed Concern Map
 - invalid / unknown Concern Map status
 - missing Review Coverage
-- inconsistent Review Coverage
+- inconsistent `complete` Review Coverage demotion
+- unknown Review Coverage status
 - mapped Concern projection
 - unmapped blind-spot candidate
 - required / optional Review Unit semantics
