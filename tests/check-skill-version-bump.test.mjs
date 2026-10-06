@@ -39,9 +39,6 @@ const BASE_BODY = [
 ].join('\n');
 
 const tmpDirs = [];
-after(() => {
-  for (const dir of tmpDirs) rmSync(dir, { recursive: true, force: true });
-});
 
 function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -86,6 +83,10 @@ async function run(changes, baseFiles) {
 }
 
 describe('check-skill-version-bump', () => {
+  after(() => {
+    for (const dir of tmpDirs) rmSync(dir, { recursive: true, force: true });
+  });
+
   test('criteria change with a version bump passes', async () => {
     const r = await run({
       [`${SKILL}/SKILL.md`]: skillMd({
