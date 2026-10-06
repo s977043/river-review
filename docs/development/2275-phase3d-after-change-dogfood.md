@@ -33,7 +33,7 @@ Epic #2054 Phase 3 の after-change Fast Verification Checkpoint（PR-3A〜3C）
 - hook wall: hook プロセスの起動から終了までの wall-clock 時間
 - checkpoint: evidence の `totalDurationMs`（core が測る resolve から証跡生成まで）
 - duplicate 率: check を実行した run のうち、同じ `occurrenceKey` と同じ作業ツリー digest の組を前の実行済み run が既に扱っていたものの割合
-- occurrenceKey 衝突率: evidence を出した run のうち、同じ `occurrenceKey` が別の作業ツリー digest で既に出ていたものの割合
+- occurrenceKey 衝突率: evidence を出した run のうち、同じ `occurrenceKey` が別の作業ツリー digest で既に出ていたものの割合。分母は各 commit の初回発火（`partial`）を含む全 run である
 - unrunnable / skipped / bypassed 率: evidence の checkpoint status 別の割合
 - not-run 率: evidence を残さず `not run (...)` だけを出した run の割合
 
@@ -56,7 +56,7 @@ Epic #2054 Phase 3 の after-change Fast Verification Checkpoint（PR-3A〜3C）
 | occurrenceKey 衝突率 | 0.244（22 / 90）                       | 0.244（22 / 90）                       |
 | LLM / network        | provider 0、network 0（guard 90 / 90） | provider 0、network 0（guard 90 / 90） |
 
-Epic #2054 の初期 SLO 候補（hard timeout 30 秒、dogfood p95 10 秒以下）に対し、hook 全体の p95 は 1 秒未満でした。ただし `trusted-true` の checker は `/usr/bin/true` なので、実際の checker を allowlist に載せた場合はその実行時間が加算されます。
+Epic #2054 の初期 SLO 候補（hard timeout 30 秒、dogfood p95 10 秒以下）に対し、記録時の負荷（load average 8.52 / 11.98 / 12.99）では hook 全体の p95 は 761.9 ms 以下でした。wall-clock 値は負荷で大きく動き、別の再実行では p95 が 3436.8 ms（repo-default）/ 3526.2 ms（trusted-true）でした。主張は「p95 10 秒以下を満たす」までとし、1 秒未満は主張しません。ただし `trusted-true` の checker は `/usr/bin/true` なので、実際の checker を allowlist に載せた場合はその実行時間が加算されます。
 
 ### 読み取り
 
@@ -64,24 +64,31 @@ Epic #2054 の初期 SLO 候補（hard timeout 30 秒、dogfood p95 10 秒以下
 
 duplicate 率 0.422 の内訳は、`repeat` の 30 件と、単一ファイル commit で `partial` と `full` が同一状態になった 8 件です。hook は `seenOccurrences` を core に渡していないため、同じ状態での再発火はそのまま再実行されます。
 
-occurrenceKey 衝突率 0.244 は、`partial` と `full` が別の作業ツリーなのに同じ `occurrenceKey` を持った 22 件です。`occurrenceId` は HEAD の SHA から導出され、作業ツリーの内容を含みません。このため、`occurrenceKey` をそのまま dedup key にすると、内容の違う 2 回目の編集が `duplicate-occurrence` として skip されます。dedup の配線には、作業ツリー内容を key に含める設計判断が先に要ります。
+occurrenceKey 衝突率 0.244 は、`partial` と `full` が別の作業ツリーなのに同じ `occurrenceKey` を持った 22 件です。分母 90 は初回発火を含みます。再発火（`full` と `repeat`）の 60 件だけを分母にすると 22 / 60 です。`occurrenceId` は HEAD の SHA から導出され、作業ツリーの内容を含みません。このため、`occurrenceKey` をそのまま dedup key にすると、内容の違う 2 回目の編集が `duplicate-occurrence` として skip されます。dedup の配線には、作業ツリー内容を key に含める設計判断が先に要ります。
 
 ## 0 LLM 呼び出しの機械検証
 
-hook が起動する Node プロセスすべてに `NODE_OPTIONS=--import=scripts/lib/llm-call-guard.mjs` を読み込ませます。guard は次の 3 種類のイベントを記録します。
+hook が環境変数を引き継いで起動する Node プロセスに、`NODE_OPTIONS=--import=scripts/lib/llm-call-guard.mjs` を読み込ませます。guard は次の 3 種類のイベントを記録します。
 
 - `guard-loaded`: guard がそのプロセスに読み込まれた
 - `provider-module`: model SDK（`openai`、`@anthropic-ai/sdk`、`@google/generative-ai`、`@google/genai`）が解決された
 - `provider-module`（repo 内）: `src/ai/*`、`llm-pipeline`、`openai-planner`、`plan-review/llm-adjudicator` が解決された
-- `network`: `fetch`、`http(s).request` / `get`、`net.connect` / `createConnection`、`tls.connect` が呼ばれた。記録したうえで拒否する
+- `network`: `fetch`、`http(s).request` / `get`、`net.connect` / `createConnection`、`net.Socket.prototype.connect`、`tls.connect` が呼ばれた。記録したうえで拒否する
 
-provider の API キー環境変数には sentinel 値を入れます。provider に到達した場合、dry-run に落ちず network 拒否として記録させるためです。evidence を出したのに `guard-loaded` が無い run も失敗として扱います。guard が読み込まれていない 0 件を、0 件の証明として数えないためです。
+provider の API キー環境変数には sentinel 値を入れます。provider に到達した場合、dry-run に落ちず network 拒否として記録させるためです。evidence を出したのに `guard-loaded` が無い run も失敗として扱います。guard が読み込まれていない 0 件を、0 件の証明として数えないためです。同じ理由で、evidence の有無によらず guard を読み込まなかった run が 1 件でもあれば失敗とします。
+
+検査範囲は、guard を読み込んだプロセスのメインスレッドから出る標準ライブラリ経由の通信です。次は対象外です。
+
+- worker thread（ネイティブの `fetch` と未パッチのモジュールを使う）
+- `NODE_OPTIONS` を落とした環境で起動する子プロセス。deterministic checker の子プロセスは sandbox の環境変数 allowlist（`src/lib/deterministic-command-sandbox.mjs`）により該当する
+- ネイティブアドオン経由の通信
 
 ガードが失敗できることは次で確認しました。
 
-- 陽性対照（テスト内）: `openai` の import、`src/ai/factory.mjs` の import、`fetch` / `http.get` / `net.connect` がそれぞれ記録される
+- 陽性対照（テスト内）: `openai` の import、`src/ai/factory.mjs` の import、`fetch` / `http.get` / `net.connect` / `new net.Socket().connect()` がそれぞれ記録される
 - 陰性対照（テスト内）: 何も呼ばないプロセスは `guard-loaded` だけを記録する
 - 変異注入（測定時に手動、復元済み）: `.claude/hooks/after-change-observe.mjs` に `src/ai/factory.mjs` の import を足すと、e2e テストが `0-LLM guard failed` で失敗した。外部 URL への `fetch` を足した場合も同様に失敗した
+- 変異注入（guard 不在）: 測定スクリプトの guard パスを存在しないファイルに向けると、`--count 1` の実行が `guardLoadedRuns 0` で exit 1 になった
 
 ## 母集団が含む入力帯域
 

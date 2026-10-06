@@ -1,8 +1,8 @@
 // Runtime "0 LLM calls" guard for the after-change dogfood measurement
 // (#2275 PR-3D, Epic #2054 Phase 3).
 //
-// Loaded with `NODE_OPTIONS=--import=<this file>` into every Node process the
-// measured hook starts. The static import-closure tests
+// Loaded with `NODE_OPTIONS=--import=<this file>` into the Node processes the
+// measured hook starts with its environment intact. The static import-closure tests
 // (`tests/fast-verification.test.mjs`, `tests/after-change-adapter.test.mjs`)
 // already pin what the checkpoint's source CAN reach; this file records what a
 // real run DID reach, so the dogfood number "LLM invocation = 0" is measured
@@ -17,6 +17,14 @@
 // the behaviour being measured. A network attempt is recorded and refused, so a
 // provider reached by some path the module list does not name still cannot
 // complete a call.
+//
+// SCOPE. What is covered is stdlib egress on the MAIN THREAD of a process that
+// loaded this file: `fetch`, `http(s).request|get`, `net.connect|
+// createConnection`, `net.Socket.prototype.connect` and `tls.connect`. NOT
+// covered: worker threads (they get the native `fetch` and unpatched modules),
+// and child processes whose env drops `NODE_OPTIONS` — the deterministic
+// checker children do, because the sandbox env is an allowlist
+// (`src/lib/deterministic-command-sandbox.mjs`). Native addons are not covered.
 
 import fs from 'node:fs';
 import http from 'node:http';
@@ -73,6 +81,7 @@ for (const [name, mod] of [
   mod.get = () => refuse(`${name}.get`);
 }
 net.connect = () => refuse('net.connect');
+net.Socket.prototype.connect = () => refuse('net.Socket.connect');
 net.createConnection = () => refuse('net.createConnection');
 tls.connect = () => refuse('tls.connect');
 

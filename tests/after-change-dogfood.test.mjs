@@ -72,10 +72,11 @@ test('guard positive control: fetch, http and a TCP connect are recorded and ref
     try { await fetch('http://127.0.0.1:9/'); outcomes.push('fetch-ok'); } catch { outcomes.push('fetch-refused'); }
     try { http.get('http://127.0.0.1:9/'); outcomes.push('http-ok'); } catch { outcomes.push('http-refused'); }
     try { net.connect(9, '127.0.0.1'); outcomes.push('net-ok'); } catch { outcomes.push('net-refused'); }
+    try { new net.Socket().connect(9, '127.0.0.1'); outcomes.push('socket-ok'); } catch { outcomes.push('socket-refused'); }
     process.stdout.write(outcomes.join(','));
   `);
-  assert.equal(stdout, 'fetch-refused,http-refused,net-refused');
-  assert.equal(events.filter((event) => event === 'network').length, 3);
+  assert.equal(stdout, 'fetch-refused,http-refused,net-refused,socket-refused');
+  assert.equal(events.filter((event) => event === 'network').length, 4);
 });
 
 test('guard negative control: a process that calls nothing records only its own load', () => {
@@ -124,6 +125,11 @@ test('llmGuardHolds fails on a provider load, a network attempt, or evidence wit
   assert.equal(llmGuardHolds(summarize([row({ guard: { providerModules: 1 } })])), false);
   assert.equal(llmGuardHolds(summarize([row({ guard: { network: 1 } })])), false);
   assert.equal(llmGuardHolds(summarize([row({ guard: { loaded: false } })])), false);
+  // A run that never loaded the guard and produced no evidence is not a proof of 0 calls.
+  const notRunWithoutGuard = row({ status: null, guard: { loaded: false } });
+  assert.equal(llmGuardHolds(summarize([notRunWithoutGuard])), false);
+  assert.equal(llmGuardHolds(summarize([row(), notRunWithoutGuard])), false);
+  assert.equal(llmGuardHolds(summarize([])), false);
 });
 
 test('the real hook over a real commit makes 0 LLM calls and never reports a silent skip', () => {

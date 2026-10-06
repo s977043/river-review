@@ -145,7 +145,11 @@ export function summarize(runs) {
 /** True when the guard proves 0 LLM/network calls for every run that produced evidence. */
 export function llmGuardHolds(summary) {
   const guard = summary.llmGuard;
+  // Every run must carry the guard: a run that never loaded it (including one
+  // that stopped before producing evidence) proves nothing about LLM calls.
   return (
+    summary.runs > 0 &&
+    guard.guardLoadedRuns === summary.runs &&
     guard.providerModuleLoads === 0 &&
     guard.networkAttempts === 0 &&
     guard.evidenceWithoutGuard === 0
