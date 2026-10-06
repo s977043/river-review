@@ -1,0 +1,64 @@
+version: 1
+skillId: async-correctness
+
+viewpoints:
+  - id: await-before-use
+    title: Async result awaited before use
+    activatesOn:
+      - async-call-in-condition
+      - async-result-assigned-unawaited
+    question: Promiseを返す呼び出しの結果が、条件や値として使われる前にawaitされているか。
+    requiredEvidence:
+      - async-callee-signature
+      - call-site
+    evidenceHints:
+      - await-usage
+      - type-signature
+    falsePositiveGuards:
+      - intentional-promise-value
+      - test-code-only
+
+  - id: floating-promise-handling
+    title: Floating promise handling
+    activatesOn:
+      - async-call-floating
+    question: 結果を使わない非同期呼び出しの完了とrejectionが、呼び出し側で扱われているか。
+    requiredEvidence:
+      - async-callee-signature
+      - call-site
+    evidenceHints:
+      - await-usage
+      - error-handling
+      - no-floating-promises-lint
+    falsePositiveGuards:
+      - intentional-fire-and-forget
+      - framework-callback-convention
+      - test-code-only
+
+  - id: try-catch-error-propagation
+    title: Error propagation through try/catch
+    activatesOn:
+      - async-return-in-try
+    question: tryブロック内でreturnされるPromiseのrejectionが、対応するcatchで捕捉されるか。
+    requiredEvidence:
+      - async-callee-signature
+      - enclosing-try-block
+    evidenceHints:
+      - return-await
+      - error-handling
+    falsePositiveGuards:
+      - test-code-only
+
+  - id: collection-callback-completion
+    title: Async collection callback completion
+    activatesOn:
+      - async-callback-in-iteration
+    question: コレクション反復に渡したasyncコールバックの完了と戻り値が、後続処理より前に扱われているか。
+    requiredEvidence:
+      - iteration-call-site
+      - following-code
+    evidenceHints:
+      - for-of-await
+      - promise-all-map
+    falsePositiveGuards:
+      - test-code-only
