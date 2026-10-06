@@ -59,6 +59,7 @@
     "check:vocab-literals": "node scripts/check-vocabulary-literals.mjs",
     "check:control-chars": "node scripts/check-control-characters.mjs",
     "check:comment-disposition": "node scripts/check-comment-disposition.mjs",
+    "pr:wait": "bash scripts/wait-pr-ready.sh",
     "check:sidebar-reachability": "node scripts/check-sidebar-reachability.mjs",
     "meta:validate": "node scripts/validate-meta-consistency.mjs && node scripts/check-doc-enumerations.mjs && node scripts/check-sidebar-reachability.mjs && node scripts/check-vocabulary-literals.mjs && node scripts/check-control-characters.mjs && node scripts/generate-skill-catalog.mjs --check",
     "plugin:validate": "node scripts/validate-plugin-manifest.mjs",
