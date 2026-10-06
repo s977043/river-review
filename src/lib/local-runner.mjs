@@ -227,14 +227,12 @@ async function collectLocalContext({
 }
 
 // --- テスト用 named export (内部ヘルパー) ---
-// resolvePullRequestBody は src/lib/pr-context.mjs の再 export（既存テストの import 先を維持するため）。
 export {
   normalizePhase,
   shouldExclude,
   shouldSkipByLabel,
   resolveAvailableContexts,
   resolveAvailableDependencies,
-  resolvePullRequestBody,
 };
 
 export async function planLocalReview({
