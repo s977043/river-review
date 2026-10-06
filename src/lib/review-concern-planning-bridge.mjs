@@ -7,7 +7,10 @@ const SCHEMA_VERSION = '1';
 
 function normalizePath(value) {
   return typeof value === 'string'
-    ? value.trim().replaceAll('\\', '/').replace(/^\.\/+/u, '')
+    ? value
+        .trim()
+        .replaceAll('\\', '/')
+        .replace(/^\.\/+/u, '')
     : '';
 }
 

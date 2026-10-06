@@ -173,7 +173,6 @@ Phase 4 may use `concernRefs` for semantic coverage experiments. Missing refs mu
 Final validation runs against the source changes and the regenerated GitHub Action bundle.
 The merge decision uses the latest branch HEAD only.
 
-
 ## Three-loop review result
 
 The Phase 3 implementation passed three explicit review loops before merge:

@@ -168,7 +168,6 @@ describe('#2523 Review Concern Planning Bridge', () => {
     assert.equal(observation.applied, false);
   });
 
-
   it('canonicalizes leading dot segments for Skill and Review Unit overlap', () => {
     const reviewConcernMap = map([
       concern('concern-1', ['./src/auth/session.ts'], ['./src/api/session-controller.ts']),
