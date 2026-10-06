@@ -65,10 +65,7 @@ describe('#2523 Review Concern Planning Bridge', () => {
     assert.equal(observation.status, 'observed');
     assert.equal(observation.applied, false);
     assert.deepEqual(observation.concerns[0].reviewerRoles, ['bug-hunter']);
-    assert.deepEqual(observation.concerns[1].reviewerRoles, [
-      'bug-hunter',
-      'security-scanner',
-    ]);
+    assert.deepEqual(observation.concerns[1].reviewerRoles, ['bug-hunter', 'security-scanner']);
     assert.deepEqual(observation.concerns[2].reviewerRoles, ['bug-hunter', 'test-gap']);
     assert.deepEqual(observation.recommendation.reviewerRoles, [
       'bug-hunter',
@@ -261,10 +258,7 @@ describe('#2523 Review Concern Planning Bridge', () => {
 
     const enriched = attachConcernRefsToReviewCoverage(
       coverage,
-      map([
-        concern('concern-existing', ['src/app.ts']),
-        concern('concern-new', ['src/app.ts']),
-      ])
+      map([concern('concern-existing', ['src/app.ts']), concern('concern-new', ['src/app.ts'])])
     );
 
     assert.deepEqual(enriched.units[0].concernRefs, ['concern-existing', 'concern-new']);

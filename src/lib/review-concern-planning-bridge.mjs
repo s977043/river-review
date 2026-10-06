@@ -132,9 +132,7 @@ export function buildReviewConcernPlanningObservation({
     });
   }
 
-  const recommendedRoles = [
-    ...new Set(concerns.flatMap((concern) => concern.reviewerRoles)),
-  ];
+  const recommendedRoles = [...new Set(concerns.flatMap((concern) => concern.reviewerRoles))];
   const recommendedSkillIds = [
     ...new Set(
       concerns.flatMap((concern) =>
