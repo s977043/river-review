@@ -12,8 +12,8 @@ argument-hint: '[pr-number]'
 対象の差分は次の順で決める。
 
 1. 引数に PR 番号 `N` がある場合: `gh pr diff N` を diff とし、`gh pr view N --json headRefOid,files` を対象コミットと変更統計とする。ローカルの作業ツリーやブランチの diff は使わない。
-2. 引数が無く、現ブランチに PR がある場合（`gh pr view --json number` が成功する場合）: その PR を対象にし、1 と同じコマンドで取得する。
-3. 引数が無く、現ブランチに PR が無い場合: `git diff <base>...HEAD` を diff とし、`git diff --stat <base>...HEAD` を変更統計とする。`<base>` は `origin/<デフォルトブランチ>` とし、デフォルトブランチ名は `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name` で得る。ローカルのブランチは遅れていることがあるため、先に `git fetch origin <デフォルトブランチ>` を実行する。
+2. 引数が無く、現ブランチに open の PR がある場合（`gh pr view --json number,state --jq 'select(.state=="OPEN") | .number'` が番号を出力する場合）: その PR を対象にし、1 と同じコマンドで取得する。`gh pr view` は同名ブランチのマージ済み・クローズ済み PR にも一致するため、open 以外は使わない。
+3. 引数が無く、現ブランチに open の PR が無い場合（上のコマンドが何も出力しないか失敗する場合）: `git diff <base>...HEAD` を diff とし、`git diff --stat <base>...HEAD` を変更統計とする。`<base>` は `origin/<デフォルトブランチ>` とし、デフォルトブランチ名は `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name` で得る。ローカルのブランチは遅れていることがあるため、先に `git fetch origin <デフォルトブランチ>` を実行する。
 
 出力の 1 行目に、使った対象を次のいずれかで書く。
 
