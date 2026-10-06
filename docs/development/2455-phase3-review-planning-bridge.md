@@ -43,7 +43,7 @@ No recommendation is fed back into execution.
 
 ## Reviewer-role recommendation
 
-For each concern, the bridge classifies that concern's changed and affected subject paths with `classifyChangedFiles()` and calls the existing `selectRolesAuto()`.
+For each concern, the bridge classifies the changed and affected subject paths with `classifyChangedFiles()`. It then calls the existing `selectRolesAuto()`.
 
 The bridge deliberately does not create a second role map.
 
