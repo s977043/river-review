@@ -1,0 +1,43 @@
+name: Temporary format PR 2542
+
+on:
+  push:
+    branches:
+      - feat/2541-concern-coverage-projection
+    paths:
+      - src/lib/review-concern-coverage.mjs
+      - tests/review-concern-coverage.test.mjs
+      - .github/workflows/tmp-format-pr-2542.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/2541-concern-coverage-projection
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Format target files
+        run: npx --no-install prettier --write src/lib/review-concern-coverage.mjs tests/review-concern-coverage.test.mjs
+      - name: Verify formatter output
+        run: npx --no-install prettier --check src/lib/review-concern-coverage.mjs tests/review-concern-coverage.test.mjs
+      - name: Commit formatted files
+        shell: bash
+        run: |
+          if git diff --quiet -- src/lib/review-concern-coverage.mjs tests/review-concern-coverage.test.mjs; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/review-concern-coverage.mjs tests/review-concern-coverage.test.mjs
+          git commit -m "style(concern): apply repository formatting"
+          git push origin HEAD:feat/2541-concern-coverage-projection
