@@ -12,8 +12,10 @@
 //   - prompt: the frontmatter `prompt` and every file under the package's
 //     `prompt/` or `prompts/` directory, plus files `prompt.system` / `prompt.user`
 //     point at inside the package
-//   - judgment criteria: the frontmatter `severity` and `rules`
-// Everything else (fixtures/, golden/, eval/, references/, README.md, applyTo,
+//   - judgment criteria: the frontmatter `severity` and `rules`, and
+//     `references/viewpoints.yaml` (review-viewpoint-stage.mjs adds it to the
+//     prompt as obligations), compared as parsed YAML
+// Everything else (fixtures/, golden/, eval/, other references/, README.md, applyTo,
 // tags, description, ...) does not count. A skill added or removed by the change
 // is not checked: there is no version on the other side to compare.
 //
@@ -21,7 +23,7 @@
 //   - Markdown (body and prompt files) is compared after formatting with the
 //     repo's Prettier config, so a formatter-only rewrite does not count.
 //   - The body is compared per level-2 section; sections and paragraphs matched
-//     by EXCLUDED_SECTION_PATTERNS / EXCLUDED_PARAGRAPH_PATTERN are ignored.
+//     by EXCLUDED_SECTION_HEADINGS / EXCLUDED_PARAGRAPH_PATTERN are ignored.
 //   - Packages under skills/agent-skills/ are skipped. They are treated as
 //     routing documents for the plugin agents, and Phase 1 only expires
 //     suppressions of findings a skill emitted.
@@ -39,6 +41,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import * as yaml from 'js-yaml';
 import prettier from 'prettier';
 
 import { parseFrontMatter } from '../runners/core/skill-loader.mjs';
@@ -46,25 +49,30 @@ import { isDirectRun } from './lib/is-direct-run.mjs';
 
 const SKILLS_ROOT = 'skills';
 const PROMPT_DIRS = ['prompt', 'prompts'];
+const VIEWPOINTS_FILE = 'references/viewpoints.yaml';
 const CRITERIA_FIELDS = ['instruction', 'prompt', 'severity', 'rules'];
 const AGENT_SKILLS_ROOT = 'skills/agent-skills';
 // Non-criteria parts of a SKILL.md body, derived from the false positives of an
 // 80-commit sweep (origin/main, 2026-10-07; see the PR for #2202 Phase 3):
-//   - level-2 sections whose heading starts with one of these (provenance,
+//   - level-2 sections whose heading is exactly one of these (provenance,
 //     reading lists, and notes on when the default CI path fires the skill)
-const EXCLUDED_SECTION_PATTERNS = [
-  /^Origin(?=[\s/]|$)/i,
-  /^由来/,
-  /^References?(?=[\s/]|$)/i,
-  /^既定 CI レビューでは発火しない/,
-];
+const EXCLUDED_SECTION_HEADINGS = new Set([
+  'Origin / 由来',
+  'References',
+  '既定 CI レビューでは発火しない / Not triggered on the default CI review path',
+]);
 //   - paragraphs, in any section, whose first line starts with one of these
 //     (external-evidence notes appended under Goal / Rule)
 const EXCLUDED_PARAGRAPH_PATTERN = /^(外部実証|外部参照|External evidence)/;
 const PRETTIER_CONFIG_ANCHOR = fileURLToPath(new URL('../package.json', import.meta.url));
 
 function git(args, cwd) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 }
 
 function showFile(ref, file, cwd) {
@@ -167,10 +175,27 @@ export function splitSections(body) {
   return sections;
 }
 
-/** True when a level-2 heading names a non-criteria section (see EXCLUDED_SECTION_PATTERNS). */
+/**
+ * Canonical form of a YAML text: the parsed value as JSON, so comments and
+ * layout do not count. Unparseable text falls back to whitespace-trimmed lines.
+ */
+export function normalizeYaml(text) {
+  if (typeof text !== 'string') return text;
+  try {
+    return JSON.stringify(yaml.load(text));
+  } catch {
+    return text
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .join('\n')
+      .trim();
+  }
+}
+
+/** True when a level-2 heading names a non-criteria section (see EXCLUDED_SECTION_HEADINGS). */
 export function isExcludedSection(heading) {
   const text = heading.replace(/ #\d+$/, '');
-  return EXCLUDED_SECTION_PATTERNS.some((re) => re.test(text));
+  return EXCLUDED_SECTION_HEADINGS.has(text);
 }
 
 /** True when the package is a routing agent-skill (see AGENT_SKILLS_ROOT). */
@@ -196,6 +221,7 @@ export async function readCriteria(ref, dir, tree, cwd) {
   for (const f of [...promptFiles].sort()) {
     files[f.slice(dir.length + 1)] = await normalizeMarkdown(showFile(ref, f, cwd));
   }
+  files[VIEWPOINTS_FILE] = normalizeYaml(showFile(ref, `${dir}/${VIEWPOINTS_FILE}`, cwd));
   const fields = {};
   for (const key of CRITERIA_FIELDS) fields[key] = metadata[key] ?? null;
   return {

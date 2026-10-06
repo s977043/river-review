@@ -134,6 +134,50 @@ describe('check-skill-version-bump', () => {
     assert.deepEqual(r.violations, []);
   });
 
+  test('excluded headings match exactly, not by prefix', async () => {
+    const r = await run({
+      [`${SKILL}/SKILL.md`]: skillMd({
+        body: `${BASE_BODY}\n## References and scoring\n\n- Score 3 when foo() lacks a timeout.\n`,
+      }),
+    });
+    assert.equal(r.violations.length, 1);
+    assert.deepEqual(r.violations[0].changed, ['instruction § References and scoring']);
+  });
+
+  const VIEWPOINTS = 'viewpoints:\n  - id: timeout\n    obligation: Check foo() timeouts.\n';
+  const VIEWPOINTS_CHANGED =
+    'viewpoints:\n  - id: timeout\n    obligation: Check foo() timeouts and retries.\n';
+
+  test('references/viewpoints.yaml change without a bump fails', async () => {
+    const r = await run(
+      { [`${SKILL}/references/viewpoints.yaml`]: VIEWPOINTS_CHANGED },
+      { [`${SKILL}/references/viewpoints.yaml`]: VIEWPOINTS }
+    );
+    assert.equal(r.violations.length, 1);
+    assert.deepEqual(r.violations[0].changed, ['references/viewpoints.yaml']);
+  });
+
+  test('references/viewpoints.yaml change with a bump passes', async () => {
+    const r = await run(
+      {
+        [`${SKILL}/references/viewpoints.yaml`]: VIEWPOINTS_CHANGED,
+        [`${SKILL}/SKILL.md`]: skillMd({ version: '0.1.1', body: BASE_BODY }),
+      },
+      { [`${SKILL}/references/viewpoints.yaml`]: VIEWPOINTS }
+    );
+    assert.deepEqual(r.violations, []);
+  });
+
+  test('references/viewpoints.yaml layout or comment change passes', async () => {
+    const r = await run(
+      {
+        [`${SKILL}/references/viewpoints.yaml`]: `# catalog\nviewpoints:\n  -   id: timeout\n      obligation: 'Check foo() timeouts.'\n`,
+      },
+      { [`${SKILL}/references/viewpoints.yaml`]: VIEWPOINTS }
+    );
+    assert.deepEqual(r.violations, []);
+  });
+
   test('non-criteria files (fixtures) pass', async () => {
     const r = await run({ [`${SKILL}/fixtures/case.md`]: 'fixture v2\n' });
     assert.deepEqual(r.violations, []);
