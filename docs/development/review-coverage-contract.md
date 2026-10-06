@@ -183,13 +183,13 @@ Reading it as a real path is a consumer bug.
 Such a unit still reports `status: "completed"` and `findingsCount: 0`.
 That is accurate for Phase 1: the reviewer role did run and returned nothing.
 Suppressing the unit, or giving it a distinct status, changes execution semantics.
-That change belongs to Gate integration and is tracked separately.
+The opt-in gate (see Rollout boundary) reads only the aggregate `status`, so it does not change this; such a change is tracked separately.
 
 ### Why there is no `coveredFiles` field
 
 File-level execution completion is not equivalent to LLM-facing file selection. A file can appear in multiple Review Units because different reviewer roles inspect the same chunk. Deterministic review logic may also inspect raw files that the LLM-facing optimizer omitted. A `covered: true/false` value would therefore require policy about required vs optional reviewers, deterministic processing, and partial failures.
 
-That policy belongs to later Gate integration. Phase 1 keeps file selection as observation and Review Unit outcomes as the execution SSoT.
+The opt-in gate does not define that policy either; it reads only the aggregate `status`. Phase 1 keeps file selection as observation and Review Unit outcomes as the execution SSoT.
 
 ### All-excluded / non-orchestrated runs
 
@@ -225,9 +225,20 @@ The single-reviewer unit reports execution completeness only. It does not claim 
 - distinguish configured exclusions from LLM diff optimization;
 - do not derive file-level completion or change Gate policy.
 
-### Gate integration—later, opt-in
+### Gate integration—shipped, opt-in
 
-Gate integration must be a separate change after fixtures and dogfooding demonstrate the policy we want for incomplete required vs optional coverage.
+The gate reads Review Coverage only when the host opts in with `RIVER_GATE_COVERAGE=1` (#2337).
+The default is OFF, so Gate / `decision` behavior is unchanged unless that variable is set.
+
+- `isCoverageGateEnabled()` in `src/lib/gate-decision.mjs` is the single opt-in predicate. It accepts exactly the string `'1'`.
+- `coverageIncompleteForGate()` maps `reviewCoverage.status` of `partial` or `not_executed` to the gate input `coverageIncomplete`. Any other value, including an absent `reviewCoverage`, does not set it.
+- Decision rule 6c returns `NO_GO` with reason code `COVERAGE_INCOMPLETE`. It is an independent gate input, not a `suggestedLoopSignal` downgrade, so the outcome does not depend on `decision`.
+- Every earlier rule, 0 through 6b, keeps precedence (for example the escalation cliffs and `NOT_EXECUTED`). Rule 6c sits ahead of rule 7, so a run with blocking findings and incomplete coverage reports `COVERAGE_INCOMPLETE` instead of `BLOCKING_FINDINGS`. `tests/gate-incompleteness-optin.test.mjs` pins this order.
+- The `river run --gate` path wires it through `src/lib/run-gate.mjs`. The `review exec` path (`src/lib/review-plan.mjs`) uses the same predicate, but stays a no-op until its engine returns `reviewCoverage`.
+
+How the gate should treat a schema-invalid or unknown `status` while opted in is still undecided (#2212).
+
+The public contract is described in [Loop Convergence Contract](../../pages/reference/loop-convergence-contract.md) and [Stable Interfaces](../../pages/reference/stable-interfaces.md).
 
 ## Backward compatibility
 
