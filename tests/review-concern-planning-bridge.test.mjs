@@ -168,6 +168,56 @@ describe('#2523 Review Concern Planning Bridge', () => {
     assert.equal(observation.applied, false);
   });
 
+
+  it('canonicalizes leading dot segments for Skill and Review Unit overlap', () => {
+    const reviewConcernMap = map([
+      concern('concern-1', ['./src/auth/session.ts'], ['./src/api/session-controller.ts']),
+    ]);
+
+    const observation = buildReviewConcernPlanningObservation({
+      reviewConcernMap,
+      fileTypes: { app: ['src/auth/session.ts'] },
+      selectedSkills: [skill('security-review', ['src/**'])],
+    });
+
+    assert.deepEqual(observation.concerns[0].subjects, [
+      'src/auth/session.ts',
+      'src/api/session-controller.ts',
+    ]);
+    assert.deepEqual(observation.concerns[0].skillRecommendations, [
+      {
+        skillId: 'security-review',
+        matchedSubjects: ['src/auth/session.ts', 'src/api/session-controller.ts'],
+        reason: 'selected-skill-applyTo-overlap',
+      },
+    ]);
+
+    const coverage = {
+      schemaVersion: '1',
+      status: 'complete',
+      expectedUnits: 1,
+      completedUnits: 1,
+      requiredUnits: 1,
+      completedRequiredUnits: 1,
+      incompleteRequiredUnitIds: [],
+      units: [
+        {
+          id: 'reviewer:bug-hunter/chunk:1',
+          kind: 'diff-chunk',
+          subjects: ['src/auth/session.ts'],
+          reviewerRole: 'bug-hunter',
+          required: true,
+          status: 'completed',
+          reasonCode: null,
+          findingsCount: 0,
+        },
+      ],
+    };
+
+    const enriched = attachConcernRefsToReviewCoverage(coverage, reviewConcernMap);
+    assert.deepEqual(enriched.units[0].concernRefs, ['concern-1']);
+  });
+
   it('keeps the whole-diff auto baseline unavailable when no plan fileTypes exist', () => {
     const observation = buildReviewConcernPlanningObservation({
       reviewConcernMap: map([concern('concern-1', ['src/app.ts'])]),
