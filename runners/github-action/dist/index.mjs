@@ -96811,7 +96811,10 @@ const SCHEMA_VERSION = '1';
 
 function review_concern_planning_bridge_normalizePath(value) {
   return typeof value === 'string'
-    ? value.trim().replaceAll('\\', '/').replace(/^\.\/+/u, '')
+    ? value
+        .trim()
+        .replaceAll('\\', '/')
+        .replace(/^\.\/+/u, '')
     : '';
 }
 
