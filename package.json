@@ -83,6 +83,7 @@
     "skills:registry": "node scripts/generate-registry-fields.mjs",
     "skills:registry:check": "node scripts/generate-registry-fields.mjs --check",
     "skills:changelog": "node scripts/skill-changelog.mjs",
+    "skills:version:check": "node scripts/check-skill-version-bump.mjs",
     "feedback:apply": "node scripts/apply-feedback.mjs",
     "packs:tier": "node scripts/pack-tier-check.mjs",
     "suppression:analytics": "node scripts/suppression-analytics.mjs",
