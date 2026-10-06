@@ -1,4 +1,4 @@
-# ADR-015: Action Review Boundary — Action / Artifact / Verification の分離
+# ADR-015: Action Review Boundary—Action / Artifact / Verification の分離
 
 ## Status
 
@@ -144,14 +144,14 @@ River Review の output は判断材料です。
 
 ## Ownership matrix
 
-| Layer | Primary owner | River Review |
-| --- | --- | --- |
-| Action Review | Caller / PlanGate / Host policy + reviewer | material / recommendation |
-| Artifact Review | River Review | owner |
-| Finding / claim Verification | River Review verifier / critic | owner |
-| Retry / stop / escalation | Caller / PlanGate / Host | evidence provider only |
-| Privileged execution | Host | none |
-| Merge / release | Human / repository policy | none |
+| Layer                        | Primary owner                              | River Review              |
+| ---------------------------- | ------------------------------------------ | ------------------------- |
+| Action Review                | Caller / PlanGate / Host policy + reviewer | material / recommendation |
+| Artifact Review              | River Review                               | owner                     |
+| Finding / claim Verification | River Review verifier / critic             | owner                     |
+| Retry / stop / escalation    | Caller / PlanGate / Host                   | evidence provider only    |
+| Privileged execution         | Host                                       | none                      |
+| Merge / release              | Human / repository policy                  | none                      |
 
 ## Relationship to Judgment Placement
 
@@ -227,7 +227,7 @@ Phase 0 は docs-only です。
 ### Trade-offs
 
 - Action Review の実行 policy は River Review 単体では完結しない
-- Caller / PlanGate / Host 側に retry / stop / escalation contract が必要になる
+- Caller / PlanGate / Host 側では retry / stop / escalation contract が必要になる
 - host ごとの risk policy を共通化しすぎない設計判断が必要になる
 
 ## Non-goals
@@ -243,11 +243,11 @@ Phase 0 は docs-only です。
 
 ## References
 
-- #2545 — Action Review Boundary
-- #1812 — Judgment Placement
-- #1760 — Reviewer Independence
-- #1978 — Finding verification
-- #2322 — Review Resolution Loop
-- ADR-013 — Evidence Architecture
+- #2545—Action Review Boundary
+- #1812—Judgment Placement
+- #1760—Reviewer Independence
+- #1978—Finding verification
+- #2322—Review Resolution Loop
+- ADR-013—Evidence Architecture
 - OpenAI, “Auto-review of agent actions without synchronous human oversight”
-  - https://alignment.openai.com/auto-review/
+  - [OpenAI Alignment: Auto-review](https://alignment.openai.com/auto-review/)
