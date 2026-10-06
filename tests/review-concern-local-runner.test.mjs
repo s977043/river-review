@@ -24,6 +24,7 @@ function withoutConcernObservation(result) {
   const cloned = structuredClone(result);
   if (cloned.reviewDebug) {
     delete cloned.reviewDebug.reviewConcernMap;
+    delete cloned.reviewDebug.reviewConcernPlanning;
     if (Object.keys(cloned.reviewDebug).length === 0) delete cloned.reviewDebug;
   }
   return cloned;
@@ -79,6 +80,10 @@ test('local runner keeps Concern Analyzer observe-only and default off', async (
   assert.deepEqual(observed.reviewDebug.reviewConcernMap.analysis.limitations, [
     'analyzer-not-executed:dry-run',
   ]);
+  assert.equal(observed.reviewDebug.reviewConcernPlanning.status, 'unavailable');
+  assert.equal(observed.reviewDebug.reviewConcernPlanning.source.reason, 'concern-map-failed');
+  assert.equal(observed.reviewDebug.reviewConcernPlanning.recommendation, null);
+  assert.equal(observed.reviewDebug.reviewConcernPlanning.applied, false);
   assert.equal(
     observed.reviewDebug.reviewConcernMap.analysis.input.rawChangedFileCount,
     rawChangedFiles.length
@@ -160,6 +165,9 @@ test('optimized-away raw changes still produce an observe-only map on no-changes
   assert.deepEqual(observed.reviewDebug.reviewConcernMap.analysis.limitations, [
     'analyzer-not-executed:dry-run',
   ]);
+  assert.equal(observed.reviewDebug.reviewConcernPlanning.status, 'unavailable');
+  assert.equal(observed.reviewDebug.reviewConcernPlanning.source.reason, 'concern-map-failed');
+  assert.equal(observed.reviewDebug.reviewConcernPlanning.applied, false);
 
   assert.deepEqual(withoutConcernObservation(observed), off);
 });

@@ -6,6 +6,10 @@ import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
 import {
+  attachConcernRefsToReviewCoverage,
+  buildReviewConcernPlanningObservation,
+} from './review-concern-planning-bridge.mjs';
+import {
   attachReviewFileScope,
   deriveReviewFileScope,
   allLlmAttemptsSkipped,
@@ -602,6 +606,13 @@ export async function runLocalReview({
       model,
       apiKey,
     });
+    const reviewConcernPlanning = buildReviewConcernPlanningObservation({
+      reviewConcernMap,
+      fileTypes: context.plan?.fileTypes,
+      riskAssessment: context.plan?.riskAssessment ?? null,
+      signals: context.plan?.reviewSignals,
+      selectedSkills: context.plan?.selected ?? [],
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -609,7 +620,14 @@ export async function runLocalReview({
       mergeBase: context.mergeBase,
       commitSha: context.commitSha ?? null,
       dirty: context.dirty ?? null,
-      ...(reviewConcernMap ? { reviewDebug: { reviewConcernMap } } : {}),
+      ...(reviewConcernMap
+        ? {
+            reviewDebug: {
+              reviewConcernMap,
+              ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+            },
+          }
+        : {}),
       config: context.config,
       configPath: context.configPath,
       configSource: context.configSource,
@@ -659,6 +677,16 @@ export async function runLocalReview({
     model,
     apiKey,
     repoContext,
+  });
+  // #2455 Phase 3: observe-only planning bridge. It reuses the existing
+  // deterministic router and already-selected Skill metadata, but its output is
+  // never fed into reviewer selection, Skill selection, Gate, or execution.
+  const reviewConcernPlanning = buildReviewConcernPlanningObservation({
+    reviewConcernMap,
+    fileTypes: context.plan?.fileTypes,
+    riskAssessment: context.plan?.riskAssessment ?? null,
+    signals: context.plan?.reviewSignals,
+    selectedSkills: context.plan?.selected ?? [],
   });
 
   const reviewArgs = {
@@ -710,7 +738,10 @@ export async function runLocalReview({
   // Slice C enriches an existing execution observation with the selection
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here.
-  const reviewCoverage = attachReviewFileScope(baseReviewCoverage, context.reviewFileScope);
+  const reviewCoverage = attachConcernRefsToReviewCoverage(
+    attachReviewFileScope(baseReviewCoverage, context.reviewFileScope),
+    reviewConcernMap
+  );
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
@@ -804,6 +835,7 @@ export async function runLocalReview({
     reviewDebug: {
       ...(review.debug ?? {}),
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
+      ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
