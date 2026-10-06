@@ -105,6 +105,25 @@ describe('#2541 Concern Coverage projection', () => {
     assert.equal(observation.applied, false);
   });
 
+  it('fails closed when Concern Map status is missing or unknown', () => {
+    const missingStatus = map(['concern-1'], {});
+    const unknownStatus = map(['concern-1'], {
+      status: 'mystery',
+      limitations: [],
+    });
+
+    for (const reviewConcernMap of [missingStatus, unknownStatus]) {
+      const observation = buildReviewConcernCoverageObservation({
+        reviewConcernMap,
+        reviewCoverage: coverage([]),
+      });
+
+      assert.equal(observation.status, 'unavailable');
+      assert.equal(observation.source.reason, 'invalid-concern-map-status');
+      assert.deepEqual(observation.blindSpotConcernRefs, []);
+    }
+  });
+
   it('does not treat missing Review Coverage as unmapped or covered', () => {
     const observation = buildReviewConcernCoverageObservation({
       reviewConcernMap: map(['concern-1']),
