@@ -136,7 +136,7 @@ describe('#2541 Concern Coverage projection', () => {
     assert.equal(observation.summary, null);
   });
 
-  it('rejects an inconsistent complete Review Coverage label', () => {
+  it('reuses normalizeCoverageStatus demotion for an inconsistent complete label', () => {
     const reviewCoverage = coverage(
       [
         unit({
@@ -153,8 +153,26 @@ describe('#2541 Concern Coverage projection', () => {
       reviewCoverage,
     });
 
+    assert.equal(observation.status, 'observed');
+    assert.equal(observation.source.reviewCoverageStatus, 'not_executed');
+    assert.equal(observation.concerns[0].executionCoverage, 'not_executed');
+    assert.equal(observation.summary.incompleteMappedConcerns, 1);
+  });
+
+  it('keeps an unknown Review Coverage status unavailable', () => {
+    const reviewCoverage = {
+      ...coverage([]),
+      status: 'mystery',
+    };
+
+    const observation = buildReviewConcernCoverageObservation({
+      reviewConcernMap: map(['concern-1']),
+      reviewCoverage,
+    });
+
     assert.equal(observation.status, 'unavailable');
     assert.equal(observation.source.reason, 'review-coverage-invalid');
+    assert.equal(observation.source.reviewCoverageStatus, 'unknown');
   });
 
   it('observes mapped execution and an unmapped blind-spot candidate', () => {
