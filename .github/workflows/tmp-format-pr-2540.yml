@@ -1,0 +1,44 @@
+name: Temporary format PR 2540
+
+on:
+  push:
+    branches:
+      - feat/2523-concern-planning-bridge-v3
+    paths:
+      - docs/development/2455-phase3-review-planning-bridge.md
+      - src/lib/review-concern-planning-bridge.mjs
+      - tests/review-concern-planning-bridge.test.mjs
+      - .github/workflows/tmp-format-pr-2540.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/2523-concern-planning-bridge-v3
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Format target files
+        run: npx --no-install prettier --write docs/development/2455-phase3-review-planning-bridge.md src/lib/review-concern-planning-bridge.mjs tests/review-concern-planning-bridge.test.mjs
+      - name: Verify formatter output
+        run: npx --no-install prettier --check docs/development/2455-phase3-review-planning-bridge.md src/lib/review-concern-planning-bridge.mjs tests/review-concern-planning-bridge.test.mjs
+      - name: Commit formatted files
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/development/2455-phase3-review-planning-bridge.md src/lib/review-concern-planning-bridge.mjs tests/review-concern-planning-bridge.test.mjs; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/development/2455-phase3-review-planning-bridge.md src/lib/review-concern-planning-bridge.mjs tests/review-concern-planning-bridge.test.mjs
+          git commit -m "style(concern): apply repository formatting"
+          git push origin HEAD:feat/2523-concern-planning-bridge-v3
