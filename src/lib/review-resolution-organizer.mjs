@@ -83,9 +83,7 @@ function warning(code, resolutionIndex, details = {}) {
   return { code, resolutionIndex, ...details };
 }
 
-export function resolveReviewResolutionFindingRef(findings = [], findingRef = {}) {
-  const sourceFindings = Array.isArray(findings) ? findings : [];
-  const indexes = buildFindingIndexes(sourceFindings);
+function resolveFindingRefWithIndexes(sourceFindings, indexes, findingRef) {
   const findingIdCandidates = nonEmptyString(findingRef.findingId)
     ? (indexes.byId.get(findingRef.findingId) ?? [])
     : [];
@@ -135,13 +133,23 @@ export function resolveReviewResolutionFindingRef(findings = [], findingRef = {}
   return { status: 'orphan' };
 }
 
+export function resolveReviewResolutionFindingRef(findings = [], findingRef = {}) {
+  const sourceFindings = Array.isArray(findings) ? findings : [];
+  return resolveFindingRefWithIndexes(
+    sourceFindings,
+    buildFindingIndexes(sourceFindings),
+    findingRef
+  );
+}
+
 function joinResolutionItems(findings, resolutionItems) {
   const matchesByFinding = findings.map(() => []);
   const warnings = [];
+  const indexes = buildFindingIndexes(findings);
 
   resolutionItems.forEach((item, resolutionIndex) => {
     const findingRef = item?.findingRef ?? {};
-    const resolved = resolveReviewResolutionFindingRef(findings, findingRef);
+    const resolved = resolveFindingRefWithIndexes(findings, indexes, findingRef);
 
     if (resolved.status === 'ambiguous') {
       warnings.push(
