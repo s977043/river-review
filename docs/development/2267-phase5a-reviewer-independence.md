@@ -259,3 +259,11 @@ Phase 5A is ready when:
 - #1760 ownership is preserved
 - targeted and existing Finding Critic regression tests pass
 - repository CI passes
+
+
+## #2543 convergence note
+
+The runtime wiring in #2543 remains observation-only.
+The latest-main reconstruction preserves the existing Finding Critic opt-in boundary.
+Generated GitHub Action dist is rebuilt by the repository automation.
+Merge readiness is decided only from checks on the final human-authored head.
