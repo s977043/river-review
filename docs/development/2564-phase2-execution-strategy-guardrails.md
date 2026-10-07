@@ -8,7 +8,7 @@
 
 HydraFusion の Single / Cascade / Critique は上位 Harness の Execution Strategy 候補とします。River Review の新しい実行モードとして追加しません。
 
-Execution Strategy は Model / Effort / Role / Autonomy / Judgment Placement から独立した軸です。Reviewer routing、Skill selection、Gate の既存責務を変えない。
+Execution Strategy は Model / Effort / Role / Autonomy / Judgment Placement から独立した軸です。Reviewer routing、Skill selection、Gate の既存責務を変えません。
 
 ### 上位 Harness / Host
 
@@ -20,7 +20,7 @@ Host は戦略の選択、モデルの割当、solver / revision / escalation / 
 
 River Review は既存の `selectRolesAuto()` と Skill selection を使います。Review Coverage、Finding Critic、Verifier、Gate から判断材料を返します。
 
-`docs/development/agent-contract.md` は論理 Agent と reviewer lens の責務を定義します。`#2455` の Review Planning Bridge は observe-only とし、別の routing SSoT を作らない。
+`docs/development/agent-contract.md` は論理 Agent と reviewer lens の責務を定義します。`#2455` の Review Planning Bridge は observe-only とし、別の routing SSoT を作りません。
 
 ### 判断と証拠の分離
 
@@ -30,7 +30,7 @@ Runtimeのモデル選択だけで reviewer independence を証明しません�
 
 ## 2. Five guardrails の現状・不足・所有者
 
-GitHub公式の HydraFusion 記事は5つの運用原則を説明しています。ベンチマーク数値を River Review の目標値や合格しきい値には使わない。
+GitHub公式の HydraFusion 記事は5つの運用原則を説明しています。ベンチマーク数値を River Review の目標値や合格しきい値には使いません。
 
 ### Complete accounting
 
@@ -80,7 +80,7 @@ GitHub公式の HydraFusion 記事は5つの運用原則を説明しています
 
 `debug.durationMs` は reviewer orchestration の wall-clock duration です。並列 reviewer の duration は足し算しません。
 
-`reviewCoverage` は Review Unit の実行状態を記録します。品質、retry回数、独立性、patchの安全性は示さない。
+`reviewCoverage` は Review Unit の実行状態を記録します。品質、retry回数、独立性、patchの安全性は示しません。
 
 Review Coverage から Gate への接続は `RIVER_GATE_COVERAGE=1` で opt-in となります。未設定時に coverage incomplete が必ずmergeを阻止すると主張しません。
 
@@ -159,7 +159,7 @@ provider request / attempt ID と leg lineage を使って重複を検証しま�
 
 ### Evidence is not approval
 
-観測結果を Gate、権限、routing、Human approvalへ自動昇格させない。
+観測結果を Gate、権限、routing、Human approvalへ自動昇格させません。
 
 prompt本文、diff、生ログ、credential、secret を accounting に保存しません。
 
@@ -209,7 +209,7 @@ usage telemetryファイルが存在しなくても費用ゼロではありま�
 
 ### 観測のみの戦略推奨
 
-Hostが実行せずshadow recommendationだけを生成しました。`actualStrategy: null` のままにします。品質向上の根拠に使わない。
+Hostが実行せずshadow recommendationだけを生成しました。`actualStrategy: null` のままにします。品質向上の根拠に使いません。
 
 ### Write可能なCritic
 
@@ -217,7 +217,7 @@ Criticが異なるmodel familyでもwrite権限があればread-only隔離の証
 
 ## 8. Exit criteria
 
-Phase 2では設計文書のみ完了します。計測・shadow routing・自動適用の実装は含まない。
+Phase 2では設計文書のみ完了します。計測・shadow routing・自動適用の実装は含みません。
 
 - [x] Strategy / Role / Model / Authority の区別
 - [x] Five guardrails の current / gap / owner
