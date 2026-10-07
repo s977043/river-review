@@ -40659,7 +40659,37 @@ function computeBackoffMs(
   return Math.min(baseMs * 2 ** Math.max(0, attempt - 1), LLM_MAX_BACKOFF_MS);
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function abortError(signal) {
+  if (signal?.reason instanceof Error) return signal.reason;
+  const err = new Error('The operation was aborted');
+  err.name = 'AbortError';
+  return err;
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw abortError(signal);
+}
+
+function sleep(ms, signal) {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function attemptSignal(timeoutMs, signal) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
 
 /**
  * Call an OpenAI-compatible chat-completion endpoint with timeout and
@@ -40680,6 +40710,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {number} [params.maxTokens]
  * @param {number} [params.timeoutMs]     Per-attempt timeout (default 15000).
  * @param {number} [params.maxAttempts]   Total attempts incl. first (default 3).
+ * @param {AbortSignal} [params.signal]    Host cancellation signal. External aborts are never retried.
  * @param {typeof fetch} [params.fetchImpl] Injectable transport for tests (#1357).
  * @param {number} [params.baseMs]        Retry backoff base ms (injectable for tests).
  * @returns {Promise<string>}
@@ -40694,6 +40725,7 @@ async function callChatCompletion({
   maxTokens,
   timeoutMs = LLM_TIMEOUT_MS,
   maxAttempts = LLM_MAX_ATTEMPTS,
+  signal,
   fetchImpl = globalThis.fetch,
   baseMs = LLM_RETRY_BASE_MS,
 }) {
@@ -40709,10 +40741,11 @@ async function callChatCompletion({
 
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    throwIfAborted(signal);
     try {
       const res = await fetchImpl(endpoint, {
         method: 'POST',
-        signal: AbortSignal.timeout(timeoutMs), // fresh per attempt (one-shot)
+        signal: attemptSignal(timeoutMs, signal), // fresh timeout + host cancellation per attempt
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body,
       });
@@ -40727,7 +40760,8 @@ async function callChatCompletion({
       const detail = await res.text();
       if (attempt < maxAttempts && isRetryableStatus(res.status)) {
         await sleep(
-          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') })
+          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') }),
+          signal
         );
         continue;
       }
@@ -40737,8 +40771,12 @@ async function callChatCompletion({
       // A non-retryable HTTP error (thrown above) has a non-network message, so
       // isRetryableNetworkError returns false and it propagates immediately.
       lastError = err;
+      // A host cancellation is a terminal control signal, not a transient
+      // provider/network failure. Do not spend retry budget after the caller
+      // has explicitly ended the review task.
+      if (signal?.aborted) throw abortError(signal);
       if (attempt < maxAttempts && isRetryableNetworkError(err)) {
-        await sleep(computeBackoffMs(attempt, { baseMs }));
+        await sleep(computeBackoffMs(attempt, { baseMs }), signal);
         continue;
       }
       throw err;
@@ -44978,6 +45016,7 @@ async function generateReview({
   prBody,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
+  signal,
   // #2334: reviewer-orchestrator は findings をマージしたあとに Critic を
   // 1 回だけ走らせる。その経路では per-reviewer の generateReview が同じ段を
   // 二重に走らせないよう true を渡す。既定 false なので、単一レビューアの
@@ -45112,6 +45151,7 @@ async function generateReview({
         endpoint: openAIConfig.endpoint,
         temperature: openAIConfig.temperature,
         maxTokens: openAIConfig.maxTokens,
+        signal,
         systemMessage: activeCompiledPrompt
           ? activeCompiledPrompt.systemMessage
           : (0,sections/* buildSystemMessage */.HB)(language),
@@ -45166,6 +45206,12 @@ async function generateReview({
         debug.llmError = 'LLM output could not be parsed';
       }
     } catch (err) {
+      // Host cancellation is control flow owned by the orchestration layer.
+      // Do not convert it into an LLM failure and continue into heuristic
+      // fallback, or a timed-out reviewer could still return a fulfilled task.
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : err;
+      }
       debug.llmUsed = false;
       debug.llmError = err.message;
     }
@@ -95422,13 +95468,12 @@ const SPLIT_LINE_THRESHOLD = 500;
 // survived is NOT clean: src/lib/run-gate.mjs reads `reviewerResults` and
 // withholds the GO / auto-approve outcome (rule 6b NOT_EXECUTED).
 //
-// Scope note: the timeout ABANDONS a slow role rather than cancelling its LLM
-// call — generateReview() takes no AbortSignal. The HTTP layer already has its
-// own budget (LLM_TIMEOUT_MS + bounded retries in llm-pipeline.mjs), so the
-// abandoned request keeps the process alive for up to that budget after the
-// timeout line is printed. This limit bounds the ORCHESTRATION wait, which is
-// what #1689 asks for; true cancellation needs an AbortSignal through
-// generateReview() and is deliberately out of scope.
+// The timeout is a real execution bound: every role×chunk task owns an
+// AbortController and the timeout aborts it before the orchestration promise is
+// rejected. generateReview() forwards that signal to llm-pipeline.mjs, where it
+// cancels an in-flight fetch and retry backoff. A custom generateReviewImpl used
+// by tests/integrations may ignore the signal; Promise.race still preserves the
+// fail-soft orchestration bound in that case.
 
 /** Env var carrying the per-role timeout in milliseconds (mirrors RIVER_PLANNER_TIMEOUT). */
 const REVIEWER_TIMEOUT_ENV = 'RIVER_REVIEWER_TIMEOUT';
@@ -95542,11 +95587,18 @@ function resolveReviewerProgressEnabled({ quiet = false, progress, config } = {}
  * Both branches of the race attach handlers to `promise`, so a late rejection
  * after a timeout is already handled and never surfaces as an unhandled rejection.
  */
-function withReviewerTimeout(promise, timeoutMs, makeError) {
+function withReviewerTimeout(promise, timeoutMs, makeError, onTimeout) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   let timer = null;
   const timeout = new Promise((_resolve, reject) => {
-    timer = setTimeout(() => reject(makeError()), timeoutMs);
+    timer = setTimeout(() => {
+      const error = makeError();
+      try {
+        onTimeout?.(error);
+      } finally {
+        reject(error);
+      }
+    }, timeoutMs);
   });
   const settled = promise.then(
     (value) => {
@@ -96215,11 +96267,13 @@ async function runReviewerOrchestration({
     const role = REVIEWER_ROLES[roleName];
     const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
     const taskStartedAt = nowMs();
+    const controller = new AbortController();
     logProgress(`Reviewer ${roleName}: start${chunkSuffix(chunkIdx)}`);
     const run = generateReviewImpl({
       ...generateArgs,
       diff: chunkDiff,
       projectRules: roleRules,
+      signal: controller.signal,
     }).then((result) => ({
       ...result,
       reviewerRole: roleName,
@@ -96230,7 +96284,8 @@ async function runReviewerOrchestration({
     return withReviewerTimeout(
       run,
       effectiveTimeoutMs,
-      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs)
+      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs),
+      (timeoutError) => controller.abort(timeoutError)
     ).then(
       (value) => {
         const durationMs = Math.round(nowMs() - taskStartedAt);
