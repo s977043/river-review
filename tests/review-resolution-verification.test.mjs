@@ -225,6 +225,37 @@ describe('proposeReviewResolutionTargetBinding', () => {
     );
   });
 
+  test('rejects invalid revision artifact hashes and untrusted source revision', () => {
+    const invalid = {
+      ...TARGET,
+      artifactRefs: [{ name: 'diff', sha256: 'invalid' }],
+    };
+    assert.throws(
+      () =>
+        proposeReviewResolutionTargetBinding({
+          findings: [finding()],
+          reviewResolution: document(),
+          findingTarget: FINDING_TARGET,
+          targetRevision: invalid,
+        }),
+      (error) =>
+        error instanceof ReviewResolutionVerificationError && error.code === 'invalid_revision'
+    );
+
+    const badSource = { ...document(), source: invalid };
+    assert.throws(
+      () =>
+        proposeReviewResolutionTargetBinding({
+          findings: [finding()],
+          reviewResolution: badSource,
+          findingTarget: FINDING_TARGET,
+          targetRevision: TARGET,
+        }),
+      (error) =>
+        error instanceof ReviewResolutionVerificationError && error.code === 'invalid_revision'
+    );
+  });
+
   test('does not bind the source revision as a submitted fix', () => {
     assert.throws(
       () =>
@@ -337,6 +368,28 @@ describe('proposeReviewResolutionVerificationUpdate', () => {
       (error) =>
         error instanceof ReviewResolutionVerificationError &&
         error.code === 'observation_finding_mismatch'
+    );
+  });
+
+  test('does not verify findings when the source revision identity is invalid', () => {
+    const invalidSource = {
+      ...boundDocument(),
+      source: {
+        ...SOURCE,
+        executionManifestId: 'unknown',
+      },
+    };
+    assert.throws(
+      () =>
+        proposeReviewResolutionVerificationUpdate({
+          findings: [finding()],
+          reviewResolution: invalidSource,
+          findingTarget: FINDING_TARGET,
+          currentRevision: TARGET,
+          observation: observation(),
+        }),
+      (error) =>
+        error instanceof ReviewResolutionVerificationError && error.code === 'invalid_revision'
     );
   });
 
