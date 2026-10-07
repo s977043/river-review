@@ -98,13 +98,12 @@ const SPLIT_LINE_THRESHOLD = 500;
 // survived is NOT clean: src/lib/run-gate.mjs reads `reviewerResults` and
 // withholds the GO / auto-approve outcome (rule 6b NOT_EXECUTED).
 //
-// Scope note: the timeout ABANDONS a slow role rather than cancelling its LLM
-// call — generateReview() takes no AbortSignal. The HTTP layer already has its
-// own budget (LLM_TIMEOUT_MS + bounded retries in llm-pipeline.mjs), so the
-// abandoned request keeps the process alive for up to that budget after the
-// timeout line is printed. This limit bounds the ORCHESTRATION wait, which is
-// what #1689 asks for; true cancellation needs an AbortSignal through
-// generateReview() and is deliberately out of scope.
+// The timeout is a real execution bound: every role×chunk task owns an
+// AbortController and the timeout aborts it before the orchestration promise is
+// rejected. generateReview() forwards that signal to llm-pipeline.mjs, where it
+// cancels an in-flight fetch and retry backoff. A custom generateReviewImpl used
+// by tests/integrations may ignore the signal; Promise.race still preserves the
+// fail-soft orchestration bound in that case.
 
 /** Env var carrying the per-role timeout in milliseconds (mirrors RIVER_PLANNER_TIMEOUT). */
 export const REVIEWER_TIMEOUT_ENV = 'RIVER_REVIEWER_TIMEOUT';
@@ -218,11 +217,18 @@ export function resolveReviewerProgressEnabled({ quiet = false, progress, config
  * Both branches of the race attach handlers to `promise`, so a late rejection
  * after a timeout is already handled and never surfaces as an unhandled rejection.
  */
-function withReviewerTimeout(promise, timeoutMs, makeError) {
+function withReviewerTimeout(promise, timeoutMs, makeError, onTimeout) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   let timer = null;
   const timeout = new Promise((_resolve, reject) => {
-    timer = setTimeout(() => reject(makeError()), timeoutMs);
+    timer = setTimeout(() => {
+      const error = makeError();
+      try {
+        onTimeout?.(error);
+      } finally {
+        reject(error);
+      }
+    }, timeoutMs);
   });
   const settled = promise.then(
     (value) => {
@@ -891,11 +897,13 @@ export async function runReviewerOrchestration({
     const role = REVIEWER_ROLES[roleName];
     const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
     const taskStartedAt = nowMs();
+    const controller = new AbortController();
     logProgress(`Reviewer ${roleName}: start${chunkSuffix(chunkIdx)}`);
     const run = generateReviewImpl({
       ...generateArgs,
       diff: chunkDiff,
       projectRules: roleRules,
+      signal: controller.signal,
     }).then((result) => ({
       ...result,
       reviewerRole: roleName,
@@ -906,7 +914,8 @@ export async function runReviewerOrchestration({
     return withReviewerTimeout(
       run,
       effectiveTimeoutMs,
-      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs)
+      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs),
+      (timeoutError) => controller.abort(timeoutError)
     ).then(
       (value) => {
         const durationMs = Math.round(nowMs() - taskStartedAt);
