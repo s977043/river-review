@@ -9,7 +9,6 @@
 HydraFusion の Single / Cascade / Critique を River Review の既定実行モードとして取り込まない。
 上位 Harness の **Execution Strategy** を独立した設計軸として扱い、River Review のレビュー・証拠・判断という既存責務を維持する。
 
-
 ```text
 Human / Host-owned authority
    │
@@ -55,16 +54,14 @@ Human / Host-owned authority
 `critique` は複数 reviewer の多数決でもない。
 いずれも本フェーズでは**設計語彙**であり、実行値・選択値・品質結果の事実として生成しない。
 
-
 ## 2. Five-guardrail gap map（既存コードで確認）
 
 GitHub の公式 HydraFusion 記事は complete accounting / bounded execution / isolated review / fail-safe application / validated routing を要件として挙げる。
 ただし記事の benchmark の数値を River Review の期待値や acceptance threshold に転用しない。
 
-
 - **Complete accounting**
   - **Current evidence / contract**: `src/lib/usage-persistence.mjs` は opt-in の file×skill JSONL。
-`src/lib/reviewer-orchestrator.mjs` は role duration / run duration / timeout を出力する
+    `src/lib/reviewer-orchestrator.mjs` は role duration / run duration / timeout を出力する
   - **Remaining gap**: 共通 strategy / leg / provider request ID がなく、retry・fallback・critique・escalation の総費用や end-to-end latency は結合できない
   - **Owner / this phase decision**: **Host/provider instrumentation**。Phase 2 は observation の必要フィールドと欠損 semantics のみ設計
 
@@ -84,7 +81,8 @@ GitHub の公式 HydraFusion 記事は complete accounting / bounded execution /
   - **Owner / this phase decision**: **Host/Human** が write authority を持つ。欠損 evidence を GO に昇格させない
 
 - **Validated routing**
-  - **Current evidence / contract**: `src/lib/reviewer-orchestrator.mjs` の deterministic `selectRolesAuto()`、`src/lib/review-mode-router.mjs`、#2455 Phase 3 Bridge の observe-only recommendation
+  - **Current evidence / contract**: `src/lib/reviewer-orchestrator.mjs` の `selectRolesAuto()`。
+    `src/lib/review-mode-router.mjs` と #2455 の observe-only Bridge も参照する。
   - **Remaining gap**: Single/Cascade/Critique の model availability、workflow graph、fallback、budget を事前検証する Host strategy router は未実装
   - **Owner / this phase decision**: **Host** が strategy 定義・model bindings を検証。River Review は shadow recommendation を実行へ接続しない
 
@@ -104,7 +102,6 @@ cache token の項目はあるが、モデル単価に基づく確定請求金�
 既存の Review Artifact / Execution Manifest / Review Coverage / saved-run / `#1574` の Experiment Manifest に新しい schema field を追加しない。
 以下は Host 側で将来計測するときの **評価用 projection 例**。
 名称・値・安定性は provisional、生成コード・JSON Schema・public CLI は追加しない。
-
 
 ```text
 # Example only. Never claim this was emitted by River Review.
@@ -133,7 +130,6 @@ strategyObservation:
 各 leg は将来少なくとも次の意味を保持する。
 `role` は actor role ではなく **workflow leg purpose**（solver / critic / revision / escalation / retry / fallback）であり、`REVIEWER_ROLES` の reviewer lens 名と混ぜない。
 
-
 - **`legId` / `parentLegId`**
   - **Meaning / invariant**: Host が付与する安定した leg ID と親。重複なし、循環なし。River Review の Review Unit ID と別。1 leg に複数 provider attempt があり得る
 
@@ -161,27 +157,29 @@ strategyObservation:
 ### Accounting と identity の hard rules
 
 1. **Complete accounting needs a proven inventory boundary**: Host の実行境界を宣言する。
-solver / critic / retry / fallback / escalation / provider attempt の網羅を検証する。
-見えている leg が全件だとは推測しない。
-証明できなければ `completeness: unknown`。
-既知の欠損は `partial` とする。
-`inventoryVerified: false` を保ち、未観測 leg は無料・成功・未実行と扱わない。
+   solver / critic / retry / fallback / escalation / provider attempt の網羅を検証する。
+   見えている leg が全件だとは推測しない。
+   証明できなければ `completeness: unknown`。
+   既知の欠損は `partial` とする。
+   `inventoryVerified: false` を保ち、未観測 leg は無料・成功・未実行と扱わない。
 
-2. **No double counting**: Host が結合する provider request ID / attempt ID と leg lineage によって重複を検証し、同一 usage event を file×skill 行と leg 行で二重加算しない。
-request/attempt ID が無ければ確実な dedupe を主張しない。
-leg が1つでも、retryが3回なら provider attempts は3つあり得る。
+2. **No double counting**: Host が provider request ID / attempt ID と leg lineage を結合して重複を検証する。
+   同じ usage event を file×skill 行と leg 行で二重加算しない。
+   request/attempt ID が無ければ dedupe を主張しない。
+   1 leg 内で retry が3回なら、provider attempt は3つあり得る。
 
 3. **Unknown differs from zero**: missing token/cost/latency は `null`。`0` は計測可能で実際にゼロだった場合にのみ使う。
 4. **Parallel latency is not a sum of leg durations**: end-to-end wall-clock は Host の run boundary で測る。並列 leg の duration 総和をユーザー待ち時間としない。
-5. **Evidence is not approval**: observation は routing、Gate、allowlist、merge authority、Human approval の入力へ自動昇格させない。
-特に `RIVER_GATE_COVERAGE=1` が無ければ Review Coverage の Gate への伝播も既定では有効でない。
+5. **Evidence is not approval**: observation を routing / Gate / allowlist / merge authority / Human approval に自動昇格させない。
+   `RIVER_GATE_COVERAGE=1` を明示しなければ、Review Coverage から Gate への伝播は無効。
 
 6. **No source/secret capture**: request body、prompt本文、diff、生ログ、credential を leg accounting に保存しない。識別子もレビュー対象 repo の untrusted input と区別する。
 
 ## 4. Evidence and comparison before Phase 3
 
-- **This is not an implemented telemetry interface.** `strategyObservation` は説明用の擬似契約であり、現行の River Review runner / artifact がこの object を出力すると主張しない。
-`source` を Host の宣言だけで `verified` に昇格させない。
+- **This is not implemented telemetry.** `strategyObservation` は説明用の擬似契約。
+  現行 runner / artifact がこの object を出力するとは主張しない。
+  `source` を Host の宣言だけで `verified` に昇格させない。
 
 - `actualStrategy` は Host の実行履歴に完全な経路がある場合だけ値を入れる。provider/model や reviewer role の数から `cascade` / `critique` を推測しない。
 - `recommendedStrategy` が計算されても `actualStrategy=null` なら一致率・改善率は `not_evaluable` とし、分母にも含めない。
@@ -194,7 +192,6 @@ Phase 3 の `recommendedStrategy` は **shadow-only**。
 既存実行結果に対する予測であって actual routing を変更せず、actual 未観測の場合は比較対象を捏造しない。
 `#2455` Concern Map は利用可能な signal 候補であり、新たな reviewer/skill selection owner ではない。
 
-
 Phase 4 は `#1574` の paired replay を再利用する。
 比較条件を Experiment Manifest に固定する。
 対象は input commit / dataset / prompt / Skill / model / routing / policy / evaluator。
@@ -203,13 +200,12 @@ Phase 4 は `#1574` の paired replay を再利用する。
 未測定の cost や latency を改善値へ集計しない。
 evaluator 自己採点や logical execution ID だけの independence claim は adoption evidence としない。
 
+**Phase 5 opt-in routing GO は Phase 2 完了を意味しない。**
 
-**Phase 5 opt-in routing GO は Phase 2 完了を意味しない。
-** Host-owned policy approval と validated workflow graph が必要。
+Host-owned policy approval と validated workflow graph が必要。
 bounded budget、trusted independent evidence、held-out evaluation も必須。
 最終判断は Human approval に委ねる。
 証拠が揃わなければ existing deterministic route に留める。
-
 
 ## 6. Failure-mode reviews (design fixtures)
 
@@ -262,6 +258,11 @@ Phase 2 **design** closes only when (measurement implementation remains a separa
 
 - [GitHub Project HydraFusion (2026-09-04)](https://github.blog/ai-and-ml/github-copilot/project-hydrafusion-frontier-quality-via-multi-model-orchestration/)
 - [#2564](https://github.com/s977043/river-review/issues/2564), [#2566](https://github.com/s977043/river-review/pull/2566)
-- [#1574 Design](1574-p0-design-contract.md), [#1574 P2 paired replay](1574-p2-paired-replay.md), [#2499 Model + Harness screening](1574-model-harness-evolution-screening.md)
-- [#2455 Review Planning Bridge](2455-phase3-review-planning-bridge.md), [#2267 Reviewer independence](2267-phase5a-reviewer-independence.md)
-- [Execution Manifest](execution-manifest.md), [Review Coverage](review-coverage-contract.md), [Agent Contract](agent-contract.md)
+- [#1574 Design](1574-p0-design-contract.md)
+- [#1574 P2 paired replay](1574-p2-paired-replay.md)
+- [#2499 Model + Harness screening](1574-model-harness-evolution-screening.md)
+- [#2455 Review Planning Bridge](2455-phase3-review-planning-bridge.md)
+- [#2267 Reviewer independence](2267-phase5a-reviewer-independence.md)
+- [Execution Manifest](execution-manifest.md)
+- [Review Coverage](review-coverage-contract.md)
+- [Agent Contract](agent-contract.md)
