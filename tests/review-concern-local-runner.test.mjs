@@ -91,10 +91,7 @@ test('local runner keeps Concern Analyzer observe-only and default off', async (
   assert.deepEqual(observed.reviewDebug.reviewConcernCoverage.blindSpotConcernRefs, []);
   assert.equal(observed.reviewDebug.reviewConcernCoverage.applied, false);
   assert.equal(observed.reviewDebug.reviewConcernInteractions.status, 'unavailable');
-  assert.equal(
-    observed.reviewDebug.reviewConcernInteractions.source.reason,
-    'concern-map-failed'
-  );
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.source.reason, 'concern-map-failed');
   assert.equal(observed.reviewDebug.reviewConcernInteractions.applied, false);
   assert.equal(
     observed.reviewDebug.reviewConcernMap.analysis.input.rawChangedFileCount,
@@ -185,10 +182,7 @@ test('optimized-away raw changes still produce an observe-only map on no-changes
   assert.deepEqual(observed.reviewDebug.reviewConcernCoverage.blindSpotConcernRefs, []);
   assert.equal(observed.reviewDebug.reviewConcernCoverage.applied, false);
   assert.equal(observed.reviewDebug.reviewConcernInteractions.status, 'unavailable');
-  assert.equal(
-    observed.reviewDebug.reviewConcernInteractions.source.reason,
-    'concern-map-failed'
-  );
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.source.reason, 'concern-map-failed');
   assert.equal(observed.reviewDebug.reviewConcernInteractions.applied, false);
 
   assert.deepEqual(withoutConcernObservation(observed), off);

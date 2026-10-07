@@ -52,17 +52,12 @@ function coverage(concerns, status = 'observed') {
 
 function coveredConcern(
   concernRef,
-  {
-    mappingStatus = 'mapped',
-    executionCoverage = 'complete',
-    blindSpotCandidate = false,
-  } = {}
+  { mappingStatus = 'mapped', executionCoverage = 'complete', blindSpotCandidate = false } = {}
 ) {
   return {
     concernRef,
     mappingStatus,
-    mappedReviewUnitIds:
-      mappingStatus === 'mapped' ? [`reviewer:bug-hunter/${concernRef}`] : [],
+    mappedReviewUnitIds: mappingStatus === 'mapped' ? [`reviewer:bug-hunter/${concernRef}`] : [],
     mappedReviewerRoles: mappingStatus === 'mapped' ? ['bug-hunter'] : [],
     executionCoverage,
     requiredMappedUnits: mappingStatus === 'mapped' ? 1 : 0,
@@ -164,10 +159,12 @@ describe('#2568 cross-concern interaction planner', () => {
   });
 
   it('fails closed on malformed interactionRefs', () => {
-    const reviewConcernMap = map([{
-      ...concern('a'),
-      interactionRefs: 'b',
-    }]);
+    const reviewConcernMap = map([
+      {
+        ...concern('a'),
+        interactionRefs: 'b',
+      },
+    ]);
 
     const observation = buildReviewConcernInteractionObservation({
       reviewConcernMap,
@@ -204,10 +201,7 @@ describe('#2568 cross-concern interaction planner', () => {
     ]);
 
     const observation = buildReviewConcernInteractionObservation({
-      reviewConcernMap: map([
-        concern('a', ['b']),
-        concern('b'),
-      ]),
+      reviewConcernMap: map([concern('a', ['b']), concern('b')]),
       reviewConcernCoverage,
     });
 
@@ -218,10 +212,7 @@ describe('#2568 cross-concern interaction planner', () => {
 
   it('keeps explicit interactions visible when coverage is missing', () => {
     const observation = buildReviewConcernInteractionObservation({
-      reviewConcernMap: map([
-        concern('a', ['b']),
-        concern('b'),
-      ]),
+      reviewConcernMap: map([concern('a', ['b']), concern('b')]),
       reviewConcernCoverage: null,
     });
 
@@ -253,10 +244,7 @@ describe('#2568 cross-concern interaction planner', () => {
 
   it('joins Phase 4 endpoint coverage without changing interaction eligibility', () => {
     const observation = buildReviewConcernInteractionObservation({
-      reviewConcernMap: map([
-        concern('a', ['b']),
-        concern('b'),
-      ]),
+      reviewConcernMap: map([concern('a', ['b']), concern('b')]),
       reviewConcernCoverage: coverage([
         coveredConcern('a'),
         coveredConcern('b', {
@@ -288,20 +276,11 @@ describe('#2568 cross-concern interaction planner', () => {
 
   it('preserves partial-map limitations and partial coverage context', () => {
     const observation = buildReviewConcernInteractionObservation({
-      reviewConcernMap: map(
-        [
-          concern('a', ['b']),
-          concern('b'),
-        ],
-        {
-          status: 'partial',
-          limitations: ['diff-input-truncated'],
-        }
-      ),
-      reviewConcernCoverage: coverage(
-        [coveredConcern('a'), coveredConcern('b')],
-        'partial'
-      ),
+      reviewConcernMap: map([concern('a', ['b']), concern('b')], {
+        status: 'partial',
+        limitations: ['diff-input-truncated'],
+      }),
+      reviewConcernCoverage: coverage([coveredConcern('a'), coveredConcern('b')], 'partial'),
     });
 
     assert.equal(observation.status, 'partial');
@@ -312,10 +291,7 @@ describe('#2568 cross-concern interaction planner', () => {
 
   it('treats malformed or mismatched coverage as unavailable context only', () => {
     const observation = buildReviewConcernInteractionObservation({
-      reviewConcernMap: map([
-        concern('a', ['b']),
-        concern('b'),
-      ]),
+      reviewConcernMap: map([concern('a', ['b']), concern('b')]),
       reviewConcernCoverage: coverage([coveredConcern('a')]),
     });
 
@@ -325,14 +301,8 @@ describe('#2568 cross-concern interaction planner', () => {
   });
 
   it('does not mutate the Concern Map or Concern Coverage input', () => {
-    const reviewConcernMap = map([
-      concern('a', ['b']),
-      concern('b', ['a']),
-    ]);
-    const reviewConcernCoverage = coverage([
-      coveredConcern('a'),
-      coveredConcern('b'),
-    ]);
+    const reviewConcernMap = map([concern('a', ['b']), concern('b', ['a'])]);
+    const reviewConcernCoverage = coverage([coveredConcern('a'), coveredConcern('b')]);
     const mapBefore = structuredClone(reviewConcernMap);
     const coverageBefore = structuredClone(reviewConcernCoverage);
 

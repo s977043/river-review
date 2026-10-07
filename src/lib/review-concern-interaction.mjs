@@ -6,11 +6,7 @@ function mapLimitations(reviewConcernMap) {
     : [];
 }
 
-function buildUnavailableObservation({
-  reviewConcernMap,
-  reviewConcernCoverage,
-  reason,
-}) {
+function buildUnavailableObservation({ reviewConcernMap, reviewConcernCoverage, reason }) {
   return {
     schemaVersion: SCHEMA_VERSION,
     kind: 'review-concern-interaction-observation',
@@ -32,10 +28,7 @@ function normalizeConcernIds(reviewConcernMap) {
   const concerns = new Map();
 
   for (const concern of reviewConcernMap.concerns) {
-    const id =
-      typeof concern?.id === 'string' && concern.id.trim()
-        ? concern.id.trim()
-        : null;
+    const id = typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
     if (!id || seen.has(id)) return null;
     seen.add(id);
     concerns.set(id, concern);
@@ -93,8 +86,7 @@ function endpointCoverage(coverageIndex, concernRef) {
   const validMappedExecution =
     mappingStatus === 'mapped' &&
     ['complete', 'partial', 'not_executed'].includes(executionCoverage);
-  const validUnmappedExecution =
-    mappingStatus === 'unmapped' && executionCoverage === null;
+  const validUnmappedExecution = mappingStatus === 'unmapped' && executionCoverage === null;
   const valid =
     observed &&
     (validMappedExecution || validUnmappedExecution) &&
@@ -118,12 +110,8 @@ function endpointCoverage(coverageIndex, concernRef) {
 }
 
 function interactionCoverage(coverageIndex, concernRefs) {
-  const concerns = concernRefs.map((concernRef) =>
-    endpointCoverage(coverageIndex, concernRef)
-  );
-  const hasEveryEndpoint = concerns.every(
-    (concern) => concern.mappingStatus !== null
-  );
+  const concerns = concernRefs.map((concernRef) => endpointCoverage(coverageIndex, concernRef));
+  const hasEveryEndpoint = concerns.every((concern) => concern.mappingStatus !== null);
 
   if (!hasEveryEndpoint || coverageIndex.status === 'unavailable') {
     return {
@@ -204,9 +192,7 @@ export function buildReviewConcernInteractionObservation({
 
     for (const rawTargetRef of refs) {
       const targetRef =
-        typeof rawTargetRef === 'string' && rawTargetRef.trim()
-          ? rawTargetRef.trim()
-          : null;
+        typeof rawTargetRef === 'string' && rawTargetRef.trim() ? rawTargetRef.trim() : null;
       if (!targetRef) {
         return buildUnavailableObservation({
           reviewConcernMap,
