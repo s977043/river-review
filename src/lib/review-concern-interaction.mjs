@@ -88,7 +88,19 @@ function buildCoverageIndex(reviewConcernCoverage) {
 
 function endpointCoverage(coverageIndex, concernRef) {
   const observed = coverageIndex.byConcern.get(concernRef);
-  if (!observed) {
+  const mappingStatus = observed?.mappingStatus;
+  const executionCoverage = observed?.executionCoverage ?? null;
+  const validMappedExecution =
+    mappingStatus === 'mapped' &&
+    ['complete', 'partial', 'not_executed'].includes(executionCoverage);
+  const validUnmappedExecution =
+    mappingStatus === 'unmapped' && executionCoverage === null;
+  const valid =
+    observed &&
+    (validMappedExecution || validUnmappedExecution) &&
+    typeof observed.blindSpotCandidate === 'boolean';
+
+  if (!valid) {
     return {
       concernRef,
       mappingStatus: null,
@@ -99,12 +111,9 @@ function endpointCoverage(coverageIndex, concernRef) {
 
   return {
     concernRef,
-    mappingStatus: observed.mappingStatus ?? null,
-    executionCoverage: observed.executionCoverage ?? null,
-    blindSpotCandidate:
-      typeof observed.blindSpotCandidate === 'boolean'
-        ? observed.blindSpotCandidate
-        : null,
+    mappingStatus,
+    executionCoverage,
+    blindSpotCandidate: observed.blindSpotCandidate,
   };
 }
 
