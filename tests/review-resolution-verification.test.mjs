@@ -234,8 +234,7 @@ describe('proposeReviewResolutionTargetBinding', () => {
           targetRevision: SOURCE,
         }),
       (error) =>
-        error instanceof ReviewResolutionVerificationError &&
-        error.code === 'same_source_revision'
+        error instanceof ReviewResolutionVerificationError && error.code === 'same_source_revision'
     );
   });
 });
@@ -336,8 +335,7 @@ describe('proposeReviewResolutionVerificationUpdate', () => {
           observation: observation({ targetRevision: SOURCE }),
         }),
       (error) =>
-        error instanceof ReviewResolutionVerificationError &&
-        error.code === 'same_source_revision'
+        error instanceof ReviewResolutionVerificationError && error.code === 'same_source_revision'
     );
   });
 
