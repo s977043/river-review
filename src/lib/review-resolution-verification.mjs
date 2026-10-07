@@ -146,6 +146,7 @@ export function proposeReviewResolutionTargetBinding({
   findingTarget,
   targetRevision,
 } = {}) {
+  requireRevision(reviewResolution?.source, 'reviewResolution.source');
   requireRevision(targetRevision, 'targetRevision');
   if (isSameReviewResolutionRevision(reviewResolution?.source, targetRevision)) {
     throw new ReviewResolutionVerificationError(
@@ -224,6 +225,7 @@ export function proposeReviewResolutionVerificationUpdate({
     );
   }
 
+  requireRevision(reviewResolution?.source, 'reviewResolution.source');
   requireRevision(currentRevision, 'currentRevision');
   requireRevision(observation?.targetRevision, 'observation.targetRevision');
 
