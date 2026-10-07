@@ -35625,15 +35625,146 @@ function isApp(file) {
 
 /***/ }),
 
-/***/ 2954:
+/***/ 7635:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
-/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
-/* harmony export */   X4: () => (/* binding */ runFindingCriticStage),
-/* harmony export */   xL: () => (/* binding */ resolveFindingCriticMode)
-/* harmony export */ });
-/* unused harmony exports FINDING_CRITIC_OPT_IN_ENV, FINDING_CRITIC_MODE */
-/* harmony import */ var _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(5863);
+
+// EXPORTS
+__nccwpck_require__.d(__webpack_exports__, {
+  xL: () => (/* binding */ resolveFindingCriticMode),
+  X4: () => (/* binding */ runFindingCriticStage)
+});
+
+// UNUSED EXPORTS: FINDING_CRITIC_MODE, FINDING_CRITIC_OPT_IN_ENV
+
+// EXTERNAL MODULE: ./src/lib/finding-critic.mjs
+var finding_critic = __nccwpck_require__(5863);
+;// CONCATENATED MODULE: ./src/lib/reviewer-independence.mjs
+/**
+ * Reviewer execution independence contract (#2286 / #2267 Phase 5A).
+ *
+ * This module answers one narrow question:
+ *
+ *   Did the finder and verifier run under different logical execution ids?
+ *
+ * It does NOT prove that the actors are different humans/models/providers, that
+ * either run is trustworthy, or that a finding is correct. The ids are logical
+ * provenance only. Cryptographic identity and stronger reviewer provenance stay
+ * with #1760.
+ *
+ * The helper is intentionally not wired into the runtime in Phase 5A. #1978's
+ * finding-critic state machine remains evaluation-gated, so a future Phase 5B
+ * adapter must call this predicate before claiming independent verification.
+ */
+
+/** Logical independence state. This is not a finding lifecycle vocabulary. */
+const REVIEWER_INDEPENDENCE_STATUS = Object.freeze({
+  INDEPENDENT: 'independent',
+  SAME_EXECUTION: 'same-execution',
+  UNKNOWN: 'unknown',
+});
+
+/** Stable reason codes for diagnostics and future audit artifacts. */
+const REVIEWER_INDEPENDENCE_REASON = Object.freeze({
+  DISTINCT_RUN_IDS: 'distinct-run-ids',
+  SAME_RUN_ID: 'same-run-id',
+  FINDER_RUN_ID_MISSING: 'finder-run-id-missing',
+  VERIFIER_RUN_ID_MISSING: 'verifier-run-id-missing',
+  BOTH_RUN_IDS_MISSING: 'both-run-ids-missing',
+});
+
+/**
+ * Normalize an opaque run id without inventing identity from another type.
+ *
+ * Run ids are case-sensitive opaque strings. Only surrounding whitespace is
+ * removed. Numbers, objects, booleans, and whitespace-only strings are treated
+ * as missing instead of being coerced into a plausible identity.
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeRunId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized === '' ? null : normalized;
+}
+
+/**
+ * Evaluate the minimum logical finder/verifier separation required by #2267.
+ *
+ * Fail-safe behavior:
+ * - missing or malformed input is UNKNOWN, never independent
+ * - missing identity is UNKNOWN, never independent
+ * - equal identities are SAME_EXECUTION, never independent
+ * - only two present, distinct ids are INDEPENDENT
+ *
+ * A true `independent` value means only that `finderRunId != verifierRunId`
+ * after normalization. It is not evidence that the validation is correct or
+ * that the ids are tamper-evident.
+ *
+ * @param {unknown} [input]
+ * @returns {{
+ *   status: string,
+ *   independent: boolean,
+ *   finderRunId: string | null,
+ *   verifierRunId: string | null,
+ *   reasonCode: string
+ * }}
+ */
+function evaluateReviewerIndependence(input = {}) {
+  const finder = normalizeRunId(input?.finderRunId);
+  const verifier = normalizeRunId(input?.verifierRunId);
+
+  if (finder === null && verifier === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: null,
+      verifierRunId: null,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.BOTH_RUN_IDS_MISSING,
+    };
+  }
+
+  if (finder === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: null,
+      verifierRunId: verifier,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.FINDER_RUN_ID_MISSING,
+    };
+  }
+
+  if (verifier === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: finder,
+      verifierRunId: null,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.VERIFIER_RUN_ID_MISSING,
+    };
+  }
+
+  if (finder === verifier) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.SAME_EXECUTION,
+      independent: false,
+      finderRunId: finder,
+      verifierRunId: verifier,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.SAME_RUN_ID,
+    };
+  }
+
+  return {
+    status: REVIEWER_INDEPENDENCE_STATUS.INDEPENDENT,
+    independent: true,
+    finderRunId: finder,
+    verifierRunId: verifier,
+    reasonCode: REVIEWER_INDEPENDENCE_REASON.DISTINCT_RUN_IDS,
+  };
+}
+
+;// CONCATENATED MODULE: ./src/lib/finding-critic-stage.mjs
 // Finding Critic の配線段（#2334 / #1978 Phase 3）。
 //
 // 位置づけ:
@@ -35657,6 +35788,7 @@ function isApp(file) {
 //   「clean」にしない。段の内部で例外が出た場合も同じで、finding は retain し
 //   humanReview を立てる。finding を落とすのは result.retainFinding === false
 //   が明示的に返ったときだけである。
+
 
 
 
@@ -35712,13 +35844,52 @@ function resolveFindingCriticMode({ reviewConfig, env = process.env } = {}) {
  */
 function criticUnreachedResult(detail) {
   return {
-    status: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FINAL_STATUS */ .aD.CRITIC_TIMEOUT,
+    status: finding_critic/* FINAL_STATUS */.aD.CRITIC_TIMEOUT,
     terminal: true,
     humanReview: true,
     retainFinding: true,
-    reasons: [_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FAILSAFE_REASON */ .nH.CRITIC_TIMEOUT, detail],
+    reasons: [finding_critic/* FAILSAFE_REASON */.nH.CRITIC_TIMEOUT, detail],
     rounds: 0,
-    askRelevance: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.UNCERTAIN,
+    askRelevance: finding_critic/* ASK_RELEVANCE */.Gl.UNCERTAIN,
+  };
+}
+
+/**
+ * Build the narrow Phase 5A execution-independence observation for one finding.
+ *
+ * The stage does not invent a verifier identity. The caller may supply a logical
+ * verifier execution id that was allocated by the orchestration host before the
+ * Critic call. Each source execution is evaluated independently with the existing
+ * Phase 5A predicate; no majority or aggregate correctness verdict is created.
+ *
+ * Missing or malformed finder provenance produces an explicit unknown check.
+ * Duplicate normalized finder ids collapse to one check.
+ */
+function buildExecutionIndependence(finding, verifierExecutionId) {
+  const sources =
+    Array.isArray(finding?.sourceExecutionIds) && finding.sourceExecutionIds.length > 0
+      ? finding.sourceExecutionIds
+      : [undefined];
+  const checks = [];
+  const seen = new Set();
+
+  for (const finderRunId of sources) {
+    const check = evaluateReviewerIndependence({ finderRunId, verifierRunId: verifierExecutionId });
+    const key = JSON.stringify([
+      check.finderRunId,
+      check.verifierRunId,
+      check.status,
+      check.reasonCode,
+    ]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    checks.push(check);
+  }
+
+  return {
+    findingId: typeof finding?.id === 'string' && finding.id.length > 0 ? finding.id : null,
+    verifierExecutionId: checks[0]?.verifierRunId ?? null,
+    checks,
   };
 }
 
@@ -35726,10 +35897,13 @@ function criticUnreachedResult(detail) {
  * 段の観測値。debug へ載せるのは件数と内訳だけで、プロンプト原文も Critic の
  * 応答本文もここからは出さない。
  *
- * @param {Array<{ result: object }>} entries
+ * Execution independence is provenance-only. It does not alter the Critic result,
+ * finding validation, severity, decision, or Gate.
+ *
+ * @param {Array<{ finding: object, result: object, verifierExecutionId?: string }>} entries
  * @param {number} dropped
  */
-function buildObservation(entries, dropped, language) {
+function buildObservation(entries, dropped, language, includeExecutionIndependence = false) {
   /** @type {Record<string, number>} */
   const byFinalStatus = {};
   let humanReview = 0;
@@ -35739,7 +35913,7 @@ function buildObservation(entries, dropped, language) {
   }
   return {
     mode: FINDING_CRITIC_MODE.ACTIVE,
-    protocol: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .PROTOCOL_ID */ .rK,
+    protocol: finding_critic/* PROTOCOL_ID */.rK,
     // #2339 review (Minor 4): recorded so the two call sites' language
     // resolution is observable in the artifact instead of only in the source.
     // Without this the orchestrator could silently fall back to the default
@@ -35749,6 +35923,13 @@ function buildObservation(entries, dropped, language) {
     dropped,
     humanReview,
     byFinalStatus,
+    ...(includeExecutionIndependence
+      ? {
+          executionIndependence: entries.map(({ finding, verifierExecutionId }) =>
+            buildExecutionIndependence(finding, verifierExecutionId)
+          ),
+        }
+      : {}),
   };
 }
 
@@ -35776,6 +35957,7 @@ function buildObservation(entries, dropped, language) {
  * @param {boolean} [params.llmAvailable] LLM 呼び出しが可能か
  * @param {string} [params.language]
  * @param {object} [params.redactOptions]
+ * @param {string[]} [params.verifierExecutionIds] host-assigned Critic execution ids aligned with findings
  * @param {Function} [params.runImpl]     テスト用の注入点（既定は runFindingCritic）
  * @returns {Promise<{ findings: Array<object>, observation: object }|null>}
  */
@@ -35793,6 +35975,7 @@ async function runFindingCriticStage({
   llmAvailable = true,
   language = 'ja',
   redactOptions = {},
+  verifierExecutionIds = [],
   runImpl,
 } = {}) {
   if (resolveFindingCriticMode({ reviewConfig, env }) === FINDING_CRITIC_MODE.OFF) return null;
@@ -35804,9 +35987,15 @@ async function runFindingCriticStage({
   const impl = runImpl ?? (await __nccwpck_require__.e(/* import() */ 18).then(__nccwpck_require__.bind(__nccwpck_require__, 1018))).runFindingCritic;
   const skill = plan?.selected?.[0] ?? {};
 
-  /** @type {Array<{ finding: object, result: object }>} */
+  /** @type {Array<{ finding: object, result: object, verifierExecutionId?: string }>} */
   const entries = [];
-  for (const finding of list) {
+  for (const [index, finding] of list.entries()) {
+    // The caller allocates the logical verifier execution id. When the LLM is
+    // unavailable no Critic execution actually starts, so the planned id is not
+    // reported as executed provenance.
+    const verifierExecutionId = Array.isArray(verifierExecutionIds)
+      ? verifierExecutionIds[index]
+      : undefined;
     if (!llmAvailable) {
       entries.push({ finding, result: criticUnreachedResult('llm call unavailable') });
       continue;
@@ -35834,15 +36023,17 @@ async function runFindingCriticStage({
         entries.push({
           finding,
           result: criticUnreachedResult('critic runner returned no result'),
+          verifierExecutionId,
         });
       } else {
-        entries.push({ finding, result: run.result });
+        entries.push({ finding, result: run.result, verifierExecutionId });
       }
     } catch (err) {
       // 段そのものが落ちても finding は消さない。retain したまま人へ回す。
       entries.push({
         finding,
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
+        verifierExecutionId,
       });
     }
   }
@@ -35854,10 +36045,18 @@ async function runFindingCriticStage({
       dropped += 1;
       continue;
     }
-    kept.push({ ...finding, validation: (0,_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .buildValidatedFinding */ .us)(finding, result).validation });
+    kept.push({ ...finding, validation: (0,finding_critic/* buildValidatedFinding */.us)(finding, result).validation });
   }
 
-  return { findings: kept, observation: buildObservation(entries, dropped, language) };
+  return {
+    findings: kept,
+    observation: buildObservation(
+      entries,
+      dropped,
+      language,
+      Array.isArray(verifierExecutionIds) && verifierExecutionIds.length > 0
+    ),
+  };
 }
 
 
@@ -44562,8 +44761,8 @@ async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
   };
 }
 
-// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
-var finding_critic_stage = __nccwpck_require__(2954);
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
+var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/review-engine.mjs
 
 
@@ -95328,8 +95527,8 @@ function synthesizeTeamLeadReport({ findings = [], reviewerResults = [] }) {
 
 // EXTERNAL MODULE: ./src/lib/review-coverage.mjs
 var review_coverage = __nccwpck_require__(3054);
-// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
-var finding_critic_stage = __nccwpck_require__(2954);
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
+var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
 
 
@@ -96115,8 +96314,9 @@ async function runReviewerOrchestration({
   progressSink,
   env = process.env,
   generateReviewImpl = review_engine/* generateReview */.G1,
-  // #2481: injectable host-side logical execution id producer. The id is
-  // assigned before the reviewer task starts and is observation-only.
+  // #2481 / #2543: injectable host-side logical execution id producer. IDs are
+  // assigned before reviewer tasks and active Critic tasks start. They are
+  // observation-only provenance, not actor identity or correctness signals.
   createExecutionId = defaultCreateReviewerExecutionId,
 } = {}) {
   const {
@@ -96334,6 +96534,26 @@ async function runReviewerOrchestration({
   // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
   const criticEnabled = (0,finding_critic_stage/* resolveFindingCriticMode */.xL)({ reviewConfig: config?.review, env }) !== 'off';
   const mergedConfig = criticEnabled ? (0,loader/* mergeConfig */.R2)(config_default/* defaultConfig */.s, config ?? {}) : null;
+  // #2543: the orchestration host, not the Critic runner, allocates one logical
+  // verifier execution id per merged finding before the Critic stage starts.
+  // Reuse the same allocator and uniqueness set as reviewer tasks so an injected
+  // allocator cannot make a Critic execution collide with a finder execution.
+  const criticVerifierExecutionIds = !criticEnabled
+    ? []
+    : allFindings.map((finding, index) => {
+        const unitId = `finding-critic:${finding.id ?? index + 1}`;
+        const executionId = normalizeReviewerExecutionId(
+          createExecutionId({ roleName: 'finding-critic', chunkIdx: index, unitId })
+        );
+        if (executionId === null) {
+          throw new Error(`Finding Critic execution id is missing for ${unitId}`);
+        }
+        if (executionIds.has(executionId)) {
+          throw new Error(`Duplicate review execution id: ${executionId}`);
+        }
+        executionIds.add(executionId);
+        return executionId;
+      });
   const criticStage = !criticEnabled
     ? null
     : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
@@ -96352,6 +96572,7 @@ async function runReviewerOrchestration({
         // Critic の出力言語と trace の redaction 設定が食い違う。
         language: mergedConfig.review.language,
         redactOptions: (0,review_engine/* resolveRedactOptions */._Q)(mergedConfig),
+        verifierExecutionIds: criticVerifierExecutionIds,
       });
   const finalFindings = criticStage ? criticStage.findings : allFindings;
   const classified = (0,finding_factory/* classifyFindings */.ZY)(finalFindings, { reviewMode: reviewMode ?? 'medium' });
