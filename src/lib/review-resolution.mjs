@@ -79,6 +79,14 @@ function isRevisionRef(value) {
 
 export function reviewResolutionRevisionArtifactKey(value) {
   if (!isRevisionRef(value)) return null;
+  if (!/^RR-EXM-[0-9a-f]{12}$/.test(value.executionManifestId)) return null;
+  if (
+    value.artifactRefs.some(
+      (ref) => !nonEmptyString(ref?.name) || !/^[0-9a-f]{64}$/.test(ref?.sha256 ?? '')
+    )
+  ) {
+    return null;
+  }
   return value.artifactRefs
     .map((ref) => `${ref?.name ?? ''}:${ref?.sha256 ?? ''}`)
     .sort()
