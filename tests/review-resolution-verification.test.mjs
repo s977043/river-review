@@ -100,6 +100,7 @@ function observation(overrides = {}) {
   return {
     mode: 'targeted',
     outcome: 'not_reproduced',
+    findingRef: { fingerprint: 'fp-rr-1', fingerprintAlgo: 'v1' },
     targetRevision: TARGET,
     coverageStatus: 'complete',
     verifier: 'finding-critic',
@@ -307,6 +308,36 @@ describe('proposeReviewResolutionVerificationUpdate', () => {
     });
 
     assert.equal(proposal.items[0].verification.state, 'inconclusive');
+  });
+
+  test('does not mark targeted findings verified without original finding identity', () => {
+    const proposal = proposeReviewResolutionVerificationUpdate({
+      findings: [finding()],
+      reviewResolution: boundDocument(),
+      findingTarget: FINDING_TARGET,
+      currentRevision: TARGET,
+      observation: observation({ findingRef: null }),
+    });
+
+    assert.equal(proposal.items[0].verification.state, 'inconclusive');
+  });
+
+  test('rejects targeted evidence bound to a different original finding', () => {
+    assert.throws(
+      () =>
+        proposeReviewResolutionVerificationUpdate({
+          findings: [finding()],
+          reviewResolution: boundDocument(),
+          findingTarget: FINDING_TARGET,
+          currentRevision: TARGET,
+          observation: observation({
+            findingRef: { fingerprint: 'fp-another', fingerprintAlgo: 'v1' },
+          }),
+        }),
+      (error) =>
+        error instanceof ReviewResolutionVerificationError &&
+        error.code === 'observation_finding_mismatch'
+    );
   });
 
   test('rejects an observation for a stale revision', () => {
