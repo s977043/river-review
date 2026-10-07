@@ -6,6 +6,7 @@ import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
 import { buildReviewConcernCoverageObservation } from './review-concern-coverage.mjs';
+import { buildReviewConcernInteractionObservation } from './review-concern-interaction.mjs';
 import {
   attachConcernRefsToReviewCoverage,
   buildReviewConcernPlanningObservation,
@@ -618,6 +619,10 @@ export async function runLocalReview({
       reviewConcernMap,
       reviewCoverage: null,
     });
+    const reviewConcernInteractions = buildReviewConcernInteractionObservation({
+      reviewConcernMap,
+      reviewConcernCoverage,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -631,6 +636,7 @@ export async function runLocalReview({
               reviewConcernMap,
               ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
               ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
+              ...(reviewConcernInteractions ? { reviewConcernInteractions } : {}),
             },
           }
         : {}),
@@ -757,6 +763,15 @@ export async function runLocalReview({
     reviewCoverage,
   });
 
+  // #2568 Phase 5A: deterministically plan only the explicit cross-concern
+  // interactions already present in the Concern Map. This remains debug-only:
+  // it does not infer relationships, generate findings, route reviewers, or
+  // affect Gate.
+  const reviewConcernInteractions = buildReviewConcernInteractionObservation({
+    reviewConcernMap,
+    reviewConcernCoverage,
+  });
+
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
@@ -851,6 +866,7 @@ export async function runLocalReview({
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
       ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
+      ...(reviewConcernInteractions ? { reviewConcernInteractions } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
