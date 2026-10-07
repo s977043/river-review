@@ -199,7 +199,10 @@ export function validateReviewResolutionSemantics(document) {
       }
     }
 
-    if (verificationState === 'verified_resolved' && isSameReviewResolutionRevision(document?.source, target)) {
+    if (
+      verificationState === 'verified_resolved' &&
+      isSameReviewResolutionRevision(document?.source, target)
+    ) {
       errors.push(`${prefix}.verified_resolved requires a revision different from source`);
     }
 
