@@ -1116,6 +1116,36 @@ describe('runReviewerOrchestration progress and per-role timeout (#1689)', () =>
     assert.match(output, /\(timed out: security-scanner\)/);
   });
 
+  it('aborts the reviewer execution signal when the timeout fires', async () => {
+    let abortReason = null;
+    const result = await runReviewerOrchestration({
+      diff: makeDiff(),
+      dryRun: true,
+      reviewers: ['bug-hunter'],
+      timeoutMs: 20,
+      env: noEnv,
+      progress: false,
+      generateReviewImpl: ({ signal }) =>
+        new Promise((_resolve, reject) => {
+          const onAbort = () => {
+            abortReason = signal.reason;
+            reject(signal.reason);
+          };
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
+          signal.addEventListener('abort', onAbort, { once: true });
+        }),
+    });
+
+    assert.ok(abortReason instanceof ReviewerTimeoutError);
+    assert.equal(abortReason.timeoutMs, 20);
+    assert.equal(result.reviewerResults[0].status, 'rejected');
+    assert.equal(result.reviewerResults[0].timedOut, true);
+    assert.deepEqual(result.debug.timedOutRoles, ['bug-hunter']);
+  });
+
   it('does not abort a slow role when no timeout is configured (default)', async () => {
     const result = await runReviewerOrchestration({
       diff: makeDiff(),
