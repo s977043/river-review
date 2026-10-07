@@ -305,7 +305,7 @@ Three review loops were completed before the final merge check:
 2. Fail-safe: missing or invalid evidence remains unavailable and cannot become a false green.
 3. SSoT consistency: existing coverage normalization wins; finding count does not affect execution projection.
 
-GitHub Action dist was rebuilt after repository formatting. The final CI runs from a later user-authored documentation commit.
+GitHub Action dist was rebuilt after repository formatting. The final CI runs from this latest-main, user-authored documentation head.
 
 Blocking findings after the third review loop: **0**.
 
