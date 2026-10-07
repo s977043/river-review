@@ -237,6 +237,13 @@
 - Bash で `cd` しないこと。`git -C <path>`・絶対パス・`npm --prefix <path>` で、作業ディレクトリを変えずに呼ぶ。2026-10-07 の
   PermissionRequest hook の実ログ（全リポジトリ 331 件）では、確認ダイアログの 41%（135 件）が先頭 `cd` の Bash だった
   （user 設定に `Bash(cd:*)` があっても、作業ディレクトリ外への `cd` は auto mode の classifier が確認を求める）。
+- push 後に `Auto Rebuild Action Dist` bot が head を進めると、CI は `action_required` で止まる。待たずに、その旨と最新の
+  head SHA を完了報告に書くこと（脱出手順は `docs/runbook/bot-pushed-head-kick.md`。オーガナイザーが自分のアカウントで
+  空コミットを push する）。2026-10-07 の PR #2558 で発生した。
+- commit が失敗して lint-staged の自動 stash（"lint-staged automatic backup"）が残ったら、drop も apply もしないこと。
+  `git stash list` の該当行を完了報告に転記する。2026-10-07 の PR #2556 で発生した。
+- commit message は header と本文の各行を 100 文字以内にすること（commitlint の `header-max-length` /
+  `body-max-line-length`）。長い URL やパスは行を分ける。
 ```
 
 ## 委託プロンプト骨格
