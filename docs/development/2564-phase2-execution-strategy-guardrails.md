@@ -63,11 +63,10 @@ GitHub の公式 HydraFusion 記事は complete accounting / bounded execution /
 # Example only. Never claim this was emitted by River Review.
 strategyObservation:
   schemaStatus: proposed-only
-  source: host-instrumentation
-  strategy: null         # single | cascade | critique | null (unknown)
-  applied: false         # Phase 2/3 は strategy routing を一切変更しない
-  actualStrategy: null   # Host 実行記録が無ければ null
+  source: null          # proposed producer = Host instrumentation。実装されるまでは null
+  actualStrategy: null   # Host execution log が実在する場合だけ single | cascade | critique
   recommendedStrategy: null # Phase 3 が導入されるまでは null
+  recommendationApplied: false # Phase 2/3 は提案を実行に接続しない
   executionIdentity: null # Host の stable run identifier; 既存IDから捏造しない
   latency:
     wallClockMs: null    # start/stop 観測がある場合のみ
@@ -101,10 +100,18 @@ strategyObservation:
 2. **No double counting**: provider request ID / attempt ID と leg lineage の組で重複排除し、同一 usage event を file×skill 行と leg 行で二重加算しない。request ID が無ければ確実な dedupe を主張しない。
 3. **Null != zero**: missing token/cost/latency は `null`。`0` は計測可能で実際にゼロだった場合にのみ使う。
 4. **Parallel latency != sum of leg durations**: end-to-end wall-clock は Host の run boundary で測る。並列 leg の duration 総和をユーザー待ち時間としない。
-5. **Evidence is not approval**: observation は routing、Gate、allowlist、merge authority、Human approval の入力へ自動昇格させない。
+5. **Evidence is not approval**: observation は routing、Gate、allowlist、merge authority、Human approval の入力へ自動昇格させない。特に `RIVER_GATE_COVERAGE=1` が無ければ Review Coverage の Gate への伝播も既定では有効でない。
 6. **No source/secret capture**: request body、prompt本文、diff、生ログ、credential を leg accounting に保存しない。識別子もレビュー対象 repo の untrusted input と区別する。
 
-## 4. Phase 3 / 4 handoff and gate
+## 4. Evidence and comparison before Phase 3
+
+- **This is not an implemented telemetry interface.** `strategyObservation` は説明用の擬似契約であり、現行の River Review runner / artifact がこの object を出力すると主張しない。`source` を Host の宣言だけで `verified` に昇格させない。
+- `actualStrategy` は Host の実行履歴に完全な経路がある場合だけ値を入れる。provider/model や reviewer role の数から `cascade` / `critique` を推測しない。
+- `recommendedStrategy` が計算されても `actualStrategy=null` なら一致率・改善率は `not_evaluable` とし、分母にも含めない。
+- actual / recommended の不一致は **観測**として残し、Phase 3 では実行経路の変更や、失敗を自動的に推奨値へ再分類する処理を禁止する。
+- `totalEstimatedUsd` は全 leg と retry/fallback inventory が揃い、単価 version と重複排除の根拠がある場合だけ合算できる。欠損がある run の合計は `null` のままにし、観測済み leg の部分小計を complete total と誤表示しない。
+
+## 5. Phase 3 / 4 handoff and gate
 
 Phase 3 の `recommendedStrategy` は **shadow-only**。既存実行結果に対する予測であって actual routing を変更せず、actual 未観測の場合は比較対象を捏造しない。`#2455` Concern Map は利用可能な signal 候補であり、新たな reviewer/skill selection owner ではない。
 
@@ -112,23 +119,23 @@ Phase 4 は `#1574` の paired replay を再利用する。input commit / datase
 
 **Phase 5 opt-in routing GO は Phase 2 完了を意味しない。** Host-owned policy approval、validated workflow graph、bounded budget、trusted independent evidence、held-out evaluation、Human approval が必要。証拠が揃わなければ existing deterministic route に留める。
 
-## 5. Failure-mode reviews (design fixtures)
+## 6. Failure-mode reviews (design fixtures)
 
 | Case | Naive mistake | Required reading |
 | --- | --- | --- |
 | 2 reviewer tasks execute in parallel (450ms / 800ms) | 1,250ms user latency | Actual Host wall-clock measure only; do not sum durations |
 | Provider request retried twice; dispatcher JSONL contains one file×skill row | 1 request / 1 charge | attempt inventory unknown; `totalEstimatedUsd: null` until request-level accounting |
 | Critic declares separate logical ID, but inherits solver tools/context | “verified independent review” | provenance observed only; Host tool/context isolation not verified |
-| Timeout aborted one reviewer, others completed | “review complete / clean” | existing Review Coverage partial/timed_out and Gate semantics win |
+| Timeout aborted one reviewer, others completed | “review complete / clean” | Review Coverage は partial/timed_out を区別する。Gate への coverage 接続は opt-in（`RIVER_GATE_COVERAGE=1`）であり、未設定時に自動ブロックしたと主張しない |
 | No usage telemetry file exists | cost = $0 | cost unknown, not zero |
 | Host cascade and River reviewer role fan-out both occur | auto-select cascade from role count | Strategy belongs to Host, reviewer selection to River Review |
 
-## 6. Exit criteria / follow-up
+## 7. Exit criteria / follow-up
 
 Phase 2 closes only when:
-- [ ] vocabulary and authority axes are separated without new runtime owner
-- [ ] all five guardrails have current/gap/owner mapping linked to existing evidence
-- [ ] strategy / leg observation semantics distinguish unknown / partial / complete, actual / recommended, cost / usage / latency
+- [x] vocabulary and authority axes are separated without new runtime owner
+- [x] all five guardrails have current/gap/owner mapping linked to existing evidence
+- [x] strategy / leg observation semantics distinguish unknown / partial / complete, actual / recommended, cost / usage / latency
 - [ ] fail-safe scenarios and explicit non-goals are reviewed in three loops
 - [ ] CI / docs checks pass and PR is merged
 
