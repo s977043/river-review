@@ -29,6 +29,7 @@ import {
   PROTOCOL_ID,
   buildValidatedFinding,
 } from './finding-critic.mjs';
+import { evaluateReviewerIndependence } from './reviewer-independence.mjs';
 
 /**
  * Opt-in 用の環境変数。値がちょうど `'1'` のときだけ有効になる。
@@ -93,13 +94,55 @@ function criticUnreachedResult(detail) {
 }
 
 /**
+ * Build the narrow Phase 5A execution-independence observation for one finding.
+ *
+ * The stage does not invent a verifier identity. The caller may supply a logical
+ * verifier execution id that was allocated by the orchestration host before the
+ * Critic call. Each source execution is evaluated independently with the existing
+ * Phase 5A predicate; no majority or aggregate correctness verdict is created.
+ *
+ * Missing or malformed finder provenance produces an explicit unknown check.
+ * Duplicate normalized finder ids collapse to one check.
+ */
+function buildExecutionIndependence(finding, verifierExecutionId) {
+  const sources =
+    Array.isArray(finding?.sourceExecutionIds) && finding.sourceExecutionIds.length > 0
+      ? finding.sourceExecutionIds
+      : [undefined];
+  const checks = [];
+  const seen = new Set();
+
+  for (const finderRunId of sources) {
+    const check = evaluateReviewerIndependence({ finderRunId, verifierRunId: verifierExecutionId });
+    const key = JSON.stringify([
+      check.finderRunId,
+      check.verifierRunId,
+      check.status,
+      check.reasonCode,
+    ]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    checks.push(check);
+  }
+
+  return {
+    findingId: typeof finding?.id === 'string' && finding.id.length > 0 ? finding.id : null,
+    verifierExecutionId: checks[0]?.verifierRunId ?? null,
+    checks,
+  };
+}
+
+/**
  * 段の観測値。debug へ載せるのは件数と内訳だけで、プロンプト原文も Critic の
  * 応答本文もここからは出さない。
  *
- * @param {Array<{ result: object }>} entries
+ * Execution independence is provenance-only. It does not alter the Critic result,
+ * finding validation, severity, decision, or Gate.
+ *
+ * @param {Array<{ finding: object, result: object, verifierExecutionId?: string }>} entries
  * @param {number} dropped
  */
-function buildObservation(entries, dropped, language) {
+function buildObservation(entries, dropped, language, includeExecutionIndependence = false) {
   /** @type {Record<string, number>} */
   const byFinalStatus = {};
   let humanReview = 0;
@@ -119,6 +162,13 @@ function buildObservation(entries, dropped, language) {
     dropped,
     humanReview,
     byFinalStatus,
+    ...(includeExecutionIndependence
+      ? {
+          executionIndependence: entries.map(({ finding, verifierExecutionId }) =>
+            buildExecutionIndependence(finding, verifierExecutionId)
+          ),
+        }
+      : {}),
   };
 }
 
@@ -146,6 +196,7 @@ function buildObservation(entries, dropped, language) {
  * @param {boolean} [params.llmAvailable] LLM 呼び出しが可能か
  * @param {string} [params.language]
  * @param {object} [params.redactOptions]
+ * @param {string[]} [params.verifierExecutionIds] host-assigned Critic execution ids aligned with findings
  * @param {Function} [params.runImpl]     テスト用の注入点（既定は runFindingCritic）
  * @returns {Promise<{ findings: Array<object>, observation: object }|null>}
  */
@@ -163,6 +214,7 @@ export async function runFindingCriticStage({
   llmAvailable = true,
   language = 'ja',
   redactOptions = {},
+  verifierExecutionIds = [],
   runImpl,
 } = {}) {
   if (resolveFindingCriticMode({ reviewConfig, env }) === FINDING_CRITIC_MODE.OFF) return null;
@@ -174,9 +226,15 @@ export async function runFindingCriticStage({
   const impl = runImpl ?? (await import('./finding-critic-runner.mjs')).runFindingCritic;
   const skill = plan?.selected?.[0] ?? {};
 
-  /** @type {Array<{ finding: object, result: object }>} */
+  /** @type {Array<{ finding: object, result: object, verifierExecutionId?: string }>} */
   const entries = [];
-  for (const finding of list) {
+  for (const [index, finding] of list.entries()) {
+    // The caller allocates the logical verifier execution id. When the LLM is
+    // unavailable no Critic execution actually starts, so the planned id is not
+    // reported as executed provenance.
+    const verifierExecutionId = Array.isArray(verifierExecutionIds)
+      ? verifierExecutionIds[index]
+      : undefined;
     if (!llmAvailable) {
       entries.push({ finding, result: criticUnreachedResult('llm call unavailable') });
       continue;
@@ -204,15 +262,17 @@ export async function runFindingCriticStage({
         entries.push({
           finding,
           result: criticUnreachedResult('critic runner returned no result'),
+          verifierExecutionId,
         });
       } else {
-        entries.push({ finding, result: run.result });
+        entries.push({ finding, result: run.result, verifierExecutionId });
       }
     } catch (err) {
       // 段そのものが落ちても finding は消さない。retain したまま人へ回す。
       entries.push({
         finding,
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
+        verifierExecutionId,
       });
     }
   }
@@ -227,5 +287,13 @@ export async function runFindingCriticStage({
     kept.push({ ...finding, validation: buildValidatedFinding(finding, result).validation });
   }
 
-  return { findings: kept, observation: buildObservation(entries, dropped, language) };
+  return {
+    findings: kept,
+    observation: buildObservation(
+      entries,
+      dropped,
+      language,
+      Array.isArray(verifierExecutionIds) && verifierExecutionIds.length > 0
+    ),
+  };
 }
