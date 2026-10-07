@@ -40659,37 +40659,7 @@ function computeBackoffMs(
   return Math.min(baseMs * 2 ** Math.max(0, attempt - 1), LLM_MAX_BACKOFF_MS);
 }
 
-function abortError(signal) {
-  if (signal?.reason instanceof Error) return signal.reason;
-  const err = new Error('The operation was aborted');
-  err.name = 'AbortError';
-  return err;
-}
-
-function throwIfAborted(signal) {
-  if (signal?.aborted) throw abortError(signal);
-}
-
-function sleep(ms, signal) {
-  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
-  throwIfAborted(signal);
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(abortError(signal));
-    };
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
-}
-
-function attemptSignal(timeoutMs, signal) {
-  const timeoutSignal = AbortSignal.timeout(timeoutMs);
-  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-}
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Call an OpenAI-compatible chat-completion endpoint with timeout and
@@ -40710,7 +40680,6 @@ function attemptSignal(timeoutMs, signal) {
  * @param {number} [params.maxTokens]
  * @param {number} [params.timeoutMs]     Per-attempt timeout (default 15000).
  * @param {number} [params.maxAttempts]   Total attempts incl. first (default 3).
- * @param {AbortSignal} [params.signal]    Host cancellation signal. External aborts are never retried.
  * @param {typeof fetch} [params.fetchImpl] Injectable transport for tests (#1357).
  * @param {number} [params.baseMs]        Retry backoff base ms (injectable for tests).
  * @returns {Promise<string>}
@@ -40725,7 +40694,6 @@ async function callChatCompletion({
   maxTokens,
   timeoutMs = LLM_TIMEOUT_MS,
   maxAttempts = LLM_MAX_ATTEMPTS,
-  signal,
   fetchImpl = globalThis.fetch,
   baseMs = LLM_RETRY_BASE_MS,
 }) {
@@ -40741,11 +40709,10 @@ async function callChatCompletion({
 
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    throwIfAborted(signal);
     try {
       const res = await fetchImpl(endpoint, {
         method: 'POST',
-        signal: attemptSignal(timeoutMs, signal), // fresh timeout + host cancellation per attempt
+        signal: AbortSignal.timeout(timeoutMs), // fresh per attempt (one-shot)
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body,
       });
@@ -40760,8 +40727,7 @@ async function callChatCompletion({
       const detail = await res.text();
       if (attempt < maxAttempts && isRetryableStatus(res.status)) {
         await sleep(
-          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') }),
-          signal
+          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') })
         );
         continue;
       }
@@ -40771,12 +40737,8 @@ async function callChatCompletion({
       // A non-retryable HTTP error (thrown above) has a non-network message, so
       // isRetryableNetworkError returns false and it propagates immediately.
       lastError = err;
-      // A host cancellation is a terminal control signal, not a transient
-      // provider/network failure. Do not spend retry budget after the caller
-      // has explicitly ended the review task.
-      if (signal?.aborted) throw abortError(signal);
       if (attempt < maxAttempts && isRetryableNetworkError(err)) {
-        await sleep(computeBackoffMs(attempt, { baseMs }), signal);
+        await sleep(computeBackoffMs(attempt, { baseMs }));
         continue;
       }
       throw err;
@@ -42691,6 +42653,7 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   $J: () => (/* binding */ isIncompleteCoverageStatus),
 /* harmony export */   Ix: () => (/* binding */ deriveReviewCoverage),
 /* harmony export */   Vb: () => (/* binding */ REVIEW_COVERAGE_STATUSES),
+/* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   dD: () => (/* binding */ isIncompleteCoverage),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
 /* harmony export */   l1: () => (/* binding */ classifyLlmAttempt),
@@ -42700,7 +42663,6 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped),
 /* harmony export */   t4: () => (/* binding */ normalizeRunCoverageStatus)
 /* harmony export */ });
-/* unused harmony export normalizeCoverageStatus */
 /* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
 
 
@@ -45016,7 +44978,6 @@ async function generateReview({
   prBody,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
-  signal,
   // #2334: reviewer-orchestrator は findings をマージしたあとに Critic を
   // 1 回だけ走らせる。その経路では per-reviewer の generateReview が同じ段を
   // 二重に走らせないよう true を渡す。既定 false なので、単一レビューアの
@@ -45151,7 +45112,6 @@ async function generateReview({
         endpoint: openAIConfig.endpoint,
         temperature: openAIConfig.temperature,
         maxTokens: openAIConfig.maxTokens,
-        signal,
         systemMessage: activeCompiledPrompt
           ? activeCompiledPrompt.systemMessage
           : (0,sections/* buildSystemMessage */.HB)(language),
@@ -45206,12 +45166,6 @@ async function generateReview({
         debug.llmError = 'LLM output could not be parsed';
       }
     } catch (err) {
-      // Host cancellation is control flow owned by the orchestration layer.
-      // Do not convert it into an LLM failure and continue into heuristic
-      // fallback, or a timed-out reviewer could still return a fulfilled task.
-      if (signal?.aborted) {
-        throw signal.reason instanceof Error ? signal.reason : err;
-      }
       debug.llmUsed = false;
       debug.llmError = err.message;
     }
@@ -95468,12 +95422,13 @@ const SPLIT_LINE_THRESHOLD = 500;
 // survived is NOT clean: src/lib/run-gate.mjs reads `reviewerResults` and
 // withholds the GO / auto-approve outcome (rule 6b NOT_EXECUTED).
 //
-// The timeout is a real execution bound: every role×chunk task owns an
-// AbortController and the timeout aborts it before the orchestration promise is
-// rejected. generateReview() forwards that signal to llm-pipeline.mjs, where it
-// cancels an in-flight fetch and retry backoff. A custom generateReviewImpl used
-// by tests/integrations may ignore the signal; Promise.race still preserves the
-// fail-soft orchestration bound in that case.
+// Scope note: the timeout ABANDONS a slow role rather than cancelling its LLM
+// call — generateReview() takes no AbortSignal. The HTTP layer already has its
+// own budget (LLM_TIMEOUT_MS + bounded retries in llm-pipeline.mjs), so the
+// abandoned request keeps the process alive for up to that budget after the
+// timeout line is printed. This limit bounds the ORCHESTRATION wait, which is
+// what #1689 asks for; true cancellation needs an AbortSignal through
+// generateReview() and is deliberately out of scope.
 
 /** Env var carrying the per-role timeout in milliseconds (mirrors RIVER_PLANNER_TIMEOUT). */
 const REVIEWER_TIMEOUT_ENV = 'RIVER_REVIEWER_TIMEOUT';
@@ -95587,18 +95542,11 @@ function resolveReviewerProgressEnabled({ quiet = false, progress, config } = {}
  * Both branches of the race attach handlers to `promise`, so a late rejection
  * after a timeout is already handled and never surfaces as an unhandled rejection.
  */
-function withReviewerTimeout(promise, timeoutMs, makeError, onTimeout) {
+function withReviewerTimeout(promise, timeoutMs, makeError) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   let timer = null;
   const timeout = new Promise((_resolve, reject) => {
-    timer = setTimeout(() => {
-      const error = makeError();
-      try {
-        onTimeout?.(error);
-      } finally {
-        reject(error);
-      }
-    }, timeoutMs);
+    timer = setTimeout(() => reject(makeError()), timeoutMs);
   });
   const settled = promise.then(
     (value) => {
@@ -96267,13 +96215,11 @@ async function runReviewerOrchestration({
     const role = REVIEWER_ROLES[roleName];
     const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
     const taskStartedAt = nowMs();
-    const controller = new AbortController();
     logProgress(`Reviewer ${roleName}: start${chunkSuffix(chunkIdx)}`);
     const run = generateReviewImpl({
       ...generateArgs,
       diff: chunkDiff,
       projectRules: roleRules,
-      signal: controller.signal,
     }).then((result) => ({
       ...result,
       reviewerRole: roleName,
@@ -96284,8 +96230,7 @@ async function runReviewerOrchestration({
     return withReviewerTimeout(
       run,
       effectiveTimeoutMs,
-      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs),
-      (timeoutError) => controller.abort(timeoutError)
+      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs)
     ).then(
       (value) => {
         const durationMs = Math.round(nowMs() - taskStartedAt);
@@ -97030,6 +96975,188 @@ async function runReviewConcernAnalyzer({
   }
 }
 
+;// CONCATENATED MODULE: ./src/lib/review-concern-coverage.mjs
+
+
+const SCHEMA_VERSION = '1';
+
+function review_concern_coverage_uniqueStrings(values = []) {
+  return [
+    ...new Set(
+      (Array.isArray(values) ? values : []).filter(
+        (value) => typeof value === 'string' && value.length > 0
+      )
+    ),
+  ];
+}
+
+function concernMapLimitations(reviewConcernMap) {
+  return Array.isArray(reviewConcernMap?.analysis?.limitations)
+    ? [...reviewConcernMap.analysis.limitations]
+    : [];
+}
+
+function buildUnavailableObservation({ reviewConcernMap, reviewCoverage, reason }) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: 'unavailable',
+    source: {
+      concernMapStatus: reviewConcernMap?.analysis?.status ?? null,
+      reviewCoverageStatus: (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage),
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason,
+    },
+    concerns: [],
+    summary: null,
+    blindSpotConcernRefs: [],
+    applied: false,
+  };
+}
+
+function validateConcernIds(reviewConcernMap) {
+  const seen = new Set();
+  const ids = [];
+
+  for (const concern of reviewConcernMap.concerns) {
+    const id = typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
+    if (!id || seen.has(id)) return null;
+    seen.add(id);
+    ids.push(id);
+  }
+
+  return ids;
+}
+
+function mappedUnitsForConcern(reviewCoverage, concernRef) {
+  return reviewCoverage.units.filter((unit) =>
+    review_concern_coverage_uniqueStrings(unit?.concernRefs).includes(concernRef)
+  );
+}
+
+/**
+ * Project existing Review Coverage execution evidence onto observed Concerns.
+ *
+ * This is observation-only. It does not mutate Review Coverage, does not infer
+ * semantic completeness, and has no Gate or routing authority.
+ *
+ * @returns {object|null}
+ */
+function buildReviewConcernCoverageObservation({ reviewConcernMap, reviewCoverage } = {}) {
+  if (!reviewConcernMap) return null;
+
+  if (
+    reviewConcernMap.kind !== 'review-concern-map' ||
+    reviewConcernMap.schemaVersion !== '1' ||
+    !Array.isArray(reviewConcernMap.concerns)
+  ) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map',
+    });
+  }
+
+  const concernMapStatus = reviewConcernMap.analysis?.status ?? null;
+  if (concernMapStatus === 'failed') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'concern-map-failed',
+    });
+  }
+  if (concernMapStatus !== 'completed' && concernMapStatus !== 'partial') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map-status',
+    });
+  }
+
+  const concernIds = validateConcernIds(reviewConcernMap);
+  if (!concernIds) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-id',
+    });
+  }
+
+  if (!reviewCoverage || !Array.isArray(reviewCoverage.units)) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-unavailable',
+    });
+  }
+
+  const reviewCoverageStatus = (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage);
+  if (reviewCoverageStatus === 'unknown') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-invalid',
+    });
+  }
+
+  const concerns = concernIds.map((concernRef) => {
+    const mappedUnits = mappedUnitsForConcern(reviewCoverage, concernRef);
+    if (mappedUnits.length === 0) {
+      return {
+        concernRef,
+        mappingStatus: 'unmapped',
+        mappedReviewUnitIds: [],
+        mappedReviewerRoles: [],
+        executionCoverage: null,
+        requiredMappedUnits: 0,
+        completedRequiredMappedUnits: 0,
+        incompleteRequiredUnitIds: [],
+        blindSpotCandidate: true,
+      };
+    }
+
+    const projected = (0,review_coverage/* deriveReviewCoverage */.Ix)(mappedUnits);
+    return {
+      concernRef,
+      mappingStatus: 'mapped',
+      mappedReviewUnitIds: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.id)),
+      mappedReviewerRoles: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.reviewerRole)),
+      executionCoverage: projected.status,
+      requiredMappedUnits: projected.requiredUnits,
+      completedRequiredMappedUnits: projected.completedRequiredUnits,
+      incompleteRequiredUnitIds: [...projected.incompleteRequiredUnitIds],
+      blindSpotCandidate: false,
+    };
+  });
+
+  const blindSpotConcernRefs = concerns
+    .filter((concern) => concern.blindSpotCandidate)
+    .map((concern) => concern.concernRef);
+  const mapped = concerns.filter((concern) => concern.mappingStatus === 'mapped');
+  const incompleteMapped = mapped.filter((concern) => concern.executionCoverage !== 'complete');
+
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: concernMapStatus === 'partial' ? 'partial' : 'observed',
+    source: {
+      concernMapStatus,
+      reviewCoverageStatus,
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason: null,
+    },
+    concerns,
+    summary: {
+      observedConcerns: concerns.length,
+      mappedConcerns: mapped.length,
+      unmappedConcerns: blindSpotConcernRefs.length,
+      incompleteMappedConcerns: incompleteMapped.length,
+    },
+    blindSpotConcernRefs,
+    applied: false,
+  };
+}
+
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
 var file_classifier = __nccwpck_require__(4673);
 ;// CONCATENATED MODULE: ./src/lib/review-concern-planning-bridge.mjs
@@ -97038,7 +97165,7 @@ var file_classifier = __nccwpck_require__(4673);
 
 
 
-const SCHEMA_VERSION = '1';
+const review_concern_planning_bridge_SCHEMA_VERSION = '1';
 
 function review_concern_planning_bridge_normalizePath(value) {
   return typeof value === 'string'
@@ -97094,9 +97221,9 @@ function baselineRoles({ fileTypes, riskAssessment, signals }) {
   return selectRolesAuto(fileTypes, riskAssessment ?? null, signals);
 }
 
-function buildUnavailableObservation(reviewConcernMap, existingRoles, reason) {
+function review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, reason) {
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
     kind: 'review-concern-planning-observation',
     status: 'unavailable',
     source: {
@@ -97134,12 +97261,12 @@ function buildReviewConcernPlanningObservation({
     reviewConcernMap.schemaVersion !== '1' ||
     !Array.isArray(reviewConcernMap.concerns)
   ) {
-    return buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-map');
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-map');
   }
 
   const mapStatus = reviewConcernMap.analysis?.status ?? null;
   if (mapStatus === 'failed') {
-    return buildUnavailableObservation(reviewConcernMap, existingRoles, 'concern-map-failed');
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'concern-map-failed');
   }
 
   const seenConcernIds = new Set();
@@ -97148,7 +97275,7 @@ function buildReviewConcernPlanningObservation({
     const concernRef =
       typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
     if (!concernRef || seenConcernIds.has(concernRef)) {
-      return buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-id');
+      return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-id');
     }
     seenConcernIds.add(concernRef);
 
@@ -97188,7 +97315,7 @@ function buildReviewConcernPlanningObservation({
   const recommendedSet = new Set(recommendedRoles);
 
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
     kind: 'review-concern-planning-observation',
     status: mapStatus === 'partial' ? 'partial' : 'observed',
     source: {
@@ -97964,6 +98091,7 @@ var pr_context = __nccwpck_require__(1891);
 
 
 
+
 function normalizePhase(phase) {
   const normalized = (phase || '').toLowerCase();
   if (planner_utils/* PHASES */.ZG.includes(normalized)) return normalized;
@@ -98522,6 +98650,10 @@ async function runLocalReview({
       signals: context.plan?.reviewSignals,
       selectedSkills: context.plan?.selected ?? [],
     });
+    const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+      reviewConcernMap,
+      reviewCoverage: null,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -98534,6 +98666,7 @@ async function runLocalReview({
             reviewDebug: {
               reviewConcernMap,
               ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+              ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
             },
           }
         : {}),
@@ -98652,6 +98785,14 @@ async function runLocalReview({
     reviewConcernMap
   );
 
+  // #2541 Phase 4: project existing Review Coverage onto observed Concerns.
+  // This is debug-only evidence. It does not change Review Coverage, Gate,
+  // routing, findings, or the meaning of a completed Review Unit.
+  const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+    reviewConcernMap,
+    reviewCoverage,
+  });
+
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
@@ -98745,6 +98886,7 @@ async function runLocalReview({
       ...(review.debug ?? {}),
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+      ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
