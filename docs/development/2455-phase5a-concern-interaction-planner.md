@@ -297,7 +297,7 @@ Phase 5A provides planning evidence only.
 
 No runtime promotion is justified by this step alone.
 
-Before Phase 5B becomes active by default, #2455 still requires paired evaluation of quality, recall, false positives, latency, and token cost.
+Before Phase 5B becomes active by default, #2455 still requires paired evaluation. The evaluation must cover quality, recall, false positives, latency and token cost.
 
 ## Delivery review
 
