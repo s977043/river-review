@@ -797,8 +797,9 @@ export async function runReviewerOrchestration({
   progressSink,
   env = process.env,
   generateReviewImpl = generateReview,
-  // #2481: injectable host-side logical execution id producer. The id is
-  // assigned before the reviewer task starts and is observation-only.
+  // #2481 / #2543: injectable host-side logical execution id producer. IDs are
+  // assigned before reviewer tasks and active Critic tasks start. They are
+  // observation-only provenance, not actor identity or correctness signals.
   createExecutionId = defaultCreateReviewerExecutionId,
 } = {}) {
   const {
@@ -1019,6 +1020,26 @@ export async function runReviewerOrchestration({
   // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
   const criticEnabled = resolveFindingCriticMode({ reviewConfig: config?.review, env }) !== 'off';
   const mergedConfig = criticEnabled ? mergeConfig(defaultConfig, config ?? {}) : null;
+  // #2543: the orchestration host, not the Critic runner, allocates one logical
+  // verifier execution id per merged finding before the Critic stage starts.
+  // Reuse the same allocator and uniqueness set as reviewer tasks so an injected
+  // allocator cannot make a Critic execution collide with a finder execution.
+  const criticVerifierExecutionIds = !criticEnabled
+    ? []
+    : allFindings.map((finding, index) => {
+        const unitId = `finding-critic:${finding.id ?? index + 1}`;
+        const executionId = normalizeReviewerExecutionId(
+          createExecutionId({ roleName: 'finding-critic', chunkIdx: index, unitId })
+        );
+        if (executionId === null) {
+          throw new Error(`Finding Critic execution id is missing for ${unitId}`);
+        }
+        if (executionIds.has(executionId)) {
+          throw new Error(`Duplicate review execution id: ${executionId}`);
+        }
+        executionIds.add(executionId);
+        return executionId;
+      });
   const criticStage = !criticEnabled
     ? null
     : await runFindingCriticStage({
@@ -1037,6 +1058,7 @@ export async function runReviewerOrchestration({
         // Critic の出力言語と trace の redaction 設定が食い違う。
         language: mergedConfig.review.language,
         redactOptions: resolveRedactOptions(mergedConfig),
+        verifierExecutionIds: criticVerifierExecutionIds,
       });
   const finalFindings = criticStage ? criticStage.findings : allFindings;
   const classified = classifyFindings(finalFindings, { reviewMode: reviewMode ?? 'medium' });
