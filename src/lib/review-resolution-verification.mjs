@@ -109,6 +109,18 @@ function findResolutionMatch({ findings, reviewResolution, findingTarget }) {
   }
 
   const match = matches[0];
+  // Verification must reference the original finding identity explicitly.
+  // A run-local findingId alone cannot override a missing/unknown algorithm.
+  if (
+    findingTarget?.fingerprint !== match.item.findingRef?.fingerprint ||
+    findingTarget?.fingerprintAlgo !== match.item.findingRef?.fingerprintAlgo
+  ) {
+    throw new ReviewResolutionVerificationError(
+      'finding_identity_mismatch',
+      'verification target must identify the original finding fingerprint and algorithm',
+      { resolutionIndex: match.resolutionIndex }
+    );
+  }
   const mismatchedResolution = projection.warnings.some(
     (entry) =>
       entry?.code === 'identity_mismatch' && entry?.resolutionIndex === match.resolutionIndex
