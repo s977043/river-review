@@ -75,6 +75,8 @@ strategyObservation:
     currency: null
     totalEstimatedUsd: null
     completeness: unknown # complete | partial | unknown
+    inventoryScope: null  # Host-declared execution boundary, not inferred from leg array
+    inventoryVerified: false # exhaustive provider-attempt enumeration is NOT proven
     pricingVersion: null
   legs: []               # 観測できた独立実行単位だけを列挙（未計測は[]≠実行0）
   warnings:
@@ -85,19 +87,19 @@ strategyObservation:
 
 | Field (proposed) | Meaning / invariant |
 | --- | --- |
-| `legId` / `parentLegId` | Host が付与する安定した leg ID と親。重複なし、循環なし。River Review の Review Unit ID と別 |
+| `legId` / `parentLegId` | Host が付与する安定した leg ID と親。重複なし、循環なし。River Review の Review Unit ID と別。1 leg に複数 provider attempt があり得る |
 | `purpose` / `modelBinding` | leg の用途、provider/model。unknown は null。model family が違うだけでは independence 証明にならない |
 | `startedAt` / `endedAt` / `durationMs` | 同じ clock domain で測った leg 区間。実測不能なら null。wall-clock と leg elapsed は別 |
 | `outcome` / `terminationReason` | completed / failed / cancelled / skipped / unknown と原因。cancelled は完了扱いしない |
-| `usage` / `usageSource` | raw input/output/cache token のうち計測された値と情報源。未取得は null であって 0 ではない |
+| `requestId` / `attemptId` / `usage` / `usageSource` | Provider request / retry attempt は Host logical leg とは別の identity。raw input/output/cache token のうち計測された値と情報源。未取得は null であって 0 ではない |
 | `costEstimateUsd` / `pricingVersion` | 料金テーブル・cache分類・retry範囲が確認できた場合だけ推定値。請求金額ではない |
 | `reviewIsolation` / `evidenceRefs` | review の no-tools/read-only 等は Host 証拠があるときだけ observed/verified とする |
 | `sideEffects` | Host が持つ patch / network / external-write と結果。River Review はこの情報から自動適用しない |
 
 ### Accounting と identity の hard rules
 
-1. **Complete accounting requires complete inventory**: retry / fallback / critic / escalation がどこで発生したかを観測できない run は `completeness: unknown`（または既知の欠損がある `partial`）。未観測 leg = 無料 / 成功 / 呼ばれなかった、とは扱わない。
-2. **No double counting**: provider request ID / attempt ID と leg lineage の組で重複排除し、同一 usage event を file×skill 行と leg 行で二重加算しない。request ID が無ければ確実な dedupe を主張しない。
+1. **Complete accounting requires a proven inventory boundary**: Host の execution boundary を宣言し、その境界内の solver / critic / retry / fallback / escalation / provider attempt を欠損なく列挙できたという証拠が必要。見えている leg だけが全件だとは証明できない。完全性を証明できなければ `completeness: unknown`（既知の欠損は `partial`）、`inventoryVerified: false`。未観測 leg = 無料 / 成功 / 呼ばれなかった、とは扱わない。
+2. **No double counting**: Host が結合する provider request ID / attempt ID と leg lineage によって重複を検証し、同一 usage event を file×skill 行と leg 行で二重加算しない。request/attempt ID が無ければ確実な dedupe を主張しない。leg が1つでも、retryが3回なら provider attempts は3つあり得る。
 3. **Null != zero**: missing token/cost/latency は `null`。`0` は計測可能で実際にゼロだった場合にのみ使う。
 4. **Parallel latency != sum of leg durations**: end-to-end wall-clock は Host の run boundary で測る。並列 leg の duration 総和をユーザー待ち時間としない。
 5. **Evidence is not approval**: observation は routing、Gate、allowlist、merge authority、Human approval の入力へ自動昇格させない。特に `RIVER_GATE_COVERAGE=1` が無ければ Review Coverage の Gate への伝播も既定では有効でない。
@@ -129,10 +131,12 @@ Phase 4 は `#1574` の paired replay を再利用する。input commit / datase
 | Timeout aborted one reviewer, others completed | “review complete / clean” | Review Coverage は partial/timed_out を区別する。Gate への coverage 接続は opt-in（`RIVER_GATE_COVERAGE=1`）であり、未設定時に自動ブロックしたと主張しない |
 | No usage telemetry file exists | cost = $0 | cost unknown, not zero |
 | Host cascade and River reviewer role fan-out both occur | auto-select cascade from role count | Strategy belongs to Host, reviewer selection to River Review |
+| Host emits a shadow recommendation although it ran no strategy | recommendation means implementation success | `actualStrategy: null` / `recommendationApplied: false`; no agreement/quality scoring |
+| Critique leg reports different model, but reviewer had write-capable tools | independent read-only critic certified | independence/tool isolation unverified; do not treat model diversity as read-only security |
 
 ## 7. Exit criteria / follow-up
 
-Phase 2 closes only when:
+Phase 2 **design** closes only when (measurement implementation remains a separate follow-up):
 - [x] vocabulary and authority axes are separated without new runtime owner
 - [x] all five guardrails have current/gap/owner mapping linked to existing evidence
 - [x] strategy / leg observation semantics distinguish unknown / partial / complete, actual / recommended, cost / usage / latency
