@@ -262,7 +262,30 @@ export function proposeReviewResolutionVerificationUpdate({
     );
   }
 
-  const state = verificationStateFor(observation);
+  // Strong targeted verification must identify the original finding, not
+  // merely supply evidenceRefs that may belong to another finding.
+  const observedRef = observation.findingRef;
+  const originalRef = sourceItem.findingRef;
+  const observedIdentityPresent =
+    nonEmptyString(observedRef?.fingerprint) &&
+    nonEmptyString(observedRef?.fingerprintAlgo);
+  if (observation.mode === 'targeted' && observedIdentityPresent) {
+    if (
+      observedRef.fingerprint !== originalRef?.fingerprint ||
+      observedRef.fingerprintAlgo !== originalRef?.fingerprintAlgo
+    ) {
+      throw new ReviewResolutionVerificationError(
+        'observation_finding_mismatch',
+        'targeted verification evidence refers to a different original finding',
+        { resolutionIndex: match.resolutionIndex }
+      );
+    }
+  }
+
+  const state =
+    observation.mode === 'targeted' && !observedIdentityPresent
+      ? 'inconclusive'
+      : verificationStateFor(observation);
   const proposal = clone(reviewResolution);
   const item = proposal.items[match.resolutionIndex];
   item.verification = {
