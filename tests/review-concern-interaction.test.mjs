@@ -178,6 +178,44 @@ describe('#2568 cross-concern interaction planner', () => {
     assert.equal(observation.source.reason, 'invalid-interaction-refs');
   });
 
+  it('fails closed on duplicate Concern ids and invalid interaction refs', () => {
+    const duplicate = buildReviewConcernInteractionObservation({
+      reviewConcernMap: map([concern('a'), concern('a')]),
+      reviewConcernCoverage: null,
+    });
+    assert.equal(duplicate.status, 'unavailable');
+    assert.equal(duplicate.source.reason, 'invalid-concern-id');
+
+    const invalidRef = buildReviewConcernInteractionObservation({
+      reviewConcernMap: map([concern('a', ['   '])]),
+      reviewConcernCoverage: null,
+    });
+    assert.equal(invalidRef.status, 'unavailable');
+    assert.equal(invalidRef.source.reason, 'invalid-interaction-ref');
+  });
+
+  it('keeps interaction visible but marks malformed coverage context unavailable', () => {
+    const reviewConcernCoverage = coverage([
+      {
+        ...coveredConcern('a'),
+        mappingStatus: 'mystery',
+      },
+      coveredConcern('b'),
+    ]);
+
+    const observation = buildReviewConcernInteractionObservation({
+      reviewConcernMap: map([
+        concern('a', ['b']),
+        concern('b'),
+      ]),
+      reviewConcernCoverage,
+    });
+
+    assert.equal(observation.status, 'observed');
+    assert.equal(observation.interactions[0].integrationCheckCandidate, true);
+    assert.equal(observation.interactions[0].coverage.status, 'unavailable');
+  });
+
   it('keeps explicit interactions visible when coverage is missing', () => {
     const observation = buildReviewConcernInteractionObservation({
       reviewConcernMap: map([
