@@ -140,6 +140,57 @@ export function assessReviewResolutionFreshness(reviewResolution, currentRevisio
   );
 }
 
+export function proposeReviewResolutionTargetBinding({
+  findings = [],
+  reviewResolution,
+  findingTarget,
+  targetRevision,
+} = {}) {
+  requireRevision(targetRevision, 'targetRevision');
+  if (isSameReviewResolutionRevision(reviewResolution?.source, targetRevision)) {
+    throw new ReviewResolutionVerificationError(
+      'same_source_revision',
+      'action submission requires a revision different from the source review'
+    );
+  }
+
+  const match = findResolutionMatch({
+    findings,
+    reviewResolution,
+    findingTarget,
+  });
+  const sourceItem = reviewResolution.items[match.resolutionIndex];
+  if (sourceItem?.authorResponse?.state !== 'will_fix') {
+    throw new ReviewResolutionVerificationError(
+      'author_response_not_will_fix',
+      'target binding requires authorResponse will_fix',
+      { resolutionIndex: match.resolutionIndex }
+    );
+  }
+
+  if (
+    sourceItem?.resolution?.target !== null &&
+    isSameReviewResolutionRevision(sourceItem.resolution.target, targetRevision) &&
+    sourceItem?.resolution?.state === 'action_submitted'
+  ) {
+    return clone(reviewResolution);
+  }
+
+  const proposal = clone(reviewResolution);
+  const item = proposal.items[match.resolutionIndex];
+  item.resolution.state = 'action_submitted';
+  item.resolution.target = clone(targetRevision);
+  item.verification = {
+    state: 'pending',
+    verifier: null,
+    coverageStatus: 'unknown',
+    evidenceRefs: [],
+  };
+
+  assertReviewResolutionSemantics(proposal);
+  return proposal;
+}
+
 /**
  * Apply one already-observed verification result to Review Resolution.
  *
@@ -196,7 +247,14 @@ export function proposeReviewResolutionVerificationUpdate({
   });
   const sourceItem = reviewResolution.items[match.resolutionIndex];
   const existingTarget = sourceItem?.resolution?.target ?? null;
-  if (existingTarget !== null && !isSameReviewResolutionRevision(existingTarget, currentRevision)) {
+  if (existingTarget === null) {
+    throw new ReviewResolutionVerificationError(
+      'unbound_resolution_target',
+      'Review Resolution must bind the submitted revision before verification',
+      { resolutionIndex: match.resolutionIndex }
+    );
+  }
+  if (!isSameReviewResolutionRevision(existingTarget, currentRevision)) {
     throw new ReviewResolutionVerificationError(
       'stale_resolution_target',
       'Review Resolution is bound to a different target revision',
@@ -207,7 +265,6 @@ export function proposeReviewResolutionVerificationUpdate({
   const state = verificationStateFor(observation);
   const proposal = clone(reviewResolution);
   const item = proposal.items[match.resolutionIndex];
-  item.resolution.target = clone(currentRevision);
   item.verification = {
     state,
     verifier: nonEmptyString(observation.verifier) ? observation.verifier : null,
