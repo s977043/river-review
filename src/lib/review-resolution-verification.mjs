@@ -281,8 +281,7 @@ export function proposeReviewResolutionVerificationUpdate({
   const observedRef = observation.findingRef;
   const originalRef = sourceItem.findingRef;
   const observedIdentityPresent =
-    nonEmptyString(observedRef?.fingerprint) &&
-    nonEmptyString(observedRef?.fingerprintAlgo);
+    nonEmptyString(observedRef?.fingerprint) && nonEmptyString(observedRef?.fingerprintAlgo);
   if (observation.mode === 'targeted' && observedIdentityPresent) {
     if (
       observedRef.fingerprint !== originalRef?.fingerprint ||
