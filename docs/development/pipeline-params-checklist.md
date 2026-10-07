@@ -93,6 +93,8 @@ rg "verifyFinding\b" src/ runners/ tests/ scripts/
 
 各ヒット箇所で「この call site は新パラメータを渡す必要があるか」を判定する。`src/ai/` と `src/core/skill-dispatcher.mjs` の `generateReview` は AI client メソッドで別物のため除外する。
 
+`AbortSignal` のような control-flow パラメータを追加する場合は、単に call site を列挙するだけでなく、上位 cancellation を retry / fallback へ変換せず伝播できることを回帰テストで固定する（#2564）。
+
 ## 設計上の制約
 
 `src/lib/` は AGENTS.md の "Ask before editing" スコープに該当するため、大規模なシグネチャ変更は事前にユーザー承認を得ること。
