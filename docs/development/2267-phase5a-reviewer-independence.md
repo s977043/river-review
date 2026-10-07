@@ -260,7 +260,6 @@ Phase 5A is ready when:
 - targeted and existing Finding Critic regression tests pass
 - repository CI passes
 
-
 ## #2543 convergence note
 
 The runtime wiring in #2543 remains observation-only.
