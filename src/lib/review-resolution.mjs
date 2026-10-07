@@ -77,7 +77,7 @@ function isRevisionRef(value) {
   );
 }
 
-function revisionArtifactKey(value) {
+export function reviewResolutionRevisionArtifactKey(value) {
   if (!isRevisionRef(value)) return null;
   return value.artifactRefs
     .map((ref) => `${ref?.name ?? ''}:${ref?.sha256 ?? ''}`)
@@ -85,9 +85,9 @@ function revisionArtifactKey(value) {
     .join('|');
 }
 
-function isSameRevision(left, right) {
-  const leftKey = revisionArtifactKey(left);
-  const rightKey = revisionArtifactKey(right);
+export function isSameReviewResolutionRevision(left, right) {
+  const leftKey = reviewResolutionRevisionArtifactKey(left);
+  const rightKey = reviewResolutionRevisionArtifactKey(right);
   return leftKey !== null && rightKey !== null && leftKey === rightKey;
 }
 
@@ -178,7 +178,7 @@ export function validateReviewResolutionSemantics(document) {
       if (coverageStatus !== 'complete') {
         errors.push(`${prefix}.not_reproduced requires complete review coverage`);
       }
-      if (isSameRevision(document?.source, target)) {
+      if (isSameReviewResolutionRevision(document?.source, target)) {
         errors.push(`${prefix}.not_reproduced requires a revision different from source`);
       }
     }
@@ -194,12 +194,15 @@ export function validateReviewResolutionSemantics(document) {
     if (item?.resolution?.state === 'action_submitted') {
       if (!isRevisionRef(target)) {
         errors.push(`${prefix}.action_submitted requires a target revision`);
-      } else if (isSameRevision(document?.source, target)) {
+      } else if (isSameReviewResolutionRevision(document?.source, target)) {
         errors.push(`${prefix}.action_submitted requires a revision different from source`);
       }
     }
 
-    if (verificationState === 'verified_resolved' && isSameRevision(document?.source, target)) {
+    if (
+      verificationState === 'verified_resolved' &&
+      isSameReviewResolutionRevision(document?.source, target)
+    ) {
       errors.push(`${prefix}.verified_resolved requires a revision different from source`);
     }
 
