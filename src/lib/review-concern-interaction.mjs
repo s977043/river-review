@@ -225,9 +225,13 @@ export function buildReviewConcernInteractionObservation({
     }
   }
 
-  const pairs = [...pairMap.values()].sort((a, b) =>
-    JSON.stringify(a).localeCompare(JSON.stringify(b))
-  );
+  const pairs = [...pairMap.values()].sort((a, b) => {
+    const left = JSON.stringify(a);
+    const right = JSON.stringify(b);
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+  });
   const coverageIndex = buildCoverageIndex(reviewConcernCoverage);
 
   const interactions = pairs.map((concernRefs, index) => ({
