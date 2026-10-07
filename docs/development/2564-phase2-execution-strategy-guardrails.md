@@ -34,7 +34,9 @@ GitHub公式の HydraFusion 記事は五つの運用原則を説明している�
 
 ### Complete accounting
 
-**Current:** `src/lib/usage-persistence.mjs` は `RIVER_USAGE_TELEMETRY=1` で file×skill の JSONL を保存する。`src/lib/reviewer-orchestrator.mjs` は role duration と run duration を出力する。
+**Current:** `src/lib/usage-persistence.mjs` は opt-in の usage JSONL を保存する。
+環境変数は `RIVER_USAGE_TELEMETRY=1` である。
+`src/lib/reviewer-orchestrator.mjs` は role と run の duration を出力する。
 
 **Gap:** 共通の Host strategy ID、leg ID、provider request / retry attempt ID がない。retry、fallback、critic、escalation の総費用を計算できない。
 
