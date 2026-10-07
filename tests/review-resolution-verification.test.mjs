@@ -475,6 +475,27 @@ describe('proposeReviewResolutionVerificationUpdate', () => {
     );
   });
 
+  test('rejects unknown or missing fingerprint algorithms even with a matching findingId', () => {
+    for (const fingerprintTarget of [
+      { findingId: 'rr-1', fingerprint: 'fp-rr-1', fingerprintAlgo: 'v9' },
+      { findingId: 'rr-1', fingerprint: 'fp-rr-1' },
+    ]) {
+      assert.throws(
+        () =>
+          proposeReviewResolutionVerificationUpdate({
+            findings: [finding()],
+            reviewResolution: boundDocument(),
+            findingTarget: fingerprintTarget,
+            currentRevision: TARGET,
+            observation: observation(),
+          }),
+        (error) =>
+          error instanceof ReviewResolutionVerificationError &&
+          error.code === 'finding_identity_mismatch'
+      );
+    }
+  });
+
   test('does not mutate source sidecar or caller-owned observation', () => {
     const doc = boundDocument();
     const obs = observation();
