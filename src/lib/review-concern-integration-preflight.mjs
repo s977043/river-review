@@ -73,6 +73,9 @@ function validatePairs(interactions) {
  * @param {boolean} [args.offline=false]
  * @param {string} [args.provider='openai']
  * @param {boolean} [args.apiKeyAvailable=false] - presence only, not secret
+ * @param {boolean} [args.reviewContractResolved=false] - target/base/scope frozen
+ * @param {boolean} [args.redactionReady=false] - persistence boundary ready
+ * @param {boolean} [args.criticAvailable=false] - #1978 validation can actually run
  * @param {number} [args.maxPairs=3] - hard-bounded positive integer (<=20)
  */
 export function selectReviewConcernIntegrationPreflight({
@@ -82,6 +85,9 @@ export function selectReviewConcernIntegrationPreflight({
   offline = false,
   provider = 'openai',
   apiKeyAvailable = false,
+  reviewContractResolved = false,
+  redactionReady = false,
+  criticAvailable = false,
   maxPairs = DEFAULT_PAIR_LIMIT,
 } = {}) {
   if (!enabled) {
@@ -128,6 +134,15 @@ export function selectReviewConcernIntegrationPreflight({
   }
   if (apiKeyAvailable !== true) {
     return observation('not-executed', 'missing-provider-authorization', [], [], sourceStatus, sourceLimitations);
+  }
+  if (reviewContractResolved !== true) {
+    return observation('not-executed', 'review-contract-unresolved', [], [], sourceStatus, sourceLimitations);
+  }
+  if (redactionReady !== true) {
+    return observation('not-executed', 'redaction-unavailable', [], [], sourceStatus, sourceLimitations);
+  }
+  if (criticAvailable !== true) {
+    return observation('not-executed', 'critic-validation-unavailable', [], [], sourceStatus, sourceLimitations);
   }
 
   // Phase 5A constructs canonical interaction order. Do not sort by perceived
