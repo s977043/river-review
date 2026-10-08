@@ -280,6 +280,14 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
       'no_proposal',
     ]);
     assert.throws(() => buildReviewResolutionFeedbackProposals({ reviewResolution: {} }));
+    const invalidRevision = document([item()]);
+    invalidRevision.source.artifactRefs[0].sha256 = 'unverified-hash';
+    assert.throws(() =>
+      buildReviewResolutionFeedbackProposals({
+        reviewResolution: invalidRevision,
+        skillIdByFingerprint: { [FP]: 'review/skill' },
+      })
+    );
     assert.throws(() =>
       buildReviewResolutionFeedbackProposals({
         reviewResolution: document([item()]),
