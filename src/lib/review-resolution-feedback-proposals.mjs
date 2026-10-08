@@ -77,7 +77,11 @@ export function buildReviewResolutionFeedbackProposals({
   sourceFindings = [],
   skillIdByFingerprint = {},
 } = {}) {
-  if (!reviewResolution || typeof reviewResolution !== 'object' || Array.isArray(reviewResolution)) {
+  if (
+    !reviewResolution ||
+    typeof reviewResolution !== 'object' ||
+    Array.isArray(reviewResolution)
+  ) {
     throw new ReviewResolutionFeedbackProposalError('reviewResolution must be an object');
   }
   assertReviewResolutionSemantics(reviewResolution);
