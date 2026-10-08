@@ -153,6 +153,17 @@ The experimental configuration must cap the number of pairs, context bytes,
 LLM calls, timeout and total token use. Exhausting any cap records the omitted
 pair count. A zero-finding result from an incomplete run is not clean.
 
+Pair selection must be deterministic within a frozen review revision. If a
+budget excludes pairs, record which per-run interaction references were
+skipped and why. The experiment must not silently prefer only pairs whose
+coverage status appears complete. Retry must not duplicate the same candidate
+or erase an earlier unresolved result.
+
+No generated integration finding may enter the existing fallback comment path,
+normal emitted issues, or any Gate input without a separate approved adoption
+contract. The default-off baseline output must remain byte-for-byte equivalent
+apart from optional experimental debug telemetry.
+
 ## Staged delivery
 
 ### PR A — offline contract and fixtures
