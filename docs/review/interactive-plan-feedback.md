@@ -1,15 +1,15 @@
 # PlanGate interactive review feedback interoperability (Phase A)
 
 Tracking: River Review #2577. Producer: PlanGate #1521.
-Existing authority owners: #2322 Review Resolution, #2212 Review Coverage,
-#2368 Decision Surface, #2470/#2509 Evidence Architecture.
+Existing authority owners include #2322 Review Resolution and #2212 Review Coverage.
+They also include #2368 Decision Surface and #2470/#2509 Evidence Architecture.
 
 ## Boundary
 
 PlanGate retains plan.md and C-3 approval as the **authoritative** plan and
 human-approval records. A PlanGate HTML page may collect review-only answers
-to explicit questions. This feedback is **not** a finding, a test result,
-a human authorization to execute, or a River Review gate/verdict.
+to explicit questions. The feedback is **not** a finding or a test result.
+It does not authorize execution and cannot change a River Review gate/verdict.
 
 River Review owns review findings, review coverage, resolution status,
 provenance, and decision *evidence*. It must not assign approval from an
@@ -47,8 +47,8 @@ but there is no implicit newest-wins or promotion to canonical state.
 
 An opt-in local validator would:
 
-1. Require exact schema version and kind, valid types, allowed states,
-   non-duplicate IDs, and a single local bounded path mapping.
+1. Require an exact schema version and kind. Validate types and allowed states.
+   Reject duplicate IDs. Restrict local paths to the task directory.
 2. Recompute plan.md and review-questions.json SHA-256 and compare.
    Changed files -> STALE; missing inputs -> UNKNOWN/BLOCKED.
 3. Ensure question IDs exist in the referenced question input, and do not
@@ -90,6 +90,10 @@ fresh repository-contract review and automated regression evidence.
 
 ## Security and compatibility review
 
-Check: no network dependency; no script or raw-html copy from a third-party
-repository; no secrets in published artifacts; no new judge/gate/approval;
-no default behavior or schema change; traceability preserves raw findings.
+Check the following properties before an implementation PR can merge:
+
+- No network dependency or third-party code copying.
+- No secrets included in published artifacts.
+- No additional judge or approval gate.
+- Existing schema and default behavior remain unchanged.
+- Raw findings and their traceability remain available.
