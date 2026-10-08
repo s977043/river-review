@@ -4,6 +4,7 @@ import {
   reviewResolutionRevisionArtifactKey,
 } from './review-resolution.mjs';
 import { FEEDBACK_TYPES } from './feedback.mjs';
+import { resolveReviewResolutionFindingRef } from './review-resolution-organizer.mjs';
 
 /**
  * Host-neutral, read-only proposal builder for #2322 Phase 5 / #2575.
@@ -104,6 +105,8 @@ function proposedType(item, sourceRevision) {
  * @param {{
  *   reviewResolution: object,
  *   skillIdByFingerprint?: Record<string,string>,
+ *   sourceFindings?: object[],
+ *   currentRevision?: object|null,
  * }} options
  * @returns {{status: string, reasonCode: string|null, feedbackType: string|null,
  *   requiresHumanApproval: true, findingRef: object, reviewRunId: string|null,
@@ -113,6 +116,8 @@ function proposedType(item, sourceRevision) {
 export function buildReviewResolutionFeedbackProposals({
   reviewResolution,
   skillIdByFingerprint = {},
+  sourceFindings = [],
+  currentRevision = null,
 } = {}) {
   assertReviewResolutionSemantics(reviewResolution);
   // The semantic checker intentionally complements (rather than replaces)
@@ -123,6 +128,9 @@ export function buildReviewResolutionFeedbackProposals({
     reviewResolutionRevisionArtifactKey(reviewResolution?.source) === null
   ) {
     throw new TypeError('Review Resolution items or source revision are invalid');
+  }
+  if (!Array.isArray(sourceFindings)) {
+    throw new TypeError('sourceFindings must be an array');
   }
   if (
     !skillIdByFingerprint ||
@@ -178,6 +186,29 @@ export function buildReviewResolutionFeedbackProposals({
     } else if (!nonEmpty(skillId) || !SKILL_ID.test(skillId)) {
       status = 'needs_human';
       reasonCode = 'missing_trusted_skill_mapping';
+    } else {
+      // The Resolution sidecar alone is not proof that this finding existed in
+      // the canonical source Review Artifact. Reuse the Organizer's identity
+      // resolver rather than treating a self-contained fingerprint as truth.
+      const resolved = resolveReviewResolutionFindingRef(sourceFindings, item.findingRef);
+      const original = resolved.status === 'matched' && !resolved.identityMismatch
+        ? sourceFindings[resolved.findingIndex]
+        : null;
+      if (
+        !original ||
+        original.id !== item.findingRef.findingId ||
+        original.fingerprint !== fingerprint
+      ) {
+        status = 'needs_human';
+        reasonCode = 'unverified_source_finding';
+      } else if (
+        mapping.feedbackType === 'accepted' &&
+        (reviewResolutionRevisionArtifactKey(currentRevision) === null ||
+          !isSameReviewResolutionRevision(item.resolution.target, currentRevision))
+      ) {
+        status = 'needs_human';
+        reasonCode = 'stale_or_unknown_target_revision';
+      }
     }
 
     return {
