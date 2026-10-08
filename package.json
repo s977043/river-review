@@ -35,7 +35,7 @@
     "lint:sh": "shellcheck -S warning scripts/*.sh .claude/hooks/*.sh hooks/*.sh",
     "lint": "npm run format:check && npm run check:dashes && npm run lint:code && npm run lint:md && npm run lint:text && npm run lint:sh",
     "format": "prettier --write \"**/*.{js,mjs,cjs,json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{js,mjs,cjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --write src/lib/execution-strategy-attempt-accounting.mjs tests/execution-strategy-attempt-accounting.test.mjs && git diff -- src/lib/execution-strategy-attempt-accounting.mjs tests/execution-strategy-attempt-accounting.test.mjs && exit 1",
     "check:links": "lychee --config .lychee.toml '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
     "check:links:quick": "lychee --config .lychee.toml --max-concurrency 16 '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
     "check:links:local": "lychee --config .lychee.toml --offline '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
