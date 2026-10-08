@@ -307,6 +307,19 @@ export function parseGuardLedger(text) {
         `${where} (${entry.id}): reviewAfter は YYYY-MM-DD（実際: ${JSON.stringify(entry.reviewAfter)}）`
       );
     }
+    // Step 9 (a): 散文だけを退役したエントリ。CLAUDE.md の bullet は持たず、台帳が記録を担う。
+    if (entry.proseRetiredAt !== undefined) {
+      if (!ISO_DATE_RE.test(String(entry.proseRetiredAt))) {
+        throw new Error(
+          `${where} (${entry.id}): proseRetiredAt は YYYY-MM-DD（実際: ${JSON.stringify(entry.proseRetiredAt)}）`
+        );
+      }
+      if (entry.mechanized !== 'full') {
+        throw new Error(
+          `${where} (${entry.id}): proseRetiredAt は mechanized: full のエントリにだけ付けられる`
+        );
+      }
+    }
   }
   return doc.guards;
 }
@@ -626,7 +639,12 @@ export const DOC_ENUMERATION_SPECS = [
     marker: '`## AI Misoperation Guards` 節の `- **<見出し>**:` 行',
     kind: 'names',
     declare: parseGuardTitles,
-    measure: async () => new Set((await loadGuardLedger()).map((entry) => entry.title)),
+    measure: async () =>
+      new Set(
+        (await loadGuardLedger())
+          .filter((entry) => entry.proseRetiredAt === undefined)
+          .map((entry) => entry.title)
+      ),
   },
   {
     // 台帳の verifiedBy が実在しないパスを指した瞬間に落とす。

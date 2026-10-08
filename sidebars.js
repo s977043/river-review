@@ -139,6 +139,7 @@ module.exports = {
         'explanation/what-is-river-review',
         'explanation/review-scope',
         'explanation/river-architecture',
+        'explanation/execution-strategy',
         'explanation/design-philosophy',
         'explanation/human-judgment-focus',
         'explanation/upstream-midstream-downstream',

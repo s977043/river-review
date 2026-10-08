@@ -143,7 +143,7 @@ JSON
 
 `app_id` は GitHub Actions のアプリ ID（現状 `15368`）です。この配列は全置換なので、既存の 7 件を省略すると必須チェックから外れてしまいます。手順 2 で取得した配列へ追記する形が安全です。
 
-一方、**既存の必須チェックの名前を変える場合（matrix leg の増減・改名・ジョブ名の変更）は逆で、branch protection を先に更新します**。この順序と背景は [CLAUDE.md](../../CLAUDE.md) の AI Misoperation Guards「CI matrix leg ↔ branch-protection required-check sync」が SSoT です。ここでは重複させないので、必ずそちらを読んでください。
+一方、**既存の必須チェックの名前を変える場合（matrix leg の増減・改名・ジョブ名の変更）は逆で、branch protection を先に更新します**。この順序と手順は [docs/governance.md](../../docs/governance.md) の「1.2 必須チェックの context 名を変える場合」が SSoT です。ここでは重複させないので、必ずそちらを読んでください。
 
 ### 4. context 名の決まり方に注意する
 

@@ -511,7 +511,7 @@ PR 番号 / head SHA / ローカル検証の exit code / 変更ファイル一�
 
 ### 日本語 docs の textlint
 
-`npm run lint:text` はキャッシュを再利用するため、新規追加した違反を見逃すことがある。`npx textlint --no-cache <files>` で直接検証し、`npm run fix:dashes` も同じパスで実行する。詳細: CLAUDE.md「Doc-edit textlint」ガード。
+`npm run lint:text` はキャッシュを再利用するため、新規追加した違反を見逃すことがある。`npx textlint --no-cache <files>` で直接検証し、`npm run fix:dashes` も同じパスで実行する。違反そのものは pre-commit の lint-staged と必須チェック `Lint` が止める。
 
 ### 停止したワーカーからの復帰（オーガナイザー側）
 
