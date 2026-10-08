@@ -260,17 +260,31 @@ describe('Review Resolution Feedback proposals (#2575 Phase 5 PR1)', () => {
     assert.equal(candidate.reasonCode, 'missing_reviewer_provenance');
   });
 
-  test('partial, unhashed or absent verification evidence cannot prove resolution', () => {
+  test('partial or unhashed verification evidence cannot prove resolution', () => {
     const cases = [
       { ...item().verification, coverageStatus: 'partial', state: 'inconclusive' },
       { ...item().verification, evidenceRefs: [{ ref: 'unhashed', sha256: null }] },
-      { ...item().verification, evidenceRefs: [] },
+      { ...item().verification, state: 'inconclusive', evidenceRefs: [] },
     ];
     for (const verification of cases) {
       const candidate = build(document([item({ verification })])).items[0];
       assert.notEqual(candidate.status, 'proposed');
       assert.equal(candidate.feedbackType, null);
     }
+  });
+
+  test('verified_resolved with no evidence is an invalid sidecar, not a positive proposal', () => {
+    assert.throws(
+      () =>
+        build(
+          document([
+            item({
+              verification: { ...item().verification, evidenceRefs: [] },
+            }),
+          ])
+        ),
+      ReviewResolutionError
+    );
   });
 
   test('target freshness is required for accepted proposals', () => {
