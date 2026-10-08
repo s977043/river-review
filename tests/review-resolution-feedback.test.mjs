@@ -307,6 +307,22 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
     }
   });
 
+  test('holds ambiguous v1 feedback identity across the original source findings', () => {
+    const [proposal] = buildProposalsImpl({
+      reviewResolution: document([item()]),
+      sourceFindings: [
+        { id: 'finding-1', fingerprint: FP },
+        { id: 'another-finding', fingerprint: FP },
+      ],
+      currentRevision: TARGET,
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+    });
+
+    assert.equal(proposal.status, 'needs_human');
+    assert.equal(proposal.reasonCode, 'ambiguous_feedback_fingerprint');
+    assert.equal(proposal.feedbackType, null);
+  });
+
   test('holds verified resolution when the current target revision is missing or stale', () => {
     const input = {
       reviewResolution: document([item()]),
