@@ -72,7 +72,7 @@ function deepFreeze(value) {
 }
 
 describe('Resolution -> Feedback proposals (#2575)', () => {
-  test('proposes accepted only for explicit verified_resolved evidence and trusted skill mapping', () => {
+  test('proposes accepted for verified_resolved evidence and explicit skill mapping', () => {
     const doc = deepFreeze(document([item()]));
     const before = JSON.stringify(doc);
     const [proposal] = buildReviewResolutionFeedbackProposals({
@@ -86,9 +86,7 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
     assert.equal(proposal.reviewRunId, SOURCE.reviewRunId);
     assert.equal(proposal.executionManifestId, SOURCE.executionManifestId);
     assert.deepEqual(proposal.reviewerIds, ['reviewer-a', 'reviewer-b']);
-    assert.deepEqual(proposal.verification.evidenceRefs, [
-      { ref: 'test:case-42', sha256: null },
-    ]);
+    assert.deepEqual(proposal.verification.evidenceRefs, [{ ref: 'test:case-42', sha256: null }]);
     assert.deepEqual(proposal.verification.target, TARGET);
     assert.equal(JSON.stringify(doc), before);
     assert.notEqual(proposal.findingRef, doc.items[0].findingRef);
@@ -274,11 +272,7 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
   });
 
   test('keeps statuses closed and rejects invalid documents / mappings', () => {
-    assert.deepEqual(RESOLUTION_FEEDBACK_PROPOSAL_STATUSES, [
-      'candidate',
-      'needs_human',
-      'no_proposal',
-    ]);
+    assert.deepEqual(RESOLUTION_FEEDBACK_PROPOSAL_STATUSES, ['candidate', 'needs_human', 'no_proposal']);
     assert.throws(() => buildReviewResolutionFeedbackProposals({ reviewResolution: {} }));
     const invalidRevision = document([item()]);
     invalidRevision.source.artifactRefs[0].sha256 = 'unverified-hash';
