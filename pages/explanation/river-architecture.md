@@ -46,6 +46,10 @@ flowchart LR
   Merge --> Findings[findings[] + summary]
 ```
 
+## Execution Strategy と Review Team の境界
+
+上位の Agent Harness は Single / Cascade / Critique のような **候補生成の実行方式**を選択できます。一方、River Review の Review Team は観点別レビュアーの選択・並列実行・指摘統合を担います。両者の routing と判断権限を混同しません。5 つの Orchestration Guardrails、現状の観測可能範囲、strategy / leg accounting の設計案は [Execution Strategy と Orchestration Guardrails](./execution-strategy.md) を参照してください。
+
 ## Agent 層（generate → review → revise ループ）
 
 River Review は、生成系エージェントの **generate → review → revise** ループにおける **review ステージ**として組み込めます（Epic #1150）。
