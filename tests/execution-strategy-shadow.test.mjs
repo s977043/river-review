@@ -76,7 +76,12 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
   it('does not recommend single if a supplied Concern Map failed or is malformed', () => {
     for (const reviewConcernMap of [
       concerns(0, 'failed'),
-      { kind: 'review-concern-map', schemaVersion: '1', analysis: { status: 'unknown' }, concerns: [] },
+      {
+        kind: 'review-concern-map',
+        schemaVersion: '1',
+        analysis: { status: 'unknown' },
+        concerns: [],
+      },
     ]) {
       const observation = buildExecutionStrategyShadowObservation({
         changedFiles: ['src/app.js'],
