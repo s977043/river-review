@@ -34,7 +34,8 @@ Node 22 is required (`.nvmrc` and `engines.node` pin 22.x). If the default `node
 | Test                    | `npm test`                                                        |
 | Skills validation       | `npm run skills:validate`                                         |
 | Agent skills validation | `npm run agent-skills:validate`                                   |
-| Agent definitions       | `npm run agents:validate`                                         |
+| Agent spec and examples | `npm run agents:validate` (`agents/spec/`, `agents/examples/`)    |
+| Plugin manifest         | `npm run plugin:validate` (incl. `agents/*.md` registration)      |
 | Local link check        | `npm run check:links:local`                                       |
 | Docs dev server         | `npm run dev`                                                     |
 | Docs build              | `npm run build`                                                   |
