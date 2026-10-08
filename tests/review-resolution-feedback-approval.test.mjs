@@ -99,7 +99,10 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
       review_run_id: 'source-run',
     });
     assert.deepEqual(result.audit.source.reviewerIds, ['bug-hunter', 'security-scanner']);
-    assert.deepEqual(result.audit.source.verification.evidenceRefs, proposed.verification.evidenceRefs);
+    assert.deepEqual(
+      result.audit.source.verification.evidenceRefs,
+      proposed.verification.evidenceRefs
+    );
     assert.equal(result.audit.proposalDigest, reviewResolutionFeedbackProposalDigest(proposed));
     assert.equal('actor' in result.feedbackEntry, false);
     assert.equal('verification' in result.feedbackEntry, false);
@@ -127,10 +130,7 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
     assert.equal(result.status, 'ready');
     assert.equal(result.feedbackEntry.feedbackType, 'accepted_risk');
     assert.equal(result.audit.source.verification.state, 'not_requested');
-    expectRejected(
-      () => execute(proposed, { currentRevision: null }),
-      'stale_or_unknown_revision'
-    );
+    expectRejected(() => execute(proposed, { currentRevision: null }), 'stale_or_unknown_revision');
     expectRejected(
       () => execute(proposed, { currentRevision: TARGET }),
       'stale_or_unknown_revision'
@@ -158,7 +158,10 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
       'invalid_human_approval'
     );
     expectRejected(
-      () => execute(proposed, { approval: approvalFor(proposed, { approvedAt: '2026-02-30T00:00:00.000Z' }) }),
+      () =>
+        execute(proposed, {
+          approval: approvalFor(proposed, { approvedAt: '2026-02-30T00:00:00.000Z' }),
+        }),
       'invalid_human_approval'
     );
     expectRejected(
@@ -166,11 +169,13 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
       'invalid_human_approval'
     );
     expectRejected(
-      () => execute(proposed, { approval: approvalFor(proposed, { proposalDigest: '0'.repeat(64) }) }),
+      () =>
+        execute(proposed, { approval: approvalFor(proposed, { proposalDigest: '0'.repeat(64) }) }),
       'approval_digest_mismatch'
     );
     expectRejected(
-      () => execute(proposed, { approval: approvalFor(proposed, { findingId: 'another-finding' }) }),
+      () =>
+        execute(proposed, { approval: approvalFor(proposed, { findingId: 'another-finding' }) }),
       'approval_target_mismatch'
     );
     expectRejected(
@@ -178,21 +183,25 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
       'approval_target_mismatch'
     );
     expectRejected(
-      () => execute(proposed, { currentProposal: candidate({ authorRationale: 'Changed after approval' }) }),
+      () =>
+        execute(proposed, {
+          currentProposal: candidate({ authorRationale: 'Changed after approval' }),
+        }),
       'stale_or_swapped_proposal'
     );
     expectRejected(
-      () => approveReviewResolutionFeedbackProposal({ proposal: proposed, approval: approvalFor(proposed) }),
+      () =>
+        approveReviewResolutionFeedbackProposal({
+          proposal: proposed,
+          approval: approvalFor(proposed),
+        }),
       'current_proposal_required'
     );
     expectRejected(
       () => execute(proposed, { currentRevision: STALE }),
       'stale_or_unknown_revision'
     );
-    expectRejected(
-      () => execute(proposed, { currentRevision: null }),
-      'stale_or_unknown_revision'
-    );
+    expectRejected(() => execute(proposed, { currentRevision: null }), 'stale_or_unknown_revision');
   });
 
   test('rejects unapprovable statuses, malformed fingerprints and missing evidence', () => {
@@ -207,9 +216,12 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
       'unsupported_feedback_type'
     );
     expectRejected(
-      () => reviewResolutionFeedbackProposalDigest(candidate({
-        findingRef: { findingId: 'finding-1', fingerprint: 'not-v1', fingerprintAlgo: 'v2' },
-      })),
+      () =>
+        reviewResolutionFeedbackProposalDigest(
+          candidate({
+            findingRef: { findingId: 'finding-1', fingerprint: 'not-v1', fingerprintAlgo: 'v2' },
+          })
+        ),
       'incompatible_fingerprint'
     );
     expectRejected(
@@ -217,16 +229,22 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
       'missing_reviewer_provenance'
     );
     expectRejected(
-      () => reviewResolutionFeedbackProposalDigest(candidate({
-        verification: { ...candidate().verification, evidenceRefs: [] },
-      })),
+      () =>
+        reviewResolutionFeedbackProposalDigest(
+          candidate({
+            verification: { ...candidate().verification, evidenceRefs: [] },
+          })
+        ),
       'insufficient_verification_evidence'
     );
     expectRejected(
-      () => reviewResolutionFeedbackProposalDigest(candidate({
-        feedbackType: 'accepted_risk',
-        authorRationale: '',
-      })),
+      () =>
+        reviewResolutionFeedbackProposalDigest(
+          candidate({
+            feedbackType: 'accepted_risk',
+            authorRationale: '',
+          })
+        ),
       'missing_risk_acceptance_rationale'
     );
   });
@@ -235,9 +253,7 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
     const proposed = candidate();
     const first = execute(proposed);
     const result = execute(proposed, {
-      existingFeedback: [
-        { ...first.feedbackEntry, timestamp: '2026-10-08T12:00:00.000Z' },
-      ],
+      existingFeedback: [{ ...first.feedbackEntry, timestamp: '2026-10-08T12:00:00.000Z' }],
     });
     assert.equal(result.status, 'duplicate');
     assert.equal(result.feedbackEntry, null);
@@ -267,10 +283,7 @@ describe('Review Resolution explicit Feedback approval (#2591)', () => {
       () => execute(proposed, { trigger: 'untrusted-event' }),
       'invalid_feedback_trigger'
     );
-    expectRejected(
-      () => execute(proposed, { pr: -1 }),
-      'invalid_pr'
-    );
+    expectRejected(() => execute(proposed, { pr: -1 }), 'invalid_pr');
   });
 
   test('does not mutate inputs or perform writes, even with frozen proposal and feedback', () => {

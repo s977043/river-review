@@ -154,10 +154,7 @@ export function approveReviewResolutionFeedbackProposal({
   ) {
     reject('invalid_human_approval');
   }
-  if (
-    !/^[0-9a-f]{64}$/.test(approval.proposalDigest ?? '') ||
-    approval.proposalDigest !== digest
-  ) {
+  if (!/^[0-9a-f]{64}$/.test(approval.proposalDigest ?? '') || approval.proposalDigest !== digest) {
     reject('approval_digest_mismatch');
   }
   if (
