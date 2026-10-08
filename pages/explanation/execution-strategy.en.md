@@ -13,7 +13,7 @@ This is a **design explanation**, not a new CLI option, persisted schema, runtim
 - **Judgment Placement** determines which evaluation layer makes a judgment (see [Judgment Placement](./judgment-placement.md)).
 - **Authority** remains with the Host / Human for applying changes, merging, or releasing.
 
-These are analytical axes, **not names of current configuration fields**. In particular, `--reviewers auto` selects *review perspectives*, not a candidate-generation execution strategy. River Review provides findings, coverage, evidence, and recommendations; it does not own implementation-agent scheduling, automatic edits, or merge/release authority.
+These are analytical axes, **not names of current configuration fields**. In particular, `--reviewers auto` selects _review perspectives_, not a candidate-generation execution strategy. River Review provides findings, coverage, evidence, and recommendations; it does not own implementation-agent scheduling, automatic edits, or merge/release authority.
 
 ```text
 Host / Harness -> Single | Cascade | Critique -> candidate
