@@ -25,6 +25,9 @@ const input = (interactions, status = 'observed', limitations = []) => ({
 const active = (interactionObservation, options = {}) => ({
   enabled: true,
   apiKeyAvailable: true,
+  reviewContractResolved: true,
+  redactionReady: true,
+  criticAvailable: true,
   interactionObservation,
   ...options,
 });
@@ -102,6 +105,9 @@ describe('Phase 5B opt-in preflight — #2585', () => {
       [{ offline: true }, 'offline'],
       [{ provider: 'custom' }, 'unsupported-provider'],
       [{ apiKeyAvailable: false }, 'missing-provider-authorization'],
+      [{ reviewContractResolved: false }, 'review-contract-unresolved'],
+      [{ redactionReady: false }, 'redaction-unavailable'],
+      [{ criticAvailable: false }, 'critic-validation-unavailable'],
     ];
     for (const [override, reason] of cases) {
       const result = selectReviewConcernIntegrationPreflight(active(obs, override));
