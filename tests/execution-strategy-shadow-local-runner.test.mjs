@@ -40,7 +40,9 @@ test('#2564 shadow strategy is opt-in and never changes review execution', async
   assert.equal(observation.recommendationApplied, false);
   assert.equal(observation.actualStrategy, null);
   assert.equal(observation.comparison, null);
-  assert.ok(['single', 'cascade', 'critique'].includes(observation.recommendedStrategy));
+  // Without an explicit risk assessment, a small diff is not declared low risk.
+  assert.equal(observation.recommendedStrategy, null);
+  assert.ok(observation.limitations.includes('risk-not-classified'));
   assert.ok(observation.limitations.includes('provider-attempt-accounting-not-measured'));
 
   const withoutShadow = structuredClone(on);
