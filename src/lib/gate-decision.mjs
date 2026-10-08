@@ -250,11 +250,7 @@ export function criticValidationIncompleteForGate(observation, env) {
   const evaluated = observation.evaluated;
   if (!Number.isSafeInteger(evaluated) || evaluated < 0) return true;
   const humanReview = observation.humanReview;
-  if (
-    !Number.isSafeInteger(humanReview) ||
-    humanReview < 0 ||
-    humanReview > evaluated
-  ) {
+  if (!Number.isSafeInteger(humanReview) || humanReview < 0 || humanReview > evaluated) {
     return true;
   }
   const statusCounts = observation.byFinalStatus;
@@ -264,7 +260,9 @@ export function criticValidationIncompleteForGate(observation, env) {
   const known = new Set(Object.values(FINAL_STATUS));
   const counts = Object.entries(statusCounts);
   if (
-    !counts.every(([status, count]) => known.has(status) && Number.isSafeInteger(count) && count >= 0) ||
+    !counts.every(
+      ([status, count]) => known.has(status) && Number.isSafeInteger(count) && count >= 0
+    ) ||
     counts.reduce((sum, [, count]) => sum + count, 0) !== evaluated
   ) {
     return true;

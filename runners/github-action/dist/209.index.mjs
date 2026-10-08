@@ -979,6 +979,7 @@ function finalizeArtifact(
         deterministicUnrunnable: gateContext.deterministicUnrunnable === true,
         // #2337 (opt-in, default OFF): see coverageIncompleteForGate.
         coverageIncomplete: gateContext.coverageIncomplete === true,
+        criticIncomplete: gateContext.criticIncomplete === true,
         config: gateContext.config ?? {},
       });
     } catch {
@@ -1666,6 +1667,7 @@ async function runReviewPlan({
   // #2337: coverage is observed by the orchestration boundary; the exec path
   // reduces it here through the SSoT predicate (false unless the host opted in).
   let gateCoverageIncomplete = false;
+  let gateCriticIncomplete = false;
 
   const configArtifacts =
     config && typeof config.artifacts === 'object' && config.artifacts ? config.artifacts : {};
@@ -1817,6 +1819,10 @@ async function runReviewPlan({
       if (execGate.strictBlock === true) gateStrictBlock = true;
       gateDeterministicUnrunnable = execGate.deterministicUnrunnable === true;
       gateCoverageIncomplete = (0,gate_decision/* coverageIncompleteForGate */.p4)(review?.reviewCoverage, process.env);
+      gateCriticIncomplete = (0,gate_decision/* criticValidationIncompleteForGate */.aN)(
+        review?.debug?.execution?.findingCritic ?? review?.debug?.findingCritic,
+        process.env
+      );
       executionTrace = {
         // #1868: replay 経路（runReviewExecReplay）と同じ順序で engine 側の
         // debug.execution 観測を引き継ぐ。2 経路で挙動を揃えないと、同じ設定でも
@@ -1908,6 +1914,7 @@ async function runReviewPlan({
       strictBlock: gateStrictBlock,
       deterministicUnrunnable: gateDeterministicUnrunnable,
       coverageIncomplete: gateCoverageIncomplete,
+      criticIncomplete: gateCriticIncomplete,
       config,
     },
   });
