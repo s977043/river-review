@@ -182,6 +182,42 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
     assert.equal(missing.feedbackType, null);
   });
 
+  test('does not emit duplicate feedback candidates for one v1 fingerprint', () => {
+    const original = item();
+    const second = item();
+    second.findingRef.findingId = 'finding-2';
+    second.findingRef.fingerprintAlgo = 'v2';
+    const proposals = buildReviewResolutionFeedbackProposals({
+      reviewResolution: document([original, second]),
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+    });
+    assert.deepEqual(
+      proposals.map((proposal) => proposal.reasonCode),
+      ['ambiguous_feedback_fingerprint', 'ambiguous_feedback_fingerprint']
+    );
+    assert.ok(proposals.every((proposal) => proposal.feedbackType === null));
+  });
+
+  test('holds nominal verified_resolved with unknown completeness', () => {
+    const [proposal] = buildReviewResolutionFeedbackProposals({
+      reviewResolution: document([item({ coverage: 'unknown' })]),
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+    });
+    assert.equal(proposal.status, 'needs_human');
+    assert.equal(proposal.reasonCode, 'verification_evidence_insufficient');
+  });
+
+  test('holds a finding without reviewer provenance', () => {
+    const finding = item();
+    finding.findingRef.sources = [{ findingId: 'reviewer-1', reviewerId: '' }];
+    const [proposal] = buildReviewResolutionFeedbackProposals({
+      reviewResolution: document([finding]),
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+    });
+    assert.equal(proposal.status, 'needs_human');
+    assert.equal(proposal.reasonCode, 'missing_review_provenance');
+  });
+
   test('does not create a proposal from absent or ambiguous outcomes', () => {
     const [proposal] = buildReviewResolutionFeedbackProposals({
       reviewResolution: document([
