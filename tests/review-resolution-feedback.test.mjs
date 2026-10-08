@@ -4,7 +4,7 @@ import { describe, test } from 'node:test';
 import { buildFeedbackEntry } from '../src/lib/feedback.mjs';
 import { buildReviewResolution } from '../src/lib/review-resolution.mjs';
 import {
-  buildReviewResolutionFeedbackProposals,
+  buildReviewResolutionFeedbackProposals as buildProposalsImpl,
   RESOLUTION_FEEDBACK_PROPOSAL_STATUSES,
 } from '../src/lib/review-resolution-feedback.mjs';
 
@@ -61,6 +61,17 @@ function document(items) {
     source: SOURCE,
     items,
   });
+}
+
+// Fixtures intentionally supply the canonical finding set and current revision
+// through the caller boundary. The builder does not infer either from its sidecar.
+function buildReviewResolutionFeedbackProposals({ reviewResolution, ...options }) {
+  const sourceFindings = reviewResolution?.items?.map((entry) => ({
+    id: entry.findingRef.findingId,
+    fingerprint: entry.findingRef.fingerprint,
+  })) ?? [];
+  const currentRevision = reviewResolution?.items?.[0]?.resolution?.target ?? null;
+  return buildProposalsImpl({ reviewResolution, sourceFindings, currentRevision, ...options });
 }
 
 function deepFreeze(value) {
@@ -269,6 +280,72 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
     });
     assert.equal(entry.feedbackType, 'accepted');
     assert.equal(entry.review_run_id, SOURCE.reviewRunId);
+  });
+
+  test('does not propose positive feedback without original finding provenance', () => {
+    const doc = document([item()]);
+    const input = { reviewResolution: doc, skillIdByFingerprint: { [FP]: 'review/skill' } };
+
+    for (const sourceFindings of [
+      [],
+      [{ id: 'not-the-finding', fingerprint: FP }],
+      [{ id: 'finding-1', fingerprint: OTHER }],
+      [{ id: 'finding-1', fingerprint: FP }, { id: 'finding-1', fingerprint: FP }],
+    ]) {
+      const [proposal] = buildProposalsImpl({
+        ...input,
+        sourceFindings,
+        currentRevision: TARGET,
+      });
+      assert.equal(proposal.status, 'needs_human');
+      assert.equal(proposal.reasonCode, 'unverified_source_finding');
+      assert.equal(proposal.feedbackType, null);
+    }
+  });
+
+  test('holds verified resolution when the current target revision is missing or stale', () => {
+    const input = {
+      reviewResolution: document([item()]),
+      sourceFindings: [{ id: 'finding-1', fingerprint: FP }],
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+    };
+    for (const currentRevision of [null, SOURCE]) {
+      const [proposal] = buildProposalsImpl({ ...input, currentRevision });
+      assert.equal(proposal.status, 'needs_human');
+      assert.equal(proposal.reasonCode, 'stale_or_unknown_target_revision');
+      assert.equal(proposal.feedbackType, null);
+    }
+    const [fresh] = buildProposalsImpl({ ...input, currentRevision: TARGET });
+    assert.equal(fresh.status, 'candidate');
+    assert.equal(fresh.feedbackType, 'accepted');
+  });
+
+  test('risk acceptance also requires provenance but not a nonexistent target revision', () => {
+    const doc = document([
+      item({
+        authorState: 'accepts_risk',
+        rationale: 'Human accepted documented compatibility risk',
+        resolutionState: 'risk_accepted',
+        verificationState: 'not_requested',
+        coverage: 'unknown',
+        verifier: null,
+        evidenceRefs: [],
+        target: null,
+      }),
+    ]);
+    const input = {
+      reviewResolution: doc,
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+      currentRevision: null,
+    };
+    const [missing] = buildProposalsImpl({ ...input });
+    assert.equal(missing.reasonCode, 'unverified_source_finding');
+    const [bound] = buildProposalsImpl({
+      ...input,
+      sourceFindings: [{ id: 'finding-1', fingerprint: FP }],
+    });
+    assert.equal(bound.status, 'candidate');
+    assert.equal(bound.feedbackType, 'accepted_risk');
   });
 
   test('keeps statuses closed and rejects invalid documents / mappings', () => {
