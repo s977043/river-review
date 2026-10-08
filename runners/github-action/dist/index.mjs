@@ -38086,11 +38086,13 @@ function resolveFlowEntry(entryName, options) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   QS: () => (/* binding */ GATE_REASON_CODES),
 /* harmony export */   RF: () => (/* binding */ deriveGateDecision),
+/* harmony export */   aN: () => (/* binding */ criticValidationIncompleteForGate),
 /* harmony export */   p4: () => (/* binding */ coverageIncompleteForGate),
 /* harmony export */   us: () => (/* binding */ llmNotExecutedForGate)
 /* harmony export */ });
 /* unused harmony exports GATE_DECISIONS, gateConfigChanged, computeGateInputsHash, isCoverageGateEnabled, isRequireLlmGateEnabled */
 /* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(7598);
+/* harmony import */ var _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(5863);
 /**
  * Gate-decision derivation (Epic #1347 S2 / #1349).
  *
@@ -38137,6 +38139,8 @@ function resolveFlowEntry(entryName, options) {
  *  7b. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
  *     (#2441, opt-in: every generateReview call skipped the LLM; placed
  *     before every rule that can emit GO / GO_WITH_OBSERVATION)
+ *  7c. Critic validation incomplete          → ESCALATE  CRITIC_VALIDATION_INCOMPLETE
+ *     (#2343, opt-in: active Critic has unresolved or contradictory result)
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
  *  9. NO_SIGNAL (decision absent/unknown)    → NO_GO     UNDETERMINED
@@ -38154,6 +38158,7 @@ function resolveFlowEntry(entryName, options) {
  * already drops the security score below the auto-approve bar) — without it
  * most real runs would land on NO_GO and loops would never converge.
  */
+
 
 
 
@@ -38184,6 +38189,7 @@ const GATE_REASON_CODES = /** @type {const} */ ([
   'COVERAGE_INCOMPLETE',
   'LLM_NOT_EXECUTED',
   'BLOCKING_FINDINGS',
+  'CRITIC_VALIDATION_INCOMPLETE',
   'MINOR_FINDINGS_OBSERVE',
   'UNDETERMINED',
   'RISK_MAP_OBSERVE',
@@ -38261,6 +38267,7 @@ function computeGateInputsHash(inputs) {
   if (inputs?.coverageIncomplete === true) canonical.coverageIncomplete = true;
   // #2441: same "only when true" scheme; the opt-in is OFF by default.
   if (inputs?.llmNotExecuted === true) canonical.llmNotExecuted = true;
+  if (inputs?.criticIncomplete === true) canonical.criticIncomplete = true;
   return (0,node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash)('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
 }
 
@@ -38320,6 +38327,45 @@ function isRequireLlmGateEnabled(env) {
  */
 function llmNotExecutedForGate(llmNotExecuted, env) {
   return isRequireLlmGateEnabled(env) && llmNotExecuted === true;
+}
+
+/**
+ * #2343: Reduce already-observed active Critic validation to an opt-in Gate
+ * escalation signal. This is not ReviewUnit execution coverage, and never
+ * authorizes a reviewer, model, or Gate to claim validation succeeded.
+ *
+ * A confirmed result may still require human review when ask relevance is
+ * uncertain. Therefore humanReview can be GREATER than unresolved status
+ * counts. It must not be SMALLER than their minimum, which would lose a
+ * Critic timeout or needs-human-judgment.
+ */
+function criticValidationIncompleteForGate(observation, env) {
+  if (env?.RIVER_GATE_CRITIC_VALIDATION !== '1') return false;
+  if (observation?.mode !== 'active') return false;
+  const evaluated = observation.evaluated;
+  if (!Number.isSafeInteger(evaluated) || evaluated < 0) return true;
+  const humanReview = observation.humanReview;
+  if (!Number.isSafeInteger(humanReview) || humanReview < 0 || humanReview > evaluated) {
+    return true;
+  }
+  const statusCounts = observation.byFinalStatus;
+  if (!statusCounts || typeof statusCounts !== 'object' || Array.isArray(statusCounts)) {
+    return true;
+  }
+  const known = new Set(Object.values(_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_1__/* .FINAL_STATUS */ .aD));
+  const counts = Object.entries(statusCounts);
+  if (
+    !counts.every(
+      ([status, count]) => known.has(status) && Number.isSafeInteger(count) && count >= 0
+    ) ||
+    counts.reduce((sum, [, count]) => sum + count, 0) !== evaluated
+  ) {
+    return true;
+  }
+  const unresolved =
+    (statusCounts[_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_1__/* .FINAL_STATUS */ .aD.CRITIC_TIMEOUT] ?? 0) +
+    (statusCounts[_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_1__/* .FINAL_STATUS */ .aD.NEEDS_HUMAN_JUDGMENT] ?? 0);
+  return unresolved > humanReview || humanReview > 0;
 }
 
 /**
@@ -38404,6 +38450,7 @@ function deriveGateDecision({
   deterministicUnrunnable = false,
   coverageIncomplete = false,
   llmNotExecuted = false,
+  criticIncomplete = false,
   config = {},
 } = {}) {
   const configChanged =
@@ -38436,6 +38483,7 @@ function deriveGateDecision({
   if (coverageIncomplete === true) inputs.coverageIncomplete = true;
   // #2441: echoed only when true, for the same reason.
   if (llmNotExecuted === true) inputs.llmNotExecuted = true;
+  if (criticIncomplete === true) inputs.criticIncomplete = true;
 
   const expiresInHours =
     config?.gate?.observation?.expiresInHours ?? DEFAULT_OBSERVATION_EXPIRES_IN_HOURS;
@@ -38513,6 +38561,7 @@ function deriveGateDecision({
     // confirmed NO_GO (dry-run NOT_EXECUTED, BLOCKING_FINDINGS) is never traded
     // for it; before 8-11 so it can never yield GO / GO_WITH_OBSERVATION.
     if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
+    if (inputs.criticIncomplete) return ['ESCALATE', 'CRITIC_VALIDATION_INCOMPLETE'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.
     if (loopSignal === 'NO_SIGNAL') {
       if (decision === 'human-review-recommended' && inputs.blockingFindings === 0) {
@@ -99852,6 +99901,10 @@ function deriveRunGate(result) {
       coverageIncomplete: (0,gate_decision/* coverageIncompleteForGate */.p4)(result.reviewCoverage, process.env),
       // #2441 (opt-in RIVER_GATE_REQUIRE_LLM=1, default OFF).
       llmNotExecuted: (0,gate_decision/* llmNotExecutedForGate */.us)(result.llmNotExecuted, process.env),
+      criticIncomplete: (0,gate_decision/* criticValidationIncompleteForGate */.aN)(
+        result.reviewDebug?.findingCritic ?? result.reviewDebug?.execution?.findingCritic,
+        process.env
+      ),
       config: result.config ?? {},
     });
   } catch {

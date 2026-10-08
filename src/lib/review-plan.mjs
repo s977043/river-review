@@ -40,7 +40,11 @@ import { resolveAvailableContexts, resolveAvailableDependencies } from './utils.
 import { scoreReview } from './scoring/engine.mjs';
 import { scanArtifactsForHumanApproval } from './plan-review/approval-scan.mjs';
 import { deriveLoopSignalFromArtifact } from './loop-signal.mjs';
-import { coverageIncompleteForGate, deriveGateDecision } from './gate-decision.mjs';
+import {
+  coverageIncompleteForGate,
+  criticValidationIncompleteForGate,
+  deriveGateDecision,
+} from './gate-decision.mjs';
 import { computeStrictBlock } from './deterministic-gate.mjs';
 import { runDeterministicExecGateIfEnabled } from './deterministic-exec-gate.mjs';
 import { SEVERITY_RANK } from './finding-factory.mjs';
@@ -128,6 +132,7 @@ function finalizeArtifact(
         deterministicUnrunnable: gateContext.deterministicUnrunnable === true,
         // #2337 (opt-in, default OFF): see coverageIncompleteForGate.
         coverageIncomplete: gateContext.coverageIncomplete === true,
+        criticIncomplete: gateContext.criticIncomplete === true,
         config: gateContext.config ?? {},
       });
     } catch {
@@ -815,6 +820,7 @@ export async function runReviewPlan({
   // #2337: coverage is observed by the orchestration boundary; the exec path
   // reduces it here through the SSoT predicate (false unless the host opted in).
   let gateCoverageIncomplete = false;
+  let gateCriticIncomplete = false;
 
   const configArtifacts =
     config && typeof config.artifacts === 'object' && config.artifacts ? config.artifacts : {};
@@ -966,6 +972,10 @@ export async function runReviewPlan({
       if (execGate.strictBlock === true) gateStrictBlock = true;
       gateDeterministicUnrunnable = execGate.deterministicUnrunnable === true;
       gateCoverageIncomplete = coverageIncompleteForGate(review?.reviewCoverage, process.env);
+      gateCriticIncomplete = criticValidationIncompleteForGate(
+        review?.debug?.execution?.findingCritic ?? review?.debug?.findingCritic,
+        process.env
+      );
       executionTrace = {
         // #1868: replay 経路（runReviewExecReplay）と同じ順序で engine 側の
         // debug.execution 観測を引き継ぐ。2 経路で挙動を揃えないと、同じ設定でも
@@ -1057,6 +1067,7 @@ export async function runReviewPlan({
       strictBlock: gateStrictBlock,
       deterministicUnrunnable: gateDeterministicUnrunnable,
       coverageIncomplete: gateCoverageIncomplete,
+      criticIncomplete: gateCriticIncomplete,
       config,
     },
   });
