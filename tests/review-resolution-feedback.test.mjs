@@ -193,7 +193,7 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
     });
     assert.deepEqual(
       proposals.map((proposal) => proposal.reasonCode),
-      ['ambiguous_feedback_fingerprint', 'ambiguous_feedback_fingerprint']
+      ['ambiguous_feedback_fingerprint', 'incompatible_feedback_fingerprint']
     );
     assert.ok(proposals.every((proposal) => proposal.feedbackType === null));
   });
