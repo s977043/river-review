@@ -1,0 +1,43 @@
+name: Temporary format Phase 5B contract
+
+on:
+  push:
+    branches:
+      - docs/2585-phase5b-contract
+    paths:
+      - docs/development/2455-phase5b-integration-contract.md
+      - .github/workflows/tmp-format-phase5b-contract.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/2585-phase5b-contract
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Format design contract
+        run: npx --no-install prettier --write docs/development/2455-phase5b-integration-contract.md
+      - name: Verify formatting
+        run: npx --no-install prettier --check docs/development/2455-phase5b-integration-contract.md
+      - name: Commit formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/development/2455-phase5b-integration-contract.md; then
+            echo "No format changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/development/2455-phase5b-integration-contract.md
+          git commit -m "style(docs): format Phase 5B contract"
+          git push origin HEAD:docs/2585-phase5b-contract
