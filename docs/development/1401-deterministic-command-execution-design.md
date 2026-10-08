@@ -349,7 +349,7 @@ deterministicGate: z
   「argv 未移行」と判断して実行せず `DETERMINISTIC_UNRUNNABLE` を出す。これにより
   「schema は通るのに危険な shell 分割実行へフォールバックする」事態を回避する。
 - parity canary（skill-schema-parity, #1399）と、`deterministicGate` を含む fixture の
-  期待値更新を同一 PR で行う（CLAUDE.md「Skill-check fixture/description drift」ガード）。
+  期待値更新を同一 PR で行う。ずれは `scripts/validate-skills.mjs` の drift gate が検査する。
 
 ## 5. reasonCode 追加案（`src/lib/gate-decision.mjs`）
 

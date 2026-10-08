@@ -137,7 +137,7 @@ guards:
     verifiedBy: []
     addedAt: '2026-04-11'
     reviewAfter: '2026-11-10'
-    notes: .claude/hooks/no-force-push.sh は force push を止めるが、switch 前の WIP commit は対象外。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降に観測された switch 系の事故（worktree が握るブランチへの switch 失敗）は「Worktree-held branches refuse switch」が受け持っている。本ガード自体の再発は特定できなかった。 2026-09-04 に並行セッション保有 worktree への退避 commit を 1 件観測し、ListAgents による事前確認を本文へ追記した。
+    notes: .claude/hooks/no-force-push.sh は force push を止めるが、switch 前の WIP commit は対象外。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降に観測された switch 系の事故（worktree が握るブランチへの switch 失敗）は「Verify git output before chaining」が受け持っている（旧「Worktree-held branches refuse switch」は 2026-10-08 に退役）。本ガード自体の再発は特定できなかった。 2026-09-04 に並行セッション保有 worktree への退避 commit を 1 件観測し、ListAgents による事前確認を本文へ追記した。
 
   - id: verify-git-output-before-chaining
     title: Verify git output before chaining
@@ -145,7 +145,7 @@ guards:
     verifiedBy: []
     addedAt: '2026-04-11'
     reviewAfter: '2026-11-10'
-    notes: 出力を読んだかどうかは判定できない。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降の観測は、本ガードを拡張した「Worktree-held branches refuse switch」として既に独立している。出力を読んだかどうかは判定できず、決定論スライスが見つかっていない。 2026-09-04 に stale な local ref に対する照合事故を 1 件観測し、origin との一致確認を本文へ追記した。
+    notes: 出力を読んだかどうかは判定できない。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降の観測は、本ガードを拡張した旧「Worktree-held branches refuse switch」として独立していたが、2026-10-08 に退役し本ガードへ戻った。出力を読んだかどうかは判定できず、決定論スライスが見つかっていない。 2026-09-04 に stale な local ref に対する照合事故を 1 件観測し、origin との一致確認を本文へ追記した。
 
   - id: verify-gh-active-account
     title: Verify gh active account before write ops
@@ -154,8 +154,10 @@ guards:
       - .claude/hooks/gh-account-guard.sh
       - .claude/settings.json
     addedAt: '2026-06-11'
-    reviewAfter: '2026-09-09'
-    notes: PreToolUse hook が gh write 前にアカウントを判定し、切り替えに失敗したら exit 2 でツール呼び出しを止める。残余は 2 つある。1 つは Claude Code の Bash ツール以外の経路（端末での直接実行）。もう 1 つは read 系であり、hook は WRITE_RE に一致する write op だけを検査する設計のため read は無検査で通す（read の失敗は壊さないのでブロック不要という判断）。read 側の 404 / Could not resolve to a Repository をアカウント切り替わりとして疑う診断は CLAUDE.md の散文のみが担う。この write は機械保証・read は散文のみという非対称のため、mechanized は full ではなく partial である。
+    reviewAfter: '2027-01-06'
+    notes: >-
+      PreToolUse hook が gh write 前にアカウントを判定し、切り替えに失敗したら exit 2 でツール呼び出しを止める。残余は 2 つある。1 つは Claude Code の Bash ツール以外の経路（端末での直接実行）。もう 1 つは read 系であり、hook は WRITE_RE に一致する write op だけを検査する設計のため read は無検査で通す（read の失敗は壊さないのでブロック不要という判断）。read 側の 404 / Could not resolve to a Repository をアカウント切り替わりとして疑う診断は CLAUDE.md の散文のみが担う。この write は機械保証・read は散文のみという非対称のため、mechanized は full ではなく partial である。
+      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2604
 
   - id: merge-time-checks
     title: Merge-time checks
@@ -214,34 +216,20 @@ guards:
       - package.json
     addedAt: '2026-06-09'
     reviewAfter: '2026-09-07'
-    notes: pre-commit の lint-staged が pages/docs/README に textlint --no-cache を掛け、必須チェック `Lint` の npm run lint が同じ違反で落ちる。2026-08-19（#1786 段階2-d）で docs/README 用の緩和 config（tools/textlint/docs.textlintrc.json）を廃止し、pages/docs/README を単一の .textlintrc.json（no-mix-dearu-desumasu / no-doubled-joshi / sentence-length max150 / prh のフルルール）に統合、npm run lint:text と lint-staged の両方が単一 config で全範囲を検査する。
-
-  - id: doc-link-relativity
-    title: Doc-link relativity (lychee)
-    mechanized: partial
-    verifiedBy:
-      - .github/workflows/link-check.yml
-    addedAt: '2026-06-18'
-    reviewAfter: '2026-09-16'
-    notes: lychee が壊れたリンクを検出するが、Link Check は branch protection の必須チェックではないためマージは止まらない。
+    proseRetiredAt: '2026-10-08'
+    notes: >-
+      pre-commit の lint-staged が pages/docs/README に textlint --no-cache を掛け、必須チェック `Lint` の npm run lint が同じ違反で落ちる。2026-08-19（#1786 段階2-d）で docs/README 用の緩和 config（tools/textlint/docs.textlintrc.json）を廃止し、pages/docs/README を単一の .textlintrc.json（no-mix-dearu-desumasu / no-doubled-joshi / sentence-length max150 / prh のフルルール）に統合、npm run lint:text と lint-staged の両方が単一 config で全範囲を検査する。
+      2026-10-08: CLAUDE.md の散文を退役（Step 9 (a)）
 
   - id: review-doc-ssot-sync
     title: Review-doc SSoT sync
     mechanized: none
     verifiedBy: []
     addedAt: '2026-06-18'
-    reviewAfter: '2026-09-16'
-    notes: docs/review/*.md と pages/reference/review-policy.md の内容一致を検証する script は存在しない。機械化の候補。
-
-  - id: plugin-bundle-mirror
-    title: Plugin bundle mirror
-    mechanized: partial
-    verifiedBy:
-      - scripts/validate-plugin-manifest.mjs
-      - scripts/sync-plugin-fields.mjs
-    addedAt: '2026-06-23'
-    reviewAfter: '2026-09-21'
-    notes: リポジトリ内 manifest の整合は必須チェック `Meta consistency` が守る。外部 fork 側の bundle は CI から見えない。
+    reviewAfter: '2027-01-06'
+    notes: >-
+      docs/review/*.md と pages/reference/review-policy.md の内容一致を検証する script は存在しない。機械化の候補。
+      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2606
 
   - id: skill-check-fixture-drift
     title: Skill-check fixture/description drift
@@ -251,39 +239,32 @@ guards:
       - .github/workflows/test.yml
     addedAt: '2026-07-01'
     reviewAfter: '2026-09-29'
-    notes: validate-skills.mjs の drift gate が Check 節・fixture の expected ブロック・frontmatter description を突き合わせ、必須チェック `Skill schema validation` で走る。
+    proseRetiredAt: '2026-10-08'
+    notes: >-
+      validate-skills.mjs の drift gate が Check 節・fixture の expected ブロック・frontmatter description を突き合わせ、必須チェック `Skill schema validation` で走る。
+      2026-10-08: CLAUDE.md の散文を退役（Step 9 (a)）
 
   - id: verify-agent-completion-reports
     title: Verify agent completion reports
     mechanized: none
     verifiedBy: []
     addedAt: '2026-07-02'
-    reviewAfter: '2026-09-30'
-    notes: /verify-agent-report が手順を提供するのみ。報告の裏取りを実行したかは検証されない。
-
-  - id: worktree-held-branches-refuse-switch
-    title: Worktree-held branches refuse switch
-    mechanized: none
-    verifiedBy: []
-    addedAt: '2026-07-02'
-    reviewAfter: '2026-09-30'
-    notes: git switch の失敗を握り潰したかどうかはリポジトリ状態に残らない。
+    reviewAfter: '2027-01-06'
+    notes: >-
+      /verify-agent-report が手順を提供するのみ。報告の裏取りを実行したかは検証されない。
+      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2607
 
   - id: n-of-n-required-checks-bot-push
     title: '`N of N required checks are expected` = bot/GITHUB_TOKEN push'
-    mechanized: none
-    verifiedBy: []
+    mechanized: partial
+    verifiedBy:
+      - scripts/pr-unstall.sh
+      - tests/scripts-pr-unstall.test.mjs
     addedAt: '2026-07-07'
-    reviewAfter: '2026-10-05'
-    notes: 診断・回復手順であり違反の概念が無い。scripts/release-please-kick.sh は手順の実装であって遵守の検証ではない。
-
-  - id: ci-matrix-leg-protection-sync
-    title: CI matrix leg ↔ branch-protection required-check sync
-    mechanized: none
-    verifiedBy: []
-    addedAt: '2026-07-07'
-    reviewAfter: '2026-10-05'
-    notes: 必須チェックの SSoT は branch protection API であり、CI からネットワークを叩かない方針のため対象外（docs/development/doc-enumeration-checks.md と同じ判断）。
+    reviewAfter: '2027-01-06'
+    notes: >-
+      診断・回復手順であり違反の概念が無い。scripts/release-please-kick.sh は手順の実装であって遵守の検証ではない。
+      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2605
 
   - id: prefix-skill-invocations
     title: Prefix skill invocations
