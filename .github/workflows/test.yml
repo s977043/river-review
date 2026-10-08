@@ -148,8 +148,8 @@ jobs:
 
   # Separate job, not a matrix leg on `test`: the required status check is named
   # "Unit tests (22.x)", and adding an `os` axis would rename it, leaving every PR
-  # blocked on a context that never reports (CLAUDE.md "CI matrix leg <-> branch-
-  # protection required-check sync"). This job carries its own name and is NOT in
+  # blocked on a context that never reports (docs/governance.md section 1.2 has the
+  # protection-first procedure). This job carries its own name and is NOT in
   # branch protection, so a macOS-only flake cannot block merges while we learn how
   # stable it is.
   #

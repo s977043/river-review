@@ -44,7 +44,7 @@ git status --short
 
 manifest に新しい「フィールド」を足した／値を変えた場合（ファイル追加だけでなく）:
 
-- 外部 bundle（awesome-codex-plugins fork の `plugin.json`）にも同じ変更を反映する（CLAUDE.md「Plugin bundle mirror」）。反映は同 PR で行う
+- 外部 bundle（awesome-codex-plugins fork の `plugin.json`）にも同じ変更を反映する。外部 bundle と repo の差分は `npm run plugin:sync` の対象外で、黙ってずれる。反映は同 PR で行う
 - `package.json` SSoT の同期フィールド（keywords / homepage / author / license）は手編集せず、`npm run plugin:sync` で反映する
 
 ## Step 3. 検証シーケンス
