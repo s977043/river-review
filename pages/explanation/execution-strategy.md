@@ -116,7 +116,7 @@ Phase 5 で adaptive routing を試す場合も opt-in / bounded budget / fallba
 - **未計測**: データが無いから合格とするのではなく、比較不能な metric として観測を拡充する。critical / independence / total cost の必須情報が無ければ active routing へ昇格しない。
 - **実行なし**: dry-run / skipped など、provider call が発生していないことを検証できたときだけその leg の使用量を 0 とする。集計に未観測 leg が含まれる場合は run total を完全値にしない。
 - **ソフトな境界**: reviewer role 数・モデル数・token 削減だけでは independence や品質を証明しない。影響範囲が限定された観測改善は shadow に留め、Human 判断を不要にしない。
-- **再開条件**: frozen baseline / held-out / source attribution / trusted verifier / critical regression なし、必要な metric の完全性を再度確認できた場合に限り、別PRで opt-in の検討を再開する。
+- **再開条件**: baseline / held-out / source attribution / trusted verifier を確認する。critical regression がなく、必要な metric が揃った場合だけ別 PR で opt-in を再検討する。
 
 ## 未着手の範囲
 
