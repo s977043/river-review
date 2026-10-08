@@ -79,6 +79,7 @@ export const SURFACES = [
   { surface: 'evolve', argv: ['evolve', '.'] },
   { surface: 'evolve aggregate', argv: ['evolve', 'aggregate'] },
   { surface: 'evolve replay', argv: ['evolve', 'replay'] },
+  { surface: 'evolve verify-replay', argv: ['evolve', 'verify-replay'] },
   { surface: 'evolve prompt-compare', argv: ['evolve', 'prompt-compare'] },
   { surface: 'evolve prompt-ab', argv: ['evolve', 'prompt-ab'] },
   ...PROMOTE_SUBCOMMANDS.map((subcommand) => ({

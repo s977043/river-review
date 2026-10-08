@@ -15,7 +15,7 @@ The CLI accepts `text|markdown|json|yaml|html` for `--output` globally, but only
 | `river run <path>`                                                                                 | Supported        | Review report (decision banner, score, findings, risk assessment) |
 | `river runs diff <id1> <id2> [<id3>...]`                                                           | Supported        | Loop dashboard (loop signal, churn, oscillation timeline)         |
 | `river review plan` / `river review exec`                                                          | Rejected, exit 3 | Use `json` or `markdown`                                          |
-| `river evolve aggregate` / `river evolve replay`                                                   | Rejected, exit 1 | Use `text` or `json`                                              |
+| `river evolve aggregate` / `river evolve replay` / `river evolve verify-replay`                    | Rejected, exit 1 | Use `text` or `json`                                              |
 | `river skills <path>`                                                                              | Rejected, exit 1 | Use `text`, `markdown`, or `json`                                 |
 | Everything else (`river review route`, `river runs list`, `river runs digest`, `river promote`, …) | Ignored          | Falls back to that command's default output                       |
 

@@ -290,14 +290,15 @@ per-side の内訳は `manifest.<side>.provenance` にあります。両側合�
 
 ## 11. 次フェーズへの申し送り
 
-- `trusted_by` の検証機構（CI attestation または署名記録）は依然として未実装である（契約1）
+- #2510 P3 foundation で detached Ed25519 attestation の検証経路を追加した。P2 artifact は引き続き untrusted のままである
+- trust root の配布・rotation / revocation、GitHub OIDC / Sigstore identity、verifier job isolation は引き続き後続課題である
 - profile 語彙と必要サンプル数の決め方は、本コマンドの出力を数サイクル観測してから確定する（契約6）
-- 独立 verifier の実体（candidate の変更権限外で走る実行主体）は P3 以降の課題である
 - 自動 canary と自動 Keep / Rollback は保留のままとし、最終処理は #1568 の lifecycle を利用する
 
 ## 12. 参照
 
 - `docs/development/1574-p0-design-contract.md`: P0 設計契約 6 点
 - `docs/development/1574-p1-shadow-aggregate.md`: P1 の read-only 集約
+- `docs/development/1574-p3-signed-replay-verification.md`: P3 foundation の signed independent verification
 - issue #1574: Review Evolution Cycle Epic
 - `src/lib/result-store.mjs`: run store の trust-boundary note
