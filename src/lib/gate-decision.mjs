@@ -44,6 +44,8 @@
  *  7b. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
  *     (#2441, opt-in: every generateReview call skipped the LLM; placed
  *     before every rule that can emit GO / GO_WITH_OBSERVATION)
+ *  7c. Critic validation incomplete          → ESCALATE  CRITIC_VALIDATION_INCOMPLETE
+ *     (#2343, opt-in: active Critic has unresolved or contradictory result)
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
  *  9. NO_SIGNAL (decision absent/unknown)    → NO_GO     UNDETERMINED
@@ -63,6 +65,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { FINAL_STATUS } from './finding-critic.mjs';
 
 /** @typedef {'GO' | 'GO_WITH_OBSERVATION' | 'NO_GO' | 'ESCALATE'} GateDecisionValue */
 /** @typedef {'cliff' | 'hill' | 'field'} GateTier */
@@ -91,6 +94,7 @@ export const GATE_REASON_CODES = /** @type {const} */ ([
   'COVERAGE_INCOMPLETE',
   'LLM_NOT_EXECUTED',
   'BLOCKING_FINDINGS',
+  'CRITIC_VALIDATION_INCOMPLETE',
   'MINOR_FINDINGS_OBSERVE',
   'UNDETERMINED',
   'RISK_MAP_OBSERVE',
@@ -168,6 +172,7 @@ export function computeGateInputsHash(inputs) {
   if (inputs?.coverageIncomplete === true) canonical.coverageIncomplete = true;
   // #2441: same "only when true" scheme; the opt-in is OFF by default.
   if (inputs?.llmNotExecuted === true) canonical.llmNotExecuted = true;
+  if (inputs?.criticIncomplete === true) canonical.criticIncomplete = true;
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
 }
 
@@ -227,6 +232,47 @@ export function isRequireLlmGateEnabled(env) {
  */
 export function llmNotExecutedForGate(llmNotExecuted, env) {
   return isRequireLlmGateEnabled(env) && llmNotExecuted === true;
+}
+
+/**
+ * #2343: Reduce already-observed active Critic validation to an opt-in Gate
+ * escalation signal. This is not ReviewUnit execution coverage, and never
+ * authorizes a reviewer, model, or Gate to claim validation succeeded.
+ *
+ * A confirmed result may still require human review when ask relevance is
+ * uncertain. Therefore humanReview can be GREATER than unresolved status
+ * counts. It must not be SMALLER than their minimum, which would lose a
+ * Critic timeout or needs-human-judgment.
+ */
+export function criticValidationIncompleteForGate(observation, env) {
+  if (env?.RIVER_GATE_CRITIC_VALIDATION !== '1') return false;
+  if (observation?.mode !== 'active') return false;
+  const evaluated = observation.evaluated;
+  if (!Number.isSafeInteger(evaluated) || evaluated < 0) return true;
+  const humanReview = observation.humanReview;
+  if (
+    !Number.isSafeInteger(humanReview) ||
+    humanReview < 0 ||
+    humanReview > evaluated
+  ) {
+    return true;
+  }
+  const statusCounts = observation.byFinalStatus;
+  if (!statusCounts || typeof statusCounts !== 'object' || Array.isArray(statusCounts)) {
+    return true;
+  }
+  const known = new Set(Object.values(FINAL_STATUS));
+  const counts = Object.entries(statusCounts);
+  if (
+    !counts.every(([status, count]) => known.has(status) && Number.isSafeInteger(count) && count >= 0) ||
+    counts.reduce((sum, [, count]) => sum + count, 0) !== evaluated
+  ) {
+    return true;
+  }
+  const unresolved =
+    (statusCounts[FINAL_STATUS.CRITIC_TIMEOUT] ?? 0) +
+    (statusCounts[FINAL_STATUS.NEEDS_HUMAN_JUDGMENT] ?? 0);
+  return unresolved > humanReview || humanReview > 0;
 }
 
 /**
@@ -311,6 +357,7 @@ export function deriveGateDecision({
   deterministicUnrunnable = false,
   coverageIncomplete = false,
   llmNotExecuted = false,
+  criticIncomplete = false,
   config = {},
 } = {}) {
   const configChanged =
@@ -343,6 +390,7 @@ export function deriveGateDecision({
   if (coverageIncomplete === true) inputs.coverageIncomplete = true;
   // #2441: echoed only when true, for the same reason.
   if (llmNotExecuted === true) inputs.llmNotExecuted = true;
+  if (criticIncomplete === true) inputs.criticIncomplete = true;
 
   const expiresInHours =
     config?.gate?.observation?.expiresInHours ?? DEFAULT_OBSERVATION_EXPIRES_IN_HOURS;
@@ -420,6 +468,7 @@ export function deriveGateDecision({
     // confirmed NO_GO (dry-run NOT_EXECUTED, BLOCKING_FINDINGS) is never traded
     // for it; before 8-11 so it can never yield GO / GO_WITH_OBSERVATION.
     if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
+    if (inputs.criticIncomplete) return ['ESCALATE', 'CRITIC_VALIDATION_INCOMPLETE'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.
     if (loopSignal === 'NO_SIGNAL') {
       if (decision === 'human-review-recommended' && inputs.blockingFindings === 0) {
