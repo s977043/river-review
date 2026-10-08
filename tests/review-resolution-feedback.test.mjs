@@ -272,7 +272,11 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
   });
 
   test('keeps statuses closed and rejects invalid documents / mappings', () => {
-    assert.deepEqual(RESOLUTION_FEEDBACK_PROPOSAL_STATUSES, ['candidate', 'needs_human', 'no_proposal']);
+    assert.deepEqual(RESOLUTION_FEEDBACK_PROPOSAL_STATUSES, [
+      'candidate',
+      'needs_human',
+      'no_proposal',
+    ]);
     assert.throws(() => buildReviewResolutionFeedbackProposals({ reviewResolution: {} }));
     const invalidRevision = document([item()]);
     invalidRevision.source.artifactRefs[0].sha256 = 'unverified-hash';
