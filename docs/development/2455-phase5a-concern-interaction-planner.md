@@ -323,6 +323,17 @@ A missing provider-backed paired evaluation is **not** evidence that automatic r
 The generated Action dist is owned by the repository's existing rebuild workflow.
 Final merge readiness must use the final human-authored head's checks and review evidence.
 
+## Final review evidence and limits
+
+The interaction list is a planning projection, not verification of a defect.
+Its `integrationCheckCandidate` value is not a Gate input or a finding verdict.
+It must not turn missing coverage into a claim of successful execution.
+
+PR #2581 was reconstructed from main to remove the original #2570 merge conflict.
+The merge commit retains both histories. Generated Action dist was rebuilt afterward.
+The final merge check must use one immutable human-authored head and fresh CI.
+Provider-dependent validation remains independently gated by #1978.
+
 ## References
 
 - #2455
