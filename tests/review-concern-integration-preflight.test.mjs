@@ -44,9 +44,7 @@ describe('Phase 5B opt-in preflight — #2585', () => {
 
   it('accepts only explicit, run-scoped Phase 5A interaction pairs', () => {
     const result = selectReviewConcernIntegrationPreflight(
-      active(input([
-        validInteraction('interaction-1', 'concern-1', 'concern-2'),
-      ]))
+      active(input([validInteraction('interaction-1', 'concern-1', 'concern-2')]))
     );
     assert.equal(result.status, 'eligible-not-executed');
     assert.equal(result.selectedCount, 1);
@@ -131,19 +129,25 @@ describe('Phase 5B opt-in preflight — #2585', () => {
 
   it('caps selected pairs, records omitted pair ids, and preserves source order', () => {
     const result = selectReviewConcernIntegrationPreflight(
-      active(input([
-        validInteraction('interaction-9', 'a', 'b'),
-        validInteraction('interaction-2', 'c', 'd'),
-        validInteraction('interaction-1', 'e', 'f'),
-      ]), { maxPairs: 2 })
+      active(
+        input([
+          validInteraction('interaction-9', 'a', 'b'),
+          validInteraction('interaction-2', 'c', 'd'),
+          validInteraction('interaction-1', 'e', 'f'),
+        ]),
+        { maxPairs: 2 }
+      )
     );
-    assert.deepEqual(result.selectedPairs.map((pair) => pair.interactionRef), [
-      'interaction-9', 'interaction-2',
+    assert.deepEqual(
+      result.selectedPairs.map((pair) => pair.interactionRef),
+      ['interaction-9', 'interaction-2']
+    );
+    assert.deepEqual(result.skippedPairs, [
+      {
+        interactionRef: 'interaction-1',
+        reason: 'pair-budget',
+      },
     ]);
-    assert.deepEqual(result.skippedPairs, [{
-      interactionRef: 'interaction-1',
-      reason: 'pair-budget',
-    }]);
     assert.equal(result.skippedCount, 1);
     assert.equal(result.executed, false);
   });
@@ -159,8 +163,9 @@ describe('Phase 5B opt-in preflight — #2585', () => {
 
   it('preserves partial input limitations without mistaking them for validation', () => {
     const result = selectReviewConcernIntegrationPreflight(
-      active(input([validInteraction('interaction-1', 'a', 'b')],
-        'partial', ['diff-input-truncated']))
+      active(
+        input([validInteraction('interaction-1', 'a', 'b')], 'partial', ['diff-input-truncated'])
+      )
     );
     assert.equal(result.status, 'eligible-not-executed');
     assert.equal(result.sourceStatus, 'partial');

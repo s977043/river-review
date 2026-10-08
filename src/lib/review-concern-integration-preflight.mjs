@@ -108,17 +108,38 @@ export function selectReviewConcernIntegrationPreflight({
     ? [...interactionObservation.source.limitations]
     : [];
   if (interactionObservation.applied !== false) {
-    return observation('unavailable', 'non-observational-source', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'unavailable',
+      'non-observational-source',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
   if (!['observed', 'partial'].includes(sourceStatus)) {
-    return observation('unavailable', 'interaction-observation-not-usable', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'unavailable',
+      'interaction-observation-not-usable',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
   const concernStatus = interactionObservation.source?.concernMapStatus;
   if (
     (sourceStatus === 'observed' && concernStatus !== 'completed') ||
     (sourceStatus === 'partial' && concernStatus !== 'partial')
   ) {
-    return observation('unavailable', 'inconsistent-concern-map-state', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'unavailable',
+      'inconsistent-concern-map-state',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
 
   const checked = validatePairs(interactionObservation.interactions);
@@ -127,7 +148,14 @@ export function selectReviewConcernIntegrationPreflight({
   }
 
   if (!Number.isSafeInteger(maxPairs) || maxPairs < 1 || maxPairs > MAX_PAIR_LIMIT) {
-    return observation('unavailable', 'invalid-pair-budget', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'unavailable',
+      'invalid-pair-budget',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
 
   if (dryRun) {
@@ -137,19 +165,54 @@ export function selectReviewConcernIntegrationPreflight({
     return observation('not-executed', 'offline', [], [], sourceStatus, sourceLimitations);
   }
   if (provider !== 'openai') {
-    return observation('not-executed', 'unsupported-provider', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'not-executed',
+      'unsupported-provider',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
   if (apiKeyAvailable !== true) {
-    return observation('not-executed', 'missing-provider-authorization', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'not-executed',
+      'missing-provider-authorization',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
   if (reviewContractResolved !== true) {
-    return observation('not-executed', 'review-contract-unresolved', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'not-executed',
+      'review-contract-unresolved',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
   if (redactionReady !== true) {
-    return observation('not-executed', 'redaction-unavailable', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'not-executed',
+      'redaction-unavailable',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
   if (criticAvailable !== true) {
-    return observation('not-executed', 'critic-validation-unavailable', [], [], sourceStatus, sourceLimitations);
+    return observation(
+      'not-executed',
+      'critic-validation-unavailable',
+      [],
+      [],
+      sourceStatus,
+      sourceLimitations
+    );
   }
 
   // Phase 5A constructs canonical interaction order. Do not sort by perceived
