@@ -37,7 +37,7 @@ A Critique strategy does not, by its label alone, prove independent model, provi
 
 ## Proposed observation contract, not implemented
 
-A **run** groups comparable work under pinned task, input, and evaluation conditions. A **strategy** is the Host's candidate-generation choice. A **leg** is an actual LLM call or clearly defined deterministic operation; a **role** may span multiple legs. An **attempt** is one retry attempt within a leg.
+A **run** groups comparable work under pinned task, input, and evaluation conditions. A **strategy** is the Host's candidate-generation choice. A **leg** is one logical LLM operation (including its retries) or a clearly defined deterministic operation; a **role** may span multiple legs. An **attempt** is one provider transport request, including the initial request. Failed attempts may still incur cost and must not be silently counted as free.
 
 Future leg observations would associate run/leg identity, strategy, role, provider/model, start/duration/outcome, attempt count, fallback reason, token/cache usage, cost and pricing provenance, observation source, coverage, and independence evidence. **None of this list defines a new active API or JSON schema.**
 
@@ -47,7 +47,7 @@ Rules for future accounting and experiments:
 
 1. Do not add overlapping file×skill and role counts for the same provider call.
 2. Parallel role durations cannot be summed as end-to-end wall-clock latency.
-3. Never turn missing usage, retry or isolation evidence into zero/verified values; mark the total partial or unknown.
+3. Never turn missing usage, retry or isolation evidence into zero/verified values; mark the total partial or unknown. Zero usage is justified only by evidence that no provider call occurred.
 4. Pin baseline/candidate task, input commit, model, prompt, skill, context and evaluator. Multiple simultaneous changes do not support single-factor attribution.
 5. Logical execution ID inequality is not evidence of strong reviewer isolation.
 6. Cost or latency savings never outweigh critical regressions, incomplete coverage or Human approval requirements.
@@ -56,6 +56,8 @@ Rules for future accounting and experiments:
 ## Evaluation before activation
 
 Phase 3 proposes **shadow-only** strategy recommendations, recording actual versus recommended choices without changing routing. Phase 4 uses paired baseline/candidate evidence ([#1574](https://github.com/s977043/river-review/issues/1574)), held-out checks, an independent verifier and **zero critical regressions as a floor, not sufficient approval**. Phase 5 may consider opt-in adaptive routing only with bounded budgets, safe fallback and Host/Human authority.
+
+If observations are incomplete, keep adaptive routing disabled and improve collection rather than treating unknown metrics as passing. A documented skipped/dry-run leg can have zero usage only when no provider call is verified. Missing critical-regression, trust or cost evidence blocks promotion; once pinned baseline, held-out, source attribution, trusted verifier and complete required metrics are available, consider a separate opt-in PR. Reviewer/model count alone does not demonstrate independence.
 
 No general-purpose Builder orchestration, automatic PR merge, new canonical strategy enum, or end-to-end accounting collector is introduced by this document.
 
