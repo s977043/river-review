@@ -55,6 +55,18 @@ function hasTargetedVerification(item, sourceRevision) {
 }
 
 function proposedType(item, sourceRevision) {
+  // Human disagreement is not a reviewer-quality verdict. Even if a later
+  // verification state appears positive, conflicting human dispositions need
+  // explicit reconciliation before any Feedback type can be proposed.
+  if (
+    item?.authorResponse?.state === 'disputes' ||
+    item?.resolution?.state === 'human_dismissed' ||
+    (item?.resolution?.state === 'risk_accepted' &&
+      item?.verification?.state === 'verified_resolved')
+  ) {
+    return { feedbackType: null, reasonCode: 'requires_human_classification' };
+  }
+
   if (item?.verification?.state === 'verified_resolved') {
     return hasTargetedVerification(item, sourceRevision)
       ? { feedbackType: 'accepted', reasonCode: null }
