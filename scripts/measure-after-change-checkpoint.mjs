@@ -64,6 +64,17 @@ const EXECUTED = new Set(['pass', 'fail', 'unrunnable']);
 const gitIn = (cwd, args, options = {}) =>
   execFileSync('git', args, { cwd, maxBuffer: 256 * 1024 * 1024, ...options });
 
+/** `--end-of-options` keeps an option-like `base` (e.g. `--all`) from being read as a git option. */
+function resolveCommit(cwd, base) {
+  const result = spawnSync(
+    'git',
+    ['rev-parse', '--verify', '--quiet', '--end-of-options', `${base}^{commit}`],
+    { cwd, encoding: 'utf8' }
+  );
+  if (result.status !== 0) throw new Error(`--base does not name a commit: ${base}`);
+  return result.stdout.trim();
+}
+
 /** Nearest-rank percentile; `null` for an empty sample. */
 export function percentile(values, p) {
   if (values.length === 0) return null;
@@ -353,7 +364,8 @@ export function measure({
   try {
     const clone = path.join(workDir, 'repo');
     execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', sourceRepo, clone]);
-    const commits = gitIn(clone, ['rev-list', '--first-parent', '-n', String(count), base])
+    const baseCommit = resolveCommit(clone, base);
+    const commits = gitIn(clone, ['rev-list', '--first-parent', '-n', String(count), baseCommit])
       .toString('utf8')
       .split('\n')
       .filter(Boolean);
@@ -442,15 +454,26 @@ function parseArgs(argv) {
   const options = { json: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--json') options.json = true;
-    else if (argv[i] === '--base') options.base = argv[++i];
-    else if (argv[i] === '--count') options.count = Number(argv[++i]);
+    else if (argv[i] === '--base') {
+      const value = argv[i + 1];
+      if (!value || value.startsWith('-')) throw new Error('--base requires a commit');
+      options.base = value;
+      i += 1;
+    } else if (argv[i] === '--count') options.count = Number(argv[++i]);
     else throw new Error(`unknown argument: ${argv[i]}`);
   }
   return options;
 }
 
 if (isDirectRun(import.meta.url)) {
-  const { json, ...options } = parseArgs(process.argv.slice(2));
+  let parsed;
+  try {
+    parsed = parseArgs(process.argv.slice(2));
+  } catch (err) {
+    process.stderr.write(`measure-after-change-checkpoint: ${err.message}\n`);
+    process.exit(2);
+  }
+  const { json, ...options } = parsed;
   const result = measure(options);
   if (json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

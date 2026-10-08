@@ -25,11 +25,15 @@
 // and child processes whose env drops `NODE_OPTIONS` — the deterministic
 // checker children do, because the sandbox env is an allowlist
 // (`src/lib/deterministic-command-sandbox.mjs`). Native addons are not covered.
+//
+// REQUIRES Node >= 22.15 for `module.registerHooks`. On an older Node the guard
+// says so on stderr and does not record `guard-loaded`, so the measurement
+// fails as "guard not loaded" instead of on an import error.
 
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
-import { registerHooks } from 'node:module';
+import module from 'node:module';
 import net from 'node:net';
 import tls from 'node:tls';
 
@@ -55,15 +59,22 @@ const record = (event) => {
 const isProviderSpecifier = (specifier) =>
   PROVIDER_SPECIFIERS.some((name) => specifier === name || specifier.startsWith(`${name}/`));
 
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    const result = nextResolve(specifier, context);
-    if (isProviderSpecifier(specifier) || PROVIDER_MODULE_PATTERN.test(result.url)) {
-      record({ event: 'provider-module', specifier });
-    }
-    return result;
-  },
-});
+const hooksAvailable = typeof module.registerHooks === 'function';
+if (hooksAvailable) {
+  module.registerHooks({
+    resolve(specifier, context, nextResolve) {
+      const result = nextResolve(specifier, context);
+      if (isProviderSpecifier(specifier) || PROVIDER_MODULE_PATTERN.test(result.url)) {
+        record({ event: 'provider-module', specifier });
+      }
+      return result;
+    },
+  });
+} else {
+  process.stderr.write(
+    `llm-call-guard: not loaded: module.registerHooks is missing in Node ${process.version} (needs >= 22.15)\n`
+  );
+}
 
 const refuse = (kind) => {
   record({ event: 'network', kind });
@@ -85,4 +96,4 @@ net.Socket.prototype.connect = () => refuse('net.Socket.connect');
 net.createConnection = () => refuse('net.createConnection');
 tls.connect = () => refuse('tls.connect');
 
-record({ event: 'guard-loaded' });
+if (hooksAvailable) record({ event: 'guard-loaded' });
