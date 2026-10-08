@@ -124,8 +124,11 @@ export function buildReviewResolutionFeedbackProposals({
   ) {
     throw new TypeError('Review Resolution items or source revision are invalid');
   }
-  if (!skillIdByFingerprint || typeof skillIdByFingerprint !== 'object' ||
-      Array.isArray(skillIdByFingerprint)) {
+  if (
+    !skillIdByFingerprint ||
+    typeof skillIdByFingerprint !== 'object' ||
+    Array.isArray(skillIdByFingerprint)
+  ) {
     throw new TypeError('skillIdByFingerprint must be a record');
   }
 
