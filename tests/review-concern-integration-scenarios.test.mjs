@@ -134,7 +134,9 @@ describe('#2585 Phase 5B synthetic offline scenario fixtures', () => {
 
       assert.equal(result.status, scenario.expectedStatus);
       assert.equal(result.selectedCount, scenario.expectedCount);
-      if (scenario.expectedReason) assert.equal(result.reason, scenario.expectedReason);
+      if (scenario.expectedReason) {
+        assert.equal(result.reason, scenario.expectedReason);
+      }
       if (scenario.expectedLimitations) {
         assert.deepEqual(result.sourceLimitations, scenario.expectedLimitations);
       }
