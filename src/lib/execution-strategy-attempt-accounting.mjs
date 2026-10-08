@@ -80,9 +80,7 @@ export function buildHostAttemptAccountingObservation({
 
   // The Host's closed inventory is only a claim. No verifier is wired here.
   const hostDeclaredComplete =
-    actualStrategy !== null &&
-    hostExecution?.inventoryScope === 'complete' &&
-    attemptsAccountedFor;
+    actualStrategy !== null && hostExecution?.inventoryScope === 'complete' && attemptsAccountedFor;
 
   let totalEstimatedCostUsd = null;
   if (hostDeclaredComplete) {
