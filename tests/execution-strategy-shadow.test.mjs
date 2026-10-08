@@ -32,13 +32,14 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
     const result = buildExecutionStrategyShadowObservation({
       changedFiles: ['src/secret/customer.ts'],
       tokenEstimate: 300,
+      riskAssessment: { aggregateAction: 'comment_only' },
     });
     assert.equal(result.recommendedStrategy, 'single');
     assert.equal(result.status, 'provisional');
     assert.equal(result.recommendationApplied, false);
     assert.equal(result.comparison, null);
     assert.equal(JSON.stringify(result).includes('src/secret/customer.ts'), false);
-    assert.equal(result.signals.riskAction, null);
+    assert.equal(result.signals.riskAction, 'comment_only');
     assert.equal(result.signals.maxCostUsd, null);
   });
 
@@ -51,6 +52,25 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
     assert.equal(result.recommendedStrategy, null);
     assert.equal(result.humanReviewRequired, true);
     assert.deepEqual(result.reasons, ['human-risk-boundary']);
+  });
+
+  it('does not label a small diff safe when risk evidence is absent', () => {
+    const observation = buildExecutionStrategyShadowObservation({
+      changedFiles: ['src/important.js'],
+    });
+    assert.equal(observation.recommendedStrategy, null);
+    assert.ok(observation.limitations.includes('risk-not-classified'));
+
+    const invalidStatus = buildExecutionStrategyShadowObservation({
+      changedFiles: ['src/important.js'],
+      reviewConcernMap: {
+        kind: 'review-concern-map',
+        schemaVersion: '1',
+        analysis: { status: 'arbitrary-untrusted-status' },
+        concerns: [],
+      },
+    });
+    assert.equal(invalidStatus.signals.concernStatus, null);
   });
 
   it('proposes critique for explicit independence need or escalated risk', () => {
@@ -99,6 +119,7 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
   it('records actual vs recommended only when Host actually supplies a valid strategy', () => {
     const matching = buildExecutionStrategyShadowObservation({
       changedFiles: ['src/app.js'],
+      riskAssessment: { aggregateAction: 'comment_only' },
       actualStrategy: 'single',
       actualStrategySource: 'host-execution-log',
       hostBudget: { maxCostUsd: 0, maxLatencyMs: 4500 },
