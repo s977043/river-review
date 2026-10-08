@@ -1,9 +1,10 @@
-# #2455 Phase 5B — Cross-concern candidate finding contract
+# #2455 Phase 5B - Cross-concern candidate finding contract
 
 ## Status and decision
 
-This is a **design-only**, experimental contract for #2585. It does not enable
-a new model call, review finding, reviewer role, routing decision, or Gate input.
+This is a **design-only** experimental contract for #2585.
+It does not enable a model call or a new finding.
+It also does not change reviewer roles, routing, or Gate inputs.
 
 Phase 5A is already delivered in #2581. It emits
 `reviewDebug.reviewConcernInteractions` from explicit, canonicalized
@@ -102,9 +103,11 @@ be inspected, return `insufficient-evidence`, not a fabricated citation or
 trusted candidate. Evidence from only one endpoint is not enough to assert a
 cross-concern defect.
 
-Repository code, comments, fixtures, PR descriptions, logs and model output
-are untrusted data. They cannot change instructions, selection scope,
-reporting obligations, or approval authority.
+Repository code and comments are untrusted data.
+Fixtures, PR descriptions and logs are also untrusted data.
+Model output has the same boundary.
+None can change instruction authority or review scope.
+They also cannot alter reporting obligations or approval authority.
 
 The output may quote only source already within the authorized review scope.
 Existing secret-redaction policy must run before persistence. Do not store
@@ -159,20 +162,21 @@ skipped and why. The experiment must not silently prefer only pairs whose
 coverage status appears complete. Retry must not duplicate the same candidate
 or erase an earlier unresolved result.
 
-No generated integration finding may enter the existing fallback comment path,
-normal emitted issues, or any Gate input without a separate approved adoption
-contract. The default-off baseline output must remain byte-for-byte equivalent
-apart from optional experimental debug telemetry.
+Generated integration findings must not enter the existing fallback comment path.
+They must not alter normal emitted issues or Gate inputs.
+A separate approved adoption contract is required for such behavior.
+The default-off baseline output must remain unchanged.
+Optional experimental debug telemetry must remain non-authoritative.
 
 ## Staged delivery
 
-### PR A — offline contract and fixtures
+### PR A - offline contract and fixtures
 
 Deliver this design, human-owned review-obligation fixture definitions and
 pure fail-safe eligibility tests without external model calls. No normal
 review behavior changes.
 
-### PR B — opt-in generation adapter
+### PR B - opt-in generation adapter
 
 Provider-backed calls only under explicit authorization. Persist candidate
 records in a non-authoritative experiment/debug area. Use the existing
@@ -180,12 +184,14 @@ deterministic verification path and route surviving claims into #1978 rather
 than a parallel verdict implementation. Do not include candidates in normal
 findings or Gate input by default.
 
-### PR C — paired evaluation and adoption decision
+### PR C - paired evaluation and adoption decision
 
-On frozen revisions, compare baseline, Phase 5A and Phase 5B against
-human-labeled integration obligations. Measure Major/Critical recall,
-false-positive rate, detection of cross-concern defects, correction burden,
-extra calls, input/output tokens, p50/p95 latency and failure rate.
+Use frozen revisions and human-labeled integration obligations.
+Compare baseline with Phase 5A and Phase 5B.
+Measure Major/Critical recall and false-positive rate.
+Measure detection of cross-concern defects and human correction burden.
+Record extra model calls and input/output tokens.
+Record p50/p95 latency and failure rate.
 
 Fixture replay tests correctness of the adapter, not production quality.
 Provider-backed results cannot be replaced by a self-rated model score.
@@ -208,11 +214,11 @@ promotion** and keep the experimental surface disabled.
 
 ## References
 
-- #2455 — Review Concern Map
-- #2581 / #2568 — Phase 5A
-- #2565 / #2541 — Phase 4
-- #1978 — Evidence-Grounded Finding Critic
-- #2343 — Critic incompleteness not reaching a decision consumer
-- #1857 — Semantic Precision
-- #2212 — Review Coverage
-- #2322 — Review Resolution
+- #2455 - Review Concern Map
+- #2581 / #2568 - Phase 5A
+- #2565 / #2541 - Phase 4
+- #1978 - Evidence-Grounded Finding Critic
+- #2343 - Critic incompleteness not reaching a decision consumer
+- #1857 - Semantic Precision
+- #2212 - Review Coverage
+- #2322 - Review Resolution
