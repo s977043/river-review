@@ -528,7 +528,7 @@
         },
         "validation": {
           "type": "object",
-          "description": "Optional Finding Critic verdict (#1978 / #2334). Present only when the Evidence-Grounded Adversarial Review stage ran (opt-in: `review.findingCritic.mode: active` or env RIVER_FINDING_CRITIC=1); absent on every default run. Additive/optional — a consumer that ignores it reads the finding exactly as before. Distinct from `validatedStatus`: the two vocabularies only partially overlap and nothing here is written to `validatedStatus` (src/lib/finding-critic.mjs:80-99). Display and triage metadata — MUST NOT override severity or gate decisions.",
+          "description": "Optional Finding Critic verdict (#1978 / #2334). Present only when the Evidence-Grounded Adversarial Review stage ran (opt-in: `review.findingCritic.mode: active` or env RIVER_FINDING_CRITIC=1); absent on every default run. Additive/optional — a consumer that ignores it reads the finding exactly as before. Distinct from `validatedStatus`: the two vocabularies only partially overlap and nothing here is written to `validatedStatus` (src/lib/finding-critic.mjs:80-99). Display and triage metadata; MUST NOT rewrite severity, consensus, finding judgment, or Gate logic. Exception by explicit HOST opt-in only: RIVER_GATE_CRITIC_VALIDATION=1 reduces the run-level active-Critic observation to an optional escalation-only input in the EXISTING Gate (#2343). The default-off Gate and all finding statuses remain unchanged.",
           "additionalProperties": false,
           "required": ["protocol", "finalStatus"],
           "properties": {
