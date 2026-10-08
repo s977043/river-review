@@ -6,8 +6,8 @@ Review Coverage answers whether assigned reviewer units executed. Finding Critic
 validation answers whether candidate Findings received a usable validation result.
 These are different facts and must not share the same `reviewCoverage.status`.
 
-For an **observed active Critic**, missing or contradictory accounting, or an outstanding
-`humanReview` obligation must not silently result in `CONVERGED_CLEAN`.
+An **observed active Critic** may have missing or contradictory accounting.
+An outstanding `humanReview` obligation must never silently produce `CONVERGED_CLEAN`.
 The existing Gate therefore accepts one new **optional** input:
 `criticIncomplete: true`.
 
@@ -25,7 +25,12 @@ values do not enable it.
 | active, one or more `humanReview` Findings                        | `criticIncomplete: true` |
 | active, evaluated Findings, inconsistent or missing status counts | `criticIncomplete: true` |
 
-The reduction is pure and shared by `river run` and `river review exec`. The Critic's own `FINAL_STATUS` vocabulary is reused. A `confirmed` finding can still require `humanReview` when ask relevance is uncertain; therefore the unresolved-status count is a lower bound, not an exact equality check. If unresolved statuses exceed `humanReview` or an unknown status occurs, the result is incomplete.
+The reduction is pure and shared by `river run` and `river review exec`.
+It reuses the Critic's own `FINAL_STATUS` vocabulary.
+A `confirmed` finding may still require `humanReview` when ask relevance is uncertain.
+The unresolved-status count is therefore a lower bound, not an exact equality check.
+If unresolved statuses exceed `humanReview`, the result is incomplete.
+An unknown final-status key also produces an incomplete result.
 An executed review with unresolved Critic validation receives
 `ESCALATE / CRITIC_VALIDATION_INCOMPLETE` instead of clean GO.
 Mandatory escalation and strict blocking retain precedence.
