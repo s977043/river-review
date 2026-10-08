@@ -18,11 +18,11 @@ No second Gate, Decision Engine, Evidence State enum, or execution authority is 
 `RIVER_GATE_CRITIC_VALIDATION=1` opts in. It is OFF by default. Near-miss
 values do not enable it.
 
-| Finding Critic observation | Gate-side reduction |
-| --- | --- |
-| Critic off / no observation / zero evaluated Findings | no new signal |
-| active, fully resolved, consistent accounting | no new signal |
-| active, one or more `humanReview` Findings | `criticIncomplete: true` |
+| Finding Critic observation                                        | Gate-side reduction      |
+| ----------------------------------------------------------------- | ------------------------ |
+| Critic off / no observation / zero evaluated Findings             | no new signal            |
+| active, fully resolved, consistent accounting                     | no new signal            |
+| active, one or more `humanReview` Findings                        | `criticIncomplete: true` |
 | active, evaluated Findings, inconsistent or missing status counts | `criticIncomplete: true` |
 
 The reduction is pure and shared by `river run` and `river review exec`.
