@@ -7,6 +7,7 @@ import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
 import { buildReviewConcernCoverageObservation } from './review-concern-coverage.mjs';
 import { buildReviewConcernInteractionObservation } from './review-concern-interaction.mjs';
+import { buildExecutionStrategyShadowObservation } from './execution-strategy-shadow.mjs';
 import {
   attachConcernRefsToReviewCoverage,
   buildReviewConcernPlanningObservation,
@@ -701,6 +702,19 @@ export async function runLocalReview({
     selectedSkills: context.plan?.selected ?? [],
   });
 
+  // #2564 Phase 3: opt-in, non-authoritative Host strategy recommendation.
+  // This observation is not fed into reviewer/Skill routing, Gate, or execution.
+  const executionStrategyShadow =
+    process.env.RIVER_EXECUTION_STRATEGY_SHADOW === '1'
+      ? buildExecutionStrategyShadowObservation({
+          changedFiles: context.changedFiles,
+          tokenEstimate: context.diff?.tokenEstimate ?? null,
+          riskAssessment: context.plan?.riskAssessment ?? null,
+          reviewConcernMap,
+          reviewSignals: context.plan?.reviewSignals ?? null,
+        })
+      : null;
+
   const reviewArgs = {
     diff: context.diff,
     plan: context.plan,
@@ -865,6 +879,7 @@ export async function runLocalReview({
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
       ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       ...(reviewConcernInteractions ? { reviewConcernInteractions } : {}),
+      ...(executionStrategyShadow ? { executionStrategyShadow } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
