@@ -291,10 +291,6 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
       [],
       [{ id: 'not-the-finding', fingerprint: FP }],
       [{ id: 'finding-1', fingerprint: OTHER }],
-      [
-        { id: 'finding-1', fingerprint: FP },
-        { id: 'finding-1', fingerprint: FP },
-      ],
     ]) {
       const [proposal] = buildProposalsImpl({
         ...input,
@@ -303,6 +299,29 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
       });
       assert.equal(proposal.status, 'needs_human');
       assert.equal(proposal.reasonCode, 'unverified_source_finding');
+      assert.equal(proposal.feedbackType, null);
+    }
+  });
+
+  test('holds a v1 fingerprint collision present only in canonical source findings', () => {
+    const input = {
+      reviewResolution: document([item()]),
+      currentRevision: TARGET,
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+    };
+    for (const sourceFindings of [
+      [
+        { id: 'finding-1', fingerprint: FP },
+        { id: 'another-finding', fingerprint: FP },
+      ],
+      [
+        { id: 'finding-1', fingerprint: FP },
+        { id: 'finding-1', fingerprint: FP },
+      ],
+    ]) {
+      const [proposal] = buildProposalsImpl({ ...input, sourceFindings });
+      assert.equal(proposal.status, 'needs_human');
+      assert.equal(proposal.reasonCode, 'ambiguous_feedback_fingerprint');
       assert.equal(proposal.feedbackType, null);
     }
   });
