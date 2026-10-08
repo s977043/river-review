@@ -157,8 +157,9 @@ jobs:
   # (a Stop hook exiting 141 on SIGPIPE, where the pipe buffer size decides whether
   # it fires) and #2144 (a 30s timeout in the pr-unstall test, still unexplained).
   # Both were found by running the suite by hand on a maintainer's machine.
-  # On pull_request it runs only when the paths below change; both fixes (PR #2142
-  # scripts/plugin-task-checkpoint-hook.sh, PR #2150 tests/helpers/spawn-guard.mjs) fall inside.
+  # On pull_request, skip only Markdown-only documentation changes. All code, skill,
+  # schema, configuration, unknown paths and diff failures continue to run macOS tests.
+  # This retains coverage for both #2135 and #2144 without a fragile allowlist.
   test-macos:
     name: Unit tests (macOS)
     runs-on: macos-latest
@@ -170,19 +171,26 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      # Fails open: other events, a non-merge HEAD, or a diff error all run the tests.
+      # Fail open for non-PR events, non-merge HEAD, diff errors, or unknown paths.
+      # --no-renames reports both sides of a rename (including removed code paths).
       - name: Detect relevant changes
         id: changes
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$(git rev-parse --verify --quiet 'HEAD^2' || true)" ] \
-            && git diff --quiet 'HEAD^1' HEAD -- scripts/ src/ tests/ runners/ hooks/ .claude/hooks/ \
-              package.json package-lock.json .nvmrc .github/workflows/test.yml .github/actions/; then
-            echo "No test-relevant paths changed; skipping macOS tests."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
+          if [ "$EVENT_NAME" != "pull_request" ] || ! git rev-parse --verify --quiet 'HEAD^2' >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
+          elif ! git diff --name-only --no-renames -z 'HEAD^1' HEAD > "$RUNNER_TEMP/macos-changed-paths"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            run=false
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                README.md|README.en.md|docs/*.md|pages/*.md) ;;
+                *) run=true; break ;;
+              esac
+            done < "$RUNNER_TEMP/macos-changed-paths"
+            echo "run=$run" >> "$GITHUB_OUTPUT"
           fi
       - uses: ./.github/actions/setup-node-deps
         if: steps.changes.outputs.run != 'false'
@@ -227,13 +235,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      # Same pathspec as SKILLS_ROOT in scripts/check-skill-version-bump.mjs.
-      # Fails open: runs whenever HEAD is not the merge commit or the diff errors.
+      # Run when the skills or the check's implementation/dependencies/workflow change.
+      # Fail open for non-merge HEAD and any diff error.
       - name: Detect skill changes
         id: changes
         run: |
-          if [ -n "$(git rev-parse --verify --quiet 'HEAD^2' || true)" ] && git diff --quiet 'HEAD^1' HEAD -- skills/; then
-            echo "No changes under skills/; skipping the check."
+          if [ -n "$(git rev-parse --verify --quiet 'HEAD^2' || true)" ] \
+            && git diff --quiet 'HEAD^1' HEAD -- skills/ scripts/check-skill-version-bump.mjs \
+              package.json package-lock.json .github/workflows/test.yml; then
+            echo "No relevant changes for skill-version-bump; skipping the check."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
