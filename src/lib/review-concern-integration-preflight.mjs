@@ -9,13 +9,21 @@
 const MAX_PAIR_LIMIT = 20;
 const DEFAULT_PAIR_LIMIT = 3;
 
-function observation(status, reason, selectedPairs = [], skippedPairs = [], sourceStatus = null) {
+function observation(
+  status,
+  reason,
+  selectedPairs = [],
+  skippedPairs = [],
+  sourceStatus = null,
+  sourceLimitations = []
+) {
   return {
     schemaVersion: '1',
     kind: 'review-concern-integration-preflight',
     status,
     reason,
     sourceStatus,
+    sourceLimitations,
     selectedPairs,
     skippedPairs,
     selectedCount: selectedPairs.length,
@@ -90,30 +98,36 @@ export function selectReviewConcernIntegrationPreflight({
   }
 
   const sourceStatus = interactionObservation.status;
+  const sourceLimitations = Array.isArray(interactionObservation.source?.limitations)
+    ? [...interactionObservation.source.limitations]
+    : [];
+  if (interactionObservation.applied !== false) {
+    return observation('unavailable', 'non-observational-source', [], [], sourceStatus, sourceLimitations);
+  }
   if (!['observed', 'partial'].includes(sourceStatus)) {
-    return observation('unavailable', 'interaction-observation-not-usable', [], [], sourceStatus);
+    return observation('unavailable', 'interaction-observation-not-usable', [], [], sourceStatus, sourceLimitations);
   }
 
   const checked = validatePairs(interactionObservation.interactions);
   if (!checked.valid) {
-    return observation('unavailable', checked.reason, [], [], sourceStatus);
+    return observation('unavailable', checked.reason, [], [], sourceStatus, sourceLimitations);
   }
 
   if (!Number.isSafeInteger(maxPairs) || maxPairs < 1 || maxPairs > MAX_PAIR_LIMIT) {
-    return observation('unavailable', 'invalid-pair-budget', [], [], sourceStatus);
+    return observation('unavailable', 'invalid-pair-budget', [], [], sourceStatus, sourceLimitations);
   }
 
   if (dryRun) {
-    return observation('not-executed', 'dry-run', [], [], sourceStatus);
+    return observation('not-executed', 'dry-run', [], [], sourceStatus, sourceLimitations);
   }
   if (offline) {
-    return observation('not-executed', 'offline', [], [], sourceStatus);
+    return observation('not-executed', 'offline', [], [], sourceStatus, sourceLimitations);
   }
   if (provider !== 'openai') {
-    return observation('not-executed', 'unsupported-provider', [], [], sourceStatus);
+    return observation('not-executed', 'unsupported-provider', [], [], sourceStatus, sourceLimitations);
   }
   if (apiKeyAvailable !== true) {
-    return observation('not-executed', 'missing-provider-authorization', [], [], sourceStatus);
+    return observation('not-executed', 'missing-provider-authorization', [], [], sourceStatus, sourceLimitations);
   }
 
   // Phase 5A constructs canonical interaction order. Do not sort by perceived
@@ -134,6 +148,7 @@ export function selectReviewConcernIntegrationPreflight({
     pairs.length === 0 ? 'no-explicit-interactions' : null,
     selected,
     skipped,
-    sourceStatus
+    sourceStatus,
+    sourceLimitations
   );
 }
