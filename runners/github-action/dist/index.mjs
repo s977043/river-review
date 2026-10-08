@@ -38086,6 +38086,7 @@ function resolveFlowEntry(entryName, options) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   QS: () => (/* binding */ GATE_REASON_CODES),
 /* harmony export */   RF: () => (/* binding */ deriveGateDecision),
+/* harmony export */   aN: () => (/* binding */ criticValidationIncompleteForGate),
 /* harmony export */   p4: () => (/* binding */ coverageIncompleteForGate),
 /* harmony export */   us: () => (/* binding */ llmNotExecutedForGate)
 /* harmony export */ });
@@ -38137,6 +38138,8 @@ function resolveFlowEntry(entryName, options) {
  *  7b. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
  *     (#2441, opt-in: every generateReview call skipped the LLM; placed
  *     before every rule that can emit GO / GO_WITH_OBSERVATION)
+ *  7c. Critic validation incomplete           → ESCALATE  CRITIC_VALIDATION_INCOMPLETE
+ *     (#2343, opt-in: observed active Critic requested Human review)
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
  *  9. NO_SIGNAL (decision absent/unknown)    → NO_GO     UNDETERMINED
@@ -38184,6 +38187,7 @@ const GATE_REASON_CODES = /** @type {const} */ ([
   'COVERAGE_INCOMPLETE',
   'LLM_NOT_EXECUTED',
   'BLOCKING_FINDINGS',
+  'CRITIC_VALIDATION_INCOMPLETE',
   'MINOR_FINDINGS_OBSERVE',
   'UNDETERMINED',
   'RISK_MAP_OBSERVE',
@@ -38261,6 +38265,7 @@ function computeGateInputsHash(inputs) {
   if (inputs?.coverageIncomplete === true) canonical.coverageIncomplete = true;
   // #2441: same "only when true" scheme; the opt-in is OFF by default.
   if (inputs?.llmNotExecuted === true) canonical.llmNotExecuted = true;
+  if (inputs?.criticIncomplete === true) canonical.criticIncomplete = true;
   return (0,node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash)('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
 }
 
@@ -38320,6 +38325,32 @@ function isRequireLlmGateEnabled(env) {
  */
 function llmNotExecutedForGate(llmNotExecuted, env) {
   return isRequireLlmGateEnabled(env) && llmNotExecuted === true;
+}
+
+/**
+ * #2343: an observed Finding Critic human-review obligation must not become a
+ * clean Gate result. This is a separate validation-quality fact, NOT execution
+ * coverage. It is opt-in and intentionally does not change default behavior.
+ *
+ * No observation / default-off Critic is NOT interpreted as Critic failure.
+ * A present, active observation that evaluated findings but has missing or
+ * contradictory status accounting is incomplete, never a clean result.
+ */
+function criticValidationIncompleteForGate(observation, env) {
+  if (env?.RIVER_GATE_CRITIC_VALIDATION !== '1') return false;
+  if (observation?.mode !== 'active') return false;
+  const evaluated = observation.evaluated;
+  if (!Number.isInteger(evaluated) || evaluated < 1) return false;
+  const humanReview = observation.humanReview;
+  if (!Number.isInteger(humanReview) || humanReview < 0 || humanReview > evaluated) return true;
+  const statusCounts = observation.byFinalStatus;
+  if (!statusCounts || typeof statusCounts !== 'object' || Array.isArray(statusCounts)) return true;
+  const counts = Object.values(statusCounts);
+  if (
+    !counts.every((count) => Number.isInteger(count) && count >= 0) ||
+    counts.reduce((sum, count) => sum + count, 0) !== evaluated
+  ) return true;
+  return humanReview > 0;
 }
 
 /**
@@ -38404,6 +38435,7 @@ function deriveGateDecision({
   deterministicUnrunnable = false,
   coverageIncomplete = false,
   llmNotExecuted = false,
+  criticIncomplete = false,
   config = {},
 } = {}) {
   const configChanged =
@@ -38436,6 +38468,7 @@ function deriveGateDecision({
   if (coverageIncomplete === true) inputs.coverageIncomplete = true;
   // #2441: echoed only when true, for the same reason.
   if (llmNotExecuted === true) inputs.llmNotExecuted = true;
+  if (criticIncomplete === true) inputs.criticIncomplete = true;
 
   const expiresInHours =
     config?.gate?.observation?.expiresInHours ?? DEFAULT_OBSERVATION_EXPIRES_IN_HOURS;
@@ -38513,6 +38546,9 @@ function deriveGateDecision({
     // confirmed NO_GO (dry-run NOT_EXECUTED, BLOCKING_FINDINGS) is never traded
     // for it; before 8-11 so it can never yield GO / GO_WITH_OBSERVATION.
     if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
+    // #2343: active Critic findings that still need human validation are not clean.
+    // Preserve confirmed blocking-finding NO_GO and earlier escalation cliffs.
+    if (inputs.criticIncomplete) return ['ESCALATE', 'CRITIC_VALIDATION_INCOMPLETE'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.
     if (loopSignal === 'NO_SIGNAL') {
       if (decision === 'human-review-recommended' && inputs.blockingFindings === 0) {
@@ -99679,6 +99715,11 @@ function deriveRunGate(result) {
       coverageIncomplete: (0,gate_decision/* coverageIncompleteForGate */.p4)(result.reviewCoverage, process.env),
       // #2441 (opt-in RIVER_GATE_REQUIRE_LLM=1, default OFF).
       llmNotExecuted: (0,gate_decision/* llmNotExecutedForGate */.us)(result.llmNotExecuted, process.env),
+      // #2343: independent Critic-validation-quality signal, opt-in only.
+      criticIncomplete: (0,gate_decision/* criticValidationIncompleteForGate */.aN)(
+        result.reviewDebug?.findingCritic ?? result.reviewDebug?.execution?.findingCritic,
+        process.env
+      ),
       config: result.config ?? {},
     });
   } catch {
