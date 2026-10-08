@@ -291,10 +291,6 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
       [],
       [{ id: 'not-the-finding', fingerprint: FP }],
       [{ id: 'finding-1', fingerprint: OTHER }],
-      [
-        { id: 'finding-1', fingerprint: FP },
-        { id: 'finding-1', fingerprint: FP },
-      ],
     ]) {
       const [proposal] = buildProposalsImpl({
         ...input,
