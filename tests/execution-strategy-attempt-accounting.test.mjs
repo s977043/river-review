@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { buildHostAttemptAccountingObservation } from '../src/lib/execution-strategy-attempt-accounting.mjs';
+import {
+  buildHostAttemptAccountingObservation,
+} from '../src/lib/execution-strategy-attempt-accounting.mjs';
 
 function completeHostEvidence() {
   return {
@@ -115,10 +117,7 @@ describe('#2564 Phase 3 Host attempt accounting preflight', () => {
   it('rejects incomplete scope, invented strategy provenance and malformed wall clocks', () => {
     const incomplete = completeHostEvidence();
     incomplete.hostExecution.inventoryScope = 'partial';
-    assert.equal(
-      buildHostAttemptAccountingObservation(incomplete).totalEstimatedCostUsd,
-      null
-    );
+    assert.equal(buildHostAttemptAccountingObservation(incomplete).totalEstimatedCostUsd, null);
 
     const invented = completeHostEvidence();
     invented.hostExecution.source = 'inferred-from-reviewer-count';
