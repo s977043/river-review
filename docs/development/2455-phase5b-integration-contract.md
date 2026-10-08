@@ -18,17 +18,17 @@ provider-backed quality evidence.
 
 ## Responsibility matrix
 
-| Owner | Owns | Does not own |
-| --- | --- | --- |
-| Concern Analyzer / #2455 | Semantic decomposition and explicit interaction references | Finding correctness |
-| Phase 5A / #2581 | Deterministic interaction-pair observation | New interaction discovery |
-| Phase 4 / #2565 | Project existing ReviewUnit execution to Concerns | Semantic completeness |
-| Phase 5B | Bounded review of an explicit interaction into *candidate* findings | Trusted validation or Gate |
-| Deterministic verifier | Evidence, diff attribution, phase/scope checks | Semantic critic verdict |
-| Finding Critic / #1978 | Review-of-review and human-review fallback | New severity taxonomy |
-| Semantic Precision / #1857 | Materiality and disposition | Candidate generation |
-| Resolution / #2322 | PR-author/human response and fix verification | Finding discovery |
-| Gate | Existing host-owned policy only | Automatic Concern promotion |
+| Owner                      | Owns                                                                | Does not own                |
+| -------------------------- | ------------------------------------------------------------------- | --------------------------- |
+| Concern Analyzer / #2455   | Semantic decomposition and explicit interaction references          | Finding correctness         |
+| Phase 5A / #2581           | Deterministic interaction-pair observation                          | New interaction discovery   |
+| Phase 4 / #2565            | Project existing ReviewUnit execution to Concerns                   | Semantic completeness       |
+| Phase 5B                   | Bounded review of an explicit interaction into _candidate_ findings | Trusted validation or Gate  |
+| Deterministic verifier     | Evidence, diff attribution, phase/scope checks                      | Semantic critic verdict     |
+| Finding Critic / #1978     | Review-of-review and human-review fallback                          | New severity taxonomy       |
+| Semantic Precision / #1857 | Materiality and disposition                                         | Candidate generation        |
+| Resolution / #2322         | PR-author/human response and fix verification                       | Finding discovery           |
+| Gate                       | Existing host-owned policy only                                     | Automatic Concern promotion |
 
 No independent Organizer, Judge, Critic, or ConcernCoverage authority is added.
 
@@ -70,7 +70,7 @@ verifier entry point. Copy-pasting its implementation creates a second owner.
 
 ## Explicit eligibility only
 
-An interaction is eligible for *experimental inspection* when:
+An interaction is eligible for _experimental inspection_ when:
 
 - `reviewConcernMap.analysis.status` is `completed` or `partial`.
 - The Phase 5A observation is `observed` or `partial`, not `unavailable`.
@@ -83,7 +83,7 @@ A partial map may yield a candidate. It must also preserve the limitation.
 Missing or failed map, contradictory refs, or unknown identity means **no
 trusted inspection result**, never a clean verdict.
 
-Coverage status from Phase 4 is *context only*. An unmapped endpoint does not
+Coverage status from Phase 4 is _context only_. An unmapped endpoint does not
 silently remove a pair. `executionCoverage: complete` is not semantic evidence.
 
 ## Evidence rules
@@ -139,18 +139,18 @@ The default switch is OFF. No Phase 5B model invocation is made by default.
 
 These conditions are observational failures, not negative test evidence:
 
-| Condition | Required experiment outcome |
-| --- | --- |
-| No opt-in | Not executed |
-| No API key / unsupported provider | Not executed; never green |
-| Dry-run / offline | Not executed |
-| Invalid or failed Concern Map | Unavailable |
-| Candidate generation timeout / parse failure | Partial or failed; no trusted finding |
-| Evidence out of scope | Reject or needs-human |
-| Deterministic verifier rejects | Not emitted as a verified finding |
-| Critic unavailable / times out | Retain unresolved provenance; needs-human |
-| Budget exhausted | Partial; report skipped pairs |
-| Missing Phase 4 coverage | Keep pair, annotate unknown coverage |
+| Condition                                    | Required experiment outcome               |
+| -------------------------------------------- | ----------------------------------------- |
+| No opt-in                                    | Not executed                              |
+| No API key / unsupported provider            | Not executed; never green                 |
+| Dry-run / offline                            | Not executed                              |
+| Invalid or failed Concern Map                | Unavailable                               |
+| Candidate generation timeout / parse failure | Partial or failed; no trusted finding     |
+| Evidence out of scope                        | Reject or needs-human                     |
+| Deterministic verifier rejects               | Not emitted as a verified finding         |
+| Critic unavailable / times out               | Retain unresolved provenance; needs-human |
+| Budget exhausted                             | Partial; report skipped pairs             |
+| Missing Phase 4 coverage                     | Keep pair, annotate unknown coverage      |
 
 The experimental configuration must cap the number of pairs, context bytes,
 LLM calls, timeout and total token use. Exhausting any cap records the omitted
