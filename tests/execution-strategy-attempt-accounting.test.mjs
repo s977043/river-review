@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  buildHostAttemptAccountingObservation,
-} from '../src/lib/execution-strategy-attempt-accounting.mjs';
+import { buildHostAttemptAccountingObservation } from '../src/lib/execution-strategy-attempt-accounting.mjs';
 
 function completeHostEvidence() {
   return {
