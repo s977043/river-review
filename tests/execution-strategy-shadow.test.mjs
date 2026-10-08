@@ -73,6 +73,28 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
     assert.equal(invalidStatus.signals.concernStatus, null);
   });
 
+  it('does not recommend single if a supplied Concern Map failed or is malformed', () => {
+    for (const reviewConcernMap of [
+      concerns(0, 'failed'),
+      {
+        kind: 'review-concern-map',
+        schemaVersion: '1',
+        analysis: { status: 'unknown' },
+        concerns: [],
+      },
+    ]) {
+      const observation = buildExecutionStrategyShadowObservation({
+        changedFiles: ['src/app.js'],
+        riskAssessment: { aggregateAction: 'comment_only' },
+        reviewConcernMap,
+      });
+      assert.equal(observation.recommendedStrategy, null);
+      assert.equal(observation.status, 'no-recommendation');
+      assert.ok(observation.limitations.includes('concern-map-unavailable'));
+      assert.equal(observation.recommendationApplied, false);
+    }
+  });
+
   it('proposes critique for explicit independence need or escalated risk', () => {
     const independence = buildExecutionStrategyShadowObservation({
       changedFiles: ['src/a.js'],
