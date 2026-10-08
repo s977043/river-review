@@ -241,7 +241,20 @@ River Review does not provide an attestation-signing command in this phase.
 
 The private key belongs to the independent verifier environment and must stay outside the candidate's write authority. Signing may be implemented later by CI/OIDC/Sigstore or another external verifier. That later signing mechanism is not a prerequisite for keeping this verification boundary sound.
 
-## 11. Completion boundary
+## 11. Operator trust checklist
+
+Before treating a successful signature check as independent evidence, the Human or CI caller must verify each external condition:
+
+- The public key was selected through a trusted channel outside the candidate branch and replay artifacts.
+- The signer belongs to an authorized verifier workflow, not merely another task or logical execution ID.
+- The candidate cannot write the verifier private key or change the signing job's inputs or trust policy.
+- Key ownership, rotation, revocation, and attestation freshness are separately reviewed when required by local policy.
+- A green verification artifact is not a verdict. Approval, canary start, merge, and release stay Human-owned.
+
+These checks are operational prerequisites, not claims verified by `river evolve verify-replay`.
+In particular, `issuedAt` is signed but there is no freshness or expiry enforcement in this foundation.
+
+## 12. Completion boundary
 
 This slice satisfies only the **signed replay verification foundation** for P3.
 
@@ -260,7 +273,7 @@ It does **not** by itself prove:
 
 Therefore, a successful `verify-replay` result may satisfy the cryptographic-attestation prerequisite for an independent verifier. It does not automatically clear the full #1574 Strategic Hold. Remaining resume conditions must be reviewed independently.
 
-## 12. References
+## 13. References
 
 - #1574 Review Evolution Cycle
 - #2510 P3 foundation
