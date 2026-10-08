@@ -83,6 +83,17 @@ describe('Phase 5B opt-in preflight — #2585', () => {
     }
   });
 
+  it('rejects contradictory Phase 5A and Concern Map states', () => {
+    for (const source of [
+      { ...input([]), source: { concernMapStatus: 'failed', limitations: [] } },
+      { ...input([], 'partial'), source: { concernMapStatus: 'completed', limitations: [] } },
+    ]) {
+      const result = selectReviewConcernIntegrationPreflight(active(source));
+      assert.equal(result.status, 'unavailable');
+      assert.equal(result.reason, 'inconsistent-concern-map-state');
+    }
+  });
+
   it('rejects malformed, self-referential and duplicate interaction pairs', () => {
     const cases = [
       [validInteraction('same', 'a', 'b'), validInteraction('same', 'c', 'd')],
