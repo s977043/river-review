@@ -59,6 +59,7 @@ function build(doc = document(), options = {}) {
   return buildReviewResolutionFeedbackProposals({
     reviewResolution: doc,
     currentRevision: TARGET,
+    sourceFindings: [{ id: 'rr-1', fingerprint: FINGERPRINT }],
     skillIdByFingerprint: { [FINGERPRINT]: 'security-basic' },
     ...options,
   });
@@ -229,6 +230,24 @@ describe('Review Resolution Feedback proposals (#2575 Phase 5 PR1)', () => {
     assert.equal(candidate.skillId, null);
   });
 
+  test('canonical source finding identity is required for proposed feedback', () => {
+    const missing = build(document(), { sourceFindings: [] }).items[0];
+    const mismatch = build(document(), {
+      sourceFindings: [{ id: 'rr-1', fingerprint: 'fedcba9876543210' }],
+    }).items[0];
+    const ambiguous = build(document(), {
+      sourceFindings: [
+        { id: 'rr-1', fingerprint: FINGERPRINT },
+        { id: 'rr-1', fingerprint: FINGERPRINT },
+      ],
+    }).items[0];
+    for (const candidate of [missing, mismatch, ambiguous]) {
+      assert.equal(candidate.status, 'needs_human');
+      assert.equal(candidate.reasonCode, 'unverified_source_finding');
+      assert.equal(candidate.feedbackType, null);
+    }
+  });
+
   test('reviewer provenance must be present', () => {
     const sourceItem = item({
       findingRef: { ...item().findingRef, sources: [] },
@@ -280,10 +299,13 @@ describe('Review Resolution Feedback proposals (#2575 Phase 5 PR1)', () => {
     const mapping = { [FINGERPRINT]: 'security-basic' };
     const beforeSource = JSON.stringify(source);
     const beforeMapping = JSON.stringify(mapping);
-    const observation = build(source, { skillIdByFingerprint: mapping });
+    const sourceFindings = [{ id: 'rr-1', fingerprint: FINGERPRINT }];
+    const beforeFindings = JSON.stringify(sourceFindings);
+    const observation = build(source, { skillIdByFingerprint: mapping, sourceFindings });
 
     assert.equal(JSON.stringify(source), beforeSource);
     assert.equal(JSON.stringify(mapping), beforeMapping);
+    assert.equal(JSON.stringify(sourceFindings), beforeFindings);
     assert.equal(Object.isFrozen(source), false);
     assert.equal(observation.items[0].status, 'proposed');
   });
