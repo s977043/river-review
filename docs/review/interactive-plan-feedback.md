@@ -1,6 +1,6 @@
 # PlanGate interactive review feedback interoperability (Phase A)
 
-Tracking: River Review #2577. Producer: PlanGate #1521.
+Tracking: River Review #2577. Producer: PlanGate #1521 (PR #1527 merged).
 Related contracts: #2322 (resolution), #2212 (coverage), #2368 (decision surface).
 Evidence architecture: #2470 and #2509.
 
