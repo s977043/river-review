@@ -82,6 +82,12 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
         analysis: { status: 'unknown' },
         concerns: [],
       },
+      {
+        kind: 'review-concern-map',
+        schemaVersion: '2',
+        analysis: { status: 'completed' },
+        concerns: [],
+      },
     ]) {
       const observation = buildExecutionStrategyShadowObservation({
         changedFiles: ['src/app.js'],
