@@ -67,6 +67,11 @@
       "suppression add"
     ]
   },
+  "--attestation": {
+    "writes": ["evolveAttestation"],
+    "readBy": ["evolve"],
+    "acceptedUnconsumedOn": []
+  },
   "--base": {
     "writes": ["base"],
     "readBy": ["review", "run", "skills"],
@@ -154,6 +159,7 @@
       "evolve",
       "evolve aggregate",
       "evolve replay",
+      "evolve verify-replay",
       "evolve prompt-compare",
       "evolve prompt-ab",
       "promote propose",
@@ -677,6 +683,11 @@
     "readBy": ["promote"],
     "acceptedUnconsumedOn": []
   },
+  "--replay": {
+    "writes": ["evolveReplay"],
+    "readBy": ["evolve"],
+    "acceptedUnconsumedOn": []
+  },
   "--reversed-by": {
     "writes": ["feedbackReversedBy"],
     "readBy": ["feedback"],
@@ -884,6 +895,11 @@
   "--trigger": {
     "writes": ["feedbackTrigger"],
     "readBy": ["feedback"],
+    "acceptedUnconsumedOn": []
+  },
+  "--trusted-key": {
+    "writes": ["evolveTrustedKey"],
+    "readBy": ["evolve"],
     "acceptedUnconsumedOn": []
   },
   "--type": {

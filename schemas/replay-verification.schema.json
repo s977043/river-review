@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Signed Paired Replay Verification",
+  "description": "Read-only #1574 P3 foundation artifact. Verifies an externally signed paired-replay attestation against an out-of-band trusted Ed25519 public key. It never promotes, starts a canary, merges, or releases.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "mode",
+    "readOnly",
+    "verifiedAt",
+    "replay",
+    "verifier",
+    "trust",
+    "canaryReadiness",
+    "decision",
+    "requiresHumanApproval",
+    "autoPromotion",
+    "autoCanary",
+    "autoActions",
+    "writeEffects"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableCandidateId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^RR-PC-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "paired-replay-verification"
+    },
+    "mode": {
+      "type": "string",
+      "const": "signed-independent-verification"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "const": true
+    },
+    "verifiedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "replay": {
+      "type": "object",
+      "required": [
+        "replaySha256",
+        "manifestId",
+        "experimentKey",
+        "manifestHash",
+        "candidateId",
+        "candidateContentHash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "replaySha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "manifestId": {
+          "type": "string",
+          "pattern": "^RR-EXP-[0-9a-f]{12}$"
+        },
+        "experimentKey": {
+          "$ref": "#/$defs/sha256"
+        },
+        "manifestHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/nullableCandidateId"
+        },
+        "candidateContentHash": {
+          "$ref": "#/$defs/nullableSha256"
+        }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "required": [
+        "verifierId",
+        "issuedAt",
+        "algorithm",
+        "keyId",
+        "independentClaimed",
+        "independentVerifierVerified"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "verifierId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "algorithm": {
+          "type": "string",
+          "const": "ed25519"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "independentClaimed": {
+          "type": "boolean",
+          "const": true
+        },
+        "independentVerifierVerified": {
+          "type": "boolean",
+          "const": true,
+          "description": "True means the replay's independent-verifier identity claim was authenticated by the caller-supplied trusted key and bound to this exact replay. Runtime/job isolation is outside this schema's claim."
+        }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "required": [
+        "trustLevel",
+        "trustedEvidenceCount",
+        "signatureVerified",
+        "replayBindingVerified",
+        "manifestVerified",
+        "experimentKeyMatchesInputs",
+        "reasons"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trustLevel": {
+          "type": "string",
+          "const": "trusted"
+        },
+        "trustedEvidenceCount": {
+          "type": "integer",
+          "const": 1
+        },
+        "signatureVerified": {
+          "type": "boolean",
+          "const": true
+        },
+        "replayBindingVerified": {
+          "type": "boolean",
+          "const": true
+        },
+        "manifestVerified": {
+          "type": "boolean",
+          "const": true
+        },
+        "experimentKeyMatchesInputs": {
+          "type": "boolean",
+          "const": true
+        },
+        "reasons": {
+          "type": "array",
+          "maxItems": 0
+        }
+      },
+      "description": "Trust is relative to the Ed25519 public key explicitly supplied by the caller. This artifact verifies the signed attestation and its replay binding; it does not prove organizational key ownership, key rotation policy, or verifier-job isolation."
+    },
+    "canaryReadiness": {
+      "type": "object",
+      "required": ["status", "blockers", "automaticCanary", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["human-review-ready", "not-ready"]
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "automaticCanary": {
+          "type": "boolean",
+          "const": false
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "decision": {
+      "type": "null"
+    },
+    "requiresHumanApproval": {
+      "type": "boolean",
+      "const": true
+    },
+    "autoPromotion": {
+      "type": "boolean",
+      "const": false
+    },
+    "autoCanary": {
+      "type": "boolean",
+      "const": false
+    },
+    "autoActions": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "string",
+        "const": "observe"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "writeEffects": {
+      "type": "array",
+      "maxItems": 0
+    }
+  }
+}

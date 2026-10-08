@@ -128,6 +128,11 @@ Commands:
                         criteria. Never re-runs a review and never decides
                         adoption (--spec <file> --expect-manifest <id>;
                         --output json)
+  evolve verify-replay  Verify a detached independent-verifier attestation
+                        against an out-of-band trusted Ed25519 public key
+                        (#1574 P3 foundation). Read-only; never starts a canary
+                        or decides adoption (--replay <file> --attestation <file>
+                        --trusted-key <pem>; --output json)
   evolve prompt-compare <path>
                         Read-only paired comparison of the legacy prompt vs the
                         compiled prompt over saved observe-mode runs
@@ -216,7 +221,7 @@ const COMMAND_USAGE = {
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
     'river promote <propose|list|approve|reject|retarget|attach-replay|template|retire|review-effectiveness> [options]',
-  evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
+  evolve: 'river evolve <aggregate|replay|verify-replay|prompt-compare|prompt-ab> [options]',
 };
 
 const GENERIC_USAGE = 'river <command> <path> [options]';
@@ -634,6 +639,9 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--month',
   '--spec',
   '--expect-manifest',
+  '--replay',
+  '--attestation',
+  '--trusted-key',
   // shared / review
   '--plan-only',
   '--fail-on',
@@ -1015,6 +1023,36 @@ function parseEvolveOption(arg, args, parsed) {
       return 'break';
     }
     parsed.evolveExpectManifest = value;
+    return 'continue';
+  }
+  if (arg === '--replay') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --replay option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveReplay = value;
+    return 'continue';
+  }
+  if (arg === '--attestation') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --attestation option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveAttestation = value;
+    return 'continue';
+  }
+  if (arg === '--trusted-key') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --trusted-key option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveTrustedKey = value;
     return 'continue';
   }
   // Options that are not evolve's own and not handled by the shared parser
@@ -1505,6 +1543,9 @@ function parseArgs(argv) {
     evolveMonth: null,
     evolveSpec: null,
     evolveExpectManifest: null,
+    evolveReplay: null,
+    evolveAttestation: null,
+    evolveTrustedKey: null,
     evolveExtraArgs: [],
     evolveUnknownOption: null,
     // skills subcommand fields

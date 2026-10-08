@@ -4,12 +4,15 @@
 //
 //   river evolve aggregate [<path>] [--min <n>] [--month YYYY-MM] [--output json|text]
 //   river evolve replay --spec <file> [--expect-manifest <id|key>] [--output json|text]
+//   river evolve verify-replay --replay <file> --attestation <file> --trusted-key <pem> [--output json|text]
 //   river evolve prompt-compare [<path>] [--output json|text]
 //   river evolve prompt-ab [<path>] [--output json|text]
 //
-// All four subcommands only READ. `aggregate` reads `.river/runs/` and
+// All five subcommands only READ. `aggregate` reads `.river/runs/` and
 // `.river/feedback/*.jsonl`; `replay` reads a single experiment spec file that
-// already contains the baseline and candidate runs; `prompt-compare` reads
+// already contains the baseline and candidate runs; `verify-replay` reads
+// an existing replay, detached attestation, and caller-supplied trusted public
+// key; `prompt-compare` reads
 // `.river/runs/` and pairs the legacy prompt against the compiled prompt from
 // the observe-mode records those runs already carry (ADR-006 / #1860) — it
 // never sends the compiled prompt anywhere. `prompt-ab` reads the same store but
@@ -25,7 +28,7 @@
 
 import { existsSync } from 'node:fs';
 
-const SUBCOMMANDS = ['aggregate', 'replay', 'prompt-compare', 'prompt-ab'];
+const SUBCOMMANDS = ['aggregate', 'replay', 'verify-replay', 'prompt-compare', 'prompt-ab'];
 
 /**
  * Warn when the positional path handed to `aggregate` does not exist (#1936).
@@ -112,26 +115,37 @@ function missingTargetPathError(targetPath, rawTarget, subcommand) {
  * Reject options that belong to another evolve subcommand (#1860 / #1880).
  *
  * Shared by `prompt-compare` and `prompt-ab`: both read the saved runs under
- * `.river/runs`, so `--spec` / `--expect-manifest` (replay) and `--min` /
- * `--month` (aggregate) would silently look honoured while changing nothing.
+ * `.river/runs`, so replay / verification / aggregate-only options would
+ * silently look honoured while changing nothing unless rejected here.
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} subcommand - the subcommand name to name in the message.
  * @returns {string|null} error message, or null when nothing is misplaced.
  */
 function misplacedStoreOptionError(parsed, subcommand) {
-  const misplaced = ['--spec', '--expect-manifest', '--min', '--month'].filter((flag) => {
+  const misplaced = [
+    '--spec',
+    '--expect-manifest',
+    '--min',
+    '--month',
+    '--replay',
+    '--attestation',
+    '--trusted-key',
+  ].filter((flag) => {
     if (flag === '--spec') return parsed.evolveSpec != null;
     if (flag === '--expect-manifest') return parsed.evolveExpectManifest != null;
     if (flag === '--min') return parsed.evolveMin != null;
-    return parsed.evolveMonth != null;
+    if (flag === '--month') return parsed.evolveMonth != null;
+    if (flag === '--replay') return parsed.evolveReplay != null;
+    if (flag === '--attestation') return parsed.evolveAttestation != null;
+    return parsed.evolveTrustedKey != null;
   });
   if (!misplaced.length) return null;
   return `${misplaced.join(', ')} is not valid for \`river evolve ${subcommand}\` (its dataset is the saved runs under .river/runs).`;
 }
 
 /**
- * Handle the `evolve` command (aggregate | replay | prompt-compare | prompt-ab).
+ * Handle the `evolve` command (aggregate | replay | verify-replay | prompt-compare | prompt-ab).
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} targetPath - resolved repo target path.
@@ -145,7 +159,7 @@ export async function runEvolveCommand(parsed, targetPath) {
   }
   if (parsed.evolveUnknownOption) {
     console.error(
-      `Unknown option for evolve: ${parsed.evolveUnknownOption}. Use: --min <n> --month YYYY-MM --spec <file> --expect-manifest <id> --output text|json`
+      `Unknown option for evolve: ${parsed.evolveUnknownOption}. Use: --min <n> --month YYYY-MM --spec <file> --expect-manifest <id> --replay <file> --attestation <file> --trusted-key <pem> --output text|json`
     );
     return 1;
   }
@@ -155,7 +169,7 @@ export async function runEvolveCommand(parsed, targetPath) {
     );
     return 1;
   }
-  // Neither subcommand has a yaml/html renderer; accepting the flag and silently
+  // Evolve subcommands have no yaml/html renderer; accepting the flag and silently
   // emitting text would misreport the format to a downstream consumer.
   const output = parsed.output ?? 'text';
   if (output !== 'text' && output !== 'json') {
@@ -165,6 +179,9 @@ export async function runEvolveCommand(parsed, targetPath) {
 
   if (subcommand === 'replay') {
     return runReplay(parsed, output);
+  }
+  if (subcommand === 'verify-replay') {
+    return runVerifyReplay(parsed, output);
   }
   if (subcommand === 'prompt-compare') {
     return runPromptCompare(parsed, targetPath, output);
@@ -275,16 +292,96 @@ async function runPromptAb(parsed, targetPath, output) {
   return 0;
 }
 
+async function runVerifyReplay(parsed, output) {
+  const required = [
+    ['--replay', parsed.evolveReplay],
+    ['--attestation', parsed.evolveAttestation],
+    ['--trusted-key', parsed.evolveTrustedKey],
+  ];
+  const missing = required.filter(([, value]) => value == null).map(([flag]) => flag);
+  if (missing.length) {
+    console.error(`Error: \`river evolve verify-replay\` requires ${missing.join(', ')}.`);
+    return 1;
+  }
+  if (
+    parsed.evolveSpec != null ||
+    parsed.evolveExpectManifest != null ||
+    parsed.evolveMin != null ||
+    parsed.evolveMonth != null
+  ) {
+    console.error(
+      'Error: --spec / --expect-manifest / --min / --month are not valid for verify-replay.'
+    );
+    return 1;
+  }
+
+  const { readFile } = await import('node:fs/promises');
+  const { ReplayVerificationError, buildReplayVerification, formatReplayVerificationMarkdown } =
+    await import('../../lib/replay-verification.mjs');
+
+  async function readJson(path, label) {
+    let value;
+    try {
+      value = JSON.parse(await readFile(path, 'utf8'));
+    } catch (error) {
+      throw new ReplayVerificationError(`cannot read ${label} ${path}: ${error.message}`);
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new ReplayVerificationError(`${label} ${path} must contain a JSON object.`);
+    }
+    return value;
+  }
+
+  let result;
+  try {
+    const [replay, attestation, trustedPublicKeyPem] = await Promise.all([
+      readJson(parsed.evolveReplay, '--replay'),
+      readJson(parsed.evolveAttestation, '--attestation'),
+      readFile(parsed.evolveTrustedKey, 'utf8').catch((error) => {
+        throw new ReplayVerificationError(
+          `cannot read --trusted-key ${parsed.evolveTrustedKey}: ${error.message}`
+        );
+      }),
+    ]);
+    result = buildReplayVerification({
+      replay,
+      attestation,
+      trustedPublicKeyPem,
+      now: new Date(),
+    });
+  } catch (error) {
+    if (error instanceof ReplayVerificationError) {
+      console.error(`Error: ${error.message}`);
+      return 1;
+    }
+    throw error;
+  }
+
+  if (output === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(formatReplayVerificationMarkdown(result));
+  }
+
+  // Verification is evidence for a later human decision. It never starts a
+  // canary, promotes a candidate, or mutates a repository.
+  return 0;
+}
+
 async function runAggregate(parsed, targetPath, output) {
   // `--spec` / `--expect-manifest` belong to `replay`. Accepting them silently
   // here would look like the aggregate honoured an experiment definition.
-  const misplaced = ['--spec', '--expect-manifest'].filter(
-    (flag) => (flag === '--spec' ? parsed.evolveSpec : parsed.evolveExpectManifest) != null
-  );
+  const misplaced = [
+    ['--spec', parsed.evolveSpec],
+    ['--expect-manifest', parsed.evolveExpectManifest],
+    ['--replay', parsed.evolveReplay],
+    ['--attestation', parsed.evolveAttestation],
+    ['--trusted-key', parsed.evolveTrustedKey],
+  ]
+    .filter(([, value]) => value != null)
+    .map(([flag]) => flag);
   if (misplaced.length) {
-    console.error(
-      `${misplaced.join(', ')} is only valid for \`river evolve replay\`, not for aggregate.`
-    );
+    console.error(`${misplaced.join(', ')} is not valid for \`river evolve aggregate\`.`);
     return 1;
   }
 
@@ -335,6 +432,16 @@ async function runReplay(parsed, output) {
     // These scope the aggregate's inputs; the replay's dataset is fixed by the
     // manifest, so honouring them would silently change the pinned dataset.
     console.error('Error: --min / --month are aggregate options and are not valid for replay.');
+    return 1;
+  }
+  if (
+    parsed.evolveReplay != null ||
+    parsed.evolveAttestation != null ||
+    parsed.evolveTrustedKey != null
+  ) {
+    console.error(
+      'Error: --replay / --attestation / --trusted-key are verify-replay options and are not valid for replay.'
+    );
     return 1;
   }
 

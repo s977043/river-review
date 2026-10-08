@@ -1912,7 +1912,7 @@ describe('river evolve replay (CLI)', () => {
 
     const withSpec = await runCliInProcess(['evolve', 'aggregate', root, '--spec', specPath]);
     assert.equal(withSpec.code, 1);
-    assert.match(withSpec.stderr, /only valid for `river evolve replay`/);
+    assert.match(withSpec.stderr, /--spec is not valid for `river evolve aggregate`/);
   });
 
   test('--output yaml is rejected rather than silently rendered as text', async (t) => {

@@ -50186,11 +50186,17 @@ const SUBCOMMAND_ONLY_COMMANDS = new Set(['runs', 'suppression', 'feedback', 'pr
 const SKILLS_SUBCOMMANDS = new Set(['import', 'export', 'list', 'resolve']);
 
 /**
- * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay`, ADR-006
- * `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
+ * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay` / P3 foundation
+ * `verify-replay`, ADR-006 `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
  * "first non-flag token") keeps `river evolve <path>` working.
  */
-const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'prompt-ab']);
+const EVOLVE_SUBCOMMANDS = new Set([
+  'aggregate',
+  'replay',
+  'verify-replay',
+  'prompt-compare',
+  'prompt-ab',
+]);
 
 /**
  * `promote` subcommands that take an optional positional candidate id.
@@ -50276,10 +50282,14 @@ function consumeEagerCommand(parsed, arg, args) {
     if (args[0] && EVOLVE_SUBCOMMANDS.has(args[0])) {
       parsed.evolveSubcommand = args.shift();
     }
-    // `replay` takes NO positional: its dataset comes from --spec. Letting
-    // the first token become `parsed.target` would make the command accept
-    // and silently ignore it (`river evolve replay ./typo.json --spec x`).
-    if (parsed.evolveSubcommand !== 'replay' && args[0] && !args[0].startsWith('-')) {
+    // `replay` and `verify-replay` take NO positional: their inputs come from
+    // explicit file options. Letting the first token become `parsed.target`
+    // would make the command accept and silently ignore a typo'd positional.
+    if (
+      !['replay', 'verify-replay'].includes(parsed.evolveSubcommand) &&
+      args[0] &&
+      !args[0].startsWith('-')
+    ) {
       const token = args.shift();
       // A mistyped subcommand (`agregate`) must not be swallowed as a path
       // and reported as an empty, successful aggregate. Anything that is
@@ -97433,276 +97443,6 @@ function buildReviewConcernCoverageObservation({ reviewConcernMap, reviewCoverag
   };
 }
 
-;// CONCATENATED MODULE: ./src/lib/review-concern-interaction.mjs
-const review_concern_interaction_SCHEMA_VERSION = '1';
-
-function mapLimitations(reviewConcernMap) {
-  return Array.isArray(reviewConcernMap?.analysis?.limitations)
-    ? [...reviewConcernMap.analysis.limitations]
-    : [];
-}
-
-function review_concern_interaction_buildUnavailableObservation({ reviewConcernMap, reviewConcernCoverage, reason }) {
-  return {
-    schemaVersion: review_concern_interaction_SCHEMA_VERSION,
-    kind: 'review-concern-interaction-observation',
-    status: 'unavailable',
-    source: {
-      concernMapStatus: reviewConcernMap?.analysis?.status ?? null,
-      concernCoverageStatus: reviewConcernCoverage?.status ?? null,
-      limitations: mapLimitations(reviewConcernMap),
-      reason,
-    },
-    interactions: [],
-    summary: null,
-    applied: false,
-  };
-}
-
-function normalizeConcernIds(reviewConcernMap) {
-  const seen = new Set();
-  const concerns = new Map();
-
-  for (const concern of reviewConcernMap.concerns) {
-    const id = typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
-    if (!id || seen.has(id)) return null;
-    seen.add(id);
-    concerns.set(id, concern);
-  }
-
-  return concerns;
-}
-
-function canonicalPair(left, right) {
-  return left <= right ? [left, right] : [right, left];
-}
-
-function buildCoverageIndex(reviewConcernCoverage) {
-  if (
-    !reviewConcernCoverage ||
-    reviewConcernCoverage.kind !== 'review-concern-coverage-observation' ||
-    reviewConcernCoverage.schemaVersion !== '1' ||
-    !['observed', 'partial'].includes(reviewConcernCoverage.status) ||
-    !Array.isArray(reviewConcernCoverage.concerns)
-  ) {
-    return {
-      status: 'unavailable',
-      sourceStatus: reviewConcernCoverage?.status ?? null,
-      byConcern: new Map(),
-    };
-  }
-
-  const byConcern = new Map();
-  for (const concern of reviewConcernCoverage.concerns) {
-    const concernRef =
-      typeof concern?.concernRef === 'string' && concern.concernRef.trim()
-        ? concern.concernRef.trim()
-        : null;
-    if (!concernRef || byConcern.has(concernRef)) {
-      return {
-        status: 'unavailable',
-        sourceStatus: reviewConcernCoverage.status,
-        byConcern: new Map(),
-      };
-    }
-    byConcern.set(concernRef, concern);
-  }
-
-  return {
-    status: reviewConcernCoverage.status === 'partial' ? 'partial' : 'available',
-    sourceStatus: reviewConcernCoverage.status,
-    byConcern,
-  };
-}
-
-function endpointCoverage(coverageIndex, concernRef) {
-  const observed = coverageIndex.byConcern.get(concernRef);
-  const mappingStatus = observed?.mappingStatus;
-  const executionCoverage = observed?.executionCoverage ?? null;
-  const validMappedExecution =
-    mappingStatus === 'mapped' &&
-    ['complete', 'partial', 'not_executed'].includes(executionCoverage);
-  const validUnmappedExecution = mappingStatus === 'unmapped' && executionCoverage === null;
-  const valid =
-    observed &&
-    (validMappedExecution || validUnmappedExecution) &&
-    typeof observed.blindSpotCandidate === 'boolean';
-
-  if (!valid) {
-    return {
-      concernRef,
-      mappingStatus: null,
-      executionCoverage: null,
-      blindSpotCandidate: null,
-    };
-  }
-
-  return {
-    concernRef,
-    mappingStatus,
-    executionCoverage,
-    blindSpotCandidate: observed.blindSpotCandidate,
-  };
-}
-
-function interactionCoverage(coverageIndex, concernRefs) {
-  const concerns = concernRefs.map((concernRef) => endpointCoverage(coverageIndex, concernRef));
-  const hasEveryEndpoint = concerns.every((concern) => concern.mappingStatus !== null);
-
-  if (!hasEveryEndpoint || coverageIndex.status === 'unavailable') {
-    return {
-      status: 'unavailable',
-      concerns,
-    };
-  }
-
-  return {
-    status: coverageIndex.status,
-    concerns,
-  };
-}
-
-/**
- * Build a deterministic, observe-only plan for explicit cross-concern
- * interactions.
- *
- * Only explicit Concern Map interactionRefs are represented. This module does
- * not infer relationships, generate findings, route reviewers, or affect Gate.
- *
- * @returns {object|null}
- */
-function buildReviewConcernInteractionObservation({
-  reviewConcernMap,
-  reviewConcernCoverage,
-} = {}) {
-  if (!reviewConcernMap) return null;
-
-  if (
-    reviewConcernMap.kind !== 'review-concern-map' ||
-    reviewConcernMap.schemaVersion !== '1' ||
-    !Array.isArray(reviewConcernMap.concerns)
-  ) {
-    return review_concern_interaction_buildUnavailableObservation({
-      reviewConcernMap,
-      reviewConcernCoverage,
-      reason: 'invalid-concern-map',
-    });
-  }
-
-  const concernMapStatus = reviewConcernMap.analysis?.status ?? null;
-  if (concernMapStatus === 'failed') {
-    return review_concern_interaction_buildUnavailableObservation({
-      reviewConcernMap,
-      reviewConcernCoverage,
-      reason: 'concern-map-failed',
-    });
-  }
-  if (concernMapStatus !== 'completed' && concernMapStatus !== 'partial') {
-    return review_concern_interaction_buildUnavailableObservation({
-      reviewConcernMap,
-      reviewConcernCoverage,
-      reason: 'invalid-concern-map-status',
-    });
-  }
-
-  const concernsById = normalizeConcernIds(reviewConcernMap);
-  if (!concernsById) {
-    return review_concern_interaction_buildUnavailableObservation({
-      reviewConcernMap,
-      reviewConcernCoverage,
-      reason: 'invalid-concern-id',
-    });
-  }
-
-  const pairMap = new Map();
-  for (const [sourceRef, concern] of concernsById) {
-    const refs = concern?.interactionRefs;
-    if (refs == null) continue;
-    if (!Array.isArray(refs)) {
-      return review_concern_interaction_buildUnavailableObservation({
-        reviewConcernMap,
-        reviewConcernCoverage,
-        reason: 'invalid-interaction-refs',
-      });
-    }
-
-    for (const rawTargetRef of refs) {
-      const targetRef =
-        typeof rawTargetRef === 'string' && rawTargetRef.trim() ? rawTargetRef.trim() : null;
-      if (!targetRef) {
-        return review_concern_interaction_buildUnavailableObservation({
-          reviewConcernMap,
-          reviewConcernCoverage,
-          reason: 'invalid-interaction-ref',
-        });
-      }
-      if (targetRef === sourceRef) {
-        return review_concern_interaction_buildUnavailableObservation({
-          reviewConcernMap,
-          reviewConcernCoverage,
-          reason: 'self-interaction-ref',
-        });
-      }
-      if (!concernsById.has(targetRef)) {
-        return review_concern_interaction_buildUnavailableObservation({
-          reviewConcernMap,
-          reviewConcernCoverage,
-          reason: 'missing-interaction-target',
-        });
-      }
-
-      const pair = canonicalPair(sourceRef, targetRef);
-      pairMap.set(JSON.stringify(pair), pair);
-    }
-  }
-
-  const pairs = [...pairMap.values()].sort((a, b) => {
-    const left = JSON.stringify(a);
-    const right = JSON.stringify(b);
-    if (left < right) return -1;
-    if (left > right) return 1;
-    return 0;
-  });
-  const coverageIndex = buildCoverageIndex(reviewConcernCoverage);
-
-  const interactions = pairs.map((concernRefs, index) => ({
-    interactionRef: `interaction-${index + 1}`,
-    concernRefs,
-    coverage: interactionCoverage(coverageIndex, concernRefs),
-    integrationCheckCandidate: true,
-  }));
-
-  const withAvailableCoverageContext = interactions.filter(
-    (interaction) => interaction.coverage.status === 'available'
-  ).length;
-  const withPartialCoverageContext = interactions.filter(
-    (interaction) => interaction.coverage.status === 'partial'
-  ).length;
-  const withUnavailableCoverageContext = interactions.filter(
-    (interaction) => interaction.coverage.status === 'unavailable'
-  ).length;
-
-  return {
-    schemaVersion: review_concern_interaction_SCHEMA_VERSION,
-    kind: 'review-concern-interaction-observation',
-    status: concernMapStatus === 'partial' ? 'partial' : 'observed',
-    source: {
-      concernMapStatus,
-      concernCoverageStatus: coverageIndex.sourceStatus,
-      limitations: mapLimitations(reviewConcernMap),
-      reason: null,
-    },
-    interactions,
-    summary: {
-      observedInteractions: interactions.length,
-      withAvailableCoverageContext,
-      withPartialCoverageContext,
-      withUnavailableCoverageContext,
-    },
-    applied: false,
-  };
-}
-
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
 var file_classifier = __nccwpck_require__(4673);
 ;// CONCATENATED MODULE: ./src/lib/review-concern-planning-bridge.mjs
@@ -98638,7 +98378,6 @@ var pr_context = __nccwpck_require__(1891);
 
 
 
-
 function normalizePhase(phase) {
   const normalized = (phase || '').toLowerCase();
   if (planner_utils/* PHASES */.ZG.includes(normalized)) return normalized;
@@ -99201,10 +98940,6 @@ async function runLocalReview({
       reviewConcernMap,
       reviewCoverage: null,
     });
-    const reviewConcernInteractions = buildReviewConcernInteractionObservation({
-      reviewConcernMap,
-      reviewConcernCoverage,
-    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -99218,7 +98953,6 @@ async function runLocalReview({
               reviewConcernMap,
               ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
               ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
-              ...(reviewConcernInteractions ? { reviewConcernInteractions } : {}),
             },
           }
         : {}),
@@ -99345,13 +99079,6 @@ async function runLocalReview({
     reviewCoverage,
   });
 
-  // #2568 Phase 5A: observe only explicit cross-concern interaction edges.
-  // This does not generate findings or change reviewer routing, coverage, or Gate.
-  const reviewConcernInteractions = buildReviewConcernInteractionObservation({
-    reviewConcernMap,
-    reviewConcernCoverage,
-  });
-
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
@@ -99446,7 +99173,6 @@ async function runLocalReview({
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
       ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
-      ...(reviewConcernInteractions ? { reviewConcernInteractions } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
@@ -103300,12 +103026,15 @@ async function runPromoteCommand(parsed, targetPath) {
 //
 //   river evolve aggregate [<path>] [--min <n>] [--month YYYY-MM] [--output json|text]
 //   river evolve replay --spec <file> [--expect-manifest <id|key>] [--output json|text]
+//   river evolve verify-replay --replay <file> --attestation <file> --trusted-key <pem> [--output json|text]
 //   river evolve prompt-compare [<path>] [--output json|text]
 //   river evolve prompt-ab [<path>] [--output json|text]
 //
-// All four subcommands only READ. `aggregate` reads `.river/runs/` and
+// All five subcommands only READ. `aggregate` reads `.river/runs/` and
 // `.river/feedback/*.jsonl`; `replay` reads a single experiment spec file that
-// already contains the baseline and candidate runs; `prompt-compare` reads
+// already contains the baseline and candidate runs; `verify-replay` reads
+// an existing replay, detached attestation, and caller-supplied trusted public
+// key; `prompt-compare` reads
 // `.river/runs/` and pairs the legacy prompt against the compiled prompt from
 // the observe-mode records those runs already carry (ADR-006 / #1860) — it
 // never sends the compiled prompt anywhere. `prompt-ab` reads the same store but
@@ -103321,7 +103050,7 @@ async function runPromoteCommand(parsed, targetPath) {
 
 
 
-const SUBCOMMANDS = ['aggregate', 'replay', 'prompt-compare', 'prompt-ab'];
+const SUBCOMMANDS = ['aggregate', 'replay', 'verify-replay', 'prompt-compare', 'prompt-ab'];
 
 /**
  * Warn when the positional path handed to `aggregate` does not exist (#1936).
@@ -103408,26 +103137,37 @@ function missingTargetPathError(targetPath, rawTarget, subcommand) {
  * Reject options that belong to another evolve subcommand (#1860 / #1880).
  *
  * Shared by `prompt-compare` and `prompt-ab`: both read the saved runs under
- * `.river/runs`, so `--spec` / `--expect-manifest` (replay) and `--min` /
- * `--month` (aggregate) would silently look honoured while changing nothing.
+ * `.river/runs`, so replay / verification / aggregate-only options would
+ * silently look honoured while changing nothing unless rejected here.
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} subcommand - the subcommand name to name in the message.
  * @returns {string|null} error message, or null when nothing is misplaced.
  */
 function misplacedStoreOptionError(parsed, subcommand) {
-  const misplaced = ['--spec', '--expect-manifest', '--min', '--month'].filter((flag) => {
+  const misplaced = [
+    '--spec',
+    '--expect-manifest',
+    '--min',
+    '--month',
+    '--replay',
+    '--attestation',
+    '--trusted-key',
+  ].filter((flag) => {
     if (flag === '--spec') return parsed.evolveSpec != null;
     if (flag === '--expect-manifest') return parsed.evolveExpectManifest != null;
     if (flag === '--min') return parsed.evolveMin != null;
-    return parsed.evolveMonth != null;
+    if (flag === '--month') return parsed.evolveMonth != null;
+    if (flag === '--replay') return parsed.evolveReplay != null;
+    if (flag === '--attestation') return parsed.evolveAttestation != null;
+    return parsed.evolveTrustedKey != null;
   });
   if (!misplaced.length) return null;
   return `${misplaced.join(', ')} is not valid for \`river evolve ${subcommand}\` (its dataset is the saved runs under .river/runs).`;
 }
 
 /**
- * Handle the `evolve` command (aggregate | replay | prompt-compare | prompt-ab).
+ * Handle the `evolve` command (aggregate | replay | verify-replay | prompt-compare | prompt-ab).
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} targetPath - resolved repo target path.
@@ -103441,7 +103181,7 @@ async function runEvolveCommand(parsed, targetPath) {
   }
   if (parsed.evolveUnknownOption) {
     console.error(
-      `Unknown option for evolve: ${parsed.evolveUnknownOption}. Use: --min <n> --month YYYY-MM --spec <file> --expect-manifest <id> --output text|json`
+      `Unknown option for evolve: ${parsed.evolveUnknownOption}. Use: --min <n> --month YYYY-MM --spec <file> --expect-manifest <id> --replay <file> --attestation <file> --trusted-key <pem> --output text|json`
     );
     return 1;
   }
@@ -103451,7 +103191,7 @@ async function runEvolveCommand(parsed, targetPath) {
     );
     return 1;
   }
-  // Neither subcommand has a yaml/html renderer; accepting the flag and silently
+  // Evolve subcommands have no yaml/html renderer; accepting the flag and silently
   // emitting text would misreport the format to a downstream consumer.
   const output = parsed.output ?? 'text';
   if (output !== 'text' && output !== 'json') {
@@ -103461,6 +103201,9 @@ async function runEvolveCommand(parsed, targetPath) {
 
   if (subcommand === 'replay') {
     return runReplay(parsed, output);
+  }
+  if (subcommand === 'verify-replay') {
+    return runVerifyReplay(parsed, output);
   }
   if (subcommand === 'prompt-compare') {
     return runPromptCompare(parsed, targetPath, output);
@@ -103571,16 +103314,96 @@ async function runPromptAb(parsed, targetPath, output) {
   return 0;
 }
 
+async function runVerifyReplay(parsed, output) {
+  const required = [
+    ['--replay', parsed.evolveReplay],
+    ['--attestation', parsed.evolveAttestation],
+    ['--trusted-key', parsed.evolveTrustedKey],
+  ];
+  const missing = required.filter(([, value]) => value == null).map(([flag]) => flag);
+  if (missing.length) {
+    console.error(`Error: \`river evolve verify-replay\` requires ${missing.join(', ')}.`);
+    return 1;
+  }
+  if (
+    parsed.evolveSpec != null ||
+    parsed.evolveExpectManifest != null ||
+    parsed.evolveMin != null ||
+    parsed.evolveMonth != null
+  ) {
+    console.error(
+      'Error: --spec / --expect-manifest / --min / --month are not valid for verify-replay.'
+    );
+    return 1;
+  }
+
+  const { readFile } = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 1455, 19));
+  const { ReplayVerificationError, buildReplayVerification, formatReplayVerificationMarkdown } =
+    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(282)]).then(__nccwpck_require__.bind(__nccwpck_require__, 9282));
+
+  async function readJson(path, label) {
+    let value;
+    try {
+      value = JSON.parse(await readFile(path, 'utf8'));
+    } catch (error) {
+      throw new ReplayVerificationError(`cannot read ${label} ${path}: ${error.message}`);
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new ReplayVerificationError(`${label} ${path} must contain a JSON object.`);
+    }
+    return value;
+  }
+
+  let result;
+  try {
+    const [replay, attestation, trustedPublicKeyPem] = await Promise.all([
+      readJson(parsed.evolveReplay, '--replay'),
+      readJson(parsed.evolveAttestation, '--attestation'),
+      readFile(parsed.evolveTrustedKey, 'utf8').catch((error) => {
+        throw new ReplayVerificationError(
+          `cannot read --trusted-key ${parsed.evolveTrustedKey}: ${error.message}`
+        );
+      }),
+    ]);
+    result = buildReplayVerification({
+      replay,
+      attestation,
+      trustedPublicKeyPem,
+      now: new Date(),
+    });
+  } catch (error) {
+    if (error instanceof ReplayVerificationError) {
+      console.error(`Error: ${error.message}`);
+      return 1;
+    }
+    throw error;
+  }
+
+  if (output === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(formatReplayVerificationMarkdown(result));
+  }
+
+  // Verification is evidence for a later human decision. It never starts a
+  // canary, promotes a candidate, or mutates a repository.
+  return 0;
+}
+
 async function runAggregate(parsed, targetPath, output) {
   // `--spec` / `--expect-manifest` belong to `replay`. Accepting them silently
   // here would look like the aggregate honoured an experiment definition.
-  const misplaced = ['--spec', '--expect-manifest'].filter(
-    (flag) => (flag === '--spec' ? parsed.evolveSpec : parsed.evolveExpectManifest) != null
-  );
+  const misplaced = [
+    ['--spec', parsed.evolveSpec],
+    ['--expect-manifest', parsed.evolveExpectManifest],
+    ['--replay', parsed.evolveReplay],
+    ['--attestation', parsed.evolveAttestation],
+    ['--trusted-key', parsed.evolveTrustedKey],
+  ]
+    .filter(([, value]) => value != null)
+    .map(([flag]) => flag);
   if (misplaced.length) {
-    console.error(
-      `${misplaced.join(', ')} is only valid for \`river evolve replay\`, not for aggregate.`
-    );
+    console.error(`${misplaced.join(', ')} is not valid for \`river evolve aggregate\`.`);
     return 1;
   }
 
@@ -103631,6 +103454,16 @@ async function runReplay(parsed, output) {
     // These scope the aggregate's inputs; the replay's dataset is fixed by the
     // manifest, so honouring them would silently change the pinned dataset.
     console.error('Error: --min / --month are aggregate options and are not valid for replay.');
+    return 1;
+  }
+  if (
+    parsed.evolveReplay != null ||
+    parsed.evolveAttestation != null ||
+    parsed.evolveTrustedKey != null
+  ) {
+    console.error(
+      'Error: --replay / --attestation / --trusted-key are verify-replay options and are not valid for replay.'
+    );
     return 1;
   }
 
@@ -103821,6 +103654,11 @@ Commands:
                         criteria. Never re-runs a review and never decides
                         adoption (--spec <file> --expect-manifest <id>;
                         --output json)
+  evolve verify-replay  Verify a detached independent-verifier attestation
+                        against an out-of-band trusted Ed25519 public key
+                        (#1574 P3 foundation). Read-only; never starts a canary
+                        or decides adoption (--replay <file> --attestation <file>
+                        --trusted-key <pem>; --output json)
   evolve prompt-compare <path>
                         Read-only paired comparison of the legacy prompt vs the
                         compiled prompt over saved observe-mode runs
@@ -103909,7 +103747,7 @@ const COMMAND_USAGE = {
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
     'river promote <propose|list|approve|reject|retarget|attach-replay|template|retire|review-effectiveness> [options]',
-  evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
+  evolve: 'river evolve <aggregate|replay|verify-replay|prompt-compare|prompt-ab> [options]',
 };
 
 const GENERIC_USAGE = 'river <command> <path> [options]';
@@ -104327,6 +104165,9 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--month',
   '--spec',
   '--expect-manifest',
+  '--replay',
+  '--attestation',
+  '--trusted-key',
   // shared / review
   '--plan-only',
   '--fail-on',
@@ -104708,6 +104549,36 @@ function parseEvolveOption(arg, args, parsed) {
       return 'break';
     }
     parsed.evolveExpectManifest = value;
+    return 'continue';
+  }
+  if (arg === '--replay') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --replay option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveReplay = value;
+    return 'continue';
+  }
+  if (arg === '--attestation') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --attestation option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveAttestation = value;
+    return 'continue';
+  }
+  if (arg === '--trusted-key') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: --trusted-key option requires a file path.');
+      usageError(parsed);
+      return 'break';
+    }
+    parsed.evolveTrustedKey = value;
     return 'continue';
   }
   // Options that are not evolve's own and not handled by the shared parser
@@ -105198,6 +105069,9 @@ function parseArgs(argv) {
     evolveMonth: null,
     evolveSpec: null,
     evolveExpectManifest: null,
+    evolveReplay: null,
+    evolveAttestation: null,
+    evolveTrustedKey: null,
     evolveExtraArgs: [],
     evolveUnknownOption: null,
     // skills subcommand fields
