@@ -151,7 +151,6 @@ Codex は skills と interface メタデータをリポジトリ同梱の `.code
 
 ## 関連ページ
 
-- [Team OS の知識をレビューに接続する](./team-os-review-context.md)
 - [クイックスタート](./quickstart.md)
 - [GitHub Actions セットアップ](./github-actions.md)
 - [W チェック実践ガイド](./w-check.md)
