@@ -108,6 +108,17 @@ export function buildReviewResolutionFeedbackProposals({
     throw new TypeError('skillIdByFingerprint must be a record');
   }
 
+  // Feedback v1 keys by fingerprint only. The Resolution sidecar can carry
+  // distinct fingerprint algorithms, so hold any collision across items
+  // rather than emitting multiple canonical candidates for one feedback key.
+  const fingerprintCounts = new Map();
+  for (const item of reviewResolution.items) {
+    const fingerprint = item?.findingRef?.fingerprint;
+    if (typeof fingerprint === 'string') {
+      fingerprintCounts.set(fingerprint, (fingerprintCounts.get(fingerprint) ?? 0) + 1);
+    }
+  }
+
   return reviewResolution.items.map((item) => {
     const fingerprint = item?.findingRef?.fingerprint;
     const reviewers = reviewerIdsFor(item);
@@ -131,6 +142,9 @@ export function buildReviewResolutionFeedbackProposals({
     } else if (!FEEDBACK_FINGERPRINT_V1.test(fingerprint ?? '')) {
       status = 'needs_human';
       reasonCode = 'incompatible_feedback_fingerprint';
+    } else if (fingerprintCounts.get(fingerprint) > 1) {
+      status = 'needs_human';
+      reasonCode = 'ambiguous_feedback_fingerprint';
     } else if (!nonEmpty(reviewResolution?.source?.reviewRunId) || reviewers.length === 0) {
       status = 'needs_human';
       reasonCode = 'missing_review_provenance';
