@@ -246,7 +246,10 @@ export function criticValidationIncompleteForGate(observation, env) {
   if (env?.RIVER_GATE_CRITIC_VALIDATION !== '1') return false;
   if (observation?.mode !== 'active') return false;
   const evaluated = observation.evaluated;
-  if (!Number.isInteger(evaluated) || evaluated < 1) return false;
+  // Zero evaluated findings is valid only with an internally consistent
+  // zero-count observation. Missing, negative, or fractional accounting on an
+  // explicitly active stage must not silently become a clean Gate.
+  if (!Number.isInteger(evaluated) || evaluated < 0) return true;
   const humanReview = observation.humanReview;
   if (!Number.isInteger(humanReview) || humanReview < 0 || humanReview > evaluated) return true;
   const statusCounts = observation.byFinalStatus;
