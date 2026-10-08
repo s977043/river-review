@@ -97773,6 +97773,9 @@ function buildExecutionStrategyShadowObservation({
     ? riskAssessment.aggregateAction
     : null;
   const concernCount = observedConcernCount(reviewConcernMap);
+  // A supplied but failed/malformed Concern Map cannot justify a "single"
+  // recommendation from an otherwise low-risk classification.
+  const concernMapUnavailable = reviewConcernMap != null && concernCount === null;
   const concernStatus = ['completed', 'partial', 'failed'].includes(
     reviewConcernMap?.analysis?.status
   )
@@ -97810,7 +97813,12 @@ function buildExecutionStrategyShadowObservation({
   ) {
     recommendedStrategy = 'cascade';
     reasons.push('complexity-or-uncertainty');
-  } else if (fileCount !== null && fileCount > 0 && riskAction === 'comment_only') {
+  } else if (
+    fileCount !== null &&
+    fileCount > 0 &&
+    riskAction === 'comment_only' &&
+    !concernMapUnavailable
+  ) {
     recommendedStrategy = 'single';
     reasons.push('limited-diff-with-comment-only-risk');
   } else {
@@ -97855,6 +97863,7 @@ function buildExecutionStrategyShadowObservation({
       ...(actual === null
         ? ['actual-host-strategy-unobserved']
         : ['host-actual-strategy-not-independently-verified']),
+      ...(concernMapUnavailable ? ['concern-map-unavailable'] : []),
       ...(riskAction === null ? ['risk-not-classified'] : []),
       ...(budgetUsd === null ? ['cost-budget-unknown'] : []),
       ...(latencyBudgetMs === null ? ['latency-budget-unknown'] : []),
