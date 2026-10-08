@@ -167,6 +167,23 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
     }
   });
 
+  test('contradictory human dismissal and verified outcome remain human decisions', () => {
+    for (const humanState of ['disputes', 'human_dismissed']) {
+      const source = item(
+        humanState === 'disputes'
+          ? { authorState: 'disputes' }
+          : { resolutionState: 'human_dismissed' }
+      );
+      const [proposal] = buildReviewResolutionFeedbackProposals({
+        reviewResolution: document([source]),
+        skillIdByFingerprint: { [FP]: 'review/skill' },
+      });
+      assert.equal(proposal.status, 'needs_human');
+      assert.equal(proposal.reasonCode, 'requires_human_classification');
+      assert.equal(proposal.feedbackType, null);
+    }
+  });
+
   test('holds incompatible feedback fingerprints and missing skill mappings', () => {
     const bad = buildReviewResolutionFeedbackProposals({
       reviewResolution: document([item({ fingerprint: 'fp:legacy-id' })]),
