@@ -1,4 +1,5 @@
 import { FEEDBACK_TYPES } from './feedback.mjs';
+import { resolveReviewResolutionFindingRef } from './review-resolution-organizer.mjs';
 import {
   assertReviewResolutionSemantics,
   isSameReviewResolutionRevision,
@@ -12,8 +13,9 @@ import {
  * Skill. The existing feedback builder/writer own those steps. In particular,
  * a resolved PR finding is NOT itself evidence that review feedback is true.
  *
- * The caller must supply skillIdByFingerprint from a trusted mapping. Reviewer
- * roles must never be interpreted as Skill IDs.
+ * The caller must supply sourceFindings from the canonical Review Artifact and
+ * skillIdByFingerprint from a trusted mapping. The adapter does not establish
+ * authenticity of those caller inputs. Reviewer roles are never Skill IDs.
  */
 
 export const FEEDBACK_PROPOSAL_STATUS = Object.freeze({
@@ -64,6 +66,7 @@ function uniqueReviewerIds(item) {
  * @param {{
  *   reviewResolution: object,
  *   currentRevision?: object,
+ *   sourceFindings?: object[],
  *   skillIdByFingerprint?: Record<string, string>
  * }} input
  * @returns {object} Deep-frozen, JSON-serializable proposal observation.
@@ -71,6 +74,7 @@ function uniqueReviewerIds(item) {
 export function buildReviewResolutionFeedbackProposals({
   reviewResolution,
   currentRevision = null,
+  sourceFindings = [],
   skillIdByFingerprint = {},
 } = {}) {
   if (!reviewResolution || typeof reviewResolution !== 'object' || Array.isArray(reviewResolution)) {
@@ -79,6 +83,11 @@ export function buildReviewResolutionFeedbackProposals({
   assertReviewResolutionSemantics(reviewResolution);
   if (reviewResolutionRevisionArtifactKey(reviewResolution.source) === null) {
     throw new ReviewResolutionFeedbackProposalError('source revision is invalid');
+  }
+  if (!Array.isArray(reviewResolution.items) || !Array.isArray(sourceFindings)) {
+    throw new ReviewResolutionFeedbackProposalError(
+      'reviewResolution.items and sourceFindings must be arrays'
+    );
   }
   if (
     !skillIdByFingerprint ||
@@ -148,6 +157,18 @@ export function buildReviewResolutionFeedbackProposals({
     // Neither a v2 fingerprint nor an invalid value can be coerced or rehashed.
     if (finding.fingerprintAlgo !== 'v1' || !/^[0-9a-f]{16}$/.test(fingerprint ?? '')) {
       return needsHuman('unsupported_fingerprint');
+    }
+    const match = resolveReviewResolutionFindingRef(sourceFindings, finding);
+    const originalFinding =
+      match.status === 'matched' && !match.identityMismatch
+        ? sourceFindings[match.findingIndex]
+        : null;
+    if (
+      !originalFinding ||
+      originalFinding.id !== finding.findingId ||
+      originalFinding.fingerprint !== fingerprint
+    ) {
+      return needsHuman('unverified_source_finding');
     }
     if (reviewerIds.length === 0 || !nonEmptyString(reviewResolution.source.reviewRunId)) {
       return needsHuman('missing_reviewer_provenance');
