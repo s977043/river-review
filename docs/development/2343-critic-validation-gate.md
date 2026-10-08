@@ -59,3 +59,20 @@ unchanged confirmed blocking precedence, Gate replay integrity, and the
 #1978 retains the real paired-evaluation / quality-promotion dependency.
 #2267 security-audit adoption still requires provenance, final-record
 verification, and separate evaluation before Gate activation by default.
+
+## Gate replay and trust boundary
+
+This signal is produced from an existing Critic observation at the Gate
+derivation boundary. The repository under review does not gain permission to
+approve itself. A host consuming the Gate must independently replay its
+`inputs` with the pinned Gate contract before acting on the decision.
+
+The `inputsHash` is a regression fingerprint, not authentication. With this
+opt-in disabled, no `criticIncomplete` key is emitted. With it enabled and
+triggered, the echoed input is `true`, so replay preserves the ESCALATE
+outcome. Critical/major finding revisions still retain their existing NO_GO
+precedence.
+
+This is not a replacement for #1978 paired model evaluation. A successful
+deterministic replay only verifies that the existing Gate follows the observed
+Critic-state contract, not that any Critic model is accurate.
