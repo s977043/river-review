@@ -274,17 +274,10 @@ describe('Review Resolution Feedback proposals (#2575 Phase 5 PR1)', () => {
   });
 
   test('verified_resolved with no evidence is an invalid sidecar, not a positive proposal', () => {
-    assert.throws(
-      () =>
-        build(
-          document([
-            item({
-              verification: { ...item().verification, evidenceRefs: [] },
-            }),
-          ])
-        ),
-      ReviewResolutionError
-    );
+    const noEvidence = item({
+      verification: { ...item().verification, evidenceRefs: [] },
+    });
+    assert.throws(() => build(document([noEvidence])), ReviewResolutionError);
   });
 
   test('target freshness is required for accepted proposals', () => {
