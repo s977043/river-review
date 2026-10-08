@@ -64,6 +64,8 @@ const EXECUTED = new Set(['pass', 'fail', 'unrunnable']);
 const gitIn = (cwd, args, options = {}) =>
   execFileSync('git', args, { cwd, maxBuffer: 256 * 1024 * 1024, ...options });
 
+class BaseNotCommitError extends Error {}
+
 /** `--end-of-options` keeps an option-like `base` (e.g. `--all`) from being read as a git option. */
 function resolveCommit(cwd, base) {
   const result = spawnSync(
@@ -71,7 +73,7 @@ function resolveCommit(cwd, base) {
     ['rev-parse', '--verify', '--quiet', '--end-of-options', `${base}^{commit}`],
     { cwd, encoding: 'utf8' }
   );
-  if (result.status !== 0) throw new Error(`--base does not name a commit: ${base}`);
+  if (result.status !== 0) throw new BaseNotCommitError(`--base does not name a commit: ${base}`);
   return result.stdout.trim();
 }
 
@@ -459,8 +461,15 @@ function parseArgs(argv) {
       if (!value || value.startsWith('-')) throw new Error('--base requires a commit');
       options.base = value;
       i += 1;
-    } else if (argv[i] === '--count') options.count = Number(argv[++i]);
-    else throw new Error(`unknown argument: ${argv[i]}`);
+    } else if (argv[i] === '--count') {
+      const value = argv[i + 1];
+      const count = Number(value);
+      if (!value || value.startsWith('-') || !Number.isInteger(count) || count < 1) {
+        throw new Error('--count requires a positive integer');
+      }
+      options.count = count;
+      i += 1;
+    } else throw new Error(`unknown argument: ${argv[i]}`);
   }
   return options;
 }
@@ -474,7 +483,14 @@ if (isDirectRun(import.meta.url)) {
     process.exit(2);
   }
   const { json, ...options } = parsed;
-  const result = measure(options);
+  let result;
+  try {
+    result = measure(options);
+  } catch (err) {
+    if (!(err instanceof BaseNotCommitError)) throw err;
+    process.stderr.write(`measure-after-change-checkpoint: ${err.message}\n`);
+    process.exit(2);
+  }
   if (json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } else {

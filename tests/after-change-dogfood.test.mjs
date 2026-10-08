@@ -157,6 +157,35 @@ test('--base rejects a missing value and an option-like value with a usage error
   }
 });
 
+test('--count rejects a missing, option-like, non-integer, or non-positive value with a usage error', () => {
+  for (const args of [['--count'], ['--count', '--json'], ['--count', 'abc'], ['--count', '0']]) {
+    const child = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
+    assert.equal(child.status, 2, `args: ${args.join(' ')}`);
+    assert.match(child.stderr, /--count requires a positive integer/);
+  }
+});
+
+test('the CLI reports a --base that names no commit as a usage error without a stack trace', () => {
+  const child = spawnSync(process.execPath, [SCRIPT, '--base', 'nosuch', '--count', '1'], {
+    encoding: 'utf8',
+  });
+  assert.equal(child.status, 2);
+  assert.equal(
+    child.stderr,
+    'measure-after-change-checkpoint: --base does not name a commit: nosuch\n'
+  );
+});
+
+test('the CLI still accepts a valid --base with --count 1', () => {
+  const child = spawnSync(
+    process.execPath,
+    [SCRIPT, '--base', DEFAULT_POPULATION.base, '--count', '1'],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+  );
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(JSON.parse(child.stdout).population.commits, 1);
+});
+
 test('measure refuses a base that does not resolve to a commit instead of measuring HEAD', () => {
   for (const base of ['--all', 'no-such-ref']) {
     assert.throws(() => measure({ base, count: 1 }), /--base does not name a commit/);
