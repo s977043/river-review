@@ -1,5 +1,5 @@
 name: 'Setup Node and install deps'
-description: 'Setup Node.js with npm cache and run npm ci'
+description: 'Setup Node.js with npm cache and run npm ci unless node_modules is restored from an exact cache'
 inputs:
   node-version:
     description: 'Node.js version to install'
@@ -13,10 +13,24 @@ runs:
   using: 'composite'
   steps:
     - name: Setup Node.js
+      id: setup-node
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: ${{ inputs.node-version }}
         cache: ${{ inputs.cache }}
+    # Exact-key only (no restore-keys): a partial restore must never skip npm ci.
+    - name: Restore node_modules cache
+      id: node-modules-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
     - name: Install dependencies
+      if: steps.node-modules-cache.outputs.cache-hit != 'true'
       shell: bash
       run: npm ci
+    # npm ci runs the root `prepare` script (husky); keep that on the cache-hit path.
+    - name: Run prepare script (cache hit)
+      if: steps.node-modules-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: npm run prepare --if-present
