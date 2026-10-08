@@ -175,6 +175,7 @@
             "COVERAGE_INCOMPLETE",
             "LLM_NOT_EXECUTED",
             "BLOCKING_FINDINGS",
+            "CRITIC_VALIDATION_INCOMPLETE",
             "MINOR_FINDINGS_OBSERVE",
             "UNDETERMINED",
             "RISK_MAP_OBSERVE",
@@ -527,7 +528,7 @@
         },
         "validation": {
           "type": "object",
-          "description": "Optional Finding Critic verdict (#1978 / #2334). Present only when the Evidence-Grounded Adversarial Review stage ran (opt-in: `review.findingCritic.mode: active` or env RIVER_FINDING_CRITIC=1); absent on every default run. Additive/optional — a consumer that ignores it reads the finding exactly as before. Distinct from `validatedStatus`: the two vocabularies only partially overlap and nothing here is written to `validatedStatus` (src/lib/finding-critic.mjs:80-99). Display and triage metadata — MUST NOT override severity or gate decisions.",
+          "description": "Optional Finding Critic verdict (#1978 / #2334). Present only when the Evidence-Grounded Adversarial Review stage ran (opt-in: `review.findingCritic.mode: active` or env RIVER_FINDING_CRITIC=1); absent on every default run. Additive/optional — a consumer that ignores it reads the finding exactly as before. Distinct from `validatedStatus`: the two vocabularies only partially overlap and nothing here is written to `validatedStatus` (src/lib/finding-critic.mjs:80-99). Display and triage metadata. MUST NOT override finding severity or disposition. The host may opt in to a separate active-Critic incompleteness escalation via RIVER_GATE_CRITIC_VALIDATION=1 (#2343); default Gate behavior remains unchanged.",
           "additionalProperties": false,
           "required": ["protocol", "finalStatus"],
           "properties": {
