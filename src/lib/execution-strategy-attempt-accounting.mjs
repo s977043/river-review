@@ -36,8 +36,7 @@ export function buildHostAttemptAccountingObservation({
   expectedAttemptIds = null,
 } = {}) {
   const actualStrategy =
-    hostExecution?.source === 'host-execution-log' &&
-    STRATEGIES.has(hostExecution.actualStrategy)
+    hostExecution?.source === 'host-execution-log' && STRATEGIES.has(hostExecution.actualStrategy)
       ? hostExecution.actualStrategy
       : null;
   const reasons = [];
@@ -68,14 +67,14 @@ export function buildHostAttemptAccountingObservation({
 
   const legIds = validLegs ? new Set(legs.map((leg) => leg.legId)) : new Set();
   const expectedIds = validExpected ? new Set(expectedAttemptIds) : new Set();
+  const belongsToInventory = (attempt) =>
+    legIds.has(attempt.legId) && expectedIds.has(attempt.attemptId);
   const attemptsAccountedFor =
     validLegs &&
     validExpected &&
     validAttempts &&
     attempts.length === expectedAttemptIds.length &&
-    attempts.every(
-      (attempt) => legIds.has(attempt.legId) && expectedIds.has(attempt.attemptId)
-    );
+    attempts.every(belongsToInventory);
 
   if (!attemptsAccountedFor) reasons.push('transport-attempt-inventory-mismatch');
 
@@ -94,10 +93,7 @@ export function buildHostAttemptAccountingObservation({
         identifier(attempt.pricingSource)
     );
     if (priced) {
-      totalEstimatedCostUsd = attempts.reduce(
-        (sum, attempt) => sum + attempt.estimatedCostUsd,
-        0
-      );
+      totalEstimatedCostUsd = attempts.reduce((sum, attempt) => sum + attempt.estimatedCostUsd, 0);
       if (!Number.isFinite(totalEstimatedCostUsd)) totalEstimatedCostUsd = null;
     }
   }
