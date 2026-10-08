@@ -60,8 +60,8 @@ Goal / task
 
 - `run`: 同一タスクに対する比較のまとまり。比較には task / input artifact / base commit / dataset を固定する。
 - `strategy`: Host が選んだ候補生成パターン。River Review が自動決定した値ではない。
-- `leg`: 実際に実行した **個々の LLM 呼び出しまたは明確に定義された deterministic 処理**。Builder / Reviewer / Verifier などの role は属性であり、複数 leg にまたがり得る。
-- `attempt`: leg 内の retry 試行。retry も費用・時間に含める。計測できない attempt 数を `0` としない。
+- `leg`: retry を内包する **1 つの論理的な LLM 操作、または明確に定義された deterministic 処理**。Builder / Reviewer / Verifier などの role は属性であり、複数 leg にまたがり得る。
+- `attempt`: 1 回の provider transport 要求（初回を含む）。同じ leg の再試行を別の leg として重複計上しない。失敗した attempt も課金され得るため、使用量が取得できなければ `unknown` とする。
 - `observation source`: 値をどの provider response / telemetry / trace / host event から得たか。直接観測・推定・不明を区別する。
 
 | 提案フィールド | 目的 | 現時点の扱い |
@@ -81,7 +81,7 @@ Goal / task
 
 1. **漏れと二重計上を防ぐ**: Host の Builder leg と River Review の Reviewer leg を識別し、すべての provider attempt を一度だけ数える。file×skill 集計を、同じ通話の role 集計と足し合わせない。
 2. **費用と時間を混同しない**: 呼び出し費用は leg / attempt 単位で加算可能だが、並列実行した role の `durationMs` を単純合計しても wall-clock latency にならない。経過時間は run の開始・終了時刻から測る。
-3. **不明値を隠さない**: provider 使用量を収集できない retry や失敗 leg があれば run total は `partial` / `unknown` として提示。完全な比較だと主張しない。
+3. **不明値を隠さない**: provider 使用量を収集できない retry や失敗 leg があれば run total は `partial` / `unknown` として提示。完全な比較だと主張しない。**0 と確定できるのは実際に provider call が発生しなかった証拠がある場合だけ**。
 4. **再現性を固定する**: baseline/candidate の task、入力commit、fixture、model、prompt、skill、context、評価条件を pin する。複数条件が同時変更されたなら個別効果と主張しない。
 5. **独立性を盛らない**: logical execution ID の違いは provenance の一要素にすぎない。context / provider / tool 分離の証拠がない評価は `unknown`。
 6. **安全境界を保持する**: cost / latency が改善しても critical regression、未充足 coverage、Human 承認要件を相殺しない。実行中止と結果判定は別に扱う。
@@ -94,6 +94,13 @@ Phase 3 は **shadow（推奨を記録するだけ）** で actual / recommended
 Phase 4 は [#1574](https://github.com/s977043/river-review/issues/1574) の baseline/candidate paired replay を再利用し、品質・critical-finding recall・false positives・必要観点の coverage・総費用・wall-clock latency・human correction burden を評価します。held-out / verifier trust が不足した評価は採用根拠にしません。**critical regression = 0** は最低条件であり、それだけで GO にはなりません。
 
 Phase 5 で adaptive routing を試す場合も opt-in / bounded budget / fallback / Human-owned irreversible authority を維持します。外部 HydraFusion benchmark の値を River Review の受け入れ閾値には使用しません。
+
+### 失敗時・例外時の扱い
+
+- **未計測**: データが無いから合格とするのではなく、比較不能な metric として観測を拡充する。critical / independence / total cost の必須情報が無ければ active routing へ昇格しない。
+- **実行なし**: dry-run / skipped など、provider call が発生していないことを検証できたときだけその leg の使用量を 0 とする。集計に未観測 leg が含まれる場合は run total を完全値にしない。
+- **ソフトな境界**: reviewer role 数・モデル数・token 削減だけでは independence や品質を証明しない。影響範囲が限定された観測改善は shadow に留め、Human 判断を不要にしない。
+- **再開条件**: frozen baseline / held-out / source attribution / trusted verifier / critical regression なし、必要な metric の完全性を再度確認できた場合に限り、別PRで opt-in の検討を再開する。
 
 ## 未着手の範囲
 
