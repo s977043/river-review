@@ -1,18 +1,19 @@
-# #2564 Phase 3 — Execution Strategy shadow observation
+# #2564 Phase 3—Execution Strategy shadow observation
 
-> Status: observe-only experimental implementation. No production strategy
-> routing, new public JSON Schema, Gate authority, provider budget enforcement,
-> or candidate-generation orchestration is introduced.
+> Status: observe-only experimental implementation.
+> No production strategy routing is introduced.
+> No public JSON Schema or Gate authority is added.
+> Provider budget enforcement and candidate-generation orchestration are not added.
 
 ## Scope and opt-in
 
 The Host owns Single / Cascade / Critique **execution**. River Review owns
 review coordination and evidence. They are different routing decisions.
 
-`RIVER_EXECUTION_STRATEGY_SHADOW=1` enables a debug-only recommendation in
-`runLocalReview` for a planned, non-empty diff. The default is OFF. The
-`executionStrategyShadow` observation never enters reviewer selection,
-Skill selection, plan selection, findings, Review Coverage, or Gate.
+Use `RIVER_EXECUTION_STRATEGY_SHADOW=1` to enable a debug-only recommendation.
+It is emitted by `runLocalReview` for a planned non-empty diff. The default is OFF.
+The `executionStrategyShadow` observation is never used by reviewer or Skill selection.
+It also never changes planning, findings, Review Coverage or Gate.
 
 The pure evaluator lives in `src/lib/execution-strategy-shadow.mjs`.
 `local-runner.mjs` only passes already-planned signals. No extra model or tool
@@ -29,8 +30,8 @@ provisional experiment hypotheses, **not validated quality or cost gates**.
   concerns: recommend `critique`.
 - High uncertainty, at least five changed files, or 8,000 estimated diff
   tokens: recommend `cascade`.
-- A non-empty, limited diff can receive a provisional `single` recommendation
-  only when the existing deterministic risk result explicitly says `comment_only`.
+- A limited non-empty diff can receive a provisional `single` recommendation.
+  The existing deterministic risk result must explicitly be `comment_only`.
   This is **not** a security or risk clearance.
 - No usable evidence: return `no-recommendation`.
 
@@ -58,10 +59,12 @@ remain `null`. Existing dispatcher usage and reviewer duration metrics are
 - Acquire a reliable Host strategy log, leg and provider-attempt inventory, and
   an explicit comparison time window. Unobserved actual strategy is not a
   negative result or a baseline match.
-- Validate the current exploratory heuristics on held-out cases using #1574
-  paired replay. Hold model, prompt, Skill, context, and evaluator fixed.
-- Measure quality, required review coverage, cost, wall-clock latency, and
-  human correction burden; never infer zero cost from missing telemetry.
+- Validate the exploratory heuristics with #1574 paired replay on held-out cases.
+  Pin the model and prompt. Pin the Skill, context and evaluator.
+- Measure quality and required review coverage.
+  Measure cost and wall-clock latency with provenance.
+  Include human correction burden.
+  Never infer zero cost from missing telemetry.
 - Confirm isolated review with independent tool/context evidence, not only
   distinct execution identifiers.
 - Keep `critical regression = 0` as a floor and require Host/Human approval
@@ -69,8 +72,9 @@ remain `null`. Existing dispatcher usage and reviewer duration metrics are
 - Stop or revise if the shadow recommendation threatens an existing Gate or
   deterministic routing contract.
 
-**No-go:** Phase 3 shadow outputs alone cannot authorize Phase 5 adaptive
-routing, additional provider calls, patch changes, merges, or releases.
+**No-go:** Phase 3 shadow outputs cannot authorize Phase 5 adaptive routing.
+They cannot authorize extra provider calls or patch changes.
+They do not authorize merges or releases.
 
 ## References
 
