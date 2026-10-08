@@ -151,6 +151,19 @@ export function buildReviewResolutionFeedbackProposals({
     }
   }
 
+  // Feedback v1 joins by fingerprint, not finding ID. A duplicate that only
+  // exists in the canonical source artifact is still an ambiguous Feedback
+  // identity even if the Resolution sidecar references just one of its findings.
+  const sourceFingerprintCounts = new Map();
+  for (const finding of sourceFindings) {
+    if (typeof finding?.fingerprint === 'string') {
+      sourceFingerprintCounts.set(
+        finding.fingerprint,
+        (sourceFingerprintCounts.get(finding.fingerprint) ?? 0) + 1
+      );
+    }
+  }
+
   return reviewResolution.items.map((item) => {
     const fingerprint = item?.findingRef?.fingerprint;
     const reviewers = reviewerIdsFor(item);
@@ -177,7 +190,10 @@ export function buildReviewResolutionFeedbackProposals({
     ) {
       status = 'needs_human';
       reasonCode = 'incompatible_feedback_fingerprint';
-    } else if (fingerprintCounts.get(fingerprint) > 1) {
+    } else if (
+      fingerprintCounts.get(fingerprint) > 1 ||
+      sourceFingerprintCounts.get(fingerprint) > 1
+    ) {
       status = 'needs_human';
       reasonCode = 'ambiguous_feedback_fingerprint';
     } else if (!nonEmpty(reviewResolution?.source?.reviewRunId) || reviewers.length === 0) {
