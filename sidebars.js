@@ -51,6 +51,7 @@ module.exports = {
             'guides/use-independent-review-synthesis',
             'guides/track-runs-and-regressions',
             'guides/agent-workflow',
+            'guides/team-os-review-context',
             'guides/ai-agent-playbook',
             'guides/figma-to-code',
           ],

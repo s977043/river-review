@@ -434,6 +434,7 @@ export async function generateReview({
   prBody,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
+  signal,
   // #2334: reviewer-orchestrator は findings をマージしたあとに Critic を
   // 1 回だけ走らせる。その経路では per-reviewer の generateReview が同じ段を
   // 二重に走らせないよう true を渡す。既定 false なので、単一レビューアの
@@ -568,6 +569,7 @@ export async function generateReview({
         endpoint: openAIConfig.endpoint,
         temperature: openAIConfig.temperature,
         maxTokens: openAIConfig.maxTokens,
+        signal,
         systemMessage: activeCompiledPrompt
           ? activeCompiledPrompt.systemMessage
           : buildSystemMessage(language),
@@ -622,6 +624,12 @@ export async function generateReview({
         debug.llmError = 'LLM output could not be parsed';
       }
     } catch (err) {
+      // Host cancellation is control flow owned by the orchestration layer.
+      // Do not convert it into an LLM failure and continue into heuristic
+      // fallback, or a timed-out reviewer could still return a fulfilled task.
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : err;
+      }
       debug.llmUsed = false;
       debug.llmError = err.message;
     }
