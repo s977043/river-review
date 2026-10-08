@@ -5,6 +5,7 @@ import { buildLlmDiffView, collectRepoDiff, renderDiffText } from './diff-proces
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
+import { buildReviewConcernCoverageObservation } from './review-concern-coverage.mjs';
 import {
   attachConcernRefsToReviewCoverage,
   buildReviewConcernPlanningObservation,
@@ -613,6 +614,10 @@ export async function runLocalReview({
       signals: context.plan?.reviewSignals,
       selectedSkills: context.plan?.selected ?? [],
     });
+    const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+      reviewConcernMap,
+      reviewCoverage: null,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -625,6 +630,7 @@ export async function runLocalReview({
             reviewDebug: {
               reviewConcernMap,
               ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+              ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
             },
           }
         : {}),
@@ -743,6 +749,14 @@ export async function runLocalReview({
     reviewConcernMap
   );
 
+  // #2541 Phase 4: project existing Review Coverage onto observed Concerns.
+  // This is debug-only evidence. It does not change Review Coverage, Gate,
+  // routing, findings, or the meaning of a completed Review Unit.
+  const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+    reviewConcernMap,
+    reviewCoverage,
+  });
+
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
@@ -836,6 +850,7 @@ export async function runLocalReview({
       ...(review.debug ?? {}),
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+      ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).

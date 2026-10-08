@@ -35625,15 +35625,146 @@ function isApp(file) {
 
 /***/ }),
 
-/***/ 2954:
+/***/ 7635:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
-/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
-/* harmony export */   X4: () => (/* binding */ runFindingCriticStage),
-/* harmony export */   xL: () => (/* binding */ resolveFindingCriticMode)
-/* harmony export */ });
-/* unused harmony exports FINDING_CRITIC_OPT_IN_ENV, FINDING_CRITIC_MODE */
-/* harmony import */ var _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(5863);
+
+// EXPORTS
+__nccwpck_require__.d(__webpack_exports__, {
+  xL: () => (/* binding */ resolveFindingCriticMode),
+  X4: () => (/* binding */ runFindingCriticStage)
+});
+
+// UNUSED EXPORTS: FINDING_CRITIC_MODE, FINDING_CRITIC_OPT_IN_ENV
+
+// EXTERNAL MODULE: ./src/lib/finding-critic.mjs
+var finding_critic = __nccwpck_require__(5863);
+;// CONCATENATED MODULE: ./src/lib/reviewer-independence.mjs
+/**
+ * Reviewer execution independence contract (#2286 / #2267 Phase 5A).
+ *
+ * This module answers one narrow question:
+ *
+ *   Did the finder and verifier run under different logical execution ids?
+ *
+ * It does NOT prove that the actors are different humans/models/providers, that
+ * either run is trustworthy, or that a finding is correct. The ids are logical
+ * provenance only. Cryptographic identity and stronger reviewer provenance stay
+ * with #1760.
+ *
+ * The helper is intentionally not wired into the runtime in Phase 5A. #1978's
+ * finding-critic state machine remains evaluation-gated, so a future Phase 5B
+ * adapter must call this predicate before claiming independent verification.
+ */
+
+/** Logical independence state. This is not a finding lifecycle vocabulary. */
+const REVIEWER_INDEPENDENCE_STATUS = Object.freeze({
+  INDEPENDENT: 'independent',
+  SAME_EXECUTION: 'same-execution',
+  UNKNOWN: 'unknown',
+});
+
+/** Stable reason codes for diagnostics and future audit artifacts. */
+const REVIEWER_INDEPENDENCE_REASON = Object.freeze({
+  DISTINCT_RUN_IDS: 'distinct-run-ids',
+  SAME_RUN_ID: 'same-run-id',
+  FINDER_RUN_ID_MISSING: 'finder-run-id-missing',
+  VERIFIER_RUN_ID_MISSING: 'verifier-run-id-missing',
+  BOTH_RUN_IDS_MISSING: 'both-run-ids-missing',
+});
+
+/**
+ * Normalize an opaque run id without inventing identity from another type.
+ *
+ * Run ids are case-sensitive opaque strings. Only surrounding whitespace is
+ * removed. Numbers, objects, booleans, and whitespace-only strings are treated
+ * as missing instead of being coerced into a plausible identity.
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeRunId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized === '' ? null : normalized;
+}
+
+/**
+ * Evaluate the minimum logical finder/verifier separation required by #2267.
+ *
+ * Fail-safe behavior:
+ * - missing or malformed input is UNKNOWN, never independent
+ * - missing identity is UNKNOWN, never independent
+ * - equal identities are SAME_EXECUTION, never independent
+ * - only two present, distinct ids are INDEPENDENT
+ *
+ * A true `independent` value means only that `finderRunId != verifierRunId`
+ * after normalization. It is not evidence that the validation is correct or
+ * that the ids are tamper-evident.
+ *
+ * @param {unknown} [input]
+ * @returns {{
+ *   status: string,
+ *   independent: boolean,
+ *   finderRunId: string | null,
+ *   verifierRunId: string | null,
+ *   reasonCode: string
+ * }}
+ */
+function evaluateReviewerIndependence(input = {}) {
+  const finder = normalizeRunId(input?.finderRunId);
+  const verifier = normalizeRunId(input?.verifierRunId);
+
+  if (finder === null && verifier === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: null,
+      verifierRunId: null,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.BOTH_RUN_IDS_MISSING,
+    };
+  }
+
+  if (finder === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: null,
+      verifierRunId: verifier,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.FINDER_RUN_ID_MISSING,
+    };
+  }
+
+  if (verifier === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: finder,
+      verifierRunId: null,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.VERIFIER_RUN_ID_MISSING,
+    };
+  }
+
+  if (finder === verifier) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.SAME_EXECUTION,
+      independent: false,
+      finderRunId: finder,
+      verifierRunId: verifier,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.SAME_RUN_ID,
+    };
+  }
+
+  return {
+    status: REVIEWER_INDEPENDENCE_STATUS.INDEPENDENT,
+    independent: true,
+    finderRunId: finder,
+    verifierRunId: verifier,
+    reasonCode: REVIEWER_INDEPENDENCE_REASON.DISTINCT_RUN_IDS,
+  };
+}
+
+;// CONCATENATED MODULE: ./src/lib/finding-critic-stage.mjs
 // Finding Critic の配線段（#2334 / #1978 Phase 3）。
 //
 // 位置づけ:
@@ -35657,6 +35788,7 @@ function isApp(file) {
 //   「clean」にしない。段の内部で例外が出た場合も同じで、finding は retain し
 //   humanReview を立てる。finding を落とすのは result.retainFinding === false
 //   が明示的に返ったときだけである。
+
 
 
 
@@ -35712,13 +35844,52 @@ function resolveFindingCriticMode({ reviewConfig, env = process.env } = {}) {
  */
 function criticUnreachedResult(detail) {
   return {
-    status: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FINAL_STATUS */ .aD.CRITIC_TIMEOUT,
+    status: finding_critic/* FINAL_STATUS */.aD.CRITIC_TIMEOUT,
     terminal: true,
     humanReview: true,
     retainFinding: true,
-    reasons: [_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FAILSAFE_REASON */ .nH.CRITIC_TIMEOUT, detail],
+    reasons: [finding_critic/* FAILSAFE_REASON */.nH.CRITIC_TIMEOUT, detail],
     rounds: 0,
-    askRelevance: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.UNCERTAIN,
+    askRelevance: finding_critic/* ASK_RELEVANCE */.Gl.UNCERTAIN,
+  };
+}
+
+/**
+ * Build the narrow Phase 5A execution-independence observation for one finding.
+ *
+ * The stage does not invent a verifier identity. The caller may supply a logical
+ * verifier execution id that was allocated by the orchestration host before the
+ * Critic call. Each source execution is evaluated independently with the existing
+ * Phase 5A predicate; no majority or aggregate correctness verdict is created.
+ *
+ * Missing or malformed finder provenance produces an explicit unknown check.
+ * Duplicate normalized finder ids collapse to one check.
+ */
+function buildExecutionIndependence(finding, verifierExecutionId) {
+  const sources =
+    Array.isArray(finding?.sourceExecutionIds) && finding.sourceExecutionIds.length > 0
+      ? finding.sourceExecutionIds
+      : [undefined];
+  const checks = [];
+  const seen = new Set();
+
+  for (const finderRunId of sources) {
+    const check = evaluateReviewerIndependence({ finderRunId, verifierRunId: verifierExecutionId });
+    const key = JSON.stringify([
+      check.finderRunId,
+      check.verifierRunId,
+      check.status,
+      check.reasonCode,
+    ]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    checks.push(check);
+  }
+
+  return {
+    findingId: typeof finding?.id === 'string' && finding.id.length > 0 ? finding.id : null,
+    verifierExecutionId: checks[0]?.verifierRunId ?? null,
+    checks,
   };
 }
 
@@ -35726,10 +35897,13 @@ function criticUnreachedResult(detail) {
  * 段の観測値。debug へ載せるのは件数と内訳だけで、プロンプト原文も Critic の
  * 応答本文もここからは出さない。
  *
- * @param {Array<{ result: object }>} entries
+ * Execution independence is provenance-only. It does not alter the Critic result,
+ * finding validation, severity, decision, or Gate.
+ *
+ * @param {Array<{ finding: object, result: object, verifierExecutionId?: string }>} entries
  * @param {number} dropped
  */
-function buildObservation(entries, dropped, language) {
+function buildObservation(entries, dropped, language, includeExecutionIndependence = false) {
   /** @type {Record<string, number>} */
   const byFinalStatus = {};
   let humanReview = 0;
@@ -35739,7 +35913,7 @@ function buildObservation(entries, dropped, language) {
   }
   return {
     mode: FINDING_CRITIC_MODE.ACTIVE,
-    protocol: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .PROTOCOL_ID */ .rK,
+    protocol: finding_critic/* PROTOCOL_ID */.rK,
     // #2339 review (Minor 4): recorded so the two call sites' language
     // resolution is observable in the artifact instead of only in the source.
     // Without this the orchestrator could silently fall back to the default
@@ -35749,6 +35923,13 @@ function buildObservation(entries, dropped, language) {
     dropped,
     humanReview,
     byFinalStatus,
+    ...(includeExecutionIndependence
+      ? {
+          executionIndependence: entries.map(({ finding, verifierExecutionId }) =>
+            buildExecutionIndependence(finding, verifierExecutionId)
+          ),
+        }
+      : {}),
   };
 }
 
@@ -35776,6 +35957,7 @@ function buildObservation(entries, dropped, language) {
  * @param {boolean} [params.llmAvailable] LLM 呼び出しが可能か
  * @param {string} [params.language]
  * @param {object} [params.redactOptions]
+ * @param {string[]} [params.verifierExecutionIds] host-assigned Critic execution ids aligned with findings
  * @param {Function} [params.runImpl]     テスト用の注入点（既定は runFindingCritic）
  * @returns {Promise<{ findings: Array<object>, observation: object }|null>}
  */
@@ -35793,6 +35975,7 @@ async function runFindingCriticStage({
   llmAvailable = true,
   language = 'ja',
   redactOptions = {},
+  verifierExecutionIds = [],
   runImpl,
 } = {}) {
   if (resolveFindingCriticMode({ reviewConfig, env }) === FINDING_CRITIC_MODE.OFF) return null;
@@ -35804,9 +35987,15 @@ async function runFindingCriticStage({
   const impl = runImpl ?? (await __nccwpck_require__.e(/* import() */ 18).then(__nccwpck_require__.bind(__nccwpck_require__, 1018))).runFindingCritic;
   const skill = plan?.selected?.[0] ?? {};
 
-  /** @type {Array<{ finding: object, result: object }>} */
+  /** @type {Array<{ finding: object, result: object, verifierExecutionId?: string }>} */
   const entries = [];
-  for (const finding of list) {
+  for (const [index, finding] of list.entries()) {
+    // The caller allocates the logical verifier execution id. When the LLM is
+    // unavailable no Critic execution actually starts, so the planned id is not
+    // reported as executed provenance.
+    const verifierExecutionId = Array.isArray(verifierExecutionIds)
+      ? verifierExecutionIds[index]
+      : undefined;
     if (!llmAvailable) {
       entries.push({ finding, result: criticUnreachedResult('llm call unavailable') });
       continue;
@@ -35834,15 +36023,17 @@ async function runFindingCriticStage({
         entries.push({
           finding,
           result: criticUnreachedResult('critic runner returned no result'),
+          verifierExecutionId,
         });
       } else {
-        entries.push({ finding, result: run.result });
+        entries.push({ finding, result: run.result, verifierExecutionId });
       }
     } catch (err) {
       // 段そのものが落ちても finding は消さない。retain したまま人へ回す。
       entries.push({
         finding,
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
+        verifierExecutionId,
       });
     }
   }
@@ -35854,10 +36045,18 @@ async function runFindingCriticStage({
       dropped += 1;
       continue;
     }
-    kept.push({ ...finding, validation: (0,_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .buildValidatedFinding */ .us)(finding, result).validation });
+    kept.push({ ...finding, validation: (0,finding_critic/* buildValidatedFinding */.us)(finding, result).validation });
   }
 
-  return { findings: kept, observation: buildObservation(entries, dropped, language) };
+  return {
+    findings: kept,
+    observation: buildObservation(
+      entries,
+      dropped,
+      language,
+      Array.isArray(verifierExecutionIds) && verifierExecutionIds.length > 0
+    ),
+  };
 }
 
 
@@ -40659,7 +40858,37 @@ function computeBackoffMs(
   return Math.min(baseMs * 2 ** Math.max(0, attempt - 1), LLM_MAX_BACKOFF_MS);
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function abortError(signal) {
+  if (signal?.reason instanceof Error) return signal.reason;
+  const err = new Error('The operation was aborted');
+  err.name = 'AbortError';
+  return err;
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw abortError(signal);
+}
+
+function sleep(ms, signal) {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function attemptSignal(timeoutMs, signal) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
 
 /**
  * Call an OpenAI-compatible chat-completion endpoint with timeout and
@@ -40680,6 +40909,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {number} [params.maxTokens]
  * @param {number} [params.timeoutMs]     Per-attempt timeout (default 15000).
  * @param {number} [params.maxAttempts]   Total attempts incl. first (default 3).
+ * @param {AbortSignal} [params.signal]    Host cancellation signal. External aborts are never retried.
  * @param {typeof fetch} [params.fetchImpl] Injectable transport for tests (#1357).
  * @param {number} [params.baseMs]        Retry backoff base ms (injectable for tests).
  * @returns {Promise<string>}
@@ -40694,6 +40924,7 @@ async function callChatCompletion({
   maxTokens,
   timeoutMs = LLM_TIMEOUT_MS,
   maxAttempts = LLM_MAX_ATTEMPTS,
+  signal,
   fetchImpl = globalThis.fetch,
   baseMs = LLM_RETRY_BASE_MS,
 }) {
@@ -40709,10 +40940,11 @@ async function callChatCompletion({
 
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    throwIfAborted(signal);
     try {
       const res = await fetchImpl(endpoint, {
         method: 'POST',
-        signal: AbortSignal.timeout(timeoutMs), // fresh per attempt (one-shot)
+        signal: attemptSignal(timeoutMs, signal), // fresh timeout + host cancellation per attempt
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body,
       });
@@ -40727,7 +40959,8 @@ async function callChatCompletion({
       const detail = await res.text();
       if (attempt < maxAttempts && isRetryableStatus(res.status)) {
         await sleep(
-          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') })
+          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') }),
+          signal
         );
         continue;
       }
@@ -40737,8 +40970,12 @@ async function callChatCompletion({
       // A non-retryable HTTP error (thrown above) has a non-network message, so
       // isRetryableNetworkError returns false and it propagates immediately.
       lastError = err;
+      // A host cancellation is a terminal control signal, not a transient
+      // provider/network failure. Do not spend retry budget after the caller
+      // has explicitly ended the review task.
+      if (signal?.aborted) throw abortError(signal);
       if (attempt < maxAttempts && isRetryableNetworkError(err)) {
-        await sleep(computeBackoffMs(attempt, { baseMs }));
+        await sleep(computeBackoffMs(attempt, { baseMs }), signal);
         continue;
       }
       throw err;
@@ -42653,6 +42890,7 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   $J: () => (/* binding */ isIncompleteCoverageStatus),
 /* harmony export */   Ix: () => (/* binding */ deriveReviewCoverage),
 /* harmony export */   Vb: () => (/* binding */ REVIEW_COVERAGE_STATUSES),
+/* harmony export */   aW: () => (/* binding */ normalizeCoverageStatus),
 /* harmony export */   dD: () => (/* binding */ isIncompleteCoverage),
 /* harmony export */   fA: () => (/* binding */ REVIEW_UNIT_STATUSES),
 /* harmony export */   l1: () => (/* binding */ classifyLlmAttempt),
@@ -42662,7 +42900,6 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped),
 /* harmony export */   t4: () => (/* binding */ normalizeRunCoverageStatus)
 /* harmony export */ });
-/* unused harmony export normalizeCoverageStatus */
 /* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
 
 
@@ -44562,8 +44799,8 @@ async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
   };
 }
 
-// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
-var finding_critic_stage = __nccwpck_require__(2954);
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
+var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/review-engine.mjs
 
 
@@ -44978,6 +45215,7 @@ async function generateReview({
   prBody,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
+  signal,
   // #2334: reviewer-orchestrator は findings をマージしたあとに Critic を
   // 1 回だけ走らせる。その経路では per-reviewer の generateReview が同じ段を
   // 二重に走らせないよう true を渡す。既定 false なので、単一レビューアの
@@ -45112,6 +45350,7 @@ async function generateReview({
         endpoint: openAIConfig.endpoint,
         temperature: openAIConfig.temperature,
         maxTokens: openAIConfig.maxTokens,
+        signal,
         systemMessage: activeCompiledPrompt
           ? activeCompiledPrompt.systemMessage
           : (0,sections/* buildSystemMessage */.HB)(language),
@@ -45166,6 +45405,12 @@ async function generateReview({
         debug.llmError = 'LLM output could not be parsed';
       }
     } catch (err) {
+      // Host cancellation is control flow owned by the orchestration layer.
+      // Do not convert it into an LLM failure and continue into heuristic
+      // fallback, or a timed-out reviewer could still return a fulfilled task.
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : err;
+      }
       debug.llmUsed = false;
       debug.llmError = err.message;
     }
@@ -95328,8 +95573,8 @@ function synthesizeTeamLeadReport({ findings = [], reviewerResults = [] }) {
 
 // EXTERNAL MODULE: ./src/lib/review-coverage.mjs
 var review_coverage = __nccwpck_require__(3054);
-// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
-var finding_critic_stage = __nccwpck_require__(2954);
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
+var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
 
 
@@ -95422,13 +95667,12 @@ const SPLIT_LINE_THRESHOLD = 500;
 // survived is NOT clean: src/lib/run-gate.mjs reads `reviewerResults` and
 // withholds the GO / auto-approve outcome (rule 6b NOT_EXECUTED).
 //
-// Scope note: the timeout ABANDONS a slow role rather than cancelling its LLM
-// call — generateReview() takes no AbortSignal. The HTTP layer already has its
-// own budget (LLM_TIMEOUT_MS + bounded retries in llm-pipeline.mjs), so the
-// abandoned request keeps the process alive for up to that budget after the
-// timeout line is printed. This limit bounds the ORCHESTRATION wait, which is
-// what #1689 asks for; true cancellation needs an AbortSignal through
-// generateReview() and is deliberately out of scope.
+// The timeout is a real execution bound: every role×chunk task owns an
+// AbortController and the timeout aborts it before the orchestration promise is
+// rejected. generateReview() forwards that signal to llm-pipeline.mjs, where it
+// cancels an in-flight fetch and retry backoff. A custom generateReviewImpl used
+// by tests/integrations may ignore the signal; Promise.race still preserves the
+// fail-soft orchestration bound in that case.
 
 /** Env var carrying the per-role timeout in milliseconds (mirrors RIVER_PLANNER_TIMEOUT). */
 const REVIEWER_TIMEOUT_ENV = 'RIVER_REVIEWER_TIMEOUT';
@@ -95542,11 +95786,18 @@ function resolveReviewerProgressEnabled({ quiet = false, progress, config } = {}
  * Both branches of the race attach handlers to `promise`, so a late rejection
  * after a timeout is already handled and never surfaces as an unhandled rejection.
  */
-function withReviewerTimeout(promise, timeoutMs, makeError) {
+function withReviewerTimeout(promise, timeoutMs, makeError, onTimeout) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   let timer = null;
   const timeout = new Promise((_resolve, reject) => {
-    timer = setTimeout(() => reject(makeError()), timeoutMs);
+    timer = setTimeout(() => {
+      const error = makeError();
+      try {
+        onTimeout?.(error);
+      } finally {
+        reject(error);
+      }
+    }, timeoutMs);
   });
   const settled = promise.then(
     (value) => {
@@ -96115,8 +96366,9 @@ async function runReviewerOrchestration({
   progressSink,
   env = process.env,
   generateReviewImpl = review_engine/* generateReview */.G1,
-  // #2481: injectable host-side logical execution id producer. The id is
-  // assigned before the reviewer task starts and is observation-only.
+  // #2481 / #2543: injectable host-side logical execution id producer. IDs are
+  // assigned before reviewer tasks and active Critic tasks start. They are
+  // observation-only provenance, not actor identity or correctness signals.
   createExecutionId = defaultCreateReviewerExecutionId,
 } = {}) {
   const {
@@ -96215,11 +96467,13 @@ async function runReviewerOrchestration({
     const role = REVIEWER_ROLES[roleName];
     const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
     const taskStartedAt = nowMs();
+    const controller = new AbortController();
     logProgress(`Reviewer ${roleName}: start${chunkSuffix(chunkIdx)}`);
     const run = generateReviewImpl({
       ...generateArgs,
       diff: chunkDiff,
       projectRules: roleRules,
+      signal: controller.signal,
     }).then((result) => ({
       ...result,
       reviewerRole: roleName,
@@ -96230,7 +96484,8 @@ async function runReviewerOrchestration({
     return withReviewerTimeout(
       run,
       effectiveTimeoutMs,
-      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs)
+      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs),
+      (timeoutError) => controller.abort(timeoutError)
     ).then(
       (value) => {
         const durationMs = Math.round(nowMs() - taskStartedAt);
@@ -96334,6 +96589,26 @@ async function runReviewerOrchestration({
   // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
   const criticEnabled = (0,finding_critic_stage/* resolveFindingCriticMode */.xL)({ reviewConfig: config?.review, env }) !== 'off';
   const mergedConfig = criticEnabled ? (0,loader/* mergeConfig */.R2)(config_default/* defaultConfig */.s, config ?? {}) : null;
+  // #2543: the orchestration host, not the Critic runner, allocates one logical
+  // verifier execution id per merged finding before the Critic stage starts.
+  // Reuse the same allocator and uniqueness set as reviewer tasks so an injected
+  // allocator cannot make a Critic execution collide with a finder execution.
+  const criticVerifierExecutionIds = !criticEnabled
+    ? []
+    : allFindings.map((finding, index) => {
+        const unitId = `finding-critic:${finding.id ?? index + 1}`;
+        const executionId = normalizeReviewerExecutionId(
+          createExecutionId({ roleName: 'finding-critic', chunkIdx: index, unitId })
+        );
+        if (executionId === null) {
+          throw new Error(`Finding Critic execution id is missing for ${unitId}`);
+        }
+        if (executionIds.has(executionId)) {
+          throw new Error(`Duplicate review execution id: ${executionId}`);
+        }
+        executionIds.add(executionId);
+        return executionId;
+      });
   const criticStage = !criticEnabled
     ? null
     : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
@@ -96352,6 +96627,7 @@ async function runReviewerOrchestration({
         // Critic の出力言語と trace の redaction 設定が食い違う。
         language: mergedConfig.review.language,
         redactOptions: (0,review_engine/* resolveRedactOptions */._Q)(mergedConfig),
+        verifierExecutionIds: criticVerifierExecutionIds,
       });
   const finalFindings = criticStage ? criticStage.findings : allFindings;
   const classified = (0,finding_factory/* classifyFindings */.ZY)(finalFindings, { reviewMode: reviewMode ?? 'medium' });
@@ -96975,6 +97251,188 @@ async function runReviewConcernAnalyzer({
   }
 }
 
+;// CONCATENATED MODULE: ./src/lib/review-concern-coverage.mjs
+
+
+const SCHEMA_VERSION = '1';
+
+function review_concern_coverage_uniqueStrings(values = []) {
+  return [
+    ...new Set(
+      (Array.isArray(values) ? values : []).filter(
+        (value) => typeof value === 'string' && value.length > 0
+      )
+    ),
+  ];
+}
+
+function concernMapLimitations(reviewConcernMap) {
+  return Array.isArray(reviewConcernMap?.analysis?.limitations)
+    ? [...reviewConcernMap.analysis.limitations]
+    : [];
+}
+
+function buildUnavailableObservation({ reviewConcernMap, reviewCoverage, reason }) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: 'unavailable',
+    source: {
+      concernMapStatus: reviewConcernMap?.analysis?.status ?? null,
+      reviewCoverageStatus: (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage),
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason,
+    },
+    concerns: [],
+    summary: null,
+    blindSpotConcernRefs: [],
+    applied: false,
+  };
+}
+
+function validateConcernIds(reviewConcernMap) {
+  const seen = new Set();
+  const ids = [];
+
+  for (const concern of reviewConcernMap.concerns) {
+    const id = typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
+    if (!id || seen.has(id)) return null;
+    seen.add(id);
+    ids.push(id);
+  }
+
+  return ids;
+}
+
+function mappedUnitsForConcern(reviewCoverage, concernRef) {
+  return reviewCoverage.units.filter((unit) =>
+    review_concern_coverage_uniqueStrings(unit?.concernRefs).includes(concernRef)
+  );
+}
+
+/**
+ * Project existing Review Coverage execution evidence onto observed Concerns.
+ *
+ * This is observation-only. It does not mutate Review Coverage, does not infer
+ * semantic completeness, and has no Gate or routing authority.
+ *
+ * @returns {object|null}
+ */
+function buildReviewConcernCoverageObservation({ reviewConcernMap, reviewCoverage } = {}) {
+  if (!reviewConcernMap) return null;
+
+  if (
+    reviewConcernMap.kind !== 'review-concern-map' ||
+    reviewConcernMap.schemaVersion !== '1' ||
+    !Array.isArray(reviewConcernMap.concerns)
+  ) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map',
+    });
+  }
+
+  const concernMapStatus = reviewConcernMap.analysis?.status ?? null;
+  if (concernMapStatus === 'failed') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'concern-map-failed',
+    });
+  }
+  if (concernMapStatus !== 'completed' && concernMapStatus !== 'partial') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map-status',
+    });
+  }
+
+  const concernIds = validateConcernIds(reviewConcernMap);
+  if (!concernIds) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-id',
+    });
+  }
+
+  if (!reviewCoverage || !Array.isArray(reviewCoverage.units)) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-unavailable',
+    });
+  }
+
+  const reviewCoverageStatus = (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage);
+  if (reviewCoverageStatus === 'unknown') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-invalid',
+    });
+  }
+
+  const concerns = concernIds.map((concernRef) => {
+    const mappedUnits = mappedUnitsForConcern(reviewCoverage, concernRef);
+    if (mappedUnits.length === 0) {
+      return {
+        concernRef,
+        mappingStatus: 'unmapped',
+        mappedReviewUnitIds: [],
+        mappedReviewerRoles: [],
+        executionCoverage: null,
+        requiredMappedUnits: 0,
+        completedRequiredMappedUnits: 0,
+        incompleteRequiredUnitIds: [],
+        blindSpotCandidate: true,
+      };
+    }
+
+    const projected = (0,review_coverage/* deriveReviewCoverage */.Ix)(mappedUnits);
+    return {
+      concernRef,
+      mappingStatus: 'mapped',
+      mappedReviewUnitIds: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.id)),
+      mappedReviewerRoles: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.reviewerRole)),
+      executionCoverage: projected.status,
+      requiredMappedUnits: projected.requiredUnits,
+      completedRequiredMappedUnits: projected.completedRequiredUnits,
+      incompleteRequiredUnitIds: [...projected.incompleteRequiredUnitIds],
+      blindSpotCandidate: false,
+    };
+  });
+
+  const blindSpotConcernRefs = concerns
+    .filter((concern) => concern.blindSpotCandidate)
+    .map((concern) => concern.concernRef);
+  const mapped = concerns.filter((concern) => concern.mappingStatus === 'mapped');
+  const incompleteMapped = mapped.filter((concern) => concern.executionCoverage !== 'complete');
+
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: concernMapStatus === 'partial' ? 'partial' : 'observed',
+    source: {
+      concernMapStatus,
+      reviewCoverageStatus,
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason: null,
+    },
+    concerns,
+    summary: {
+      observedConcerns: concerns.length,
+      mappedConcerns: mapped.length,
+      unmappedConcerns: blindSpotConcernRefs.length,
+      incompleteMappedConcerns: incompleteMapped.length,
+    },
+    blindSpotConcernRefs,
+    applied: false,
+  };
+}
+
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
 var file_classifier = __nccwpck_require__(4673);
 ;// CONCATENATED MODULE: ./src/lib/review-concern-planning-bridge.mjs
@@ -96983,7 +97441,7 @@ var file_classifier = __nccwpck_require__(4673);
 
 
 
-const SCHEMA_VERSION = '1';
+const review_concern_planning_bridge_SCHEMA_VERSION = '1';
 
 function review_concern_planning_bridge_normalizePath(value) {
   return typeof value === 'string'
@@ -97039,9 +97497,9 @@ function baselineRoles({ fileTypes, riskAssessment, signals }) {
   return selectRolesAuto(fileTypes, riskAssessment ?? null, signals);
 }
 
-function buildUnavailableObservation(reviewConcernMap, existingRoles, reason) {
+function review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, reason) {
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
     kind: 'review-concern-planning-observation',
     status: 'unavailable',
     source: {
@@ -97079,12 +97537,12 @@ function buildReviewConcernPlanningObservation({
     reviewConcernMap.schemaVersion !== '1' ||
     !Array.isArray(reviewConcernMap.concerns)
   ) {
-    return buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-map');
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-map');
   }
 
   const mapStatus = reviewConcernMap.analysis?.status ?? null;
   if (mapStatus === 'failed') {
-    return buildUnavailableObservation(reviewConcernMap, existingRoles, 'concern-map-failed');
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'concern-map-failed');
   }
 
   const seenConcernIds = new Set();
@@ -97093,7 +97551,7 @@ function buildReviewConcernPlanningObservation({
     const concernRef =
       typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
     if (!concernRef || seenConcernIds.has(concernRef)) {
-      return buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-id');
+      return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-id');
     }
     seenConcernIds.add(concernRef);
 
@@ -97133,7 +97591,7 @@ function buildReviewConcernPlanningObservation({
   const recommendedSet = new Set(recommendedRoles);
 
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
     kind: 'review-concern-planning-observation',
     status: mapStatus === 'partial' ? 'partial' : 'observed',
     source: {
@@ -97909,6 +98367,7 @@ var pr_context = __nccwpck_require__(1891);
 
 
 
+
 function normalizePhase(phase) {
   const normalized = (phase || '').toLowerCase();
   if (planner_utils/* PHASES */.ZG.includes(normalized)) return normalized;
@@ -98467,6 +98926,10 @@ async function runLocalReview({
       signals: context.plan?.reviewSignals,
       selectedSkills: context.plan?.selected ?? [],
     });
+    const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+      reviewConcernMap,
+      reviewCoverage: null,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -98479,6 +98942,7 @@ async function runLocalReview({
             reviewDebug: {
               reviewConcernMap,
               ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+              ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
             },
           }
         : {}),
@@ -98597,6 +99061,14 @@ async function runLocalReview({
     reviewConcernMap
   );
 
+  // #2541 Phase 4: project existing Review Coverage onto observed Concerns.
+  // This is debug-only evidence. It does not change Review Coverage, Gate,
+  // routing, findings, or the meaning of a completed Review Unit.
+  const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+    reviewConcernMap,
+    reviewCoverage,
+  });
+
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
   // 16-hex fingerprint produced by computeFingerprint(). Bypassed when
@@ -98690,6 +99162,7 @@ async function runLocalReview({
       ...(review.debug ?? {}),
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+      ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
