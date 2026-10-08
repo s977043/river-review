@@ -97,7 +97,10 @@ describe('Review Resolution Feedback proposals (#2575 Phase 5 PR1)', () => {
 
   test('risk acceptance creates accepted_risk proposal only with author rationale', () => {
     const risk = item({
-      authorResponse: { state: 'accepts_risk', rationale: '  Approved as a documented exception  ' },
+      authorResponse: {
+        state: 'accepts_risk',
+        rationale: '  Approved as a documented exception  ',
+      },
       resolution: { state: 'risk_accepted', target: null, decisionRefs: [] },
       verification: {
         state: 'not_requested',
@@ -279,7 +282,7 @@ describe('Review Resolution Feedback proposals (#2575 Phase 5 PR1)', () => {
     }
   });
 
-  test('duplicate finding fingerprints fail semantic validation instead of creating repeated proposals', () => {
+  test('duplicate fingerprints fail instead of yielding repeated proposals', () => {
     assert.throws(
       () => build(document([item(), item()])),
       (error) => error instanceof ReviewResolutionError
@@ -287,7 +290,10 @@ describe('Review Resolution Feedback proposals (#2575 Phase 5 PR1)', () => {
   });
 
   test('invalid input and invalid mapping fail loudly without producing feedback', () => {
-    assert.throws(() => buildReviewResolutionFeedbackProposals(), ReviewResolutionFeedbackProposalError);
+    assert.throws(
+      () => buildReviewResolutionFeedbackProposals(),
+      ReviewResolutionFeedbackProposalError
+    );
     assert.throws(
       () => build(document(), { skillIdByFingerprint: [] }),
       ReviewResolutionFeedbackProposalError
