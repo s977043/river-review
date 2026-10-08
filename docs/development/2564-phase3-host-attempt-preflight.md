@@ -1,71 +1,89 @@
 # #2564 Phase 3—Host attempt-accounting preflight
 
-> Status: experimental, read-only helper. Not a telemetry producer or
-> production accounting ledger. Execution Strategy routing remains disabled.
+> Status: experimental, read-only helper.
+> Not a telemetry producer or production accounting ledger.
+> Execution Strategy routing remains disabled.
 
 ## Purpose
 
-`buildHostAttemptAccountingObservation()` in
-`src/lib/execution-strategy-attempt-accounting.mjs` evaluates an **explicit
-Host declaration**. It never fetches data, executes a strategy, calls a
-provider, changes a Gate, writes files, or approves a PR.
+`buildHostAttemptAccountingObservation()` is implemented in
+`src/lib/execution-strategy-attempt-accounting.mjs`.
+It evaluates an explicit Host declaration.
+It does not fetch data or execute a strategy.
+It cannot change a Gate or approve a pull request.
+It has no network or filesystem side effects.
 
-This helper is not wired to the default local-runner path because there is
-currently no trustworthy Host strategy and transport-attempt feed. Fixture tests
-only establish deterministic validation behavior, **not** real Host coverage,
-provider completeness, price accuracy, or strategy improvement.
+This helper is not connected to the default local runner.
+A trustworthy Host strategy log and provider-attempt feed are not connected.
+Tests establish deterministic validation behavior.
+Fixtures do not prove real Host coverage or billing accuracy.
+Fixtures do not demonstrate strategy improvement.
 
 ## Input boundary
 
-The Host supplies an optional `hostExecution` declaration containing:
+The Host may supply `hostExecution`.
+Its strategy is `single`, `cascade` or `critique`.
+The source must be `host-execution-log`.
+The Host may set `inventoryScope: 'complete'` to claim complete inventory.
+This declaration is not independent attestation.
 
-- `source: 'host-execution-log'` and `actualStrategy: single | cascade | critique`
-- `inventoryScope: 'complete'`, meaning the Host **claims** the supplied
-  inventory covers the run. This string is not independent attestation.
-- Optional run-level `startedAtMs`, `endedAtMs`, `clockSource` for wall time
+For wall time, the Host may provide `startedAtMs` and `endedAtMs`.
+A nonempty `clockSource` is also required.
 
-The Host must also supply non-empty, unique `legs[].legId`,
-`expectedAttemptIds[]`, and `attempts[]` with unique
-`attemptId` and known `legId`. A leg is one logical operation; an attempt
-is one provider transport request. A retry is another attempt, **not
-necessarily** another leg. Failed, cancelled, retry, fallback and escalation
-attempts are required in the Host's declared inventory.
+Each logical leg needs a unique `legId`.
+The Host also declares `expectedAttemptIds[]`.
+Each transport attempt requires an `attemptId` and a known `legId`.
+A retry is another transport attempt.
+A retry is not necessarily another logical leg.
+Failed and cancelled attempts must remain visible.
+The Host inventory must also cover fallback and escalation attempts.
 
-Only a matched declaration returns `status: 'host-declared-complete'`.
-The helper cannot assert a provider actually reported every request.
-Missing/duplicate/unexpected IDs or unknown scope return `incomplete`.
-An empty inventory cannot assert zero usage without independent evidence.
+Only an exhaustive declared match yields `host-declared-complete`.
+A missing or duplicate attempt is incomplete.
+Unexpected IDs are also incomplete.
+Empty inventory cannot prove zero usage.
 
-A cost estimate is returned only when the claimed inventory is complete and
-every attempt has a finite nonnegative USD estimate and non-empty pricing
-provenance. Missing price/currency/provenance makes total cost `null`.
-Estimated costs remain `host-estimate-unverified`. A literal `0` is only a
-Host-declared estimate, not proof of free execution.
+## Cost and latency
 
-Wall-clock duration comes only from the Host's run-level clock boundary;
-parallel leg durations are never added. Without a valid Host time boundary,
-`wallClockMs` is `null`.
+Cost is derived only from a matching Host inventory.
+Every attempt must contain a finite nonnegative USD estimate.
+Every attempt also requires a nonempty `pricingSource`.
+Missing pricing evidence yields `totalEstimatedCostUsd: null`.
+The status remains `host-estimate-unverified` even when a total exists.
+A literal cost of zero remains a Host estimate.
+It does not establish free execution.
 
-The output deliberately omits attempt IDs, provider names, prompts, diffs,
-credentials and other raw Host payloads.
+Wall-clock time uses the Host run boundary.
+Parallel leg durations are not added.
+A missing or invalid run boundary produces `wallClockMs: null`.
+
+The output omits transport IDs and provider names.
+It also omits prompts and source diffs.
+Credentials and raw Host records are never copied into the output.
 
 ## Adoption and ownership
 
-Every result has `inventoryTrust: 'unverified'`,
-`eligibleForAdoption: false` and `recommendationApplied: false`.
-Even a `host-declared-complete` result is **not** a trusted verified witness.
+Every output retains `inventoryTrust: 'unverified'`.
+Every output retains `eligibleForAdoption: false`.
+Every output retains `recommendationApplied: false`.
+A Host-declared complete inventory is not trusted provider evidence.
 
-Remaining work for #2564:
+Outstanding work in #2564:
 
-1. A Host producer with correlation IDs, complete leg/transport attempt
-   inventory, provider usage and pinned pricing provenance.
-2. A separately trusted reconciliation step for coverage and pricing.
-3. Paired baseline/candidate replay with held-out cases and independent
-   verifier as specified by #1574, including quality, coverage, costs, latency,
-   and human correction burden.
-4. `critical regression = 0`, explicit budget checks and Human approval
-   before any Host-side adaptive strategy could be considered.
+1. Build a Host producer with a complete leg and attempt inventory.
+   Record strategy identity and source provenance.
+2. Reconcile usage and prices with separately trusted evidence.
+   Check missing attempts and duplicated cost records.
+3. Run the #1574 paired baseline/candidate evaluation.
+   Use held-out tasks and an independently verifiable reviewer.
+   Compare quality and coverage.
+   Include costs and wall time.
+   Measure human correction burden.
+4. Enforce zero critical regressions.
+   Verify budgets and Host execution boundaries.
+   Require Human approval before considering adaptive routing.
 
-This helper does not create new persisted schema or replace the existing
-review/execution artifacts. The existing debug-only exploratory recommender
-remains opt-in via `RIVER_EXECUTION_STRATEGY_SHADOW=1`.
+This helper does not create a new persisted schema.
+It does not replace existing review or execution artifacts.
+The current exploratory recommender is still opt-in.
+Enable it with `RIVER_EXECUTION_STRATEGY_SHADOW=1`.
