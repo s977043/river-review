@@ -1,99 +1,105 @@
 # PlanGate interactive review feedback interoperability (Phase A)
 
 Tracking: River Review #2577. Producer: PlanGate #1521.
-Existing authority owners include #2322 Review Resolution and #2212 Review Coverage.
-They also include #2368 Decision Surface and #2470/#2509 Evidence Architecture.
+Related contracts: #2322 (resolution), #2212 (coverage), #2368 (decision surface).
+Evidence architecture: #2470 and #2509.
 
-## Boundary
+## Trust boundary
 
-PlanGate retains plan.md and C-3 approval as the **authoritative** plan and
-human-approval records. A PlanGate HTML page may collect review-only answers
-to explicit questions. The feedback is **not** a finding or a test result.
-It does not authorize execution and cannot change a River Review gate/verdict.
+PlanGate owns the canonical `plan.md` and the C-3 human approval record.
+The optional HTML collects feedback for explicit review questions.
+Feedback is not approval. It is not a finding or a verification result.
+It cannot authorize execution or change River Review's gate or verdict.
 
-River Review owns review findings, review coverage, resolution status,
-provenance, and decision *evidence*. It must not assign approval from an
-untrusted browser-originated file.
+River Review owns its review findings and coverage.
+It also owns resolution and provenance evidence.
+Untrusted browser-generated JSON never grants approval.
 
-## Proposed additive review-only sidecar
+## Review-only sidecar contract
 
-~~~json
+```json
 {
   "schemaVersion": 1,
   "kind": "plan-review-feedback",
   "taskId": "TASK-0001",
   "source": {
-    "plan": {"path": "plan.md", "sha256": "64-lowercase-hex"},
-    "questions": {"path": "review-questions.json", "sha256": "64-lowercase-hex"}
+    "plan": {
+      "path": "plan.md",
+      "sha256": "64-lowercase-hex"
+    },
+    "questions": {
+      "path": "review-questions.json",
+      "sha256": "64-lowercase-hex"
+    }
   },
   "feedback_only": true,
   "approval_granted": false,
   "generatedAt": "RFC3339-UTC-time",
   "answers": [
-    {"questionId": "Q-1", "status": "answered", "response": "Canary", "note": ""},
-    {"questionId": "Q-2", "status": "deferred", "response": "", "note": "Need more evidence"}
+    {
+      "questionId": "Q-1",
+      "status": "answered",
+      "response": "Canary",
+      "note": ""
+    },
+    {
+      "questionId": "Q-2",
+      "status": "deferred",
+      "response": "",
+      "note": "Need more evidence"
+    }
   ]
 }
-~~~
+```
 
-The source digest covers the raw bytes of each input file. Entries have
-exactly one of three states: answered, deferred, unanswered. Deferred
-requires a non-empty note, answered a non-empty response, and unanswered
-must have no response or note. Unknown or
-missing status is **not** affirmative consent. Multiple exports can exist,
-but there is no implicit newest-wins or promotion to canonical state.
+The source SHA-256 values cover the raw bytes of each file.
+Answer status is `answered`, `deferred`, or `unanswered`.
+An answered item requires a non-empty response.
+A deferred item requires a non-empty note and an empty response.
+An unanswered item has an empty response and an empty note.
+Unknown states do not imply affirmative consent.
+Multiple exports do not imply a canonical newest-wins policy.
 
-## Planned importer, not implemented in Phase A
+## Phase B: optional validator and importer
 
-An opt-in local validator would:
+The importer is not implemented by this Phase A PR.
+The proposed validator must perform the following checks:
 
-1. Require an exact schema version and kind. Validate types and allowed states.
-   Reject duplicate IDs. Restrict local paths to the task directory.
-2. Recompute plan.md and review-questions.json SHA-256 and compare.
-   Changed files -> STALE; missing inputs -> UNKNOWN/BLOCKED.
-3. Ensure question IDs exist in the referenced question input, and do not
-   infer reviewer identity, authenticity, or approval from generatedAt.
-4. Keep feedback as separate provenance, link explicit artifactRefs to
-   existing finding criterionRefs/artifactRefs **without** inventing IDs.
-5. Surface unresolved questions and the evidence link in the existing
-   display projection only. Never synthesize a finding, override gate /
-   decision, hide partial coverage, or mark a resolution verified.
-6. Require a separate human action in the established PlanGate C-3 workflow
-   to accept or reject plan changes.
+1. Check exact schema version and kind.
+2. Validate types and allowed states. Reject duplicate question IDs.
+3. Keep source file paths within the task directory.
+4. Recompute both source hashes from the raw file bytes.
+5. Mark hash mismatches as stale. Treat missing files as blocked.
+6. Require every question ID to exist in the question source.
+7. Never infer reviewer identity from timestamps or text fields.
+8. Keep feedback as separate provenance and link only explicit artifact references.
+9. Require a separate PlanGate C-3 human action to accept changes.
 
-Note: A SHA-256 source digest establishes freshness/integrity matching,
-not reviewer authenticity or cryptographic signing. A browser-controlled
-JSON answer is not an identity assertion or authorization.
+SHA-256 matching provides source integrity and freshness checks.
+It does not establish reviewer identity or signed authorization.
 
-## Relationship to current semantics
+## Phase C: read-only decision surface
 
-- System disposition (blocking/advisory/suppressed) is not human resolution.
-- Author says fixed is not verified resolved; absence in another run is
-  not verification (Review Resolution #2322).
-- A finding's artifactRefs are existing traceability metadata; they are
-  not evidence that the user chose an option.
-- Incomplete/not_executed review coverage may not become GO/CONVERGED due
-  to optional UI results.
-- Existing HTML/JSON/YAML formats, Review Artifact, Decision Surface and
-  gate must remain compatible.
+An optional projection may display unresolved questions with evidence links.
+It must not create findings or override the canonical decision.
+It must never treat disappearance from a later review as verified resolution.
+It must preserve all findings and incomplete review coverage.
+System disposition and author resolution remain separate concepts (#2322).
 
-## Delivery slices / acceptance
+## Delivery status
 
-- [x] Phase A: contract and trust boundaries documented (this file).
-- [ ] Phase B: strict validator + positive/negative fixtures + CLI opt-in.
-- [ ] Phase C: decision-only projection referencing validated sidecar.
-- [ ] Browser/UX integration evaluation; evaluate whether it reduces human
-  decision time without hiding unresolved or low-priority findings.
+- [x] Phase A: review-only contract and trust boundaries.
+- [ ] Phase B: strict validator plus positive and negative test fixtures.
+- [ ] Phase C: display-only projection to the current decision surface.
+- [ ] Real-browser evaluation of keyboard navigation and JSON download.
 
-Phase B/C remain outside this design PR. Their implementation requires
-fresh repository-contract review and automated regression evidence.
+Phase B and Phase C require separate reviewable implementation slices.
+Neither phase changes the current approval or gate authority.
 
-## Security and compatibility review
-
-Check the following properties before an implementation PR can merge:
+## Security and compatibility checklist
 
 - No network dependency or third-party code copying.
 - No secrets included in published artifacts.
-- No additional judge or approval gate.
-- Existing schema and default behavior remain unchanged.
-- Raw findings and their traceability remain available.
+- No extra judge or approval gate.
+- No default behavior or schema change.
+- No suppression of raw findings or traceability.
