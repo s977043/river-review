@@ -29,11 +29,12 @@ provisional experiment hypotheses, **not validated quality or cost gates**.
   concerns: recommend `critique`.
 - High uncertainty, at least five changed files, or 8,000 estimated diff
   tokens: recommend `cascade`.
-- Otherwise, a non-empty planned diff can receive a provisional `single`
-  recommendation. This does **not** establish low risk.
+- A non-empty, limited diff can receive a provisional `single` recommendation
+  only when the existing deterministic risk result explicitly says `comment_only`.
+  This is **not** a security or risk clearance.
 - No usable evidence: return `no-recommendation`.
 
-Missing risk-map evidence remains `null` and adds `risk-not-classified`.
+Missing risk-map evidence remains `null`, adds `risk-not-classified`, and never implies `single`.
 A failed Concern Map never counts as zero observed concerns. No raw file path,
 prompt, diff, or credential is copied into the observation.
 
