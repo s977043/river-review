@@ -30,14 +30,16 @@ untrusted browser-originated file.
   "approval_granted": false,
   "generatedAt": "RFC3339-UTC-time",
   "answers": [
-    {"questionId": "Q-1", "status": "answered", "response": "Canary"},
-    {"questionId": "Q-2", "status": "deferred", "response": "Need more evidence"}
+    {"questionId": "Q-1", "status": "answered", "response": "Canary", "note": ""},
+    {"questionId": "Q-2", "status": "deferred", "response": "", "note": "Need more evidence"}
   ]
 }
 ~~~
 
 The source digest covers the raw bytes of each input file. Entries have
-exactly one of three states: answered, deferred, unanswered. Unknown or
+exactly one of three states: answered, deferred, unanswered. Deferred
+requires a non-empty note, answered a non-empty response, and unanswered
+must have no response or note. Unknown or
 missing status is **not** affirmative consent. Multiple exports can exist,
 but there is no implicit newest-wins or promotion to canonical state.
 
