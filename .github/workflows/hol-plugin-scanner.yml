@@ -8,6 +8,10 @@ on:
 
 permissions: read-all
 
+concurrency:
+  group: hol-plugin-scanner-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   scan:
     runs-on: ubuntu-latest
