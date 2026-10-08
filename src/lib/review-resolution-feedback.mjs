@@ -115,6 +115,15 @@ export function buildReviewResolutionFeedbackProposals({
   skillIdByFingerprint = {},
 } = {}) {
   assertReviewResolutionSemantics(reviewResolution);
+  // The semantic checker intentionally complements (rather than replaces)
+  // the JSON Schema. Guard structural corruption at this read-only boundary
+  // before it can become a seemingly valid feedback candidate.
+  if (
+    !Array.isArray(reviewResolution?.items) ||
+    reviewResolutionRevisionArtifactKey(reviewResolution?.source) === null
+  ) {
+    throw new TypeError('Review Resolution items or source revision are invalid');
+  }
   if (!skillIdByFingerprint || typeof skillIdByFingerprint !== 'object' ||
       Array.isArray(skillIdByFingerprint)) {
     throw new TypeError('skillIdByFingerprint must be a record');
