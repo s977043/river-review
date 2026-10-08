@@ -66,10 +66,11 @@ function document(items) {
 // Fixtures intentionally supply the canonical finding set and current revision
 // through the caller boundary. The builder does not infer either from its sidecar.
 function buildReviewResolutionFeedbackProposals({ reviewResolution, ...options }) {
-  const sourceFindings = reviewResolution?.items?.map((entry) => ({
-    id: entry.findingRef.findingId,
-    fingerprint: entry.findingRef.fingerprint,
-  })) ?? [];
+  const sourceFindings =
+    reviewResolution?.items?.map((entry) => ({
+      id: entry.findingRef.findingId,
+      fingerprint: entry.findingRef.fingerprint,
+    })) ?? [];
   const currentRevision = reviewResolution?.items?.[0]?.resolution?.target ?? null;
   return buildProposalsImpl({ reviewResolution, sourceFindings, currentRevision, ...options });
 }
@@ -290,7 +291,10 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
       [],
       [{ id: 'not-the-finding', fingerprint: FP }],
       [{ id: 'finding-1', fingerprint: OTHER }],
-      [{ id: 'finding-1', fingerprint: FP }, { id: 'finding-1', fingerprint: FP }],
+      [
+        { id: 'finding-1', fingerprint: FP },
+        { id: 'finding-1', fingerprint: FP },
+      ],
     ]) {
       const [proposal] = buildProposalsImpl({
         ...input,
