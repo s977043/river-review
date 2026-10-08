@@ -51,7 +51,7 @@
 
 ### manifest の「フィールド」を追加・変更した場合（ファイル追加だけでなく）
 
-- [ ] 外部 bundle（awesome-codex-plugins fork の `plugin.json`）にも同じフィールドを反映した（CLAUDE.md「Plugin bundle mirror」）
+- [ ] 外部 bundle（awesome-codex-plugins fork の `plugin.json`）にも同じフィールドを反映した（`npm run plugin:sync` の対象外のため手で揃える）
 - [ ] cross-manifest parity 対象フィールド（repository / skills / displayName / composerIcon / homepage↔websiteURL / author.name↔developerName）を両 manifest で一致させた
 - [ ] `package.json` を SSoT とする同期フィールド（keywords / homepage / author / license）は手編集せず `npm run plugin:sync` で反映した
 
@@ -95,6 +95,5 @@ npm run meta:validate         # メタ整合
 - `scripts/validate-plugin-manifest.mjs`（`plugin:validate`）
 - `scripts/validate-plugin-official.mjs`（`plugin:validate:official`・公式 CLI ラッパー）
 - `scripts/sync-plugin-fields.mjs`（`plugin:sync` / `plugin:sync:check`）
-- CLAUDE.md「AI Misoperation Guards」>「Plugin bundle mirror」
 - `release-please-config.json` の `extra-files`（version bump は release-please が両 manifest へ反映）
 - `pages/guides/add-new-skill.md`（skill 本体の作成手順）

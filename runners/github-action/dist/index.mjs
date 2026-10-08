@@ -38086,7 +38086,6 @@ function resolveFlowEntry(entryName, options) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   QS: () => (/* binding */ GATE_REASON_CODES),
 /* harmony export */   RF: () => (/* binding */ deriveGateDecision),
-/* harmony export */   aN: () => (/* binding */ criticValidationIncompleteForGate),
 /* harmony export */   p4: () => (/* binding */ coverageIncompleteForGate),
 /* harmony export */   us: () => (/* binding */ llmNotExecutedForGate)
 /* harmony export */ });
@@ -38138,8 +38137,6 @@ function resolveFlowEntry(entryName, options) {
  *  7b. no unit reached the LLM               → ESCALATE  LLM_NOT_EXECUTED
  *     (#2441, opt-in: every generateReview call skipped the LLM; placed
  *     before every rule that can emit GO / GO_WITH_OBSERVATION)
- *  7c. Critic validation incomplete           → ESCALATE  CRITIC_VALIDATION_INCOMPLETE
- *     (#2343, opt-in: observed active Critic requested Human review)
  *  8. NO_SIGNAL + human-review-recommended
  *     + zero blocking findings               → GO_WITH_OBSERVATION MINOR_FINDINGS_OBSERVE
  *  9. NO_SIGNAL (decision absent/unknown)    → NO_GO     UNDETERMINED
@@ -38187,7 +38184,6 @@ const GATE_REASON_CODES = /** @type {const} */ ([
   'COVERAGE_INCOMPLETE',
   'LLM_NOT_EXECUTED',
   'BLOCKING_FINDINGS',
-  'CRITIC_VALIDATION_INCOMPLETE',
   'MINOR_FINDINGS_OBSERVE',
   'UNDETERMINED',
   'RISK_MAP_OBSERVE',
@@ -38265,7 +38261,6 @@ function computeGateInputsHash(inputs) {
   if (inputs?.coverageIncomplete === true) canonical.coverageIncomplete = true;
   // #2441: same "only when true" scheme; the opt-in is OFF by default.
   if (inputs?.llmNotExecuted === true) canonical.llmNotExecuted = true;
-  if (inputs?.criticIncomplete === true) canonical.criticIncomplete = true;
   return (0,node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash)('sha256').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
 }
 
@@ -38325,36 +38320,6 @@ function isRequireLlmGateEnabled(env) {
  */
 function llmNotExecutedForGate(llmNotExecuted, env) {
   return isRequireLlmGateEnabled(env) && llmNotExecuted === true;
-}
-
-/**
- * #2343: an observed Finding Critic human-review obligation must not become a
- * clean Gate result. This is a separate validation-quality fact, NOT execution
- * coverage. It is opt-in and intentionally does not change default behavior.
- *
- * No observation / default-off Critic is NOT interpreted as Critic failure.
- * A present, active observation that evaluated findings but has missing or
- * contradictory status accounting is incomplete, never a clean result.
- */
-function criticValidationIncompleteForGate(observation, env) {
-  if (env?.RIVER_GATE_CRITIC_VALIDATION !== '1') return false;
-  if (observation?.mode !== 'active') return false;
-  const evaluated = observation.evaluated;
-  if (!Number.isInteger(evaluated) || evaluated < 1) return false;
-  const humanReview = observation.humanReview;
-  if (!Number.isInteger(humanReview) || humanReview < 0 || humanReview > evaluated) return true;
-  const statusCounts = observation.byFinalStatus;
-  if (!statusCounts || typeof statusCounts !== 'object' || Array.isArray(statusCounts)) {
-    return true;
-  }
-  const counts = Object.values(statusCounts);
-  if (
-    !counts.every((count) => Number.isInteger(count) && count >= 0) ||
-    counts.reduce((sum, count) => sum + count, 0) !== evaluated
-  ) {
-    return true;
-  }
-  return humanReview > 0;
 }
 
 /**
@@ -38439,7 +38404,6 @@ function deriveGateDecision({
   deterministicUnrunnable = false,
   coverageIncomplete = false,
   llmNotExecuted = false,
-  criticIncomplete = false,
   config = {},
 } = {}) {
   const configChanged =
@@ -38472,7 +38436,6 @@ function deriveGateDecision({
   if (coverageIncomplete === true) inputs.coverageIncomplete = true;
   // #2441: echoed only when true, for the same reason.
   if (llmNotExecuted === true) inputs.llmNotExecuted = true;
-  if (criticIncomplete === true) inputs.criticIncomplete = true;
 
   const expiresInHours =
     config?.gate?.observation?.expiresInHours ?? DEFAULT_OBSERVATION_EXPIRES_IN_HOURS;
@@ -38550,9 +38513,6 @@ function deriveGateDecision({
     // confirmed NO_GO (dry-run NOT_EXECUTED, BLOCKING_FINDINGS) is never traded
     // for it; before 8-11 so it can never yield GO / GO_WITH_OBSERVATION.
     if (inputs.llmNotExecuted) return ['ESCALATE', 'LLM_NOT_EXECUTED'];
-    // #2343: active Critic findings that still need human validation are not clean.
-    // Preserve confirmed blocking-finding NO_GO and earlier escalation cliffs.
-    if (inputs.criticIncomplete) return ['ESCALATE', 'CRITIC_VALIDATION_INCOMPLETE'];
     // 8-9. NO_SIGNAL: the common "warn" verdict observes; true unknowns stop.
     if (loopSignal === 'NO_SIGNAL') {
       if (decision === 'human-review-recommended' && inputs.blockingFindings === 0) {
@@ -97753,6 +97713,164 @@ function buildReviewConcernInteractionObservation({
   };
 }
 
+;// CONCATENATED MODULE: ./src/lib/execution-strategy-shadow.mjs
+/**
+ * #2564 Phase 3: deterministic, observe-only Host execution-strategy advice.
+ *
+ * This is NOT reviewer/Skill routing, an execution engine, a permission gate,
+ * or a measurement ledger. No candidate-generation model is invoked here.
+ * Only Host/provider evidence can establish the actual strategy or cost.
+ */
+
+const STRATEGIES = new Set(['single', 'cascade', 'critique']);
+const RISK_ACTIONS = new Set(['comment_only', 'escalate', 'require_human_review']);
+
+function nonnegativeNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function observedConcernCount(reviewConcernMap) {
+  if (
+    reviewConcernMap?.kind !== 'review-concern-map' ||
+    reviewConcernMap?.schemaVersion !== '1' ||
+    !Array.isArray(reviewConcernMap.concerns) ||
+    !['completed', 'partial'].includes(reviewConcernMap.analysis?.status)
+  ) {
+    return null;
+  }
+  return reviewConcernMap.concerns.length;
+}
+
+function normalizeStrategy(value) {
+  return typeof value === 'string' && STRATEGIES.has(value) ? value : null;
+}
+
+/**
+ * @param {object} input
+ * @param {string[]} [input.changedFiles] Current planned diff files (not source text).
+ * @param {number|null} [input.tokenEstimate] Existing diff estimate; not billed tokens.
+ * @param {object|null} [input.riskAssessment] Existing deterministic risk map outcome.
+ * @param {object|null} [input.reviewConcernMap] Optional semantic evidence, never a command.
+ * @param {object|null} [input.reviewSignals] Host planning hints (unverified).
+ * @param {object|null} [input.hostBudget] Explicit Host constraints, when supplied.
+ * @param {string|null} [input.actualStrategy] Host-declared only, never inferred.
+ * @param {string|null} [input.actualStrategySource] Must be host-execution-log.
+ * @returns {object} Non-authoritative observation; has no effect on execution.
+ */
+function buildExecutionStrategyShadowObservation({
+  changedFiles,
+  tokenEstimate = null,
+  riskAssessment = null,
+  reviewConcernMap = null,
+  reviewSignals = null,
+  hostBudget = null,
+  actualStrategy = null,
+  actualStrategySource = null,
+} = {}) {
+  const fileCount = Array.isArray(changedFiles) ? changedFiles.length : null;
+  const estimatedDiffTokens = nonnegativeNumber(tokenEstimate);
+  const riskAction = RISK_ACTIONS.has(riskAssessment?.aggregateAction)
+    ? riskAssessment.aggregateAction
+    : null;
+  const concernCount = observedConcernCount(reviewConcernMap);
+  // A supplied but failed/malformed Concern Map cannot justify a "single"
+  // recommendation from an otherwise low-risk classification.
+  const concernMapUnavailable = reviewConcernMap != null && concernCount === null;
+  const concernStatus = ['completed', 'partial', 'failed'].includes(
+    reviewConcernMap?.analysis?.status
+  )
+    ? reviewConcernMap.analysis.status
+    : null;
+  const independentReviewRequired =
+    typeof reviewSignals?.independentReviewRequired === 'boolean'
+      ? reviewSignals.independentReviewRequired
+      : null;
+  const uncertaintyHigh =
+    reviewSignals?.uncertainty === 'high' || concernStatus === 'partial'
+      ? true
+      : reviewSignals?.uncertainty === 'low' && concernStatus !== 'partial'
+        ? false
+        : null;
+  const budgetUsd = nonnegativeNumber(hostBudget?.maxCostUsd);
+  const latencyBudgetMs = nonnegativeNumber(hostBudget?.maxLatencyMs);
+
+  let recommendedStrategy = null;
+  const reasons = [];
+  if (riskAction === 'require_human_review') {
+    reasons.push('human-risk-boundary');
+  } else if (independentReviewRequired === true || riskAction === 'escalate') {
+    recommendedStrategy = 'critique';
+    reasons.push(
+      independentReviewRequired === true ? 'explicit-independence-need' : 'risk-escalation'
+    );
+  } else if (concernCount !== null && concernCount >= 3) {
+    recommendedStrategy = 'critique';
+    reasons.push('multiple-observed-concerns');
+  } else if (
+    uncertaintyHigh === true ||
+    (fileCount !== null && fileCount >= 5) ||
+    (estimatedDiffTokens !== null && estimatedDiffTokens >= 8000)
+  ) {
+    recommendedStrategy = 'cascade';
+    reasons.push('complexity-or-uncertainty');
+  } else if (
+    fileCount !== null &&
+    fileCount > 0 &&
+    riskAction === 'comment_only' &&
+    !concernMapUnavailable
+  ) {
+    recommendedStrategy = 'single';
+    reasons.push('limited-diff-with-comment-only-risk');
+  } else {
+    reasons.push('insufficient-execution-evidence');
+  }
+
+  // Neither a proposed strategy nor known cost/latency constraints proves
+  // the execution graph, provider availability, isolation, or budget feasibility.
+  const actual =
+    actualStrategySource === 'host-execution-log' ? normalizeStrategy(actualStrategy) : null;
+  return {
+    kind: 'execution-strategy-shadow-observation',
+    schemaVersion: '1',
+    heuristicVersion: 'exploratory-v0',
+    status: recommendedStrategy ? 'provisional' : 'no-recommendation',
+    recommendedStrategy,
+    actualStrategy: actual,
+    actualStrategyEvidence:
+      actual === null ? null : { source: 'host-execution-log', trust: 'unverified' },
+    comparison:
+      actual !== null && recommendedStrategy !== null
+        ? { matches: actual === recommendedStrategy, evidenceStatus: 'exploratory' }
+        : null,
+    recommendationApplied: false,
+    humanReviewRequired: riskAction === 'require_human_review',
+    reasons,
+    signals: {
+      changedFileCount: fileCount,
+      estimatedDiffTokens,
+      riskAction,
+      concernCount,
+      concernStatus,
+      independentReviewRequired,
+      uncertaintyHigh,
+      maxCostUsd: budgetUsd,
+      maxLatencyMs: latencyBudgetMs,
+    },
+    limitations: [
+      'host-strategy-routing-not-connected',
+      'provider-attempt-accounting-not-measured',
+      'strategy-budget-and-isolation-not-validated',
+      ...(actual === null
+        ? ['actual-host-strategy-unobserved']
+        : ['host-actual-strategy-not-independently-verified']),
+      ...(concernMapUnavailable ? ['concern-map-unavailable'] : []),
+      ...(riskAction === null ? ['risk-not-classified'] : []),
+      ...(budgetUsd === null ? ['cost-budget-unknown'] : []),
+      ...(latencyBudgetMs === null ? ['latency-budget-unknown'] : []),
+    ],
+  };
+}
+
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
 var file_classifier = __nccwpck_require__(4673);
 ;// CONCATENATED MODULE: ./src/lib/review-concern-planning-bridge.mjs
@@ -98689,6 +98807,7 @@ var pr_context = __nccwpck_require__(1891);
 
 
 
+
 function normalizePhase(phase) {
   const normalized = (phase || '').toLowerCase();
   if (planner_utils/* PHASES */.ZG.includes(normalized)) return normalized;
@@ -99333,6 +99452,19 @@ async function runLocalReview({
     selectedSkills: context.plan?.selected ?? [],
   });
 
+  // #2564 Phase 3: opt-in, non-authoritative Host strategy recommendation.
+  // This observation is not fed into reviewer/Skill routing, Gate, or execution.
+  const executionStrategyShadow =
+    process.env.RIVER_EXECUTION_STRATEGY_SHADOW === '1'
+      ? buildExecutionStrategyShadowObservation({
+          changedFiles: context.changedFiles,
+          tokenEstimate: context.diff?.tokenEstimate ?? null,
+          riskAssessment: context.plan?.riskAssessment ?? null,
+          reviewConcernMap,
+          reviewSignals: context.plan?.reviewSignals ?? null,
+        })
+      : null;
+
   const reviewArgs = {
     diff: context.diff,
     plan: context.plan,
@@ -99497,6 +99629,7 @@ async function runLocalReview({
       ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
       ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       ...(reviewConcernInteractions ? { reviewConcernInteractions } : {}),
+      ...(executionStrategyShadow ? { executionStrategyShadow } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
@@ -99719,11 +99852,6 @@ function deriveRunGate(result) {
       coverageIncomplete: (0,gate_decision/* coverageIncompleteForGate */.p4)(result.reviewCoverage, process.env),
       // #2441 (opt-in RIVER_GATE_REQUIRE_LLM=1, default OFF).
       llmNotExecuted: (0,gate_decision/* llmNotExecutedForGate */.us)(result.llmNotExecuted, process.env),
-      // #2343: independent Critic-validation-quality signal, opt-in only.
-      criticIncomplete: (0,gate_decision/* criticValidationIncompleteForGate */.aN)(
-        result.reviewDebug?.findingCritic ?? result.reviewDebug?.execution?.findingCritic,
-        process.env
-      ),
       config: result.config ?? {},
     });
   } catch {

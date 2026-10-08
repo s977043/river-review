@@ -48,6 +48,10 @@ flowchart LR
   Merge --> Findings[findings[] + summary]
 ```
 
+## Execution Strategy versus Review Team
+
+The Host/Harness may choose a Single / Cascade / Critique execution strategy for producing a candidate. River Review's Review Team instead selects and coordinates review perspectives. These are different routing responsibilities. See [Execution Strategy and Orchestration Guardrails](./execution-strategy.md) for the proposed accounting contract and the five guardrails.
+
 ## Agent layer (generate → review → revise loop)
 
 River Review can be embedded as the **review stage** of a generating agent's **generate → review → revise** loop (Epic #1150).

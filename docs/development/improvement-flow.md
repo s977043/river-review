@@ -146,6 +146,8 @@ for(const e of d.decisions??[]) if(e.reviewAfter==='undecided'||e.reviewAfter<=t
 | (b) ガードごと削除する | `addedAt` 以降に発火実績が無い（該当のミスが再発していない）            | CLAUDE.md の bullet と台帳のエントリを同じ PR で削除する。照合 spec があるため片方だけ消すと CI が落ちる   |
 | (c) 機械化を起票する   | `mechanized` が `full` でなく、`addedAt` 以降に同種のミスが再発している | 機械化の Issue を `/propose-issue` で起票し、`reviewAfter` を延長したうえで `notes` に Issue 番号を書く    |
 
+(a) では台帳のエントリに `proseRetiredAt: 'YYYY-MM-DD'` を付けます。付いたエントリは spec `claude-md-guard-ledger` の照合から外れ、`Meta consistency` は CLAUDE.md の bullet を要求しなくなります。
+
 (a) で散文だけを削除するのは、機械検証が代替になっているためです。読む側の負荷を減らしても、違反はチェックが止めます。(b) の「発火実績が無い」は、振り返り記録（`docs/development/retrospectives/`）と `git log` で確認します。判断できないときは (c) を選び、確認そのものをタスクとして残します。
 
 #### 期限付きの決定（`decisions:`）の判断

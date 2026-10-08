@@ -54,7 +54,7 @@ main ブランチには GitHub branch protection rule により以下の Require
 - `Integration (CLI)`
 - `Blocked label guard`
 
-> **この一覧の正は下記「現在の設定の確認」コマンドの出力です。** ドキュメント側は実設定に追随する必要があり、CI のテストマトリクス leg を追加・削除・改名した際は CLAUDE.md「CI matrix leg ↔ branch-protection required-check sync」ガードに従って branch protection を先に更新し、本一覧も同じ PR で揃えてください。実際に `Unit tests (20.x)` の記載が実設定から外れたまま残っていたことがあります。
+> **この一覧の正は下記「現在の設定の確認」コマンドの出力です。** ドキュメント側は実設定に追随する必要があり、CI のテストマトリクス leg を追加・削除・改名した際は 下記「1.2 必須チェックの context 名を変える場合」に従って branch protection を先に更新し、本一覧も同じ PR で揃えてください。実際に `Unit tests (20.x)` の記載が実設定から外れたまま残っていたことがあります。
 
 `strict: true` で PR が最新 main にリベース済みであることが求められ、`enforce_admins: true` のためメンテナも bypass できません。`allow_force_pushes: false` / `allow_deletions: false` により main への force push / 削除も不可です。
 
@@ -66,6 +66,21 @@ gh api 'repos/:owner/:repo/branches/main/protection' --jq \
 ```
 
 リリース等で一時的に無効化が必要な場合は、`gh api -X PUT .../protection` でルールを編集してから実行し、終了後に再有効化します。設定の技術詳細は Issue #483 を参照。
+
+#### 1.2 必須チェックの context 名を変える場合
+
+CI のテストマトリクス leg（例: `node-version: [20.x, 22.x]`）のジョブ名が必須チェック（例: `Unit tests (20.x)`）に登録されていると、leg とその設定は連動します。
+leg の追加・削除・改名を必須チェックの更新なしにマージすると、旧 context は二度と報告されません。
+以後のすべての PR が `N of N required checks are expected` で恒久的に止まります。
+
+手順は次のとおりです。
+
+1. branch protection を先に更新する。`gh api -X PATCH repos/OWNER/REPO/branches/main/protection/required_status_checks` に新しい `checks` 配列を渡す（外す leg を除き、足す leg を加え、`app_id` は維持する）
+2. `gh api repos/OWNER/REPO/rulesets` も確認し、ruleset が必須チェックを持つなら同じ手順で揃える
+3. そのあとで workflow の変更をマージする
+4. `package.json` の `engines.node` と README のサポート版の記述も揃える
+
+順序を逆にすると、その間のすべての PR が止まります。
 
 #### 2. レビュアーコメントの確認
 

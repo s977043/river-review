@@ -786,7 +786,7 @@ test('the real ledger covers every guard and keeps reviewAfter on or after added
   const entries = parseGuardLedger(await readRepoFile(GUARD_LEDGER_PATH));
   const titles = parseGuardTitles(await readRepoFile('CLAUDE.md'));
   assert.ok(titles && titles.size > 0);
-  assert.equal(entries.length, titles.size);
+  assert.equal(entries.filter((e) => e.proseRetiredAt === undefined).length, titles.size);
   for (const entry of entries) {
     if (entry.addedAt === 'unknown') continue;
     assert.ok(
@@ -799,7 +799,7 @@ test('the real ledger covers every guard and keeps reviewAfter on or after added
 test('claude-md-guard-ledger spec fails when a guard is removed from CLAUDE.md', async () => {
   const spec = realSpec('claude-md-guard-ledger');
   const realText = await readRepoFile('CLAUDE.md');
-  const mutated = realText.replace(/^-\s+\*\*Doc-edit textlint\*\*:.*\r?\n/m, '');
+  const mutated = realText.replace(/^-\s+\*\*Prefix skill invocations\*\*:.*\r?\n/m, '');
   assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
 
   const { errors, checked } = await checkDocEnumerations({
@@ -808,14 +808,60 @@ test('claude-md-guard-ledger spec fails when a guard is removed from CLAUDE.md',
   });
   assert.equal(checked, 1);
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /実体に "Doc-edit textlint" があるが .* に載っていない/);
+  assert.match(errors[0], /実体に "Prefix skill invocations" があるが .* に載っていない/);
+});
+
+test('claude-md-guard-ledger spec passes when a prose-retired guard is absent from CLAUDE.md', async () => {
+  const entries = parseGuardLedger(await readRepoFile(GUARD_LEDGER_PATH));
+  const retired = entries.filter((e) => e.proseRetiredAt !== undefined);
+  assert.ok(retired.length > 0, 'fixture precondition: at least one prose-retired entry');
+  const realText = await readRepoFile('CLAUDE.md');
+  const titles = parseGuardTitles(realText);
+  for (const entry of retired) assert.ok(!titles.has(entry.title), entry.title);
+
+  const { errors, checked } = await checkDocEnumerations({
+    specs: [realSpec('claude-md-guard-ledger')],
+    readDoc: async () => realText,
+  });
+  assert.equal(checked, 1);
+  assert.deepEqual(errors, []);
+});
+
+test('claude-md-guard-ledger spec fails when a prose-retired guard is still in CLAUDE.md', async () => {
+  const realText = await readRepoFile('CLAUDE.md');
+  const mutated = realText.replace(
+    /^(-\s+\*\*Prefix skill invocations\*\*:)/m,
+    '- **Doc-edit textlint**: prose that should have been retired.\n$1'
+  );
+  assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
+
+  const { errors } = await checkDocEnumerations({
+    specs: [realSpec('claude-md-guard-ledger')],
+    readDoc: async () => mutated,
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /"Doc-edit textlint" を挙げているが実体に存在しない/);
+});
+
+test('parseGuardLedger rejects proseRetiredAt on a guard that is not mechanized: full', () => {
+  const text = [
+    'guards:',
+    '  - id: x',
+    '    title: X',
+    '    mechanized: none',
+    '    verifiedBy: []',
+    "    addedAt: '2026-01-01'",
+    "    reviewAfter: '2026-04-01'",
+    "    proseRetiredAt: '2026-02-01'",
+  ].join('\n');
+  assert.throws(() => parseGuardLedger(text), /proseRetiredAt は mechanized: full/);
 });
 
 test('claude-md-guard-ledger spec fails when a phantom guard is added to CLAUDE.md', async () => {
   const spec = realSpec('claude-md-guard-ledger');
   const realText = await readRepoFile('CLAUDE.md');
   const mutated = realText.replace(
-    /^(-\s+\*\*Doc-edit textlint\*\*:)/m,
+    /^(-\s+\*\*Prefix skill invocations\*\*:)/m,
     '- **Phantom guard**: not in the ledger.\n$1'
   );
   assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
@@ -833,17 +879,19 @@ test('claude-md-guard-ledger spec reports both directions when a guard is rename
   const spec = realSpec('claude-md-guard-ledger');
   const realText = await readRepoFile('CLAUDE.md');
   const mutated = realText.replace(
-    /^-\s+\*\*Doc-edit textlint\*\*:/m,
-    '- **Doc-edit textlint (renamed)**:'
+    /^-\s+\*\*Prefix skill invocations\*\*:/m,
+    '- **Prefix skill invocations (renamed)**:'
   );
   assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
 
   const { errors } = await checkDocEnumerations({ specs: [spec], readDoc: async () => mutated });
   assert.equal(errors.length, 2);
-  assert.ok(errors.some((e) => e.includes('"Doc-edit textlint"') && e.includes('載っていない')));
+  assert.ok(
+    errors.some((e) => e.includes('"Prefix skill invocations"') && e.includes('載っていない'))
+  );
   assert.ok(
     errors.some(
-      (e) => e.includes('"Doc-edit textlint (renamed)"') && e.includes('実体に存在しない')
+      (e) => e.includes('"Prefix skill invocations (renamed)"') && e.includes('実体に存在しない')
     )
   );
 });
@@ -934,7 +982,11 @@ test('the real ledger keeps decisions out of the CLAUDE.md guard comparison', as
   assert.ok(decisions.length > 0, '実台帳に decisions エントリがあること');
 
   // decisions を足してもガード側の照合キー（title）は増えない。
-  const guardTitles = new Set(parseGuardLedger(ledgerText).map((entry) => entry.title));
+  const guardTitles = new Set(
+    parseGuardLedger(ledgerText)
+      .filter((entry) => entry.proseRetiredAt === undefined)
+      .map((entry) => entry.title)
+  );
   for (const decision of decisions) {
     assert.equal(guardTitles.has(decision.id), false);
   }
