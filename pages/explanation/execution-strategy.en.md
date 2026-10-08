@@ -25,7 +25,6 @@ A Critique strategy does not, by its label alone, prove independent model, provi
 
 ## Five guardrails: current reality and gaps
 
-
 - **Complete accounting** — Current: opt-in file×skill usage from `src/lib/usage-persistence.mjs`, plus reviewer role duration/timeout. Gap: no guaranteed end-to-end strategy/leg cost, retry, fallback, and token ledger. Host owns full workflow; River Review owns observed review legs.
 - **Bounded execution** — [#2566](https://github.com/s977043/river-review/pull/2566) aborts in-flight reviewer requests and retry backoff on reviewer timeout. Other/custom paths need separate cancellation verification.
 - **Isolated review** — `reviewer-independence.mjs` compares logical execution IDs. Distinct IDs do not prove model, provider, context, or tool isolation; unknown remains unknown ([#2543](https://github.com/s977043/river-review/issues/2543)).
