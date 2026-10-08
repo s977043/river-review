@@ -100,10 +100,15 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
     const matching = buildExecutionStrategyShadowObservation({
       changedFiles: ['src/app.js'],
       actualStrategy: 'single',
+      actualStrategySource: 'host-execution-log',
       hostBudget: { maxCostUsd: 0, maxLatencyMs: 4500 },
     });
     assert.equal(matching.actualStrategy, 'single');
-    assert.deepEqual(matching.comparison, { matches: true });
+    assert.deepEqual(matching.comparison, { matches: true, evidenceStatus: 'exploratory' });
+    assert.deepEqual(matching.actualStrategyEvidence, {
+      source: 'host-execution-log',
+      trust: 'unverified',
+    });
     assert.equal(matching.signals.maxCostUsd, 0);
     assert.equal(matching.signals.maxLatencyMs, 4500);
     assert.equal(matching.recommendationApplied, false);
@@ -111,11 +116,19 @@ describe('#2564 Phase 3 shadow execution strategy', () => {
     const unknown = buildExecutionStrategyShadowObservation({
       changedFiles: ['src/app.js'],
       actualStrategy: 'auto',
+      actualStrategySource: 'host-execution-log',
       hostBudget: { maxCostUsd: -1, maxLatencyMs: Number.NaN },
     });
     assert.equal(unknown.actualStrategy, null);
     assert.equal(unknown.comparison, null);
     assert.equal(unknown.signals.maxCostUsd, null);
     assert.equal(unknown.signals.maxLatencyMs, null);
+
+    const withoutProvenance = buildExecutionStrategyShadowObservation({
+      changedFiles: ['src/app.js'],
+      actualStrategy: 'single',
+    });
+    assert.equal(withoutProvenance.actualStrategy, null);
+    assert.equal(withoutProvenance.comparison, null);
   });
 });
