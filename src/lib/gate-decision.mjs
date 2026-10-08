@@ -250,12 +250,16 @@ export function criticValidationIncompleteForGate(observation, env) {
   const humanReview = observation.humanReview;
   if (!Number.isInteger(humanReview) || humanReview < 0 || humanReview > evaluated) return true;
   const statusCounts = observation.byFinalStatus;
-  if (!statusCounts || typeof statusCounts !== 'object' || Array.isArray(statusCounts)) return true;
+  if (!statusCounts || typeof statusCounts !== 'object' || Array.isArray(statusCounts)) {
+    return true;
+  }
   const counts = Object.values(statusCounts);
   if (
     !counts.every((count) => Number.isInteger(count) && count >= 0) ||
     counts.reduce((sum, count) => sum + count, 0) !== evaluated
-  ) return true;
+  ) {
+    return true;
+  }
   return humanReview > 0;
 }
 
