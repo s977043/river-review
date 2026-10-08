@@ -34,6 +34,7 @@ docs/runbook/community-skill-eval.md
 docs/runbook/bot-pushed-head-kick.md
 docs/runbook/release-smoke.md
 docs/use-cases/github-actions.md
+docs/development/self-review-checklist.md
 
 # Retrospective records are point-in-time accounts of what happened in a past
 # session. Rewriting their prose to satisfy today's style rules would amount to
