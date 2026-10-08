@@ -37,7 +37,8 @@ function normalizeStrategy(value) {
  * @param {object|null} [input.reviewConcernMap] Optional semantic evidence, never a command.
  * @param {object|null} [input.reviewSignals] Host planning hints (unverified).
  * @param {object|null} [input.hostBudget] Explicit Host constraints, when supplied.
- * @param {string|null} [input.actualStrategy] Observed by Host only, never inferred.
+ * @param {string|null} [input.actualStrategy] Host-declared only, never inferred.
+ * @param {string|null} [input.actualStrategySource] Must be host-execution-log.
  * @returns {object} Non-authoritative observation; has no effect on execution.
  */
 export function buildExecutionStrategyShadowObservation({
@@ -48,6 +49,7 @@ export function buildExecutionStrategyShadowObservation({
   reviewSignals = null,
   hostBudget = null,
   actualStrategy = null,
+  actualStrategySource = null,
 } = {}) {
   const fileCount = Array.isArray(changedFiles) ? changedFiles.length : null;
   const estimatedDiffTokens = nonnegativeNumber(tokenEstimate);
@@ -97,16 +99,20 @@ export function buildExecutionStrategyShadowObservation({
 
   // Neither a proposed strategy nor known cost/latency constraints proves
   // the execution graph, provider availability, isolation, or budget feasibility.
-  const actual = normalizeStrategy(actualStrategy);
+  const actual =
+    actualStrategySource === 'host-execution-log' ? normalizeStrategy(actualStrategy) : null;
   return {
     kind: 'execution-strategy-shadow-observation',
     schemaVersion: '1',
+    heuristicVersion: 'exploratory-v0',
     status: recommendedStrategy ? 'provisional' : 'no-recommendation',
     recommendedStrategy,
     actualStrategy: actual,
+    actualStrategyEvidence:
+      actual === null ? null : { source: 'host-execution-log', trust: 'unverified' },
     comparison:
       actual !== null && recommendedStrategy !== null
-        ? { matches: actual === recommendedStrategy }
+        ? { matches: actual === recommendedStrategy, evidenceStatus: 'exploratory' }
         : null,
     recommendationApplied: false,
     humanReviewRequired: riskAction === 'require_human_review',
@@ -126,7 +132,10 @@ export function buildExecutionStrategyShadowObservation({
       'host-strategy-routing-not-connected',
       'provider-attempt-accounting-not-measured',
       'strategy-budget-and-isolation-not-validated',
-      ...(actual === null ? ['actual-host-strategy-unobserved'] : []),
+      ...(actual === null
+        ? ['actual-host-strategy-unobserved']
+        : ['host-actual-strategy-not-independently-verified']),
+      ...(riskAction === null ? ['risk-not-classified'] : []),
       ...(budgetUsd === null ? ['cost-budget-unknown'] : []),
       ...(latencyBudgetMs === null ? ['latency-budget-unknown'] : []),
     ],
