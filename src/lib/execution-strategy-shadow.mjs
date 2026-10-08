@@ -57,7 +57,11 @@ export function buildExecutionStrategyShadowObservation({
     ? riskAssessment.aggregateAction
     : null;
   const concernCount = observedConcernCount(reviewConcernMap);
-  const concernStatus = reviewConcernMap?.analysis?.status ?? null;
+  const concernStatus = ['completed', 'partial', 'failed'].includes(
+    reviewConcernMap?.analysis?.status
+  )
+    ? reviewConcernMap.analysis.status
+    : null;
   const independentReviewRequired =
     typeof reviewSignals?.independentReviewRequired === 'boolean'
       ? reviewSignals.independentReviewRequired
@@ -90,9 +94,9 @@ export function buildExecutionStrategyShadowObservation({
   ) {
     recommendedStrategy = 'cascade';
     reasons.push('complexity-or-uncertainty');
-  } else if (fileCount !== null && fileCount > 0) {
+  } else if (fileCount !== null && fileCount > 0 && riskAction === 'comment_only') {
     recommendedStrategy = 'single';
-    reasons.push('limited-observed-diff');
+    reasons.push('limited-diff-with-comment-only-risk');
   } else {
     reasons.push('insufficient-execution-evidence');
   }
