@@ -1,0 +1,33 @@
+# 開発エージェント向けルールの効果測定台帳（agent harness の SSoT）。
+#
+# 1 エントリ = 1 ルール = 1 つの測定可能な signal。ルールを入れた時刻（introducedAt）の
+# 前後で signal の割合を比べ、効いたか・効かなかったかを判定する。
+# 判定の閾値と窓の取り方は docs/development/agent-harness-design.md の「効果測定」が SSoT で、
+# 実装は scripts/harness/permission-prompt-report.mjs（npm run harness:report）にある。
+#
+# rules: のフィールド:
+#   id           … kebab-case の安定キー
+#   source       … ルール本文の所在（repo 相対パス）
+#   introducedIn … ルールを入れた PR（`#2559` 形式）
+#   introducedAt … その PR のマージ時刻（UTC の ISO 8601。git show -s --format=%cI <sha> を UTC へ直した値）
+#   reviewAfter  … 退役判定の期日（YYYY-MM-DD）。判定の手順は improvement-flow.md の Step 9 に従う
+#   signal       … 減るはずの事象。kind ごとのキーは次のとおり
+#                  permission-prompt-first-command:
+#                    toolName … PermissionRequest ログの tool_name（完全一致）
+#                    command  … tool_input.command の最初のコマンド語（完全一致）
+#   notes        … 測定上の注意・母集団の限界
+
+rules:
+  - id: no-cd-in-bash
+    source: docs/development/worker-discipline-template.md
+    introducedIn: '#2559'
+    introducedAt: '2026-10-06T22:19:55Z'
+    reviewAfter: '2026-11-06'
+    signal:
+      kind: permission-prompt-first-command
+      toolName: Bash
+      command: cd
+    notes: >-
+      ルールは委託ワーカーのプロンプト定型に入っており、オーガナイザー本人のセッションや他リポジトリには届かない。
+      全リポジトリの母集団では効果が薄まるため、判定は --repo で river-review に絞った値を正とする。
+      ログ（~/.claude/state/permission-prompts.jsonl）の記録開始は 2026-10-06T16:32Z で、導入前の窓は約 5.8 時間しかない。
