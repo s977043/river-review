@@ -226,4 +226,51 @@ describe('callChatCompletion — network-error retry path (#1357)', () => {
     );
     assert.equal(calls, 2);
   });
+
+  test('does not retry when the host aborts an in-flight request', async () => {
+    let calls = 0;
+    const controller = new AbortController();
+    const fetchImpl = async (_url, { signal }) => {
+      calls += 1;
+      return new Promise((_resolve, reject) => {
+        const onAbort = () =>
+          reject(signal.reason instanceof Error ? signal.reason : new Error('aborted'));
+        if (signal.aborted) {
+          onAbort();
+          return;
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
+      });
+    };
+
+    const pending = callChatCompletion({
+      ...baseParams,
+      fetchImpl,
+      signal: controller.signal,
+      baseMs: 1,
+    });
+    controller.abort(new Error('host cancelled'));
+
+    await assert.rejects(pending, /host cancelled/);
+    assert.equal(calls, 1, 'host cancellation must not consume retry budget');
+  });
+
+  test('aborts retry backoff without starting another attempt', async () => {
+    let calls = 0;
+    const controller = new AbortController();
+    const fetchImpl = async () => {
+      calls += 1;
+      return errorResponse(429, { retryAfter: '30' });
+    };
+
+    const pending = callChatCompletion({
+      ...baseParams,
+      fetchImpl,
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(new Error('cancelled during backoff')), 5);
+
+    await assert.rejects(pending, /cancelled during backoff/);
+    assert.equal(calls, 1, 'aborted backoff must not start the next fetch');
+  });
 });
