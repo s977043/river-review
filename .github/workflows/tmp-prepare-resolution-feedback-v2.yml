@@ -1,0 +1,42 @@
+name: Temporary prepare Resolution Feedback v2
+
+on:
+  push:
+    branches:
+      - feat/2575-resolution-feedback-proposals-v2
+    paths:
+      - src/lib/review-resolution-feedback.mjs
+      - tests/review-resolution-feedback.test.mjs
+      - .github/workflows/tmp-prepare-resolution-feedback-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/2575-resolution-feedback-proposals-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: >-
+          npx --no-install prettier --write
+          src/lib/review-resolution-feedback.mjs
+          tests/review-resolution-feedback.test.mjs
+      - run: node --test tests/review-resolution-feedback.test.mjs
+      - name: Commit formatter results
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add src/lib/review-resolution-feedback.mjs tests/review-resolution-feedback.test.mjs
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style(resolution): format feedback proposal module"
+          git push origin HEAD:feat/2575-resolution-feedback-proposals-v2
