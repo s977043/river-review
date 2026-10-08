@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.126.0](https://github.com/s977043/river-review/compare/v1.125.1...v1.126.0) (2026-10-05)
+
+
+### Features
+
+* **pr:** resolve /pr target by PR number and handle external tickets ([#2531](https://github.com/s977043/river-review/issues/2531)) ([a984663](https://github.com/s977043/river-review/commit/a98466389e35f929cfc558dc4874a7bc68565963)), closes [#2457](https://github.com/s977043/river-review/issues/2457)
+* **skills:** add open-redirect backslash and radio auto-advance review patterns ([#2530](https://github.com/s977043/river-review/issues/2530)) ([7641a6b](https://github.com/s977043/river-review/commit/7641a6ba55373690851af71614795613cab80265))
+
+## [1.125.1](https://github.com/s977043/river-review/compare/v1.125.0...v1.125.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* **review-differ:** treat llmNotExecuted runs as not_executed in runs diff ([#2467](https://github.com/s977043/river-review/issues/2467)) ([#2518](https://github.com/s977043/river-review/issues/2518)) ([1669907](https://github.com/s977043/river-review/commit/166990786247f7f51705e9a078e8b56ff9e07e2e))
+* **review:** pass prBody to generateReview on the review-plan exec and replay paths ([#2519](https://github.com/s977043/river-review/issues/2519)) ([41f19c2](https://github.com/s977043/river-review/commit/41f19c244a8c46095d197e7156fac3d5e75d1253))
+* **run:** pass llmNotExecuted to the --baseline regression diff ([#2467](https://github.com/s977043/river-review/issues/2467)) ([#2527](https://github.com/s977043/river-review/issues/2527)) ([cebc9f2](https://github.com/s977043/river-review/commit/cebc9f2b3d09bc229000c07546cb8c0269227ae1))
+
 ## [1.125.0](https://github.com/s977043/river-review/compare/v1.124.5...v1.125.0) (2026-10-05)
 
 

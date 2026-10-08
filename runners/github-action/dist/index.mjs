@@ -33552,6 +33552,7 @@ function computeStrictBlock({ findings, selected } = {}) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   KD: () => (/* binding */ collectRepoDiff),
 /* harmony export */   So: () => (/* binding */ extractDiffMeta),
+/* harmony export */   bJ: () => (/* binding */ classifyHunkBodyLine),
 /* harmony export */   pQ: () => (/* binding */ renderDiffText),
 /* harmony export */   rj: () => (/* binding */ parseUnifiedDiff),
 /* harmony export */   vS: () => (/* binding */ isGeneratedArtifactPath),
@@ -33948,6 +33949,21 @@ function classifyCombinedBodyLine(line, parentCount) {
 }
 
 /**
+ * Classify one hunk body line exactly as `parseUnifiedDiff` does when it builds
+ * `addedLines`. Exported so a consumer that needs the TEXT of added lines reads
+ * them through the parse layer's own classifier instead of re-deriving it.
+ *
+ * @param {string} line
+ * @param {number} parentCount the hunk's `parentCount`
+ * @returns {'added' | 'removed' | 'context'}
+ */
+function classifyHunkBodyLine(line, parentCount) {
+  return parentCount > 1
+    ? classifyCombinedBodyLine(line, parentCount)
+    : classifyUnifiedBodyLine(line);
+}
+
+/**
  * Parse a unified diff into a structured representation.
  * Returns files with hunks and added line hints so downstream consumers
  * can locate where to attach review comments.
@@ -34075,10 +34091,7 @@ function parseUnifiedDiff(diffText) {
     // instead of a single prefix character, so the one-character test above
     // would read the second parent's column as file content. The column rules
     // are counted instead — see `classifyCombinedBodyLine` (#2294).
-    const classified =
-      currentHunk.parentCount > 1
-        ? classifyCombinedBodyLine(line, currentHunk.parentCount)
-        : classifyUnifiedBodyLine(line);
+    const classified = classifyHunkBodyLine(line, currentHunk.parentCount);
     if (classified === 'added') {
       currentFile.addedLines.push(newLineNumber);
       currentHunk.addedLines.push(newLineNumber);
@@ -35612,15 +35625,146 @@ function isApp(file) {
 
 /***/ }),
 
-/***/ 2954:
+/***/ 7635:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
-/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
-/* harmony export */   X4: () => (/* binding */ runFindingCriticStage),
-/* harmony export */   xL: () => (/* binding */ resolveFindingCriticMode)
-/* harmony export */ });
-/* unused harmony exports FINDING_CRITIC_OPT_IN_ENV, FINDING_CRITIC_MODE */
-/* harmony import */ var _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(5863);
+
+// EXPORTS
+__nccwpck_require__.d(__webpack_exports__, {
+  xL: () => (/* binding */ resolveFindingCriticMode),
+  X4: () => (/* binding */ runFindingCriticStage)
+});
+
+// UNUSED EXPORTS: FINDING_CRITIC_MODE, FINDING_CRITIC_OPT_IN_ENV
+
+// EXTERNAL MODULE: ./src/lib/finding-critic.mjs
+var finding_critic = __nccwpck_require__(5863);
+;// CONCATENATED MODULE: ./src/lib/reviewer-independence.mjs
+/**
+ * Reviewer execution independence contract (#2286 / #2267 Phase 5A).
+ *
+ * This module answers one narrow question:
+ *
+ *   Did the finder and verifier run under different logical execution ids?
+ *
+ * It does NOT prove that the actors are different humans/models/providers, that
+ * either run is trustworthy, or that a finding is correct. The ids are logical
+ * provenance only. Cryptographic identity and stronger reviewer provenance stay
+ * with #1760.
+ *
+ * The helper is intentionally not wired into the runtime in Phase 5A. #1978's
+ * finding-critic state machine remains evaluation-gated, so a future Phase 5B
+ * adapter must call this predicate before claiming independent verification.
+ */
+
+/** Logical independence state. This is not a finding lifecycle vocabulary. */
+const REVIEWER_INDEPENDENCE_STATUS = Object.freeze({
+  INDEPENDENT: 'independent',
+  SAME_EXECUTION: 'same-execution',
+  UNKNOWN: 'unknown',
+});
+
+/** Stable reason codes for diagnostics and future audit artifacts. */
+const REVIEWER_INDEPENDENCE_REASON = Object.freeze({
+  DISTINCT_RUN_IDS: 'distinct-run-ids',
+  SAME_RUN_ID: 'same-run-id',
+  FINDER_RUN_ID_MISSING: 'finder-run-id-missing',
+  VERIFIER_RUN_ID_MISSING: 'verifier-run-id-missing',
+  BOTH_RUN_IDS_MISSING: 'both-run-ids-missing',
+});
+
+/**
+ * Normalize an opaque run id without inventing identity from another type.
+ *
+ * Run ids are case-sensitive opaque strings. Only surrounding whitespace is
+ * removed. Numbers, objects, booleans, and whitespace-only strings are treated
+ * as missing instead of being coerced into a plausible identity.
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeRunId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized === '' ? null : normalized;
+}
+
+/**
+ * Evaluate the minimum logical finder/verifier separation required by #2267.
+ *
+ * Fail-safe behavior:
+ * - missing or malformed input is UNKNOWN, never independent
+ * - missing identity is UNKNOWN, never independent
+ * - equal identities are SAME_EXECUTION, never independent
+ * - only two present, distinct ids are INDEPENDENT
+ *
+ * A true `independent` value means only that `finderRunId != verifierRunId`
+ * after normalization. It is not evidence that the validation is correct or
+ * that the ids are tamper-evident.
+ *
+ * @param {unknown} [input]
+ * @returns {{
+ *   status: string,
+ *   independent: boolean,
+ *   finderRunId: string | null,
+ *   verifierRunId: string | null,
+ *   reasonCode: string
+ * }}
+ */
+function evaluateReviewerIndependence(input = {}) {
+  const finder = normalizeRunId(input?.finderRunId);
+  const verifier = normalizeRunId(input?.verifierRunId);
+
+  if (finder === null && verifier === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: null,
+      verifierRunId: null,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.BOTH_RUN_IDS_MISSING,
+    };
+  }
+
+  if (finder === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: null,
+      verifierRunId: verifier,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.FINDER_RUN_ID_MISSING,
+    };
+  }
+
+  if (verifier === null) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.UNKNOWN,
+      independent: false,
+      finderRunId: finder,
+      verifierRunId: null,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.VERIFIER_RUN_ID_MISSING,
+    };
+  }
+
+  if (finder === verifier) {
+    return {
+      status: REVIEWER_INDEPENDENCE_STATUS.SAME_EXECUTION,
+      independent: false,
+      finderRunId: finder,
+      verifierRunId: verifier,
+      reasonCode: REVIEWER_INDEPENDENCE_REASON.SAME_RUN_ID,
+    };
+  }
+
+  return {
+    status: REVIEWER_INDEPENDENCE_STATUS.INDEPENDENT,
+    independent: true,
+    finderRunId: finder,
+    verifierRunId: verifier,
+    reasonCode: REVIEWER_INDEPENDENCE_REASON.DISTINCT_RUN_IDS,
+  };
+}
+
+;// CONCATENATED MODULE: ./src/lib/finding-critic-stage.mjs
 // Finding Critic の配線段（#2334 / #1978 Phase 3）。
 //
 // 位置づけ:
@@ -35644,6 +35788,7 @@ function isApp(file) {
 //   「clean」にしない。段の内部で例外が出た場合も同じで、finding は retain し
 //   humanReview を立てる。finding を落とすのは result.retainFinding === false
 //   が明示的に返ったときだけである。
+
 
 
 
@@ -35699,13 +35844,52 @@ function resolveFindingCriticMode({ reviewConfig, env = process.env } = {}) {
  */
 function criticUnreachedResult(detail) {
   return {
-    status: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FINAL_STATUS */ .aD.CRITIC_TIMEOUT,
+    status: finding_critic/* FINAL_STATUS */.aD.CRITIC_TIMEOUT,
     terminal: true,
     humanReview: true,
     retainFinding: true,
-    reasons: [_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .FAILSAFE_REASON */ .nH.CRITIC_TIMEOUT, detail],
+    reasons: [finding_critic/* FAILSAFE_REASON */.nH.CRITIC_TIMEOUT, detail],
     rounds: 0,
-    askRelevance: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .ASK_RELEVANCE */ .Gl.UNCERTAIN,
+    askRelevance: finding_critic/* ASK_RELEVANCE */.Gl.UNCERTAIN,
+  };
+}
+
+/**
+ * Build the narrow Phase 5A execution-independence observation for one finding.
+ *
+ * The stage does not invent a verifier identity. The caller may supply a logical
+ * verifier execution id that was allocated by the orchestration host before the
+ * Critic call. Each source execution is evaluated independently with the existing
+ * Phase 5A predicate; no majority or aggregate correctness verdict is created.
+ *
+ * Missing or malformed finder provenance produces an explicit unknown check.
+ * Duplicate normalized finder ids collapse to one check.
+ */
+function buildExecutionIndependence(finding, verifierExecutionId) {
+  const sources =
+    Array.isArray(finding?.sourceExecutionIds) && finding.sourceExecutionIds.length > 0
+      ? finding.sourceExecutionIds
+      : [undefined];
+  const checks = [];
+  const seen = new Set();
+
+  for (const finderRunId of sources) {
+    const check = evaluateReviewerIndependence({ finderRunId, verifierRunId: verifierExecutionId });
+    const key = JSON.stringify([
+      check.finderRunId,
+      check.verifierRunId,
+      check.status,
+      check.reasonCode,
+    ]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    checks.push(check);
+  }
+
+  return {
+    findingId: typeof finding?.id === 'string' && finding.id.length > 0 ? finding.id : null,
+    verifierExecutionId: checks[0]?.verifierRunId ?? null,
+    checks,
   };
 }
 
@@ -35713,10 +35897,13 @@ function criticUnreachedResult(detail) {
  * 段の観測値。debug へ載せるのは件数と内訳だけで、プロンプト原文も Critic の
  * 応答本文もここからは出さない。
  *
- * @param {Array<{ result: object }>} entries
+ * Execution independence is provenance-only. It does not alter the Critic result,
+ * finding validation, severity, decision, or Gate.
+ *
+ * @param {Array<{ finding: object, result: object, verifierExecutionId?: string }>} entries
  * @param {number} dropped
  */
-function buildObservation(entries, dropped, language) {
+function buildObservation(entries, dropped, language, includeExecutionIndependence = false) {
   /** @type {Record<string, number>} */
   const byFinalStatus = {};
   let humanReview = 0;
@@ -35726,7 +35913,7 @@ function buildObservation(entries, dropped, language) {
   }
   return {
     mode: FINDING_CRITIC_MODE.ACTIVE,
-    protocol: _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .PROTOCOL_ID */ .rK,
+    protocol: finding_critic/* PROTOCOL_ID */.rK,
     // #2339 review (Minor 4): recorded so the two call sites' language
     // resolution is observable in the artifact instead of only in the source.
     // Without this the orchestrator could silently fall back to the default
@@ -35736,6 +35923,13 @@ function buildObservation(entries, dropped, language) {
     dropped,
     humanReview,
     byFinalStatus,
+    ...(includeExecutionIndependence
+      ? {
+          executionIndependence: entries.map(({ finding, verifierExecutionId }) =>
+            buildExecutionIndependence(finding, verifierExecutionId)
+          ),
+        }
+      : {}),
   };
 }
 
@@ -35763,6 +35957,7 @@ function buildObservation(entries, dropped, language) {
  * @param {boolean} [params.llmAvailable] LLM 呼び出しが可能か
  * @param {string} [params.language]
  * @param {object} [params.redactOptions]
+ * @param {string[]} [params.verifierExecutionIds] host-assigned Critic execution ids aligned with findings
  * @param {Function} [params.runImpl]     テスト用の注入点（既定は runFindingCritic）
  * @returns {Promise<{ findings: Array<object>, observation: object }|null>}
  */
@@ -35780,6 +35975,7 @@ async function runFindingCriticStage({
   llmAvailable = true,
   language = 'ja',
   redactOptions = {},
+  verifierExecutionIds = [],
   runImpl,
 } = {}) {
   if (resolveFindingCriticMode({ reviewConfig, env }) === FINDING_CRITIC_MODE.OFF) return null;
@@ -35791,9 +35987,15 @@ async function runFindingCriticStage({
   const impl = runImpl ?? (await __nccwpck_require__.e(/* import() */ 18).then(__nccwpck_require__.bind(__nccwpck_require__, 1018))).runFindingCritic;
   const skill = plan?.selected?.[0] ?? {};
 
-  /** @type {Array<{ finding: object, result: object }>} */
+  /** @type {Array<{ finding: object, result: object, verifierExecutionId?: string }>} */
   const entries = [];
-  for (const finding of list) {
+  for (const [index, finding] of list.entries()) {
+    // The caller allocates the logical verifier execution id. When the LLM is
+    // unavailable no Critic execution actually starts, so the planned id is not
+    // reported as executed provenance.
+    const verifierExecutionId = Array.isArray(verifierExecutionIds)
+      ? verifierExecutionIds[index]
+      : undefined;
     if (!llmAvailable) {
       entries.push({ finding, result: criticUnreachedResult('llm call unavailable') });
       continue;
@@ -35821,15 +36023,17 @@ async function runFindingCriticStage({
         entries.push({
           finding,
           result: criticUnreachedResult('critic runner returned no result'),
+          verifierExecutionId,
         });
       } else {
-        entries.push({ finding, result: run.result });
+        entries.push({ finding, result: run.result, verifierExecutionId });
       }
     } catch (err) {
       // 段そのものが落ちても finding は消さない。retain したまま人へ回す。
       entries.push({
         finding,
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
+        verifierExecutionId,
       });
     }
   }
@@ -35841,10 +36045,18 @@ async function runFindingCriticStage({
       dropped += 1;
       continue;
     }
-    kept.push({ ...finding, validation: (0,_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .buildValidatedFinding */ .us)(finding, result).validation });
+    kept.push({ ...finding, validation: (0,finding_critic/* buildValidatedFinding */.us)(finding, result).validation });
   }
 
-  return { findings: kept, observation: buildObservation(entries, dropped, language) };
+  return {
+    findings: kept,
+    observation: buildObservation(
+      entries,
+      dropped,
+      language,
+      Array.isArray(verifierExecutionIds) && verifierExecutionIds.length > 0
+    ),
+  };
 }
 
 
@@ -40646,7 +40858,37 @@ function computeBackoffMs(
   return Math.min(baseMs * 2 ** Math.max(0, attempt - 1), LLM_MAX_BACKOFF_MS);
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function abortError(signal) {
+  if (signal?.reason instanceof Error) return signal.reason;
+  const err = new Error('The operation was aborted');
+  err.name = 'AbortError';
+  return err;
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw abortError(signal);
+}
+
+function sleep(ms, signal) {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function attemptSignal(timeoutMs, signal) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
 
 /**
  * Call an OpenAI-compatible chat-completion endpoint with timeout and
@@ -40667,6 +40909,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {number} [params.maxTokens]
  * @param {number} [params.timeoutMs]     Per-attempt timeout (default 15000).
  * @param {number} [params.maxAttempts]   Total attempts incl. first (default 3).
+ * @param {AbortSignal} [params.signal]    Host cancellation signal. External aborts are never retried.
  * @param {typeof fetch} [params.fetchImpl] Injectable transport for tests (#1357).
  * @param {number} [params.baseMs]        Retry backoff base ms (injectable for tests).
  * @returns {Promise<string>}
@@ -40681,6 +40924,7 @@ async function callChatCompletion({
   maxTokens,
   timeoutMs = LLM_TIMEOUT_MS,
   maxAttempts = LLM_MAX_ATTEMPTS,
+  signal,
   fetchImpl = globalThis.fetch,
   baseMs = LLM_RETRY_BASE_MS,
 }) {
@@ -40696,10 +40940,11 @@ async function callChatCompletion({
 
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    throwIfAborted(signal);
     try {
       const res = await fetchImpl(endpoint, {
         method: 'POST',
-        signal: AbortSignal.timeout(timeoutMs), // fresh per attempt (one-shot)
+        signal: attemptSignal(timeoutMs, signal), // fresh timeout + host cancellation per attempt
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body,
       });
@@ -40714,7 +40959,8 @@ async function callChatCompletion({
       const detail = await res.text();
       if (attempt < maxAttempts && isRetryableStatus(res.status)) {
         await sleep(
-          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') })
+          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') }),
+          signal
         );
         continue;
       }
@@ -40724,8 +40970,12 @@ async function callChatCompletion({
       // A non-retryable HTTP error (thrown above) has a non-network message, so
       // isRetryableNetworkError returns false and it propagates immediately.
       lastError = err;
+      // A host cancellation is a terminal control signal, not a transient
+      // provider/network failure. Do not spend retry budget after the caller
+      // has explicitly ended the review task.
+      if (signal?.aborted) throw abortError(signal);
       if (attempt < maxAttempts && isRetryableNetworkError(err)) {
-        await sleep(computeBackoffMs(attempt, { baseMs }));
+        await sleep(computeBackoffMs(attempt, { baseMs }), signal);
         continue;
       }
       throw err;
@@ -40966,6 +41216,56 @@ function normalizePlannerMode(mode, { defaultMode = 'off' } = {}) {
   const normalized = (mode || '').toLowerCase();
   if (PLANNER_MODES.includes(normalized)) return normalized;
   return fallback;
+}
+
+
+/***/ }),
+
+/***/ 1891:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   O: () => (/* binding */ resolvePullRequestLabels),
+/* harmony export */   X: () => (/* binding */ resolvePullRequestBody)
+/* harmony export */ });
+/* harmony import */ var node_fs_promises__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(1455);
+/* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(9746);
+
+
+
+async function resolvePullRequestLabels() {
+  const envLabels = (0,_utils_mjs__WEBPACK_IMPORTED_MODULE_1__/* .parseList */ .E1)(process.env.RIVER_PR_LABELS);
+  if (envLabels.length) return envLabels;
+
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath) return [];
+
+  try {
+    const raw = await node_fs_promises__WEBPACK_IMPORTED_MODULE_0__.readFile(eventPath, 'utf8');
+    const event = JSON.parse(raw);
+    const pullRequestLabels = event?.pull_request?.labels ?? event?.labels ?? [];
+    return pullRequestLabels.map((label) => label?.name).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function resolvePullRequestBody() {
+  // Explicit env wins (works for any runner / non-Action use).
+  const envBody = process.env.RIVER_PR_BODY;
+  if (envBody && envBody.trim()) return envBody;
+
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath) return null;
+
+  try {
+    const raw = await node_fs_promises__WEBPACK_IMPORTED_MODULE_0__.readFile(eventPath, 'utf8');
+    const event = JSON.parse(raw);
+    const body = event?.pull_request?.body;
+    return body && String(body).trim() ? String(body) : null;
+  } catch {
+    return null;
+  }
 }
 
 
@@ -42597,7 +42897,8 @@ async function searchSymbolUsages({ symbols, repoRoot, excludeFiles, maxChars })
 /* harmony export */   mz: () => (/* binding */ deriveSingleReviewerLlmCoverage),
 /* harmony export */   oG: () => (/* binding */ attachReviewFileScope),
 /* harmony export */   or: () => (/* binding */ deriveReviewFileScope),
-/* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped)
+/* harmony export */   rC: () => (/* binding */ allLlmAttemptsSkipped),
+/* harmony export */   t4: () => (/* binding */ normalizeRunCoverageStatus)
 /* harmony export */ });
 /* harmony import */ var _utils_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9746);
 
@@ -42822,6 +43123,24 @@ function normalizeCoverageStatus(coverage) {
 }
 
 /**
+ * `normalizeCoverageStatus` for a saved run record, which carries a second
+ * fact about execution besides `reviewCoverage`: `llmNotExecuted: true` when
+ * no unit reached the LLM (#2441, written by `buildRunRecord` in
+ * result-store.mjs). Such a run has no `reviewCoverage`, so its coverage alone
+ * normalizes to `unknown` and its empty finding list would be read as an
+ * observed absence. It is `not_executed` instead (#2467).
+ *
+ * Reads the recorded fact; the predicate itself is `allLlmAttemptsSkipped`.
+ *
+ * @param {{ reviewCoverage?: object|null, llmNotExecuted?: unknown }|null|undefined} record
+ * @returns {'complete'|'partial'|'not_executed'|'unknown'}
+ */
+function normalizeRunCoverageStatus(record) {
+  if (record?.llmNotExecuted === true) return 'not_executed';
+  return normalizeCoverageStatus(record?.reviewCoverage);
+}
+
+/**
  * True when a run's coverage says review work that was expected to run did not
  * finish (`partial` or `not_executed`).
  *
@@ -42922,7 +43241,7 @@ function attachReviewFileScope(coverage, fileScope) {
 
 /***/ }),
 
-/***/ 5134:
+/***/ 7156:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
@@ -43716,6 +44035,167 @@ function detectApiCompatibilitySignals({ diff } = {}) {
   return signals;
 }
 
+;// CONCATENATED MODULE: ./src/lib/async-correctness-signals.mjs
+
+
+const SOURCE_PATH_RE = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/i;
+const async_correctness_signals_TEST_PATH_RE =
+  /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
+const ASYNC_DECLARATION_RES = [
+  /\basync\s+function\s*\*?\s*(?<name>[A-Za-z_$][\w$]*)\s*\(/g,
+  /\b(?:const|let|var)\s+(?<name>[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*async\b/g,
+];
+const ASYNC_ITERATION_CALLBACK_RE =
+  /\.(?:forEach|filter|reduce|some|every|find|findIndex)\s*\(\s*async\b/;
+const TRY_OPEN_RE = /\btry\s*\{/;
+const TRY_CLOSE_RE = /\b(?:catch|finally)\b/;
+const PROMISE_COMBINATOR_RE = /\bPromise\.(?:all|allSettled|race|any)\s*\(/;
+
+function async_correctness_signals_markerWidth(hunk) {
+  const parentCount = hunk?.parentCount;
+  return Number.isInteger(parentCount) && parentCount > 1 ? parentCount : 1;
+}
+
+function stripLineComment(text) {
+  const index = text.indexOf('//');
+  return index === -1 ? text : text.slice(0, index);
+}
+
+/**
+ * Body lines of every hunk, classified by the parse layer's own classifier.
+ * Added and context lines carry their new-side line number; removed lines are
+ * dropped because they are absent from the code under review.
+ */
+function collectVisibleLines(file) {
+  const hunks = [];
+  for (const hunk of file?.hunks ?? []) {
+    const width = async_correctness_signals_markerWidth(hunk);
+    let newLine = Number.isInteger(hunk?.newStart) ? hunk.newStart : 1;
+    const rows = [];
+    for (const rawLine of hunk?.lines ?? []) {
+      const line = String(rawLine);
+      const classified = (0,diff_processor/* classifyHunkBodyLine */.bJ)(line, hunk?.parentCount);
+      if (classified === 'removed') continue;
+      rows.push({ added: classified === 'added', line: newLine, text: line.slice(width) });
+      newLine += 1;
+    }
+    hunks.push(rows);
+  }
+  return hunks;
+}
+
+function collectAsyncNames(hunks) {
+  const names = new Set();
+  for (const rows of hunks) {
+    for (const { text } of rows) {
+      const code = stripLineComment(text);
+      for (const re of ASYNC_DECLARATION_RES) {
+        for (const match of code.matchAll(re)) names.add(match.groups.name);
+      }
+    }
+  }
+  return names;
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isInsideOpenTry(rows, index) {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const code = stripLineComment(rows[i].text);
+    if (TRY_CLOSE_RE.test(code)) return false;
+    if (TRY_OPEN_RE.test(code)) return true;
+  }
+  return false;
+}
+
+/**
+ * Classify one call to a known async function on an added line.
+ * Returns the signal kind, or null when the call site is not one this v1
+ * producer can classify without type information.
+ */
+function classifyAsyncCall(code, name, rows, index) {
+  const callRe = new RegExp(`(^|[^\\w$.])(${escapeRegExp(name)})\\s*\\(`);
+  const match = callRe.exec(code);
+  if (!match) return null;
+
+  const before = code.slice(0, match.index + match[1].length);
+  if (/\b(?:await|void)\s*$/.test(before)) return null;
+  // The declaration line of the function itself is not a call site.
+  if (/\bfunction\s*\*?\s*$/.test(before) || /\b(?:const|let|var)\s*$/.test(before)) {
+    return null;
+  }
+  if (PROMISE_COMBINATOR_RE.test(code)) return null;
+
+  const after = code.slice(match.index + match[0].length);
+  if (/\)\s*\.\s*(?:then|catch|finally)\s*\(/.test(after)) return null;
+
+  if (/\breturn\s*$/.test(before)) {
+    return isInsideOpenTry(rows, index) ? 'async-return-in-try' : null;
+  }
+  if (
+    /^\s*(?:\}\s*else\s+)?(?:if|while)\s*\(/.test(code) ||
+    /!\s*$/.test(before) ||
+    /\)\s*\?(?![?.])/.test(after)
+  ) {
+    return 'async-call-in-condition';
+  }
+  if (/^\s*$/.test(before)) return 'async-call-floating';
+  if (/\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*(?::[^=]+)?=\s*$/.test(before)) {
+    return 'async-result-assigned-unawaited';
+  }
+  return null;
+}
+
+/**
+ * Extract neutral, deterministic facts that can activate async-correctness
+ * Review Viewpoints. These are signals, not findings: no severity, policy,
+ * violation decision, or gate behavior is attached here.
+ *
+ * Whether a callee returns a Promise is only known when the same file's visible
+ * diff lines (added or context) declare it `async`. Calls to functions declared
+ * elsewhere emit nothing, so this v1 producer trades recall for precision
+ * rather than guessing from names. Test and fixture files are excluded because
+ * un-awaited assertions belong to a different Skill.
+ *
+ * @param {{diff?: {files?: Array<object>}}} options
+ * @returns {Array<{kind: string, file: string, line: number}>}
+ */
+function detectAsyncCorrectnessSignals({ diff } = {}) {
+  const signals = [];
+
+  for (const file of diff?.files ?? []) {
+    const filePath = typeof file?.path === 'string' ? file.path : '';
+    if (!filePath || filePath === '/dev/null') continue;
+    if (!SOURCE_PATH_RE.test(filePath) || async_correctness_signals_TEST_PATH_RE.test(filePath)) continue;
+
+    const hunks = collectVisibleLines(file);
+    const asyncNames = collectAsyncNames(hunks);
+    const seen = new Set();
+    const emit = (kind, line) => {
+      const key = `${kind}\u0000${line}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      signals.push({ kind, file: filePath, line });
+    };
+
+    for (const rows of hunks) {
+      for (const [index, row] of rows.entries()) {
+        if (!row.added) continue;
+        const code = stripLineComment(row.text);
+        if (ASYNC_ITERATION_CALLBACK_RE.test(code)) emit('async-callback-in-iteration', row.line);
+        for (const name of asyncNames) {
+          const kind = classifyAsyncCall(code, name, rows, index);
+          if (kind) emit(kind, row.line);
+        }
+      }
+    }
+  }
+
+  return signals;
+}
+
 ;// CONCATENATED MODULE: ./src/lib/review-viewpoint-observer.mjs
 function assertViewpointDocument(document) {
   if (!document || typeof document !== 'object' || Array.isArray(document)) {
@@ -44049,6 +44529,7 @@ async function loadReviewViewpoints(viewpointsPath, { expectedSkillId } = {}) {
 
 
 
+
 // Skill discovery already resolves the River Review package root, including the
 // GitHub Action/ncc RIVER_REPO_ROOT override. Reuse that SSoT instead of
 // re-deriving it from this module's __dirname, which changes after bundling.
@@ -44057,6 +44538,7 @@ const REVIEW_VIEWPOINT_MODES = new Set(['off', 'observe', 'active']);
 
 const NEUTRAL_SIGNAL_PRODUCERS = new Map([
   ['api-compatibility', ({ diff }) => detectApiCompatibilitySignals({ diff })],
+  ['async-correctness', ({ diff }) => detectAsyncCorrectnessSignals({ diff })],
 ]);
 
 class ReviewViewpointStageError extends Error {
@@ -44317,8 +44799,8 @@ async function runReviewViewpointStage({ reviewConfig, diff, plan }) {
   };
 }
 
-// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
-var finding_critic_stage = __nccwpck_require__(2954);
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
+var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/review-engine.mjs
 
 
@@ -44733,6 +45215,7 @@ async function generateReview({
   prBody,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
+  signal,
   // #2334: reviewer-orchestrator は findings をマージしたあとに Critic を
   // 1 回だけ走らせる。その経路では per-reviewer の generateReview が同じ段を
   // 二重に走らせないよう true を渡す。既定 false なので、単一レビューアの
@@ -44867,6 +45350,7 @@ async function generateReview({
         endpoint: openAIConfig.endpoint,
         temperature: openAIConfig.temperature,
         maxTokens: openAIConfig.maxTokens,
+        signal,
         systemMessage: activeCompiledPrompt
           ? activeCompiledPrompt.systemMessage
           : (0,sections/* buildSystemMessage */.HB)(language),
@@ -44921,6 +45405,12 @@ async function generateReview({
         debug.llmError = 'LLM output could not be parsed';
       }
     } catch (err) {
+      // Host cancellation is control flow owned by the orchestration layer.
+      // Do not convert it into an LLM failure and continue into heuristic
+      // fallback, or a timed-out reviewer could still return a fulfilled task.
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : err;
+      }
       debug.llmUsed = false;
       debug.llmError = err.message;
     }
@@ -49696,17 +50186,11 @@ const SUBCOMMAND_ONLY_COMMANDS = new Set(['runs', 'suppression', 'feedback', 'pr
 const SKILLS_SUBCOMMANDS = new Set(['import', 'export', 'list', 'resolve']);
 
 /**
- * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay` / P3 foundation
- * `verify-replay`, ADR-006 `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
+ * `evolve` subcommands (#1574 P1 `aggregate` / P2 `replay`, ADR-006
+ * `prompt-compare` / `prompt-ab`). Matching against a known set (rather than
  * "first non-flag token") keeps `river evolve <path>` working.
  */
-const EVOLVE_SUBCOMMANDS = new Set([
-  'aggregate',
-  'replay',
-  'verify-replay',
-  'prompt-compare',
-  'prompt-ab',
-]);
+const EVOLVE_SUBCOMMANDS = new Set(['aggregate', 'replay', 'prompt-compare', 'prompt-ab']);
 
 /**
  * `promote` subcommands that take an optional positional candidate id.
@@ -49792,14 +50276,10 @@ function consumeEagerCommand(parsed, arg, args) {
     if (args[0] && EVOLVE_SUBCOMMANDS.has(args[0])) {
       parsed.evolveSubcommand = args.shift();
     }
-    // `replay` and `verify-replay` take NO positional: their inputs come from
-    // explicit file options. Letting the first token become `parsed.target`
-    // would make the command accept and silently ignore a typo'd positional.
-    if (
-      !['replay', 'verify-replay'].includes(parsed.evolveSubcommand) &&
-      args[0] &&
-      !args[0].startsWith('-')
-    ) {
+    // `replay` takes NO positional: its dataset comes from --spec. Letting
+    // the first token become `parsed.target` would make the command accept
+    // and silently ignore it (`river evolve replay ./typo.json --spec x`).
+    if (parsed.evolveSubcommand !== 'replay' && args[0] && !args[0].startsWith('-')) {
       const token = args.shift();
       // A mistyped subcommand (`agregate`) must not be swallowed as a path
       // and reported as an empty, successful aggregate. Anything that is
@@ -94562,6 +95042,7 @@ async function runRunsCommand(parsed, targetPath) {
       const diff = diffReviews(run1.findings ?? [], run2.findings ?? [], {
         // run2 is the current side: its coverage qualifies the absences (#2325).
         currentCoverage: run2.reviewCoverage ?? null,
+        currentLlmNotExecuted: run2.llmNotExecuted,
       });
       const runsSignal = (0,loop_signal/* deriveLoopSignalFromRunsDiff */.vD)(diff, run2);
       if (parsed.output === 'json') {
@@ -94987,8 +95468,8 @@ async function resolveSelectionSkillIds(
   });
 }
 
-// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 13 modules
-var review_engine = __nccwpck_require__(5134);
+// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 14 modules
+var review_engine = __nccwpck_require__(7156);
 // EXTERNAL MODULE: ./src/config/default.mjs
 var config_default = __nccwpck_require__(4807);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
@@ -95092,8 +95573,8 @@ function synthesizeTeamLeadReport({ findings = [], reviewerResults = [] }) {
 
 // EXTERNAL MODULE: ./src/lib/review-coverage.mjs
 var review_coverage = __nccwpck_require__(3054);
-// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs
-var finding_critic_stage = __nccwpck_require__(2954);
+// EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
+var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
 
 
@@ -95186,13 +95667,12 @@ const SPLIT_LINE_THRESHOLD = 500;
 // survived is NOT clean: src/lib/run-gate.mjs reads `reviewerResults` and
 // withholds the GO / auto-approve outcome (rule 6b NOT_EXECUTED).
 //
-// Scope note: the timeout ABANDONS a slow role rather than cancelling its LLM
-// call — generateReview() takes no AbortSignal. The HTTP layer already has its
-// own budget (LLM_TIMEOUT_MS + bounded retries in llm-pipeline.mjs), so the
-// abandoned request keeps the process alive for up to that budget after the
-// timeout line is printed. This limit bounds the ORCHESTRATION wait, which is
-// what #1689 asks for; true cancellation needs an AbortSignal through
-// generateReview() and is deliberately out of scope.
+// The timeout is a real execution bound: every role×chunk task owns an
+// AbortController and the timeout aborts it before the orchestration promise is
+// rejected. generateReview() forwards that signal to llm-pipeline.mjs, where it
+// cancels an in-flight fetch and retry backoff. A custom generateReviewImpl used
+// by tests/integrations may ignore the signal; Promise.race still preserves the
+// fail-soft orchestration bound in that case.
 
 /** Env var carrying the per-role timeout in milliseconds (mirrors RIVER_PLANNER_TIMEOUT). */
 const REVIEWER_TIMEOUT_ENV = 'RIVER_REVIEWER_TIMEOUT';
@@ -95306,11 +95786,18 @@ function resolveReviewerProgressEnabled({ quiet = false, progress, config } = {}
  * Both branches of the race attach handlers to `promise`, so a late rejection
  * after a timeout is already handled and never surfaces as an unhandled rejection.
  */
-function withReviewerTimeout(promise, timeoutMs, makeError) {
+function withReviewerTimeout(promise, timeoutMs, makeError, onTimeout) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   let timer = null;
   const timeout = new Promise((_resolve, reject) => {
-    timer = setTimeout(() => reject(makeError()), timeoutMs);
+    timer = setTimeout(() => {
+      const error = makeError();
+      try {
+        onTimeout?.(error);
+      } finally {
+        reject(error);
+      }
+    }, timeoutMs);
   });
   const settled = promise.then(
     (value) => {
@@ -95879,8 +96366,9 @@ async function runReviewerOrchestration({
   progressSink,
   env = process.env,
   generateReviewImpl = review_engine/* generateReview */.G1,
-  // #2481: injectable host-side logical execution id producer. The id is
-  // assigned before the reviewer task starts and is observation-only.
+  // #2481 / #2543: injectable host-side logical execution id producer. IDs are
+  // assigned before reviewer tasks and active Critic tasks start. They are
+  // observation-only provenance, not actor identity or correctness signals.
   createExecutionId = defaultCreateReviewerExecutionId,
 } = {}) {
   const {
@@ -95979,11 +96467,13 @@ async function runReviewerOrchestration({
     const role = REVIEWER_ROLES[roleName];
     const roleRules = [role.focusInstructions, projectRules].filter(Boolean).join('\n\n');
     const taskStartedAt = nowMs();
+    const controller = new AbortController();
     logProgress(`Reviewer ${roleName}: start${chunkSuffix(chunkIdx)}`);
     const run = generateReviewImpl({
       ...generateArgs,
       diff: chunkDiff,
       projectRules: roleRules,
+      signal: controller.signal,
     }).then((result) => ({
       ...result,
       reviewerRole: roleName,
@@ -95994,7 +96484,8 @@ async function runReviewerOrchestration({
     return withReviewerTimeout(
       run,
       effectiveTimeoutMs,
-      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs)
+      () => new ReviewerTimeoutError(roleName, effectiveTimeoutMs),
+      (timeoutError) => controller.abort(timeoutError)
     ).then(
       (value) => {
         const durationMs = Math.round(nowMs() - taskStartedAt);
@@ -96098,6 +96589,26 @@ async function runReviewerOrchestration({
   // 同じ解決で、language / security.redact の既定を埋めるために active 時だけ要る。
   const criticEnabled = (0,finding_critic_stage/* resolveFindingCriticMode */.xL)({ reviewConfig: config?.review, env }) !== 'off';
   const mergedConfig = criticEnabled ? (0,loader/* mergeConfig */.R2)(config_default/* defaultConfig */.s, config ?? {}) : null;
+  // #2543: the orchestration host, not the Critic runner, allocates one logical
+  // verifier execution id per merged finding before the Critic stage starts.
+  // Reuse the same allocator and uniqueness set as reviewer tasks so an injected
+  // allocator cannot make a Critic execution collide with a finder execution.
+  const criticVerifierExecutionIds = !criticEnabled
+    ? []
+    : allFindings.map((finding, index) => {
+        const unitId = `finding-critic:${finding.id ?? index + 1}`;
+        const executionId = normalizeReviewerExecutionId(
+          createExecutionId({ roleName: 'finding-critic', chunkIdx: index, unitId })
+        );
+        if (executionId === null) {
+          throw new Error(`Finding Critic execution id is missing for ${unitId}`);
+        }
+        if (executionIds.has(executionId)) {
+          throw new Error(`Duplicate review execution id: ${executionId}`);
+        }
+        executionIds.add(executionId);
+        return executionId;
+      });
   const criticStage = !criticEnabled
     ? null
     : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
@@ -96116,6 +96627,7 @@ async function runReviewerOrchestration({
         // Critic の出力言語と trace の redaction 設定が食い違う。
         language: mergedConfig.review.language,
         redactOptions: (0,review_engine/* resolveRedactOptions */._Q)(mergedConfig),
+        verifierExecutionIds: criticVerifierExecutionIds,
       });
   const finalFindings = criticStage ? criticStage.findings : allFindings;
   const classified = (0,finding_factory/* classifyFindings */.ZY)(finalFindings, { reviewMode: reviewMode ?? 'medium' });
@@ -96737,6 +97249,425 @@ async function runReviewConcernAnalyzer({
 
     return buildFailedMap(subject, rawChangedFiles, `analyzer-failed:${reasonCode}`, built.input);
   }
+}
+
+;// CONCATENATED MODULE: ./src/lib/review-concern-coverage.mjs
+
+
+const SCHEMA_VERSION = '1';
+
+function review_concern_coverage_uniqueStrings(values = []) {
+  return [
+    ...new Set(
+      (Array.isArray(values) ? values : []).filter(
+        (value) => typeof value === 'string' && value.length > 0
+      )
+    ),
+  ];
+}
+
+function concernMapLimitations(reviewConcernMap) {
+  return Array.isArray(reviewConcernMap?.analysis?.limitations)
+    ? [...reviewConcernMap.analysis.limitations]
+    : [];
+}
+
+function buildUnavailableObservation({ reviewConcernMap, reviewCoverage, reason }) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: 'unavailable',
+    source: {
+      concernMapStatus: reviewConcernMap?.analysis?.status ?? null,
+      reviewCoverageStatus: (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage),
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason,
+    },
+    concerns: [],
+    summary: null,
+    blindSpotConcernRefs: [],
+    applied: false,
+  };
+}
+
+function validateConcernIds(reviewConcernMap) {
+  const seen = new Set();
+  const ids = [];
+
+  for (const concern of reviewConcernMap.concerns) {
+    const id = typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
+    if (!id || seen.has(id)) return null;
+    seen.add(id);
+    ids.push(id);
+  }
+
+  return ids;
+}
+
+function mappedUnitsForConcern(reviewCoverage, concernRef) {
+  return reviewCoverage.units.filter((unit) =>
+    review_concern_coverage_uniqueStrings(unit?.concernRefs).includes(concernRef)
+  );
+}
+
+/**
+ * Project existing Review Coverage execution evidence onto observed Concerns.
+ *
+ * This is observation-only. It does not mutate Review Coverage, does not infer
+ * semantic completeness, and has no Gate or routing authority.
+ *
+ * @returns {object|null}
+ */
+function buildReviewConcernCoverageObservation({ reviewConcernMap, reviewCoverage } = {}) {
+  if (!reviewConcernMap) return null;
+
+  if (
+    reviewConcernMap.kind !== 'review-concern-map' ||
+    reviewConcernMap.schemaVersion !== '1' ||
+    !Array.isArray(reviewConcernMap.concerns)
+  ) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map',
+    });
+  }
+
+  const concernMapStatus = reviewConcernMap.analysis?.status ?? null;
+  if (concernMapStatus === 'failed') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'concern-map-failed',
+    });
+  }
+  if (concernMapStatus !== 'completed' && concernMapStatus !== 'partial') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-map-status',
+    });
+  }
+
+  const concernIds = validateConcernIds(reviewConcernMap);
+  if (!concernIds) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'invalid-concern-id',
+    });
+  }
+
+  if (!reviewCoverage || !Array.isArray(reviewCoverage.units)) {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-unavailable',
+    });
+  }
+
+  const reviewCoverageStatus = (0,review_coverage/* normalizeCoverageStatus */.aW)(reviewCoverage);
+  if (reviewCoverageStatus === 'unknown') {
+    return buildUnavailableObservation({
+      reviewConcernMap,
+      reviewCoverage,
+      reason: 'review-coverage-invalid',
+    });
+  }
+
+  const concerns = concernIds.map((concernRef) => {
+    const mappedUnits = mappedUnitsForConcern(reviewCoverage, concernRef);
+    if (mappedUnits.length === 0) {
+      return {
+        concernRef,
+        mappingStatus: 'unmapped',
+        mappedReviewUnitIds: [],
+        mappedReviewerRoles: [],
+        executionCoverage: null,
+        requiredMappedUnits: 0,
+        completedRequiredMappedUnits: 0,
+        incompleteRequiredUnitIds: [],
+        blindSpotCandidate: true,
+      };
+    }
+
+    const projected = (0,review_coverage/* deriveReviewCoverage */.Ix)(mappedUnits);
+    return {
+      concernRef,
+      mappingStatus: 'mapped',
+      mappedReviewUnitIds: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.id)),
+      mappedReviewerRoles: review_concern_coverage_uniqueStrings(mappedUnits.map((unit) => unit?.reviewerRole)),
+      executionCoverage: projected.status,
+      requiredMappedUnits: projected.requiredUnits,
+      completedRequiredMappedUnits: projected.completedRequiredUnits,
+      incompleteRequiredUnitIds: [...projected.incompleteRequiredUnitIds],
+      blindSpotCandidate: false,
+    };
+  });
+
+  const blindSpotConcernRefs = concerns
+    .filter((concern) => concern.blindSpotCandidate)
+    .map((concern) => concern.concernRef);
+  const mapped = concerns.filter((concern) => concern.mappingStatus === 'mapped');
+  const incompleteMapped = mapped.filter((concern) => concern.executionCoverage !== 'complete');
+
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'review-concern-coverage-observation',
+    status: concernMapStatus === 'partial' ? 'partial' : 'observed',
+    source: {
+      concernMapStatus,
+      reviewCoverageStatus,
+      limitations: concernMapLimitations(reviewConcernMap),
+      reason: null,
+    },
+    concerns,
+    summary: {
+      observedConcerns: concerns.length,
+      mappedConcerns: mapped.length,
+      unmappedConcerns: blindSpotConcernRefs.length,
+      incompleteMappedConcerns: incompleteMapped.length,
+    },
+    blindSpotConcernRefs,
+    applied: false,
+  };
+}
+
+// EXTERNAL MODULE: ./src/lib/file-classifier.mjs
+var file_classifier = __nccwpck_require__(4673);
+;// CONCATENATED MODULE: ./src/lib/review-concern-planning-bridge.mjs
+
+
+
+
+
+const review_concern_planning_bridge_SCHEMA_VERSION = '1';
+
+function review_concern_planning_bridge_normalizePath(value) {
+  return typeof value === 'string'
+    ? value
+        .trim()
+        .replaceAll('\\', '/')
+        .replace(/^\.\/+/u, '')
+    : '';
+}
+
+function review_concern_planning_bridge_uniqueStrings(values) {
+  return [...new Set((Array.isArray(values) ? values : []).map(review_concern_planning_bridge_normalizePath).filter(Boolean))];
+}
+
+function concernSubjects(concern) {
+  const changed = review_concern_planning_bridge_uniqueStrings(concern?.changedSubjects);
+  const affected = review_concern_planning_bridge_uniqueStrings(
+    (Array.isArray(concern?.affectedSubjects) ? concern.affectedSubjects : []).map(
+      (subject) => subject?.path
+    )
+  );
+  return [...new Set([...changed, ...affected])];
+}
+
+function skillId(skill) {
+  const value = skill?.metadata?.id ?? skill?.id;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function skillApplyTo(skill) {
+  const value = skill?.metadata?.applyTo ?? skill?.applyTo;
+  if (typeof value === 'string') return [value];
+  return Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
+}
+
+function matchedSkillSubjects(skill, subjects) {
+  const patterns = skillApplyTo(skill);
+  if (patterns.length === 0) return [];
+
+  return subjects.filter((subject) =>
+    patterns.some((pattern) => {
+      try {
+        return (0,esm/* minimatch */.xF)(subject, pattern, { dot: true });
+      } catch {
+        return false;
+      }
+    })
+  );
+}
+
+function baselineRoles({ fileTypes, riskAssessment, signals }) {
+  if (!fileTypes || typeof fileTypes !== 'object' || Array.isArray(fileTypes)) return null;
+  return selectRolesAuto(fileTypes, riskAssessment ?? null, signals);
+}
+
+function review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, reason) {
+  return {
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
+    kind: 'review-concern-planning-observation',
+    status: 'unavailable',
+    source: {
+      concernMapStatus: reviewConcernMap?.analysis?.status ?? null,
+      limitations: Array.isArray(reviewConcernMap?.analysis?.limitations)
+        ? [...reviewConcernMap.analysis.limitations]
+        : [],
+      reason,
+    },
+    wholeDiffAutoSelection:
+      existingRoles === null
+        ? null
+        : {
+            reviewerRoles: existingRoles,
+          },
+    concerns: [],
+    recommendation: null,
+    delta: null,
+    applied: false,
+  };
+}
+
+function buildReviewConcernPlanningObservation({
+  reviewConcernMap,
+  fileTypes,
+  riskAssessment,
+  signals,
+  selectedSkills = [],
+} = {}) {
+  if (!reviewConcernMap) return null;
+
+  const existingRoles = baselineRoles({ fileTypes, riskAssessment, signals });
+  if (
+    reviewConcernMap.kind !== 'review-concern-map' ||
+    reviewConcernMap.schemaVersion !== '1' ||
+    !Array.isArray(reviewConcernMap.concerns)
+  ) {
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-map');
+  }
+
+  const mapStatus = reviewConcernMap.analysis?.status ?? null;
+  if (mapStatus === 'failed') {
+    return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'concern-map-failed');
+  }
+
+  const seenConcernIds = new Set();
+  const concerns = [];
+  for (const concern of reviewConcernMap.concerns) {
+    const concernRef =
+      typeof concern?.id === 'string' && concern.id.trim() ? concern.id.trim() : null;
+    if (!concernRef || seenConcernIds.has(concernRef)) {
+      return review_concern_planning_bridge_buildUnavailableObservation(reviewConcernMap, existingRoles, 'invalid-concern-id');
+    }
+    seenConcernIds.add(concernRef);
+
+    const subjects = concernSubjects(concern);
+    const reviewerRoles = selectRolesAuto((0,file_classifier/* classifyChangedFiles */.q)(subjects), null, null);
+    const skillRecommendations = (Array.isArray(selectedSkills) ? selectedSkills : [])
+      .map((skill) => {
+        const id = skillId(skill);
+        if (!id) return null;
+        const matchedSubjects = matchedSkillSubjects(skill, subjects);
+        if (matchedSubjects.length === 0) return null;
+        return {
+          skillId: id,
+          matchedSubjects,
+          reason: 'selected-skill-applyTo-overlap',
+        };
+      })
+      .filter(Boolean);
+
+    concerns.push({
+      concernRef,
+      subjects,
+      reviewerRoles,
+      skillRecommendations,
+    });
+  }
+
+  const recommendedRoles = [...new Set(concerns.flatMap((concern) => concern.reviewerRoles))];
+  const recommendedSkillIds = [
+    ...new Set(
+      concerns.flatMap((concern) =>
+        concern.skillRecommendations.map((recommendation) => recommendation.skillId)
+      )
+    ),
+  ];
+  const existingSet = new Set(existingRoles ?? []);
+  const recommendedSet = new Set(recommendedRoles);
+
+  return {
+    schemaVersion: review_concern_planning_bridge_SCHEMA_VERSION,
+    kind: 'review-concern-planning-observation',
+    status: mapStatus === 'partial' ? 'partial' : 'observed',
+    source: {
+      concernMapStatus: mapStatus,
+      limitations: Array.isArray(reviewConcernMap.analysis?.limitations)
+        ? [...reviewConcernMap.analysis.limitations]
+        : [],
+      reason: null,
+    },
+    wholeDiffAutoSelection:
+      existingRoles === null
+        ? null
+        : {
+            reviewerRoles: existingRoles,
+          },
+    concerns,
+    recommendation: {
+      reviewerRoles: recommendedRoles,
+      skillIds: recommendedSkillIds,
+    },
+    delta:
+      existingRoles === null
+        ? null
+        : {
+            reviewerRoles: {
+              recommendedOnly: recommendedRoles.filter((role) => !existingSet.has(role)),
+              existingOnly: existingRoles.filter((role) => !recommendedSet.has(role)),
+              shared: recommendedRoles.filter((role) => existingSet.has(role)),
+            },
+          },
+    applied: false,
+  };
+}
+
+function attachConcernRefsToReviewCoverage(reviewCoverage, reviewConcernMap) {
+  if (!reviewCoverage || !Array.isArray(reviewCoverage.units)) return reviewCoverage;
+  if (
+    !reviewConcernMap ||
+    reviewConcernMap.kind !== 'review-concern-map' ||
+    reviewConcernMap.schemaVersion !== '1' ||
+    reviewConcernMap.analysis?.status === 'failed' ||
+    !Array.isArray(reviewConcernMap.concerns)
+  ) {
+    return reviewCoverage;
+  }
+
+  const concernSubjectsById = reviewConcernMap.concerns
+    .map((concern) => {
+      const id = typeof concern?.id === 'string' ? concern.id.trim() : '';
+      return id ? { id, subjects: new Set(concernSubjects(concern)) } : null;
+    })
+    .filter(Boolean);
+
+  let changed = false;
+  const units = reviewCoverage.units.map((unit) => {
+    const unitSubjects = new Set(review_concern_planning_bridge_uniqueStrings(unit?.subjects));
+    const matchedConcernRefs = concernSubjectsById
+      .filter((concern) => [...concern.subjects].some((subject) => unitSubjects.has(subject)))
+      .map((concern) => concern.id);
+    const existingConcernRefs = review_concern_planning_bridge_uniqueStrings(unit?.concernRefs);
+    const concernRefs = [...new Set([...existingConcernRefs, ...matchedConcernRefs])];
+
+    if (concernRefs.length === existingConcernRefs.length) return unit;
+    changed = true;
+    return {
+      ...unit,
+      concernRefs,
+    };
+  });
+
+  return changed
+    ? {
+        ...reviewCoverage,
+        units,
+      }
+    : reviewCoverage;
 }
 
 ;// CONCATENATED MODULE: ./src/lib/openai-planner.mjs
@@ -97407,7 +98338,11 @@ function applySuppressions(findings, memoryContext, opts = {}) {
 var deterministic_gate = __nccwpck_require__(5837);
 // EXTERNAL MODULE: ./src/lib/deterministic-exec-gate.mjs
 var deterministic_exec_gate = __nccwpck_require__(2785);
+// EXTERNAL MODULE: ./src/lib/pr-context.mjs
+var pr_context = __nccwpck_require__(1891);
 ;// CONCATENATED MODULE: ./src/lib/local-runner.mjs
+
+
 
 
 
@@ -97474,41 +98409,6 @@ function applyFileExclusions(diff, patterns = []) {
   };
 }
 
-async function resolvePullRequestLabels() {
-  const envLabels = (0,utils/* parseList */.E1)(process.env.RIVER_PR_LABELS);
-  if (envLabels.length) return envLabels;
-
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!eventPath) return [];
-
-  try {
-    const raw = await promises_.readFile(eventPath, 'utf8');
-    const event = JSON.parse(raw);
-    const pullRequestLabels = event?.pull_request?.labels ?? event?.labels ?? [];
-    return pullRequestLabels.map((label) => label?.name).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-async function resolvePullRequestBody() {
-  // Explicit env wins (works for any runner / non-Action use).
-  const envBody = process.env.RIVER_PR_BODY;
-  if (envBody && envBody.trim()) return envBody;
-
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!eventPath) return null;
-
-  try {
-    const raw = await promises_.readFile(eventPath, 'utf8');
-    const event = JSON.parse(raw);
-    const body = event?.pull_request?.body;
-    return body && String(body).trim() ? String(body) : null;
-  } catch {
-    return null;
-  }
-}
-
 function shouldSkipByLabel(prLabels = [], ignorePatterns = []) {
   if (!prLabels.length || !ignorePatterns.length) return { matched: [], shouldSkip: false };
   const normalizedLabels = prLabels.map((label) => label.toLowerCase());
@@ -97542,8 +98442,8 @@ async function collectLocalContext({
 } = {}) {
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(cwd);
   const { config, path: configPath, source: configSource } = await configLoader.load(repoRoot);
-  const prLabels = await resolvePullRequestLabels();
-  const prBody = await resolvePullRequestBody();
+  const prLabels = await (0,pr_context/* resolvePullRequestLabels */.O)();
+  const prBody = await (0,pr_context/* resolvePullRequestBody */.X)();
   const { rulesText: projectRules } = await (0,rules/* loadProjectRules */.TR)(repoRoot);
   const riskMap = await (0,risk_map.loadRiskMap)(repoRoot);
   // When --base is provided, compare against the explicit ref instead of the
@@ -98019,6 +98919,17 @@ async function runLocalReview({
       model,
       apiKey,
     });
+    const reviewConcernPlanning = buildReviewConcernPlanningObservation({
+      reviewConcernMap,
+      fileTypes: context.plan?.fileTypes,
+      riskAssessment: context.plan?.riskAssessment ?? null,
+      signals: context.plan?.reviewSignals,
+      selectedSkills: context.plan?.selected ?? [],
+    });
+    const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+      reviewConcernMap,
+      reviewCoverage: null,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -98026,7 +98937,15 @@ async function runLocalReview({
       mergeBase: context.mergeBase,
       commitSha: context.commitSha ?? null,
       dirty: context.dirty ?? null,
-      ...(reviewConcernMap ? { reviewDebug: { reviewConcernMap } } : {}),
+      ...(reviewConcernMap
+        ? {
+            reviewDebug: {
+              reviewConcernMap,
+              ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+              ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
+            },
+          }
+        : {}),
       config: context.config,
       configPath: context.configPath,
       configSource: context.configSource,
@@ -98076,6 +98995,16 @@ async function runLocalReview({
     model,
     apiKey,
     repoContext,
+  });
+  // #2455 Phase 3: observe-only planning bridge. It reuses the existing
+  // deterministic router and already-selected Skill metadata, but its output is
+  // never fed into reviewer selection, Skill selection, Gate, or execution.
+  const reviewConcernPlanning = buildReviewConcernPlanningObservation({
+    reviewConcernMap,
+    fileTypes: context.plan?.fileTypes,
+    riskAssessment: context.plan?.riskAssessment ?? null,
+    signals: context.plan?.reviewSignals,
+    selectedSkills: context.plan?.selected ?? [],
   });
 
   const reviewArgs = {
@@ -98127,7 +99056,18 @@ async function runLocalReview({
   // Slice C enriches an existing execution observation with the selection
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here.
-  const reviewCoverage = (0,review_coverage/* attachReviewFileScope */.oG)(baseReviewCoverage, context.reviewFileScope);
+  const reviewCoverage = attachConcernRefsToReviewCoverage(
+    (0,review_coverage/* attachReviewFileScope */.oG)(baseReviewCoverage, context.reviewFileScope),
+    reviewConcernMap
+  );
+
+  // #2541 Phase 4: project existing Review Coverage onto observed Concerns.
+  // This is debug-only evidence. It does not change Review Coverage, Gate,
+  // routing, findings, or the meaning of a completed Review Unit.
+  const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+    reviewConcernMap,
+    reviewCoverage,
+  });
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
@@ -98221,6 +99161,8 @@ async function runLocalReview({
     reviewDebug: {
       ...(review.debug ?? {}),
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
+      ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+      ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).
@@ -100285,6 +101227,7 @@ function formatBaselineRegression(
   const diff = diffReviews(prevFindings, result?.findings ?? [], {
     // The current run's coverage qualifies its absences (#2325).
     currentCoverage: result?.reviewCoverage ?? null,
+    currentLlmNotExecuted: result?.llmNotExecuted,
   });
   return formatRegressionSummary(diff);
 }
@@ -102073,15 +103016,12 @@ async function runPromoteCommand(parsed, targetPath) {
 //
 //   river evolve aggregate [<path>] [--min <n>] [--month YYYY-MM] [--output json|text]
 //   river evolve replay --spec <file> [--expect-manifest <id|key>] [--output json|text]
-//   river evolve verify-replay --replay <file> --attestation <file> --trusted-key <pem> [--output json|text]
 //   river evolve prompt-compare [<path>] [--output json|text]
 //   river evolve prompt-ab [<path>] [--output json|text]
 //
-// All five subcommands only READ. `aggregate` reads `.river/runs/` and
+// All four subcommands only READ. `aggregate` reads `.river/runs/` and
 // `.river/feedback/*.jsonl`; `replay` reads a single experiment spec file that
-// already contains the baseline and candidate runs; `verify-replay` reads
-// an existing replay, detached attestation, and caller-supplied trusted public
-// key; `prompt-compare` reads
+// already contains the baseline and candidate runs; `prompt-compare` reads
 // `.river/runs/` and pairs the legacy prompt against the compiled prompt from
 // the observe-mode records those runs already carry (ADR-006 / #1860) — it
 // never sends the compiled prompt anywhere. `prompt-ab` reads the same store but
@@ -102097,7 +103037,7 @@ async function runPromoteCommand(parsed, targetPath) {
 
 
 
-const SUBCOMMANDS = ['aggregate', 'replay', 'verify-replay', 'prompt-compare', 'prompt-ab'];
+const SUBCOMMANDS = ['aggregate', 'replay', 'prompt-compare', 'prompt-ab'];
 
 /**
  * Warn when the positional path handed to `aggregate` does not exist (#1936).
@@ -102184,37 +103124,26 @@ function missingTargetPathError(targetPath, rawTarget, subcommand) {
  * Reject options that belong to another evolve subcommand (#1860 / #1880).
  *
  * Shared by `prompt-compare` and `prompt-ab`: both read the saved runs under
- * `.river/runs`, so replay / verification / aggregate-only options would
- * silently look honoured while changing nothing unless rejected here.
+ * `.river/runs`, so `--spec` / `--expect-manifest` (replay) and `--min` /
+ * `--month` (aggregate) would silently look honoured while changing nothing.
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} subcommand - the subcommand name to name in the message.
  * @returns {string|null} error message, or null when nothing is misplaced.
  */
 function misplacedStoreOptionError(parsed, subcommand) {
-  const misplaced = [
-    '--spec',
-    '--expect-manifest',
-    '--min',
-    '--month',
-    '--replay',
-    '--attestation',
-    '--trusted-key',
-  ].filter((flag) => {
+  const misplaced = ['--spec', '--expect-manifest', '--min', '--month'].filter((flag) => {
     if (flag === '--spec') return parsed.evolveSpec != null;
     if (flag === '--expect-manifest') return parsed.evolveExpectManifest != null;
     if (flag === '--min') return parsed.evolveMin != null;
-    if (flag === '--month') return parsed.evolveMonth != null;
-    if (flag === '--replay') return parsed.evolveReplay != null;
-    if (flag === '--attestation') return parsed.evolveAttestation != null;
-    return parsed.evolveTrustedKey != null;
+    return parsed.evolveMonth != null;
   });
   if (!misplaced.length) return null;
   return `${misplaced.join(', ')} is not valid for \`river evolve ${subcommand}\` (its dataset is the saved runs under .river/runs).`;
 }
 
 /**
- * Handle the `evolve` command (aggregate | replay | verify-replay | prompt-compare | prompt-ab).
+ * Handle the `evolve` command (aggregate | replay | prompt-compare | prompt-ab).
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
  * @param {string} targetPath - resolved repo target path.
@@ -102228,7 +103157,7 @@ async function runEvolveCommand(parsed, targetPath) {
   }
   if (parsed.evolveUnknownOption) {
     console.error(
-      `Unknown option for evolve: ${parsed.evolveUnknownOption}. Use: --min <n> --month YYYY-MM --spec <file> --expect-manifest <id> --replay <file> --attestation <file> --trusted-key <pem> --output text|json`
+      `Unknown option for evolve: ${parsed.evolveUnknownOption}. Use: --min <n> --month YYYY-MM --spec <file> --expect-manifest <id> --output text|json`
     );
     return 1;
   }
@@ -102238,7 +103167,7 @@ async function runEvolveCommand(parsed, targetPath) {
     );
     return 1;
   }
-  // Evolve subcommands have no yaml/html renderer; accepting the flag and silently
+  // Neither subcommand has a yaml/html renderer; accepting the flag and silently
   // emitting text would misreport the format to a downstream consumer.
   const output = parsed.output ?? 'text';
   if (output !== 'text' && output !== 'json') {
@@ -102248,9 +103177,6 @@ async function runEvolveCommand(parsed, targetPath) {
 
   if (subcommand === 'replay') {
     return runReplay(parsed, output);
-  }
-  if (subcommand === 'verify-replay') {
-    return runVerifyReplay(parsed, output);
   }
   if (subcommand === 'prompt-compare') {
     return runPromptCompare(parsed, targetPath, output);
@@ -102361,96 +103287,16 @@ async function runPromptAb(parsed, targetPath, output) {
   return 0;
 }
 
-async function runVerifyReplay(parsed, output) {
-  const required = [
-    ['--replay', parsed.evolveReplay],
-    ['--attestation', parsed.evolveAttestation],
-    ['--trusted-key', parsed.evolveTrustedKey],
-  ];
-  const missing = required.filter(([, value]) => value == null).map(([flag]) => flag);
-  if (missing.length) {
-    console.error(`Error: \`river evolve verify-replay\` requires ${missing.join(', ')}.`);
-    return 1;
-  }
-  if (
-    parsed.evolveSpec != null ||
-    parsed.evolveExpectManifest != null ||
-    parsed.evolveMin != null ||
-    parsed.evolveMonth != null
-  ) {
-    console.error(
-      'Error: --spec / --expect-manifest / --min / --month are not valid for verify-replay.'
-    );
-    return 1;
-  }
-
-  const { readFile } = await Promise.resolve(/* import() */).then(__nccwpck_require__.t.bind(__nccwpck_require__, 1455, 19));
-  const { ReplayVerificationError, buildReplayVerification, formatReplayVerificationMarkdown } =
-    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(282)]).then(__nccwpck_require__.bind(__nccwpck_require__, 9282));
-
-  async function readJson(path, label) {
-    let value;
-    try {
-      value = JSON.parse(await readFile(path, 'utf8'));
-    } catch (error) {
-      throw new ReplayVerificationError(`cannot read ${label} ${path}: ${error.message}`);
-    }
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      throw new ReplayVerificationError(`${label} ${path} must contain a JSON object.`);
-    }
-    return value;
-  }
-
-  let result;
-  try {
-    const [replay, attestation, trustedPublicKeyPem] = await Promise.all([
-      readJson(parsed.evolveReplay, '--replay'),
-      readJson(parsed.evolveAttestation, '--attestation'),
-      readFile(parsed.evolveTrustedKey, 'utf8').catch((error) => {
-        throw new ReplayVerificationError(
-          `cannot read --trusted-key ${parsed.evolveTrustedKey}: ${error.message}`
-        );
-      }),
-    ]);
-    result = buildReplayVerification({
-      replay,
-      attestation,
-      trustedPublicKeyPem,
-      now: new Date(),
-    });
-  } catch (error) {
-    if (error instanceof ReplayVerificationError) {
-      console.error(`Error: ${error.message}`);
-      return 1;
-    }
-    throw error;
-  }
-
-  if (output === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    console.log(formatReplayVerificationMarkdown(result));
-  }
-
-  // Verification is evidence for a later human decision. It never starts a
-  // canary, promotes a candidate, or mutates a repository.
-  return 0;
-}
-
 async function runAggregate(parsed, targetPath, output) {
   // `--spec` / `--expect-manifest` belong to `replay`. Accepting them silently
   // here would look like the aggregate honoured an experiment definition.
-  const misplaced = [
-    ['--spec', parsed.evolveSpec],
-    ['--expect-manifest', parsed.evolveExpectManifest],
-    ['--replay', parsed.evolveReplay],
-    ['--attestation', parsed.evolveAttestation],
-    ['--trusted-key', parsed.evolveTrustedKey],
-  ]
-    .filter(([, value]) => value != null)
-    .map(([flag]) => flag);
+  const misplaced = ['--spec', '--expect-manifest'].filter(
+    (flag) => (flag === '--spec' ? parsed.evolveSpec : parsed.evolveExpectManifest) != null
+  );
   if (misplaced.length) {
-    console.error(`${misplaced.join(', ')} is not valid for \`river evolve aggregate\`.`);
+    console.error(
+      `${misplaced.join(', ')} is only valid for \`river evolve replay\`, not for aggregate.`
+    );
     return 1;
   }
 
@@ -102501,16 +103347,6 @@ async function runReplay(parsed, output) {
     // These scope the aggregate's inputs; the replay's dataset is fixed by the
     // manifest, so honouring them would silently change the pinned dataset.
     console.error('Error: --min / --month are aggregate options and are not valid for replay.');
-    return 1;
-  }
-  if (
-    parsed.evolveReplay != null ||
-    parsed.evolveAttestation != null ||
-    parsed.evolveTrustedKey != null
-  ) {
-    console.error(
-      'Error: --replay / --attestation / --trusted-key are verify-replay options and are not valid for replay.'
-    );
     return 1;
   }
 
@@ -102701,11 +103537,6 @@ Commands:
                         criteria. Never re-runs a review and never decides
                         adoption (--spec <file> --expect-manifest <id>;
                         --output json)
-  evolve verify-replay  Verify a detached independent-verifier attestation
-                        against an out-of-band trusted Ed25519 public key
-                        (#1574 P3 foundation). Read-only; never starts a canary
-                        or decides adoption (--replay <file> --attestation <file>
-                        --trusted-key <pem>; --output json)
   evolve prompt-compare <path>
                         Read-only paired comparison of the legacy prompt vs the
                         compiled prompt over saved observe-mode runs
@@ -102794,7 +103625,7 @@ const COMMAND_USAGE = {
     'river suppression add --fingerprint <fp> --feedback <type> --rationale <text> [options]',
   promote:
     'river promote <propose|list|approve|reject|retarget|attach-replay|template|retire|review-effectiveness> [options]',
-  evolve: 'river evolve <aggregate|replay|verify-replay|prompt-compare|prompt-ab> [options]',
+  evolve: 'river evolve <aggregate|replay|prompt-compare|prompt-ab> [options]',
 };
 
 const GENERIC_USAGE = 'river <command> <path> [options]';
@@ -103212,9 +104043,6 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--month',
   '--spec',
   '--expect-manifest',
-  '--replay',
-  '--attestation',
-  '--trusted-key',
   // shared / review
   '--plan-only',
   '--fail-on',
@@ -103596,36 +104424,6 @@ function parseEvolveOption(arg, args, parsed) {
       return 'break';
     }
     parsed.evolveExpectManifest = value;
-    return 'continue';
-  }
-  if (arg === '--replay') {
-    const value = args.shift();
-    if (!value || value.startsWith('-')) {
-      console.error('Error: --replay option requires a file path.');
-      usageError(parsed);
-      return 'break';
-    }
-    parsed.evolveReplay = value;
-    return 'continue';
-  }
-  if (arg === '--attestation') {
-    const value = args.shift();
-    if (!value || value.startsWith('-')) {
-      console.error('Error: --attestation option requires a file path.');
-      usageError(parsed);
-      return 'break';
-    }
-    parsed.evolveAttestation = value;
-    return 'continue';
-  }
-  if (arg === '--trusted-key') {
-    const value = args.shift();
-    if (!value || value.startsWith('-')) {
-      console.error('Error: --trusted-key option requires a file path.');
-      usageError(parsed);
-      return 'break';
-    }
-    parsed.evolveTrustedKey = value;
     return 'continue';
   }
   // Options that are not evolve's own and not handled by the shared parser
@@ -104116,9 +104914,6 @@ function parseArgs(argv) {
     evolveMonth: null,
     evolveSpec: null,
     evolveExpectManifest: null,
-    evolveReplay: null,
-    evolveAttestation: null,
-    evolveTrustedKey: null,
     evolveExtraArgs: [],
     evolveUnknownOption: null,
     // skills subcommand fields

@@ -29,8 +29,10 @@ var artifact_resolver = __webpack_require__(4281);
 var diff_processor = __webpack_require__(861);
 // EXTERNAL MODULE: ./runners/core/review-runner.mjs + 4 modules
 var review_runner = __webpack_require__(2821);
-// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 13 modules
-var review_engine = __webpack_require__(5134);
+// EXTERNAL MODULE: ./src/lib/review-engine.mjs + 14 modules
+var review_engine = __webpack_require__(7156);
+// EXTERNAL MODULE: ./src/lib/pr-context.mjs
+var pr_context = __webpack_require__(1891);
 // EXTERNAL MODULE: ./src/lib/risk-map.mjs + 1 modules
 var risk_map = __webpack_require__(572);
 // EXTERNAL MODULE: ./src/lib/planner-utils.mjs
@@ -895,6 +897,7 @@ var external_node_crypto_ = __webpack_require__(7598);
 
 
 
+
 const VALID_PHASES = new Set(planner_utils/* PHASES */.ZG);
 
 /**
@@ -1359,6 +1362,13 @@ async function runReviewExecReplay({
           relatedADRs: sourceSnapshot?.relatedADRs ?? undefined,
           reviewMode: sourceSnapshot?.reviewMode ?? undefined,
           riskAssessment: sourceSnapshot?.riskAssessment ?? undefined,
+          // #2342: the PR body is resolved from the replay-time environment
+          // (RIVER_PR_BODY / GITHUB_EVENT_PATH) by the same helper the local
+          // runner uses — the source plan's snapshot does not carry it, just as
+          // it does not carry the diff. When neither source is set this stays
+          // null and the Finding Critic sees an empty ask (fixture F12:
+          // relevance undecidable → humanReview).
+          prBody: await (0,pr_context/* resolvePullRequestBody */.X)(),
         });
       } catch (err) {
         throw new ReviewPlanError(`Failed to execute replay review skills: ${err.message}`);
@@ -1776,6 +1786,11 @@ async function runReviewPlan({
           relatedADRs: plan.relatedADRs ?? undefined,
           reviewMode: plan.reviewMode ?? undefined,
           riskAssessment: plan.riskAssessment ?? undefined,
+          // #2342: same source as the local runner (RIVER_PR_BODY /
+          // GITHUB_EVENT_PATH). null when neither is set; the Finding Critic
+          // then sees an empty ask (fixture F12: relevance undecidable →
+          // humanReview).
+          prBody: await (0,pr_context/* resolvePullRequestBody */.X)(),
         });
       } catch (err) {
         throw new ReviewPlanError(`Failed to execute review skills: ${err.message}`);

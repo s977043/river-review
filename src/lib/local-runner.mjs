@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ConfigLoader } from '../config/loader.mjs';
 import { hasSelection, resolveSelectionSkillIds } from './selection.mjs';
@@ -6,6 +5,11 @@ import { buildLlmDiffView, collectRepoDiff, renderDiffText } from './diff-proces
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
+import { buildReviewConcernCoverageObservation } from './review-concern-coverage.mjs';
+import {
+  attachConcernRefsToReviewCoverage,
+  buildReviewConcernPlanningObservation,
+} from './review-concern-planning-bridge.mjs';
 import {
   attachReviewFileScope,
   deriveReviewFileScope,
@@ -31,7 +35,6 @@ import { loadSkills } from '../../runners/core/skill-loader.mjs';
 import {
   isLlmEnabled,
   isOfflineMode,
-  parseList,
   resolveAvailableContexts as resolveAvailableContextsShared,
   resolveAvailableDependencies as resolveAvailableDependenciesShared,
   shouldExclude,
@@ -45,6 +48,7 @@ import {
 import { applySuppressions } from './suppression-apply.mjs';
 import { computeStrictBlock } from './deterministic-gate.mjs';
 import { runDeterministicExecGateIfEnabled } from './deterministic-exec-gate.mjs';
+import { resolvePullRequestBody, resolvePullRequestLabels } from './pr-context.mjs';
 
 function normalizePhase(phase) {
   const normalized = (phase || '').toLowerCase();
@@ -85,41 +89,6 @@ function applyFileExclusions(diff, patterns = []) {
     tokenEstimate,
     reduction,
   };
-}
-
-async function resolvePullRequestLabels() {
-  const envLabels = parseList(process.env.RIVER_PR_LABELS);
-  if (envLabels.length) return envLabels;
-
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!eventPath) return [];
-
-  try {
-    const raw = await fs.readFile(eventPath, 'utf8');
-    const event = JSON.parse(raw);
-    const pullRequestLabels = event?.pull_request?.labels ?? event?.labels ?? [];
-    return pullRequestLabels.map((label) => label?.name).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-async function resolvePullRequestBody() {
-  // Explicit env wins (works for any runner / non-Action use).
-  const envBody = process.env.RIVER_PR_BODY;
-  if (envBody && envBody.trim()) return envBody;
-
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!eventPath) return null;
-
-  try {
-    const raw = await fs.readFile(eventPath, 'utf8');
-    const event = JSON.parse(raw);
-    const body = event?.pull_request?.body;
-    return body && String(body).trim() ? String(body) : null;
-  } catch {
-    return null;
-  }
 }
 
 function shouldSkipByLabel(prLabels = [], ignorePatterns = []) {
@@ -269,7 +238,6 @@ export {
   shouldSkipByLabel,
   resolveAvailableContexts,
   resolveAvailableDependencies,
-  resolvePullRequestBody,
 };
 
 export async function planLocalReview({
@@ -639,6 +607,17 @@ export async function runLocalReview({
       model,
       apiKey,
     });
+    const reviewConcernPlanning = buildReviewConcernPlanningObservation({
+      reviewConcernMap,
+      fileTypes: context.plan?.fileTypes,
+      riskAssessment: context.plan?.riskAssessment ?? null,
+      signals: context.plan?.reviewSignals,
+      selectedSkills: context.plan?.selected ?? [],
+    });
+    const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+      reviewConcernMap,
+      reviewCoverage: null,
+    });
     return {
       status: 'no-changes',
       repoRoot: context.repoRoot,
@@ -646,7 +625,15 @@ export async function runLocalReview({
       mergeBase: context.mergeBase,
       commitSha: context.commitSha ?? null,
       dirty: context.dirty ?? null,
-      ...(reviewConcernMap ? { reviewDebug: { reviewConcernMap } } : {}),
+      ...(reviewConcernMap
+        ? {
+            reviewDebug: {
+              reviewConcernMap,
+              ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+              ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
+            },
+          }
+        : {}),
       config: context.config,
       configPath: context.configPath,
       configSource: context.configSource,
@@ -696,6 +683,16 @@ export async function runLocalReview({
     model,
     apiKey,
     repoContext,
+  });
+  // #2455 Phase 3: observe-only planning bridge. It reuses the existing
+  // deterministic router and already-selected Skill metadata, but its output is
+  // never fed into reviewer selection, Skill selection, Gate, or execution.
+  const reviewConcernPlanning = buildReviewConcernPlanningObservation({
+    reviewConcernMap,
+    fileTypes: context.plan?.fileTypes,
+    riskAssessment: context.plan?.riskAssessment ?? null,
+    signals: context.plan?.reviewSignals,
+    selectedSkills: context.plan?.selected ?? [],
   });
 
   const reviewArgs = {
@@ -747,7 +744,18 @@ export async function runLocalReview({
   // Slice C enriches an existing execution observation with the selection
   // ledger from the boundary that actually filtered the diff. Counters/status/
   // units are never recomputed here.
-  const reviewCoverage = attachReviewFileScope(baseReviewCoverage, context.reviewFileScope);
+  const reviewCoverage = attachConcernRefsToReviewCoverage(
+    attachReviewFileScope(baseReviewCoverage, context.reviewFileScope),
+    reviewConcernMap
+  );
+
+  // #2541 Phase 4: project existing Review Coverage onto observed Concerns.
+  // This is debug-only evidence. It does not change Review Coverage, Gate,
+  // routing, findings, or the meaning of a completed Review Unit.
+  const reviewConcernCoverage = buildReviewConcernCoverageObservation({
+    reviewConcernMap,
+    reviewCoverage,
+  });
 
   // #687 PR-C: gate findings by Riverbed Memory suppressions.
   // Run AFTER fingerprint annotation so applySuppressions sees the canonical
@@ -841,6 +849,8 @@ export async function runLocalReview({
     reviewDebug: {
       ...(review.debug ?? {}),
       ...(reviewConcernMap ? { reviewConcernMap } : {}),
+      ...(reviewConcernPlanning ? { reviewConcernPlanning } : {}),
+      ...(reviewConcernCoverage ? { reviewConcernCoverage } : {}),
       suppressionsApplied,
       // #1606: fullFile supply ledger (which changed files were declared as
       // fullFile context vs skipped for budget/binary/generated/non-source).

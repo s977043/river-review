@@ -240,6 +240,156 @@ describe('#2334 fail-safe: no degraded path reads as clean', () => {
   });
 });
 
+describe('#2543 Finding Critic execution provenance observation', () => {
+  const enabled = { env: { [FINDING_CRITIC_OPT_IN_ENV]: '1' } };
+  const confirmed = async () => ({
+    result: {
+      status: FINAL_STATUS.CONFIRMED,
+      humanReview: false,
+      retainFinding: true,
+      reasons: [],
+      rounds: 1,
+      askRelevance: ASK_RELEVANCE.IN_ASK,
+    },
+  });
+
+  it('records one Phase 5A check per distinct finder execution', async () => {
+    const out = await runFindingCriticStage({
+      ...baseStageArgs(),
+      findings: [
+        {
+          ...FINDING,
+          sourceExecutionIds: [' finder-a ', 'finder-a', 'finder-b'],
+        },
+      ],
+      ...enabled,
+      verifierExecutionIds: ['verifier-a'],
+      runImpl: confirmed,
+    });
+
+    const observation = out.observation.executionIndependence[0];
+    assert.equal(observation.findingId, FINDING.id);
+    assert.equal(observation.verifierExecutionId, 'verifier-a');
+    assert.deepEqual(
+      observation.checks.map((check) => ({
+        finderRunId: check.finderRunId,
+        status: check.status,
+        independent: check.independent,
+      })),
+      [
+        { finderRunId: 'finder-a', status: 'independent', independent: true },
+        { finderRunId: 'finder-b', status: 'independent', independent: true },
+      ]
+    );
+  });
+
+  it('does not turn same-execution into independent verification', async () => {
+    const out = await runFindingCriticStage({
+      ...baseStageArgs(),
+      findings: [{ ...FINDING, sourceExecutionIds: ['same-exec'] }],
+      ...enabled,
+      verifierExecutionIds: ['same-exec'],
+      runImpl: confirmed,
+    });
+
+    const [check] = out.observation.executionIndependence[0].checks;
+    assert.equal(check.status, 'same-execution');
+    assert.equal(check.independent, false);
+    assert.equal(check.reasonCode, 'same-run-id');
+  });
+
+  it('keeps missing finder provenance unknown', async () => {
+    const out = await runFindingCriticStage({
+      ...baseStageArgs(),
+      ...enabled,
+      verifierExecutionIds: ['verifier-a'],
+      runImpl: confirmed,
+    });
+
+    const [check] = out.observation.executionIndependence[0].checks;
+    assert.equal(check.status, 'unknown');
+    assert.equal(check.independent, false);
+    assert.equal(check.reasonCode, 'finder-run-id-missing');
+  });
+
+  it('does not report a planned verifier id when the Critic never executes', async () => {
+    const out = await runFindingCriticStage({
+      ...baseStageArgs(),
+      findings: [{ ...FINDING, sourceExecutionIds: ['finder-a'] }],
+      ...enabled,
+      llmAvailable: false,
+      verifierExecutionIds: ['planned-verifier'],
+      runImpl: async () => {
+        throw new Error('must not be called');
+      },
+    });
+
+    const observation = out.observation.executionIndependence[0];
+    const [check] = observation.checks;
+    assert.equal(observation.verifierExecutionId, null);
+    assert.equal(check.status, 'unknown');
+    assert.equal(check.independent, false);
+    assert.equal(check.reasonCode, 'verifier-run-id-missing');
+  });
+
+  it('the orchestrator allocates Critic ids through the same host allocator', async () => {
+    const allocated = [];
+    const result = await runReviewerOrchestration({
+      diff: {
+        diffText: DIFF_TEXT,
+        files: [{ path: 'src/lib/fetch-url.mjs', addedLines: [1, 2], hunks: [] }],
+      },
+      plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+      phase: 'midstream',
+      dryRun: true,
+      reviewers: ['bug-hunter'],
+      quiet: true,
+      config: { review: { findingCritic: { mode: 'active' } } },
+      createExecutionId: ({ unitId }) => {
+        allocated.push(unitId);
+        return `exec:${unitId}`;
+      },
+      generateReviewImpl: async () => ({
+        comments: [],
+        findings: [{ ...FINDING, id: undefined }],
+        classified: { overview: [], overflow: [] },
+        debug: { llmUsed: true },
+      }),
+    });
+
+    assert.deepEqual(allocated, ['reviewer:bug-hunter/chunk:1', 'finding-critic:rr-1']);
+    const observation = result.debug.findingCritic.executionIndependence[0];
+    assert.equal(observation.verifierExecutionId, null, 'dry-run did not execute the Critic');
+    assert.equal(observation.checks[0].reasonCode, 'verifier-run-id-missing');
+  });
+
+  it('rejects a Critic execution id that collides with a finder execution id', async () => {
+    await assert.rejects(
+      () =>
+        runReviewerOrchestration({
+          diff: {
+            diffText: DIFF_TEXT,
+            files: [{ path: 'src/lib/fetch-url.mjs', addedLines: [1, 2], hunks: [] }],
+          },
+          plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+          phase: 'midstream',
+          dryRun: true,
+          reviewers: ['bug-hunter'],
+          quiet: true,
+          config: { review: { findingCritic: { mode: 'active' } } },
+          createExecutionId: () => 'same-exec',
+          generateReviewImpl: async () => ({
+            comments: [],
+            findings: [{ ...FINDING, id: undefined }],
+            classified: { overview: [], overflow: [] },
+            debug: { llmUsed: true },
+          }),
+        }),
+      /Duplicate review execution id: same-exec/
+    );
+  });
+});
+
 describe('#2334 default path is unchanged (no injection point used)', () => {
   // These call generateReview / runReviewerOrchestration with their DEFAULT
   // arguments — no runImpl, no env override, no config. `env: {}` is not passed
@@ -332,6 +482,11 @@ describe('#2334 the production wiring in generateReview (no runImpl injected)', 
     assert.ok(observation, 'debug.execution.findingCritic must be recorded when enabled');
     assert.equal(observation.evaluated, result.findings.length);
     assert.equal(observation.dropped, 0);
+    assert.equal(
+      Object.hasOwn(observation, 'executionIndependence'),
+      false,
+      'single-reviewer Critic path has no host-owned finder/verifier execution provenance'
+    );
   });
 
   it('is enabled by the env var alone, with no config', async () => {

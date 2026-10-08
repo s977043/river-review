@@ -93,6 +93,34 @@ src/lib/finding-critic.mjs
 The helper is not imported by normal runtime paths in Phase 5A.
 This keeps the existing Finding Critic behavior, normal PR latency, token usage, and Gate behavior unchanged.
 
+### Phase 5B prerequisite observation (#2543)
+
+After #2481, reviewer task execution IDs are available. The existing opt-in Finding Critic path can now observe the minimum Phase 5A relationship without promoting the Critic or changing judgment semantics.
+
+The bridge is intentionally narrow:
+
+```text
+merged finding.sourceExecutionIds[]
+  + orchestrator-assigned Critic execution id
+  -> evaluateReviewerIndependence() per source execution
+  -> debug Finding Critic observation only
+```
+
+The Critic runner does not mint its own identity. Before the Critic stage starts, the multi-reviewer orchestrator allocates the verifier execution ID. It uses the same host-owned allocator as reviewer tasks and rejects collisions with finder execution IDs.
+
+If the Critic does not actually execute, a preallocated ID is not reported as executed verifier provenance. Missing finder or verifier provenance therefore remains `unknown` rather than being upgraded to independent.
+
+This observation does not:
+
+- change `validation.finalStatus`
+- change severity, consensus, decision, or Gate
+- add a Review Artifact schema field
+- prove actor/model/provider/context isolation
+- satisfy the #1978 paired-evaluation promotion gate
+- enable the Finding Critic by default
+
+A merged finding may carry multiple source execution IDs. The bridge records one existing Phase 5A check per distinct source execution and does not invent a majority or aggregate correctness verdict.
+
 ## Security Audit integration boundary
 
 When Phase 5B becomes eligible, an explicit focused or full Security Audit may use the contract as a precondition.
@@ -231,3 +259,10 @@ Phase 5A is ready when:
 - #1760 ownership is preserved
 - targeted and existing Finding Critic regression tests pass
 - repository CI passes
+
+## #2543 convergence note
+
+The runtime wiring in #2543 remains observation-only.
+The latest-main reconstruction preserves the existing Finding Critic opt-in boundary.
+Generated GitHub Action dist is rebuilt by the repository automation.
+Merge readiness is decided only from checks on the final human-authored head.

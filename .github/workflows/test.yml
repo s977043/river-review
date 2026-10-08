@@ -195,6 +195,29 @@ jobs:
       - name: Check registry structural-field freshness
         run: npm run skills:registry:check
 
+  # #2202 Phase 3: flags a skill whose review criteria changed without a
+  # `version` bump. Advisory: this job is NOT a required check, and adding it to
+  # branch protection is a separate decision. pull_request only, because the base
+  # is the merge commit's first parent (the #1775 reasoning in dist-check).
+  skill-version-bump:
+    name: Skill version bump (advisory)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-deps
+      - name: Check skill version bumps
+        run: |
+          if [ -z "$(git rev-parse --verify --quiet 'HEAD^2' || true)" ]; then
+            echo "HEAD is not the pull request merge commit; cannot resolve the base." >&2
+            exit 2
+          fi
+          npm run skills:version:check -- --base HEAD^1 --head HEAD
+
   meta-check:
     name: Meta consistency
     runs-on: ubuntu-latest

@@ -21,6 +21,9 @@
 //   node scripts/build-review-viewpoint-band-diffs.mjs
 //   npx prettier --write tests/fixtures/review-viewpoints/band-diffs.generated.mjs
 //
+//   node scripts/build-review-viewpoint-band-diffs.mjs --skill async-correctness
+//   npx prettier --write tests/fixtures/review-viewpoints/async-correctness-band-diffs.generated.mjs
+//
 // The second command is required: this script emits plain JSON string literals
 // and does not reproduce prettier's line wrapping, so `npm run lint` fails on a
 // freshly generated file until prettier has rewritten it.
@@ -33,13 +36,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
-const OUT = path.join(
-  repoRoot,
-  'tests',
-  'fixtures',
-  'review-viewpoints',
-  'band-diffs.generated.mjs'
-);
+const FIXTURE_DIR = path.join(repoRoot, 'tests', 'fixtures', 'review-viewpoints');
 
 const DTO_BASE = `interface UserResponse {
   id: string;
@@ -203,6 +200,188 @@ interface AccountResponse {
   },
 ];
 
+// async-correctness (#2252 Phase 7). Each changed line sits within three lines
+// of the `async` declaration it calls, so the default band carries the
+// declaration the signal producer needs and the u0 band does not.
+export const ASYNC_SCENARIOS = [
+  {
+    key: 'ab01-condition-unawaited',
+    file: 'src/jobs/runner.ts',
+    base: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function runJob(id: string): Promise<void> {
+  if (await isLocked(id)) {
+    return;
+  }
+  await process(id);
+}
+`,
+    after: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function runJob(id: string): Promise<void> {
+  if (isLocked(id)) {
+    return;
+  }
+  await process(id);
+}
+`,
+    rival: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function runJob(id: string): Promise<void> {
+  if (paused || (await isLocked(id))) {
+    return;
+  }
+  await process(id);
+}
+`,
+    resolution: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function runJob(id: string): Promise<void> {
+  if (paused || isLocked(id)) {
+    return;
+  }
+  await process(id);
+}
+`,
+  },
+  {
+    key: 'ab02-foreach-async-callback',
+    file: 'src/sync/save.ts',
+    base: `export async function saveAll(items: Item[]): Promise<void> {
+  for (const item of items) {
+    await save(item);
+  }
+  await flush();
+}
+`,
+    after: `export async function saveAll(items: Item[]): Promise<void> {
+  items.forEach(async (item) => {
+    await save(item);
+  });
+  await flush();
+}
+`,
+    rival: `export async function saveAll(items: Item[]): Promise<void> {
+  for (const item of items.filter(Boolean)) {
+    await save(item);
+  }
+  await flush();
+}
+`,
+    resolution: `export async function saveAll(items: Item[]): Promise<void> {
+  items.filter(Boolean).forEach(async (item) => {
+    await save(item);
+  });
+  await flush();
+}
+`,
+  },
+  {
+    key: 'ab03-return-in-try-unawaited',
+    file: 'src/users/load.ts',
+    base: `const fetchUser = async (id: string): Promise<User> => http.get(\`/users/\${id}\`);
+export async function loadUser(id: string): Promise<User | null> {
+  try {
+    return await fetchUser(id);
+  } catch {
+    return null;
+  }
+}
+`,
+    after: `const fetchUser = async (id: string): Promise<User> => http.get(\`/users/\${id}\`);
+export async function loadUser(id: string): Promise<User | null> {
+  try {
+    return fetchUser(id);
+  } catch {
+    return null;
+  }
+}
+`,
+    rival: `const fetchUser = async (id: string): Promise<User> => http.get(\`/users/\${id}\`);
+export async function loadUser(id: string): Promise<User | null> {
+  try {
+    return await fetchUser(id.trim());
+  } catch {
+    return null;
+  }
+}
+`,
+    resolution: `const fetchUser = async (id: string): Promise<User> => http.get(\`/users/\${id}\`);
+export async function loadUser(id: string): Promise<User | null> {
+  try {
+    return fetchUser(id.trim());
+  } catch {
+    return null;
+  }
+}
+`,
+  },
+  {
+    key: 'ab04-await-added',
+    file: 'src/jobs/cleanup.ts',
+    base: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function cleanup(id: string): Promise<void> {
+  if (isLocked(id)) {
+    return;
+  }
+  await remove(id);
+}
+`,
+    after: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function cleanup(id: string): Promise<void> {
+  if (await isLocked(id)) {
+    return;
+  }
+  await remove(id);
+}
+`,
+    rival: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function cleanup(id: string): Promise<void> {
+  if (isLocked(id) || dryRun) {
+    return;
+  }
+  await remove(id);
+}
+`,
+    resolution: `const isLocked = async (id: string): Promise<boolean> => store.has(id);
+export async function cleanup(id: string): Promise<void> {
+  if ((await isLocked(id)) || dryRun) {
+    return;
+  }
+  await remove(id);
+}
+`,
+  },
+  {
+    key: 'ab05-void-fire-and-forget',
+    file: 'src/api/checkout.ts',
+    base: `const trackEvent = async (name: string): Promise<void> => analytics.send(name);
+export async function checkout(cart: Cart): Promise<Receipt> {
+  const receipt = await submitOrder(cart);
+  await trackEvent('checkout_completed');
+  return receipt;
+}
+`,
+    after: `const trackEvent = async (name: string): Promise<void> => analytics.send(name);
+export async function checkout(cart: Cart): Promise<Receipt> {
+  const receipt = await submitOrder(cart);
+  void trackEvent('checkout_completed').catch((err) => logger.warn(err));
+  return receipt;
+}
+`,
+    rival: `const trackEvent = async (name: string): Promise<void> => analytics.send(name);
+export async function checkout(cart: Cart): Promise<Receipt> {
+  const receipt = await submitOrder(cart);
+  await trackEvent('checkout_done');
+  return receipt;
+}
+`,
+    resolution: `const trackEvent = async (name: string): Promise<void> => analytics.send(name);
+export async function checkout(cart: Cart): Promise<Receipt> {
+  const receipt = await submitOrder(cart);
+  void trackEvent('checkout_done').catch((err) => logger.warn(err));
+  return receipt;
+}
+`,
+  },
+];
+
 function git(cwd, args) {
   return execFileSync('git', args, {
     cwd,
@@ -279,8 +458,8 @@ function buildOne(scenario) {
   }
 }
 
-export function buildBandDiffs() {
-  return Object.fromEntries(SCENARIOS.map((scenario) => [scenario.key, buildOne(scenario)]));
+export function buildBandDiffs(scenarios = SCENARIOS) {
+  return Object.fromEntries(scenarios.map((scenario) => [scenario.key, buildOne(scenario)]));
 }
 
 // Real commits from THIS repository. Chosen so the corpus is not made only of
@@ -332,9 +511,44 @@ export const REPO_COMMITS = [
   },
 ];
 
-export function buildRepoCommitDiffs() {
+// Real async code from THIS repository: new modules whose every async call is
+// awaited. They are the precision rows for async-correctness.
+export const ASYNC_REPO_COMMITS = [
+  {
+    key: 'arc01-review-viewpoints-loader-default',
+    band: 'default',
+    args: ['show', '--format=', '-U3', '8c67ff88', '--', 'src/lib/review-viewpoints.mjs'],
+  },
+  {
+    key: 'arc02-review-viewpoint-stage-default',
+    band: 'default',
+    args: ['show', '--format=', '-U3', 'a7300837', '--', 'src/lib/review-viewpoint-stage.mjs'],
+  },
+  {
+    key: 'arc03-review-viewpoint-stage-u0',
+    band: 'u0',
+    args: ['show', '--format=', '-U0', 'a7300837', '--', 'src/lib/review-viewpoint-stage.mjs'],
+  },
+];
+
+const TARGETS = {
+  'api-compatibility': {
+    out: 'band-diffs.generated.mjs',
+    corpusFile: 'corpus.mjs',
+    scenarios: SCENARIOS,
+    repoCommits: REPO_COMMITS,
+  },
+  'async-correctness': {
+    out: 'async-correctness-band-diffs.generated.mjs',
+    corpusFile: 'async-correctness-corpus.mjs',
+    scenarios: ASYNC_SCENARIOS,
+    repoCommits: ASYNC_REPO_COMMITS,
+  },
+};
+
+export function buildRepoCommitDiffs(commits = REPO_COMMITS) {
   return Object.fromEntries(
-    REPO_COMMITS.map((entry) => {
+    commits.map((entry) => {
       const text = git(repoRoot, entry.args);
       if (!text.trim()) {
         throw new Error(`repo commit capture produced no diff: ${entry.key}`);
@@ -344,13 +558,13 @@ export function buildRepoCommitDiffs() {
   );
 }
 
-function serialize(bandDiffs, repoCommitDiffs) {
+function serialize(bandDiffs, repoCommitDiffs, corpusFile) {
   const lines = [
     '// GENERATED by scripts/build-review-viewpoint-band-diffs.mjs -- do not edit by hand.',
     '//',
     '// Real `git show` output captured from a disposable repository, in three',
     '// input bands (-U3 / -U0 / --cc). The labels for these diffs live in',
-    '// tests/fixtures/review-viewpoints/corpus.mjs and are written by hand.',
+    `// tests/fixtures/review-viewpoints/${corpusFile} and are written by hand.`,
     '',
     'export const bandDiffs = {',
   ];
@@ -377,13 +591,18 @@ function serialize(bandDiffs, repoCommitDiffs) {
 }
 
 async function main() {
-  const bandDiffs = buildBandDiffs();
-  const repoCommitDiffs = buildRepoCommitDiffs();
+  const skillIndex = process.argv.indexOf('--skill');
+  const skillId = skillIndex === -1 ? 'api-compatibility' : process.argv[skillIndex + 1];
+  const target = TARGETS[skillId];
+  if (!target) throw new Error(`unknown --skill: ${String(skillId)}`);
+  const OUT = path.join(FIXTURE_DIR, target.out);
+  const bandDiffs = buildBandDiffs(target.scenarios);
+  const repoCommitDiffs = buildRepoCommitDiffs(target.repoCommits);
   if (process.argv.includes('--print')) {
     process.stdout.write(JSON.stringify({ bandDiffs, repoCommitDiffs }, null, 2));
     return;
   }
-  writeFileSync(OUT, serialize(bandDiffs, repoCommitDiffs));
+  writeFileSync(OUT, serialize(bandDiffs, repoCommitDiffs, target.corpusFile));
   process.stdout.write(`wrote ${path.relative(repoRoot, OUT)}\n`);
 }
 

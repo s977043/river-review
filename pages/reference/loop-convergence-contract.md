@@ -35,6 +35,8 @@ Issue #2441 以降は、最新 run の saved record にある `llmNotExecuted: t
 
 この条件は、振動の判定を打ち消すのではなく保留します。absent 側の run が不完全なあいだ、その absent は根拠として数えられないままです。したがって coverage が恒常的に `partial` / `not_executed` な環境では `STOP_OSCILLATED` に到達しません。`coverage` の粒度も効きます。`reviewCoverage` は run 単位の観測であり、finding を担当した review unit 単位ではありません。そのため、その finding と無関係な unit だけがタイムアウトした run でも、absent は同じように割り引かれます。より細かい判定には finding 側の unit 帰属が必要で、現在の run record はそれを持ちません。本物の振動を確実にエスカレーションしたい caller は、Layer 3 の `STOP_MAX_ITERATIONS` など上限側の停止条件を併せて持ってください。
 
+Issue #2467 以降、saved record に `llmNotExecuted: true` を持つ run は、`river runs diff` の両経路で coverage `not_executed` として扱います。この run は `reviewCoverage` を持たないため従来は `unknown` となり、空の findings が本物の absent として数えられていました。3 run 以上の経路では、この run の absent を振動の根拠に数えません。最新 run がこの run にあたる場合、`resolved` の各 entry と `summary.currentCoverageStatus` は `not_executed` を示し、`summary.absenceMayBeUnexecuted` は `true` になります。2 run 経路と 3 run 以上の経路のどちらでも同じです。differ は `llmNotExecuted` を再判定せず、記録された値が `true` のときだけこの扱いにします。キーを持たない record と `false` の record はこれまでどおりです。
+
 降格ではなく検知側の条件としました。理由は、`deriveLoopSignalFromRunsDiff` から読めるのが最新 run の coverage だけという点にあります。present → absent → present の最新 run は finding が present 側にあたり、疑うべき absent は手前の run にあります。したがって最新 run の coverage は振動の真偽を判定する観測値になりません。判定は run ごとの timeline を持つ `review-differ.mjs` 側に置いています。
 
 **Layer 3** — 呼び出し元が合成（River Review は意図的に出力**しない**）:

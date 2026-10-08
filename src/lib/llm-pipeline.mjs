@@ -56,7 +56,37 @@ export function computeBackoffMs(
   return Math.min(baseMs * 2 ** Math.max(0, attempt - 1), LLM_MAX_BACKOFF_MS);
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function abortError(signal) {
+  if (signal?.reason instanceof Error) return signal.reason;
+  const err = new Error('The operation was aborted');
+  err.name = 'AbortError';
+  return err;
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw abortError(signal);
+}
+
+function sleep(ms, signal) {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function attemptSignal(timeoutMs, signal) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
 
 /**
  * Call an OpenAI-compatible chat-completion endpoint with timeout and
@@ -77,6 +107,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {number} [params.maxTokens]
  * @param {number} [params.timeoutMs]     Per-attempt timeout (default 15000).
  * @param {number} [params.maxAttempts]   Total attempts incl. first (default 3).
+ * @param {AbortSignal} [params.signal]    Host cancellation signal. External aborts are never retried.
  * @param {typeof fetch} [params.fetchImpl] Injectable transport for tests (#1357).
  * @param {number} [params.baseMs]        Retry backoff base ms (injectable for tests).
  * @returns {Promise<string>}
@@ -91,6 +122,7 @@ export async function callChatCompletion({
   maxTokens,
   timeoutMs = LLM_TIMEOUT_MS,
   maxAttempts = LLM_MAX_ATTEMPTS,
+  signal,
   fetchImpl = globalThis.fetch,
   baseMs = LLM_RETRY_BASE_MS,
 }) {
@@ -106,10 +138,11 @@ export async function callChatCompletion({
 
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    throwIfAborted(signal);
     try {
       const res = await fetchImpl(endpoint, {
         method: 'POST',
-        signal: AbortSignal.timeout(timeoutMs), // fresh per attempt (one-shot)
+        signal: attemptSignal(timeoutMs, signal), // fresh timeout + host cancellation per attempt
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body,
       });
@@ -124,7 +157,8 @@ export async function callChatCompletion({
       const detail = await res.text();
       if (attempt < maxAttempts && isRetryableStatus(res.status)) {
         await sleep(
-          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') })
+          computeBackoffMs(attempt, { baseMs, retryAfterSec: res.headers?.get?.('retry-after') }),
+          signal
         );
         continue;
       }
@@ -134,8 +168,12 @@ export async function callChatCompletion({
       // A non-retryable HTTP error (thrown above) has a non-network message, so
       // isRetryableNetworkError returns false and it propagates immediately.
       lastError = err;
+      // A host cancellation is a terminal control signal, not a transient
+      // provider/network failure. Do not spend retry budget after the caller
+      // has explicitly ended the review task.
+      if (signal?.aborted) throw abortError(signal);
       if (attempt < maxAttempts && isRetryableNetworkError(err)) {
-        await sleep(computeBackoffMs(attempt, { baseMs }));
+        await sleep(computeBackoffMs(attempt, { baseMs }), signal);
         continue;
       }
       throw err;

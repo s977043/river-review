@@ -63,6 +63,24 @@ npx promptfoo eval
 - 環境変数参照
 - 短い文字列定数
 
+### Happy Path (fixtures/03-open-redirect-backslash-happy.md)
+
+検出するケース：
+
+- PHP `parse_url` でホスト一致を判定しているが、`\` を含む戻り先 URL を拒否していない
+
+### Edge Case (fixtures/04-open-redirect-relative-path-allowlist-guard.md)
+
+偽陽性を避けるケース：
+
+- 戻り先 URL を、単一の `/` で始まり `\` と制御文字を含まない相対パスだけに制限している
+
+### Happy Path (fixtures/05-open-redirect-null-host-bypass-happy.md)
+
+検出するケース：
+
+- `\` / `%5C` は拒否しているが、`parse_url` のホストが無い値（`http:evil.example` など）を素通ししている
+
 ## 設計判断
 
 ### なぜ midstream?

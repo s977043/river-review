@@ -8,11 +8,10 @@ export const modules = {
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   PairedReplayError: () => (/* binding */ PairedReplayError),
 /* harmony export */   XZ: () => (/* binding */ deriveCaseKey),
-/* harmony export */   _h: () => (/* binding */ verifyExperimentManifest),
 /* harmony export */   buildPairedReplay: () => (/* binding */ buildPairedReplay),
 /* harmony export */   formatPairedReplayMarkdown: () => (/* binding */ formatPairedReplayMarkdown)
 /* harmony export */ });
-/* unused harmony exports PAIRED_REPLAY_SCHEMA_VERSION, PAIRED_REPLAY_COLLECTOR_VERSION, PAIRED_REPLAY_EVALUATOR_VERSION, MANIFEST_ID_PREFIX, TERMINAL_REASONS, SUPPORTED_ACCEPTANCE_METRICS, METRIC_DENOMINATORS, ACCEPTANCE_COMPARATORS, buildExperimentManifest, pairFindings, evaluateAcceptance */
+/* unused harmony exports PAIRED_REPLAY_SCHEMA_VERSION, PAIRED_REPLAY_COLLECTOR_VERSION, PAIRED_REPLAY_EVALUATOR_VERSION, MANIFEST_ID_PREFIX, TERMINAL_REASONS, SUPPORTED_ACCEPTANCE_METRICS, METRIC_DENOMINATORS, ACCEPTANCE_COMPARATORS, buildExperimentManifest, verifyExperimentManifest, pairFindings, evaluateAcceptance */
 /* harmony import */ var _promotion_candidates_mjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3077);
 /* harmony import */ var _shadow_aggregate_mjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(4029);
 // Paired replay (#1574 P2) — immutable Experiment Manifest + paired diffing.

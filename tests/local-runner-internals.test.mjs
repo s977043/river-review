@@ -7,51 +7,7 @@ import {
   shouldSkipByLabel,
   resolveAvailableContexts,
   resolveAvailableDependencies,
-  resolvePullRequestBody,
 } from '../src/lib/local-runner.mjs';
-
-describe('resolvePullRequestBody', () => {
-  test('returns RIVER_PR_BODY env when set', async () => {
-    const prev = process.env.RIVER_PR_BODY;
-    const prevEvent = process.env.GITHUB_EVENT_PATH;
-    process.env.RIVER_PR_BODY = '## Why\nbecause';
-    delete process.env.GITHUB_EVENT_PATH;
-    try {
-      assert.equal(await resolvePullRequestBody(), '## Why\nbecause');
-    } finally {
-      if (prev === undefined) delete process.env.RIVER_PR_BODY;
-      else process.env.RIVER_PR_BODY = prev;
-      if (prevEvent !== undefined) process.env.GITHUB_EVENT_PATH = prevEvent;
-    }
-  });
-
-  test('returns null when no env and no event path', async () => {
-    const prev = process.env.RIVER_PR_BODY;
-    const prevEvent = process.env.GITHUB_EVENT_PATH;
-    delete process.env.RIVER_PR_BODY;
-    delete process.env.GITHUB_EVENT_PATH;
-    try {
-      assert.equal(await resolvePullRequestBody(), null);
-    } finally {
-      if (prev !== undefined) process.env.RIVER_PR_BODY = prev;
-      if (prevEvent !== undefined) process.env.GITHUB_EVENT_PATH = prevEvent;
-    }
-  });
-
-  test('treats blank RIVER_PR_BODY as absent', async () => {
-    const prev = process.env.RIVER_PR_BODY;
-    const prevEvent = process.env.GITHUB_EVENT_PATH;
-    process.env.RIVER_PR_BODY = '   \n ';
-    delete process.env.GITHUB_EVENT_PATH;
-    try {
-      assert.equal(await resolvePullRequestBody(), null);
-    } finally {
-      if (prev === undefined) delete process.env.RIVER_PR_BODY;
-      else process.env.RIVER_PR_BODY = prev;
-      if (prevEvent !== undefined) process.env.GITHUB_EVENT_PATH = prevEvent;
-    }
-  });
-});
 
 // ---------------------------------------------------------------------------
 // normalizePhase

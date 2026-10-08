@@ -1,7 +1,7 @@
 ---
 id: 'modern-web-a11y-interactive'
 name: Modern Web Accessibility for Interactive UI
-description: キーボード操作 / focus 管理 / 動的コンテンツ更新 / ARIA role など、インタラクティブ UI のアクセシビリティ観点を suggestion で提示する。
+description: キーボード操作 / focus 管理 / 動的コンテンツ更新 / ARIA role / フォームの自動遷移など、インタラクティブ UI のアクセシビリティ観点を suggestion で提示する。
 version: 0.1.0
 category: midstream
 phase: midstream
@@ -38,6 +38,7 @@ modelHint: balanced
 - `tabIndex` / `aria-*` 属性が既に明示的に設定されている差分（意図的な制御）は指摘しない。
 - 差分が CSS のみのスタイル微調整（色変更・余白調整など）で、interaction が変わらない場合は指摘しない。
 - focus visibility 関連で `:focus-visible` / `outline` が既に明示制御されている場合は新たに指摘しない。
+- 任意の設問に「回答しない」などのスキップ用の選択肢や操作が明示されている場合は、フォームの自動遷移による任意項目の実質必須化として指摘しない。
 
 ## Rule / ルール
 
@@ -68,6 +69,13 @@ modelHint: balanced
 - 選択リスト (radio group, listbox, combobox) には role / `aria-selected` / `aria-checked` の整合を確認する。
 - 「装飾要素」と「操作要素」が混在しているマークアップでは `aria-hidden` / `pointer-events` の使い分けに触れる。
 
+### フォームの自動遷移
+
+- 単一選択（radio）1 問だけのステップで「次へ」ボタンを隠し、選択時に自動で次へ進める差分では、自動遷移の条件に `required` が含まれているかを確認する。
+- radio は未選択に戻せないため、任意の設問まで自動遷移の対象にすると、答えない限り先へ進めず、任意項目が実質必須になる。
+- 改善案は明示的な「次へ」ボタンを残す形を第一にする。ネイティブの radio group は矢印キーで選択が移り、そのたびに `onChange` が発火する。そのため選択変更で進める実装は、キーボード利用者を最初の矢印キーで先へ進めてしまう（WCAG SC 3.2.2 On Input が扱う、入力による予期しない状況の変化）。
+- 自動遷移を残す場合は、必須の設問に限ったうえで、`onChange` ではなくクリックや Enter など明示的な操作を起点にする案を示す。
+
 ### Focus visibility
 
 - 差分で `outline: none` / `:focus { outline: 0 }` を新たに追加する場合は、`:focus-visible` 代替の検討を強く促す。
@@ -87,6 +95,7 @@ modelHint: balanced
 - `aria-live` / `role="status"` 無しで動的にメッセージを差し込んでいる差分。
 - `outline: none` / `outline: 0` を新規追加。
 - positive `tabIndex` (1 以上) の使用。
+- radio の `onChange` から次ステップへ進める処理と「次へ」ボタンの非表示が同じ条件で切り替わり、その条件に `required` が無い。
 
 ## Actions / 改善案
 
@@ -96,7 +105,7 @@ modelHint: balanced
 
 ## Output / 出力
 
-- `Finding:` 該当 UI パターン名 + a11y 観点（keyboard / focus / live region / role / focus visibility）
+- `Finding:` 該当 UI パターン名 + a11y 観点（keyboard / focus / live region / role / form flow / focus visibility）
 - `Evidence:` 差分のコード抜粋 + 該当行
 - `Suggestion:` 代替 API / ARIA 属性 / library コンポーネント
 - `Severity:` minor 固定
@@ -104,7 +113,7 @@ modelHint: balanced
 
 ## 評価指標（Evaluation）
 
-- 合格基準: 差分の interactive UI に直接根拠があり、a11y 観点（keyboard / focus / role / live region / focus visibility）の 1 つ以上を具体的に指摘し、代替手段が示されている。
+- 合格基準: 差分の interactive UI に直接根拠があり、a11y 観点（keyboard / focus / role / live region / form flow / focus visibility）の 1 つ以上を具体的に指摘し、代替手段が示されている。
 - 不合格基準: 「アクセシビリティが心配です」のような曖昧表現、差分と無関係な一般論、強制トーン、false-positive guards 無視、accessible name の二重指摘（既存 skill のスコープ）。
 
 ## 人間に返す条件（Human Handoff）

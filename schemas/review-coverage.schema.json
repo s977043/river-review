@@ -74,6 +74,12 @@
           "minLength": 1,
           "description": "Opaque logical execution id assigned by the orchestration host before this reviewer task starts. Observation-only provenance: it is not actor identity, a signature, a trust signal, or proof of independent verification."
         },
+        "concernRefs": {
+          "type": "array",
+          "description": "Optional observe-only Review Concern ids whose subjects overlap this Review Unit. Missing refs do not make coverage partial or failed and have no Gate authority.",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
         "kind": { "type": "string", "enum": ["diff-chunk"] },
         "subjects": {
           "type": "array",

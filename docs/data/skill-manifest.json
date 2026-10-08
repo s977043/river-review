@@ -6,7 +6,7 @@
     {
       "id": "a11y-accessible-name",
       "path": "skills/midstream/a11y-accessible-name",
-      "checksum": "sha256:9fe48476ff9cc15fe58b9ad9910c4eb080e6e36613a80ab8ab10af7da4115750",
+      "checksum": "sha256:d93ea929d40573d63778b100293a5e6e15c0af64520c31011178dacc50367a9f",
       "files": 9
     },
     {
@@ -96,8 +96,8 @@
     {
       "id": "async-correctness",
       "path": "skills/midstream/async-correctness",
-      "checksum": "sha256:3c05d7b721fff339d103e89cde93446d47cc051a23b70ca278a2a500059bb66b",
-      "files": 3
+      "checksum": "sha256:846930c4add4bb95fd3aacacc72fe897f6442f7bd394f2e363308c2b0db7f644",
+      "files": 4
     },
     {
       "id": "availability-architecture",
@@ -240,7 +240,7 @@
     {
       "id": "design-token-enforcement",
       "path": "skills/midstream/design-token-enforcement",
-      "checksum": "sha256:774efb0868b06e6fa55cab81f83c60d9f86f59da68b6a505f25c4e6ac7b6f764",
+      "checksum": "sha256:787cb5928e0a371060a729cc17f15497911681899bbced48f4e3019571d3ae1e",
       "files": 9
     },
     {
@@ -354,7 +354,7 @@
     {
       "id": "independent-review-synthesis",
       "path": "skills/midstream/independent-review-synthesis",
-      "checksum": "sha256:120affd932c3b2f3ed994df7b8bb25af9473863fdea1138d4a01ce7e251e717c",
+      "checksum": "sha256:323fc96e56820703ffa3b5c78355b3f5d00a5356e30e0a601ca974e03b867321",
       "files": 9
     },
     {
@@ -426,25 +426,25 @@
     {
       "id": "modern-web-a11y-interactive",
       "path": "skills/midstream/modern-web-a11y-interactive",
-      "checksum": "sha256:2f0af16ae83ae5421b30423106e1f569c4c1d1ca5f64fa501ecaf27f127a12df",
-      "files": 9
+      "checksum": "sha256:89790550eb588912f3aeab1df11f94c2e68a92a65027e3fc8c141f9d4d1afa41",
+      "files": 11
     },
     {
       "id": "modern-web-browser-compat",
       "path": "skills/midstream/modern-web-browser-compat",
-      "checksum": "sha256:cfea908e05b007b1e879ed1e63d8ade557c019b30d4f008bb57f677abb749679",
+      "checksum": "sha256:fbc1aa35ed81869eea37051058b71d36d46390d61a2bfe9d5fc98342877a884c",
       "files": 9
     },
     {
       "id": "modern-web-performance",
       "path": "skills/midstream/modern-web-performance",
-      "checksum": "sha256:1403f1ce365f522d4311835cdc5b9c27a537ad2a01e7ee1a97b90ec8d56bf430",
+      "checksum": "sha256:bb7bff9f280bbc14c4dde299a49b3610ca808a135b6aa4c9a17373b09e762346",
       "files": 9
     },
     {
       "id": "modern-web-semantic",
       "path": "skills/midstream/modern-web-semantic",
-      "checksum": "sha256:faf548938677fea7ec195008514f4f07e30ec466745f2b2ec3e817013a7bf0a5",
+      "checksum": "sha256:5ea24485b12aafbd63b8b37f5c656754aafbb4c90f5896874ca8c9a4ba307a28",
       "files": 9
     },
     {
@@ -456,7 +456,7 @@
     {
       "id": "nextjs-app-router-boundary",
       "path": "skills/midstream/nextjs-app-router-boundary",
-      "checksum": "sha256:102e5b043d6dd4f8e2ed66560218f537bb4e82e863955a0ada6331c2d609c943",
+      "checksum": "sha256:191ba0a3ce17345f902ae0f3c34f8b80f8c0411a011dd41596450840da678383",
       "files": 9
     },
     {
@@ -618,8 +618,8 @@
     {
       "id": "river-review",
       "path": "skills/agent-skills/river-review",
-      "checksum": "sha256:8cb0373becd422a9b9482adc5d0d8cce676acd7941cb3ae2c56190b34a0841a6",
-      "files": 10
+      "checksum": "sha256:536d530b6b3f089fb5fa6d4863ee8a2b6d05bb82d055ffbc2f137bfd3dc99628",
+      "files": 11
     },
     {
       "id": "river-review-architecture",
@@ -678,8 +678,8 @@
     {
       "id": "security-basic",
       "path": "skills/midstream/security-basic",
-      "checksum": "sha256:9442d34e67f637296b18aecdbbf3f059c8647855f8b829b18567bfe7d7f53ba6",
-      "files": 9
+      "checksum": "sha256:f59f3c29b80853df78463d0e2de9efe6f3c0ad97f70051e503bdd57c1f024e7d",
+      "files": 15
     },
     {
       "id": "security-privacy-design",

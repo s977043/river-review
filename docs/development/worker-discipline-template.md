@@ -195,6 +195,9 @@
 - textlint の exit 0 を報告する前に、ルールが有効なことを陽性対照で確かめること（ですます調とである調を混ぜた文書で exit 1 になるか）。
   `node_modules` のない worktree で `npx textlint` を実行すると、"No rules found" を出して exit 0 で終わる。
   2026-10-02 の PR #2466 では、この空振りを「textlint exit 0」として PR 本文に書いた（後で訂正）。
+- テストファイルの `beforeEach` / `afterEach` / `before` / `after` は `describe` の内側に置くこと。`npm test` は `--experimental-test-isolation=none` で全ファイルを 1 プロセスで実行するため、
+  トップレベルの hook は他ファイルのテストにも効く。2026-10-05 の PR #2519 では、env を消す hook が別ファイルの対照実行と食い違いを起こした。
+  `GITHUB_EVENT_PATH` を持つ CI でだけ必須の Unit tests が落ち、単独実行では緑のままだった。
 - **他セッションの PR を引き継いだ場合は、自分が変えたファイルだけでなく `npm run format:check`（CI と同じリポジトリ全体）を実行すること。**
   引き継いだ PR には、自分が触っていないファイルの違反が残っていることがある。2026-09-24 の PR #2403 では、
   ワーカーが変更した 2 ファイルだけに prettier を流して exit 0 と報告し、PR にもともと含まれていた
@@ -231,6 +234,16 @@
   `--gate --dry-run` が 1 つの引数として渡る。引数はそのまま書くか、配列を使う。
 - 一時ファイルは `mktemp -d` で作ったディレクトリに置くこと。`/tmp` 直下へ固定名で書くと、並行するワーカーと衝突する。
   また、`rm` が権限で拒否されると後片付けできずに残る（2026-10-02 の範囲レビューで 2 本が `/tmp/mut.out` などを残した）。
+- Bash で `cd` しないこと。`git -C <path>`・絶対パス・`npm --prefix <path>` で、作業ディレクトリを変えずに呼ぶ。2026-10-07 の
+  PermissionRequest hook の実ログ（全リポジトリ 331 件）では、確認ダイアログの 41%（135 件）が先頭 `cd` の Bash だった
+  （user 設定に `Bash(cd:*)` があっても、作業ディレクトリ外への `cd` は auto mode の classifier が確認を求める）。
+- push 後に `Auto Rebuild Action Dist` bot が head を進めると、CI は `action_required` で止まる。待たずに、その旨と最新の
+  head SHA を完了報告に書くこと（脱出手順は `docs/runbook/bot-pushed-head-kick.md`。オーガナイザーが自分のアカウントで
+  空コミットを push する）。2026-10-07 の PR #2558 で発生した。
+- commit が失敗して lint-staged の自動 stash（"lint-staged automatic backup"）が残ったら、drop も apply もしないこと。
+  `git stash list` の該当行を完了報告に転記する。2026-10-07 の PR #2556 で発生した。
+- commit message は header と本文の各行を 100 文字以内にすること（commitlint の `header-max-length` /
+  `body-max-line-length`）。長い URL やパスは行を分ける。
 ```
 
 ## 委託プロンプト骨格
