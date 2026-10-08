@@ -191,9 +191,10 @@ export function buildReviewResolutionFeedbackProposals({
       // the canonical source Review Artifact. Reuse the Organizer's identity
       // resolver rather than treating a self-contained fingerprint as truth.
       const resolved = resolveReviewResolutionFindingRef(sourceFindings, item.findingRef);
-      const original = resolved.status === 'matched' && !resolved.identityMismatch
-        ? sourceFindings[resolved.findingIndex]
-        : null;
+      const original =
+        resolved.status === 'matched' && !resolved.identityMismatch
+          ? sourceFindings[resolved.findingIndex]
+          : null;
       if (
         !original ||
         original.id !== item.findingRef.findingId ||
