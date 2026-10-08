@@ -465,3 +465,34 @@ jobs:
           node src/cli.mjs review plan --plan-only --phase upstream \
             --output-file "$tmp/o.json"
           node -e "const a=require(process.argv[1]); if(a.version!=='1') process.exit(1)" "$tmp/o.json"
+
+  # TEMPORARY measurement job (do not merge): coverage overhead on unit tests.
+  measure-coverage-overhead:
+    name: Measure coverage overhead (temporary) (${{ matrix.variant }}, ${{ matrix.rep }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [cov, nocov]
+        rep: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-deps
+        with:
+          node-version: 22.x
+      - name: Run unit tests (${{ matrix.variant }})
+        shell: bash
+        run: |
+          SECONDS=0
+          if [ "${{ matrix.variant }}" = cov ]; then
+            NODE_V8_COVERAGE=coverage npm test
+          else
+            npm test
+          fi
+          echo "ELAPSED_SECONDS=$SECONDS variant=${{ matrix.variant }} rep=${{ matrix.rep }}"
+          if [ -d coverage ]; then echo "COVERAGE_SIZE=$(du -sh coverage | cut -f1) files=$(ls coverage | wc -l)"; fi
