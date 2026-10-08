@@ -8,7 +8,6 @@ Project HydraFusion の Single / Cascade / Critique と 5 つの原則から着�
 
 ## 何を分離するか
 
-
 - **Model** — どのモデル・プロバイダーを使うか。例: provider / model / version。主な所有者: Host / Harness。
 - **Effort** — 推論資源の配分。例: effort / budget。主な所有者: Host / Harness。
 - **Role** — Builder / Reviewer / Verifier の職務分担。Host が管理し、River Review 内では Review Team がレビュー職務を担う。
@@ -40,7 +39,6 @@ Goal / task
 これらは外側の **候補生成方式の例**です。River Review の `--reviewers auto` は既存の **観点別レビュアー選択**であり、Single / Cascade / Critique の自動選択ではありません。River Review がコードを自動修正したり、Host の worker scheduler やマージ権限を引き受けたりすることはありません。詳しくは [アーキテクチャ](./river-architecture.md) を参照してください。
 
 ## 5 つの Orchestration Guardrails
-
 
 - **Complete accounting**
   - 現状: `src/lib/usage-persistence.mjs` は opt-in の file×skill token 使用量を記録。`src/lib/reviewer-orchestrator.mjs` は role の duration / timeout を記録。
@@ -80,7 +78,6 @@ Goal / task
 - `leg`: retry を内包する **1 つの論理的な LLM 操作、または明確に定義された deterministic 処理**。Builder / Reviewer / Verifier などの role は属性であり、複数 leg にまたがり得る。
 - `attempt`: 1 回の provider transport 要求（初回を含む）。同じ leg の再試行を別の leg として重複計上しない。失敗した attempt も課金され得るため、使用量が取得できなければ `unknown` とする。
 - `observation source`: 値をどの provider response / telemetry / trace / host event から得たか。直接観測・推定・不明を区別する。
-
 
 - **`runId` / `legId` / `parentLegId`** — 実行の関連付け。ID の namespace と発行元を保存する設計案。既存 `runId` と同一だとは推測しない。
 - **`strategy` / `role` / `provider` / `model`** — routing とモデル帰属を分離。role/model の一部は既存証跡にあるが、strategy は Host 情報。
