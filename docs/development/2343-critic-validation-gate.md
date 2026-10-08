@@ -1,4 +1,4 @@
-# #2343 — Critic validation incomplete: existing Gate opt-in
+# #2343: Critic validation incomplete - existing Gate opt-in
 
 ## Decision
 
@@ -26,11 +26,12 @@ values do not enable it.
 | active, evaluated Findings, inconsistent or missing status counts | `criticIncomplete: true` |
 
 The reduction is pure and shared by `river run` and `river review exec`.
-On a non-blocked executed review, it produces
-`ESCALATE / CRITIC_VALIDATION_INCOMPLETE` rather than clean GO.
-Existing mandatory escalation, strict block, review-not-executed,
-incomplete Review Coverage, and blocking-finding decisions keep precedence.
-The host decides whether and how to enforce an ESCALATE decision.
+An executed review with unresolved Critic validation receives
+`ESCALATE / CRITIC_VALIDATION_INCOMPLETE` instead of clean GO.
+Mandatory escalation and strict blocking retain precedence.
+Review-not-executed and incomplete Review Coverage retain precedence.
+Blocking findings retain their existing NO_GO result.
+The host decides how to enforce an ESCALATE decision.
 
 The input and new reason are emitted only when opted in and triggered.
 Without the opt-in, the Gate fields and canonical `inputsHash` are unchanged.
@@ -49,16 +50,16 @@ A host can replay the returned `gate.inputs` through `deriveGateDecision`.
 
 ## Deterministic verification
 
-`tests/critic-validation-gate.test.mjs` pins default-off byte identity,
-exact opt-in, observed timeout escalation, inconsistent status accounting,
-unchanged confirmed blocking precedence, Gate replay integrity, and the
-`river run` consumer. No network or model evaluation is involved.
+`tests/critic-validation-gate.test.mjs` pins the default-off contract.
+It checks exact opt-in and observed timeout escalation.
+It also checks malformed status accounting and blocking precedence.
+Gate replay and the `river run` consumer are tested without provider calls.
 
 ## Follow-ups
 
-#1978 retains the real paired-evaluation / quality-promotion dependency.
-#2267 security-audit adoption still requires provenance, final-record
-verification, and separate evaluation before Gate activation by default.
+Issue #1978 retains the paired-evaluation and quality-promotion dependency.
+Issue #2267 still requires security audit provenance and final-record verification.
+Separate evaluation is required before Gate activation by default.
 
 ## Gate replay and trust boundary
 
@@ -73,6 +74,6 @@ triggered, the echoed input is `true`, so replay preserves the ESCALATE
 outcome. Critical/major finding revisions still retain their existing NO_GO
 precedence.
 
-This is not a replacement for #1978 paired model evaluation. A successful
-deterministic replay only verifies that the existing Gate follows the observed
-Critic-state contract, not that any Critic model is accurate.
+This is not a replacement for the #1978 paired model evaluation.
+Deterministic replay verifies only the observed Critic-state Gate contract.
+It does not establish that a Critic model is accurate.
