@@ -14,6 +14,7 @@ import { scoreReview, resolveVerdict } from './scoring/engine.mjs';
 import { deriveLoopSignalFromArtifact } from './loop-signal.mjs';
 import {
   coverageIncompleteForGate,
+  criticValidationIncompleteForGate,
   deriveGateDecision,
   llmNotExecutedForGate,
 } from './gate-decision.mjs';
@@ -108,6 +109,11 @@ export function deriveRunGate(result) {
       coverageIncomplete: coverageIncompleteForGate(result.reviewCoverage, process.env),
       // #2441 (opt-in RIVER_GATE_REQUIRE_LLM=1, default OFF).
       llmNotExecuted: llmNotExecutedForGate(result.llmNotExecuted, process.env),
+      // #2343: independent Critic-validation-quality signal, opt-in only.
+      criticIncomplete: criticValidationIncompleteForGate(
+        result.reviewDebug?.findingCritic ?? result.reviewDebug?.execution?.findingCritic,
+        process.env
+      ),
       config: result.config ?? {},
     });
   } catch {
