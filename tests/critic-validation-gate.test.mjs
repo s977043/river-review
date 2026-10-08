@@ -97,6 +97,11 @@ describe('#2343 Critic validation gate — evidence and opt-in', () => {
       { mode: 'active', evaluated: 2, humanReview: 0, byFinalStatus: {} },
       { mode: 'active', evaluated: 2, humanReview: 3, byFinalStatus: { confirmed: 2 } },
       { mode: 'active', evaluated: 2, humanReview: 0, byFinalStatus: { confirmed: -2 } },
+      { mode: 'active', humanReview: 0, byFinalStatus: {} },
+      { mode: 'active', evaluated: -1, humanReview: 0, byFinalStatus: {} },
+      { mode: 'active', evaluated: 1.5, humanReview: 0, byFinalStatus: {} },
+      { mode: 'active', evaluated: 0, humanReview: 1, byFinalStatus: {} },
+      { mode: 'active', evaluated: 0, humanReview: 0, byFinalStatus: { confirmed: 1 } },
     ]) {
       assert.equal(criticValidationIncompleteForGate(malformed, ON), true);
     }
