@@ -311,6 +311,18 @@ Repository formatting and GitHub Action dist generation were run from the final 
 
 Blocking findings after the third review loop: **0**.
 
+## Latest-main integration handoff
+
+The original #2570 branch diverged from main while other work changed generated Action dist.
+PR #2581 reconstructs Phase 5A from current main rather than rewriting that open PR's history.
+
+The source change remains observe-only.
+Phase 5B must not produce validated findings without the existing #1978 validation path.
+A missing provider-backed paired evaluation is **not** evidence that automatic routing is safe.
+
+The generated Action dist is owned by the repository's existing rebuild workflow.
+Final merge readiness must use the final human-authored head's checks and review evidence.
+
 ## References
 
 - #2455
