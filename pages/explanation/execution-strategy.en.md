@@ -2,8 +2,6 @@
 title: Execution Strategy and Orchestration Guardrails
 ---
 
-# Execution Strategy and Orchestration Guardrails
-
 This is a **design explanation**, not a new CLI option, persisted schema, runtime configuration, or agent scheduler. It documents Phase 2 of [#2564](https://github.com/s977043/river-review/issues/2564), inspired by HydraFusion's Single / Cascade / Critique patterns and its five execution guardrails. External benchmark results are not River Review adoption evidence.
 
 ## Separate the axes
@@ -27,13 +25,12 @@ A Critique strategy does not, by its label alone, prove independent model, provi
 
 ## Five guardrails: current reality and gaps
 
-| Guardrail | Existing capability | Remaining gap / owner |
-| --- | --- | --- |
-| Complete accounting | Opt-in file×skill usage in `src/lib/usage-persistence.mjs`; role duration/timeout in `reviewer-orchestrator.mjs` | No guaranteed end-to-end strategy/leg cost, retry, fallback, and token ledger. Host owns full workflow; River Review owns observed review legs |
-| Bounded execution | [#2566](https://github.com/s977043/river-review/pull/2566) aborts an in-flight review request and retry backoff after reviewer timeout | Other/custom execution paths require separate cancellation testing |
-| Isolated review | Logical execution ID comparison in `reviewer-independence.mjs` | Different IDs are not proof of model/provider/context/tool isolation; unknown stays unknown ([#2543](https://github.com/s977043/river-review/issues/2543)) |
-| Fail-safe application | Review findings / verdict are advisory; no patch or merge authority | Caller must not turn an advisory signal into unconditional GO |
-| Validated routing | Deterministic, explainable reviewer auto-selection | Adaptive *execution-strategy* routing requires shadow observation and paired evidence first |
+
+- **Complete accounting** — Current: opt-in file×skill usage from `src/lib/usage-persistence.mjs`, plus reviewer role duration/timeout. Gap: no guaranteed end-to-end strategy/leg cost, retry, fallback, and token ledger. Host owns full workflow; River Review owns observed review legs.
+- **Bounded execution** — [#2566](https://github.com/s977043/river-review/pull/2566) aborts in-flight reviewer requests and retry backoff on reviewer timeout. Other/custom paths need separate cancellation verification.
+- **Isolated review** — `reviewer-independence.mjs` compares logical execution IDs. Distinct IDs do not prove model, provider, context, or tool isolation; unknown remains unknown ([#2543](https://github.com/s977043/river-review/issues/2543)).
+- **Fail-safe application** — Review findings and verdict are advisory. The Host retains change application and merge authority; it must not turn an advisory signal into unconditional GO.
+- **Validated routing** — Deterministic, explainable reviewer auto-selection exists. Adaptive execution-strategy routing requires shadow observation and paired evidence first.
 
 ## Proposed observation contract, not implemented
 
