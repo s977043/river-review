@@ -113,6 +113,13 @@ export function selectReviewConcernIntegrationPreflight({
   if (!['observed', 'partial'].includes(sourceStatus)) {
     return observation('unavailable', 'interaction-observation-not-usable', [], [], sourceStatus, sourceLimitations);
   }
+  const concernStatus = interactionObservation.source?.concernMapStatus;
+  if (
+    (sourceStatus === 'observed' && concernStatus !== 'completed') ||
+    (sourceStatus === 'partial' && concernStatus !== 'partial')
+  ) {
+    return observation('unavailable', 'inconsistent-concern-map-state', [], [], sourceStatus, sourceLimitations);
+  }
 
   const checked = validatePairs(interactionObservation.interactions);
   if (!checked.valid) {
