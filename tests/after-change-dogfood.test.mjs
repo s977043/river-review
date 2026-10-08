@@ -26,17 +26,23 @@ import {
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const GUARD = path.join(repoRoot, 'scripts/lib/llm-call-guard.mjs');
 
-function runUnderGuard(source) {
+function runUnderGuard(source, { preload } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'river-llm-guard-'));
   try {
     const log = path.join(dir, 'guard.jsonl');
+    const imports = [pathToFileURL(GUARD).href];
+    if (preload) {
+      const preloadPath = path.join(dir, 'preload.mjs');
+      fs.writeFileSync(preloadPath, preload);
+      imports.unshift(pathToFileURL(preloadPath).href);
+    }
     const child = spawnSync(process.execPath, ['--input-type=module', '-'], {
       cwd: repoRoot,
       input: source,
       encoding: 'utf8',
       env: {
         PATH: process.env.PATH,
-        NODE_OPTIONS: `--import=${pathToFileURL(GUARD).href}`,
+        NODE_OPTIONS: imports.map((href) => `--import=${href}`).join(' '),
         RIVER_LLM_GUARD_LOG: log,
       },
     });
@@ -47,7 +53,7 @@ function runUnderGuard(source) {
           .filter(Boolean)
           .map((line) => JSON.parse(line).event)
       : [];
-    return { events, status: child.status, stdout: child.stdout };
+    return { events, status: child.status, stdout: child.stdout, stderr: child.stderr };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -82,6 +88,15 @@ test('guard positive control: fetch, http and a TCP connect are recorded and ref
 test('guard negative control: a process that calls nothing records only its own load', () => {
   const { events } = runUnderGuard('const x = 1;');
   assert.deepEqual(events, ['guard-loaded']);
+});
+
+test('guard without module.registerHooks says so and does not record guard-loaded', () => {
+  const { events, status, stderr } = runUnderGuard('const x = 1;', {
+    preload: "import module from 'node:module';\ndelete module.registerHooks;\n",
+  });
+  assert.equal(status, 0);
+  assert.match(stderr, /llm-call-guard: not loaded: module\.registerHooks is missing/);
+  assert.deepEqual(events, []);
 });
 
 test('percentile is nearest-rank', () => {
@@ -132,7 +147,25 @@ test('llmGuardHolds fails on a provider load, a network attempt, or evidence wit
   assert.equal(llmGuardHolds(summarize([])), false);
 });
 
+const SCRIPT = path.join(repoRoot, 'scripts/measure-after-change-checkpoint.mjs');
+
+test('--base rejects a missing value and an option-like value with a usage error', () => {
+  for (const args of [['--base'], ['--base', '--all'], ['--base', '-n'], ['--base', '--json']]) {
+    const child = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
+    assert.equal(child.status, 2, `args: ${args.join(' ')}`);
+    assert.match(child.stderr, /--base requires a commit/);
+  }
+});
+
+test('measure refuses a base that does not resolve to a commit instead of measuring HEAD', () => {
+  for (const base of ['--all', 'no-such-ref']) {
+    assert.throws(() => measure({ base, count: 1 }), /--base does not name a commit/);
+  }
+});
+
 test('the real hook over a real commit makes 0 LLM calls and never reports a silent skip', () => {
+  assert.deepEqual(EVENTS, ['partial', 'full', 'repeat']);
+  assert.deepEqual(CONFIGS, ['repo-default', 'trusted-true']);
   const result = measure({ base: DEFAULT_POPULATION.base, count: 1 });
   assert.equal(result.population.commits, 1);
   assert.equal(result.runs.length, EVENTS.length * CONFIGS.length);
