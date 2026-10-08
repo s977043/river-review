@@ -26,6 +26,7 @@ function withoutConcernObservation(result) {
     delete cloned.reviewDebug.reviewConcernMap;
     delete cloned.reviewDebug.reviewConcernPlanning;
     delete cloned.reviewDebug.reviewConcernCoverage;
+    delete cloned.reviewDebug.reviewConcernInteractions;
     if (Object.keys(cloned.reviewDebug).length === 0) delete cloned.reviewDebug;
   }
   return cloned;
@@ -89,6 +90,9 @@ test('local runner keeps Concern Analyzer observe-only and default off', async (
   assert.equal(observed.reviewDebug.reviewConcernCoverage.source.reason, 'concern-map-failed');
   assert.deepEqual(observed.reviewDebug.reviewConcernCoverage.blindSpotConcernRefs, []);
   assert.equal(observed.reviewDebug.reviewConcernCoverage.applied, false);
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.status, 'unavailable');
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.source.reason, 'concern-map-failed');
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.applied, false);
   assert.equal(
     observed.reviewDebug.reviewConcernMap.analysis.input.rawChangedFileCount,
     rawChangedFiles.length
@@ -177,6 +181,9 @@ test('optimized-away raw changes still produce an observe-only map on no-changes
   assert.equal(observed.reviewDebug.reviewConcernCoverage.source.reason, 'concern-map-failed');
   assert.deepEqual(observed.reviewDebug.reviewConcernCoverage.blindSpotConcernRefs, []);
   assert.equal(observed.reviewDebug.reviewConcernCoverage.applied, false);
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.status, 'unavailable');
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.source.reason, 'concern-map-failed');
+  assert.equal(observed.reviewDebug.reviewConcernInteractions.applied, false);
 
   assert.deepEqual(withoutConcernObservation(observed), off);
 });
