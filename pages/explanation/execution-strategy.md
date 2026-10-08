@@ -2,23 +2,20 @@
 title: Execution Strategy と Orchestration Guardrails
 ---
 
-# Execution Strategy と Orchestration Guardrails
-
-このページは、AI 支援開発で **どの順序・実行方式で候補成果物を作るか** と、**その候補を River Review でどう検証するか** の境界を説明します。Issue [#2564](https://github.com/s977043/river-review/issues/2564) の Phase 2 に対応する**設計上の整理**であり、新しい CLI オプション、設定フィールド、JSON Schema、実行エンジンが導入されたことは意味しません。
+このページは、AI 支援開発において、**どの順序・実行方式で候補成果物を作るか** と、**その候補を River Review でどう検証するか** の境界を説明します。Issue [#2564](https://github.com/s977043/river-review/issues/2564) の Phase 2 に対応する**設計上の整理**であり、新しい CLI オプション、設定フィールド、JSON Schema、実行エンジンが導入されたことは意味しません。
 
 Project HydraFusion の Single / Cascade / Critique と 5 つの原則から着想を得ていますが、外部の実装やベンチマークをそのまま採用しません。River Review 固有の効果は [レビュー実行の保存と比較](../guides/track-runs-and-regressions.md) などの証跡を使った別途の評価が必要です。
 
 ## 何を分離するか
 
-| 軸 | 問い | 例 | 主な所有者 |
-| --- | --- | --- | --- |
-| **Model** | どのモデル・プロバイダーか | provider / model / version | Host / Harness |
-| **Effort** | どれだけ推論資源を使うか | effort / budget | Host / Harness |
-| **Role** | 誰がどの職務を担うか | Builder / Reviewer / Verifier | Host（River Review 内では Review Team） |
-| **Execution Strategy** | どの呼び出し順・段構成で候補を作るか | Single / Cascade / Critique | Host / Harness |
-| **Autonomy** | どの範囲まで自律実行を許すか | 提案のみ / 実装可 | Host / Human |
-| **Judgment Placement** | 判断をどの評価層へ配置するか | Deterministic / Heuristic / Agentic Review / Human Judgment | [Judgment Placement](./judgment-placement.md) |
-| **Authority** | 承認・変更適用・マージを誰が決めるか | Host / Human | Host / Human |
+
+- **Model** — どのモデル・プロバイダーを使うか。例: provider / model / version。主な所有者: Host / Harness。
+- **Effort** — 推論資源の配分。例: effort / budget。主な所有者: Host / Harness。
+- **Role** — Builder / Reviewer / Verifier の職務分担。Host が管理し、River Review 内では Review Team がレビュー職務を担う。
+- **Execution Strategy** — 候補生成の呼び出し順・段構成。例: Single / Cascade / Critique。主な所有者: Host / Harness。
+- **Autonomy** — 提案のみ・実装可などの自律実行範囲。主な所有者: Host / Human。
+- **Judgment Placement** — 評価層の配置。Deterministic / Heuristic / Agentic Review / Human Judgment。参照: [Judgment Placement](./judgment-placement.md)。
+- **Authority** — 承認・適用・マージの最終判断。主な所有者: Host / Human。
 
 **Execution Strategy ≠ reviewer role ≠ review mode ≠ Judgment Placement ≠ Authority** です。上記は実験を記述するための分析上の軸であり、現行設定に同名のフィールドがあるという意味ではありません。
 
@@ -44,19 +41,39 @@ Goal / task
 
 ## 5 つの Orchestration Guardrails
 
-| 原則 | River Review の現状・根拠 | 不足・誤認リスク | 責務・次の検証 |
-| --- | --- | --- | --- |
-| **Complete accounting** | `src/lib/usage-persistence.mjs` は opt-in の file×skill token 使用量を記録。`src/lib/reviewer-orchestrator.mjs` は role の duration / timeout を記録 | Builder〜reviewer〜verifier を通した leg 別 token / retries / fallback / cost は一括計測されていない | Host は全 leg、River Review は自分が観測できる review leg。後述の観測契約から始める |
-| **Bounded execution** | PR [#2566](https://github.com/s977043/river-review/pull/2566) で reviewer timeout 時の host cancellation を LLM fetch / retry backoff へ伝播 | カスタム実行器や他の呼び出し経路まで無条件に取消保証があるわけではない | 各実行器の cancel coverage / timeout / partial-result 契約を個別に検証 |
-| **Isolated review** | `src/lib/reviewer-independence.mjs` は論理 execution ID の分離を判定 | 異なる ID は別モデル・別プロバイダー・文脈隔離・tool 権限制限の証明にはならない | 観測可能な provenance を増やし、証明不能なら `unknown` を維持（[#2543](https://github.com/s977043/river-review/issues/2543)） |
-| **Fail-safe application** | River Review は findings / verdict を返し、変更適用・マージは行わない | 信号を Host が無条件 GO と解釈すると権限逸脱する | Host / Human の最終判断を保持。[Judgment Placement](./judgment-placement.md) と独立に制御 |
-| **Validated routing** | 現在は deterministic / explainable な reviewer role 自動選択 | 候補生成 strategy の adaptive routing は実証されていない | [#1574](https://github.com/s977043/river-review/issues/1574) の baseline/candidate paired replay を前提に shadow → 評価 → opt-in |
+
+- **Complete accounting**
+  - 現状: `src/lib/usage-persistence.mjs` は opt-in の file×skill token 使用量を記録。`src/lib/reviewer-orchestrator.mjs` は role の duration / timeout を記録。
+  - 不足: Builder〜Reviewer〜Verifier の leg 別 token / retries / fallback / cost を一括計測する仕組みはない。
+  - 責務: Host が全 leg を所有し、River Review は観測できる review leg に限定する。
+
+- **Bounded execution**
+  - 現状: [#2566](https://github.com/s977043/river-review/pull/2566) で reviewer timeout を LLM fetch / retry backoff まで伝播。
+  - 不足: 他の呼び出し経路・カスタム実行器に対する取消保証は別途検証が必要。
+  - 責務: 各実行器ごとに cancellation と partial-result 契約を検証する。
+
+- **Isolated review**
+  - 現状: `src/lib/reviewer-independence.mjs` は論理 execution ID の分離を判定。
+  - 不足: 別モデル・別プロバイダー・文脈隔離・tool 制限の証明にはならない。
+  - 責務: 証明不能なら `unknown` を維持し、provenance を段階的に拡張（[#2543](https://github.com/s977043/river-review/issues/2543)）。
+
+- **Fail-safe application**
+  - 現状: River Review は findings / verdict を返し、コードの適用・マージは行わない。
+  - リスク: Host がレビュー信号を無条件 GO と解釈すると権限逸脱になる。
+  - 責務: Host / Human の最終権限を保持し、[Judgment Placement](./judgment-placement.md) と分離する。
+
+- **Validated routing**
+  - 現状: deterministic / explainable な reviewer role 自動選択がある。
+  - 不足: 候補生成 strategy の adaptive routing は未検証。
+  - 責務: [#1574](https://github.com/s977043/river-review/issues/1574) の paired replay を前提に shadow → 評価 → opt-in と進める。
 
 ## Strategy / leg accounting — 提案する最小の観測契約
 
-**以下は Phase 3 以降を設計するための概念契約であり、現行の persisted schema や API ではありません。** 既存の Review Artifact、Run store、Execution Manifest、opt-in usage telemetry を重複して再定義せず、外側の Harness が持つ実行記録と結合する際の比較単位を定めます。
+これは Phase 3 以降に向けた**概念契約**であり、現行の persisted schema や API ではありません。
 
-**実行単位の考え方**
+既存の Review Artifact / Run store / Execution Manifest / opt-in usage telemetry は再定義しません。外側の Harness の実行記録と結合するときの比較単位だけを示します。
+
+### 実行単位の考え方
 
 - `run`: 同一タスクに対する比較のまとまり。比較には task / input artifact / base commit / dataset を固定する。
 - `strategy`: Host が選んだ候補生成パターン。River Review が自動決定した値ではない。
@@ -64,16 +81,15 @@ Goal / task
 - `attempt`: 1 回の provider transport 要求（初回を含む）。同じ leg の再試行を別の leg として重複計上しない。失敗した attempt も課金され得るため、使用量が取得できなければ `unknown` とする。
 - `observation source`: 値をどの provider response / telemetry / trace / host event から得たか。直接観測・推定・不明を区別する。
 
-| 提案フィールド | 目的 | 現時点の扱い |
-| --- | --- | --- |
-| `runId` / `legId` / `parentLegId` | run・leg の関連付け。ID の namespace と発行元を保存 | **設計のみ**。既存 `runId` と異なる値の相互同一性を推測しない |
-| `strategy` / `role` / `provider` / `model` | routing と model attribution の分離 | role/model の一部は既存証跡にあるが strategy は Host 情報 |
-| `startedAt` / `durationMs` / `outcome` | wall-clock と成功・失敗・timeout・skip を区別 | reviewer role の duration / timeout は存在。leg 完全性は未保証 |
-| `attemptCount` / `fallbackReason` | retry / fallback で負荷が増えた原因 | Review Team 全 leg に対する安定記録は**未実装** |
-| `inputTokens` / `outputTokens` / `cacheReadInputTokens` / `cacheCreationInputTokens` | 使用量の内訳 | file×skill usage telemetry が opt-in で存在。ただし leg との 1:1 対応は**未保証** |
-| `costUsd` / `priceSource` / `priceVersion` / `costKind` | 計測費用と単価ベースの推定を分離 | 単価による推定機能は既存。全 leg の確定課金値は取得できていない |
-| `evidenceSource` / `completeness` | 観測の根拠と欠測状態 | **設計のみ**。採取開始時に明示する |
-| `reviewCoverage` / `independenceEvidence` | 検証の網羅性・独立性を費用と併記 | Review Coverage と論理 provenance は存在。強い隔離の保証にはならない |
+
+- **`runId` / `legId` / `parentLegId`** — 実行の関連付け。ID の namespace と発行元を保存する設計案。既存 `runId` と同一だとは推測しない。
+- **`strategy` / `role` / `provider` / `model`** — routing とモデル帰属を分離。role/model の一部は既存証跡にあるが、strategy は Host 情報。
+- **`startedAt` / `durationMs` / `outcome`** — wall-clock と成功・失敗・timeout・skip を区別。reviewer role の時間は存在するが、全 leg の網羅性は未保証。
+- **`attemptCount` / `fallbackReason`** — retry / fallback の負荷を観測。Review Team 全 leg の安定記録は未実装。
+- **`inputTokens` / `outputTokens` / cache token counts** — 使用量の内訳。file×skill telemetry は opt-in で存在するが、leg と 1:1 の対応は未保証。
+- **`costUsd` / `priceSource` / `priceVersion` / `costKind`** — 実コストと推定コストを分離。全 leg の確定課金値は未取得。
+- **`evidenceSource` / `completeness`** — 根拠・欠測を区別するための設計案。collector 実装前に正本化しない。
+- **`reviewCoverage` / `independenceEvidence`** — 網羅性と独立性を併記。論理 provenance は強い隔離の証明ではない。
 
 観測が欠けたフィールドは `unknown` / `null` / `not_collected` 相当として扱い、**未観測のコストを $0、未観測のretryを0回、未観測の隔離を達成済みに置換しません**。新たな enum / JSON Schema の正本化は、Phase 3 の実データと移行要件が揃ってから判断します。
 
@@ -91,7 +107,7 @@ Goal / task
 
 Phase 3 は **shadow（推奨を記録するだけ）** で actual / recommended strategy を比較します。routing 変更はまだ行いません。
 
-Phase 4 は [#1574](https://github.com/s977043/river-review/issues/1574) の baseline/candidate paired replay を再利用し、品質・critical-finding recall・false positives・必要観点の coverage・総費用・wall-clock latency・human correction burden を評価します。held-out / verifier trust が不足した評価は採用根拠にしません。**critical regression = 0** は最低条件であり、それだけで GO にはなりません。
+Phase 4 は [#1574](https://github.com/s977043/river-review/issues/1574) の baseline/candidate paired replay を再利用します。評価指標は品質・critical-finding recall・false positives・coverage・総費用・wall-clock latency・human correction burden です。held-out / verifier trust が不足した評価は採用根拠にしません。**critical regression = 0** は最低条件であり、それだけで GO にはなりません。
 
 Phase 5 で adaptive routing を試す場合も opt-in / bounded budget / fallback / Human-owned irreversible authority を維持します。外部 HydraFusion benchmark の値を River Review の受け入れ閾値には使用しません。
 
