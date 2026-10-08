@@ -139,7 +139,10 @@ export function buildReviewResolutionFeedbackProposals({
     } else if (!FEEDBACK_TYPES.includes(mapping.feedbackType)) {
       status = 'needs_human';
       reasonCode = 'unsupported_feedback_type';
-    } else if (!FEEDBACK_FINGERPRINT_V1.test(fingerprint ?? '')) {
+    } else if (
+      !FEEDBACK_FINGERPRINT_V1.test(fingerprint ?? '') ||
+      item?.findingRef?.fingerprintAlgo !== 'v1'
+    ) {
       status = 'needs_human';
       reasonCode = 'incompatible_feedback_fingerprint';
     } else if (fingerprintCounts.get(fingerprint) > 1) {
