@@ -95067,7 +95067,7 @@ async function runRunsCommand(parsed, targetPath) {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
         console.log(JSON.stringify(diffWithSignal, null, 2));
       } else if (parsed.output === 'html') {
-        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 980).then(__nccwpck_require__.bind(__nccwpck_require__, 3980));
+        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 474).then(__nccwpck_require__.bind(__nccwpck_require__, 9474));
         console.log(
           formatLoopDashboardHtml(diff, {
             runIds: sortedRecords.map((r) => r.runId),
@@ -95108,7 +95108,7 @@ async function runRunsCommand(parsed, targetPath) {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
         console.log(JSON.stringify(diffWithSignal, null, 2));
       } else if (parsed.output === 'html') {
-        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 980).then(__nccwpck_require__.bind(__nccwpck_require__, 3980));
+        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 474).then(__nccwpck_require__.bind(__nccwpck_require__, 9474));
         console.log(
           formatLoopDashboardHtml(diff, {
             runIds: [run1.runId, run2.runId].filter(Boolean),
@@ -101389,7 +101389,7 @@ async function renderRunResult(result, parsed) {
     };
     console.log(formatYamlOutput(artifact));
   } else if (parsed.output === 'html') {
-    const { formatHtmlOutput } = await __nccwpck_require__.e(/* import() */ 980).then(__nccwpck_require__.bind(__nccwpck_require__, 3980));
+    const { formatHtmlOutput } = await __nccwpck_require__.e(/* import() */ 474).then(__nccwpck_require__.bind(__nccwpck_require__, 9474));
     const jsonOutput = formatJsonOutput(result, parsed.phase);
     const htmlResult = {
       findings: result.findings ?? [],
