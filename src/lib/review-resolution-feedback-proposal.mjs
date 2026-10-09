@@ -172,7 +172,7 @@ export function buildReviewResolutionFeedbackProposals({
         !nonEmpty(author?.rationale) ||
         !Array.isArray(resolution?.decisionRefs) ||
         resolution.decisionRefs.length === 0 ||
-        !resolution.decisionRefs.every((ref) => nonEmpty(ref?.ref))
+        !resolution.decisionRefs.every((ref) => nonEmpty(ref?.kind) && nonEmpty(ref?.ref))
       ) {
         return result(base, 'needs_human', 'human_risk_acceptance_missing');
       }
@@ -193,6 +193,9 @@ export function buildReviewResolutionFeedbackProposals({
         feedbackType,
         skillId: binding.skillId.trim(),
         reviewer: reviewer.reviewerId,
+        // This is the Review Resolution source ID, NOT proof that it equals
+        // the saved-run id required for canonical feedback's review_run_id.
+        // The future approval adapter must explicitly resolve that join.
         reviewRunId: sourceReviewRunId,
         findingFingerprint: item.findingRef.fingerprint,
         fingerprintAlgo: item.findingRef.fingerprintAlgo,
