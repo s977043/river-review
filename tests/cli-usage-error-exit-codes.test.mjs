@@ -249,7 +249,10 @@ const CONTRACTS = {
 // いずれも `Error: unknown option --plan-feedback.` の exit 1 で、exit code は
 // 動いていない（実測）。受理形は VALID_CASES 側へ 2 行（通常の語順 /
 // フラグ先行語順）pin した（101 -> 103）。
-const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 178, C4: 1 };
+// #2626 で 3 フラグと `--estimate` の併用を拒否し、C3 が 178 -> 179 になった。
+// BEFORE は workdir の検証で exit 2（ファイルが揃っていれば exit 0 で見積りだけ出る）、
+// AFTER は parse 層の usage error で exit 1（実測）。
+const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 179, C4: 1 };
 
 /** 一時 repo 配下の「存在しないパス」に実行時に差し替えるプレースホルダ。 */
 const NONEXISTENT_PATH = '<nonexistent-path>';
@@ -338,6 +341,25 @@ const CASES = [
     argv: [
       'doctor',
       '.',
+      '--plan-feedback',
+      'f.json',
+      '--plan-feedback-workdir',
+      'w',
+      '--plan-feedback-task',
+      'TASK-0001',
+    ],
+    contract: 'C3',
+  },
+  // #2626: 3 フラグが揃っていても `--estimate` との併用は拒否する（BEFORE は検証だけして無視）。
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: [
+      'run',
+      '.',
+      '--estimate',
+      '--output',
+      'html',
       '--plan-feedback',
       'f.json',
       '--plan-feedback-workdir',
@@ -1795,11 +1817,11 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // テーブルそのものの健全性（転記ミス・重複の検出）
   // ---------------------------------------------------------------------------
 
-  test('the matrix pins 179 usage-error cases and every row is unique', () => {
+  test('the matrix pins 180 usage-error cases and every row is unique', () => {
     assert.equal(
       CASES.length,
-      179,
-      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）+ PR #2621 の plan-feedback 不正形 4 件（exit code は動いていない）'
+      180,
+      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）+ PR #2621 の plan-feedback 不正形 4 件（exit code は動いていない）+ #2626 の plan-feedback と --estimate の併用 1 件（exit 2 -> 1）'
     );
     const keys = new Set(CASES.map(caseKey));
     assert.equal(keys.size, CASES.length, '同一 (surface, kind, argv) の行が重複している');

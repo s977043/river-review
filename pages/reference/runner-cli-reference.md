@@ -1,6 +1,6 @@
 # `--reviewers` フラグリファレンス
 
-> **スコープ注意**: このページは `river run` の `--reviewers` フラグと検証コマンドのみを扱います。
+> **スコープ注意**: このページは `river run` の `--reviewers` フラグ・[`--plan-feedback` フラグ](#plan-feedback)・検証コマンドのみを扱います。
 >
 > - `river run` の全フラグ（`--phase` / `--planner` / `--dry-run` / `--output` / `--max-cost` / `--debug` / `--estimate` など）は **[stable-interfaces.md](./stable-interfaces.md)** を参照してください。
 > - W-check で使用する `river review exec` のフラグ（`--artifact`, `--ensemble`, `--phase`）は **[W-check ガイド](../guides/w-check.md)** および **[cli-review-exec-spec.md](./cli-review-exec-spec.md)** を参照してください。
@@ -77,6 +77,51 @@ Reviewers: 1/2 roles succeeded, 0 failed, 120.0s total (timed out: security-scan
 
 > **注意**: タイムアウトはオーケストレーション層の待ち時間を打ち切るだけであり、進行中の LLM 呼び出しを cancel しません。放置されたリクエストは `src/lib/llm-pipeline.mjs` 側の上限（1 回 15 秒 + 上限付きリトライ、最大およそ 45 秒）が尽きるまで走り続けるため、`timeout` 行を出した後もプロセスはその間だけ生存します。真のキャンセルには `generateReview()` への `AbortSignal` 導入が必要であり、本 PR のスコープ外です。
 
+## `--plan-feedback` フラグ {#plan-feedback}
+
+PlanGate のレビュー質問への回答（review-only の JSON）を、`river run --output html` のレポートに表示専用の節として追加します。回答は承認ではありません。findings・gate・判定・カバレッジは変わりません。契約と信頼境界の詳細は `docs/review/interactive-plan-feedback.md` にあります。
+
+```sh
+river run . --dry-run --output html \
+  --plan-feedback /local/downloads/TASK-0001-review-feedback.json \
+  --plan-feedback-workdir /local/project/docs/working/TASK-0001 \
+  --plan-feedback-task TASK-0001 > review.html
+```
+
+| フラグ                          | 値                                                                  |
+| ------------------------------- | ------------------------------------------------------------------- |
+| `--plan-feedback <file>`        | PlanGate が出力した review-only の回答 JSON                         |
+| `--plan-feedback-workdir <dir>` | `plan.md` と `review-questions.json` を置いた PlanGate のタスク dir |
+| `--plan-feedback-task <TASK>`   | `TASK-` に数字 4 桁を続けたタスク ID（例: `TASK-0001`）             |
+
+### 受理条件
+
+- 3 つのフラグを揃えて指定する（1 つでも欠けると usage error）
+- `river run` かつ `--output html` のときだけ受理する（`--output json` や `doctor` では usage error）
+- `--estimate` とは併用できない（見積りは HTML を生成しないため。#2626）
+
+### 入力の検証
+
+レビューを始める前に、次の検証を通らない入力は拒否します（`src/lib/plan-feedback-projection.mjs`）。
+
+- workdir は実ディレクトリである（symlink は拒否）
+- `plan.md` / `review-questions.json` / 回答 JSON は通常ファイルである（symlink は拒否）
+- サイズ上限は `plan.md` が 10 MiB、`review-questions.json` が 128 KiB、回答 JSON が 512 KiB である
+- JSON は UTF-8 として厳密に解釈し、重複キーを拒否する
+- `review-questions.json` は `version: 1` で、質問は 1〜50 件である
+- 回答 JSON の `taskId` は `--plan-feedback-task` と一致し、`feedback_only: true` / `approval_granted: false` である
+- 回答 JSON に記録された `plan.md` と `review-questions.json` の SHA-256 が、workdir のファイルと一致する（不一致は `STALE`）
+- 回答は質問と 1 対 1 で対応し、状態は `answered` / `deferred` / `unanswered` のいずれかである
+
+### 終了コード
+
+| コード | 条件                                                                                                                                                  |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`    | 受理条件に反する指定（usage error）。stderr に理由と使い方の案内を出し、stdout には何も出しません                                                     |
+| `2`    | 入力の検証に失敗した（ファイル欠落・symlink・サイズ超過・`STALE` など）。`Error: invalid source-matched plan feedback: ...` を出し、HTML は出しません |
+
+検証を通った後の終了コードは、フラグを付けない `river run` と同じです。
+
 ## コマンド
 
 - Agents: `npm run agents:validate` (または `node scripts/validate-agents.mjs`)
@@ -91,7 +136,7 @@ Reviewers: 1/2 roles succeeded, 0 failed, 120.0s total (timed out: security-scan
 | ------ | ----------------------------------------------------------------------------------------- |
 | `0`    | 正常終了                                                                                  |
 | `1`    | 実行エラー・スキーマエラー・引数エラー（不明コマンド / オプション値の欠落・不正値を含む） |
-| `2`    | `--warn-on` の警告しきい値超過                                                            |
+| `2`    | `--warn-on` の警告しきい値超過、[`--plan-feedback`](#plan-feedback) の入力検証の失敗      |
 | `3`    | `--gate` の ESCALATE 判定、`review` ハンドラの設定エラー、`review` の未実装サブコマンド   |
 
 引数エラー（usage error）の exit code は #1709 で exit 1 + stderr 要約へ統一されました。不明コマンドとオプション値の欠落・不正値は Slice 2 で統一済みです。未知オプション・余剰 positional・残っていた値欠落経路（例: `--from` / `--cases`）も Slice 3 で統一されました。help 全文の stdout 出力と exit 0 の組み合わせは、明示的な `--help` と引数なし起動だけが維持します。

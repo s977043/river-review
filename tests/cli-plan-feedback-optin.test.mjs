@@ -90,6 +90,19 @@ test('CLI rejects partial and wrong-format feedback flags before reviewing', asy
   }
 });
 
+test('CLI rejects valid feedback flags combined with --estimate (#2626)', async (t) => {
+  const { dir, cleanup } = await createRepoWithSilentCatchChange();
+  t.after(cleanup);
+  const { workDir, feedbackPath } = await planFiles(dir);
+  const run = await runCliAsSubprocess(
+    ['run', '.', '--estimate', '--output', 'html', ...flags(workDir, feedbackPath)],
+    { cwd: dir }
+  );
+  assert.equal(run.code, 1, run.stderr);
+  assert.match(run.stderr, /cannot be combined with --estimate/);
+  assert.equal(run.stdout, '');
+});
+
 test('CLI refuses a stale sidecar before emitting an HTML success document', async (t) => {
   const { dir, cleanup } = await createRepoWithSilentCatchChange();
   t.after(cleanup);

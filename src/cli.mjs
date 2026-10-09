@@ -1731,6 +1731,14 @@ function parseArgs(argv) {
           'must be used together with river run --output html.'
       );
       usageError(parsed);
+    } else if (parsed.estimate) {
+      // #2626: --estimate never builds the HTML report, so the flags would be
+      // validated and then silently ignored.
+      console.error(
+        'Error: --plan-feedback, --plan-feedback-workdir and --plan-feedback-task ' +
+          'cannot be combined with --estimate.'
+      );
+      usageError(parsed);
     }
   }
 
