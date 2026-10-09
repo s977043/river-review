@@ -165,7 +165,7 @@ for(const e of d.decisions??[]) if(e.reviewAfter==='undecided'||e.reviewAfter<=t
 #### 退役 PR の作法
 
 - 台帳と CLAUDE.md は必ず同じ PR で更新する（別 PR に分けると、先にマージされたほうで必須チェック `Meta consistency` が落ちる）
-- CLAUDE.md の「Improvement Flow」節はガード名を列挙しているため、削除したガード名をこの列挙からも外す
+- `docs/development/guard-details.md` はガード名ごとに節と由来の列挙を持つため、削除したガードの節と列挙の行も外す
 - 削除したガードの根拠（発火実績の有無、機械化の所在）を PR 本文に書く。台帳の `notes` には結論だけを残す
 
 ## Dogfooding
