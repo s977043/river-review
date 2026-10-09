@@ -327,6 +327,83 @@ test('produced candidates are accepted by the production buildFeedbackEntry writ
   }
 });
 
+test('reviewer IDs are trimmed and NFC-normalized; whitespace-only fails closed', () => {
+  const nfd = 'café';
+  const item = resolutionItem({
+    findingRef: {
+      ...resolutionItem().findingRef,
+      sources: [{ findingId: 'role-a:17', reviewerId: `  ${nfd}  ` }],
+    },
+  });
+  const doc = sidecar(item);
+  assert.equal(evaluate(doc).proposals[0].candidate.reviewer, 'café');
+  const bound = evaluate(doc, [{ ...BINDING, reviewerId: ' café ' }]).proposals[0];
+  assert.equal(bound.candidate.reviewer, 'café');
+  assert.equal(
+    evaluate(doc, [{ ...BINDING, reviewerId: '   ' }]).proposals[0].reasonCode,
+    'reviewer_binding_mismatch'
+  );
+  const blank = resolutionItem({
+    findingRef: {
+      ...resolutionItem().findingRef,
+      sources: [{ findingId: 'role-a:17', reviewerId: '   ' }],
+    },
+  });
+  assert.equal(evaluate(sidecar(blank)).proposals[0].reasonCode, 'reviewer_provenance_missing');
+});
+
+test('human rationale is trimmed and NFC-normalized', () => {
+  const item = resolutionItem({
+    authorResponse: { state: 'accepts_risk', rationale: '  Accepted café  ' },
+    resolution: {
+      state: 'risk_accepted',
+      target: null,
+      decisionRefs: [{ kind: 'pr', ref: 'PR-1' }],
+    },
+    verification: {
+      state: 'not_requested',
+      verifier: null,
+      coverageStatus: 'unknown',
+      evidenceRefs: [],
+    },
+  });
+  assert.equal(evaluate(sidecar(item)).proposals[0].candidate.humanRationale, 'Accepted café');
+});
+
+test('duplicate evidence refs are de-duplicated in first-seen order', () => {
+  const item = resolutionItem({
+    verification: {
+      state: 'verified_resolved',
+      verifier: 'verifier-3',
+      coverageStatus: 'complete',
+      evidenceRefs: [
+        { ref: 'ci://b', sha256: C },
+        { ref: 'ci://a', sha256: C },
+        { ref: 'ci://b', sha256: C },
+        { ref: 'ci://b', sha256: A },
+      ],
+    },
+  });
+  assert.deepEqual(evaluate(sidecar(item)).proposals[0].candidate.verificationEvidenceRefs, [
+    { ref: 'ci://b', sha256: C },
+    { ref: 'ci://a', sha256: C },
+    { ref: 'ci://b', sha256: A },
+  ]);
+});
+
+test('read-only output never freezes or mutates caller-owned summary values', () => {
+  const doc = sidecar();
+  const findingId = { nested: ['rr-17'] };
+  doc.items[0].findingRef.findingId = findingId;
+  const original = JSON.stringify(doc);
+  const out = buildReviewResolutionFeedbackProposals({ reviewResolution: doc, bindings: [] });
+  assert.equal(Object.isFrozen(out.proposals[0]), true);
+  assert.equal(Object.isFrozen(findingId), false);
+  assert.equal(Object.isFrozen(findingId.nested), false);
+  assert.equal(Object.isFrozen(doc), false);
+  assert.equal(JSON.stringify(doc), original);
+});
+
 test('every emitted outcome and reasonCode is in the closed exported lists', () => {
   assert.ok(emitted.length > 0);
   for (const row of emitted) {

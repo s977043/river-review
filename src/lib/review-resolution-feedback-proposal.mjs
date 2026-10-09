@@ -6,6 +6,7 @@
  * never change the source Review Artifact, Review Resolution, or Gate.
  */
 import { FEEDBACK_TYPES } from './feedback.mjs';
+import { nonEmptyNfcString } from './promotion-candidates.mjs';
 import {
   assertReviewResolutionSemantics,
   isSameReviewResolutionRevision,
@@ -46,6 +47,7 @@ function nonEmpty(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+// Callers pass a freshly cloned tree so caller-owned objects are never frozen.
 function readOnly(value) {
   if (Array.isArray(value)) {
     value.forEach(readOnly);
@@ -83,11 +85,12 @@ function matchBinding(item, bindings) {
 
 function resolveReviewer(item, binding) {
   const sources = Array.isArray(item?.findingRef?.sources) ? item.findingRef.sources : [];
-  const ids = [...new Set(sources.map((s) => s?.reviewerId).filter(nonEmpty))];
+  const ids = [...new Set(sources.map((s) => nonEmptyNfcString(s?.reviewerId)).filter(Boolean))];
   if (ids.length === 0) return { reasonCode: 'reviewer_provenance_missing' };
-  if (nonEmpty(binding?.reviewerId)) {
-    return ids.includes(binding.reviewerId)
-      ? { reviewerId: binding.reviewerId }
+  if (binding?.reviewerId != null) {
+    const bound = nonEmptyNfcString(binding.reviewerId);
+    return bound !== null && ids.includes(bound)
+      ? { reviewerId: bound }
       : { reasonCode: 'reviewer_binding_mismatch' };
   }
   return ids.length === 1 ? { reviewerId: ids[0] } : { reasonCode: 'reviewer_binding_ambiguous' };
@@ -186,14 +189,17 @@ export function buildReviewResolutionFeedbackProposals({ reviewResolution, bindi
         return result(base, 'needs_human', 'verification_evidence_incomplete');
       }
       feedbackType = 'accepted';
-      evidenceRefs = verification.evidenceRefs.map((ref) => ({
-        ref: ref.ref,
-        sha256: ref.sha256,
-      }));
+      const seen = new Set();
+      for (const entry of verification.evidenceRefs) {
+        const key = JSON.stringify([entry.ref, entry.sha256]);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        evidenceRefs.push({ ref: entry.ref, sha256: entry.sha256 });
+      }
     } else {
       if (
         author?.state !== 'accepts_risk' ||
-        !nonEmpty(author?.rationale) ||
+        nonEmptyNfcString(author?.rationale) === null ||
         !Array.isArray(resolution?.decisionRefs) ||
         resolution.decisionRefs.length === 0 ||
         !resolution.decisionRefs.every((ref) => nonEmpty(ref?.kind) && nonEmpty(ref?.ref))
@@ -201,7 +207,7 @@ export function buildReviewResolutionFeedbackProposals({ reviewResolution, bindi
         return result(base, 'needs_human', 'human_risk_acceptance_missing');
       }
       feedbackType = 'accepted_risk';
-      rationale = author.rationale;
+      rationale = nonEmptyNfcString(author.rationale);
       decisionRefs = resolution.decisionRefs.map((ref) => ({
         kind: ref.kind,
         ref: ref.ref,
@@ -233,10 +239,12 @@ export function buildReviewResolutionFeedbackProposals({ reviewResolution, bindi
     });
   });
 
-  return readOnly({
-    kind: 'review-resolution-feedback-proposals',
-    resolutionId: reviewResolution.resolutionId,
-    reviewRunId: sourceReviewRunId,
-    proposals,
-  });
+  return readOnly(
+    structuredClone({
+      kind: 'review-resolution-feedback-proposals',
+      resolutionId: reviewResolution.resolutionId,
+      reviewRunId: sourceReviewRunId,
+      proposals,
+    })
+  );
 }
