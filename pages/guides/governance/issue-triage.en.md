@@ -1,5 +1,5 @@
 ---
-id: issue-triage
+id: issue-triage-en
 sidebar_label: Issue Triage and HOTL
 ---
 
