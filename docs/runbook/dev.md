@@ -69,7 +69,7 @@ bash scripts/local-npm.sh test -- tests/fix-dashes.test.mjs
 - `tests/helpers/`—`createTempMemory` / `createTempDir` など複数テストで共有するヘルパー (#506 で導入)
 - `tests/fixtures/`—eval / レビュー / Riverbed Memory のフィクスチャ
 
-CI ではカバレッジを `NODE_V8_COVERAGE=coverage npm test` で取得し、Codecov へ OIDC (`id-token: write`) でアップロードする ([CI ワークフロー](../../.github/workflows/test.yml)の `test` ジョブ、表示名は `Unit tests`)。Codecov を呼び出すジョブには `permissions.id-token: write` が必須で、無いと OIDC トークン取得に失敗する (#546 で修正済み)。
+CI ではカバレッジを `NODE_V8_COVERAGE=coverage npm test` で取得し、Codecov へ OIDC (`id-token: write`) でアップロードする ([CI ワークフロー](../../.github/workflows/test.yml)の `coverage` ジョブ、表示名は `Coverage (22.x)`)。Codecov を呼び出すジョブには `permissions.id-token: write` が必須で、無いと OIDC トークン取得に失敗する (#546 で修正済み)。このジョブは必須チェックではない。
 
 ## よくある詰まりどころ
 
