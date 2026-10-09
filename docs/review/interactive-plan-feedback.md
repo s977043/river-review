@@ -78,6 +78,44 @@ The proposed validator must perform the following checks:
 SHA-256 matching provides source integrity and freshness checks.
 It does not establish reviewer identity or signed authorization.
 
+## Phase C opt-in HTML projection (#2601)
+
+The library reads explicit local PlanGate task files in a read-only manner.
+It checks the raw plan and question SHA-256 digests.
+It validates question definitions and answer states before building the
+optional display-only model. It does not trust a `validated` flag.
+
+```js
+import { loadPlanFeedbackProjection } from './src/lib/plan-feedback-projection.mjs';
+import { formatHtmlOutput } from './src/lib/output-formatters/html.mjs';
+
+const planFeedback = loadPlanFeedbackProjection({
+  workDir: '/local/project/docs/working/TASK-0001',
+  feedbackPath: '/local/downloads/TASK-0001-review-feedback.json',
+  taskId: 'TASK-0001',
+});
+const html = formatHtmlOutput(canonicalReviewResult, 'midstream', {
+  planFeedback,
+});
+```
+
+The canonical review result is supplied by the existing River Review host.
+The optional third argument adds only an HTML section. Without the argument
+the existing output is unchanged. Any arbitrary object pretending to be a
+validated projection is rejected. The projected question text, answer and
+artifact references are escaped. No extra judge, finding, gate, or coverage
+status is created.
+
+Source hashes prove freshness against task files at load time; they do not
+prove a reviewer's identity. The file-reading host is responsible for
+providing its own local paths and protecting them from untrusted callers.
+The module never sends a network request or updates an approval record.
+Declared `artifactRefs` are display hints, not proof that a referenced
+artifact exists or was reviewed. They are rendered as escaped text only.
+
+CLI wiring is deliberately separate: do not expose an implicit environment
+variable or accept a browser-only `validated` field as permission to render.
+
 ## Phase C: read-only decision surface
 
 An optional projection may display unresolved questions with evidence links.
@@ -89,8 +127,8 @@ System disposition and author resolution remain separate concepts (#2322).
 ## Delivery status
 
 - [x] Phase A: review-only contract and trust boundaries.
-- [ ] Phase B: strict validator plus positive and negative test fixtures.
-- [ ] Phase C: display-only projection to the current decision surface.
+- [x] Phase B: PlanGate local validator (producer-side) is merged; no automatic importer.
+- [ ] Phase C: source-checked library HTML projection added; CLI integration remains opt-in future work.
 - [ ] Real-browser evaluation of keyboard navigation and JSON download.
 
 Phase B and Phase C require separate reviewable implementation slices.
