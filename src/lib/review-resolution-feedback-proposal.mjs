@@ -74,7 +74,8 @@ function resolveReviewer(item, binding) {
     : { reasonCode: 'reviewer_binding_ambiguous' };
 }
 
-function hasTrustedShapeEvidence(verification) {
+// Checks complete evidence references only. A digest is not an authenticity proof.
+function hasCompleteEvidenceReferences(verification) {
   return (
     nonEmpty(verification?.verifier) &&
     verification?.coverageStatus === 'complete' &&
@@ -90,8 +91,9 @@ function hasTrustedShapeEvidence(verification) {
  * Build read-only proposals, not canonical Feedback entries.
  *
  * `bindings` are explicit caller-provided finding→Skill mappings, NOT
- * proof of trusted Skill ownership. A future approval adapter must check
- * their authority before calling the existing buildFeedbackEntry writer.
+ * proof of trusted Skill ownership. Hashed evidence references are also
+ * not independent attestation. A future approval adapter must check their
+ * authority before calling the existing buildFeedbackEntry writer.
  *
  * @param {{reviewResolution: object, bindings?: object[]}} options
  * @returns {{kind:string, resolutionId:string, reviewRunId:string, proposals:object[]}}
@@ -155,7 +157,7 @@ export function buildReviewResolutionFeedbackProposals({
       if (
         reviewResolutionRevisionArtifactKey(resolution?.target) === null ||
         isSameReviewResolutionRevision(reviewResolution.source, resolution.target) ||
-        !hasTrustedShapeEvidence(verification)
+        !hasCompleteEvidenceReferences(verification)
       ) {
         return result(base, 'needs_human', 'verification_evidence_incomplete');
       }
