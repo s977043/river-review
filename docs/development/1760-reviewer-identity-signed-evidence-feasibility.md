@@ -134,13 +134,16 @@ writer/key boundary.
 
 - Check canonical payload, exact target revision, rulebook and artifact digest.
 - Use an externally supplied allowlisted trust root.
-- Emit explicit `verified / unverified / unavailable` as a separate
-  experimental observation, not `decision`, Gate, or approval.
+- Record verification success, failure, and unavailable inputs explicitly.
+  Reuse or extend the existing replay-verification owner only after a
+  compatibility review; do not invent a second trust-status vocabulary.
+  No result becomes `decision`, Gate, or approval.
 - Keep private keys outside River Review and the candidate workspace.
 - Test all eight threat scenarios above, plus unknown/older artifacts.
 
 **Gate:** hostile-fixture tests, backward compatibility and independent
 security review must pass. A valid signature alone does not pass this gate.
+A signature-verification error cannot be treated as a clean or approved review.
 
 ### Phase C: Optional Host event integration (separate decision)
 
