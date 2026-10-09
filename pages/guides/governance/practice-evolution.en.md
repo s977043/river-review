@@ -1,6 +1,6 @@
 ---
 id: practice-evolution-en
-title: Practice Evolution (OSS Governance)
+sidebar_label: Practice Evolution
 ---
 
 # Evolving River Review's practices through agile values
