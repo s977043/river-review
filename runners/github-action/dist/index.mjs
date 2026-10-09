@@ -50664,6 +50664,21 @@ function consumeOption(parsed, arg, args) {
     parsed.outputExplicit = true;
     return 'continue';
   }
+  if (
+    arg === '--plan-feedback' ||
+    arg === '--plan-feedback-workdir' ||
+    arg === '--plan-feedback-task'
+  ) {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: ' + arg + ' requires a value.');
+      return 'break';
+    }
+    if (arg === '--plan-feedback') parsed.planFeedbackFile = value;
+    else if (arg === '--plan-feedback-workdir') parsed.planFeedbackWorkdir = value;
+    else parsed.planFeedbackTask = value;
+    return 'continue';
+  }
   if (arg === '--format') {
     const value = args.shift();
     if (!value || value.startsWith('-')) {
@@ -95067,7 +95082,7 @@ async function runRunsCommand(parsed, targetPath) {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
         console.log(JSON.stringify(diffWithSignal, null, 2));
       } else if (parsed.output === 'html') {
-        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 474).then(__nccwpck_require__.bind(__nccwpck_require__, 9474));
+        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 980).then(__nccwpck_require__.bind(__nccwpck_require__, 3980));
         console.log(
           formatLoopDashboardHtml(diff, {
             runIds: sortedRecords.map((r) => r.runId),
@@ -95108,7 +95123,7 @@ async function runRunsCommand(parsed, targetPath) {
         const diffWithSignal = { ...diff, suggestedLoopSignal: runsSignal };
         console.log(JSON.stringify(diffWithSignal, null, 2));
       } else if (parsed.output === 'html') {
-        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 474).then(__nccwpck_require__.bind(__nccwpck_require__, 9474));
+        const { formatLoopDashboardHtml } = await __nccwpck_require__.e(/* import() */ 980).then(__nccwpck_require__.bind(__nccwpck_require__, 3980));
         console.log(
           formatLoopDashboardHtml(diff, {
             runIds: [run1.runId, run2.runId].filter(Boolean),
@@ -101389,7 +101404,7 @@ async function renderRunResult(result, parsed) {
     };
     console.log(formatYamlOutput(artifact));
   } else if (parsed.output === 'html') {
-    const { formatHtmlOutput } = await __nccwpck_require__.e(/* import() */ 474).then(__nccwpck_require__.bind(__nccwpck_require__, 9474));
+    const { formatHtmlOutput } = await __nccwpck_require__.e(/* import() */ 980).then(__nccwpck_require__.bind(__nccwpck_require__, 3980));
     const jsonOutput = formatJsonOutput(result, parsed.phase);
     const htmlResult = {
       findings: result.findings ?? [],
@@ -101398,7 +101413,11 @@ async function renderRunResult(result, parsed) {
       // Propagate the canonical verdict so HTML matches JSON (#1170 F3).
       ...(jsonOutput.decision !== undefined ? { decision: jsonOutput.decision } : {}),
     };
-    console.log(formatHtmlOutput(htmlResult, parsed.phase));
+    console.log(
+      formatHtmlOutput(htmlResult, parsed.phase, {
+        planFeedback: parsed.planFeedbackProjection,
+      })
+    );
   } else {
     printPlan(result.plan);
     printComments(result.comments);
@@ -101534,6 +101553,19 @@ async function persistRunArtifacts(result, parsed, targetPath) {
  * @returns {Promise<number>} process exit code.
  */
 async function runRunCommand(parsed, targetPath) {
+  if (parsed.planFeedbackFile !== null) {
+    try {
+      const { loadPlanFeedbackProjection } = await __nccwpck_require__.e(/* import() */ 448).then(__nccwpck_require__.bind(__nccwpck_require__, 5448));
+      parsed.planFeedbackProjection = loadPlanFeedbackProjection({
+        feedbackPath: parsed.planFeedbackFile,
+        workDir: parsed.planFeedbackWorkdir,
+        taskId: parsed.planFeedbackTask,
+      });
+    } catch (error) {
+      console.error('Error: invalid source-matched plan feedback: ' + error.message);
+      return 2;
+    }
+  }
   // Resolve --skill-set to its skill ids up front so an unknown name fails
   // fast with a clear message before any review work begins.
   let skillIds = null;
@@ -104202,6 +104234,9 @@ Options:
   --estimate        Print cost estimate only (no review)
   --max-cost <usd>  Abort if estimated cost exceeds this USD amount
   --output <mode>   Output format: text|markdown|json|yaml|html. Default: text
+  --plan-feedback <file>          (run --output html) Review-only JSON feedback file
+  --plan-feedback-workdir <dir>   Source task directory with plan.md and review-questions.json
+  --plan-feedback-task <TASK>     TASK-XXXX; all three flags must be supplied
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
@@ -104703,6 +104738,9 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--estimate',
   '--max-cost',
   '--output',
+  '--plan-feedback',
+  '--plan-feedback-workdir',
+  '--plan-feedback-task',
   '--format',
   '--context',
   '--dependency',
@@ -105521,6 +105559,10 @@ function parseArgs(argv) {
     availableDependencies: null,
     reviewers: null,
     baseline: null,
+    planFeedbackFile: null,
+    planFeedbackWorkdir: null,
+    planFeedbackTask: null,
+    planFeedbackProjection: null,
     base: null,
     entry: null,
     skillSet: null,
@@ -105744,6 +105786,21 @@ function parseArgs(argv) {
   // report `river review null` on top of it (checkCommandScopedOptions returns
   // early when parsed.usageError is already set).
   checkCommandScopedOptions(parsed);
+
+  const suppliedPlanFeedback = [
+    parsed.planFeedbackFile,
+    parsed.planFeedbackWorkdir,
+    parsed.planFeedbackTask,
+  ].filter((value) => value !== null);
+  if (!parsed.usageError && suppliedPlanFeedback.length > 0) {
+    if (parsed.command !== 'run' || parsed.output !== 'html' || suppliedPlanFeedback.length !== 3) {
+      console.error(
+        'Error: --plan-feedback, --plan-feedback-workdir and --plan-feedback-task ' +
+          'must be used together with river run --output html.'
+      );
+      usageError(parsed);
+    }
+  }
 
   if (applyPhaseFallback(parsed)) {
     usageError(parsed);
