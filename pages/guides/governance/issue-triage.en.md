@@ -12,6 +12,8 @@ sidebar_label: Issue Triage and HOTL
 > **Rules SSoT:** [Issue / Project operation rules](./issue-management.en.md)
 > **Values:** [Practice Evolution Policy](./practice-evolution.en.md)
 
+[日本語版](./issue-triage.md)
+
 ## Purpose and authority
 
 Keep open Issues as a backlog of verifiable, actionable work rather than a store of historical discussions. GitHub Issues/PRs, current main, tests and execution evidence are the factual sources of truth. This page is an **adaptable practice**, not a new mandatory gate or a replacement for the existing rules about labels, contributions, approval, merging or releases.
@@ -36,15 +38,13 @@ Test a single case before bulk updates. Neither an unchecked checklist nor a mer
 
 ### Triage outcomes (not new labels)
 
-| Outcome | Evidence | Action |
-| --- | --- | --- |
-| Completed | All AC fulfilled in current main with verification | Record evidence and close as completed |
-| Duplicate | Same goal and remaining AC; safe transfer to one representative Issue | Transfer AC, add bidirectional links, close as duplicate/not planned |
-| Superseded | Replaced by an adopted design or successor Issue | Document successor and transfer; close as not planned |
-| Obsolete / not reproducible | Checked against current behavior; residual risk acceptably low | Record limits and reopen trigger; close as not planned |
-| Out of scope | Explicit, authorized decision to defer or reject | Record reason and revisit condition; close as not planned |
-| Actionable | A verification, implementation or evaluation slice can proceed | Keep open and identify smallest slice |
-| Blocked / decision required | Mandatory prerequisite or human-owned authority is missing | Keep open; record unblock condition **and parallel work** |
+- **Completed:** All AC are fulfilled in current main and verified. Record the evidence and close as completed.
+- **Duplicate:** Goal and remaining AC match another Issue. Transfer AC, add bidirectional links, then close as duplicate/not planned.
+- **Superseded:** Replaced by an adopted design or successor Issue. Record successor and transferred AC, then close as not planned.
+- **Obsolete / not reproducible:** Checked against current behavior with reasonably low residual risk. Record investigation limits and revisit trigger, then close as not planned.
+- **Out of scope:** An authorized decision has been made not to proceed. Record rationale and revisit condition, then close as not planned.
+- **Actionable:** A verification, implementation or evaluation slice can proceed. Keep open and define the smallest useful slice.
+- **Blocked / decision required:** A prerequisite or human-owned authority is missing. Keep open; record the unblock condition and parallel work.
 
 Related/parent Issues are not necessarily duplicates. Never close a still-relevant security, privacy, data-loss, fail-open or approval-bypass risk merely because it is old or hard to reproduce.
 
