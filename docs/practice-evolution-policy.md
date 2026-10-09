@@ -1,4 +1,4 @@
-# Practice Evolution Policy — 内部参照
+# Practice Evolution Policy: 内部参照
 
 **公開・OSS運営上の正本**: [実践進化方針（日本語）](../pages/guides/governance/practice-evolution.md) / [Practice Evolution (English)](../pages/guides/governance/practice-evolution.en.md)。
 
