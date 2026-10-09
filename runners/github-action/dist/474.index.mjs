@@ -73,8 +73,14 @@ function parseStrict(bytes) {
   for (let i = 0; i < source.length; i++) {
     const c = source[i];
     if (start >= 0) {
-      if (escaped) { escaped = false; continue; }
-      if (c === '\\') { escaped = true; continue; }
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (c === '\\') {
+        escaped = true;
+        continue;
+      }
       if (c !== '"') continue;
       const token = JSON.parse(source.slice(start, i + 1));
       let next = i + 1;
@@ -109,8 +115,12 @@ function sourceDigest(source, name, filename, bytes) {
 
 /** Return an opaque, source-checked display-only model. */
 function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
-  if (!validText(workDir, 2048) || !validText(feedbackPath, 2048) ||
-      typeof taskId !== 'string' || !TASK.test(taskId)) {
+  if (
+    !validText(workDir, 2048) ||
+    !validText(feedbackPath, 2048) ||
+    typeof taskId !== 'string' ||
+    !TASK.test(taskId)
+  ) {
     throw new Error('explicit task ID, workDir and feedbackPath required');
   }
   const work = path.resolve(workDir);
@@ -121,39 +131,70 @@ function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
   const rawQuestions = readRegular(path.join(work, 'review-questions.json'), 128 * 1024);
   const rawFeedback = readRegular(path.resolve(feedbackPath), 512 * 1024);
   const questionsDoc = exact(parseStrict(rawQuestions), ['version', 'questions'], 'questions');
-  if (questionsDoc.version !== 1 || !Number.isInteger(questionsDoc.version) ||
-      !Array.isArray(questionsDoc.questions) || questionsDoc.questions.length === 0 ||
-      questionsDoc.questions.length > 50) throw new Error('unsupported questions schema');
+  if (
+    questionsDoc.version !== 1 ||
+    !Number.isInteger(questionsDoc.version) ||
+    !Array.isArray(questionsDoc.questions) ||
+    questionsDoc.questions.length === 0 ||
+    questionsDoc.questions.length > 50
+  )
+    throw new Error('unsupported questions schema');
   const definitions = new Map();
   for (const q of questionsDoc.questions) {
-    if (!q || typeof q !== 'object' || Array.isArray(q) ||
-        Object.keys(q).some(key => !['id', 'prompt', 'choices', 'artifactRefs'].includes(key)) ||
-        typeof q.id !== 'string' || !ID.test(q.id) ||
-        !validText(q.prompt, 1200) || definitions.has(q.id)) {
+    if (
+      !q ||
+      typeof q !== 'object' ||
+      Array.isArray(q) ||
+      Object.keys(q).some((key) => !['id', 'prompt', 'choices', 'artifactRefs'].includes(key)) ||
+      typeof q.id !== 'string' ||
+      !ID.test(q.id) ||
+      !validText(q.prompt, 1200) ||
+      definitions.has(q.id)
+    ) {
       throw new Error('invalid or duplicate question definition');
     }
     for (const [field, maxCount, maxLength] of [
-      ['choices', 12, 300], ['artifactRefs', 10, 250],
+      ['choices', 12, 300],
+      ['artifactRefs', 10, 250],
     ]) {
       const list = q[field] ?? [];
-      if (!Array.isArray(list) || list.length > maxCount ||
-          list.some(x => !validText(x, maxLength)) || new Set(list).size !== list.length) {
+      if (
+        !Array.isArray(list) ||
+        list.length > maxCount ||
+        list.some((x) => !validText(x, maxLength)) ||
+        new Set(list).size !== list.length
+      ) {
         throw new Error('invalid question ' + field);
       }
     }
     definitions.set(q.id, q);
   }
-  const feedback = exact(parseStrict(rawFeedback), [
-    'schemaVersion', 'kind', 'taskId', 'source', 'feedback_only',
-    'approval_granted', 'generatedAt', 'answers',
-  ], 'feedback');
-  if (feedback.schemaVersion !== 1 || !Number.isInteger(feedback.schemaVersion) ||
-      feedback.kind !== 'plan-review-feedback' || feedback.taskId !== taskId ||
-      feedback.feedback_only !== true || feedback.approval_granted !== false ||
-      typeof feedback.generatedAt !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T/.test(feedback.generatedAt) ||
-      !feedback.generatedAt.endsWith('Z') ||
-      !Number.isFinite(Date.parse(feedback.generatedAt))) {
+  const feedback = exact(
+    parseStrict(rawFeedback),
+    [
+      'schemaVersion',
+      'kind',
+      'taskId',
+      'source',
+      'feedback_only',
+      'approval_granted',
+      'generatedAt',
+      'answers',
+    ],
+    'feedback'
+  );
+  if (
+    feedback.schemaVersion !== 1 ||
+    !Number.isInteger(feedback.schemaVersion) ||
+    feedback.kind !== 'plan-review-feedback' ||
+    feedback.taskId !== taskId ||
+    feedback.feedback_only !== true ||
+    feedback.approval_granted !== false ||
+    typeof feedback.generatedAt !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T/.test(feedback.generatedAt) ||
+    !feedback.generatedAt.endsWith('Z') ||
+    !Number.isFinite(Date.parse(feedback.generatedAt))
+  ) {
     throw new Error('unsupported or authoritative feedback envelope');
   }
   const sources = exact(feedback.source, ['plan', 'questions'], 'source');
@@ -165,14 +206,22 @@ function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
   const answerById = new Map();
   for (const a of feedback.answers) {
     exact(a, ['questionId', 'status', 'response', 'note'], 'answer');
-    if (!definitions.has(a.questionId) || answerById.has(a.questionId) ||
-        !STATES.has(a.status) || typeof a.response !== 'string' ||
-        a.response.length > 4000 || typeof a.note !== 'string' || a.note.length > 4000) {
+    if (
+      !definitions.has(a.questionId) ||
+      answerById.has(a.questionId) ||
+      !STATES.has(a.status) ||
+      typeof a.response !== 'string' ||
+      a.response.length > 4000 ||
+      typeof a.note !== 'string' ||
+      a.note.length > 4000
+    ) {
       throw new Error('invalid answer / unknown or duplicate question');
     }
     const choices = definitions.get(a.questionId).choices ?? [];
-    if (a.status === 'answered' &&
-        (!a.response.trim() || (choices.length && !choices.includes(a.response)))) {
+    if (
+      a.status === 'answered' &&
+      (!a.response.trim() || (choices.length && !choices.includes(a.response)))
+    ) {
       throw new Error('invalid answered state');
     }
     if (a.status === 'deferred' && (a.response || !a.note.trim())) {
@@ -183,17 +232,23 @@ function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
     }
     answerById.set(a.questionId, a);
   }
-  const items = [...definitions.values()].map(q => {
+  const items = [...definitions.values()].map((q) => {
     const answer = answerById.get(q.id);
     return Object.freeze({
-      id: q.id, prompt: q.prompt, status: answer.status,
-      response: answer.response, note: answer.note,
+      id: q.id,
+      prompt: q.prompt,
+      status: answer.status,
+      response: answer.response,
+      note: answer.note,
       artifactRefs: Object.freeze([...(q.artifactRefs ?? [])]),
     });
   });
   return Object.freeze({
-    [BRAND]: true, kind: 'SOURCE_MATCHED_REVIEW_FEEDBACK',
-    taskId, planSha256: sources.plan.sha256, questionsSha256: sources.questions.sha256,
+    [BRAND]: true,
+    kind: 'SOURCE_MATCHED_REVIEW_FEEDBACK',
+    taskId,
+    planSha256: sources.plan.sha256,
+    questionsSha256: sources.questions.sha256,
     items: Object.freeze(items),
     // A digest cannot establish reviewer identity or grant authorization.
     approvalGranted: false,
@@ -365,19 +420,39 @@ function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
       '<p class="meta">Source-matched feedback, not reviewer authentication, C-3 approval, a River verdict, or permission to merge.</p>'
     );
     parts.push('<p class="meta">Task: <code>' + escHtml(planFeedback.taskId) + '</code></p>');
-    parts.push('<p class="meta">Plan SHA-256: <code>' + escHtml(planFeedback.planSha256) + '</code></p>');
     parts.push(
-      '<p class="meta">Questions SHA-256: <code>' + escHtml(planFeedback.questionsSha256) + '</code></p>'
+      '<p class="meta">Plan SHA-256: <code>' + escHtml(planFeedback.planSha256) + '</code></p>'
     );
-    parts.push('<table><tr><th>Question</th><th>Status</th><th>Response / reason</th><th>Declared references</th></tr>');
+    parts.push(
+      '<p class="meta">Questions SHA-256: <code>' +
+        escHtml(planFeedback.questionsSha256) +
+        '</code></p>'
+    );
+    parts.push(
+      '<table><tr><th>Question</th><th>Status</th><th>Response / reason</th><th>Declared references</th></tr>'
+    );
     for (const q of planFeedback.items) {
-      const status = q.status === 'unanswered' ? 'UNANSWERED' :
-        q.status === 'deferred' ? 'DEFERRED' : 'ANSWERED';
+      const details = [q.response, q.note].filter(Boolean).join('\n');
+      const status =
+        q.status === 'unanswered'
+          ? 'UNANSWERED'
+          : q.status === 'deferred'
+            ? 'DEFERRED'
+            : 'ANSWERED';
       parts.push(
-        '<tr><td><strong>' + escHtml(q.id) + '</strong> ' + escHtml(q.prompt) + '</td>' +
-          '<td>' + escHtml(status) + '</td>' +
-          '<td><pre>' + escHtml(q.status === 'answered' ? q.response : q.note) + '</pre></td>' +
-          '<td>' + q.artifactRefs.map(ref => '<code>' + escHtml(ref) + '</code>').join(', ') +
+        '<tr><td><strong>' +
+          escHtml(q.id) +
+          '</strong> ' +
+          escHtml(q.prompt) +
+          '</td>' +
+          '<td>' +
+          escHtml(status) +
+          '</td>' +
+          '<td><pre>' +
+          escHtml(details) +
+          '</pre></td>' +
+          '<td>' +
+          q.artifactRefs.map((ref) => '<code>' + escHtml(ref) + '</code>').join(', ') +
           '</td></tr>'
       );
     }

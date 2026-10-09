@@ -47,9 +47,12 @@ async function planFiles(dir) {
 
 function flags(workDir, feedbackPath) {
   return [
-    '--plan-feedback', feedbackPath,
-    '--plan-feedback-workdir', workDir,
-    '--plan-feedback-task', 'TASK-0001',
+    '--plan-feedback',
+    feedbackPath,
+    '--plan-feedback-workdir',
+    workDir,
+    '--plan-feedback-task',
+    'TASK-0001',
   ];
 }
 

@@ -275,8 +275,11 @@ export function consumeOption(parsed, arg, args) {
     parsed.outputExplicit = true;
     return 'continue';
   }
-  if (arg === '--plan-feedback' || arg === '--plan-feedback-workdir' ||
-      arg === '--plan-feedback-task') {
+  if (
+    arg === '--plan-feedback' ||
+    arg === '--plan-feedback-workdir' ||
+    arg === '--plan-feedback-task'
+  ) {
     const value = args.shift();
     if (!value || value.startsWith('-')) {
       console.error('Error: ' + arg + ' requires a value.');

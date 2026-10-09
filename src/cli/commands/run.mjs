@@ -101,9 +101,11 @@ async function renderRunResult(result, parsed) {
       // Propagate the canonical verdict so HTML matches JSON (#1170 F3).
       ...(jsonOutput.decision !== undefined ? { decision: jsonOutput.decision } : {}),
     };
-    console.log(formatHtmlOutput(htmlResult, parsed.phase, {
-      planFeedback: parsed.planFeedbackProjection,
-    }));
+    console.log(
+      formatHtmlOutput(htmlResult, parsed.phase, {
+        planFeedback: parsed.planFeedbackProjection,
+      })
+    );
   } else {
     printPlan(result.plan);
     printComments(result.comments);
@@ -241,8 +243,7 @@ async function persistRunArtifacts(result, parsed, targetPath) {
 export async function runRunCommand(parsed, targetPath) {
   if (parsed.planFeedbackFile !== null) {
     try {
-      const { loadPlanFeedbackProjection } =
-        await import('../../lib/plan-feedback-projection.mjs');
+      const { loadPlanFeedbackProjection } = await import('../../lib/plan-feedback-projection.mjs');
       parsed.planFeedbackProjection = loadPlanFeedbackProjection({
         feedbackPath: parsed.planFeedbackFile,
         workDir: parsed.planFeedbackWorkdir,

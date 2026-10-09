@@ -1720,7 +1720,9 @@ function parseArgs(argv) {
   checkCommandScopedOptions(parsed);
 
   const suppliedPlanFeedback = [
-    parsed.planFeedbackFile, parsed.planFeedbackWorkdir, parsed.planFeedbackTask,
+    parsed.planFeedbackFile,
+    parsed.planFeedbackWorkdir,
+    parsed.planFeedbackTask,
   ].filter((value) => value !== null);
   if (!parsed.usageError && suppliedPlanFeedback.length > 0) {
     if (parsed.command !== 'run' || parsed.output !== 'html' || suppliedPlanFeedback.length !== 3) {
