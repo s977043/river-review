@@ -12,6 +12,8 @@ sidebar_label: Issue棚卸しとHOTL運用
 > **Rules SSoT:** [Issue / Project運用ルール](./issue-management.md)
 > **Values:** [実践進化方針](./practice-evolution.md)
 
+[English version](./issue-triage.en.md)
+
 ## 目的と責務
 
 Open Issueを、過去の議論の保管庫ではなく「次に確かめ、進める仕事が分かるバックログ」に保つ。正本はGitHub Issue/PR、現行main、実行ログ・テストであり、このページは**変更可能な実践手順**とする。ラベル、Issue作成、承認、merge、releaseの現行規約は[Issue管理規約](./issue-management.md)とリポジトリのgovernanceが所有し、このページで変更しない。
@@ -36,15 +38,13 @@ Open Issueを、過去の議論の保管庫ではなく「次に確かめ、進�
 
 ### 処置分類（追加のラベルではない）
 
-| Triage outcome | 根拠 | 次の一手 |
-| --- | --- | --- |
-| Completed | 全ACが現行mainと検証結果で充足 | 根拠と確認範囲を記録してcompleted |
-| Duplicate | 目的・未達ACが同じで、代表Issueへ安全に引き継げる | AC移管・双方向リンクの後にduplicate/not planned |
-| Superseded | 新設計・代替Issueに明示的に置換済み | 引継ぎ先と未達事項を記録してnot planned |
-| Obsolete / not reproducible | 現行環境で確認して継続リスクが合理的に低い | 調査限界・再発条件を記録してnot planned |
-| Out of scope | 現行の目標に照らして採らないと決定済み | 判断理由・再訪条件を記録してnot planned |
-| Actionable | 次の検証・修正・評価を開始できる | Open、最小スライスとACを具体化 |
-| Blocked / decision required | 不足する条件やHuman-owned権限がある | Open、解除条件と**並行可能な仕事**を記録 |
+- **Completed:** 全ACが現行mainと検証結果で充足。根拠と確認範囲を記録してcompletedでClose。
+- **Duplicate:** 目的・未達ACが同じ。残ACの代表Issueへの移管と双方向リンクを確認し、duplicate/not plannedでClose。
+- **Superseded:** 新設計・代替Issueへ置換済み。引継ぎ先と未達事項を記録しnot plannedでClose。
+- **Obsolete / not reproducible:** 現行環境で確認して継続リスクが合理的に低い。調査限界と再発条件を記録しnot plannedでClose。
+- **Out of scope:** 現行の目標に照らして採らないと正式に決定済み。判断理由と再訪条件を記録しnot plannedでClose。
+- **Actionable:** 次の検証・修正・評価を開始できる。最小スライスとACを明確にしてOpenを維持。
+- **Blocked / decision required:** 必須の先行条件やHuman-owned権限が不足。解除条件と並行できる作業を記録してOpenを維持。
 
 Issue番号が親子・関連であるだけでは重複にしない。安全保障、秘密情報、データ損失、承認迂回、fail-openなどの継続リスクは、単なる古さや再現困難を理由にCloseしない。監査可能な理由を残す。
 
@@ -58,7 +58,7 @@ Issueを「Human判断が必要」の一行で終わらせない。**作業可�
 - **E3 Decision packet:** 未解決の判断だけを人に示す。下記の情報が揃うまで情報収集・並行作業を続ける。
 - **E4 Human-owned authority:** セキュリティリスク受容、不可逆操作、policy変更の正式採否、必要な独立承認やmerge等は既存の権限に従う。E0〜E3はE4の承認を代替しない。
 
-最低限のDecision packetには `Problem / Evidence (refs+観測時点) / Unknown / Options / Recommendation / Cost & risk / Executable now / Explicit owner decision / Stop & recovery` を含める。証拠不足の項目を `0` や `PASS` としない。
+Decision packetには問題、根拠、未確認事項、選択肢、推奨案、コストとリスクを記録する。今すぐ実行できる作業、判断権限の所在、中止・復旧条件も明記する。証拠不足を `0` や `PASS` としない。
 
 **判断前に進められる例:** #2601のHTML連携はPRのマージ確認とdogfoodを独立に進められる。#2455のprovider-backed評価が未許可でも、offline fixturesや契約整合は進められる。これらを「承認済みの本番評価」と混同しない。
 
