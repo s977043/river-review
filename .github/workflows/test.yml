@@ -114,7 +114,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      id-token: write
     strategy:
       matrix:
         node-version: [22.x]
@@ -135,9 +134,32 @@ jobs:
       # caller — CI jobs, PR templates, and local runs — gets it. This flag does
       # not exist on Node 20.x, which is EOL (2026-04), so the matrix is pinned
       # to 22.x. The full suite passes under single-process isolation (verified:
-      # no shared-state pollution). Coverage is safe to collect now (no children
-      # to serialize).
+      # no shared-state pollution). Coverage collection moved to the non-required
+      # `coverage` job so this required check does not pay its instrumentation cost.
       - name: Run unit tests (single-process isolation, #1415)
+        run: npm test
+
+  # Not in branch protection; runs in parallel with `test`. NODE_V8_COVERAGE made
+  # `npm test` ~28% slower (run 37759602071), so it lives off the required path.
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      matrix:
+        node-version: [22.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-deps
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Run unit tests with coverage
         run: NODE_V8_COVERAGE=coverage npm test
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
