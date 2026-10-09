@@ -11,6 +11,12 @@ River Review is built to deliver timely, phase-aware feedback without slowing te
 - **Evidence-based**: link guidance to commands or links that prove the recommendation.
 - **Context-aware**: systematically design the context passed to the LLM. Maximize review quality within a bounded context budget through skill selection, diff filtering, and progressive disclosure.
 
+## Values guiding OSS development and governance
+
+In developing and maintaining River Review, we value dialogue, working outcomes, collaboration with users, and responsiveness to change, in the spirit of the Agile Manifesto. We compare local evidence with external knowledge, then choose to adopt, adapt, transform, or defer proposals. Small experiments and fast feedback may also show when to remove needless procedures.
+
+This is guidance for evolving practices, not a new mandatory review gate. The boundaries between evidence and judgment, review verdict and approval, and role and authority remain unchanged. See the [public Practice Evolution policy](../guides/governance/practice-evolution.en.md) for contributor-facing guidance.
+
 ## Judgment Placement: put each judgment in the right layer
 
 For cliff-tier, high-risk changes, human approval stays mandatory and HITL is preserved. Without moving that premise, River Review treats review as a judgment system spanning multiple evaluation layers, not as one ceremony attached to a pull request.
