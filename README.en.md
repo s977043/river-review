@@ -30,7 +30,7 @@ River Review helps you answer questions like:
 
 ⭐ If this helps your team's review workflow in AI-assisted development, please [Star the repo](https://github.com/s977043/river-review). It keeps you posted on updates and helps other teams with the same problem find River Review.
 
-For the problems River Review addresses, its design intent, and its relationship to PlanGate and Harness Engineering, see [Design philosophy (Japanese)](docs/philosophy.md).
+For design intent and boundaries, see the [public Design Philosophy](pages/explanation/design-philosophy.en.md). Our OSS governance values are published in the [Practice Evolution policy](pages/guides/governance/practice-evolution.en.md).
 
 ## Why River Review?
 
@@ -98,7 +98,7 @@ The shortest no-install path is the bundled plugin: add the marketplace and ask 
 | Repo-wide aware review                  | [Repo-wide review guide](pages/guides/repo-wide-review.en.md)                                                                                 |
 | Plan and run a review from the CLI      | [review plan spec](pages/reference/cli-review-plan-spec.en.md) / [review exec spec](pages/reference/cli-review-exec-spec.en.md)               |
 | Understand the concept                  | [Concept page](https://river-review.the3396.com/explanation/concept-en/)                                                                      |
-| Understand the design                   | [Design philosophy (Japanese)](docs/philosophy.md) / [Architecture docs](https://river-review.the3396.com/explanation/river-architecture.en/) |
+| Understand the design                   | [Design Philosophy](pages/explanation/design-philosophy.en.md) / [Architecture docs](https://river-review.the3396.com/explanation/river-architecture.en/) |
 
 See [docs/runbook/dev.md](docs/runbook/dev.md) for the development runbook. License details are at the [bottom of this file](#license).
 
