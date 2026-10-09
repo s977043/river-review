@@ -1,5 +1,7 @@
 # Reviewer Identity / signed review evidence—Phase 0 feasibility (#1760)
 
+<!-- prettier-ignore-start -->
+
 Status: **design only / conditional GO for further evaluation**  
 Baseline: `main` at `b0e6728ebf1f787d807a9fb9bed2dc01c19836bf` (2026-10-09).  
 Scope: Reviewer Identity, Review Record and signature trust boundaries. No runtime/schema/Gate change in this slice.
@@ -187,3 +189,5 @@ Do not feed signature success into Gate, merge or release decisions.
 This is a partial milestone for #1760.
 The full ADR and Review Record/Event schema remain unfinished.
 Key lifecycle and signed audit acceptance criteria also remain unfinished.
+
+<!-- prettier-ignore-end -->
