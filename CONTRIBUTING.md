@@ -9,7 +9,7 @@
 
 ## OSSとしての価値観・運営方針
 
-River Review は[アジャイルの価値観に基づく実践進化方針](https://river-review.the3396.com/guides/governance/practice-evolution/)に従い、利用者との対話、検証可能な成果、変化への対応を重視します。現場の Evidence と外部知識を比較し、**Adopt / Adapt / Transform / Defer（採用・適応・前提の変革・見送り）**を判断します。
+River Review は[アジャイルの価値観に基づく実践進化方針](pages/guides/governance/practice-evolution.md)に従い、利用者との対話、検証可能な成果、変化への対応を重視します。現場の Evidence と外部知識を比較し、**Adopt / Adapt / Transform / Defer（採用・適応・前提の変革・見送り）**を判断します。
 
 新しい Skill やチェックの提案だけでなく、不要な手順・レビュー待ち時間・誤検知を減らす提案も歓迎します。可能なら問題・証拠・最小の検証・見直し条件を示してください。ただし新たな必須テンプレートではありません。セキュリティ、承認、CI、メンテナの最終判断に関する既存のルールは引き続き有効です。
 
