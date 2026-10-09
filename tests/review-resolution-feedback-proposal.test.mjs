@@ -230,10 +230,7 @@ test('same-revision verified_resolved and duplicate sidecar findings fail closed
   const sameRevision = resolutionItem({
     resolution: { state: 'action_submitted', target: SOURCE, decisionRefs: [] },
   });
-  assert.throws(
-    () => sidecar(sameRevision),
-    /Review Resolution semantic validation failed/
-  );
+  assert.throws(() => sidecar(sameRevision), /Review Resolution semantic validation failed/);
 
   assert.throws(
     () =>
