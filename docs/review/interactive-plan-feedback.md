@@ -118,9 +118,8 @@ variable or accept a browser-only `validated` field as permission to render.
 
 ## Explicit HTML CLI integration
 
-After the PlanGate source files and browser-exported JSON are available,
-River Review can display the source-matched questions alongside an
-ordinary completed review report:
+The PlanGate source files and exported JSON must be available locally.
+River Review can then display source-matched questions in the review report:
 
 ```sh
 river run . --dry-run --output html \
