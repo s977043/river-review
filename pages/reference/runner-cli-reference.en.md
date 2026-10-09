@@ -1,6 +1,6 @@
 # Runner CLI Reference
 
-> **Scope note**: this page covers only the `--reviewers` flag of `river run` and the validation commands.
+> **Scope note**: this page covers only the `--reviewers` and [`--plan-feedback`](#plan-feedback) flags of `river run` and the validation commands.
 >
 > - For every other `river run` flag (`--phase` / `--planner` / `--dry-run` / `--output` / `--max-cost` / `--debug` / `--estimate` and so on), see **[stable-interfaces.en.md](./stable-interfaces.en.md)**.
 > - For the `river review exec` flags used in a W-check (`--artifact`, `--ensemble`, `--phase`), see the **[W-check guide](../guides/w-check.en.md)** and **[cli-review-exec-spec.en.md](./cli-review-exec-spec.en.md)**.
@@ -77,6 +77,51 @@ A cutoff is observable from:
 
 > **Note**: the timeout only bounds the orchestration-layer wait; it does not cancel the in-flight LLM call. The abandoned request keeps running until the budget in `src/lib/llm-pipeline.mjs` is exhausted (15 s per attempt plus bounded retries — roughly 45 s), so the process stays alive for that long after the `timeout` line is printed. True cancellation requires threading an `AbortSignal` through `generateReview()` and is out of scope for this change.
 
+## `--plan-feedback` flags {#plan-feedback}
+
+These flags add PlanGate's answers to review questions (review-only JSON) to the `river run --output html` report as a display-only section. The answers are not approval. Findings, the gate, the verdict, and coverage do not change. The contract and trust boundary are described in `docs/review/interactive-plan-feedback.md`.
+
+```sh
+river run . --dry-run --output html \
+  --plan-feedback /local/downloads/TASK-0001-review-feedback.json \
+  --plan-feedback-workdir /local/project/docs/working/TASK-0001 \
+  --plan-feedback-task TASK-0001 > review.html
+```
+
+| Flag                            | Value                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `--plan-feedback <file>`        | The review-only answer JSON exported by PlanGate                          |
+| `--plan-feedback-workdir <dir>` | The PlanGate task directory holding `plan.md` and `review-questions.json` |
+| `--plan-feedback-task <TASK>`   | The task ID: `TASK-` followed by four digits (for example `TASK-0001`)    |
+
+### Acceptance rules
+
+- All three flags must be supplied together (any missing one is a usage error)
+- Accepted only by `river run` with `--output html` (`--output json` or `doctor` is a usage error)
+- Cannot be combined with `--estimate`, because an estimate never builds the HTML report (#2626)
+
+### Input validation
+
+Before the review starts, input that fails any of these checks is rejected (`src/lib/plan-feedback-projection.mjs`).
+
+- The workdir is a real directory (symlinks are rejected)
+- `plan.md`, `review-questions.json`, and the answer JSON are regular files (symlinks are rejected)
+- Size caps: 10 MiB for `plan.md`, 128 KiB for `review-questions.json`, 512 KiB for the answer JSON
+- JSON is decoded as strict UTF-8 and duplicate keys are rejected
+- `review-questions.json` has `version: 1` and 1 to 50 questions
+- The answer JSON's `taskId` matches `--plan-feedback-task`, with `feedback_only: true` and `approval_granted: false`
+- The SHA-256 digests of `plan.md` and `review-questions.json` recorded in the answer JSON match the files in the workdir (a mismatch is `STALE`)
+- Answers map one-to-one to questions, and each status is `answered`, `deferred`, or `unanswered`
+
+### Exit codes
+
+| Code | Condition                                                                                                                                            |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`  | The flags break an acceptance rule (usage error). The reason and a usage hint go to stderr and nothing goes to stdout                                |
+| `2`  | Input validation failed (missing file, symlink, oversize, `STALE`, and so on). Prints `Error: invalid source-matched plan feedback: ...` and no HTML |
+
+Once validation passes, exit codes are the same as `river run` without these flags.
+
 ## Commands
 
 - Agents: `npm run agents:validate` (or `node scripts/validate-agents.mjs`)
@@ -91,7 +136,7 @@ A cutoff is observable from:
 | ---- | --------------------------------------------------------------------------------------------------------------------------- |
 | `0`  | Success                                                                                                                     |
 | `1`  | Runtime error, schema error, or argument error (including an unknown command and a missing or invalid option value)         |
-| `2`  | The `--warn-on` warning threshold was exceeded                                                                              |
+| `2`  | The `--warn-on` warning threshold was exceeded, or [`--plan-feedback`](#plan-feedback) input validation failed              |
 | `3`  | An `--gate` ESCALATE verdict, a configuration error raised by the `review` handler, or an unimplemented `review` subcommand |
 
 The exit code for argument errors (usage errors) was unified to exit 1 plus a stderr summary in #1709. Unknown commands and missing or invalid option values were unified in Slice 2. Unknown options, surplus positionals, and the value-missing paths that remained (for example `--from` / `--cases`) were unified in Slice 3. Printing the full help to stdout and exiting 0 is kept only for an explicit `--help` and for invocation with no arguments.
