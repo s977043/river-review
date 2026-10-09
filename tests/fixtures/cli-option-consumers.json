@@ -594,6 +594,21 @@
       "suppression add"
     ]
   },
+  "--plan-feedback": {
+    "writes": ["planFeedbackFile"],
+    "readBy": ["run"],
+    "acceptedUnconsumedOn": []
+  },
+  "--plan-feedback-task": {
+    "writes": ["planFeedbackTask"],
+    "readBy": ["run"],
+    "acceptedUnconsumedOn": []
+  },
+  "--plan-feedback-workdir": {
+    "writes": ["planFeedbackWorkdir"],
+    "readBy": ["run"],
+    "acceptedUnconsumedOn": []
+  },
   "--plan-only": {
     "writes": ["planOnly"],
     "readBy": ["review"],

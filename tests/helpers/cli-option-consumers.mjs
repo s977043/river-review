@@ -220,6 +220,40 @@ export const OPTION_SAMPLES = {
   '--to': { value: ['to-dir'] },
   '--strict': { pre: ['--loose'] },
   '--source': { value: ['rr'] },
+  // The three plan-feedback flags are accepted only together with `run --output html`.
+  '--plan-feedback': {
+    value: ['feedback.json'],
+    pre: [
+      '--output',
+      'html',
+      '--plan-feedback-workdir',
+      'task-dir',
+      '--plan-feedback-task',
+      'TASK-0001',
+    ],
+  },
+  '--plan-feedback-workdir': {
+    value: ['task-dir'],
+    pre: [
+      '--output',
+      'html',
+      '--plan-feedback',
+      'feedback.json',
+      '--plan-feedback-task',
+      'TASK-0001',
+    ],
+  },
+  '--plan-feedback-task': {
+    value: ['TASK-0001'],
+    pre: [
+      '--output',
+      'html',
+      '--plan-feedback',
+      'feedback.json',
+      '--plan-feedback-workdir',
+      'task-dir',
+    ],
+  },
 };
 
 /**
