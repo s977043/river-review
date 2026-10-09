@@ -64,11 +64,7 @@ function evaluate(reviewResolution = sidecar(), bindings = [BINDING]) {
 }
 
 test('canonical feedback vocabulary is not copied into the Resolution state machine', () => {
-  assert.deepEqual(RESOLUTION_FEEDBACK_OUTCOMES, [
-    'candidate',
-    'needs_human',
-    'no_proposal',
-  ]);
+  assert.deepEqual(RESOLUTION_FEEDBACK_OUTCOMES, ['candidate', 'needs_human', 'no_proposal']);
 });
 
 test('verified_resolved with targeted evidence yields an unapproved accepted candidate', () => {
@@ -96,10 +92,12 @@ test('verified_resolved with targeted evidence yields an unapproved accepted can
   assert.equal(JSON.stringify(document), original);
   assert.equal(Object.isFrozen(out), true);
   assert.equal(Object.isFrozen(row.candidate.verificationEvidenceRefs[0]), true);
-  assert.throws(() => { out.proposals[0].candidate.skillId = 'modified'; }, TypeError);
+  assert.throws(() => {
+    out.proposals[0].candidate.skillId = 'modified';
+  }, TypeError);
 });
 
-test('risk_accepted with documented human decision is only an unapproved accepted_risk candidate', () => {
+test('risk_accepted only proposes an unapproved accepted_risk candidate', () => {
   const item = resolutionItem({
     authorResponse: { state: 'accepts_risk', rationale: 'Trade-off approved after discussion' },
     resolution: {
@@ -122,25 +120,32 @@ test('risk_accepted with documented human decision is only an unapproved accepte
   assert.equal(row.candidate.requiresApproval, true);
 });
 
-test('risk acceptance without author rationale or human decision provenance is not promoted', () => {
-  const row = evaluate(sidecar(resolutionItem({
+test('risk acceptance without human rationale or decision stays unresolved', () => {
+  const item = resolutionItem({
     authorResponse: { state: 'accepts_risk', rationale: null },
     resolution: { state: 'risk_accepted', target: null, decisionRefs: [] },
-    verification: { state: 'not_requested', verifier: null, coverageStatus: 'unknown', evidenceRefs: [] },
-  }))).proposals[0];
+    verification: {
+      state: 'not_requested',
+      verifier: null,
+      coverageStatus: 'unknown',
+      evidenceRefs: [],
+    },
+  });
+  const row = evaluate(sidecar(item)).proposals[0];
   assert.equal(row.outcome, 'needs_human');
   assert.equal(row.reasonCode, 'human_risk_acceptance_missing');
 });
 
 test('full-run not_reproduced is no_proposal, never accepted', () => {
-  const row = evaluate(sidecar(resolutionItem({
+  const item = resolutionItem({
     verification: {
       state: 'not_reproduced',
       verifier: null,
       coverageStatus: 'complete',
       evidenceRefs: [],
     },
-  }))).proposals[0];
+  });
+  const row = evaluate(sidecar(item)).proposals[0];
   assert.equal(row.outcome, 'no_proposal');
   assert.equal(row.reasonCode, 'not_reproduced');
 });
@@ -169,7 +174,8 @@ test('unsupported fingerprint schemes or invalid v1 hex are not hashed or reinte
         fingerprintAlgo,
       },
     });
-    const row = evaluate(sidecar(item), [{ ...BINDING, fingerprint, fingerprintAlgo }]).proposals[0];
+    const binding = { ...BINDING, fingerprint, fingerprintAlgo };
+    const row = evaluate(sidecar(item), [binding]).proposals[0];
     assert.equal(row.outcome, 'needs_human');
     assert.equal(row.reasonCode, 'feedback_fingerprint_incompatible');
   }
@@ -207,33 +213,47 @@ test('multiple reviewer sources need an explicit matching reviewer binding', () 
 test('incomplete verification evidence refuses a candidate', () => {
   // Evidence references with null hash are structurally valid, but cannot
   // establish the integrity of evidence used to propose a Feedback entry.
-  const row = evaluate(sidecar(resolutionItem({
+  const item = resolutionItem({
     verification: {
       state: 'verified_resolved',
       verifier: 'verifier',
       coverageStatus: 'complete',
       evidenceRefs: [{ ref: 'CI-LOG-1', sha256: null }],
     },
-  }))).proposals[0];
+  });
+  const row = evaluate(sidecar(item)).proposals[0];
   assert.equal(row.outcome, 'needs_human');
   assert.equal(row.reasonCode, 'verification_evidence_incomplete');
 });
 
 test('same-revision verified_resolved and duplicate sidecar findings fail closed', () => {
-  assert.throws(() => sidecar(resolutionItem({
+  const sameRevision = resolutionItem({
     resolution: { state: 'action_submitted', target: SOURCE, decisionRefs: [] },
-  })), /Review Resolution semantic validation failed/);
+  });
+  assert.throws(
+    () => sidecar(sameRevision),
+    /Review Resolution semantic validation failed/
+  );
 
-  assert.throws(() => buildReviewResolution({
-    resolutionId: 'RR-RES-duplicates',
-    source: SOURCE,
-    items: [resolutionItem(), resolutionItem()],
-  }), /Review Resolution semantic validation failed/);
+  assert.throws(
+    () =>
+      buildReviewResolution({
+        resolutionId: 'RR-RES-duplicates',
+        source: SOURCE,
+        items: [resolutionItem(), resolutionItem()],
+      }),
+    /Review Resolution semantic validation failed/
+  );
 });
 
-test('no canonical Feedback write, Skill promotion, or Gate judgment is possible in the pure bridge', () => {
+test('the pure bridge cannot write Feedback, promote Skills, or change Gate judgment', () => {
   const before = {
-    status: 'ok', dryRun: false, findings: [], changedFiles: ['src/app.mjs'], plan: {}, config: {},
+    status: 'ok',
+    dryRun: false,
+    findings: [],
+    changedFiles: ['src/app.mjs'],
+    plan: {},
+    config: {},
   };
   const decisionBefore = deriveRunGate(before);
   const original = JSON.stringify(before);
