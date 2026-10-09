@@ -22,7 +22,7 @@ export const modules = {
 
 
 
-const BRAND = Symbol('river-review/source-matched-plan-feedback');
+const TRUSTED_MODELS = new WeakSet();
 const STATES = new Set(['answered', 'deferred', 'unanswered']);
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const SHA = /^[0-9a-f]{64}$/;
@@ -228,8 +228,7 @@ function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
       artifactRefs: Object.freeze([...(q.artifactRefs ?? [])]),
     });
   });
-  return Object.freeze({
-    [BRAND]: true,
+  const projection = Object.freeze({
     kind: 'SOURCE_MATCHED_REVIEW_FEEDBACK',
     taskId,
     planSha256: sources.plan.sha256,
@@ -238,10 +237,12 @@ function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
     // A digest cannot establish reviewer identity or grant authorization.
     approvalGranted: false,
   });
+  TRUSTED_MODELS.add(projection);
+  return projection;
 }
 
 function isSourceMatchedPlanFeedback(value) {
-  return value?.[BRAND] === true && value.kind === 'SOURCE_MATCHED_REVIEW_FEEDBACK';
+  return TRUSTED_MODELS.has(value) && value.kind === 'SOURCE_MATCHED_REVIEW_FEEDBACK';
 }
 
 
