@@ -18,6 +18,27 @@ export const RESOLUTION_FEEDBACK_OUTCOMES = Object.freeze([
   'no_proposal',
 ]);
 
+export const RESOLUTION_FEEDBACK_REASON_CODES = Object.freeze([
+  'requires_explicit_human_approval',
+  'not_reproduced',
+  'ambiguous_human_judgment',
+  'no_confirmed_feedback_mapping',
+  'resolution_state_conflict',
+  'feedback_fingerprint_incompatible',
+  'skill_binding_missing',
+  'skill_binding_ambiguous',
+  'skill_id_missing',
+  'reviewer_provenance_missing',
+  'reviewer_binding_mismatch',
+  'reviewer_binding_ambiguous',
+  'verification_evidence_incomplete',
+  'human_risk_acceptance_missing',
+]);
+
+// A verified fix is only "accepted" when the author and resolution both
+// describe a submitted fix; any other combination is a mixed signal.
+const VERIFIED_AUTHOR_STATES = Object.freeze(['none', 'will_fix']);
+
 const V1_FINGERPRINT = /^[0-9a-f]{16}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 
@@ -125,6 +146,12 @@ export function buildReviewResolutionFeedbackProposals({ reviewResolution, bindi
     const riskAccepted = resolution?.state === 'risk_accepted';
     if (!verified && !riskAccepted) {
       return result(base, 'no_proposal', 'no_confirmed_feedback_mapping');
+    }
+    if (
+      verified &&
+      (resolution?.state !== 'action_submitted' || !VERIFIED_AUTHOR_STATES.includes(author?.state))
+    ) {
+      return result(base, 'needs_human', 'resolution_state_conflict');
     }
 
     // Canonical feedback v1 understands only 16-hex v1 fingerprints.

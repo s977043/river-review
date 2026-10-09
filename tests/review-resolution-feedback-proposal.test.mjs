@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { buildFeedbackEntry } from '../src/lib/feedback.mjs';
 import { buildReviewResolution } from '../src/lib/review-resolution.mjs';
 import {
   RESOLUTION_FEEDBACK_OUTCOMES,
+  RESOLUTION_FEEDBACK_REASON_CODES,
   buildReviewResolutionFeedbackProposals,
 } from '../src/lib/review-resolution-feedback-proposal.mjs';
 import { deriveRunGate } from '../src/lib/run-gate.mjs';
@@ -59,8 +61,12 @@ const BINDING = {
   skillId: 'river-review-security',
 };
 
+const emitted = [];
+
 function evaluate(reviewResolution = sidecar(), bindings = [BINDING]) {
-  return buildReviewResolutionFeedbackProposals({ reviewResolution, bindings });
+  const out = buildReviewResolutionFeedbackProposals({ reviewResolution, bindings });
+  emitted.push(...out.proposals);
+  return out;
 }
 
 test('canonical feedback vocabulary is not copied into the Resolution state machine', () => {
@@ -258,4 +264,74 @@ test('the pure bridge cannot write Feedback, promote Skills, or change Gate judg
   assert.equal(out.proposals[0].candidate.requiresApproval, true);
   assert.equal(JSON.stringify(before), original);
   assert.deepEqual(deriveRunGate(before), decisionBefore);
+});
+
+test('verified_resolved with a conflicting resolution or author state fails closed', () => {
+  const riskWithoutDecision = resolutionItem({
+    authorResponse: { state: 'accepts_risk', rationale: 'Accepted' },
+    resolution: { state: 'risk_accepted', target: TARGET, decisionRefs: [] },
+  });
+  const openWontFix = resolutionItem({
+    authorResponse: { state: 'wont_fix', rationale: null },
+    resolution: { state: 'open', target: TARGET, decisionRefs: [] },
+  });
+  const submittedPostponed = resolutionItem({
+    authorResponse: { state: 'postpones', rationale: null },
+  });
+  for (const item of [riskWithoutDecision, openWontFix, submittedPostponed]) {
+    const row = evaluate(sidecar(item)).proposals[0];
+    assert.equal(row.outcome, 'needs_human');
+    assert.equal(row.reasonCode, 'resolution_state_conflict');
+    assert.equal(row.candidate, undefined);
+  }
+  const noResponse = resolutionItem({ authorResponse: { state: 'none', rationale: null } });
+  const row = evaluate(sidecar(noResponse)).proposals[0];
+  assert.equal(row.outcome, 'candidate');
+  assert.equal(row.candidate.feedbackType, 'accepted');
+});
+
+test('produced candidates are accepted by the production buildFeedbackEntry writer', () => {
+  const now = new Date('2026-10-09T00:00:00.000Z');
+  const riskItem = resolutionItem({
+    authorResponse: { state: 'accepts_risk', rationale: 'Trade-off approved' },
+    resolution: {
+      state: 'risk_accepted',
+      target: null,
+      decisionRefs: [{ kind: 'pr', ref: 'PR-72' }],
+    },
+    verification: {
+      state: 'not_requested',
+      verifier: null,
+      coverageStatus: 'unknown',
+      evidenceRefs: [],
+    },
+  });
+  for (const [item, type] of [
+    [resolutionItem(), 'accepted'],
+    [riskItem, 'accepted_risk'],
+  ]) {
+    const { candidate } = evaluate(sidecar(item)).proposals[0];
+    const entry = buildFeedbackEntry({
+      feedbackType: candidate.feedbackType,
+      skillId: candidate.skillId,
+      findingFingerprint: candidate.findingFingerprint,
+      reviewer: candidate.reviewer,
+      reviewRunId: candidate.reviewRunId,
+      now,
+    });
+    assert.equal(entry.feedbackType, type);
+    assert.equal(entry.skillId, 'river-review-security');
+    assert.equal(entry.findingFingerprint, FP);
+    assert.equal(entry.reviewer, 'bug-hunter');
+    assert.equal(entry.review_run_id, 'run-original');
+  }
+});
+
+test('every emitted outcome and reasonCode is in the closed exported lists', () => {
+  assert.ok(emitted.length > 0);
+  for (const row of emitted) {
+    assert.ok(RESOLUTION_FEEDBACK_OUTCOMES.includes(row.outcome), row.outcome);
+    assert.ok(RESOLUTION_FEEDBACK_REASON_CODES.includes(row.reasonCode), row.reasonCode);
+  }
+  assert.equal(Object.isFrozen(RESOLUTION_FEEDBACK_REASON_CODES), true);
 });
