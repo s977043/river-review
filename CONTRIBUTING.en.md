@@ -9,7 +9,7 @@ We aim for an open, welcoming community. Please follow our [Code of Conduct](COD
 
 ## Values and OSS practice evolution
 
-River Review follows a [public Practice Evolution policy](https://github.com/s977043/river-review/blob/main/pages/guides/governance/practice-evolution.en.md), guided by agile values, user dialogue, verifiable outcomes, and responsiveness to change. We weigh local evidence and external knowledge to **adopt, adapt, transform, or defer** proposals.
+River Review follows a [public Practice Evolution policy](pages/guides/governance/practice-evolution.en.md), guided by agile values, user dialogue, verifiable outcomes, and responsiveness to change. We weigh local evidence and external knowledge to **adopt, adapt, transform, or defer** proposals.
 
 We welcome suggestions that simplify review, reduce false positives, or remove unnecessary process, not just new skills and gates. When possible, share the problem, evidence, smallest useful experiment, and a reason to revisit the decision. This is not a new required template. Existing security, approval, CI, and maintainer authority rules still apply.
 
