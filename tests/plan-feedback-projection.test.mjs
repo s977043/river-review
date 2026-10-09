@@ -45,7 +45,7 @@ function fixture(test) {
     approval_granted: false,
     generatedAt: '2026-10-09T00:00:00.000Z',
     answers: [
-      { questionId: 'Q1', status: 'answered', response: 'Canary', note: '' },
+      { questionId: 'Q1', status: 'answered', response: 'Canary', note: 'Keep QA' },
       { questionId: 'Q2', status: 'deferred', response: '', note: 'Need evidence' },
     ],
   };
@@ -74,6 +74,7 @@ describe('PlanGate source-matched review feedback projection (#2601)', () => {
     assert.ok(html.includes('Blocking finding'));
     assert.ok(html.includes('DEFERRED'));
     assert.ok(html.includes('Need evidence'));
+    assert.ok(html.includes('Keep QA'));
     assert.ok(html.includes('plan.md#rollout'));
     assert.ok(html.includes('Source-matched feedback'));
     assert.ok(html.includes('&lt;script&gt;'));

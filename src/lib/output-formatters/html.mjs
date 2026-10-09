@@ -170,6 +170,7 @@ export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
       '<table><tr><th>Question</th><th>Status</th><th>Response / reason</th><th>Declared references</th></tr>'
     );
     for (const q of planFeedback.items) {
+      const details = [q.response, q.note].filter(Boolean).join('\n');
       const status =
         q.status === 'unanswered'
           ? 'UNANSWERED'
@@ -186,7 +187,7 @@ export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
           escHtml(status) +
           '</td>' +
           '<td><pre>' +
-          escHtml(q.status === 'answered' ? q.response : q.note) +
+          escHtml(details) +
           '</pre></td>' +
           '<td>' +
           q.artifactRefs.map((ref) => '<code>' + escHtml(ref) + '</code>').join(', ') +
