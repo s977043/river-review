@@ -169,6 +169,7 @@ Options:
   --plan-feedback <file>          (run --output html) Review-only JSON feedback file
   --plan-feedback-workdir <dir>   Source task directory with plan.md and review-questions.json
   --plan-feedback-task <TASK>     TASK-XXXX; all three flags must be supplied
+                                  (not with --estimate)
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)

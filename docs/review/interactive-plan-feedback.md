@@ -113,7 +113,7 @@ The module never sends a network request or updates an approval record.
 Declared `artifactRefs` are display hints, not proof that a referenced
 artifact exists or was reviewed. They are rendered as escaped text only.
 
-CLI wiring is deliberately separate: do not expose an implicit environment
+CLI wiring is explicit (below). It does not read an implicit environment
 variable or accept a browser-only `validated` field as permission to render.
 
 ## Explicit HTML CLI integration
@@ -129,7 +129,8 @@ river run . --dry-run --output html \
 ```
 
 All three flags are required together and are only accepted by `river run`
-with `--output html`. Input validation executes before the review starts.
+with `--output html`. They cannot be combined with `--estimate`, which never
+builds the HTML report; that combination is a usage error (exit 1). Input validation executes before the review starts.
 Changed/missing/malicious inputs exit nonzero with no success HTML.
 
 This feature is explicit. It never takes approval from browser text and
@@ -149,7 +150,7 @@ System disposition and author resolution remain separate concepts (#2322).
 
 - [x] Phase A: review-only contract and trust boundaries.
 - [x] Phase B: PlanGate local validator (producer-side) is merged; no automatic importer.
-- [ ] Phase C: source-checked library HTML projection added; CLI integration remains opt-in future work.
+- [x] Phase C: source-checked library HTML projection and explicit opt-in CLI integration (#2621; `--estimate` rejection in #2630).
 - [ ] Real-browser evaluation of keyboard navigation and JSON download.
 
 Phase B and Phase C require separate reviewable implementation slices.
