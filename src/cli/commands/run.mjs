@@ -101,7 +101,11 @@ async function renderRunResult(result, parsed) {
       // Propagate the canonical verdict so HTML matches JSON (#1170 F3).
       ...(jsonOutput.decision !== undefined ? { decision: jsonOutput.decision } : {}),
     };
-    console.log(formatHtmlOutput(htmlResult, parsed.phase));
+    console.log(
+      formatHtmlOutput(htmlResult, parsed.phase, {
+        planFeedback: parsed.planFeedbackProjection,
+      })
+    );
   } else {
     printPlan(result.plan);
     printComments(result.comments);
@@ -237,6 +241,19 @@ async function persistRunArtifacts(result, parsed, targetPath) {
  * @returns {Promise<number>} process exit code.
  */
 export async function runRunCommand(parsed, targetPath) {
+  if (parsed.planFeedbackFile !== null) {
+    try {
+      const { loadPlanFeedbackProjection } = await import('../../lib/plan-feedback-projection.mjs');
+      parsed.planFeedbackProjection = loadPlanFeedbackProjection({
+        feedbackPath: parsed.planFeedbackFile,
+        workDir: parsed.planFeedbackWorkdir,
+        taskId: parsed.planFeedbackTask,
+      });
+    } catch (error) {
+      console.error('Error: invalid source-matched plan feedback: ' + error.message);
+      return 2;
+    }
+  }
   // Resolve --skill-set to its skill ids up front so an unknown name fails
   // fast with a clear message before any review work begins.
   let skillIds = null;

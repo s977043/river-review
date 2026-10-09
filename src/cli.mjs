@@ -166,6 +166,9 @@ Options:
   --estimate        Print cost estimate only (no review)
   --max-cost <usd>  Abort if estimated cost exceeds this USD amount
   --output <mode>   Output format: text|markdown|json|yaml|html. Default: text
+  --plan-feedback <file>          (run --output html) Review-only JSON feedback file
+  --plan-feedback-workdir <dir>   Source task directory with plan.md and review-questions.json
+  --plan-feedback-task <TASK>     TASK-XXXX; all three flags must be supplied
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
@@ -667,6 +670,9 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--estimate',
   '--max-cost',
   '--output',
+  '--plan-feedback',
+  '--plan-feedback-workdir',
+  '--plan-feedback-task',
   '--format',
   '--context',
   '--dependency',
@@ -1485,6 +1491,10 @@ function parseArgs(argv) {
     availableDependencies: null,
     reviewers: null,
     baseline: null,
+    planFeedbackFile: null,
+    planFeedbackWorkdir: null,
+    planFeedbackTask: null,
+    planFeedbackProjection: null,
     base: null,
     entry: null,
     skillSet: null,
@@ -1708,6 +1718,21 @@ function parseArgs(argv) {
   // report `river review null` on top of it (checkCommandScopedOptions returns
   // early when parsed.usageError is already set).
   checkCommandScopedOptions(parsed);
+
+  const suppliedPlanFeedback = [
+    parsed.planFeedbackFile,
+    parsed.planFeedbackWorkdir,
+    parsed.planFeedbackTask,
+  ].filter((value) => value !== null);
+  if (!parsed.usageError && suppliedPlanFeedback.length > 0) {
+    if (parsed.command !== 'run' || parsed.output !== 'html' || suppliedPlanFeedback.length !== 3) {
+      console.error(
+        'Error: --plan-feedback, --plan-feedback-workdir and --plan-feedback-task ' +
+          'must be used together with river run --output html.'
+      );
+      usageError(parsed);
+    }
+  }
 
   if (applyPhaseFallback(parsed)) {
     usageError(parsed);

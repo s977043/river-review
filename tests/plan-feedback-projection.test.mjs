@@ -95,6 +95,16 @@ describe('PlanGate source-matched review feedback projection (#2601)', () => {
     );
   });
 
+  it('rejects a forged clone of an authentic source-matched model', (t) => {
+    const f = fixture(t);
+    const projection = f.load();
+    const clone = { ...projection };
+    assert.throws(
+      () => formatHtmlOutput({ findings: [] }, 'upstream', { planFeedback: clone }),
+      /source-matched/
+    );
+  });
+
   it('rejects stale plan bytes and stale questions bytes', (t) => {
     const f = fixture(t);
     writeFileSync(f.plan, '# changed\n');

@@ -1,12 +1,26 @@
+export const id = 448;
+export const ids = [448];
+export const modules = {
+
+/***/ 5448:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   loadPlanFeedbackProjection: () => (/* binding */ loadPlanFeedbackProjection),
+/* harmony export */   y: () => (/* binding */ isSourceMatchedPlanFeedback)
+/* harmony export */ });
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7598);
+/* harmony import */ var node_fs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3024);
+/* harmony import */ var node_path__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(6760);
 /**
  * Source-matched, non-authoritative PlanGate question projection.
  *
  * This validates local PlanGate input bytes independently. It never grants
  * approval, authenticates a reviewer, writes a file, or changes a River verdict.
  */
-import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync } from 'node:fs';
-import path from 'node:path';
+
+
+
 
 const TRUSTED_MODELS = new WeakSet();
 const STATES = new Set(['answered', 'deferred', 'unanswered']);
@@ -26,11 +40,11 @@ function exact(obj, fields, label) {
 }
 
 function readRegular(file, maximum) {
-  const stat = lstatSync(file);
+  const stat = (0,node_fs__WEBPACK_IMPORTED_MODULE_1__.lstatSync)(file);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maximum) {
-    throw new Error('invalid, symlinked or oversized local file: ' + path.basename(file));
+    throw new Error('invalid, symlinked or oversized local file: ' + node_path__WEBPACK_IMPORTED_MODULE_2__.basename(file));
   }
-  const bytes = readFileSync(file);
+  const bytes = (0,node_fs__WEBPACK_IMPORTED_MODULE_1__.readFileSync)(file);
   if (bytes.length > maximum) throw new Error('oversized input');
   return bytes;
 }
@@ -79,13 +93,13 @@ function sourceDigest(source, name, filename, bytes) {
   if (item.path !== filename || typeof item.sha256 !== 'string' || !SHA.test(item.sha256)) {
     throw new Error('invalid source reference: ' + name);
   }
-  if (createHash('sha256').update(bytes).digest('hex') !== item.sha256) {
+  if ((0,node_crypto__WEBPACK_IMPORTED_MODULE_0__.createHash)('sha256').update(bytes).digest('hex') !== item.sha256) {
     throw new Error('STALE plan feedback source: ' + name);
   }
 }
 
 /** Return an opaque, source-checked display-only model. */
-export function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
+function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
   if (
     !validText(workDir, 2048) ||
     !validText(feedbackPath, 2048) ||
@@ -94,13 +108,13 @@ export function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
   ) {
     throw new Error('explicit task ID, workDir and feedbackPath required');
   }
-  const work = path.resolve(workDir);
-  if (!lstatSync(work).isDirectory() || lstatSync(work).isSymbolicLink()) {
+  const work = node_path__WEBPACK_IMPORTED_MODULE_2__.resolve(workDir);
+  if (!(0,node_fs__WEBPACK_IMPORTED_MODULE_1__.lstatSync)(work).isDirectory() || (0,node_fs__WEBPACK_IMPORTED_MODULE_1__.lstatSync)(work).isSymbolicLink()) {
     throw new Error('workDir must be a real directory');
   }
-  const plan = readRegular(path.join(work, 'plan.md'), 10 * 1024 * 1024);
-  const rawQuestions = readRegular(path.join(work, 'review-questions.json'), 128 * 1024);
-  const rawFeedback = readRegular(path.resolve(feedbackPath), 512 * 1024);
+  const plan = readRegular(node_path__WEBPACK_IMPORTED_MODULE_2__.join(work, 'plan.md'), 10 * 1024 * 1024);
+  const rawQuestions = readRegular(node_path__WEBPACK_IMPORTED_MODULE_2__.join(work, 'review-questions.json'), 128 * 1024);
+  const rawFeedback = readRegular(node_path__WEBPACK_IMPORTED_MODULE_2__.resolve(feedbackPath), 512 * 1024);
   const questionsDoc = exact(parseStrict(rawQuestions), ['version', 'questions'], 'questions');
   if (
     questionsDoc.version !== 1 ||
@@ -227,6 +241,13 @@ export function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
   return projection;
 }
 
-export function isSourceMatchedPlanFeedback(value) {
+function isSourceMatchedPlanFeedback(value) {
   return TRUSTED_MODELS.has(value) && value.kind === 'SOURCE_MATCHED_REVIEW_FEEDBACK';
 }
+
+
+/***/ })
+
+};
+
+//# sourceMappingURL=448.index.mjs.map

@@ -244,7 +244,12 @@ const CONTRACTS = {
 // オプションにも掛けるためである。値欠落の判定は `feedback add --skill` と
 // 同じヘルパー（src/cli.mjs の takeSkillIdValue）が行う。受理形は
 // VALID_CASES 側へ 2 行（通常の語順 / フラグ先行語順）pin した（99 -> 101）。
-const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 174, C4: 1 };
+// PR #2621 で plan-feedback の 3 フラグを新設し、部分指定 / `--output json` /
+// `doctor` / 値欠落の 4 形を追加して C3 が 174 -> 178 になった。BEFORE では
+// いずれも `Error: unknown option --plan-feedback.` の exit 1 で、exit code は
+// 動いていない（実測）。受理形は VALID_CASES 側へ 2 行（通常の語順 /
+// フラグ先行語順）pin した（101 -> 103）。
+const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 178, C4: 1 };
 
 /** 一時 repo 配下の「存在しないパス」に実行時に差し替えるプレースホルダ。 */
 const NONEXISTENT_PATH = '<nonexistent-path>';
@@ -297,6 +302,51 @@ const CASES = [
   { surface: 'run', kind: 'unknown-option', argv: ['run', '.', '--nope'], contract: 'C3' },
   { surface: 'run', kind: 'unknown-option', argv: ['run', '.', '--dry-runn'], contract: 'C3' },
   { surface: 'run', kind: 'surplus-positional', argv: ['run', '.', 'extra'], contract: 'C3' },
+  // PR #2621: plan-feedback の 3 フラグは `run --output html` で 3 つ揃ったときだけ受理する。
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--output', 'html', '--plan-feedback', 'f.json'],
+    contract: 'C3',
+  },
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: [
+      'run',
+      '.',
+      '--output',
+      'json',
+      '--plan-feedback',
+      'f.json',
+      '--plan-feedback-workdir',
+      'w',
+      '--plan-feedback-task',
+      'TASK-0001',
+    ],
+    contract: 'C3',
+  },
+  {
+    surface: 'run',
+    kind: 'value-missing',
+    argv: ['run', '.', '--output', 'html', '--plan-feedback'],
+    contract: 'C3',
+  },
+  {
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: [
+      'doctor',
+      '.',
+      '--plan-feedback',
+      'f.json',
+      '--plan-feedback-workdir',
+      'w',
+      '--plan-feedback-task',
+      'TASK-0001',
+    ],
+    contract: 'C3',
+  },
 
   // ---- river review plan ----
   {
@@ -1745,11 +1795,11 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // テーブルそのものの健全性（転記ミス・重複の検出）
   // ---------------------------------------------------------------------------
 
-  test('the matrix pins 175 usage-error cases and every row is unique', () => {
+  test('the matrix pins 179 usage-error cases and every row is unique', () => {
     assert.equal(
       CASES.length,
-      175,
-      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）'
+      179,
+      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）+ PR #2621 の plan-feedback 不正形 4 件（exit code は動いていない）'
     );
     const keys = new Set(CASES.map(caseKey));
     assert.equal(keys.size, CASES.length, '同一 (surface, kind, argv) の行が重複している');
@@ -1776,15 +1826,15 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // 「フラグ先行形を拒否」も v1.72.1 の「`--phase Upstream` を誤拒否」も
   // 壊したのは**成功側**であり、守りが薄いのは逆だった。行を消すだけで
   // 黙って保護が減るのを防ぐ。
-  test('the success-side table pins 101 legitimate argv forms', () => {
+  test('the success-side table pins 103 legitimate argv forms', () => {
     assert.equal(
       VALID_CASES.length,
-      101,
-      'コマンド面ごとの正常形: run 14 (#1759 C3 で --context 未知語彙 1行追加、#2065 で run --base main を1行追加) / doctor 5 / skills 16 (#2051 で skills --base main を1行追加、#2081 で後置サブコマンド 1行と ./import 明示パス 1行追加) / runs 7 (#1759 B2 で1行追加) / review 23 (#2046 で review plan --base を1行追加、#2065 で review exec --base を1行追加、#2054 PR-3 で review plan --entry を1行追加、#2011 AC7 P2 で review exec --entry を1行追加) / eval 2 / feedback 2 / suppression 8 (#2401 で --skill の両語順 2行追加) / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
+      103,
+      'コマンド面ごとの正常形: run 16 (#1759 C3 で --context 未知語彙 1行追加、#2065 で run --base main を1行追加、PR #2621 で plan-feedback の両語順 2行追加) / doctor 5 / skills 16 (#2051 で skills --base main を1行追加、#2081 で後置サブコマンド 1行と ./import 明示パス 1行追加) / runs 7 (#1759 B2 で1行追加) / review 23 (#2046 で review plan --base を1行追加、#2065 で review exec --base を1行追加、#2054 PR-3 で review plan --entry を1行追加、#2011 AC7 P2 で review exec --entry を1行追加) / eval 2 / feedback 2 / suppression 8 (#2401 で --skill の両語順 2行追加) / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
     );
   });
 
-  test('the contract distribution is C1:0 / C2:0 / C3:174 / C4:1 (0 of 175 exit 0)', () => {
+  test('the contract distribution is C1:0 / C2:0 / C3:178 / C4:1 (0 of 179 exit 0)', () => {
     const counts = { C1: 0, C2: 0, C3: 0, C4: 0 };
     for (const testCase of CASES) counts[testCase.contract] += 1;
     assert.deepEqual(
@@ -1942,6 +1992,38 @@ const VALID_CASES = [
   // #2065: コマンド別 allowlist が `--base` を読む面まで巻き込んでいないこと。
   // `run` は allowlist の対象面なので、解決できる ref はそのまま受理される。
   { argv: ['run', '.', '--base', 'main'], command: 'run' },
+  // PR #2621: plan-feedback の 3 フラグを `--output html` と揃えた形（両語順）。
+  {
+    argv: [
+      'run',
+      '.',
+      '--output',
+      'html',
+      '--plan-feedback',
+      'f.json',
+      '--plan-feedback-workdir',
+      'w',
+      '--plan-feedback-task',
+      'TASK-0001',
+    ],
+    command: 'run',
+  },
+  {
+    argv: [
+      '--output',
+      'html',
+      '--plan-feedback',
+      'f.json',
+      '--plan-feedback-workdir',
+      'w',
+      '--plan-feedback-task',
+      'TASK-0001',
+      'run',
+      '.',
+    ],
+    command: 'run',
+    target: '.',
+  },
   { argv: ['doctor', '.', '--output', 'json'], command: 'doctor' },
   { argv: ['skills', '.', '--phase', 'upstream'], command: 'skills' },
   // #2051: `skills` が `--base` を読むようになった後も、有効な ref を渡す形が

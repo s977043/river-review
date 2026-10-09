@@ -275,6 +275,21 @@ export function consumeOption(parsed, arg, args) {
     parsed.outputExplicit = true;
     return 'continue';
   }
+  if (
+    arg === '--plan-feedback' ||
+    arg === '--plan-feedback-workdir' ||
+    arg === '--plan-feedback-task'
+  ) {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: ' + arg + ' requires a value.');
+      return 'break';
+    }
+    if (arg === '--plan-feedback') parsed.planFeedbackFile = value;
+    else if (arg === '--plan-feedback-workdir') parsed.planFeedbackWorkdir = value;
+    else parsed.planFeedbackTask = value;
+    return 'continue';
+  }
   if (arg === '--format') {
     const value = args.shift();
     if (!value || value.startsWith('-')) {

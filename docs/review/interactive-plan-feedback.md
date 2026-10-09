@@ -116,6 +116,27 @@ artifact exists or was reviewed. They are rendered as escaped text only.
 CLI wiring is deliberately separate: do not expose an implicit environment
 variable or accept a browser-only `validated` field as permission to render.
 
+## Explicit HTML CLI integration
+
+The PlanGate source files and exported JSON must be available locally.
+River Review can then display source-matched questions in the review report:
+
+```sh
+river run . --dry-run --output html \
+  --plan-feedback /local/downloads/TASK-0001-review-feedback.json \
+  --plan-feedback-workdir /local/project/docs/working/TASK-0001 \
+  --plan-feedback-task TASK-0001 > review.html
+```
+
+All three flags are required together and are only accepted by `river run`
+with `--output html`. Input validation executes before the review starts.
+Changed/missing/malicious inputs exit nonzero with no success HTML.
+
+This feature is explicit. It never takes approval from browser text and
+never changes a canonical review verdict, gate, or review coverage.
+If the repository has no changes to review, the ordinary no-changes path
+still applies; the flags do not create a fabricated review run.
+
 ## Phase C: read-only decision surface
 
 An optional projection may display unresolved questions with evidence links.
