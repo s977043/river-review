@@ -101,7 +101,6 @@ River Review には、レビューに特化した 3 つの実行形態があり�
 | リポジトリ全体を踏まえたレビュー           | [リポジトリ全体レビューガイド](pages/guides/repo-wide-review.md)                                                          |
 | CLI でレビューを計画・実行する             | [review plan 仕様](pages/reference/cli-review-plan-spec.md) / [review exec 仕様](pages/reference/cli-review-exec-spec.md) |
 | コンセプトを理解する                       | [コンセプト解説](https://river-review.the3396.com/explanation/concept/)                                                   |
-| 設計思想を理解する                         | [設計思想](docs/philosophy.md) / [アーキテクチャ解説](https://river-review.the3396.com/explanation/river-architecture/)   |
 
 開発手順は [docs/runbook/dev.md](docs/runbook/dev.md) を参照してください。ライセンスは [本ファイル末尾](#ライセンス) に記載しています。
 
