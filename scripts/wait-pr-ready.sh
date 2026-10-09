@@ -23,7 +23,11 @@
 # entry (`Vercel Preview Comments`) while `actions/runs?head_sha=` listed 13 runs,
 # all `action_required`. The stall is therefore read from the runs endpoint, and
 # it is reported as a failure rather than waited on, because waiting never clears
-# it -- see the runbook for the escape.
+# it -- see the runbook for the escape. For each stalled PR the dry-run verdict
+# of scripts/pr-unstall.sh is appended to stderr, followed by the
+# `scripts/pr-unstall.sh --execute <N>` command that escapes it. The escape is
+# printed, never run, because it pushes. A failing pr-unstall.sh is reported
+# with its exit status and does not change this script's exit code.
 #
 # Exit codes:
 #   0  every PR settled with no failing check and no stalled run
@@ -55,6 +59,7 @@ done
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1800}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-30}"
 REPO="${REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # mergeable_state values that mean GitHub has finished computing the PR.
 # `blocked` and `unknown` are deliberately absent: `blocked` is the state a
@@ -91,6 +96,7 @@ while :; do
   all_settled=1
   any_failed=0
   report=''
+  stalled_prs=''
 
   for pr in "$@"; do
     pr_json=$(gh_api_or_die "PR #${pr} in ${REPO}" "repos/${REPO}/pulls/${pr}")
@@ -111,6 +117,9 @@ while :; do
     report="${report}#${pr}	${head_sha}	${state}	${failed:--}	${stalled:--}
 "
 
+    if [ -n "${stalled}" ]; then
+      stalled_prs="${stalled_prs} ${pr}"
+    fi
     if [ -n "${failed}" ] || [ -n "${stalled}" ]; then
       any_failed=1
     fi
@@ -143,6 +152,16 @@ case "${exit_code}" in
   1)
     echo "At least one PR has a failing check or a stalled run." >&2
     echo "For a non-empty stalled_runs column, follow docs/runbook/bot-pushed-head-kick.md." >&2
+    for pr in ${stalled_prs}; do
+      echo "" >&2
+      echo "pr-unstall.sh dry-run for #${pr}:" >&2
+      unstall_rc=0
+      REPO="${REPO}" "${SCRIPT_DIR}/pr-unstall.sh" "${pr}" </dev/null >&2 2>&1 || unstall_rc=$?
+      if [ "${unstall_rc}" -ne 0 ]; then
+        echo "pr-unstall.sh exited ${unstall_rc} for #${pr}; the stall above still stands." >&2
+      fi
+      echo "To escape (pushes from your own account): ${SCRIPT_DIR}/pr-unstall.sh --execute ${pr}" >&2
+    done
     ;;
   2) echo "Timed out after ${TIMEOUT_SECONDS}s before every PR settled." >&2 ;;
 esac
