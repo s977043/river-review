@@ -1,4 +1,4 @@
-# Reviewer Identity / signed review evidence — Phase 0 feasibility (#1760)
+# Reviewer Identity / signed review evidence—Phase 0 feasibility (#1760)
 
 Status: **design only / conditional GO for further evaluation**  
 Baseline: `main` at `b0e6728ebf1f787d807a9fb9bed2dc01c19836bf` (2026-10-09).  
@@ -8,9 +8,9 @@ Scope: Reviewer Identity, Review Record and signature trust boundaries. No runti
 
 **Do not add a general signed-review event log or a new trust vocabulary yet.**
 
-Use existing execution provenance and the out-of-band signature verifier as separate
-owners. The next implementation step, if authorized, should first demonstrate an
-actual consumer and a trusted signing boundary that candidate code cannot edit.
+Keep execution provenance and the out-of-band signature verifier as separate owners.
+Identify a concrete consumer before any implementation.
+The signing boundary must be outside the candidate's write authority.
 
 Keep these statements distinct:
 
@@ -24,6 +24,7 @@ verified review evidence != merge / release permission
 
 ## Current ownership and gap map
 
+<!-- prettier-ignore -->
 | Surface | Current owner / source | What it establishes | What it does not establish |
 | --- | --- | --- | --- |
 | Reviewer task execution | `src/lib/reviewer-orchestrator.mjs`; `reviewCoverage.units[].executionId` | Opaque logical execution identity before task start | Actor, provider, context isolation, or signed identity |
@@ -41,19 +42,22 @@ these fields or add a second independence evaluator.
 
 ## Threat model
 
-**Protected assets:** evidence content, target revision, rulebook reference,
-verdict provenance, actor claims, review ordering and human override reason.
+**Protected assets:** evidence content and target revision.
+Also protect rulebook and verdict provenance.
+Keep actor claims, event order and Human override reasons intact.
 
-**Attacker capabilities:** a candidate or AI agent can modify files and
-self-reported artifacts inside the reviewed workspace; can replay older evidence;
-can claim `evidence_source=CI`, `trusted_by`, or a reviewer display name;
-and may be able to edit workflow configuration inside its branch.
+**Attacker capabilities:** candidate code can edit workspace files and
+self-reported artifacts. It can replay older evidence.
+It can claim `evidence_source=CI` or `trusted_by` without proving either.
+It can supply an unverified reviewer display name.
+It may also change workflow configuration within its branch.
 
 **Required trusted boundary:** a verifier or signing service outside the
-candidate write authority. Its public-key trust root must be selected by the
-Host/operator outside the submitted review artifact and branch. Key ownership,
-issuance, revocation, rotation, expiry and signer-job isolation are separate
-policy requirements; the current replay verifier does not supply those proofs.
+candidate write authority. The Host/operator must select the trust root
+outside the submitted artifact and branch.
+Key ownership and issuance are separate requirements.
+So are revocation, rotation, expiry and signer-job isolation.
+The current replay verifier does not prove those properties.
 
 **Specific failures to test before any runtime integration:**
 
@@ -105,15 +109,16 @@ A future optional Review Record would need independently sourced bindings:
 This is an **illustrative, noncanonical sketch**. No files are emitted, the
 shape is not accepted as input by River Review, and it grants no authority.
 
-A real schema must be preceded by answers to:
-- Which Host is the consumer and writer of immutable records?
-- Who binds `reviewerId` to an authenticated identity?
-- Which canonical bytes are signed, and how are revision/rulebook/target
-  bindings checked?
-- Which out-of-band trust store and revocation policy is authoritative?
-- Are review, resolution, override and supersede separate append-only events?
-- What is the retention and data-minimization policy?
-- What happens when one of these answers is `unknown`?
+A real schema first requires the following decisions:
+
+- Identify the Host that consumes and writes immutable records.
+- Assign ownership of authenticated `reviewerId` bindings.
+- Define the canonical signed bytes and the revision binding checks.
+- Identify the authoritative external trust store and revocation policy.
+- Decide whether review and resolution are separate append-only events.
+- Specify override and supersede event boundaries.
+- Define retention and data-minimization policy.
+- Preserve an explicit unknown state when any prerequisite is missing.
 
 ## Recommended sequence and entry gates
 
@@ -121,8 +126,9 @@ A real schema must be preceded by answers to:
 
 - Identify one concrete Host review/approval workflow that needs signed
   provenance; capture an example where existing artifacts are insufficient.
-- Assign separately: record producer, signer, trusted-key selector, verifier,
-  append-only storage and Human approval owner.
+- Assign a record producer, signer and trusted-key selector.
+  Assign the verifier and append-only storage separately.
+  Human approval keeps its own owner.
 - Compare integration against the current paired-replay signature verifier.
   Reuse cryptographic primitives/validation where appropriate, but not its
   replay-specific schema or trust conclusion.
@@ -174,9 +180,10 @@ actually benefits without false independence or false trust claims.
 **GO:** document the existing owner boundaries and defer cryptographic
 integration until an authentic Host workflow and trust policy are supplied.
 
-**NO-GO:** create general signed-review fields, automatically claim independent
-review from execution IDs or signatures, or wire signature success into
-Gate/merge/release decisions now.
+**NO-GO:** do not add general signed-review fields in this phase.
+Do not claim independent review from IDs or signatures.
+Do not feed signature success into Gate, merge or release decisions.
 
-This is a partial milestone for #1760, not completion of its full ADR,
-Review Record/Event schema, key lifecycle, or signed audit acceptance criteria.
+This is a partial milestone for #1760.
+The full ADR and Review Record/Event schema remain unfinished.
+Key lifecycle and signed audit acceptance criteria also remain unfinished.
