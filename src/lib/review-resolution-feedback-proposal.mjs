@@ -98,10 +98,7 @@ function hasCompleteEvidenceReferences(verification) {
  * @param {{reviewResolution: object, bindings?: object[]}} options
  * @returns {{kind:string, resolutionId:string, reviewRunId:string, proposals:object[]}}
  */
-export function buildReviewResolutionFeedbackProposals({
-  reviewResolution,
-  bindings = [],
-} = {}) {
+export function buildReviewResolutionFeedbackProposals({ reviewResolution, bindings = [] } = {}) {
   // Reuse the sidecar SSoT, not a shadow Resolution vocabulary.
   assertReviewResolutionSemantics(reviewResolution);
   if (reviewResolutionRevisionArtifactKey(reviewResolution?.source) === null) {
@@ -134,8 +131,10 @@ export function buildReviewResolutionFeedbackProposals({
 
     // Canonical feedback v1 understands only 16-hex v1 fingerprints.
     // Do not silently hash or reinterpret Resolution v2 fingerprints.
-    if (item?.findingRef?.fingerprintAlgo !== 'v1' ||
-        !V1_FINGERPRINT.test(item?.findingRef?.fingerprint ?? '')) {
+    if (
+      item?.findingRef?.fingerprintAlgo !== 'v1' ||
+      !V1_FINGERPRINT.test(item?.findingRef?.fingerprint ?? '')
+    ) {
       return result(base, 'needs_human', 'feedback_fingerprint_incompatible');
     }
 
