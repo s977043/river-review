@@ -80,10 +80,10 @@ It does not establish reviewer identity or signed authorization.
 
 ## Phase C opt-in HTML projection (#2601)
 
-The library exposes an explicit, read-only consumer of local PlanGate task
-files. It checks the plan's and question file's exact SHA-256 digests,
-question definitions, answer states, and JSON shape before returning an
-opaque display-only model. It does not rely on a self-asserted `validated` flag.
+The library reads explicit local PlanGate task files in a read-only manner.
+It checks the raw plan and question SHA-256 digests.
+It validates question definitions and answer states before building the
+optional display-only model. It does not trust a `validated` flag.
 
 ```js
 import { loadPlanFeedbackProjection } from './src/lib/plan-feedback-projection.mjs';
@@ -113,6 +113,7 @@ The module never sends a network request or updates an approval record.
 
 CLI wiring is deliberately separate: do not expose an implicit environment
 variable or accept a browser-only `validated` field as permission to render.
+
 ## Phase C: read-only decision surface
 
 An optional projection may display unresolved questions with evidence links.
