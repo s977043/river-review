@@ -99,7 +99,8 @@ export function loadPlanFeedbackProjection({ workDir, feedbackPath, taskId }) {
   for (const q of questionsDoc.questions) {
     if (!q || typeof q !== 'object' || Array.isArray(q) ||
         Object.keys(q).some(key => !['id', 'prompt', 'choices', 'artifactRefs'].includes(key)) ||
-        !ID.test(q.id) || !validText(q.prompt, 1200) || definitions.has(q.id)) {
+        typeof q.id !== 'string' || !ID.test(q.id) ||
+        !validText(q.prompt, 1200) || definitions.has(q.id)) {
       throw new Error('invalid or duplicate question definition');
     }
     for (const [field, maxCount, maxLength] of [
