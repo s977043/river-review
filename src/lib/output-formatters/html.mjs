@@ -9,6 +9,7 @@
 import { stripSelfReportedScope } from '../finding-factory.mjs';
 import { resolveVerdict, scoreReview } from '../scoring/engine.mjs';
 import { AXES, AXIS_LABELS_JA } from '../scoring/rubric.mjs';
+import { isSourceMatchedPlanFeedback } from '../plan-feedback-projection.mjs';
 
 /**
  * Escape a string for safe inclusion in HTML content or attribute values.
@@ -91,7 +92,10 @@ const INLINE_STYLE = [
  * @param {string} phase  - Review phase (upstream|midstream|downstream)
  * @returns {string} Complete HTML document
  */
-export function formatHtmlOutput(result, phase) {
+export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
+  if (planFeedback !== null && !isSourceMatchedPlanFeedback(planFeedback)) {
+    throw new TypeError('planFeedback requires a source-matched read-only model');
+  }
   const findings = result.findings ?? [];
   const score = scoreReview(findings);
 
@@ -143,6 +147,34 @@ export function formatHtmlOutput(result, phase) {
     parts.push('<div class="banner" style="background:#f5f5f5;border-color:#9e9e9e">');
     parts.push('Decision: N/A');
     parts.push('</div>');
+  }
+
+  // PlanGate feedback is a separate, opt-in review-only projection.
+  // It never feeds the canonical scorer, verdict or coverage model.
+  if (planFeedback !== null) {
+    parts.push('<section aria-labelledby="plan-feedback-heading">');
+    parts.push('<h2 id="plan-feedback-heading">Planning questions (review-only)</h2>');
+    parts.push(
+      '<p class="meta">Source-matched feedback, not reviewer authentication, C-3 approval, a River verdict, or permission to merge.</p>'
+    );
+    parts.push('<p class="meta">Task: <code>' + escHtml(planFeedback.taskId) + '</code></p>');
+    parts.push('<p class="meta">Plan SHA-256: <code>' + escHtml(planFeedback.planSha256) + '</code></p>');
+    parts.push(
+      '<p class="meta">Questions SHA-256: <code>' + escHtml(planFeedback.questionsSha256) + '</code></p>'
+    );
+    parts.push('<table><tr><th>Question</th><th>Status</th><th>Response / reason</th><th>Declared references</th></tr>');
+    for (const q of planFeedback.items) {
+      const status = q.status === 'unanswered' ? 'UNANSWERED' :
+        q.status === 'deferred' ? 'DEFERRED' : 'ANSWERED';
+      parts.push(
+        '<tr><td><strong>' + escHtml(q.id) + '</strong> ' + escHtml(q.prompt) + '</td>' +
+          '<td>' + escHtml(status) + '</td>' +
+          '<td><pre>' + escHtml(q.status === 'answered' ? q.response : q.note) + '</pre></td>' +
+          '<td>' + q.artifactRefs.map(ref => '<code>' + escHtml(ref) + '</code>').join(', ') +
+          '</td></tr>'
+      );
+    }
+    parts.push('</table></section>');
   }
 
   // Summary
