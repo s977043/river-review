@@ -29,7 +29,7 @@ River Review は、こうした問いに答えるためのフレームワーク�
 
 ⭐ AI 支援開発のレビュー運用に役立ちそうなら、[Star](https://github.com/s977043/river-review) で応援してください。更新を追えるほか、同じ課題を持つチームに River Review が届きやすくなります。
 
-River Review が向き合う課題、設計意図、PlanGate および Harness Engineering との関係は、[公開の設計哲学](https://river-review.the3396.com/explanation/design-philosophy/)を参照してください。OSSの開発・改善で大切にする価値観は[実践進化方針](https://river-review.the3396.com/guides/governance/practice-evolution/)で公開しています。
+River Review が向き合う課題、設計意図、PlanGate および Harness Engineering との関係は、[公開の設計哲学](https://river-review.the3396.com/explanation/design-philosophy/)を参照してください。OSSの開発・改善で大切にする価値観は[実践進化方針](pages/guides/governance/practice-evolution.md)で公開しています。
 
 ## なぜ River Review か
 
