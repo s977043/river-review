@@ -349,6 +349,7 @@ test('#2033 redactText redacts JSON-shaped password keys', () => {
 });
 
 test('#2203 preserve valid JSON after password redaction', () => {
+  // Preserve syntactic delimiters so downstream config readers can parse it.
   const source = '{"password":"hunter2","enabled":true,"label":"public"}';
   const { text, hits } = redactText(source, { highEntropy: false });
   assert.deepEqual(JSON.parse(text), {
