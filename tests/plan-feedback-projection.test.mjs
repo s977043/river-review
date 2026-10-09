@@ -86,9 +86,10 @@ describe('PlanGate source-matched review feedback projection (#2601)', () => {
 
   it('rejects arbitrary caller objects that claim to be validated', () => {
     assert.throws(
-      () => formatHtmlOutput({ findings: [] }, 'upstream', {
-        planFeedback: { kind: 'SOURCE_MATCHED_REVIEW_FEEDBACK', validated: true },
-      }),
+      () =>
+        formatHtmlOutput({ findings: [] }, 'upstream', {
+          planFeedback: { kind: 'SOURCE_MATCHED_REVIEW_FEEDBACK', validated: true },
+        }),
       /source-matched/
     );
   });
@@ -98,7 +99,9 @@ describe('PlanGate source-matched review feedback projection (#2601)', () => {
     writeFileSync(f.plan, '# changed\n');
     assert.throws(f.load, /STALE/);
     writeFileSync(f.plan, '# Task plan\n');
-    writeFileSync(f.questions, '{"version":1,"questions":[]}');
+    const updated = JSON.parse(readFileSync(f.questions, 'utf8'));
+    updated.questions[0].prompt = 'Changed question';
+    writeFileSync(f.questions, JSON.stringify(updated));
     assert.throws(f.load, /STALE/);
   });
 
@@ -139,11 +142,17 @@ describe('PlanGate source-matched review feedback projection (#2601)', () => {
   it('rejects duplicate nested JSON properties, even escaped equivalents', (t) => {
     const f = fixture(t);
     const raw = JSON.stringify(f.body);
-    writeFileSync(f.feedbackPath, raw.replace('"approval_granted":false', '"approval_granted":false,"approval_granted":false'));
+    writeFileSync(
+      f.feedbackPath,
+      raw.replace('"approval_granted":false', '"approval_granted":false,"approval_granted":false')
+    );
     assert.throws(f.load, /duplicate JSON property/);
     writeFileSync(
       f.feedbackPath,
-      raw.replace('"approval_granted":false', '"approval_granted":false,"approval_\\u0067ranted":false')
+      raw.replace(
+        '"approval_granted":false',
+        '"approval_granted":false,"approval_\\u0067ranted":false'
+      )
     );
     assert.throws(f.load, /duplicate JSON property/);
   });
