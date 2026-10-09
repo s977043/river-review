@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -101,5 +101,21 @@ test('CLI refuses a stale sidecar before emitting an HTML success document', asy
   );
   assert.equal(run.code, 2, run.stderr);
   assert.match(run.stderr, /STALE/);
+  assert.equal(run.stdout, '');
+});
+
+test('CLI rejects a forged approval flag even when source hashes match', async (t) => {
+  const { dir, cleanup } = await createRepoWithSilentCatchChange();
+  t.after(cleanup);
+  const { workDir, feedbackPath } = await planFiles(dir);
+  const payload = JSON.parse(await readFile(feedbackPath, 'utf8'));
+  payload.approval_granted = true;
+  await writeFile(feedbackPath, JSON.stringify(payload));
+  const run = await runCliAsSubprocess(
+    ['run', '.', '--dry-run', '--output', 'html', ...flags(workDir, feedbackPath)],
+    { cwd: dir }
+  );
+  assert.equal(run.code, 2, run.stderr);
+  assert.match(run.stderr, /invalid source-matched plan feedback/);
   assert.equal(run.stdout, '');
 });
