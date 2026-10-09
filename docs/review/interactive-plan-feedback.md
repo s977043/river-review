@@ -110,6 +110,8 @@ Source hashes prove freshness against task files at load time; they do not
 prove a reviewer's identity. The file-reading host is responsible for
 providing its own local paths and protecting them from untrusted callers.
 The module never sends a network request or updates an approval record.
+Declared `artifactRefs` are display hints, not proof that a referenced
+artifact exists or was reviewed. They are rendered as escaped text only.
 
 CLI wiring is deliberately separate: do not expose an implicit environment
 variable or accept a browser-only `validated` field as permission to render.
