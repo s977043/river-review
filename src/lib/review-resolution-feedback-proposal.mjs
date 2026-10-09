@@ -69,9 +69,7 @@ function resolveReviewer(item, binding) {
       ? { reviewerId: binding.reviewerId }
       : { reasonCode: 'reviewer_binding_mismatch' };
   }
-  return ids.length === 1
-    ? { reviewerId: ids[0] }
-    : { reasonCode: 'reviewer_binding_ambiguous' };
+  return ids.length === 1 ? { reviewerId: ids[0] } : { reasonCode: 'reviewer_binding_ambiguous' };
 }
 
 // Checks complete evidence references only. A digest is not an authenticity proof.
