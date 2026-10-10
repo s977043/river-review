@@ -34739,7 +34739,11 @@ function buildExecutionManifest(spec, { now = new Date() } = {}) {
   // it must not be the one derived early.
   redacted.skills.skillSetHash = computeSkillSetHash(redacted.skills.entries);
   redacted.redaction = {
+    // "applied" means pattern-based scanning ran; it does NOT attest that
+    // every possible secret has been detected. Record the actual scanner
+    // categories so later readers can distinguish coverage from a guarantee.
     applied: true,
+    appliedPatterns: [..._secret_redactor_mjs__WEBPACK_IMPORTED_MODULE_2__/* .REDACTION_PATTERN_IDS */ .E2],
     hits: [...acc.hits.entries()]
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => compareStrings(a.category, b.category)),
