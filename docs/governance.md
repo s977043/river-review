@@ -34,6 +34,8 @@ CLAUDE.md "AI Misoperation Guards" の運用ガードのうち、PR マージ判
 
 `gh pr merge` の前に `gh pr checks` を実行し、必須チェックがすべて `pass` バケットに入っていることを確認します。`fail` / `pending` / `cancel` が残るマージは不可です。
 
+Vercel Preview がデプロイ回数制限で失敗した場合は、[Vercel PR preview capacity の復旧手順](runbook/vercel-preview-capacity.md)を参照してください。別SHAの成功やCode側CIの成功で代用せず、対象headのステータスを再確認します。
+
 ```bash
 gh pr checks <N> --json name,bucket,startedAt --jq 'group_by(.name) | map(if any(.[]; .bucket == "pending") then (map(select(.bucket == "pending")) | first) else max_by(.startedAt) end) | .[] | select(.bucket != "skipping")'
 ```
