@@ -158,9 +158,9 @@ Adding hyperlinks needs a trusted, explicit base URL.
 - [x] Phase A: review-only contract and trust boundaries.
 - [x] Phase B: PlanGate local validator (producer-side) is merged; no automatic importer.
 - [x] Phase C: source-matched HTML projection (River Review #2620) and explicit
-  `river run --output html` flags (River Review #2621), both merged.
+      `river run --output html` flags (River Review #2621), both merged.
 - [x] Real-browser keyboard focus, actual disk download, and validator roundtrip
-  tested in PlanGate #1542 (merged; #1535 closed).
+      tested in PlanGate #1542 (merged; #1535 closed).
 
 Phase A/B/C work was reviewed separately in PRs #2584, #2620, and #2621.
 PlanGate provides the feedback UI, validator and browser E2E.
