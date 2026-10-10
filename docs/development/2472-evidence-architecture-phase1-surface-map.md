@@ -26,7 +26,8 @@ current source code / JSON Schema
 この文書の ownership matrix / availability matrix / scenario G1 は上記の **2026-10-04 baseline** に対する調査結果です。表の `P4: helper-only / runtime 未配線` はその日時点では正しく、その後の実装状態を意味しません。基準状態を消さず、変更履歴をここに追記します。
 
 - #2481 / PR #2501: multi-reviewer の Review Coverage unit に `executionId`、merged finding に `sourceExecutionIds[]` を追加（logical task provenance、observe-only）。
-- #2543 / PR #2571: `src/lib/finding-critic-stage.mjs:buildExecutionIndependence` が `evaluateReviewerIndependence()` を opt-in Finding Critic runtime 経路から呼び出す。verifier execution ID は orchestrator/caller が Critic 呼出し前に割り当てる。
+- #2543 / PR #2571: Finding Critic は既存の `evaluateReviewerIndependence()` を opt-in で利用する。観測値の owner は `src/lib/finding-critic-stage.mjs:buildExecutionIndependence`。
+- verifier execution ID は Critic 呼び出し前に orchestrator/caller が割り当てる。
 - 主な観測先は `debug.findingCritic.executionIndependence[]`。通常の `findings[].validation` と別の debug observation であり、Review Artifact に新たな必須の independence field が存在するわけではない。
 - Critic が既定 off、ID欠落、Critic未実行、LLM利用不可などの状態を `independent` へ格上げしない。runtime経路が有効でも、この述語の保証は **異なる logical execution ID** のみ。
 - actor authenticity / actor authorization / model/provider separation / trust / correctness / adversarial verification quality は引き続き #1760 の未完了の境界。Evidence State、Semantic Precision、Gate、`decision` と Human authority は変更しない。
