@@ -47022,7 +47022,10 @@ const ASSIGNMENT_PATTERNS = [
       /(["']?)\b(password|passwd|pwd)\b\1(\s*[:=]\s*)("[^"\n]{4,}"|'[^'\n]{4,}'|[^\s'"`,;)\]}&]{4,})/gi,
     redact: (_m, quote, name, sep, value) => {
       if (NON_SECRET_PWD_NAMES.has(name)) return null;
-      if (!isCredentialLiteral(value)) return null;
+      // A compact `password=value` in an env/config/query string is more
+      // likely to be a literal than an identifier reference. Keep spaced
+      // assignments and colon-style source-code declarations conservative.
+      if (!isCredentialLiteral(value, { compactEquals: sep === '=' })) return null;
       const valueQuote = value[0];
       const quoted = (valueQuote === '"' || valueQuote === "'") && value.endsWith(valueQuote);
       const replacement = REPLACEMENT('passwordAssignment');
@@ -47048,12 +47051,11 @@ const REFERENCE_EXPRESSION_RE = /^[A-Za-z_$][\w$]*(?:\.[\w$]+)+$/;
 // A bare identifier written the way source code names things — camelCase
 // (`hashedPassword`) or snake_case (`user_password`), letters only. A literal
 // credential is not spelled like a symbol, so this shape is a reference to
-// one. Deliberately NOT `^[A-Za-z_$][\w$]*$`: that also covers `hunter2`,
-// which is the canonical leaked-password form and must stay redacted. Digits
-// disqualify the identifier reading for the same reason — `MyS3cret` after a
-// `password=` key is a credential, not a symbol. Residual gap: an unquoted,
-// digit-free camelCase password (`password=MyPassword`) is not redacted;
-// quoted, SCREAMING_CASE (`envAssignment`) and high-entropy forms still are.
+// one. Deliberately NOT a generic identifier regex: that also covers
+// digit-bearing leaked passwords such as hunter2. Whitespace-separated
+// and colon-style source assignments remain conservative about digit-free
+// identifiers. Compact password=value is a security-biased exception that
+// masks more credential forms but can hide ambiguous code references.
 const IDENTIFIER_SHAPED_RE =
   /^(?:[A-Za-z][a-z]*(?:[A-Z][a-z]*)+|[A-Za-z_$][A-Za-z_$]*[_$][A-Za-z_$]*)$/;
 // Names that match the `pwd` alternative but never hold a password: `PWD` and
@@ -47061,7 +47063,7 @@ const IDENTIFIER_SHAPED_RE =
 // CI log. Case-sensitive — lowercase `pwd = '...'` is still a password key.
 const NON_SECRET_PWD_NAMES = new Set(['PWD', 'OLDPWD']);
 
-function isCredentialLiteral(raw) {
+function isCredentialLiteral(raw, { compactEquals = false } = {}) {
   const quoted = /^(["']).*\1$/s.test(raw);
   const value = raw.replace(/^["']/, '').replace(/["']$/, '').trim();
   if (value.length < 4) return false;
@@ -47080,8 +47082,12 @@ function isCredentialLiteral(raw) {
     // `getPassword(` — the value class stops before `)`, so a call site is
     // recognised by the opening paren alone. Redacting it would also leave
     // the stray `)` behind and break the syntax the reviewer is reading.
-    if (value.includes('(')) return false;
-    if (IDENTIFIER_SHAPED_RE.test(value)) return false;
+    // Preserve function-call expressions even when there is no whitespace
+    // around '='. A non-identifier literal such as 'P@ss(word1' is different.
+    if (value.includes('(') && (!compactEquals || /^[A-Za-z_$][\w$.]*\(/.test(value))) {
+      return false;
+    }
+    if (IDENTIFIER_SHAPED_RE.test(value) && !compactEquals) return false;
   }
   return true;
 }
