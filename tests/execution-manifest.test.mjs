@@ -34,7 +34,7 @@ import {
 import { buildRunEvidence, deriveReviewRunId, sha256Hex } from '../src/lib/shadow-aggregate.mjs';
 import { canonicalJson } from '../src/lib/promotion-candidates.mjs';
 import { buildRunRecord } from '../src/lib/result-store.mjs';
-import { redactText } from '../src/lib/secret-redactor.mjs';
+import { REDACTION_PATTERN_IDS, redactText } from '../src/lib/secret-redactor.mjs';
 import {
   compileSchemaFile,
   compileFlowValidator,
@@ -346,6 +346,23 @@ describe('redaction and raw-context refusal (#2015 AC 2)', () => {
     assert.deepEqual(manifest.redaction.hits, [{ category: 'anthropicKey', count: 1 }]);
   });
 
+  it('records every scanner category regardless of hit count without attesting completeness', () => {
+    const manifest = buildExecutionManifest(completeSpec(), { now: FIXED_NOW });
+    assert.equal(manifest.redaction.applied, true);
+    assert.deepEqual(manifest.redaction.hits, []);
+    assert.deepEqual(manifest.redaction.appliedPatterns, [...REDACTION_PATTERN_IDS]);
+    assert.ok(manifest.redaction.appliedPatterns.includes('urlUserInfo'));
+    assert.ok(manifest.redaction.appliedPatterns.includes('passwordAssignment'));
+    assert.equal(verifyExecutionManifest(manifest).verified, true);
+
+    // Pattern-list provenance is covered by the manifest's content hash.
+    const tampered = {
+      ...manifest,
+      redaction: { ...manifest.redaction, appliedPatterns: ['made-up-pattern'] },
+    };
+    assert.equal(verifyExecutionManifest(tampered).verified, false);
+  });
+
   it('redacts before hashing, so a redacted manifest still verifies', () => {
     const manifest = buildExecutionManifest(
       completeSpec({
@@ -517,6 +534,40 @@ describe('schemas/execution-manifest.schema.json', () => {
   it('accepts both committed fixtures', () => {
     assert.equal(validate(COMPLETE), true, JSON.stringify(validate.errors));
     assert.equal(validate(PARTIAL), true, JSON.stringify(validate.errors));
+  });
+
+  it('allows legacy manifests without pattern provenance but validates modern lists', () => {
+    const oldRedaction = { applied: true, hits: [] };
+    const { manifestId, manifestKey, manifestHash, createdAt, ...newConditions } = COMPLETE;
+    const legacyConditions = { ...newConditions, redaction: oldRedaction };
+    const legacyKey = sha256Hex(canonicalJson(legacyConditions));
+    const legacyId = `RR-EXM-${legacyKey.slice(0, 12)}`;
+    const legacy = {
+      ...legacyConditions,
+      createdAt,
+      manifestKey: legacyKey,
+      manifestId: legacyId,
+      manifestHash: sha256Hex(
+        canonicalJson({
+          conditions: legacyConditions,
+          createdAt,
+          manifestKey: legacyKey,
+          manifestId: legacyId,
+        })
+      ),
+    };
+    assert.equal(
+      legacyKey,
+      'b3208c770b916ad459bf76fd021869e8e6e0638a0bb7ac03bed200d6d8b42d17'
+    );
+    assert.equal(validate(legacy), true, JSON.stringify(validate.errors));
+    assert.equal(verifyExecutionManifest(legacy).verified, true);
+    assert.deepEqual(COMPLETE.redaction.appliedPatterns, [...REDACTION_PATTERN_IDS]);
+
+    for (const appliedPatterns of [[], ['urlUserInfo', 'urlUserInfo'], ['']]) {
+      const invalid = { ...COMPLETE, redaction: { ...COMPLETE.redaction, appliedPatterns } };
+      assert.equal(validate(invalid), false, JSON.stringify(appliedPatterns));
+    }
   });
 
   it('rejects an unknown top-level field (the document is closed)', () => {
