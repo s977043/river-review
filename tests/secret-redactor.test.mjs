@@ -149,6 +149,58 @@ test('redactText catches dotenv-style secret assignments by variable name', () =
   assert.equal(hits.find((h) => h.category === 'envAssignment')?.count, 2);
 });
 
+test('#2203 tracks a secret once when named-pattern masking precedes env masking', () => {
+  // Masking a first-pass token is not a second secret discovery in ENV_VAR_RE.
+  const cases = [
+    ['PASSWORD = hunter2', 'PASSWORD = <REDACTED:passwordAssignment>', 'passwordAssignment'],
+    ["PASSWORD='hunter2'", "PASSWORD='<REDACTED:passwordAssignment>'", 'passwordAssignment'],
+    ['TOKEN=sk-proj-' + TOKEN_BODY_48, 'TOKEN=<REDACTED:openaiKey>', 'openaiKey'],
+  ];
+  for (const [sample, expected, category] of cases) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, expected, sample);
+    assert.deepEqual(hits, [{ category, count: 1 }], sample);
+  }
+});
+
+test('#2203 treats caller-supplied masks as untrusted, even with plausible categories', () => {
+  // Marker syntax does not prove the value was masked in this invocation.
+  // Unknown, known, and quoted caller-owned markers must reach ENV_VAR_RE.
+  for (const source of [
+    'PASSWORD=<REDACTED:unknownMarker>',
+    'PASSWORD=<REDACTED:passwordAssignment>',
+    'PASSWORD="<REDACTED:passwordAssignment>"',
+  ]) {
+    const { text, hits } = redactText(source, { highEntropy: false });
+    assert.equal(text, 'PASSWORD=<REDACTED:envAssignment>', source);
+    assert.deepEqual(hits, [{ category: 'envAssignment', count: 1 }], source);
+  }
+
+  // Input-owned marker collision forces a conservative second mask.
+  const source = 'PASSWORD = hunter2\nTOKEN=<REDACTED:passwordAssignment>';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  const expected = 'PASSWORD = <REDACTED:envAssignment>\nTOKEN=<REDACTED:envAssignment>';
+  assert.equal(text, expected);
+  assert.deepEqual(hits, [
+    { category: 'passwordAssignment', count: 1 },
+    { category: 'envAssignment', count: 2 },
+  ]);
+});
+
+test('#2203 only skips a complete redacted env value, never trailing raw material', () => {
+  // A forged placeholder with extra raw bytes must not bypass the env pass.
+  const source = 'PASSWORD=<REDACTED:passwordAssignment>secretSuffix';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  assert.equal(text, 'PASSWORD=<REDACTED:envAssignment>');
+  assert.deepEqual(hits, [{ category: 'envAssignment', count: 1 }]);
+
+  for (const clean of ['PORT=3000', 'PWD=/tmp/workdir']) {
+    const { text: untouched, hits: noHits } = redactText(clean, { highEntropy: false });
+    assert.equal(untouched, clean);
+    assert.deepEqual(noHits, []);
+  }
+});
+
 test('redactText catches short and unprefixed secret-named variables', () => {
   // Cases the original ENV_VAR_RE (which required `_KIND` suffix on a 3+
   // char prefix) missed: bare `TOKEN=`, two-char-prefix `MY_TOKEN`, and
