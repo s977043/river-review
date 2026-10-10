@@ -78,6 +78,7 @@ module.exports = {
             'guides/governance/WRITING_GUIDE',
             'guides/governance/roadmap-guide',
             'guides/governance/issue-management',
+            'guides/governance/issue-triage',
             'guides/governance/skill-policy',
           ],
         },

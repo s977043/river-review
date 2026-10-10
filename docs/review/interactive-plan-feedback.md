@@ -1,4 +1,4 @@
-# PlanGate interactive review feedback interoperability (Phase A)
+# PlanGate interactive review feedback interoperability (Phases A-C)
 
 Tracking: River Review #2577. Producer: PlanGate #1521 (PR #1527 merged).
 Related contracts: #2322 (resolution), #2212 (coverage), #2368 (decision surface).
@@ -60,10 +60,13 @@ An unanswered item has an empty response and an empty note.
 Unknown states do not imply affirmative consent.
 Multiple exports do not imply a canonical newest-wins policy.
 
-## Phase B: optional validator and importer
+## Phase B: source-matched local validation
 
-The importer is not implemented by this Phase A PR.
-The proposed validator must perform the following checks:
+PlanGate PR #1534 provides the read-only source-bound JSON validator.
+River Review PR #2620 independently validates local source bytes when
+building a display-only projection. Neither tool authenticates the reviewer.
+No automatic feedback importer or approval writer is installed.
+The validation boundary applies these checks:
 
 1. Check exact schema version and kind.
 2. Validate types and allowed states. Reject duplicate question IDs.
@@ -113,8 +116,8 @@ The module never sends a network request or updates an approval record.
 Declared `artifactRefs` are display hints, not proof that a referenced
 artifact exists or was reviewed. They are rendered as escaped text only.
 
-CLI wiring is deliberately separate: do not expose an implicit environment
-variable or accept a browser-only `validated` field as permission to render.
+CLI wiring is explicitly opt-in; never read an implicit environment variable
+or accept a browser-only `validated` field as permission to render.
 
 ## Explicit HTML CLI integration
 
@@ -139,21 +142,34 @@ still applies; the flags do not create a fabricated review run.
 
 ## Phase C: read-only decision surface
 
-An optional projection may display unresolved questions with evidence links.
-It must not create findings or override the canonical decision.
-It must never treat disappearance from a later review as verified resolution.
-It must preserve all findings and incomplete review coverage.
-System disposition and author resolution remain separate concepts (#2322).
+The optional HTML section presents answered, unanswered, and deferred items.
+It never creates findings or overrides the canonical decision.
+Disappearance in a later review is not evidence of verified resolution.
+All findings and incomplete review coverage remain canonical (#2212, #2322).
+
+The task ID and SHA-256 values identify the original PlanGate C-3 files.
+`artifactRefs` are escaped display hints, not verified clickable links.
+An HTML report may be moved outside the source repository.
+Absolute `file://` links could disclose a private local working path.
+Adding hyperlinks needs a trusted, explicit base URL.
 
 ## Delivery status
 
 - [x] Phase A: review-only contract and trust boundaries.
 - [x] Phase B: PlanGate local validator (producer-side) is merged; no automatic importer.
-- [ ] Phase C: source-checked library HTML projection added; CLI integration remains opt-in future work.
-- [ ] Real-browser evaluation of keyboard navigation and JSON download.
+- [x] Phase C: source-matched HTML projection (River Review #2620) and explicit
+      `river run --output html` flags (River Review #2621), both merged.
+- [x] Real-browser keyboard focus, actual disk download, and validator roundtrip
+      tested in PlanGate #1542 (merged; #1535 closed).
 
-Phase B and Phase C require separate reviewable implementation slices.
-Neither phase changes the current approval or gate authority.
+Phase A/B/C work was reviewed separately in PRs #2584, #2620, and #2621.
+PlanGate provides the feedback UI, validator and browser E2E.
+None of these phases changes the current approval or gate authority.
+
+Merged PR #2621 has a successful latest-head CI, CodeQL, and PlanGate Review.
+The HTML report does not authenticate a human or grant C-3 approval.
+Missing or stale explicit feedback fails closed before review output; with no
+feedback flags, legacy behavior remains unchanged.
 
 ## Security and compatibility checklist
 
