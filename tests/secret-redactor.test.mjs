@@ -155,7 +155,11 @@ test('#2203 tracks a secret once when named-pattern masking precedes env masking
     ['PASSWORD = hunter2', 'PASSWORD = <REDACTED:passwordAssignment>', 'passwordAssignment'],
     ["PASSWORD='hunter2'", "PASSWORD='<REDACTED:passwordAssignment>'", 'passwordAssignment'],
     ['PASSWORD="hunter2"', 'PASSWORD="<REDACTED:passwordAssignment>"', 'passwordAssignment'],
-    ['export PASSWORD=hunter2', 'export PASSWORD=<REDACTED:passwordAssignment>', 'passwordAssignment'],
+    [
+      'export PASSWORD=hunter2',
+      'export PASSWORD=<REDACTED:passwordAssignment>',
+      'passwordAssignment',
+    ],
     ['TOKEN=sk-proj-' + TOKEN_BODY_48, 'TOKEN=<REDACTED:openaiKey>', 'openaiKey'],
   ];
   for (const [sample, expected, category] of cases) {
