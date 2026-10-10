@@ -393,6 +393,10 @@ export function redactText(text, opts = {}) {
   const skipMatch = (full) => isAllowlisted(full) || (extraAllow ? extraAllow.test(full) : false);
 
   let out = String(text);
+  // Preserve source-vs-generated provenance without re-scanning the entire
+  // input once for each environment variable. Caller-owned mask syntax is
+  // untrusted, even when another match discovers the same category later.
+  const inputMarkers = new Set(out.match(/<REDACTED:[A-Za-z][A-Za-z0-9]*>/g) ?? []);
 
   for (const { id, regex, redact } of [...PATTERNS, ...ASSIGNMENT_PATTERNS]) {
     out = out.replace(regex, (m, ...groups) => {
@@ -421,7 +425,7 @@ export function redactText(text, opts = {}) {
     if (
       complete &&
       firstPassCategories.has(complete[2]) &&
-      !String(text).includes(REPLACEMENT(complete[2]))
+      !inputMarkers.has(REPLACEMENT(complete[2]))
     ) {
       return full;
     }
