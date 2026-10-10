@@ -85,6 +85,32 @@ describe('PlanGate source-matched review feedback projection (#2601)', () => {
     assert.equal(formatHtmlOutput(review, 'midstream', {}), baseline);
   });
 
+  it('keeps unanswered questions explicit without changing review findings or verdict', (t) => {
+    const f = fixture(t);
+    f.body.answers[1] = { questionId: 'Q2', status: 'unanswered', response: '', note: '' };
+    f.save();
+    const projection = f.load();
+    const review = {
+      decision: 'human-review-required',
+      findings: [{ severity: 'major', title: 'Unsafe rollout', message: 'Needs review' }],
+      timestamp: '2026-10-09T00:00:00.000Z',
+    };
+    const original = formatHtmlOutput(review, 'upstream');
+    const withFeedback = formatHtmlOutput(review, 'upstream', { planFeedback: projection });
+    assert.match(withFeedback, /UNANSWERED/);
+    assert.match(withFeedback, /Unsafe rollout/);
+    assert.match(withFeedback, /Human Review Required/);
+    assert.doesNotMatch(original, /UNANSWERED/);
+    assert.equal(formatHtmlOutput(review, 'upstream', {}), original);
+    assert.equal(projection.approvalGranted, false);
+  });
+
+  it('fails closed when the referenced review JSON is missing', (t) => {
+    const f = fixture(t);
+    rmSync(f.feedbackPath);
+    assert.throws(f.load, /ENOENT/);
+  });
+
   it('rejects arbitrary caller objects that claim to be validated', () => {
     assert.throws(
       () =>
