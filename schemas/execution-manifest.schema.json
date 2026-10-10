@@ -203,9 +203,20 @@
       "type": "object",
       "required": ["applied", "hits"],
       "additionalProperties": false,
-      "description": "Redaction applied to every string leaf before the digests were computed (#2015 AC 2). Recording the hit counts rather than the values keeps the manifest auditable without reproducing what was redacted.",
+      "description": "Pattern-based redaction was attempted on every string leaf before digests were computed. This is NOT exhaustive secret detection or security attestation. Optional appliedPatterns records the scanner categories; absent on legacy manifests means unknown coverage.",
       "properties": {
-        "applied": { "type": "boolean", "const": true },
+        "applied": {
+          "type": "boolean",
+          "const": true,
+          "description": "True means the pattern-based scanner ran, not that the content is secret-free."
+        },
+        "appliedPatterns": {
+          "type": "array",
+          "description": "Categories scanned even if no matches were found. Missing on old manifests means unknown, not complete coverage.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "hits": {
           "type": "array",
           "items": {
