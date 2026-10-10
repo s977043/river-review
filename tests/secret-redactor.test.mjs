@@ -295,6 +295,13 @@ test('#2203 compact unquoted credential literals are not silently skipped', () =
   }
 });
 
+test('#2203 compact password redaction preserves query neighbors', () => {
+  const source = '?user=viewer&password=SuperSecretPass&debug=1';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  assert.equal(text, '?user=viewer&password=<REDACTED:passwordAssignment>&debug=1');
+  assert.deepEqual(hits, [{ category: 'passwordAssignment', count: 1 }]);
+});
+
 test('#2203 compact credential correction preserves source references and calls', () => {
   const sourceRefs = [
     'password: hashedPassword',
