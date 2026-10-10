@@ -47051,14 +47051,11 @@ const REFERENCE_EXPRESSION_RE = /^[A-Za-z_$][\w$]*(?:\.[\w$]+)+$/;
 // A bare identifier written the way source code names things — camelCase
 // (`hashedPassword`) or snake_case (`user_password`), letters only. A literal
 // credential is not spelled like a symbol, so this shape is a reference to
-// one. Deliberately NOT `^[A-Za-z_$][\w$]*$`: that also covers `hunter2`,
-// which is the canonical leaked-password form and must stay redacted. Digits
-// disqualify the identifier reading for the same reason — `MyS3cret` after a
-// `password=` key is a credential, not a symbol. Residual gap: an unquoted,
-// digit-free camelCase password (`password=MyPassword`) is not redacted;
-// quoted, SCREAMING_CASE (`envAssignment`) and high-entropy forms still are.
-// Compact `password=value` gets a separate security-biased exception below:
-// it can hide ambiguous source assignments, so paired negative tests remain essential.
+// one. Deliberately NOT a generic identifier regex: that also covers
+// digit-bearing leaked passwords such as hunter2. Whitespace-separated
+// and colon-style source assignments remain conservative about digit-free
+// identifiers. Compact password=value is a security-biased exception that
+// masks more credential forms but can hide ambiguous code references.
 const IDENTIFIER_SHAPED_RE =
   /^(?:[A-Za-z][a-z]*(?:[A-Z][a-z]*)+|[A-Za-z_$][A-Za-z_$]*[_$][A-Za-z_$]*)$/;
 // Names that match the `pwd` alternative but never hold a password: `PWD` and
