@@ -538,11 +538,27 @@ describe('schemas/execution-manifest.schema.json', () => {
 
   it('allows legacy manifests without pattern provenance but validates modern lists', () => {
     const oldRedaction = { applied: true, hits: [] };
-    assert.equal(
-      validate({ ...COMPLETE, redaction: oldRedaction }),
-      true,
-      JSON.stringify(validate.errors)
-    );
+    const { manifestId, manifestKey, manifestHash, createdAt, ...newConditions } = COMPLETE;
+    const legacyConditions = { ...newConditions, redaction: oldRedaction };
+    const legacyKey = sha256Hex(canonicalJson(legacyConditions));
+    const legacyId = `RR-EXM-${legacyKey.slice(0, 12)}`;
+    const legacy = {
+      ...legacyConditions,
+      createdAt,
+      manifestKey: legacyKey,
+      manifestId: legacyId,
+      manifestHash: sha256Hex(
+        canonicalJson({
+          conditions: legacyConditions,
+          createdAt,
+          manifestKey: legacyKey,
+          manifestId: legacyId,
+        })
+      ),
+    };
+    assert.equal(legacyKey, 'b3208c770b916ad459bf76fd021869e8e6e0638a0bb7ac03bed200d6d8b42d17');
+    assert.equal(validate(legacy), true, JSON.stringify(validate.errors));
+    assert.equal(verifyExecutionManifest(legacy).verified, true);
     assert.deepEqual(COMPLETE.redaction.appliedPatterns, [...REDACTION_PATTERN_IDS]);
 
     for (const appliedPatterns of [[], ['urlUserInfo', 'urlUserInfo'], ['']]) {
