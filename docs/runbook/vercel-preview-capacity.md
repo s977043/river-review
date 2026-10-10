@@ -46,9 +46,9 @@ large unsafe commit merely to reduce deployment count.
 
 ## Recover after a provider quota failure
 
-1. Record the provider error code and affected **exact** head SHA. Keep the
-   PR open; do not forge a green status, remove required checks, force a merge,
-   or change account billing or branch-preview rules without owner approval.
+1. Record the provider error code and **exact** head SHA. Keep the PR
+   open. Do not forge green checks or remove required checks. Do not force
+   merge or change account billing or preview rules without owner approval.
 2. Check provider capacity. Avoid assuming a particular quota-reset clock:
    measure an explicit time window and distinguish canceled, READY and
    failed deployments. Counts from one window do not prove the quota policy.
@@ -56,14 +56,15 @@ large unsafe commit merely to reduce deployment count.
    preview project. Validate the resulting deployment metadata and GitHub
    `Vercel=success` status for that SHA. A deployment can be READY before
    the GitHub status has finished updating.
-4. Re-fetch the PR head and base, required checks, PlanGate/review comments,
-   both PR discussion and inline review threads, blocked labels and
-   generated Action freshness. Rerun if the branch/head changed. Merge only
-   when the repository's existing conditions actually pass.
+4. Re-fetch the PR head and base. Inspect required checks and
+   PlanGate/reviewer comments. Check both PR discussion and inline review
+   threads. Verify blocked labels and generated Action freshness.
+   Rerun if the branch/head changed. Merge only after all existing
+   conditions pass.
 
-If approval of GitHub Actions workflows is pending after a bot push, that is
-a separate problem: use `docs/runbook/bot-pushed-head-kick.md` and the
-existing `scripts/pr-unstall.sh` workflow. It does not fix Vercel quota.
+A bot push can leave GitHub Actions waiting for workflow approval.
+This is a separate problem. See `docs/runbook/bot-pushed-head-kick.md`.
+Use the existing `scripts/pr-unstall.sh` workflow. It does not fix Vercel quota.
 
 ## Pilot evidence (2026-10-10–11 JST)
 
