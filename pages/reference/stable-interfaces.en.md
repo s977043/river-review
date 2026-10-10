@@ -69,6 +69,12 @@ These fields are execution-provenance observations only.
 They do not establish actor identity, signatures, trust, or independent verification.
 They are not inputs to Gate, `decision`, severity, or consensus.
 
+### Finding Critic execution-independence observation (#2543 / PR #2571)
+
+When Finding Critic is explicitly enabled, it can use the existing `evaluateReviewerIndependence()` predicate to compare a finding's `sourceExecutionIds[]` with a Critic verifier execution ID assigned beforehand by the caller/orchestrator. The observation is held under `debug.findingCritic.executionIndependence[]`. Finding Critic defaults to off; this observation can be absent depending on the runtime path and execution availability. It is not a new required Finding or Review Artifact field.
+
+Here, `independent` establishes **distinct logical execution IDs only**. It does not establish separate actors, signatures, trust, model diversity, prompt/context isolation, verification quality, or finding correctness. Missing IDs or an unexecuted Critic must not become PASS. This observation must not change validation, severity, Gate, `decision`, or Human approval. Stronger Reviewer Identity and signed trust remain scoped to [#1760](https://github.com/s977043/river-review/issues/1760).
+
 ## CLI (`river`) Reference (Minimal)
 
 ### Commands
