@@ -247,6 +247,8 @@ const REFERENCE_EXPRESSION_RE = /^[A-Za-z_$][\w$]*(?:\.[\w$]+)+$/;
 // `password=` key is a credential, not a symbol. Residual gap: an unquoted,
 // digit-free camelCase password (`password=MyPassword`) is not redacted;
 // quoted, SCREAMING_CASE (`envAssignment`) and high-entropy forms still are.
+// Compact `password=value` gets a separate security-biased exception below:
+// it can hide ambiguous source assignments, so paired negative tests remain essential.
 const IDENTIFIER_SHAPED_RE =
   /^(?:[A-Za-z][a-z]*(?:[A-Z][a-z]*)+|[A-Za-z_$][A-Za-z_$]*[_$][A-Za-z_$]*)$/;
 // Names that match the `pwd` alternative but never hold a password: `PWD` and
