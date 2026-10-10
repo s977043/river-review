@@ -69,6 +69,12 @@ River Review は OSS として成長中であり、内部実装は変更され�
 actor identity・署名・trust・独立検証の証明ではありません。
 Gate / `decision` / severity / consensus の入力にもなりません。
 
+### Finding Criticのexecution-independence観測（#2543 / PR #2571）
+
+Finding Criticを明示的に有効にした場合、既存の `evaluateReviewerIndependence()` を用い、findingの `sourceExecutionIds[]` とcaller/orchestratorが事前割当てしたCriticのverifier execution IDを比較できます。観測結果は `debug.findingCritic.executionIndependence[]` に保持されます。Criticは既定offで、経路・実行可否によって観測自体が存在しない場合があります。これは新たな必須のFinding/Review Artifact fieldではありません。
+
+`independent` が意味するのは **logical execution IDが異なる**ことだけです。別actor、署名、trust、別モデル、prompt/context分離、検証品質、findingの正しさは証明しません。ID欠落やCritic未実行をPASSへ変換せず、この観測をFinding Criticのvalidation、severity、Gate、`decision`、Human approvalへ逆流させません。Reviewer Identityとより強い署名/信頼の境界は [#1760](https://github.com/s977043/river-review/issues/1760) で引き続き検討します。
+
 ## CLI（`river`）リファレンス（最小）
 
 ### コマンド
