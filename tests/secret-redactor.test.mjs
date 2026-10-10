@@ -284,6 +284,39 @@ test('#2033 redactText redacts password / passwd / pwd assignments', () => {
   }
 });
 
+test('#2203 compact unquoted credential literals are not silently skipped', () => {
+  // Synthetic examples only. These are compact key=value configuration
+  // values, not assertions that redaction is an exhaustive security scan.
+  const inputs = [
+    'password=SuperSecretPass',
+    'password=my_secret_pass',
+    'password=P@ss(word1',
+  ];
+  for (const source of inputs) {
+    const { text, hits } = redactText(source, { highEntropy: false });
+    assert.equal(text, 'password=<REDACTED:passwordAssignment>', source);
+    assert.deepEqual(hits, [{ category: 'passwordAssignment', count: 1 }], source);
+  }
+});
+
+test('#2203 compact credential correction preserves source references and calls', () => {
+  const sourceRefs = [
+    'password: hashedPassword',
+    'password: user_password',
+    'password = hashedPassword',
+    'password = getPassword()',
+    'password=getPassword()',
+    'password=process.env.DB_PASSWORD',
+    'password=${DB_PASSWORD}',
+    'password=example-value',
+  ];
+  for (const source of sourceRefs) {
+    const { text, hits } = redactText(source, { highEntropy: false });
+    assert.equal(text, source, source);
+    assert.equal(hits.length, 0, source);
+  }
+});
+
 test('#2033 redactText does not redact password type annotations, references, or placeholders', () => {
   // The canary set for passwordAssignment. Each line is ordinary source or
   // documentation that a naive `password\s*[:=]\s*\S+` rule would mangle.
