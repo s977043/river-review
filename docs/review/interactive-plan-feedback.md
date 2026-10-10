@@ -147,12 +147,11 @@ It never creates findings or overrides the canonical decision.
 Disappearance in a later review is not evidence of verified resolution.
 All findings and incomplete review coverage remain canonical (#2212, #2322).
 
-The source task ID and exact plan/question SHA-256 values serve as stable
-references back to the PlanGate C-3 working files. `artifactRefs` are rendered
-as escaped text, not verified clickable URLs: the HTML output may be moved
-away from the source repository, and embedding an absolute `file://` path
-could disclose private local locations. Creating hyperlinks requires a
-separately trusted, explicit base URL and is not part of this contract.
+The task ID and SHA-256 values identify the original PlanGate C-3 files.
+`artifactRefs` are escaped display hints, not verified clickable links.
+An HTML report may be moved outside the source repository.
+Absolute `file://` links could disclose a private local working path.
+Adding hyperlinks needs a trusted, explicit base URL.
 
 ## Delivery status
 
@@ -163,9 +162,9 @@ separately trusted, explicit base URL and is not part of this contract.
 - [x] Real-browser keyboard focus, actual disk download, and validator roundtrip
   tested in PlanGate #1542 (merged; #1535 closed).
 
-The Phase A/B/C delivery slices were reviewed independently in PRs #2584,
-#2620, and #2621. PlanGate provides the feedback UI/validator and browser E2E.
-Neither phase changes the current approval or gate authority.
+Phase A/B/C work was reviewed separately in PRs #2584, #2620, and #2621.
+PlanGate provides the feedback UI, validator and browser E2E.
+None of these phases changes the current approval or gate authority.
 
 Merged PR #2621 has a successful latest-head CI, CodeQL, and PlanGate Review.
 The HTML report does not authenticate a human or grant C-3 approval.
