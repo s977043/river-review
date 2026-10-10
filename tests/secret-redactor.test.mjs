@@ -163,6 +163,37 @@ test('#2203 tracks a secret once when named-pattern masking precedes env masking
   }
 });
 
+test('#2203 treats caller-supplied masks as untrusted, even with plausible categories', () => {
+  // The syntax alone is not proof a prior scan masked this value.
+  // An unknown category, and a known but pre-existing category, must not
+  // bypass the env fallback or masquerade as a detected hit.
+  for (const source of [
+    'PASSWORD=<REDACTED:unknownMarker>',
+    'PASSWORD=<REDACTED:passwordAssignment>',
+    'PASSWORD="<REDACTED:passwordAssignment>"',
+  ]) {
+    const { text, hits } = redactText(source, { highEntropy: false });
+    assert.equal(text, 'PASSWORD=<REDACTED:envAssignment>', source);
+    assert.deepEqual(hits, [{ category: 'envAssignment', count: 1 }], source);
+  }
+
+  // A source-owned marker matching a category also found elsewhere remains
+  // untrusted. Conservatively recounting is safer than silently retaining it.
+  const source = 'PASSWORD = hunter2\\nTOKEN=<REDACTED:passwordAssignment>';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  assert.equal(
+    text,
+    'PASSWORD = <REDACTED:envAssignment>\\nTOKEN=<REDACTED:envAssignment>'
+  );
+  assert.deepEqual(
+    hits,
+    [
+      { category: 'passwordAssignment', count: 1 },
+      { category: 'envAssignment', count: 2 },
+    ]
+  );
+});
+
 test('#2203 only skips a complete redacted env value, never trailing raw material', () => {
   // A forged placeholder with extra raw bytes must not bypass the env pass.
   const source = 'PASSWORD=<REDACTED:passwordAssignment>secretSuffix';
