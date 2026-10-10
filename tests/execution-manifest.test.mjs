@@ -556,7 +556,10 @@ describe('schemas/execution-manifest.schema.json', () => {
         })
       ),
     };
-    assert.equal(legacyKey, 'b3208c770b916ad459bf76fd021869e8e6e0638a0bb7ac03bed200d6d8b42d17');
+    assert.equal(
+      legacyKey,
+      'b3208c770b916ad459bf76fd021869e8e6e0638a0bb7ac03bed200d6d8b42d17'
+    );
     assert.equal(validate(legacy), true, JSON.stringify(validate.errors));
     assert.equal(verifyExecutionManifest(legacy).verified, true);
     assert.deepEqual(COMPLETE.redaction.appliedPatterns, [...REDACTION_PATTERN_IDS]);
