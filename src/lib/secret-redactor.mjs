@@ -275,7 +275,7 @@ function isCredentialLiteral(raw, { compactEquals = false } = {}) {
     // the stray `)` behind and break the syntax the reviewer is reading.
     // Preserve function-call expressions even when there is no whitespace
     // around '='. A non-identifier literal such as 'P@ss(word1' is different.
-    if (value.includes('(') && (!compactEquals || /^[A-Za-z_$][\\w$.]*\\(/.test(value))) {
+    if (value.includes('(') && (!compactEquals || /^[A-Za-z_$][\w$.]*\(/.test(value))) {
       return false;
     }
     if (IDENTIFIER_SHAPED_RE.test(value) && !compactEquals) return false;
