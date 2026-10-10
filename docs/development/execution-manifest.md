@@ -104,6 +104,10 @@ observe mode を解除できるのは Flow 実行エンジンが着地したと�
 
 redaction は hash 計算の**前**に走ります。後から redact すると、保存済み manifest と再計算 hash が食い違い、全 manifest が `verifyExecutionManifest` に落ちます。
 
+`redaction.applied: true` は**パターンベースの走査を実施した**という記録であり、機密情報の網羅的な除去や監査済みの証明ではありません。新しい Manifest は `redaction.appliedPatterns` に `REDACTION_PATTERN_IDS` 由来の適用カテゴリ一覧（hit が 0 件でも記録）を持ちます。これにより `redaction.hits`（検出件数）と `appliedPatterns`（試行した検出範囲）を区別できます。古い Manifest の `appliedPatterns` 欠落は**検出範囲が不明**を意味し、「全カテゴリを確認した」と推定しません。
+
+この追加フィールドは optional で、旧形式を schema で引き続き受け付けます。一方、新形式の `manifestKey` / `manifestHash` は内容アドレスの仕様どおり変わります。旧 Manifest のハッシュや本文を遡及的に書き換えません。
+
 `spec.artifacts` のキーだけは拒否対象から外しています。artifact 名としての `diff` は #2015 の manifest 候補が明示的に挙げている正当な名前であり、値は `sha256` へ正規化されるためです。
 
 なお `src/lib/result-store.mjs` の run record 書き出しは「上流で redact 済み」という前提に依存しています（`result.reviewDebug` のコメント参照）。本 manifest はその前提の外に出ないよう、自前で redaction を持ちます。
