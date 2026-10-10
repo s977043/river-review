@@ -200,9 +200,15 @@ finderRunId != verifierRunId
 
 **受理時点（Phase 5A）の観測:** `reviewer-independence.mjs` は helper-only で、runtime には未配線でした。この記述は当時の基準状態を記録しています。
 
-**実装後の更新（2026-10-10 確認、#2481 / PR #2501、#2543 / PR #2571）:** `src/lib/finding-critic-stage.mjs:buildExecutionIndependence` が既存の `evaluateReviewerIndependence()` を利用します。orchestrator が事前割当てした verifier execution ID と、finding の `sourceExecutionIds[]` を入力に、`debug.findingCritic.executionIndependence[]` の観測を構築します。Finding Critic は opt-in（既定 off）で、この情報は debug observation であり、Review Artifact の新たな必須・トップレベル independence field ではありません。利用可能性は caller/path に依存します。
+**実装後の更新（2026-10-10確認、#2481 / PR #2501、#2543 / PR #2571）:** Finding Critic は既存の `evaluateReviewerIndependence()` を利用します。観測値は `src/lib/finding-critic-stage.mjs:buildExecutionIndependence` が生成します。
 
-この更新は**logical execution ID の比較**に限られ、distinct ID から actor identity、異なる provider/model、prompt/context isolation、trusted provenance、finding correctness、independent adversarial verification の成立を推論してはいけません。Critic 未実行・ID欠落時に独立性を捏造せず、結果を severity・validation・`decision`・Gate・Human authority に昇格させません。Review Evidence Projection は owning debug observation を必要に応じて参照できますが、canonical finding truth や新たな判断権限として再解釈しません。
+入力は orchestrator が事前割当てした verifier execution ID と、finding の `sourceExecutionIds[]` です。結果は `debug.findingCritic.executionIndependence[]` に保持されます。
+
+Finding Critic は opt-in（既定 off）です。この値は debug observation であり、Review Artifact の必須・トップレベル independence field ではありません。利用可能性は呼び出し経路に依存します。
+
+この更新の保証は **logical execution ID の比較**だけです。distinct ID は actor identity、別 provider/model、prompt/context isolation、trusted provenance を証明しません。finding correctness や independent adversarial verification の品質も証明しません。
+
+Critic 未実行や ID 欠落を独立性の証明にせず、結果を severity・validation・`decision`・Gate・Human authority に昇格させません。Review Evidence Projection は既存の debug observation を参照できます。ただし、canonical finding truth や新たな判断権限として再解釈しません。
 
 より強い actor / provider / model / prompt / signature provenance は #1760 の責務を再利用する。
 
