@@ -1,0 +1,30 @@
+name: Temporary Phase C Prettier Snapshot
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    if: github.head_ref == 'docs/plan-feedback-phase-c-closeout-20261010'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned formatter
+        run: npm ci --ignore-scripts
+      - name: Print normalized document (read-only)
+        run: |
+          node <<'NODE'
+          const { readFileSync } = require('node:fs');
+          const { spawnSync } = require('node:child_process');
+          const f = 'docs/review/interactive-plan-feedback.md';
+          const out = spawnSync('./node_modules/.bin/prettier', ['--stdin-filepath', f], {
+            input: readFileSync(f), encoding: 'utf8', maxBuffer: 1024 * 1024
+          });
+          if (out.status !== 0) throw new Error(out.stderr);
+          console.log('FORMATTED_DOC ' + Buffer.from(out.stdout, 'utf8').toString('base64'));
+          NODE
