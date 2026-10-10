@@ -287,11 +287,7 @@ test('#2033 redactText redacts password / passwd / pwd assignments', () => {
 test('#2203 compact unquoted credential literals are not silently skipped', () => {
   // Synthetic examples only. These are compact key=value configuration
   // values, not assertions that redaction is an exhaustive security scan.
-  const inputs = [
-    'password=SuperSecretPass',
-    'password=my_secret_pass',
-    'password=P@ss(word1',
-  ];
+  const inputs = ['password=SuperSecretPass', 'password=my_secret_pass', 'password=P@ss(word1'];
   for (const source of inputs) {
     const { text, hits } = redactText(source, { highEntropy: false });
     assert.equal(text, 'password=<REDACTED:passwordAssignment>', source);
