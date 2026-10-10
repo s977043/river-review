@@ -538,8 +538,9 @@ describe('schemas/execution-manifest.schema.json', () => {
 
   it('allows legacy manifests without pattern provenance but validates modern lists', () => {
     const oldRedaction = { applied: true, hits: [] };
-    const { manifestId, manifestKey, manifestHash, createdAt, ...newConditions } = COMPLETE;
+    const { createdAt, ...newConditions } = COMPLETE;
     const legacyConditions = { ...newConditions, redaction: oldRedaction };
+    for (const key of ['manifestId', 'manifestKey', 'manifestHash']) delete legacyConditions[key];
     const legacyKey = sha256Hex(canonicalJson(legacyConditions));
     const legacyId = `RR-EXM-${legacyKey.slice(0, 12)}`;
     const legacy = {
@@ -556,10 +557,7 @@ describe('schemas/execution-manifest.schema.json', () => {
         })
       ),
     };
-    assert.equal(
-      legacyKey,
-      'b3208c770b916ad459bf76fd021869e8e6e0638a0bb7ac03bed200d6d8b42d17'
-    );
+    assert.equal(legacyKey, 'b3208c770b916ad459bf76fd021869e8e6e0638a0bb7ac03bed200d6d8b42d17');
     assert.equal(validate(legacy), true, JSON.stringify(validate.errors));
     assert.equal(verifyExecutionManifest(legacy).verified, true);
     assert.deepEqual(COMPLETE.redaction.appliedPatterns, [...REDACTION_PATTERN_IDS]);
