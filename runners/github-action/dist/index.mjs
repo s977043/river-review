@@ -47109,6 +47109,11 @@ function isCredentialLiteral(raw, { compactEquals = false } = {}) {
 const ENV_VAR_RE = /^[ \t]*(?:export[ \t]+)?([A-Z][A-Z0-9_]*)\s*=\s*(.+)$/gm;
 const SENSITIVE_NAME_RE =
   /(?:^|_)(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|CREDENTIALS|API_KEY|ACCESS_KEY|PRIVATE_KEY)$/;
+// A complete first-pass mask should not be counted again as envAssignment.
+// Anchoring to the entire value (optionally wrapped by matching quotes) is
+// critical: '<REDACTED:...>secret' still needs the env fallback.
+// The captured category is verified against THIS invocation's first-pass hits.
+const COMPLETE_REDACTED_VALUE_RE = /^(["']?)<REDACTED:([A-Za-z][A-Za-z0-9]*)>\1$/;
 
 /**
  * The pattern set `redactText` applies, as stable category ids (#2033).
@@ -47202,6 +47207,10 @@ function redactText(text, opts = {}) {
   const skipMatch = (full) => isAllowlisted(full) || (extraAllow ? extraAllow.test(full) : false);
 
   let out = String(text);
+  // Preserve source-vs-generated provenance without re-scanning the entire
+  // input once for each environment variable. Caller-owned mask syntax is
+  // untrusted, even when another match discovers the same category later.
+  const inputMarkers = new Set(out.match(/<REDACTED:[A-Za-z][A-Za-z0-9]*>/g) ?? []);
 
   for (const { id, regex, redact } of [...PATTERNS, ...ASSIGNMENT_PATTERNS]) {
     out = out.replace(regex, (m, ...groups) => {
@@ -47217,10 +47226,23 @@ function redactText(text, opts = {}) {
     });
   }
 
+  const firstPassCategories = new Set(hits.keys());
   out = out.replace(ENV_VAR_RE, (full, name, value) => {
     if (skipMatch(full)) return full;
     if (!SENSITIVE_NAME_RE.test(name)) return full;
     if (!value || value.trim().length < 8) return full;
+    // Only a category detected by a named pass in THIS invocation can skip
+    // another env hit. A marker supplied by the caller is not such evidence.
+    // When original text already has the same marker, conservatively mask
+    // again rather than mistake attacker-controlled text for provenance.
+    const complete = COMPLETE_REDACTED_VALUE_RE.exec(value.trim());
+    if (
+      complete &&
+      firstPassCategories.has(complete[2]) &&
+      !inputMarkers.has(REPLACEMENT(complete[2]))
+    ) {
+      return full;
+    }
     bump('envAssignment');
     // Reconstruct so we keep the (optional) `export ` prefix and the exact
     // whitespace around `=`. Slicing `full` up to the start of `value` is
