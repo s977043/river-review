@@ -27,23 +27,43 @@
   "additionalProperties": false,
   "$defs": {
     "sha256": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[0-9a-f]{64}$",
       "description": "Bare lowercase hex sha256, or null when the source did not supply one. The `sha256:` prefix used by docs/data/skill-manifest.json is stripped by normalizeSha256 before it lands here."
     },
     "status": {
       "type": "string",
-      "enum": ["resolved", "missing", "unavailable"],
+      "enum": [
+        "resolved",
+        "missing",
+        "unavailable"
+      ],
       "description": "Resolution status of one provenance block (#2015 AC 3). `resolved` means every field the block needs was supplied; `missing` means the source exists in this deployment but this run did not record it; `unavailable` means the caller explicitly declared there was nothing to pin (an empty skill selection, no agents). The distinction exists so that a null block is never read as a present one — that misreading is exactly how a run gets treated as replayable when it is not."
     },
     "versionedComponent": {
       "type": "object",
-      "required": ["id", "version", "sha256"],
+      "required": [
+        "id",
+        "version",
+        "sha256"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string" },
-        "version": { "type": ["string", "null"] },
-        "sha256": { "$ref": "#/$defs/sha256" }
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     }
   },
@@ -68,62 +88,125 @@
       "format": "date-time",
       "description": "ISO 8601 timestamp of manifest creation. Deliberately outside manifestKey."
     },
-    "schemaVersion": { "type": "integer", "const": 1 },
-    "kind": { "type": "string", "const": "execution-manifest" },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "execution-manifest"
+    },
     "reviewRunId": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Canonical review_run_id of the run this manifest describes, resolved with deriveReviewRunId (src/lib/shadow-aggregate.mjs) — the contract-2 SSoT, never re-derived here."
     },
     "riverReview": {
       "type": "object",
-      "required": ["status", "version"],
+      "required": [
+        "status",
+        "version"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
-        "version": { "type": ["string", "null"] }
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "plugin": {
       "type": "object",
-      "required": ["status", "host", "pluginVersion"],
+      "required": [
+        "status",
+        "host",
+        "pluginVersion"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
         "host": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Host that loaded the capability pack, e.g. \"claude-code\" or \"codex\"."
         },
-        "pluginVersion": { "type": ["string", "null"] }
+        "pluginVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "flow": {
       "type": "object",
-      "required": ["status", "id", "version", "sha256"],
+      "required": [
+        "status",
+        "id",
+        "version",
+        "sha256"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
-        "id": { "type": ["string", "null"] },
-        "version": { "type": ["string", "null"] },
-        "sha256": { "$ref": "#/$defs/sha256" }
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       },
       "description": "The flow definition this run executed (schemas/flow.schema.json, #2013). Flow INSTANCE documents now exist — #2016 landed flows/*.flow.json plus flows/entry-map.json — but src/lib/execution-manifest.mjs does not read them, because #2016 also pins an observe-mode guarantee that no module under src/ or runners/ loads that directory (tests/flow-definitions.test.mjs). The caller therefore passes the parsed document as `flowDocument` and `deriveFlowPin` hashes it (#2037); `sha256` is the digest of canonicalJson(document), not of the file bytes, so re-formatting the document does not invalidate the pin. A run that supplies no document leaves this block `missing`, which REPLAY_PINS treats as not replayable. The agent roster is the same shape: agents/contracts/*.agent.json (#2014) carry no checksum, so the caller hashes those too."
     },
     "agents": {
       "type": "object",
-      "required": ["status", "entries"],
+      "required": [
+        "status",
+        "entries"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
         "entries": {
           "type": "array",
-          "items": { "$ref": "#/$defs/versionedComponent" },
+          "items": {
+            "$ref": "#/$defs/versionedComponent"
+          },
           "description": "Agent roster, sorted by id so the manifest hash does not depend on dispatch order."
         }
       }
     },
     "skills": {
       "type": "object",
-      "required": ["status", "entries", "skillSetHash"],
+      "required": [
+        "status",
+        "entries",
+        "skillSetHash"
+      ],
       "additionalProperties": false,
       "properties": {
         "status": {
@@ -132,7 +215,9 @@
         },
         "entries": {
           "type": "array",
-          "items": { "$ref": "#/$defs/versionedComponent" }
+          "items": {
+            "$ref": "#/$defs/versionedComponent"
+          }
         },
         "skillSetHash": {
           "$ref": "#/$defs/sha256",
@@ -142,20 +227,32 @@
     },
     "artifacts": {
       "type": "object",
-      "required": ["status", "entries"],
+      "required": [
+        "status",
+        "entries"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
         "entries": {
           "type": "array",
           "description": "Input artifacts (requirements, diff, …) BY HASH ONLY. The contents are never copied here — that is what keeps a manifest from becoming a context dump.",
           "items": {
             "type": "object",
-            "required": ["name", "sha256"],
+            "required": [
+              "name",
+              "sha256"
+            ],
             "additionalProperties": false,
             "properties": {
-              "name": { "type": "string" },
-              "sha256": { "$ref": "#/$defs/sha256" }
+              "name": {
+                "type": "string"
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              }
             }
           }
         }
@@ -163,14 +260,31 @@
     },
     "policy": {
       "type": "object",
-      "required": ["status", "ref", "sha256", "riskMapDigest"],
+      "required": [
+        "status",
+        "ref",
+        "sha256",
+        "riskMapDigest"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
-        "ref": { "type": ["string", "null"] },
-        "sha256": { "$ref": "#/$defs/sha256" },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
         "riskMapDigest": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[0-9a-f]{16}$",
           "description": "The gate's risk-map digest (gate.inputs.riskMapDigest). It is a 16-hex TRUNCATION produced at src/lib/review-plan.mjs:842, not a sha256, so it keeps its own field — comparing two different lengths of the same hash would read as tampering."
         }
@@ -178,21 +292,48 @@
     },
     "runtime": {
       "type": "object",
-      "required": ["status", "provider", "model", "profile"],
+      "required": [
+        "status",
+        "provider",
+        "model",
+        "profile"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
-        "provider": { "type": ["string", "null"] },
-        "model": { "type": ["string", "null"] },
-        "profile": { "type": ["string", "null"] }
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "config": {
       "type": "object",
-      "required": ["status", "sha256"],
+      "required": [
+        "status",
+        "sha256"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "$ref": "#/$defs/status" },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
         "sha256": {
           "$ref": "#/$defs/sha256",
           "description": "Digest of the effective configuration. The config VALUES are never carried — a config can hold provider credentials."
@@ -201,21 +342,46 @@
     },
     "redaction": {
       "type": "object",
-      "required": ["applied", "hits"],
+      "required": [
+        "applied",
+        "hits"
+      ],
       "additionalProperties": false,
-      "description": "Redaction applied to every string leaf before the digests were computed (#2015 AC 2). Recording the hit counts rather than the values keeps the manifest auditable without reproducing what was redacted.",
+      "description": "Pattern-based redaction was attempted on every string leaf before digests were computed; this is NOT exhaustive secret detection or a security attestation. The optional appliedPatterns field records categories examined by newer producers. Legacy manifests with only applied=true remain valid but have unknown applied-pattern coverage.",
       "properties": {
-        "applied": { "type": "boolean", "const": true },
+        "applied": {
+          "type": "boolean",
+          "const": true,
+          "description": "True means the pattern-based scanner ran, not that the content is secret-free."
+        },
         "hits": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["category", "count"],
+            "required": [
+              "category",
+              "count"
+            ],
             "additionalProperties": false,
             "properties": {
-              "category": { "type": "string" },
-              "count": { "type": "integer", "minimum": 1 }
+              "category": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              }
             }
+          }
+        },
+        "appliedPatterns": {
+          "type": "array",
+          "description": "Categories scanned, whether or not they matched. Absent on legacy manifests; its absence is UNKNOWN coverage, not full coverage. The list does not prove every secret was detected.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
