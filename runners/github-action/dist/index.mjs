@@ -47105,6 +47105,10 @@ function isCredentialLiteral(raw, { compactEquals = false } = {}) {
 const ENV_VAR_RE = /^[ \t]*(?:export[ \t]+)?([A-Z][A-Z0-9_]*)\s*=\s*(.+)$/gm;
 const SENSITIVE_NAME_RE =
   /(?:^|_)(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|CREDENTIALS|API_KEY|ACCESS_KEY|PRIVATE_KEY)$/;
+// A complete first-pass mask should not be counted again as envAssignment.
+// Anchoring to the entire value (optionally wrapped by matching quotes) is
+// critical: '<REDACTED:...>secret' still needs the env fallback.
+const COMPLETE_REDACTED_VALUE_RE = /^(["']?)<REDACTED:[A-Za-z][A-Za-z0-9]*>\1$/;
 
 /**
  * The pattern set `redactText` applies, as stable category ids (#2033).
@@ -47217,6 +47221,10 @@ function redactText(text, opts = {}) {
     if (skipMatch(full)) return full;
     if (!SENSITIVE_NAME_RE.test(name)) return full;
     if (!value || value.trim().length < 8) return full;
+    // Named patterns run first; their complete replacement is evidence of
+    // the SAME secret, not another env hit. Partial replacements must still
+    // be redacted here so no trailing raw material escapes.
+    if (COMPLETE_REDACTED_VALUE_RE.test(value.trim())) return full;
     bump('envAssignment');
     // Reconstruct so we keep the (optional) `export ` prefix and the exact
     // whitespace around `=`. Slicing `full` up to the start of `value` is
