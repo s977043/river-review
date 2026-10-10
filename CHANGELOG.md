@@ -1,5 +1,53 @@
 # Changelog
 
+## [1.127.0](https://github.com/s977043/river-review/compare/v1.126.0...v1.127.0) (2026-10-10)
+
+
+### Features
+
+* **cli:** explicit validated PlanGate feedback flags for HTML review run ([#2621](https://github.com/s977043/river-review/issues/2621)) ([9eff5e7](https://github.com/s977043/river-review/commit/9eff5e78733a498ac9f67636349a17e6dba8a8c1))
+* **concern:** add fail-closed Phase 5B preflight ([#2600](https://github.com/s977043/river-review/issues/2600)) ([d9ff6b4](https://github.com/s977043/river-review/commit/d9ff6b49c1ce5a9ccbb3c1bc1ef6166140587860))
+* **concern:** add observe-only Concern Coverage projection ([#2565](https://github.com/s977043/river-review/issues/2565)) ([8c1bbc4](https://github.com/s977043/river-review/commit/8c1bbc46fa794a06dfab7edf56c6c7de3c3e52cf)), closes [#2541](https://github.com/s977043/river-review/issues/2541) [#2455](https://github.com/s977043/river-review/issues/2455)
+* **concern:** add observe-only interaction planner ([#2581](https://github.com/s977043/river-review/issues/2581)) ([7b882b9](https://github.com/s977043/river-review/commit/7b882b9182b967a9d2de21548a4300d34af25c5d))
+* **concern:** add observe-only Review Planning Bridge ([#2540](https://github.com/s977043/river-review/issues/2540)) ([a61dadf](https://github.com/s977043/river-review/commit/a61dadfccdcf9ef154ebb23e354a7396a2123ff6)), closes [#2523](https://github.com/s977043/river-review/issues/2523) [#2455](https://github.com/s977043/river-review/issues/2455)
+* **evolve:** verify signed independent replay evidence ([#2520](https://github.com/s977043/river-review/issues/2520)) ([6c4ac03](https://github.com/s977043/river-review/commit/6c4ac0305b9a59f88ee9fe85bcef5d3cbdea92a5))
+* **harness:** development-agent harness design and first effect-measurement loop ([#2563](https://github.com/s977043/river-review/issues/2563)) ([0180bba](https://github.com/s977043/river-review/commit/0180bba9270afa9e35b1f23d15d4744ff97b00f8))
+* **observe:** fail-closed Host attempt accounting preflight ([#2610](https://github.com/s977043/river-review/issues/2610)) ([f0992a3](https://github.com/s977043/river-review/commit/f0992a3ead7871fbd7430daec6388f31e807c7a8))
+* **observe:** Phase 3 execution strategy shadow recommendation ([#2589](https://github.com/s977043/river-review/issues/2589)) ([2d4418c](https://github.com/s977043/river-review/commit/2d4418cdb4a6268d89584eeb7ef2d2d6fb748bae))
+* **resolution:** add explicit human Feedback approval adapter ([#2617](https://github.com/s977043/river-review/issues/2617)) ([fff0e55](https://github.com/s977043/river-review/commit/fff0e5511fcb915ed76cd9b04bc311a423e3ade9))
+* **resolution:** build read-only Feedback proposals ([#2613](https://github.com/s977043/river-review/issues/2613)) ([e16467d](https://github.com/s977043/river-review/commit/e16467d0640b5590338942066c403cd166de1565))
+* **resolution:** propose human-approved Feedback candidates from Review Resolution ([#2624](https://github.com/s977043/river-review/issues/2624)) ([d418c19](https://github.com/s977043/river-review/commit/d418c1935f88ee5a8e0d1efaf3a79038b348cb72))
+* **review:** add deterministic Review Resolution organizer ([#2524](https://github.com/s977043/river-review/issues/2524)) ([3281f66](https://github.com/s977043/river-review/commit/3281f6673743220cde8941a80dd8a1d2635f325d)), closes [#2513](https://github.com/s977043/river-review/issues/2513) [#2322](https://github.com/s977043/river-review/issues/2322)
+* **review:** add Review Resolution host adapter ([#2536](https://github.com/s977043/river-review/issues/2536)) ([b925847](https://github.com/s977043/river-review/commit/b925847d97b88fbf67d91f9bf6dae995446e89da)), closes [#2535](https://github.com/s977043/river-review/issues/2535) [#2322](https://github.com/s977043/river-review/issues/2322)
+* **review:** add Review Resolution verification transitions ([#2569](https://github.com/s977043/river-review/issues/2569)) ([b898123](https://github.com/s977043/river-review/commit/b8981236c04d55fec7ef0de3fd9adcdc1e3d6934)), closes [#2567](https://github.com/s977043/river-review/issues/2567) [#2322](https://github.com/s977043/river-review/issues/2322)
+* **review:** cancel timed-out reviewer executions ([#2566](https://github.com/s977043/river-review/issues/2566)) ([783c373](https://github.com/s977043/river-review/commit/783c3734aad2a0c412786298da793a1f04dafd40)), closes [#2564](https://github.com/s977043/river-review/issues/2564)
+* **review:** observe Finding Critic execution provenance ([#2571](https://github.com/s977043/river-review/issues/2571)) ([b7d7939](https://github.com/s977043/river-review/commit/b7d79392cc142d158d691eeaa1f9ddaf6f1f0dc8))
+* **review:** optional source-matched PlanGate question section in HTML ([#2620](https://github.com/s977043/river-review/issues/2620)) ([19cc54d](https://github.com/s977043/river-review/commit/19cc54daf50781b345268987ff4e35cda291e2ab))
+* **scripts:** surface pr-unstall verdict when wait-pr-ready sees a bot-push stall ([#2628](https://github.com/s977043/river-review/issues/2628)) ([ad10d3a](https://github.com/s977043/river-review/commit/ad10d3a653c09bb8b384eaba438fc59f4e4a33f6)), closes [#2605](https://github.com/s977043/river-review/issues/2605)
+* **viewpoints:** add async-correctness Review Viewpoints ([#2252](https://github.com/s977043/river-review/issues/2252) Phase 7) ([#2558](https://github.com/s977043/river-review/issues/2558)) ([edf0315](https://github.com/s977043/river-review/commit/edf0315223a9a11215109d618533363066d33fc2))
+
+
+### Bug Fixes
+
+* **cli:** --estimate と plan-feedback フラグの併用を拒否し、フラグを文書化する ([#2630](https://github.com/s977043/river-review/issues/2630)) ([baa9dbd](https://github.com/s977043/river-review/commit/baa9dbd0586165141a1f5d67ec87e5cca563a030))
+* **deps:** override tinypool to 2.1.2 for docusaurus (critical advisories) ([#2595](https://github.com/s977043/river-review/issues/2595)) ([380186e](https://github.com/s977043/river-review/commit/380186e49e6386b5c06fe72604e9df428d4cb2c1))
+* **gate:** escalate contradictory Critic validation evidence ([#2611](https://github.com/s977043/river-review/issues/2611)) ([336177c](https://github.com/s977043/river-review/commit/336177c1d792c51f90983be8135a32ac5867bc5b))
+* **manifest:** record applied redaction patterns with legacy compatibility ([#2641](https://github.com/s977043/river-review/issues/2641)) ([7a0d508](https://github.com/s977043/river-review/commit/7a0d508427b79641818dac1e59eeb2f2cb1a958c))
+* **observe:** fail closed on unusable Concern Map evidence ([#2602](https://github.com/s977043/river-review/issues/2602)) ([1400bcc](https://github.com/s977043/river-review/commit/1400bcc47b40853b717f38ff55adf37927c4dd31))
+* **pr:** use only an open PR when resolving the current branch's PR ([#2538](https://github.com/s977043/river-review/issues/2538)) ([e1ce34a](https://github.com/s977043/river-review/commit/e1ce34a768f91726655c01ae3f34e4427bffa609)), closes [#2457](https://github.com/s977043/river-review/issues/2457)
+* **resolution:** fail closed on source-only Feedback fingerprint collisions ([#2618](https://github.com/s977043/river-review/issues/2618)) ([b56c395](https://github.com/s977043/river-review/commit/b56c395ec3b4d164201e62dca3d9a1733e3f9966))
+* **resolution:** normalize proposal reviewer/rationale and dedupe evidence ([#2629](https://github.com/s977043/river-review/issues/2629)) ([ed28b31](https://github.com/s977043/river-review/commit/ed28b313890a2436e442dfb184cb48000a50d8a1))
+* **scripts:** address range review minors for the after-change dogfood ([#2561](https://github.com/s977043/river-review/issues/2561)) ([340bfbb](https://github.com/s977043/river-review/commit/340bfbbd61690dc778791db363929224983c69b4))
+* **scripts:** validate --count and report a bad --base as a usage error ([#2594](https://github.com/s977043/river-review/issues/2594)) ([ca5bc6d](https://github.com/s977043/river-review/commit/ca5bc6d77bfddada73d5a55a847c90787bb406fb)), closes [#2582](https://github.com/s977043/river-review/issues/2582)
+* **security:** mask compact unquoted password literals ([#2639](https://github.com/s977043/river-review/issues/2639)) ([f4c85db](https://github.com/s977043/river-review/commit/f4c85dbb0cf8ba243e4aa67ae842900c1060e2a8))
+* **security:** preserve quoted redacted credential values ([#2637](https://github.com/s977043/river-review/issues/2637)) ([5432e6e](https://github.com/s977043/river-review/commit/5432e6e3610d6dabba964ba9043432dae94879b5))
+* **security:** prevent duplicate redaction hit attribution ([#2645](https://github.com/s977043/river-review/issues/2645)) ([0530952](https://github.com/s977043/river-review/commit/0530952ed7bcc9ad8d2b44b16acd778054d37ea3))
+
+
+### Reverts
+
+* **docs:** remove out-of-scope Team OS integration guide ([#2579](https://github.com/s977043/river-review/issues/2579)) ([05e9d7d](https://github.com/s977043/river-review/commit/05e9d7dda037e968d2c9993d0c04c92b829c5def))
+
 ## [1.126.0](https://github.com/s977043/river-review/compare/v1.125.1...v1.126.0) (2026-10-05)
 
 
