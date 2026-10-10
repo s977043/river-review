@@ -273,17 +273,13 @@ test('#2033 redactText leaves AWS-shaped identifiers that are not keys alone', (
 
 test('#2033 redactText redacts password / passwd / pwd assignments', () => {
   const cases = [
-    ['password=hunter2', 'password='],
-    ['passwd: "hunter2xyz"', 'passwd: '],
-    ["pwd = 's0meThing'", 'pwd = '],
+    ['password=hunter2', 'password=<REDACTED:passwordAssignment>'],
+    ['passwd: "hunter2xyz"', 'passwd: "<REDACTED:passwordAssignment>"'],
+    ["pwd = 's0meThing'", "pwd = '<REDACTED:passwordAssignment>'"],
   ];
-  for (const [sample, keptPrefix] of cases) {
+  for (const [sample, expected] of cases) {
     const { text, hits } = redactText(sample, { highEntropy: false });
-    assert.equal(
-      text,
-      keptPrefix + '<REDACTED:passwordAssignment>',
-      'not redacted as expected: ' + sample
-    );
+    assert.equal(text, expected, 'not redacted as expected: ' + sample);
     assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
   }
 });
@@ -350,6 +346,19 @@ test('#2033 redactText redacts JSON-shaped password keys', () => {
     assert.equal(text.includes('hunter2'), false, 'leaked: ' + sample);
     assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
   }
+});
+
+test('#2203 preserve valid JSON after password redaction', () => {
+  // Preserve syntactic delimiters so downstream config readers can parse it.
+  const source = '{"password":"hunter2","enabled":true,"label":"public"}';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  assert.deepEqual(JSON.parse(text), {
+    password: '<REDACTED:passwordAssignment>',
+    enabled: true,
+    label: 'public',
+  });
+  assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  assert.equal(text.includes('hunter2'), false);
 });
 
 test('#2033 redactText redacts quoted non-ASCII password values', () => {

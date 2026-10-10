@@ -213,7 +213,10 @@ const ASSIGNMENT_PATTERNS = [
     redact: (_m, quote, name, sep, value) => {
       if (NON_SECRET_PWD_NAMES.has(name)) return null;
       if (!isCredentialLiteral(value)) return null;
-      return `${quote}${name}${quote}${sep}${REPLACEMENT('passwordAssignment')}`;
+      const valueQuote = value[0];
+      const quoted = (valueQuote === '"' || valueQuote === "'") && value.endsWith(valueQuote);
+      const replacement = REPLACEMENT('passwordAssignment');
+      return `${quote}${name}${quote}${sep}${quoted ? valueQuote : ''}${replacement}${quoted ? valueQuote : ''}`;
     },
   },
 ];
