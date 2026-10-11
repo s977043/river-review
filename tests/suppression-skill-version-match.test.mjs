@@ -125,10 +125,10 @@ test('known mismatch resurfaces findings once, but unrelated skill changes do no
   );
   assert.equal(mismatched.keptFindings.length, 2);
   assert.equal(mismatched.suppressedFindings.length, 0);
-  assert.deepEqual(mismatched.applied.map((a) => a.reason), [
-    'skill-version-mismatch',
-    'skill-version-mismatch',
-  ]);
+  assert.deepEqual(
+    mismatched.applied.map((a) => a.reason),
+    ['skill-version-mismatch', 'skill-version-mismatch']
+  );
   assert.deepEqual(mismatched.warnings, [formatSkillVersionMismatchWarning({ id: s.id })]);
 });
 
@@ -187,7 +187,8 @@ test('runLocalReview consults actual installed skill metadata only when opted in
 
   const skills = await loadSkills();
   const skill = skills.find(
-    (item) => typeof item?.metadata?.id === 'string' &&
+    (item) =>
+      typeof item?.metadata?.id === 'string' &&
       typeof item?.metadata?.version === 'string'
   );
   assert.ok(skill, 'the installed loader must supply versioned skills');
@@ -205,7 +206,9 @@ test('runLocalReview consults actual installed skill metadata only when opted in
     skillVersion: '0.0.0-older-than-current',
   });
   const unguarded = await review({});
-  assert.ok(unguarded.suppressedFindings.some((f) => f.fingerprint === target.fingerprint));
+  assert.ok(
+    unguarded.suppressedFindings.some((f) => f.fingerprint === target.fingerprint)
+  );
 
   const active = await review(ON);
   assert.ok(active.findings.some((f) => f.fingerprint === target.fingerprint));
