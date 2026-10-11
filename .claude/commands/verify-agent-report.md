@@ -1,7 +1,7 @@
 ---
 description: background 実装エージェントの完了報告 (branch / PR / commit / ファイル) が実在するか親側で検証する
 argument-hint: '<branch name> [PR number] [commit SHA] [key files]'
-allowed-tools: Bash(git ls-remote:*), Bash(git fetch:*), Bash(git log:*), Bash(git show:*), Bash(git worktree:*), Bash(gh pr view:*), Bash(gh api:*), Bash(ls:*), Bash(npm test:*), Bash(npm run:*)
+allowed-tools: Bash(scripts/verify-agent-report.sh:*), Bash(git ls-remote:*), Bash(git fetch:*), Bash(git log:*), Bash(git show:*), Bash(git worktree:*), Bash(gh pr view:*), Bash(gh api:*), Bash(ls:*), Bash(npm test:*), Bash(npm run:*)
 ---
 
 エージェント完了報告の検証: 「$ARGUMENTS」で報告された branch / PR / commit / ファイルが実在するか、親セッション側のコマンド実行で裏取りする。
@@ -21,6 +21,14 @@ read-only の調査・レビューエージェントの報告はこの failure m
 ## 検証手順
 
 報告から branch 名・PR 番号・commit SHA・主要ファイルを抽出し、以下を順に実行する。
+
+### Step 0. script で Step 1〜4 を一括実行する
+
+```bash
+scripts/verify-agent-report.sh [--worktree <path>] <branch> [PR|-] [SHA|-] [files...]
+```
+
+Step 1〜4 を実行し、項目ごとの PASS / FAIL 表と `VERDICT` を出す。exit 0 は PASS、exit 1 は FABRICATION_SUSPECTED、exit 64 は引数誤りを表す。PR の読み取り失敗は gh アカウントの切り替わりでも起こるため、FAIL が `pr` 行だけなら `gh api user --jq .login` を確認してから再実行する。script が使えない場合は以下の Step 1〜4 を手で実行する。Step 5 は script の対象外である。
 
 ### Step 1. branch の実在確認
 
