@@ -244,6 +244,8 @@
   `git stash list` の該当行を完了報告に転記する。2026-10-07 の PR #2556 で発生した。
 - commit message は header と本文の各行を 100 文字以内にすること（commitlint の `header-max-length` /
   `body-max-line-length`）。長い URL やパスは行を分ける。
+- テストやコマンドの出力を worktree の直下へリダイレクトしないこと（`> test.log` など）。`mktemp -d` のディレクトリへ書く。
+  `rm` が拒否されると未追跡ファイルが残り、worktree を強制削除しないと片付かない（2026-10-09〜11 に 2 本で発生）。
 ```
 
 ## 委託プロンプト骨格
