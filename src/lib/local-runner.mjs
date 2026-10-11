@@ -47,7 +47,7 @@ import {
   computeFingerprint,
   computeFingerprintV2,
 } from './finding-factory.mjs';
-import { applySuppressions } from './suppression-apply.mjs';
+import { applySuppressions, isSuppressionSkillVersionMatchEnabled } from './suppression-apply.mjs';
 import { computeStrictBlock } from './deterministic-gate.mjs';
 import { runDeterministicExecGateIfEnabled } from './deterministic-exec-gate.mjs';
 import { resolvePullRequestBody, resolvePullRequestLabels } from './pr-context.mjs';
@@ -791,6 +791,20 @@ export async function runLocalReview({
   // #2202 Phase 2: the current project rules are handed over for the opt-in
   // rules-match gate (config.memory.suppressionRequireRulesMatch); with the
   // option off applySuppressions does not read them.
+  // #2202 Phase 1: reuse the same skill loader that buildExecutionPlan uses.
+  // Only load on opt-in; missing current metadata never revokes legacy
+  // suppressions. Do not derive a global policy version from promotion rules.
+  const skillVersions = isSuppressionSkillVersionMatchEnabled(context.config)
+    ? new Map(
+        (await loadSkills())
+          .filter(
+            (skill) =>
+              typeof skill?.metadata?.id === 'string' &&
+              typeof skill?.metadata?.version === 'string'
+          )
+          .map((skill) => [skill.metadata.id, skill.metadata.version])
+      )
+    : undefined;
   const annotatedFindings = annotateFingerprints(review.findings ?? []);
   const {
     keptFindings,
@@ -799,6 +813,7 @@ export async function runLocalReview({
   } = applySuppressions(annotatedFindings, memoryContext, {
     config: context.config,
     rulesText: context.projectRules,
+    skillVersions,
   });
 
   // Epic #1347 S4 (#1351): deterministic strict_block gate. Computed over the

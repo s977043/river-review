@@ -483,6 +483,41 @@ export function evaluateSuppressionRulesMatch(suppression, rulesText, { digests 
 }
 
 /**
+ * Opt-in skill criterion provenance (#2202 Phase 1).
+ *
+ * A missing historical skillId / skillVersion, or an unavailable current
+ * skill version, means UNDETERMINED. Missing provenance is never enough to
+ * revoke a human-issued suppression. The calendar expiry predicate has a
+ * deliberately different fail-safe direction and stays untouched.
+ *
+ * @param {object} suppression issued suppression entry
+ * @param {Map<string, string> | undefined} skillVersions current loader versions
+ * @returns {{ status: 'match' | 'mismatch' | 'undetermined' }}
+ */
+export function evaluateSuppressionSkillVersionMatch(suppression, skillVersions) {
+  const id = suppression?.context?.skillId;
+  const issuedVersion = suppression?.context?.skillVersion;
+  if (!isNonEmptyString(id) || !isNonEmptyString(issuedVersion)) {
+    return { status: 'undetermined' };
+  }
+  const current = skillVersions instanceof Map ? skillVersions.get(id) : undefined;
+  if (!isNonEmptyString(current)) return { status: 'undetermined' };
+  return { status: current === issuedVersion ? 'match' : 'mismatch' };
+}
+
+/**
+ * Report only the suppression entry ID. Raw skill metadata and the finding
+ * rationale are unnecessary in the warning stream.
+ */
+export function formatSkillVersionMismatchWarning({ id }) {
+  return (
+    `Warning: suppression ${id} was issued under an older or different skill version; ` +
+    'it no longer suppresses findings because memory.suppressionRequireSkillVersionMatch is enabled. ' +
+    'Re-evaluate and re-issue the suppression if it still applies.'
+  );
+}
+
+/**
  * Find active suppressions that overlap with the given file paths.
  * Filters out expired and revoked suppressions.
  *

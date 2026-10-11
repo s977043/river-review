@@ -34,11 +34,11 @@ const localRunnerSource = readFileSync(
 );
 
 test('local-runner.mjs imports applySuppressions from suppression-apply.mjs', () => {
-  // Direct grep — guards against an accidental removal of the import line
-  // during a refactor. If this fires, the wiring has been lost.
+  // Guard the named import, not its exact formatting or whether other
+  // imports were added from the same module.
   assert.match(
     localRunnerSource,
-    /import \{ applySuppressions \} from '\.\/suppression-apply\.mjs';/,
+    /import\s*\{[^}]*\bapplySuppressions\b[^}]*\}\s*from\s*['"]\.\/suppression-apply\.mjs['"];?/,
     'applySuppressions import is missing from local-runner.mjs'
   );
 });
