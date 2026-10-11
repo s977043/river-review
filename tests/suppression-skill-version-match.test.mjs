@@ -188,8 +188,7 @@ test('runLocalReview consults actual installed skill metadata only when opted in
   const skills = await loadSkills();
   const skill = skills.find(
     (item) =>
-      typeof item?.metadata?.id === 'string' &&
-      typeof item?.metadata?.version === 'string'
+      typeof item?.metadata?.id === 'string' && typeof item?.metadata?.version === 'string'
   );
   assert.ok(skill, 'the installed loader must supply versioned skills');
 
