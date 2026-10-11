@@ -32880,6 +32880,7 @@ const securityConfigSchema = schemas/* object */.Ikc({
 const memoryConfigSchema = schemas/* object */.Ikc({
     suppressionEnabled: schemas/* boolean */.zMY().optional(),
     suppressionRequireRulesMatch: schemas/* boolean */.zMY().optional(),
+    suppressionRequireSkillVersionMatch: schemas/* boolean */.zMY().optional(),
   })
   .strict();
 
@@ -48256,9 +48257,11 @@ async function planSkills({ skills, context, llmPlan, appendRemaining = true }) 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   CO: () => (/* binding */ formatUnknownRulesDigestAlgoWarning),
 /* harmony export */   Df: () => (/* binding */ formatUnknownFingerprintAlgoWarning),
+/* harmony export */   HG: () => (/* binding */ evaluateSuppressionSkillVersionMatch),
 /* harmony export */   RL: () => (/* binding */ formatUnparseableExpiresAtWarning),
 /* harmony export */   createSuppression: () => (/* binding */ createSuppression),
 /* harmony export */   dG: () => (/* binding */ evaluateSuppressionRulesMatch),
+/* harmony export */   f6: () => (/* binding */ formatSkillVersionMismatchWarning),
 /* harmony export */   i$: () => (/* binding */ collectRevokedSuppressionIds),
 /* harmony export */   lq: () => (/* binding */ isSuppressionExpired),
 /* harmony export */   rW: () => (/* binding */ formatRulesDigestMismatchWarning),
@@ -48741,6 +48744,41 @@ function evaluateSuppressionRulesMatch(suppression, rulesText, { digests } = {})
   }
   if (!isNonEmptyString(current)) return { status: 'undetermined' };
   return { status: current === recorded ? 'match' : 'mismatch' };
+}
+
+/**
+ * Opt-in skill criterion provenance (#2202 Phase 1).
+ *
+ * A missing historical skillId / skillVersion, or an unavailable current
+ * skill version, means UNDETERMINED. Missing provenance is never enough to
+ * revoke a human-issued suppression. The calendar expiry predicate has a
+ * deliberately different fail-safe direction and stays untouched.
+ *
+ * @param {object} suppression issued suppression entry
+ * @param {Map<string, string> | undefined} skillVersions current loader versions
+ * @returns {{ status: 'match' | 'mismatch' | 'undetermined' }}
+ */
+function evaluateSuppressionSkillVersionMatch(suppression, skillVersions) {
+  const id = suppression?.context?.skillId;
+  const issuedVersion = suppression?.context?.skillVersion;
+  if (!isNonEmptyString(id) || !isNonEmptyString(issuedVersion)) {
+    return { status: 'undetermined' };
+  }
+  const current = skillVersions instanceof Map ? skillVersions.get(id) : undefined;
+  if (!isNonEmptyString(current)) return { status: 'undetermined' };
+  return { status: current === issuedVersion ? 'match' : 'mismatch' };
+}
+
+/**
+ * Report only the suppression entry ID. Raw skill metadata and the finding
+ * rationale are unnecessary in the warning stream.
+ */
+function formatSkillVersionMismatchWarning({ id }) {
+  return (
+    `Warning: suppression ${id} was issued under an older or different skill version; ` +
+    'it no longer suppresses findings because memory.suppressionRequireSkillVersionMatch is enabled. ' +
+    'Re-evaluate and re-issue the suppression if it still applies.'
+  );
 }
 
 /**
@@ -100156,6 +100194,13 @@ function isSuppressionRulesMatchEnabled(config) {
   return config?.memory?.suppressionRequireRulesMatch === true;
 }
 
+/**
+ * Optional criterion-version check, strictly disabled by default (#2202).
+ */
+function isSuppressionSkillVersionMatchEnabled(config) {
+  return config?.memory?.suppressionRequireSkillVersionMatch === true;
+}
+
 function severityOf(finding) {
   return String(finding.severity || 'info').toLowerCase();
 }
@@ -100212,6 +100257,9 @@ function applySuppressions(findings, memoryContext, opts = {}) {
   // #2202 Phase 2: rules-match verdicts, filled only when the gate is opted in.
   // With the gate off this stays null and nothing below reads the rules.
   const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
+  const skillVersionMismatched = isSuppressionSkillVersionMatchEnabled(opts?.config)
+    ? new Set()
+    : null;
   const rulesDigests = new Map();
   const now = opts?.now ?? new Date();
   const revokedIds = new Set(
@@ -100250,6 +100298,10 @@ function applySuppressions(findings, memoryContext, opts = {}) {
         );
       }
     }
+    if (skillVersionMismatched) {
+      const verdict = (0,suppression/* evaluateSuppressionSkillVersionMatch */.HG)(s, opts?.skillVersions);
+      if (verdict.status === 'mismatch') skillVersionMismatched.add(s);
+    }
     const prev = target.get(fp);
     if (!prev || !(0,suppression/* isSuppressionExpired */.lq)(s, now) || (0,suppression/* isSuppressionExpired */.lq)(prev, now)) {
       target.set(fp, s);
@@ -100262,6 +100314,7 @@ function applySuppressions(findings, memoryContext, opts = {}) {
   const applied = [];
   const warnedIds = new Set();
   const rulesWarnedIds = new Set();
+  const skillVersionWarnedIds = new Set();
 
   for (const finding of list) {
     // v2 (line-anchored) is consulted first: it is the more specific claim.
@@ -100326,6 +100379,27 @@ function applySuppressions(findings, memoryContext, opts = {}) {
       if (!rulesWarnedIds.has(match.id)) {
         rulesWarnedIds.add(match.id);
         warn((0,suppression/* formatRulesDigestMismatchWarning */.rW)({ id: match.id }));
+      }
+      continue;
+    }
+
+    // Criterion-version gate (#2202 Phase 1, opt-in). An unknown or absent
+    // current/issued skill version is NOT a proven mismatch, so legacy
+    // suppressions keep working. Calendar/rules reasons remain higher priority.
+    if (skillVersionMismatched?.has(match)) {
+      kept.push(finding);
+      applied.push({
+        fingerprint: fp,
+        suppressionId: match.id,
+        fingerprintAlgo: matchedAlgo,
+        feedbackType,
+        severity: sev,
+        action: 'skipped',
+        reason: 'skill-version-mismatch',
+      });
+      if (!skillVersionWarnedIds.has(match.id)) {
+        skillVersionWarnedIds.add(match.id);
+        warn((0,suppression/* formatSkillVersionMismatchWarning */.f6)({ id: match.id }));
       }
       continue;
     }
@@ -101156,6 +101230,20 @@ async function runLocalReview({
   // #2202 Phase 2: the current project rules are handed over for the opt-in
   // rules-match gate (config.memory.suppressionRequireRulesMatch); with the
   // option off applySuppressions does not read them.
+  // #2202 Phase 1: reuse the same skill loader that buildExecutionPlan uses.
+  // Only load on opt-in; missing current metadata never revokes legacy
+  // suppressions. Do not derive a global policy version from promotion rules.
+  const skillVersions = isSuppressionSkillVersionMatchEnabled(context.config)
+    ? new Map(
+        (await (0,skill_loader/* loadSkills */.l1)())
+          .filter(
+            (skill) =>
+              typeof skill?.metadata?.id === 'string' &&
+              typeof skill?.metadata?.version === 'string'
+          )
+          .map((skill) => [skill.metadata.id, skill.metadata.version])
+      )
+    : undefined;
   const annotatedFindings = (0,finding_factory/* annotateFingerprints */.ic)(review.findings ?? []);
   const {
     keptFindings,
@@ -101164,6 +101252,7 @@ async function runLocalReview({
   } = applySuppressions(annotatedFindings, memoryContext, {
     config: context.config,
     rulesText: context.projectRules,
+    skillVersions,
   });
 
   // Epic #1347 S4 (#1351): deterministic strict_block gate. Computed over the
