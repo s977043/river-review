@@ -1240,3 +1240,74 @@ test('checkDocEnumerations passes on the current repo state', async () => {
     );
   }
 });
+
+// #2606: docs/review の派生文書 → review-policy（ja / en）の見出し・語彙同期。
+const REVIEW_SPECS = DOC_ENUMERATION_SPECS.filter((spec) => spec.id.startsWith('review-doc-'));
+const OUTPUT_FORMAT = 'docs/review/output-format.md';
+const VIEWPOINTS = 'docs/review/viewpoints.md';
+const POLICY_JA = 'pages/reference/review-policy.md';
+const POLICY_EN = 'pages/reference/review-policy.en.md';
+
+async function checkReviewDocs(overrides = {}) {
+  const readDoc = async (doc) => overrides[doc] ?? fs.readFile(path.join(REPO_ROOT, doc), 'utf8');
+  return checkDocEnumerations({ specs: REVIEW_SPECS, readDoc });
+}
+
+async function mutate(doc, from, to) {
+  const text = await fs.readFile(path.join(REPO_ROOT, doc), 'utf8');
+  assert.ok(text.includes(from), `fixture anchor missing in ${doc}: ${from}`);
+  return text.replace(from, to);
+}
+
+test('review-doc specs pass on the current repository', async () => {
+  assert.equal(REVIEW_SPECS.length, 3);
+  const { errors, checked } = await checkReviewDocs();
+  assert.deepEqual(errors, []);
+  assert.equal(checked, 3);
+});
+
+test('review-doc specs fail when only the derived doc adds a severity label', async () => {
+  const derived = await mutate(OUTPUT_FORMAT, '| Info     |', '| Trivial | 追加 |\n| Info     |');
+  const { errors } = await checkReviewDocs({ [OUTPUT_FORMAT]: derived });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /review-doc-severity-labels.*"Trivial"/);
+});
+
+test('review-doc specs fail when only the derived doc renames an output section', async () => {
+  const derived = await mutate(OUTPUT_FORMAT, '### 1. Summary（要約）', '### 1. Overview（要約）');
+  const { errors } = await checkReviewDocs({ [OUTPUT_FORMAT]: derived });
+  assert.equal(errors.length, 2);
+  assert.ok(errors.every((e) => e.includes('[review-doc-output-sections]')));
+});
+
+test('review-doc specs fail when only the derived doc renames a phase heading', async () => {
+  const derived = await mutate(VIEWPOINTS, '### Upstream（設計）', '### Design（設計）');
+  const { errors } = await checkReviewDocs({ [VIEWPOINTS]: derived });
+  assert.equal(errors.length, 2);
+  assert.ok(errors.every((e) => e.includes('[review-doc-phase-headings]')));
+});
+
+test('review-doc specs pass when the rename lands in the derived doc and the SSoT', async () => {
+  const derived = await mutate(OUTPUT_FORMAT, '### 1. Summary（要約）', '### 1. Overview（要約）');
+  const ja = await mutate(POLICY_JA, '### 2.1 Summary（要約）', '### 2.1 Overview（要約）');
+  const { errors } = await checkReviewDocs({ [OUTPUT_FORMAT]: derived, [POLICY_JA]: ja });
+  assert.deepEqual(errors, []);
+});
+
+test('review-doc specs fail when the ja and en SSoTs disagree on severity labels', async () => {
+  const en = await mutate(POLICY_EN, '4. **Info**', '4. **Note**');
+  const { errors } = await checkReviewDocs({ [POLICY_EN]: en });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /review-doc-severity-labels.*実測に失敗/);
+});
+
+test('review-doc specs ignore field-table, note, and prose edits in the derived docs', async () => {
+  const table = '| `extra` | string | - | 追加フィールド |\n\n補足の散文。\n\n## 禁止事項';
+  const derived = (await mutate(OUTPUT_FORMAT, '## 禁止事項', table)).replace(
+    '### 4. 補助セクション（任意 / #1196 S2）',
+    '### 4. 補助セクション（任意）'
+  );
+  const viewpoints = await mutate(VIEWPOINTS, '## 共通観点', '## 共通観点\n\n散文を追加する。');
+  const { errors } = await checkReviewDocs({ [OUTPUT_FORMAT]: derived, [VIEWPOINTS]: viewpoints });
+  assert.deepEqual(errors, []);
+});

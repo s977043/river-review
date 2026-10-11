@@ -223,13 +223,18 @@ guards:
 
   - id: review-doc-ssot-sync
     title: Review-doc SSoT sync
-    mechanized: none
-    verifiedBy: []
+    mechanized: partial
+    verifiedBy:
+      - scripts/check-doc-enumerations.mjs
+      - tests/check-doc-enumerations.test.mjs
     addedAt: '2026-06-18'
     reviewAfter: '2027-01-06'
     notes: >-
-      docs/review/*.md と pages/reference/review-policy.md の内容一致を検証する script は存在しない。機械化の候補。
-      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2606
+      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2606。
+      Issue #2606 で check-doc-enumerations の review-doc-* spec 3 件を追加した。出力節見出し（§2）、
+      重要度ラベル（§6）、フェーズ見出し（§4）を派生文書と review-policy（ja / en）で照合する。
+      partial の理由は 3 点ある。表・注記・散文の変更は誤検知回避のため見ない。
+      en の §2 は節数だけを比べる。過去に SSoT へ先行した出力描画の規則（PR #1914）は検知できない。
 
   - id: skill-check-fixture-drift
     title: Skill-check fixture/description drift
