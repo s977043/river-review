@@ -169,8 +169,13 @@ main() {
 
   local body
   body="$(printf 'Reverts #%s\n\n## 理由\n\n<!-- なぜ fix-forward ではなく revert か -->\n' "${pr}")"
-  gh pr create --repo "${repo}" --base main --head "${branch}" --title "${pr_title}" --body "${body}" ||
-    die 2 "gh pr create failed"
+  if ! gh pr create --repo "${repo}" --base main --head "${branch}" --title "${pr_title}" --body "${body}"; then
+    echo "revert-pr: ${branch} was pushed but gh pr create failed. Do not rerun this script" >&2
+    echo "  (the branch now exists, so it refuses). Check the gh account, then open the PR:" >&2
+    printf '  gh pr create --repo %q --base main --head %q --title %q --body %q\n' \
+      "${repo}" "${branch}" "${pr_title}" "Reverts #${pr}" >&2
+    exit 2
+  fi
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

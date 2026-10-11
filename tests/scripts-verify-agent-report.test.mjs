@@ -1,7 +1,7 @@
 // scripts/verify-agent-report.sh: claims checked against a temp git remote, with `gh` stubbed.
 
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 
@@ -13,6 +13,7 @@ const SCRIPT = 'scripts/verify-agent-report.sh';
 const BRANCH = 'feat/agent-work';
 let clone;
 let head;
+let parent;
 
 function git(cwd, ...args) {
   const r = spawnSyncGuarded('git', args, { cwd, encoding: 'utf8' });
@@ -33,6 +34,10 @@ before(() => {
   writeFileSync(join(clone, 'scripts', 'new.sh'), 'echo hi\n');
   git(clone, 'add', '.');
   git(clone, 'commit', '--quiet', '-m', 'feat: new');
+  parent = git(clone, 'rev-parse', 'HEAD');
+  writeFileSync(join(clone, 'dist.txt'), 'bot rebuild\n');
+  git(clone, 'add', '.');
+  git(clone, 'commit', '--quiet', '-m', 'chore: bot dist push');
   git(clone, 'push', '--quiet', 'origin', BRANCH);
   head = git(clone, 'rev-parse', 'HEAD');
 });
@@ -105,6 +110,37 @@ test('judge_pr rejects a real PR number from another repository', () => {
 test('judge_sha requires at least 7 hex chars', () => {
   assert.match(callFunction(SCRIPT, 'judge_sha', ['abc', 'abcdef0123']).stdout, /^FAIL/);
   assert.equal(callFunction(SCRIPT, 'judge_sha', ['abcdef0', 'abcdef0123']).stdout.trim(), 'PASS');
+});
+
+test('claimed SHA is an ancestor of the tip -> WARN rows and exit 0', () => {
+  const r = run([BRANCH, '101', parent, 'scripts/new.sh'], prStub(101, head));
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /^WARN\tbranch-head\ttip advanced/m);
+  assert.match(r.stdout, /^WARN\tpr\t#101 OPEN tip advanced/m);
+  assert.match(r.stdout, /^PASS\tcommit\t/m);
+  assert.match(r.stdout, /VERDICT: PASS/);
+});
+
+test('uppercase claimed SHA is accepted', () => {
+  const r = run([BRANCH, '-', head.slice(0, 10).toUpperCase()]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /^PASS\tbranch-head\t/m);
+});
+
+test('git fetch failure -> FAIL commit row and files marked unchecked', () => {
+  const stub = createGhStub([]);
+  const realGit = spawnSyncGuarded('sh', ['-c', 'command -v git'], {
+    encoding: 'utf8',
+  }).stdout.trim();
+  writeFileSync(
+    join(stub.dir, 'git'),
+    `#!/bin/sh\nfor a in "$@"; do [ "$a" = fetch ] && exit 128; done\nexec ${realGit} "$@"\n`
+  );
+  chmodSync(join(stub.dir, 'git'), 0o755);
+  const r = run([BRANCH, '-', head, 'scripts/new.sh'], stub);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /^FAIL\tcommit\tgit fetch origin .* failed/m);
+  assert.match(r.stdout, /^FAIL\tfile\tscripts\/new.sh missing in <no ref> \(fetch failed\)/m);
 });
 
 test('no arguments -> usage exit 64', () => {
