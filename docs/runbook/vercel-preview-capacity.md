@@ -1,4 +1,4 @@
-# Vercel PR preview capacity — recovery and prevention
+# Vercel PR preview capacity—recovery and prevention
 
 This runbook applies when the GitHub `Vercel` commit status fails with
 `api-deployments-free-per-day`. It is a **capacity problem**, not evidence
