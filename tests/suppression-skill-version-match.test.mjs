@@ -219,3 +219,15 @@ test('runLocalReview consults actual installed skill metadata only when opted in
     )
   );
 });
+
+// TEMP_PRETTIER_DIAGNOSTIC_REMOVE
+test('temporary: capture repository Prettier normalization', async () => {
+  const prettier = await import('prettier');
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const filepath = fileURLToPath(import.meta.url);
+  const original = readFileSync(filepath, 'utf8').split('// TEMP_PRETTIER_DIAGNOSTIC_REMOVE')[0];
+  const options = (await prettier.resolveConfig(filepath)) ?? {};
+  const normalized = await prettier.format(original, { ...options, filepath });
+  console.log('PRETTIER_EXPECTED_BASE64=' + Buffer.from(normalized).toString('base64'));
+});
