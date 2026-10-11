@@ -158,6 +158,7 @@ export const memoryConfigSchema = z
   .object({
     suppressionEnabled: z.boolean().optional(),
     suppressionRequireRulesMatch: z.boolean().optional(),
+    suppressionRequireSkillVersionMatch: z.boolean().optional(),
   })
   .strict();
 

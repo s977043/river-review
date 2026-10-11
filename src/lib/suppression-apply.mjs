@@ -81,6 +81,8 @@ import {
   evaluateSuppressionRulesMatch,
   formatUnknownRulesDigestAlgoWarning,
   formatRulesDigestMismatchWarning,
+  evaluateSuppressionSkillVersionMatch,
+  formatSkillVersionMismatchWarning,
 } from './suppression.mjs';
 
 const HIGH_SEVERITY = new Set(['major', 'critical']);
@@ -95,6 +97,13 @@ const HIGH_SEVERITY = new Set(['major', 'critical']);
  */
 export function isSuppressionRulesMatchEnabled(config) {
   return config?.memory?.suppressionRequireRulesMatch === true;
+}
+
+/**
+ * Optional criterion-version check, strictly disabled by default (#2202).
+ */
+export function isSuppressionSkillVersionMatchEnabled(config) {
+  return config?.memory?.suppressionRequireSkillVersionMatch === true;
 }
 
 function severityOf(finding) {
@@ -153,6 +162,9 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
   // #2202 Phase 2: rules-match verdicts, filled only when the gate is opted in.
   // With the gate off this stays null and nothing below reads the rules.
   const rulesMismatched = isSuppressionRulesMatchEnabled(opts?.config) ? new Set() : null;
+  const skillVersionMismatched = isSuppressionSkillVersionMatchEnabled(opts?.config)
+    ? new Set()
+    : null;
   const rulesDigests = new Map();
   const now = opts?.now ?? new Date();
   const revokedIds = new Set(
@@ -191,6 +203,10 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
         );
       }
     }
+    if (skillVersionMismatched) {
+      const verdict = evaluateSuppressionSkillVersionMatch(s, opts?.skillVersions);
+      if (verdict.status === 'mismatch') skillVersionMismatched.add(s);
+    }
     const prev = target.get(fp);
     if (!prev || !isSuppressionExpired(s, now) || isSuppressionExpired(prev, now)) {
       target.set(fp, s);
@@ -203,6 +219,7 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
   const applied = [];
   const warnedIds = new Set();
   const rulesWarnedIds = new Set();
+  const skillVersionWarnedIds = new Set();
 
   for (const finding of list) {
     // v2 (line-anchored) is consulted first: it is the more specific claim.
@@ -267,6 +284,27 @@ export function applySuppressions(findings, memoryContext, opts = {}) {
       if (!rulesWarnedIds.has(match.id)) {
         rulesWarnedIds.add(match.id);
         warn(formatRulesDigestMismatchWarning({ id: match.id }));
+      }
+      continue;
+    }
+
+    // Criterion-version gate (#2202 Phase 1, opt-in). An unknown or absent
+    // current/issued skill version is NOT a proven mismatch, so legacy
+    // suppressions keep working. Calendar/rules reasons remain higher priority.
+    if (skillVersionMismatched?.has(match)) {
+      kept.push(finding);
+      applied.push({
+        fingerprint: fp,
+        suppressionId: match.id,
+        fingerprintAlgo: matchedAlgo,
+        feedbackType,
+        severity: sev,
+        action: 'skipped',
+        reason: 'skill-version-mismatch',
+      });
+      if (!skillVersionWarnedIds.has(match.id)) {
+        skillVersionWarnedIds.add(match.id);
+        warn(formatSkillVersionMismatchWarning({ id: match.id }));
       }
       continue;
     }
