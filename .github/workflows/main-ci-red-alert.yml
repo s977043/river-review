@@ -1,0 +1,57 @@
+name: Main CI Red Alert
+
+# Experiment: a red CI on main is noticed within 10 minutes. When the `CI`
+# workflow (.github/workflows/test.yml) fails on main, open or update a
+# `ci-red` issue; when a later main run succeeds, close it. Rollback: disable
+# this workflow. Logic lives in scripts/main-ci-red-alert.sh.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      simulate_conclusion:
+        description: Conclusion to simulate
+        type: choice
+        options: [failure, success]
+        required: true
+      simulate_sha:
+        description: Full head sha to report
+        type: string
+        required: true
+
+permissions:
+  issues: write
+  actions: read
+  contents: read
+
+# One alert at a time per workflow, so two red runs cannot both miss the
+# open issue and create duplicates. Never cancel: a queued success must still
+# close the issue a failure opened.
+concurrency:
+  group: main-ci-red-alert
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    name: Alert on main CI result
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.head_branch == 'main' &&
+       contains(fromJSON('["push","merge_group"]'), github.event.workflow_run.event) &&
+       contains(fromJSON('["failure","success"]'), github.event.workflow_run.conclusion))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Open, update, or close the ci-red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name || 'CI' }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion || inputs.simulate_conclusion }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || inputs.simulate_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url || format('{0}/{1}/actions/runs/{2} (simulated)', github.server_url, github.repository, github.run_id) }}
+        run: bash scripts/main-ci-red-alert.sh
