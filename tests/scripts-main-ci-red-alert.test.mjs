@@ -1,9 +1,12 @@
 // scripts/main-ci-red-alert.sh: open / update / close the ci-red issue, with `gh` stubbed.
 
 import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { createGhStub, runScriptWithStub } from './helpers/gh-stub.mjs';
+import { createTempDir } from './helpers/temp-dir.mjs';
 
 const SCRIPT = 'scripts/main-ci-red-alert.sh';
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12';
@@ -105,4 +108,79 @@ test('a failing read (issue list) fails the script', () => {
   const stub = createGhStub([{ match: ISSUE_LIST, body: 'HTTP 404', exit: 1 }]);
   const r = runScriptWithStub(SCRIPT, [], stub, { ...ENV, CONCLUSION: 'success' });
   assert.notEqual(r.status, 0);
+});
+
+function eventFile(run) {
+  const dir = createTempDir({ prefix: 'red-alert-event-' });
+  const path = join(dir, 'event.json');
+  writeFileSync(path, JSON.stringify({ workflow_run: run }));
+  return path;
+}
+
+const RUN = {
+  name: 'CI',
+  conclusion: 'success',
+  head_sha: SHA,
+  id: 42,
+  html_url: 'https://github.com/owner/repo/actions/runs/42',
+};
+
+test('workflow_run on a main push reads the run from the event payload', () => {
+  const stub = createGhStub([
+    { match: ISSUE_LIST, body: '[{"number":9,"title":"main CI red: CI @ 2222222"}]' },
+    {
+      match:
+        /^issue close 9 --repo owner\/repo --comment recovered at abcdef1234567890.*runs\/42\)$/,
+      body: '',
+    },
+  ]);
+  const r = runScriptWithStub(SCRIPT, [], stub, {
+    EVENT_NAME: 'workflow_run',
+    GITHUB_EVENT_PATH: eventFile({ ...RUN, head_branch: 'main', event: 'push' }),
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /closed #9/);
+});
+
+test('workflow_run on a non-main branch or a pull_request event calls no gh at all', () => {
+  for (const [branch, event] of [
+    ['feature/x', 'push'],
+    ['main', 'pull_request'],
+  ]) {
+    const stub = createGhStub([]);
+    const r = runScriptWithStub(SCRIPT, [], stub, {
+      EVENT_NAME: 'workflow_run',
+      GITHUB_EVENT_PATH: eventFile({ ...RUN, conclusion: 'failure', head_branch: branch, event }),
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /no action/);
+    assert.equal(stub.calls().length, 0);
+  }
+});
+
+test('workflow_run with an unreadable payload fails instead of skipping silently', () => {
+  const stub = createGhStub([]);
+  const r = runScriptWithStub(SCRIPT, [], stub, {
+    EVENT_NAME: 'workflow_run',
+    GITHUB_EVENT_PATH: '/nonexistent/event.json',
+  });
+  assert.notEqual(r.status, 0);
+});
+
+test('workflow_dispatch simulates a failure without a run id', () => {
+  const stub = createGhStub([
+    { match: ISSUE_LIST, body: '[]' },
+    { match: PULLS, body: '[]' },
+    { match: /^label create ci-red .*$/, body: '' },
+    { match: /^issue create .*$/, body: 'url' },
+  ]);
+  const r = runScriptWithStub(SCRIPT, [], stub, {
+    EVENT_NAME: 'workflow_dispatch',
+    SIMULATE_CONCLUSION: 'failure',
+    SIMULATE_SHA: SHA,
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const log = stub.calls().join('\n');
+  assert.match(log, /simulated run: no jobs/);
+  assert.ok(!log.includes('run view'));
 });

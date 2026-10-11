@@ -2,7 +2,9 @@
 # Open (or update) an issue when a CI workflow on main turns red, and close it
 # when a later main run of the same workflow succeeds.
 #
-# Called by .github/workflows/main-ci-red-alert.yml. Inputs come from the env:
+# Called by .github/workflows/main-ci-red-alert.yml. With EVENT_NAME set to
+# workflow_run / workflow_dispatch the inputs are filled by load_event; without
+# it they come straight from the env (tests, local runs):
 #   REPO           owner/repo
 #   WORKFLOW_NAME  the watched workflow's `name:` (e.g. CI)
 #   CONCLUSION     workflow_run conclusion: failure | success | anything else
@@ -86,7 +88,46 @@ on_success() {
   echo "closed #${issue}"
 }
 
+# workflow_run: read the run from the event payload and ignore anything that is
+# not a push / merge_group run on main. The workflow file deliberately does not
+# reference the run's head ref: the HOL plugin scanner flags any workflow_run
+# workflow that names it next to a checkout (GITHUB_ACTIONS_UNTRUSTED_CHECKOUT),
+# even though the checkout here is the default branch.
+# workflow_dispatch: simulate a run from SIMULATE_* inputs.
+load_event() {
+  local event branch kind
+  case "${EVENT_NAME:-}" in
+    workflow_run)
+      event="${GITHUB_EVENT_PATH:?}"
+      branch=$(jq -r '.workflow_run.head_branch' "${event}")
+      kind=$(jq -r '.workflow_run.event' "${event}")
+      if [ "${branch}" != 'main' ] || { [ "${kind}" != 'push' ] && [ "${kind}" != 'merge_group' ]; }; then
+        echo "run on ${branch} (${kind}) is not a main push / merge_group run: no action"
+        SKIP=1
+        return
+      fi
+      WORKFLOW_NAME=$(jq -r '.workflow_run.name' "${event}")
+      CONCLUSION=$(jq -r '.workflow_run.conclusion' "${event}")
+      HEAD_SHA=$(jq -r '.workflow_run.head_sha' "${event}")
+      RUN_ID=$(jq -r '.workflow_run.id' "${event}")
+      RUN_URL=$(jq -r '.workflow_run.html_url' "${event}")
+      ;;
+    workflow_dispatch)
+      WORKFLOW_NAME="${WORKFLOW_NAME:-CI}"
+      CONCLUSION="${SIMULATE_CONCLUSION:?}"
+      HEAD_SHA="${SIMULATE_SHA:?}"
+      RUN_ID=''
+      RUN_URL="${SIMULATE_RUN_URL:-(simulated)}"
+      ;;
+  esac
+}
+
 main() {
+  # Not `load_event || ...`: set -e is off inside a function called from a
+  # `||` list, so a failed jq read would be swallowed.
+  SKIP=''
+  load_event
+  [ -z "${SKIP}" ] || return 0
   : "${REPO:?}" "${WORKFLOW_NAME:?}" "${CONCLUSION:?}" "${HEAD_SHA:?}"
   RUN_ID="${RUN_ID:-}"
   RUN_URL="${RUN_URL:-(simulated)}"

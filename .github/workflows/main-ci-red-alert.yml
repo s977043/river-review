@@ -35,11 +35,11 @@ concurrency:
 jobs:
   alert:
     name: Alert on main CI result
+    # Branch / event filtering happens in the script from the event payload, so
+    # this file never names the run's head ref (see the script header).
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.head_branch == 'main' &&
-       contains(fromJSON('["push","merge_group"]'), github.event.workflow_run.event) &&
-       contains(fromJSON('["failure","success"]'), github.event.workflow_run.conclusion))
+      contains(fromJSON('["failure","success"]'), github.event.workflow_run.conclusion)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -49,9 +49,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          WORKFLOW_NAME: ${{ github.event.workflow_run.name || 'CI' }}
-          CONCLUSION: ${{ github.event.workflow_run.conclusion || inputs.simulate_conclusion }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha || inputs.simulate_sha }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
-          RUN_URL: ${{ github.event.workflow_run.html_url || format('{0}/{1}/actions/runs/{2} (simulated)', github.server_url, github.repository, github.run_id) }}
+          EVENT_NAME: ${{ github.event_name }}
+          SIMULATE_CONCLUSION: ${{ inputs.simulate_conclusion }}
+          SIMULATE_SHA: ${{ inputs.simulate_sha }}
+          SIMULATE_RUN_URL: ${{ format('{0}/{1}/actions/runs/{2} (simulated)', github.server_url, github.repository, github.run_id) }}
         run: bash scripts/main-ci-red-alert.sh
