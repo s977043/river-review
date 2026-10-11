@@ -541,6 +541,109 @@ const PIPELINE_IGNORE_KEYS = {
   },
 };
 
+const REVIEW_POLICY_JA = 'pages/reference/review-policy.md';
+const REVIEW_POLICY_EN = 'pages/reference/review-policy.en.md';
+
+/** 見出し名から全角括弧の補足（`（要約）` `（#1713）` 等）を落とす。 */
+function stripFullWidthNote(name) {
+  return name.replace(/（[^）]*）/g, '').trim();
+}
+
+function leadingAsciiWord(name) {
+  return /^[A-Za-z]+/.exec(name)?.[0] ?? name;
+}
+
+/**
+ * `## <heading>` 節（次の `## ` まで）の `###` 見出し本文を返す。節が無ければ null。
+ * コードフェンス内の行は見出しとして扱わない。
+ */
+function listSubheadings(text, isSection) {
+  const lines = String(text ?? '').split('\n');
+  let inSection = false;
+  let found = false;
+  let inFence = false;
+  const headings = [];
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (inFence) continue;
+    if (line.startsWith('## ')) {
+      inSection = isSection(line.slice(3).trim());
+      found ||= inSection;
+      continue;
+    }
+    if (inSection && line.startsWith('### ')) headings.push(line.slice(4).trim());
+  }
+  return found ? headings : null;
+}
+
+/** output-format.md `## 構造` の `### <n>. <名前>` を `<n>. <名前>` の集合にする。 */
+export function parseDerivedOutputSections(text) {
+  const headings = listSubheadings(text, (h) => h === '構造');
+  if (!headings) return null;
+  const names = new Set();
+  for (const heading of headings) {
+    const match = /^(\d+)\.\s+(.+)$/.exec(heading);
+    if (match) names.add(`${match[1]}. ${stripFullWidthNote(match[2])}`);
+  }
+  return names.size > 0 ? names : null;
+}
+
+/** viewpoints.md `## フェーズ別の追加観点` の英字始まり見出しの先頭語を集合にする。 */
+export function parseDerivedPhaseHeadings(text) {
+  const headings = listSubheadings(text, (h) => h === 'フェーズ別の追加観点');
+  if (!headings) return null;
+  const words = new Set(headings.filter((h) => /^[A-Za-z]/.test(h)).map(leadingAsciiWord));
+  return words.size > 0 ? words : null;
+}
+
+/** review-policy の `## <sec>.` 節にある `### <sec>.<n> <名前>` を返す。節が無ければ throw。 */
+export function parseReviewPolicySubsections(text, sec) {
+  const headings = listSubheadings(text, (h) => h.startsWith(`${sec}. `));
+  const items = [];
+  for (const heading of headings ?? []) {
+    const match = new RegExp(`^${sec}\\.(\\d+)\\s+(.+)$`).exec(heading);
+    if (match) items.push({ n: match[1], name: stripFullWidthNote(match[2]) });
+  }
+  if (items.length === 0) throw new Error(`review-policy の §${sec} 小見出しが見つからない`);
+  return items;
+}
+
+/** review-policy §6 の `<n>. **<ラベル>**` 行をラベル集合にする。見つからなければ throw。 */
+export function parseReviewPolicySeverities(text) {
+  const lines = String(text ?? '').split('\n');
+  let inSection = false;
+  const labels = new Set();
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      inSection = line.startsWith('## 6. ');
+      continue;
+    }
+    const match = inSection && /^\d+\.\s+\*\*([^*]+)\*\*/.exec(line);
+    if (match) labels.add(match[1].trim());
+  }
+  if (labels.size === 0) throw new Error('review-policy の §6 重要度ラベルが見つからない');
+  return labels;
+}
+
+function requireSameSet(ja, en, where) {
+  const same = ja.size === en.size && [...ja].every((name) => en.has(name));
+  if (!same) {
+    throw new Error(
+      `review-policy.md と review-policy.en.md の ${where} が一致しない（ja: ${[...ja].join(', ')} / en: ${[...en].join(', ')}）`
+    );
+  }
+  return ja;
+}
+
+function requireSameSize(ja, en, where) {
+  if (ja.size !== en.length) {
+    throw new Error(
+      `review-policy.md と review-policy.en.md の ${where} 小見出し数が一致しない（ja: ${ja.size} / en: ${en.length}）`
+    );
+  }
+  return ja;
+}
+
 /**
  * 宣言的な spec テーブル。ドキュメントの列挙・件数と実体の対応をここに 1 行で登録する。
  *
@@ -551,7 +654,7 @@ const PIPELINE_IGNORE_KEYS = {
  *   marker    … 宣言側の目印（消失時のエラー文に出す）
  *   kind      … 'counts'（キー→数値）か 'names'（名前の集合）
  *   declare   … doc 本文から宣言値を取り出す純関数。マーカー消失時は 'names' なら null を返す
- *   measure   … 実測値を返す async 関数
+ *   measure   … 実測値を返す async 関数（doc を読む spec は引数の readDoc を使う）
  *   ignoreKeys… キー単位の除外（値は理由。空の理由はエラーになり、除外として採用されない）
  */
 export const DOC_ENUMERATION_SPECS = [
@@ -735,6 +838,63 @@ export const DOC_ENUMERATION_SPECS = [
     measure: () => findCallSiteFiles(group.names),
     ignoreKeys: PIPELINE_IGNORE_KEYS[group.id],
   })),
+  // レビュー文書の派生側 → SSoT 同期（#2606）。docs/review/{output-format,viewpoints}.md は
+  // pages/reference/review-policy.md（ja）と review-policy.en.md を出典とする派生文書である。
+  // 過去の派生側単独変更は Finding フィールド表と注記の追記だけだったため、比較対象は
+  // 「出力節の見出し」「重要度ラベル」「フェーズ見出し」の 3 つに絞り、表・注記・散文は見ない。
+  // 派生側だけで見出しや語彙を変えると落ち、SSoT（ja / en）を同じ PR で直せば通る。
+  {
+    // 比較: output-format.md `## 構造` 直下の `### <n>. <名前>` と、review-policy.md
+    // `## 2.` 直下の `### 2.<n> <名前>`。キーは `<n>. <名前>`（全角括弧の補足は落とす）。
+    // en は名前が英語なので、ja と同じ節数であることだけを要求する。
+    id: 'review-doc-output-sections',
+    doc: 'docs/review/output-format.md',
+    summary: '`## 構造` の出力節見出し（SSoT: review-policy §2）',
+    marker: '`## 構造` 節の `### <n>. <名前>` 行',
+    kind: 'names',
+    declare: parseDerivedOutputSections,
+    measure: async (readDoc = readDocFromDisk) => {
+      const ja = parseReviewPolicySubsections(await readDoc(REVIEW_POLICY_JA), '2');
+      const en = parseReviewPolicySubsections(await readDoc(REVIEW_POLICY_EN), '2');
+      return requireSameSize(new Set(ja.map(({ n, name }) => `${n}. ${name}`)), en, '§2');
+    },
+  },
+  {
+    // 比較: output-format.md `重要度ラベル` 表の `ラベル` 列と、review-policy §6 の
+    // `<n>. **<ラベル>**` 行（ja / en とも同じ英語ラベル集合であることを要求する）。
+    // 内部語彙 blocker / warning / nit はどちらの文書にも現れないので対象外。
+    id: 'review-doc-severity-labels',
+    doc: 'docs/review/output-format.md',
+    summary: '`重要度ラベル` 表のラベル（SSoT: review-policy §6）',
+    marker: '`ラベル | 定義` 表',
+    kind: 'names',
+    declare: (text) => {
+      const column = parseMarkdownTableColumn(text, 'ラベル');
+      return column && new Set(column);
+    },
+    measure: async (readDoc = readDocFromDisk) => {
+      const ja = parseReviewPolicySeverities(await readDoc(REVIEW_POLICY_JA));
+      const en = parseReviewPolicySeverities(await readDoc(REVIEW_POLICY_EN));
+      return requireSameSet(ja, en, '§6');
+    },
+  },
+  {
+    // 比較: viewpoints.md `## フェーズ別の追加観点` 直下で英字始まりの `###` 見出しの
+    // 先頭語（Upstream 等）と、review-policy §4 の `### 4.<n> <先頭語>`。
+    // 和文始まりの見出し（ドキュメント変更・運用・出荷影響）は派生側の拡張なので見ない。
+    id: 'review-doc-phase-headings',
+    doc: 'docs/review/viewpoints.md',
+    summary: '`## フェーズ別の追加観点` のフェーズ見出し（SSoT: review-policy §4）',
+    marker: '`## フェーズ別の追加観点` 節の `### <Phase>（…）` 行',
+    kind: 'names',
+    declare: parseDerivedPhaseHeadings,
+    measure: async (readDoc = readDocFromDisk) => {
+      const toWords = (items) => new Set(items.map(({ name }) => leadingAsciiWord(name)));
+      const ja = toWords(parseReviewPolicySubsections(await readDoc(REVIEW_POLICY_JA), '4'));
+      const en = toWords(parseReviewPolicySubsections(await readDoc(REVIEW_POLICY_EN), '4'));
+      return requireSameSet(ja, en, '§4');
+    },
+  },
 ];
 
 // 除外判定は素の `key in ignoreKeys` ではなく Object.hasOwn を使う。`in` は
@@ -893,7 +1053,7 @@ export async function checkDocEnumerations({
 
     let measured;
     try {
-      measured = await spec.measure();
+      measured = await spec.measure(readDoc);
     } catch (err) {
       errors.push(`${spec.doc} [${spec.id}]: 実測に失敗した (${err.message})`);
       continue;
