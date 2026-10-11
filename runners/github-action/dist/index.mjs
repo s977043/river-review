@@ -68523,7 +68523,7 @@ async function shims_CancelReadableStream(stream) {
 //# sourceMappingURL=shims.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/utils/bytes.mjs
 /** Copies byte arrays into one contiguous `Uint8Array` while preserving their order. */
-function concatBytes(buffers) {
+function bytes_concatBytes(buffers) {
     let length = 0;
     for (const buffer of buffers) {
         length += buffer.length;
@@ -69142,6 +69142,12 @@ class streaming_Stream {
     [(streaming_Stream_client = new WeakMap(), _Stream_isTeeBranch = new WeakMap(), _Stream_instances = new WeakSet(), Symbol.asyncIterator)]() {
         return this.iterator();
     }
+    /** Beta-only iterator decoration for Agents helpers, preserving custom stream identity.
+     * @internal
+     */
+    __betaTransformIterator(transform) {
+        this.iterator = transform(this.iterator.bind(this));
+    }
     /**
      * Splits the stream into two streams which can be
      * independently read from at different speeds.
@@ -69626,7 +69632,7 @@ function addRequestID(value, response) {
 //# sourceMappingURL=parse.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/version.mjs
 /** Version of the installed OpenAI SDK package. */
-const version_VERSION = '7.25.0'; // x-release-please-version
+const version_VERSION = '7.30.1'; // x-release-please-version
 //# sourceMappingURL=version.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/detect-platform.mjs
 
@@ -72413,7 +72419,9 @@ function uploads_makeFile(fileBits, fileName, options) {
  * Directory components separated by either `/` or `\\` are discarded unless an
  * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
  * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
- * discard their directories.
+ * discard their directories. URL filenames decode valid UTF-8 percent escapes,
+ * except that ASCII control characters stay escaped for multipart compatibility.
+ * A basename stays encoded if decoding would introduce literal multipart escape sequences.
  */
 function uploads_getName(value, options) {
     if (typeof value !== 'object' || value === null) {
@@ -72427,7 +72435,8 @@ function uploads_getName(value, options) {
     const url = 'url' in value && value.url && String(value.url);
     if (url) {
         try {
-            return basename(new URL(url).pathname);
+            const filename = basename(new URL(url).pathname);
+            return filename === undefined ? undefined : basename(decodeURLFilename(filename));
         }
         catch {
             return basename(url);
@@ -72438,6 +72447,21 @@ function uploads_getName(value, options) {
 }
 function basename(value) {
     return value.split(/[\\/]/).pop() || undefined;
+}
+function decodeURLFilename(filename) {
+    try {
+        const decodedFilename = decodeURIComponent(filename);
+        // Fetch multipart receivers interpret these spellings as CR, LF, or a quote.
+        if (/%(?:0[AD]|22)/i.test(decodedFilename)) {
+            return filename;
+        }
+        // oxlint-disable-next-line no-control-regex -- Multipart parsers reject unescaped ASCII controls in filenames.
+        return decodedFilename.replace(/[\u0000-\u001F\u007F]/gu, encodeURIComponent);
+    }
+    catch {
+        // A malformed escape leaves the original URL segment usable as a filename.
+        return filename;
+    }
 }
 function normalizeFilenamePath(value) {
     const normalized = value.replace(/\\/g, '/');
@@ -73106,6 +73130,30 @@ class completions_messages_Messages extends resource_APIResource {
     }
 }
 //# sourceMappingURL=messages.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/chat-completions/streaming.mjs
+function normalizeChatCompletionChunk(chunk) {
+    if (!Array.isArray(chunk?.choices)) {
+        // SAFETY: This is an opaque provider record, with no choices to normalize.
+        // Preserve the existing SSE pass-through; the SDK does not validate these records.
+        return chunk;
+    }
+    return {
+        ...chunk,
+        choices: chunk.choices.map((choice) => ({ ...choice, finish_reason: choice.finish_reason ?? null })),
+    };
+}
+function normalizeChatCompletionStream(stream) {
+    const iterator = stream[Symbol.asyncIterator].bind(stream);
+    stream[Symbol.asyncIterator] = async function* normalizedChunks() {
+        const source = { [Symbol.asyncIterator]: iterator };
+        for await (const chunk of source) {
+            yield normalizeChatCompletionChunk(chunk);
+        }
+    };
+    // SAFETY: The installed iterator normalizes every wire chunk before exposing it.
+    return stream;
+}
+//# sourceMappingURL=streaming.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/error.mjs
 /** @deprecated Import from ./core/error instead */
 
@@ -75836,6 +75884,7 @@ var _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompleti
 
 
 
+
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- Partial JSON may have any shape; callers validate or parse it against their response schema.
 function parseStructuredStreamingJSON(content) {
     try {
@@ -76744,7 +76793,7 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
                 this._addMessage(message.message);
                 continue;
             }
-            const chunk = item;
+            const chunk = normalizeChatCompletionChunk(item);
             if (chatId && chunk.id && chatId !== chunk.id) {
                 // A new request has been made.
                 this._addChatCompletion(__classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_endRequest).call(this));
@@ -77126,7 +77175,13 @@ class ChatCompletionStream extends AbstractChatCompletionRunner {
             }
             let choice = snapshot.choices[index];
             if (!choice) {
-                const newChoice = { finish_reason, index, message: {}, logprobs: null, ...other };
+                const newChoice = {
+                    finish_reason: finish_reason ?? null,
+                    index,
+                    message: {},
+                    logprobs: null,
+                    ...other,
+                };
                 snapshot.choices[index] = newChoice;
                 choice = newChoice;
             }
@@ -77625,6 +77680,7 @@ class ChatCompletionStreamingRunner extends ChatCompletionStream {
 
 
 
+
 function completions_resolveResourceRequestOptions(options, buildOptions) {
     return Promise.resolve(options).then(buildOptions);
 }
@@ -77689,12 +77745,14 @@ class completions_Completions extends resource_APIResource {
         this.messages = new completions_messages_Messages(this._client);
     }
     create(body, options) {
-        return this._client.post('/chat/completions', completions_resolveResourceRequestOptions(options, (options) => ({
+        return this._client
+            .post('/chat/completions', completions_resolveResourceRequestOptions(options, (options) => ({
             body,
             ...options,
             stream: body.stream ?? false,
             __security: { bearerAuth: true },
-        })));
+        })))
+            ._thenUnwrap((result) => body.stream ? normalizeChatCompletionStream(result) : result);
     }
     /**
      * Get a stored chat completion. Only Chat Completions that have been created with
@@ -81707,8 +81765,48 @@ class Translations extends resource_APIResource {
     }
 }
 //# sourceMappingURL=translations.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/audio/voices.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+function voices_resolveResourceRequestOptions(options, buildOptions) {
+    return Promise.resolve(options).then(buildOptions);
+}
+/**
+ * Turn audio into text or text into audio.
+ */
+class Voices extends resource_APIResource {
+    /**
+     * Create a custom voice you can use for audio output (for example, in
+     * Text-to-Speech and the Realtime API). This requires an audio sample and a
+     * previously uploaded consent recording.
+     *
+     * Send `name`, `audio_sample`, and the `consent` recording ID as multipart form
+     * data. The optional `type` defaults to `audio_sample`.
+     *
+     * Returns the saved voice's metadata. See the
+     * [custom voices guide](https://developers.openai.com/api/docs/guides/text-to-speech#custom-voices)
+     * for requirements and best practices. Custom voices are limited to eligible
+     * customers.
+     *
+     * @example
+     * ```ts
+     * const voice = await client.audio.voices.create({
+     *   audio_sample: fs.createReadStream('path/to/file'),
+     *   consent: 'consent',
+     *   name: 'x',
+     * });
+     * ```
+     */
+    create(body, options) {
+        return this._client.post('/audio/voices', voices_resolveResourceRequestOptions(options, (options) => uploads_multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client)));
+    }
+}
+//# sourceMappingURL=voices.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/audio/audio.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
 
 
 
@@ -81722,11 +81820,13 @@ class Audio extends resource_APIResource {
         this.transcriptions = new Transcriptions(this._client);
         this.translations = new Translations(this._client);
         this.speech = new Speech(this._client);
+        this.voices = new Voices(this._client);
     }
 }
 Audio.Transcriptions = Transcriptions;
 Audio.Translations = Translations;
 Audio.Speech = Speech;
+Audio.Voices = Voices;
 //# sourceMappingURL=audio.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/batches.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -82039,8 +82139,96 @@ class Realtime extends resource_APIResource {
 Realtime.Sessions = sessions_Sessions;
 Realtime.TranscriptionSessions = TranscriptionSessions;
 //# sourceMappingURL=realtime.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/files.mjs
+
+
+/** Beta: uploaded file IDs remain available after partial preparation or staging failure. */
+class AgentFileUploadError extends error_OpenAIError {
+    constructor(uploadedFiles, cause) {
+        super('Agent file preparation or staging failed; uploaded files remain caller-owned.');
+        this.name = 'AgentFileUploadError';
+        this.uploadedFiles = uploadedFiles;
+        Object.defineProperty(this, 'cause', { value: cause, configurable: true });
+    }
+}
+/** @internal */
+function validateAgentFilePath(path) {
+    const parts = path.split('/');
+    const root = parts[2] ?? '';
+    if (!path.startsWith('/workspace/') ||
+        path.includes('\\') ||
+        path.includes('\0') ||
+        parts.slice(1).some((part) => part === '' || part === '.' || part === '..') ||
+        root === '.codex' ||
+        root === '.managed-agents' ||
+        root.startsWith('.managed-agents-') ||
+        path === '/workspace/outputs') {
+        throw new error_OpenAIError('Agent files require a non-reserved absolute file path inside /workspace');
+    }
+}
+function preflight(files, options) {
+    const entries = Object.entries(files);
+    const headers = headers_buildHeaders([options.headers]);
+    if (entries.length > 1 &&
+        (headers.values.has('idempotency-key') ||
+            (!headers.nulls.has('idempotency-key') && options?.idempotencyKey !== undefined))) {
+        throw new error_OpenAIError('Do not reuse an Idempotency-Key across multiple file uploads');
+    }
+    const paths = new Set(entries.map(([path]) => path));
+    for (const [path] of entries) {
+        validateAgentFilePath(path);
+        for (let slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
+            if (paths.has(path.slice(0, slash))) {
+                throw new error_OpenAIError('Agent file destinations conflict');
+            }
+        }
+    }
+    return entries;
+}
+/** @internal */
+async function prepareAgentFiles(client, files, options) {
+    const requestOptions = { ...options };
+    // Internal SDK read: capture effective headers once, including defaults and explicit omissions.
+    const headers = headers_buildHeaders([client['_options'].defaultHeaders, requestOptions.headers]);
+    requestOptions.headers = headers;
+    const entries = preflight(files, requestOptions);
+    if (entries.length > 1) {
+        // Keep a later mutation of client defaults from adding one key to this entire batch.
+        headers.nulls.add('idempotency-key');
+    }
+    const prepared = { files: [], uploadedFiles: [] };
+    try {
+        for (const [path, file] of entries) {
+            // oxlint-disable-next-line no-await-in-loop -- Stop on the first failure and expose precisely the uploads already created.
+            const uploaded = await client.files.create({ file, purpose: 'user_data' }, requestOptions);
+            prepared.uploadedFiles.push(uploaded);
+            prepared.files.push({ type: 'file_id', file_id: uploaded.id, path });
+        }
+        return prepared;
+    }
+    catch (error) {
+        throw new AgentFileUploadError(prepared.uploadedFiles, error);
+    }
+}
+/** @internal */
+async function uploadAgentFile(client, resource, environmentID, params, options) {
+    const prepared = await prepareAgentFiles(client, { [params.path]: params.file }, options);
+    const [reference] = prepared.files;
+    const [uploadedFile] = prepared.uploadedFiles;
+    if (!reference || !uploadedFile) {
+        throw new error_OpenAIError('Missing prepared agent file');
+    }
+    try {
+        return { uploadedFile, environmentFile: await resource.create(environmentID, reference, options) };
+    }
+    catch (error) {
+        throw new AgentFileUploadError(prepared.uploadedFiles, error);
+    }
+}
+//# sourceMappingURL=files.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/environments/files.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
 
 
 
@@ -82049,6 +82237,14 @@ function files_resolveResourceRequestOptions(options, buildOptions) {
     return Promise.resolve(options).then(buildOptions);
 }
 class environments_files_Files extends resource_APIResource {
+    /** Beta: prepare initial hosted file references; uploaded Files API objects remain caller-owned. */
+    prepare(files, options) {
+        return prepareAgentFiles(this._client, files, options);
+    }
+    /** Beta: upload one local file and stage its reference in a live environment. */
+    upload(environmentID, params, options) {
+        return uploadAgentFile(this._client, this, environmentID, params, options);
+    }
     /**
      * Copies inline bytes or a Files API file into a connected execution environment.
      * See
@@ -82359,14 +82555,12 @@ class TurnState {
 }
 _TurnState_turnID = new WeakMap(), _TurnState_turnEnded = new WeakMap(), _TurnState_eventIDs = new WeakMap(), _TurnState_calls = new WeakMap();
 //# sourceMappingURL=turn-state.mjs.map
-;// CONCATENATED MODULE: ./node_modules/openai/lib/agents/agent-session-stream.mjs
-var _AgentSessionStream_instances, _AgentSessionStream_consumed, _AgentSessionStream_stream, _AgentSessionStream_response, _AgentSessionStream_reading, _AgentSessionStream_sessions, _AgentSessionStream_sessionID, _AgentSessionStream_input, _AgentSessionStream_handlers, _AgentSessionStream_inputKey, _AgentSessionStream_options, _AgentSessionStream_iterate, _AgentSessionStream_result, _AgentSessionStream_checkAbort, _AgentSessionStream_abortError, _AgentSessionStream_wait, _AgentSessionStream_submit;
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/tool-output.mjs
 
-
-
-
-
-
+/**
+ * Recognizes supported content blocks without confusing JSON business data with content.
+ * @internal
+ */
 function isInputContent(value) {
     if (!isObj(value)) {
         return false;
@@ -82384,6 +82578,20 @@ function isInputContent(value) {
     }
     return hasOwn(content, 'type') && hasOwn(content, field) && typeof content[field] === 'string';
 }
+//# sourceMappingURL=tool-output.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/tool-stages.mjs
+/** @internal */
+const toolStages = Symbol.for('openai.beta.agents.toolStages');
+//# sourceMappingURL=tool-stages.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/tool-dispatcher.mjs
+var _AgentToolDispatcher_instances, _AgentToolDispatcher_handlers, _AgentToolDispatcher_options, _AgentToolDispatcher_sessions, _AgentToolDispatcher_controller, _AgentToolDispatcher_onToolError, _AgentToolDispatcher_result, _AgentToolDispatcher_checkAbort, _AgentToolDispatcher_abortError, _AgentToolDispatcher_wait, _AgentToolDispatcher_submit;
+
+
+
+
+
+
+
 function normalizedOutput(value) {
     if (value === null) {
         return null;
@@ -82409,6 +82617,552 @@ function toolResult(call, value) {
         output: normalizedOutput(typeof output === 'string' ? output : JSON.parse(serialized)),
     };
 }
+/** Shared local function dispatch for creation and follow-up streams. @internal */
+class AgentToolDispatcher {
+    constructor(sessions, handlers, controller, options, onToolError) {
+        _AgentToolDispatcher_instances.add(this);
+        _AgentToolDispatcher_handlers.set(this, void 0);
+        _AgentToolDispatcher_options.set(this, void 0);
+        _AgentToolDispatcher_sessions.set(this, void 0);
+        _AgentToolDispatcher_controller.set(this, void 0);
+        _AgentToolDispatcher_onToolError.set(this, void 0);
+        __classPrivateFieldSet(this, _AgentToolDispatcher_sessions, sessions, "f");
+        __classPrivateFieldSet(this, _AgentToolDispatcher_controller, controller, "f");
+        __classPrivateFieldSet(this, _AgentToolDispatcher_onToolError, onToolError, "f");
+        __classPrivateFieldSet(this, _AgentToolDispatcher_handlers, new Map(Object.entries(handlers)), "f");
+        const headers = headers_buildHeaders([options?.headers]);
+        headers.values.delete('idempotency-key');
+        headers.nulls.delete('idempotency-key');
+        const { idempotencyKey: _key, ...rest } = options ?? {};
+        __classPrivateFieldSet(this, _AgentToolDispatcher_options, { ...rest, headers, signal: controller.signal }, "f");
+    }
+    canHandle(name) {
+        return typeof __classPrivateFieldGet(this, _AgentToolDispatcher_handlers, "f").get(name) === 'function';
+    }
+    /** Capture routing and arguments before the caller can mutate the yielded event. */
+    prepare(call, sessionID) {
+        const handler = call && __classPrivateFieldGet(this, _AgentToolDispatcher_handlers, "f").get(call.name);
+        if (!call || typeof handler !== 'function') {
+            return;
+        }
+        if (!sessionID) {
+            throw new error_OpenAIError('Tool call received before the session creation event');
+        }
+        const snapshot = structuredClone(call);
+        return async () => {
+            __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_checkAbort).call(this);
+            const result = await __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_result).call(this, snapshot, handler, sessionID);
+            __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_checkAbort).call(this);
+            await __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_submit).call(this, sessionID, result);
+        };
+    }
+}
+_AgentToolDispatcher_handlers = new WeakMap(), _AgentToolDispatcher_options = new WeakMap(), _AgentToolDispatcher_sessions = new WeakMap(), _AgentToolDispatcher_controller = new WeakMap(), _AgentToolDispatcher_onToolError = new WeakMap(), _AgentToolDispatcher_instances = new WeakSet(), _AgentToolDispatcher_result = async function _AgentToolDispatcher_result(call, handler, sessionID) {
+    let stage = 'arguments';
+    try {
+        const args = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
+        if (!isObj(args)) {
+            throw new error_OpenAIError('Function arguments must be a JSON object');
+        }
+        stage = 'execution';
+        // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
+        const arguments_ = args;
+        const output = await __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_wait).call(this, () => __classPrivateFieldGet(this, _AgentToolDispatcher_onToolError, "f") && handler[toolStages]
+            ? handler(arguments_, (value) => {
+                stage = value;
+            })
+            : handler(arguments_));
+        stage = 'output';
+        return toolResult(call, output);
+    }
+    catch (error) {
+        __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_checkAbort).call(this);
+        if (__classPrivateFieldGet(this, _AgentToolDispatcher_onToolError, "f")) {
+            const failure = Object.freeze({
+                error,
+                stage,
+                tool_name: call.name,
+                session_id: sessionID,
+                turn_id: call.turn_id,
+                call_id: call.call_id,
+            });
+            try {
+                await __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_wait).call(this, () => __classPrivateFieldGet(this, _AgentToolDispatcher_onToolError, "f")?.call(this, failure));
+            }
+            catch {
+                // Observers must not prevent the original sanitized tool failure from being submitted.
+                __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_checkAbort).call(this);
+            }
+        }
+        return {
+            type: 'agent.session.input.tool_result',
+            turn_id: call.turn_id,
+            call_id: call.call_id,
+            success: false,
+            error: 'Tool handler failed.',
+        };
+    }
+}, _AgentToolDispatcher_checkAbort = function _AgentToolDispatcher_checkAbort() {
+    if (__classPrivateFieldGet(this, _AgentToolDispatcher_controller, "f").signal.aborted) {
+        throw __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_abortError).call(this);
+    }
+}, _AgentToolDispatcher_abortError = function _AgentToolDispatcher_abortError() {
+    const error = new APIUserAbortError();
+    Object.defineProperty(error, 'cause', {
+        value: __classPrivateFieldGet(this, _AgentToolDispatcher_controller, "f").signal.reason,
+        writable: true,
+        configurable: true,
+    });
+    return error;
+}, _AgentToolDispatcher_wait = async function _AgentToolDispatcher_wait(action) {
+    let onAbort;
+    // oxlint-disable-next-line promise/avoid-new -- Bridge the caller's AbortSignal while a handler or registration delay is pending.
+    const aborted = new Promise((_resolve, reject) => {
+        onAbort = () => reject(__classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_abortError).call(this));
+        __classPrivateFieldGet(this, _AgentToolDispatcher_controller, "f").signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+        __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_checkAbort).call(this);
+        // Capture synchronous throws before racing cancellation, so both promises
+        // always have rejection handlers even if the callback aborts and throws.
+        const invoke = async () => await action();
+        return await Promise.race([invoke(), aborted]);
+    }
+    finally {
+        if (onAbort) {
+            __classPrivateFieldGet(this, _AgentToolDispatcher_controller, "f").signal.removeEventListener('abort', onAbort);
+        }
+    }
+}, _AgentToolDispatcher_submit = async function _AgentToolDispatcher_submit(sessionID, result, key = uuid_uuid4(), attempt = 0) {
+    __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_checkAbort).call(this);
+    try {
+        await __classPrivateFieldGet(this, _AgentToolDispatcher_sessions, "f").events.create(sessionID, { events: [result], 'Idempotency-Key': key }, __classPrivateFieldGet(this, _AgentToolDispatcher_options, "f"));
+    }
+    catch (error) {
+        const delay = [100, 300, 600][attempt];
+        if (delay === undefined ||
+            !(error instanceof BadRequestError) ||
+            error.code !== 'invalid_request_error' ||
+            !error.error ||
+            !('message' in error.error) ||
+            error.error.message !== `Unknown pending tool call: ${result.call_id}`) {
+            throw error;
+        }
+        let timer;
+        try {
+            await __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_wait).call(this, () => 
+            // oxlint-disable-next-line promise/avoid-new -- Own the registration timer so cancellation clears it promptly.
+            new Promise((resolve) => {
+                timer = setTimeout(resolve, delay);
+            }));
+        }
+        finally {
+            if (timer !== undefined) {
+                clearTimeout(timer);
+            }
+        }
+        await __classPrivateFieldGet(this, _AgentToolDispatcher_instances, "m", _AgentToolDispatcher_submit).call(this, sessionID, result, key, attempt + 1);
+    }
+};
+//# sourceMappingURL=tool-dispatcher.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/agents/output-text.mjs
+/** Joins output_text blocks in content order, without filtering phase, fetching, or mutating the message. */
+function outputText(message) {
+    return message.content.map((block) => (block.type === 'output_text' ? block.text : '')).join('');
+}
+//# sourceMappingURL=output-text.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/agent-turn-result.mjs
+
+/** Beta: the completed final assistant messages from one hosted root turn. */
+class AgentTurnResult {
+    constructor(turn, messages) {
+        this.turn = turn;
+        this.messages = messages;
+    }
+    get session_id() {
+        return this.turn.session_id;
+    }
+    get turn_id() {
+        return this.turn.id;
+    }
+    get output_text() {
+        return this.messages.map(outputText).join('');
+    }
+}
+//# sourceMappingURL=agent-turn-result.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/parsed-agent-turn-result.mjs
+
+/** Beta: a completed hosted turn whose output passed the local parser. */
+class ParsedAgentTurnResult extends AgentTurnResult {
+    constructor(result, parsed) {
+        super(result.turn, result.messages);
+        this.raw_result = result;
+        this.output_parsed = parsed;
+    }
+}
+//# sourceMappingURL=parsed-agent-turn-result.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/output-parse-error.mjs
+var _AgentOutputParseError_rawResult;
+
+
+/** Beta: hosted execution completed, but local output parsing failed. */
+class AgentOutputParseError extends error_OpenAIError {
+    constructor(result) {
+        super('The completed agent output could not be parsed');
+        this.name = 'AgentOutputParseError';
+        _AgentOutputParseError_rawResult.set(this, void 0);
+        __classPrivateFieldSet(this, _AgentOutputParseError_rawResult, result, "f");
+    }
+    /** Inspect the completed output explicitly; ordinary error logging omits it. */
+    get raw_result() {
+        return __classPrivateFieldGet(this, _AgentOutputParseError_rawResult, "f");
+    }
+}
+_AgentOutputParseError_rawResult = new WeakMap();
+//# sourceMappingURL=output-parse-error.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/parse-result.mjs
+
+
+
+/** @internal */
+function parseAgentResult(result, format) {
+    try {
+        if (!format) {
+            // SAFETY: Absent formats use the default never/raw overload.
+            return result;
+        }
+        let first;
+        for (const message of result.messages) {
+            for (const content of message.content) {
+                if (content.type === 'output_text') {
+                    const value = format.$parseRaw(content.text);
+                    first ?? (first = { value });
+                }
+            }
+        }
+        if (!first) {
+            throw new AgentOutputParseError(result);
+        }
+        // SAFETY: Callers preserve the format's inferred T.
+        return new ParsedAgentTurnResult(result, first.value);
+    }
+    catch {
+        throw new AgentOutputParseError(result);
+    }
+}
+// Inspect only JSON-visible data fields; leave getters and inherited values to normal serialization.
+function ownJSONValue(object, key) {
+    const descriptor = object && Object.getOwnPropertyDescriptor(object, key);
+    // SAFETY: The own data descriptor corresponds to the requested property in T.
+    return descriptor?.enumerable && 'value' in descriptor ? descriptor.value : undefined;
+}
+/** @internal */
+function agentFormatParser(format) {
+    if (!format) {
+        return undefined;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(format, '$parseRaw');
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- An own parser data property is the explicit opt-in marker.
+    if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
+        return undefined;
+    }
+    // SAFETY: Inspect the schema data descriptor without evaluating a caller getter; validate its discriminator below.
+    const schema = ownJSONValue(format, 'schema');
+    if (ownJSONValue(format, 'type') !== 'json_schema' || !schema) {
+        throw new error_OpenAIError('Typed agent formats require own enumerable type and schema data properties');
+    }
+    // SAFETY: The own descriptor was checked for a callable parser; retain its receiver and never reread the property.
+    const parse = descriptor.value;
+    return { type: 'json_schema', schema, $parseRaw: (text) => parse.call(format, text) };
+}
+// Materialize JSON-visible envelope getters once without evaluating unrelated properties.
+function snapshotJSONProperty(object, key, capture = (value) => value) {
+    const descriptor = Object.getOwnPropertyDescriptor(object, key);
+    if (!descriptor?.enumerable) {
+        return object;
+    }
+    const value = capture(object[key]);
+    if ('value' in descriptor && value === descriptor.value) {
+        return object;
+    }
+    // SAFETY: Preserve the original properties/prototype, replacing only this captured property's value.
+    return Object.create(Object.getPrototypeOf(object), {
+        ...Object.getOwnPropertyDescriptors(object),
+        [key]: { value, enumerable: true, configurable: descriptor.configurable, writable: true },
+    });
+}
+/** @internal */
+function captureAgentOutput(input, options) {
+    const body = snapshotJSONProperty(input, 'agent', (agent) => agent
+        ? snapshotJSONProperty(agent, 'text', (text) => (text ? snapshotJSONProperty(text, 'format') : text))
+        : agent);
+    const agent = ownJSONValue(body, 'agent');
+    const text = ownJSONValue(agent, 'text');
+    const format = agentFormatParser(ownJSONValue(text, 'format'));
+    if (!format) {
+        return { body, options };
+    }
+    const schema = structuredClone(format.schema);
+    for (const envelope of [body, agent, text]) {
+        if (envelope && 'toJSON' in envelope) {
+            throw new error_OpenAIError('Typed agent requests cannot customize body, agent, or text serialization');
+        }
+    }
+    // Snapshot options once, matching the own enumerable fields native request spreading uses.
+    const capturedOptions = { ...options };
+    if (ownJSONValue(capturedOptions, 'body') !== undefined) {
+        throw new error_OpenAIError('Typed agent requests cannot override the body in request options');
+    }
+    delete capturedOptions.body;
+    return {
+        options: capturedOptions,
+        body: {
+            ...body,
+            agent: {
+                ...agent,
+                text: { ...text, format: { type: 'json_schema', schema } },
+            },
+        },
+        format,
+    };
+}
+/** @internal */
+async function parseAgentResultPromise(result, format) {
+    return parseAgentResult(await result, format);
+}
+//# sourceMappingURL=parse-result.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/agent-turn-result-error.mjs
+
+/** Beta: final collection failed; partial state is evidence, not a successful result. */
+class AgentTurnResultError extends error_OpenAIError {
+    constructor(reason, session_id, turn, messages, required_actions = [], cause) {
+        super(`Could not collect the agent turn result: ${reason}`);
+        this.name = 'AgentTurnResultError';
+        this.reason = reason;
+        this.session_id = session_id;
+        this.turn = turn;
+        this.messages = messages;
+        this.required_actions = required_actions;
+        this.cause = cause;
+    }
+    get turn_id() {
+        return this.turn?.id;
+    }
+}
+//# sourceMappingURL=agent-turn-result-error.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/agent-turn-result-collector.mjs
+var _AgentTurnResultCollector_instances, _AgentTurnResultCollector_sessionID, _AgentTurnResultCollector_turn, _AgentTurnResultCollector_messages, _AgentTurnResultCollector_requiredActions, _AgentTurnResultCollector_sessionFailed, _AgentTurnResultCollector_terminal, _AgentTurnResultCollector_idle, _AgentTurnResultCollector_acceptTurn, _AgentTurnResultCollector_acceptOutput, _AgentTurnResultCollector_finalMessages;
+
+
+
+/** Accumulates completed items independently of transport and tool execution.
+ * @internal
+ */
+class AgentTurnResultCollector {
+    constructor(sessionID) {
+        _AgentTurnResultCollector_instances.add(this);
+        _AgentTurnResultCollector_sessionID.set(this, void 0);
+        _AgentTurnResultCollector_turn.set(this, void 0);
+        _AgentTurnResultCollector_messages.set(this, new Map());
+        _AgentTurnResultCollector_requiredActions.set(this, []);
+        _AgentTurnResultCollector_sessionFailed.set(this, false);
+        _AgentTurnResultCollector_terminal.set(this, false);
+        _AgentTurnResultCollector_idle.set(this, false);
+        __classPrivateFieldSet(this, _AgentTurnResultCollector_sessionID, sessionID, "f");
+    }
+    accept(event) {
+        if (this.ready) {
+            return;
+        }
+        if ('session' in event) {
+            __classPrivateFieldSet(this, _AgentTurnResultCollector_sessionID, __classPrivateFieldGet(this, _AgentTurnResultCollector_sessionID, "f") ?? event.session.id, "f");
+            __classPrivateFieldSet(this, _AgentTurnResultCollector_requiredActions, structuredClone(event.session.required_actions ?? []), "f");
+            __classPrivateFieldSet(this, _AgentTurnResultCollector_sessionFailed, __classPrivateFieldGet(this, _AgentTurnResultCollector_sessionFailed, "f") || event.type === 'agent.session.failed', "f");
+            __classPrivateFieldSet(this, _AgentTurnResultCollector_idle, __classPrivateFieldGet(this, _AgentTurnResultCollector_idle, "f") || event.type === 'agent.session.idle' && __classPrivateFieldGet(this, _AgentTurnResultCollector_terminal, "f"), "f");
+        }
+        if (event.type === 'agent.session.turn.created' && event.turn.subagent_id === null && !__classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f")) {
+            __classPrivateFieldSet(this, _AgentTurnResultCollector_turn, structuredClone(event.turn), "f");
+            __classPrivateFieldSet(this, _AgentTurnResultCollector_sessionID, event.turn.session_id, "f");
+        }
+        let turnID = 'turn_id' in event ? event.turn_id : undefined;
+        if ('item' in event) {
+            turnID = event.item.turn_id;
+        }
+        if (!__classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f") || turnID !== __classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f").id) {
+            return;
+        }
+        __classPrivateFieldGet(this, _AgentTurnResultCollector_instances, "m", _AgentTurnResultCollector_acceptTurn).call(this, event);
+    }
+    error(reason, cause) {
+        return new AgentTurnResultError(reason, __classPrivateFieldGet(this, _AgentTurnResultCollector_sessionID, "f"), __classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f"), __classPrivateFieldGet(this, _AgentTurnResultCollector_instances, "m", _AgentTurnResultCollector_finalMessages).call(this), __classPrivateFieldGet(this, _AgentTurnResultCollector_requiredActions, "f"), cause);
+    }
+    checkAction(canHandle) {
+        if (__classPrivateFieldGet(this, _AgentTurnResultCollector_sessionFailed, "f") || __classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f")?.status === 'failed') {
+            throw this.error('failed');
+        }
+        if (__classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f")?.status === 'cancelled') {
+            throw this.error('cancelled');
+        }
+        if (__classPrivateFieldGet(this, _AgentTurnResultCollector_requiredActions, "f").some((action) => action.type !== 'function_call' || !canHandle(action.name))) {
+            throw this.error('requires_action');
+        }
+    }
+    get ready() {
+        return __classPrivateFieldGet(this, _AgentTurnResultCollector_terminal, "f") && __classPrivateFieldGet(this, _AgentTurnResultCollector_idle, "f");
+    }
+    release() {
+        __classPrivateFieldGet(this, _AgentTurnResultCollector_messages, "f").clear();
+        __classPrivateFieldSet(this, _AgentTurnResultCollector_requiredActions, [], "f");
+    }
+    finish() {
+        this.checkAction(() => this.ready);
+        if (!__classPrivateFieldGet(this, _AgentTurnResultCollector_terminal, "f") || __classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f")?.status !== 'completed' || !__classPrivateFieldGet(this, _AgentTurnResultCollector_idle, "f")) {
+            throw this.error('observation');
+        }
+        return new AgentTurnResult(__classPrivateFieldGet(this, _AgentTurnResultCollector_turn, "f"), __classPrivateFieldGet(this, _AgentTurnResultCollector_instances, "m", _AgentTurnResultCollector_finalMessages).call(this));
+    }
+}
+_AgentTurnResultCollector_sessionID = new WeakMap(), _AgentTurnResultCollector_turn = new WeakMap(), _AgentTurnResultCollector_messages = new WeakMap(), _AgentTurnResultCollector_requiredActions = new WeakMap(), _AgentTurnResultCollector_sessionFailed = new WeakMap(), _AgentTurnResultCollector_terminal = new WeakMap(), _AgentTurnResultCollector_idle = new WeakMap(), _AgentTurnResultCollector_instances = new WeakSet(), _AgentTurnResultCollector_acceptTurn = function _AgentTurnResultCollector_acceptTurn(event) {
+    if ('turn' in event) {
+        __classPrivateFieldSet(this, _AgentTurnResultCollector_turn, structuredClone(event.turn), "f");
+        __classPrivateFieldSet(this, _AgentTurnResultCollector_terminal, __classPrivateFieldGet(this, _AgentTurnResultCollector_terminal, "f") || (event.type === 'agent.session.turn.completed' ||
+            event.type === 'agent.session.turn.failed' ||
+            event.type === 'agent.session.turn.cancelled'), "f");
+    }
+    __classPrivateFieldGet(this, _AgentTurnResultCollector_instances, "m", _AgentTurnResultCollector_acceptOutput).call(this, event);
+}, _AgentTurnResultCollector_acceptOutput = function _AgentTurnResultCollector_acceptOutput(event) {
+    if (event.type !== 'agent.session.turn.item.done' ||
+        event.item.type !== 'message' ||
+        event.item.status !== 'completed' ||
+        event.item.phase === 'commentary' ||
+        __classPrivateFieldGet(this, _AgentTurnResultCollector_messages, "f").has(event.item.id)) {
+        return;
+    }
+    __classPrivateFieldGet(this, _AgentTurnResultCollector_messages, "f").set(event.item.id, { index: event.output_index, message: structuredClone(event.item) });
+}, _AgentTurnResultCollector_finalMessages = function _AgentTurnResultCollector_finalMessages() {
+    return ([...__classPrivateFieldGet(this, _AgentTurnResultCollector_messages, "f").values()]
+        // oxlint-disable-next-line unicorn/no-array-sort -- Sort a fresh array; ES2020 declarations do not include toSorted.
+        .sort((a, b) => a.index - b.index)
+        .map(({ message }) => message));
+};
+//# sourceMappingURL=agent-turn-result-collector.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/result-collection.mjs
+var _ResultCollection_instances, _ResultCollection_iterator, _ResultCollection_ended, _ResultCollection_enabled, _ResultCollection_uncollectedEvents, _ResultCollection_error, _ResultCollection_result, _ResultCollection_source, _ResultCollection_signal, _ResultCollection_canHandle, _ResultCollection_observe, _ResultCollection_collect;
+
+
+
+
+/** Shares collection between a raw creation stream and the follow-up helper.
+ * @internal
+ */
+class ResultCollection {
+    constructor(source, canHandle = () => false, sessionID, signal) {
+        _ResultCollection_instances.add(this);
+        _ResultCollection_iterator.set(this, void 0);
+        _ResultCollection_ended.set(this, false);
+        _ResultCollection_enabled.set(this, false);
+        _ResultCollection_uncollectedEvents.set(this, false);
+        _ResultCollection_error.set(this, void 0);
+        _ResultCollection_result.set(this, void 0);
+        _ResultCollection_source.set(this, void 0);
+        _ResultCollection_signal.set(this, void 0);
+        _ResultCollection_canHandle.set(this, void 0);
+        __classPrivateFieldSet(this, _ResultCollection_source, source, "f");
+        __classPrivateFieldSet(this, _ResultCollection_signal, signal, "f");
+        __classPrivateFieldSet(this, _ResultCollection_canHandle, canHandle, "f");
+        this.collector = new AgentTurnResultCollector(sessionID);
+    }
+    enable() {
+        if (!__classPrivateFieldGet(this, _ResultCollection_enabled, "f") && __classPrivateFieldGet(this, _ResultCollection_uncollectedEvents, "f")) {
+            throw new error_OpenAIError('Call withResultCollection() before consuming events, or call finalResult() on a fresh stream.');
+        }
+        __classPrivateFieldSet(this, _ResultCollection_enabled, true, "f");
+    }
+    iterate() {
+        if (__classPrivateFieldGet(this, _ResultCollection_iterator, "f")) {
+            throw new error_OpenAIError('An agent result stream can only be consumed once');
+        }
+        return (__classPrivateFieldSet(this, _ResultCollection_iterator, __classPrivateFieldGet(this, _ResultCollection_instances, "m", _ResultCollection_observe).call(this), "f"));
+    }
+    finalResult() {
+        return (__classPrivateFieldSet(this, _ResultCollection_result, __classPrivateFieldGet(this, _ResultCollection_result, "f") ?? __classPrivateFieldGet(this, _ResultCollection_instances, "m", _ResultCollection_collect).call(this), "f"));
+    }
+}
+_ResultCollection_iterator = new WeakMap(), _ResultCollection_ended = new WeakMap(), _ResultCollection_enabled = new WeakMap(), _ResultCollection_uncollectedEvents = new WeakMap(), _ResultCollection_error = new WeakMap(), _ResultCollection_result = new WeakMap(), _ResultCollection_source = new WeakMap(), _ResultCollection_signal = new WeakMap(), _ResultCollection_canHandle = new WeakMap(), _ResultCollection_instances = new WeakSet(), _ResultCollection_observe = async function* _ResultCollection_observe() {
+    const iterator = __classPrivateFieldGet(this, _ResultCollection_source, "f").call(this);
+    let done = false;
+    try {
+        while (true) {
+            // oxlint-disable-next-line no-await-in-loop -- Pull the single-use stream sequentially.
+            const next = await iterator.next();
+            if (next.done) {
+                done = true;
+                return;
+            }
+            if (__classPrivateFieldGet(this, _ResultCollection_enabled, "f")) {
+                this.collector.accept(next.value);
+            }
+            else {
+                __classPrivateFieldSet(this, _ResultCollection_uncollectedEvents, true, "f");
+            }
+            yield next.value;
+        }
+    }
+    catch (error) {
+        if (__classPrivateFieldGet(this, _ResultCollection_enabled, "f")) {
+            __classPrivateFieldSet(this, _ResultCollection_error, error, "f");
+        }
+        throw error;
+    }
+    finally {
+        __classPrivateFieldSet(this, _ResultCollection_ended, true, "f");
+        if (!done) {
+            await iterator.return?.();
+        }
+    }
+}, _ResultCollection_collect = async function _ResultCollection_collect() {
+    this.enable();
+    try {
+        const iterator = __classPrivateFieldGet(this, _ResultCollection_iterator, "f") ?? this.iterate();
+        while (!__classPrivateFieldGet(this, _ResultCollection_ended, "f") && !this.collector.ready) {
+            this.collector.checkAction(__classPrivateFieldGet(this, _ResultCollection_canHandle, "f"));
+            // oxlint-disable-next-line no-await-in-loop -- Each event can dispatch tools before the next pull.
+            const next = await iterator.next();
+            if (next.done) {
+                break;
+            }
+        }
+        if (__classPrivateFieldGet(this, _ResultCollection_error, "f") !== undefined && !this.collector.ready) {
+            throw __classPrivateFieldGet(this, _ResultCollection_error, "f");
+        }
+        if (!this.collector.ready && __classPrivateFieldGet(this, _ResultCollection_signal, "f")?.aborted) {
+            throw this.collector.error('observation', __classPrivateFieldGet(this, _ResultCollection_signal, "f").reason);
+        }
+        return this.collector.finish();
+    }
+    catch (error) {
+        throw error instanceof AgentTurnResultError ? error : this.collector.error('observation', error);
+    }
+    finally {
+        try {
+            await __classPrivateFieldGet(this, _ResultCollection_iterator, "f")?.return();
+        }
+        finally {
+            this.collector.release();
+        }
+    }
+};
+//# sourceMappingURL=result-collection.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/agents/agent-session-stream.mjs
+var _AgentSessionStream_instances, _AgentSessionStream_consumed, _AgentSessionStream_format, _AgentSessionStream_parsedResult, _AgentSessionStream_collection, _AgentSessionStream_stream, _AgentSessionStream_response, _AgentSessionStream_reading, _AgentSessionStream_sessions, _AgentSessionStream_sessionID, _AgentSessionStream_input, _AgentSessionStream_dispatcher, _AgentSessionStream_inputKey, _AgentSessionStream_options, _AgentSessionStream_iterate, _AgentSessionStream_checkAbort, _AgentSessionStream_abortError;
+
+
+
+
+
+
+
+
 async function cancelBody(response) {
     try {
         await response?.body?.cancel();
@@ -82437,13 +83191,16 @@ class AgentSessionStream {
         /** Aborts local requests and iteration without cancelling the backend turn. */
         this.controller = new AbortController();
         _AgentSessionStream_consumed.set(this, false);
+        _AgentSessionStream_format.set(this, void 0);
+        _AgentSessionStream_parsedResult.set(this, void 0);
+        _AgentSessionStream_collection.set(this, void 0);
         _AgentSessionStream_stream.set(this, void 0);
         _AgentSessionStream_response.set(this, void 0);
         _AgentSessionStream_reading.set(this, false);
         _AgentSessionStream_sessions.set(this, void 0);
         _AgentSessionStream_sessionID.set(this, void 0);
         _AgentSessionStream_input.set(this, void 0);
-        _AgentSessionStream_handlers.set(this, void 0);
+        _AgentSessionStream_dispatcher.set(this, void 0);
         _AgentSessionStream_inputKey.set(this, void 0);
         _AgentSessionStream_options.set(this, void 0);
         const input = typeof params.input === 'string'
@@ -82452,10 +83209,13 @@ class AgentSessionStream {
         if (params.input.length === 0) {
             throw new error_OpenAIError('input must not be empty');
         }
+        __classPrivateFieldSet(this, _AgentSessionStream_format, agentFormatParser(params.outputFormat), "f");
+        if (params.outputFormat && !__classPrivateFieldGet(this, _AgentSessionStream_format, "f")) {
+            throw new error_OpenAIError('outputFormat must have its own parser function');
+        }
         __classPrivateFieldSet(this, _AgentSessionStream_sessions, sessions, "f");
         __classPrivateFieldSet(this, _AgentSessionStream_sessionID, sessionID, "f");
         __classPrivateFieldSet(this, _AgentSessionStream_input, { type: 'agent.session.input.message', input }, "f");
-        __classPrivateFieldSet(this, _AgentSessionStream_handlers, new Map(Object.entries(params.toolHandlers ?? {})), "f");
         const headers = headers_buildHeaders([options?.headers]);
         __classPrivateFieldSet(this, _AgentSessionStream_inputKey, headers.nulls.has('idempotency-key')
             ? undefined
@@ -82467,6 +83227,8 @@ class AgentSessionStream {
         headers.nulls.delete('idempotency-key');
         const { idempotencyKey: _key, ...rest } = options ?? {};
         __classPrivateFieldSet(this, _AgentSessionStream_options, { ...rest, headers }, "f");
+        __classPrivateFieldSet(this, _AgentSessionStream_dispatcher, new AgentToolDispatcher(sessions, params.toolHandlers ?? {}, this.controller, __classPrivateFieldGet(this, _AgentSessionStream_options, "f"), params.onToolError), "f");
+        __classPrivateFieldSet(this, _AgentSessionStream_collection, new ResultCollection(() => __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_iterate).call(this), (name) => __classPrivateFieldGet(this, _AgentSessionStream_dispatcher, "f").canHandle(name), sessionID), "f");
     }
     /** Closes local requests without cancelling the turn; an optional reason becomes the abort error's cause. */
     abort(reason) {
@@ -82477,12 +83239,21 @@ class AgentSessionStream {
         }
     }
     /** Starts iteration once; use for await to ensure early exits close the connection. */
-    [(_AgentSessionStream_consumed = new WeakMap(), _AgentSessionStream_stream = new WeakMap(), _AgentSessionStream_response = new WeakMap(), _AgentSessionStream_reading = new WeakMap(), _AgentSessionStream_sessions = new WeakMap(), _AgentSessionStream_sessionID = new WeakMap(), _AgentSessionStream_input = new WeakMap(), _AgentSessionStream_handlers = new WeakMap(), _AgentSessionStream_inputKey = new WeakMap(), _AgentSessionStream_options = new WeakMap(), _AgentSessionStream_instances = new WeakSet(), Symbol.asyncIterator)]() {
+    [(_AgentSessionStream_consumed = new WeakMap(), _AgentSessionStream_format = new WeakMap(), _AgentSessionStream_parsedResult = new WeakMap(), _AgentSessionStream_collection = new WeakMap(), _AgentSessionStream_stream = new WeakMap(), _AgentSessionStream_response = new WeakMap(), _AgentSessionStream_reading = new WeakMap(), _AgentSessionStream_sessions = new WeakMap(), _AgentSessionStream_sessionID = new WeakMap(), _AgentSessionStream_input = new WeakMap(), _AgentSessionStream_dispatcher = new WeakMap(), _AgentSessionStream_inputKey = new WeakMap(), _AgentSessionStream_options = new WeakMap(), _AgentSessionStream_instances = new WeakSet(), Symbol.asyncIterator)]() {
         if (__classPrivateFieldGet(this, _AgentSessionStream_consumed, "f")) {
             throw new error_OpenAIError('An AgentSessionStream can only be consumed once');
         }
         __classPrivateFieldSet(this, _AgentSessionStream_consumed, true, "f");
-        return __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_iterate).call(this);
+        return __classPrivateFieldGet(this, _AgentSessionStream_collection, "f").iterate();
+    }
+    /** Beta: opt into retaining completed final messages before iterating progress events. */
+    withResultCollection() {
+        __classPrivateFieldGet(this, _AgentSessionStream_collection, "f").enable();
+        return this;
+    }
+    /** Beta: drain this turn, dispatch registered tools, and collect its final assistant messages. */
+    finalResult() {
+        return (__classPrivateFieldSet(this, _AgentSessionStream_parsedResult, __classPrivateFieldGet(this, _AgentSessionStream_parsedResult, "f") ?? parseAgentResultPromise(__classPrivateFieldGet(this, _AgentSessionStream_collection, "f").finalResult(), __classPrivateFieldGet(this, _AgentSessionStream_format, "f")), "f"));
     }
 }
 _AgentSessionStream_iterate = async function* _AgentSessionStream_iterate() {
@@ -82521,10 +83292,7 @@ _AgentSessionStream_iterate = async function* _AgentSessionStream_iterate() {
                 continue;
             }
             const terminal = state.terminal(event);
-            const pendingCall = state.call(event);
-            const handler = pendingCall && __classPrivateFieldGet(this, _AgentSessionStream_handlers, "f").get(pendingCall.name);
-            // Freeze dispatch identity and arguments before exposing the original event.
-            const call = pendingCall && handler ? structuredClone(pendingCall) : undefined;
+            const dispatch = __classPrivateFieldGet(this, _AgentSessionStream_dispatcher, "f").prepare(state.call(event), __classPrivateFieldGet(this, _AgentSessionStream_sessionID, "f"));
             if (terminal) {
                 __classPrivateFieldGet(this, _AgentSessionStream_stream, "f").controller.abort();
             }
@@ -82533,12 +83301,7 @@ _AgentSessionStream_iterate = async function* _AgentSessionStream_iterate() {
                 return;
             }
             __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
-            if (!call || !handler) {
-                continue;
-            }
-            const result = await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_result).call(this, call, handler);
-            __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
-            await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_submit).call(this, result, options);
+            await dispatch?.();
         }
         __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
         throw new error_OpenAIError('Session event stream ended before the turn reached idle or failed');
@@ -82547,25 +83310,6 @@ _AgentSessionStream_iterate = async function* _AgentSessionStream_iterate() {
         externalSignal?.removeEventListener('abort', abort);
         this.controller.signal.removeEventListener('abort', abort);
         this.abort();
-    }
-}, _AgentSessionStream_result = async function _AgentSessionStream_result(call, handler) {
-    try {
-        const args = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
-        if (!isObj(args)) {
-            throw new error_OpenAIError('Function arguments must be a JSON object');
-        }
-        // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
-        return toolResult(call, await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_wait).call(this, () => handler(args)));
-    }
-    catch {
-        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
-        return {
-            type: 'agent.session.input.tool_result',
-            turn_id: call.turn_id,
-            call_id: call.call_id,
-            success: false,
-            error: 'Tool handler failed.',
-        };
     }
 }, _AgentSessionStream_checkAbort = function _AgentSessionStream_checkAbort() {
     if (this.controller.signal.aborted) {
@@ -82579,59 +83323,195 @@ _AgentSessionStream_iterate = async function* _AgentSessionStream_iterate() {
         configurable: true,
     });
     return error;
-}, _AgentSessionStream_wait = async function _AgentSessionStream_wait(action) {
-    let onAbort;
-    // oxlint-disable-next-line promise/avoid-new -- Bridge the caller's AbortSignal while a handler or registration delay is pending.
-    const aborted = new Promise((_resolve, reject) => {
-        onAbort = () => reject(__classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_abortError).call(this));
-        this.controller.signal.addEventListener('abort', onAbort, { once: true });
-    });
-    try {
-        __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
-        // Capture synchronous throws before racing cancellation, so both promises
-        // always have rejection handlers even if the callback aborts and throws.
-        const invoke = async () => await action();
-        return await Promise.race([invoke(), aborted]);
-    }
-    finally {
-        if (onAbort) {
-            this.controller.signal.removeEventListener('abort', onAbort);
-        }
-    }
-}, _AgentSessionStream_submit = async function _AgentSessionStream_submit(result, options, key = uuid_uuid4(), attempt = 0) {
-    __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_checkAbort).call(this);
-    try {
-        await __classPrivateFieldGet(this, _AgentSessionStream_sessions, "f").events.create(__classPrivateFieldGet(this, _AgentSessionStream_sessionID, "f"), { events: [result], 'Idempotency-Key': key }, options);
-    }
-    catch (error) {
-        const delay = [100, 300, 600][attempt];
-        if (delay === undefined ||
-            !(error instanceof BadRequestError) ||
-            error.code !== 'invalid_request_error' ||
-            !error.error ||
-            !('message' in error.error) ||
-            error.error.message !== `Unknown pending tool call: ${result.call_id}`) {
-            throw error;
-        }
-        let timer;
-        try {
-            await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_wait).call(this, () => 
-            // oxlint-disable-next-line promise/avoid-new -- Own the registration timer so cancellation clears it promptly.
-            new Promise((resolve) => {
-                timer = setTimeout(resolve, delay);
-            }));
-        }
-        finally {
-            if (timer !== undefined) {
-                clearTimeout(timer);
-            }
-        }
-        await __classPrivateFieldGet(this, _AgentSessionStream_instances, "m", _AgentSessionStream_submit).call(this, result, options, key, attempt + 1);
-    }
 };
 //# sourceMappingURL=agent-session-stream.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/agent-session-create-stream.mjs
+
+
+
+
+
+
+async function* dispatchCreationTools(source, dispatcher, signal) {
+    const state = new TurnState();
+    let sessionID;
+    for await (const event of { [Symbol.asyncIterator]: source }) {
+        if (event.type === 'agent.session.created') {
+            sessionID ?? (sessionID = event.session.id);
+        }
+        const dispatch = state.accept(event) ? dispatcher.prepare(state.call(event), sessionID) : undefined;
+        yield event;
+        if (signal.aborted) {
+            return;
+        }
+        try {
+            await dispatch?.();
+        }
+        catch (error) {
+            if (signal.aborted && error instanceof APIUserAbortError) {
+                return;
+            }
+            throw error;
+        }
+    }
+}
+/** Add beta result collection without replacing custom stream instances.
+ * @internal
+ */
+function withAgentTurnResult(stream, format, tools) {
+    let collection;
+    stream.__betaTransformIterator((source) => {
+        // A tool result has its own POST endpoint, independent of creation overrides.
+        const { path: _path, method: _method, stream: _stream, ...options } = tools?.options ?? {};
+        const dispatcher = tools && new AgentToolDispatcher(tools.sessions, tools.handlers, stream.controller, options);
+        collection = new ResultCollection(dispatcher ? () => dispatchCreationTools(source, dispatcher, stream.controller.signal) : source, dispatcher ? (name) => dispatcher.canHandle(name) : undefined, undefined, stream.controller.signal);
+        return () => collection.iterate();
+    });
+    let parsed;
+    const result = Object.assign(stream, {
+        finalResult: () => (parsed ?? (parsed = parseAgentResultPromise(collection.finalResult(), format))),
+        withResultCollection: () => {
+            collection.enable();
+            return result;
+        },
+    });
+    return result;
+}
+/** Remove local callbacks without changing ordinary creation requests. @internal */
+function captureCreationTools(body, options) {
+    const descriptor = Object.getOwnPropertyDescriptor(body, 'toolHandlers');
+    if (!descriptor) {
+        return { body, options };
+    }
+    const handlers = body.toolHandlers;
+    if (handlers === undefined && 'value' in descriptor) {
+        return { body, options };
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(body);
+    delete descriptors.toolHandlers;
+    const capturedOptions = { ...options };
+    if ('toJSON' in body || capturedOptions.body !== undefined) {
+        throw new error_OpenAIError('Creation tool handlers cannot customize request body serialization');
+    }
+    if (handlers === undefined) {
+        // SAFETY: Preserve request fields while removing the accessor so serialization cannot evaluate it again.
+        return {
+            body: Object.create(Object.getPrototypeOf(body), descriptors),
+            options: capturedOptions,
+        };
+    }
+    const { stream } = body;
+    if (stream !== true) {
+        throw new error_OpenAIError('toolHandlers requires stream: true');
+    }
+    capturedOptions.headers = headers_buildHeaders([capturedOptions.headers]);
+    descriptors.stream = { value: stream, enumerable: true, configurable: true, writable: true };
+    // SAFETY: Preserve request fields, omitting callbacks and fixing the validated streaming mode.
+    const request = Object.create(Object.getPrototypeOf(body), descriptors);
+    return {
+        body: request,
+        options: capturedOptions,
+        handlers: handlers && Object.fromEntries(Object.entries(handlers)),
+    };
+}
+//# sourceMappingURL=agent-session-create-stream.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/pages.mjs
+
+
+/** Retain server cursor metadata for legacy Agents items with nullable IDs.
+ * @internal
+ * @yields {T} Each item in server order, failing if pagination cannot advance.
+ */
+async function* agentItems(load) {
+    let after;
+    while (true) {
+        // oxlint-disable-next-line no-await-in-loop -- Each page determines the next cursor.
+        const page = await load(after);
+        yield* page.data;
+        if (!page.has_more) {
+            return;
+        }
+        // Internal SDK read: CursorPage keeps raw metadata but does not expose last_id.
+        // oxlint-disable-next-line prefer-destructuring -- Bracket access intentionally reads a protected internal field.
+        const body = page['body'];
+        // oxlint-disable-next-line unicorn/prefer-at -- Keep published source compatible with ES2020 declarations.
+        const last = page.data[page.data.length - 1];
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate only the opaque cursor from response metadata.
+        const cursor = isObj(body) && typeof body['last_id'] === 'string' ? body['last_id'] : last?.id;
+        if (!cursor || cursor === after) {
+            throw new error_OpenAIError('Agent pagination cannot advance to the next page');
+        }
+        after = cursor;
+    }
+}
+//# sourceMappingURL=pages.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/lib/beta/agents/result-artifacts.mjs
+var _AgentResultArtifacts_resource, _AgentResultArtifacts_sessionID, _AgentResultArtifacts_turnID;
+
+
+
+/** Beta: artifacts from the exact session and turn represented by a result. */
+class AgentResultArtifacts {
+    constructor(resource, result) {
+        _AgentResultArtifacts_resource.set(this, void 0);
+        _AgentResultArtifacts_sessionID.set(this, void 0);
+        _AgentResultArtifacts_turnID.set(this, void 0);
+        __classPrivateFieldSet(this, _AgentResultArtifacts_resource, resource, "f");
+        __classPrivateFieldSet(this, _AgentResultArtifacts_sessionID, result.session_id, "f");
+        __classPrivateFieldSet(this, _AgentResultArtifacts_turnID, result.turn_id, "f");
+    }
+    /** Find one immutable artifact by its exact hosted path, across all pages. */
+    async retrieve(path, options) {
+        let selected;
+        for await (const artifact of agentItems((after) => __classPrivateFieldGet(this, _AgentResultArtifacts_resource, "f").list(__classPrivateFieldGet(this, _AgentResultArtifacts_sessionID, "f"), {}, { ...options, query: { ...options?.query, after, environment_id: undefined } }))) {
+            if (artifact.session_id === __classPrivateFieldGet(this, _AgentResultArtifacts_sessionID, "f") &&
+                artifact.turn_id === __classPrivateFieldGet(this, _AgentResultArtifacts_turnID, "f") &&
+                artifact.path === path) {
+                if (selected) {
+                    throw new error_OpenAIError('Multiple artifacts match this result and path');
+                }
+                selected = artifact;
+            }
+        }
+        if (!selected) {
+            throw new error_OpenAIError('No artifact matches this result and path');
+        }
+        return selected;
+    }
+    /** Return the native binary response for this result's exact artifact path. */
+    async content(path, options) {
+        const artifact = await this.retrieve(path, options);
+        return __classPrivateFieldGet(this, _AgentResultArtifacts_resource, "f").content(artifact.id, { session_id: __classPrivateFieldGet(this, _AgentResultArtifacts_sessionID, "f") }, options);
+    }
+    /** Stream bytes to a caller-chosen destination; the hosted path never selects a local path. */
+    async download(params, options) {
+        const { path, to } = params;
+        const artifact = await this.retrieve(path, options);
+        const response = await __classPrivateFieldGet(this, _AgentResultArtifacts_resource, "f").content(artifact.id, { session_id: __classPrivateFieldGet(this, _AgentResultArtifacts_sessionID, "f") }, options);
+        if (!response.body) {
+            throw new error_OpenAIError('Artifact response has no content stream');
+        }
+        try {
+            await response.body.pipeTo(to, options?.signal ? { signal: options.signal } : {});
+        }
+        catch (error) {
+            // pipeTo can reject before acquiring a reader, for example when the destination is locked.
+            try {
+                await response.body.cancel();
+            }
+            catch {
+                /* already cancelled or owned by pipeTo */
+            }
+            throw error;
+        }
+        return artifact;
+    }
+}
+_AgentResultArtifacts_resource = new WeakMap(), _AgentResultArtifacts_sessionID = new WeakMap(), _AgentResultArtifacts_turnID = new WeakMap();
+//# sourceMappingURL=result-artifacts.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/artifacts.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
 
 
 
@@ -82692,6 +83572,10 @@ function artifacts_normalizeRequestOptionsForQuery(value, queryKeys, options) {
     }));
 }
 class Artifacts extends resource_APIResource {
+    /** Beta: bind artifact lookup and downloads to a completed result's exact session and turn. */
+    forResult(result) {
+        return new AgentResultArtifacts(this, result);
+    }
     /**
      * Retrieves immutable metadata for one durable session artifact. See
      * [session artifacts](https://developers.openai.com/api/docs/guides/agents-api/environments/files#openai-hosted-artifacts).
@@ -82790,11 +83674,12 @@ function events_resolveResourceRequestOptions(options, buildOptions) {
 }
 class sessions_events_Events extends resource_APIResource {
     /**
-     * Submits message, cancellation, or tool-result events to a managed agent session.
-     * Cancellation can recover a still-open turn whose backend execution has ended by
-     * marking it cancelled and abandoning unpublished outputs. Saved results,
-     * published files, and existing terminal outcomes are preserved. HTTP 202 confirms
-     * acceptance, not durable completion. See
+     * Submits message, cancellation, tool-result, or computer-use approval-response
+     * events to a managed agent session. Cancellation can recover a still-open turn
+     * whose backend execution has ended by marking it cancelled and abandoning
+     * unpublished outputs. Saved results, published files, and existing terminal
+     * outcomes are preserved. HTTP 202 confirms acceptance, not durable completion.
+     * See
      * [session events](https://developers.openai.com/api/docs/guides/agents-api/sessions/events).
      *
      * @example
@@ -82939,18 +83824,18 @@ class Items extends resource_APIResource {
     }
 }
 //# sourceMappingURL=items.mjs.map
-;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/turns.mjs
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/traces.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 
 
 
-function turns_resolveResourceRequestOptions(options, buildOptions) {
+function traces_resolveResourceRequestOptions(options, buildOptions) {
     return Promise.resolve(options).then(buildOptions);
 }
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
-const turns_normalizeRequestOptionsForQueryKeys = new Set([
+const traces_normalizeRequestOptionsForQueryKeys = new Set([
     'method',
     'path',
     'query',
@@ -82971,20 +83856,20 @@ const turns_normalizeRequestOptionsForQueryKeys = new Set([
     '__security',
     '__synthesizeEventData',
 ]);
-function turns_normalizeRequestOptionsForQuery(value, queryKeys, options) {
+function traces_normalizeRequestOptionsForQuery(value, queryKeys, options) {
     if (typeof value !== 'object' || value === null)
         return undefined;
     // Optional never fields can still be explicitly undefined unless consumers
     // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
     const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined));
     const keys = entries.map(([key]) => key);
-    const requestOnly = keys.some((key) => turns_normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key));
+    const requestOnly = keys.some((key) => traces_normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key));
     if (!requestOnly)
         return undefined;
     // Declared query fields, including stream, must use the query argument.
     // Mixing them with request-only options is ambiguous and could change the return type.
     if (options !== undefined ||
-        keys.some((key) => !turns_normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))) {
+        keys.some((key) => !traces_normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))) {
         throw new TypeError('Query parameters and request options must be passed as separate arguments.');
     }
     // The query position must not gain authority to change the request destination
@@ -83000,37 +83885,15 @@ function turns_normalizeRequestOptionsForQuery(value, queryKeys, options) {
         return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
     }));
 }
-class Turns extends resource_APIResource {
-    /**
-     * Retrieves a turn's current status, timestamps, usage, and error. Returns 404 if
-     * the turn does not belong to the session. See
-     * [session turns](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage#inspect-session-turns).
-     *
-     * @example
-     * ```ts
-     * const turn =
-     *   await client.beta.agents.sessions.turns.retrieve(
-     *     'turn_id',
-     *     { session_id: 'session_id' },
-     *   );
-     * ```
-     */
-    retrieve(turnID, params, options) {
-        const { session_id } = params;
-        return this._client.get(path_path `/agents/sessions/${session_id}/turns/${turnID}`, turns_resolveResourceRequestOptions(options, (options) => ({
-            ...options,
-            headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-            __security: { bearerAuth: true },
-        })));
-    }
+class Traces extends resource_APIResource {
     list(sessionID, query = {}, options) {
-        const normalizeRequestOptionsForQueryOptions = turns_normalizeRequestOptionsForQuery(query, ['after', 'limit', 'order'], options);
+        const normalizeRequestOptionsForQueryOptions = traces_normalizeRequestOptionsForQuery(query, ['after', 'limit', 'order'], options);
         if (normalizeRequestOptionsForQueryOptions !== undefined) {
             options = normalizeRequestOptionsForQueryOptions;
             query = {};
         }
         query = query;
-        return this._client.getAPIList(path_path `/agents/sessions/${sessionID}/turns`, (CursorPage), turns_resolveResourceRequestOptions(options, (options) => ({
+        return this._client.getAPIList(path_path `/agents/sessions/${sessionID}/traces`, (CursorPage), traces_resolveResourceRequestOptions(options, (options) => ({
             query,
             ...options,
             headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
@@ -83038,7 +83901,7 @@ class Turns extends resource_APIResource {
         })));
     }
 }
-//# sourceMappingURL=turns.mjs.map
+//# sourceMappingURL=traces.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/subagents/items.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
@@ -83119,10 +83982,10 @@ class turns_items_Items extends resource_APIResource {
 
 
 
-function turns_turns_resolveResourceRequestOptions(options, buildOptions) {
+function turns_resolveResourceRequestOptions(options, buildOptions) {
     return Promise.resolve(options).then(buildOptions);
 }
-class turns_Turns extends resource_APIResource {
+class Turns extends resource_APIResource {
     constructor() {
         super(...arguments);
         this.items = new turns_items_Items(this._client);
@@ -83145,7 +84008,7 @@ class turns_Turns extends resource_APIResource {
      */
     retrieve(turnID, params, options) {
         const { session_id, subagent_id } = params;
-        return this._client.get(path_path `/agents/sessions/${session_id}/subagents/${subagent_id}/turns/${turnID}`, turns_turns_resolveResourceRequestOptions(options, (options) => ({
+        return this._client.get(path_path `/agents/sessions/${session_id}/subagents/${subagent_id}/turns/${turnID}`, turns_resolveResourceRequestOptions(options, (options) => ({
             ...options,
             headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
             __security: { bearerAuth: true },
@@ -83168,7 +84031,7 @@ class turns_Turns extends resource_APIResource {
      */
     list(subagentID, params, options) {
         const { session_id, ...query } = params;
-        return this._client.getAPIList(path_path `/agents/sessions/${session_id}/subagents/${subagentID}/turns`, (CursorPage), turns_turns_resolveResourceRequestOptions(options, (options) => ({
+        return this._client.getAPIList(path_path `/agents/sessions/${session_id}/subagents/${subagentID}/turns`, (CursorPage), turns_resolveResourceRequestOptions(options, (options) => ({
             query,
             ...options,
             headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
@@ -83176,7 +84039,7 @@ class turns_Turns extends resource_APIResource {
         })));
     }
 }
-turns_Turns.Items = turns_items_Items;
+Turns.Items = turns_items_Items;
 //# sourceMappingURL=turns.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/subagents/subagents.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -83247,7 +84110,7 @@ class Subagents extends resource_APIResource {
     constructor() {
         super(...arguments);
         this.items = new items_Items(this._client);
-        this.turns = new turns_Turns(this._client);
+        this.turns = new Turns(this._client);
     }
     /**
      * Retrieves a subagent belonging to this session. See
@@ -83286,10 +84149,158 @@ class Subagents extends resource_APIResource {
     }
 }
 Subagents.Items = items_Items;
-Subagents.Turns = turns_Turns;
+Subagents.Turns = Turns;
 //# sourceMappingURL=subagents.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/turns/items.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+function sessions_turns_items_resolveResourceRequestOptions(options, buildOptions) {
+    return Promise.resolve(options).then(buildOptions);
+}
+class sessions_turns_items_Items extends resource_APIResource {
+    /**
+     * Lists items belonging to one root-agent turn, including its interactions with
+     * subagents. See
+     * [inspecting agent output](https://developers.openai.com/api/docs/guides/agents-api/observability).
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const agentSessionItem of client.beta.agents.sessions.turns.items.list(
+     *   'turn_id',
+     *   { session_id: 'session_id' },
+     * )) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(turnID, params, options) {
+        const { session_id, ...query } = params;
+        return this._client.getAPIList(path_path `/agents/sessions/${session_id}/turns/${turnID}/items`, (ConversationCursorPage), sessions_turns_items_resolveResourceRequestOptions(options, (options) => ({
+            query,
+            ...options,
+            headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        })));
+    }
+}
+//# sourceMappingURL=items.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/turns/turns.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
+
+
+function turns_turns_resolveResourceRequestOptions(options, buildOptions) {
+    return Promise.resolve(options).then(buildOptions);
+}
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const turns_normalizeRequestOptionsForQueryKeys = new Set([
+    'method',
+    'path',
+    'query',
+    'body',
+    'headers',
+    'maxRetries',
+    'stream',
+    'timeout',
+    'httpAgent',
+    'fetchOptions',
+    'signal',
+    'idempotencyKey',
+    'defaultBaseURL',
+    '__metadata',
+    '__binaryRequest',
+    '__binaryResponse',
+    '__streamClass',
+    '__security',
+    '__synthesizeEventData',
+]);
+function turns_normalizeRequestOptionsForQuery(value, queryKeys, options) {
+    if (typeof value !== 'object' || value === null)
+        return undefined;
+    // Optional never fields can still be explicitly undefined unless consumers
+    // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+    const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined));
+    const keys = entries.map(([key]) => key);
+    const requestOnly = keys.some((key) => turns_normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key));
+    if (!requestOnly)
+        return undefined;
+    // Declared query fields, including stream, must use the query argument.
+    // Mixing them with request-only options is ambiguous and could change the return type.
+    if (options !== undefined ||
+        keys.some((key) => !turns_normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))) {
+        throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+    }
+    // The query position must not gain authority to change the request destination
+    // or transport. Those overrides require the explicit request options argument.
+    if (keys.some((key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key))) {
+        throw new TypeError('Pass transport overrides in the explicit request options argument.');
+    }
+    // Copy only the validated fields. Spreading value would reintroduce undefined
+    // transport overrides, and deleting them would mutate the caller's object.
+    return Object.fromEntries(entries.map(([key, descriptor]) => {
+        if ('value' in descriptor)
+            return [key, descriptor.value];
+        return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }));
+}
+class turns_Turns extends resource_APIResource {
+    constructor() {
+        super(...arguments);
+        this.items = new sessions_turns_items_Items(this._client);
+    }
+    /**
+     * Retrieves a turn's current status, timestamps, usage, and error. Returns 404 if
+     * the turn does not belong to the session. See
+     * [session turns](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage#inspect-session-turns).
+     *
+     * @example
+     * ```ts
+     * const turn =
+     *   await client.beta.agents.sessions.turns.retrieve(
+     *     'turn_id',
+     *     { session_id: 'session_id' },
+     *   );
+     * ```
+     */
+    retrieve(turnID, params, options) {
+        const { session_id } = params;
+        return this._client.get(path_path `/agents/sessions/${session_id}/turns/${turnID}`, turns_turns_resolveResourceRequestOptions(options, (options) => ({
+            ...options,
+            headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        })));
+    }
+    list(sessionID, query = {}, options) {
+        const normalizeRequestOptionsForQueryOptions = turns_normalizeRequestOptionsForQuery(query, ['after', 'limit', 'order'], options);
+        if (normalizeRequestOptionsForQueryOptions !== undefined) {
+            options = normalizeRequestOptionsForQueryOptions;
+            query = {};
+        }
+        query = query;
+        return this._client.getAPIList(path_path `/agents/sessions/${sessionID}/turns`, (CursorPage), turns_turns_resolveResourceRequestOptions(options, (options) => ({
+            query,
+            ...options,
+            headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            __security: { bearerAuth: true },
+        })));
+    }
+}
+turns_Turns.Items = sessions_turns_items_Items;
+//# sourceMappingURL=turns.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/sessions/sessions.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+
+
+
 
 
 
@@ -83367,20 +84378,31 @@ class sessions_sessions_Sessions extends resource_APIResource {
         this.artifacts = new Artifacts(this._client);
         this.items = new Items(this._client);
         this.events = new sessions_events_Events(this._client);
-        this.turns = new Turns(this._client);
+        this.traces = new Traces(this._client);
+        this.turns = new turns_Turns(this._client);
     }
     /** Stream one turn on an idle session with a single input writer. See AgentSessionStream for lifecycle and tool handling. */
     stream(sessionID, params, options) {
         return new AgentSessionStream(this, sessionID, params, options);
     }
     create(body, options) {
-        return this._client.post('/agents/sessions', sessions_resolveResourceRequestOptions(options, (options) => ({
-            body,
+        const creation = captureCreationTools(body, options);
+        const output = captureAgentOutput(creation.body, creation.options);
+        return this._client
+            .post('/agents/sessions', sessions_resolveResourceRequestOptions(output.options, (options) => ({
+            body: output.body,
             ...options,
             headers: headers_buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-            stream: body.stream ?? false,
+            stream: output.body.stream ?? false,
             __security: { bearerAuth: true },
-        })));
+        })))
+            ._thenUnwrap((data, { options }) => 
+        // SAFETY: defaultParseResponse uses this same resolved flag to return the configured stream instance.
+        options.stream
+            ? withAgentTurnResult(data, output.format, creation.handlers
+                ? { sessions: this, handlers: creation.handlers, options: output.options }
+                : undefined)
+            : data);
     }
     /**
      * Retrieves the current state of a managed agent session. See
@@ -83457,7 +84479,8 @@ sessions_sessions_Sessions.Subagents = Subagents;
 sessions_sessions_Sessions.Artifacts = Artifacts;
 sessions_sessions_Sessions.Items = Items;
 sessions_sessions_Sessions.Events = sessions_events_Events;
-sessions_sessions_Sessions.Turns = Turns;
+sessions_sessions_Sessions.Traces = Traces;
+sessions_sessions_Sessions.Turns = turns_Turns;
 //# sourceMappingURL=sessions.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/beta/agents/vaults/credentials.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -86662,6 +87685,35 @@ class Conversations extends resource_APIResource {
 }
 Conversations.Items = conversations_items_Items;
 //# sourceMappingURL=conversations.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/resources/decisions.mjs
+// File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
+
+function decisions_resolveResourceRequestOptions(options, buildOptions) {
+    return Promise.resolve(options).then(buildOptions);
+}
+class Decisions extends resource_APIResource {
+    /**
+     * Evaluate ordered classification and scoring questions against shared input.
+     * Answers are returned in question order.
+     *
+     * Supply input as a string or user messages containing text and inline images.
+     * Only user messages with `input_text` and `input_image` parts are supported;
+     * non-user roles, function calls, files, audio, and item references are not
+     * supported. Images require a data URL, not an external URL or file ID. At most
+     * 128 images are allowed across the request.
+     *
+     * Each question can return a refusal instead of a scored answer. A refusal has
+     * type `refusal` and the corresponding question name, or null if unnamed.
+     */
+    create(body, options) {
+        return this._client.post('/decisions', decisions_resolveResourceRequestOptions(options, (options) => ({
+            body,
+            ...options,
+            __security: { bearerAuth: true },
+        })));
+    }
+}
+//# sourceMappingURL=decisions.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/lib/embeddings.mjs
 
 /**
@@ -86877,7 +87929,7 @@ class runs_Runs extends resource_APIResource {
      */
     cancel(runID, params, options) {
         const { eval_id } = params;
-        return this._client.post(path_path `/evals/${eval_id}/runs/${runID}`, runs_runs_resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })));
+        return this._client.post(path_path `/evals/${eval_id}/runs/${runID}/cancel`, runs_runs_resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })));
     }
 }
 runs_Runs.OutputItems = OutputItems;
@@ -87725,14 +88777,11 @@ function images_resolveResourceRequestOptions(options, buildOptions) {
  */
 class Images extends resource_APIResource {
     /**
-     * Creates a variation of a given image. This endpoint only supports `dall-e-2`.
+     * This endpoint is retired and no longer available. Use the image edits endpoint
+     * with a GPT Image model and a prompt to create a variation of an image. The
+     * request and response schemas below describe the legacy contract.
      *
-     * @example
-     * ```ts
-     * const imagesResponse = await client.images.createVariation({
-     *   image: fs.createReadStream('otter.png'),
-     * });
-     * ```
+     * @deprecated
      */
     createVariation(body, options) {
         return this._client.post('/images/variations', images_resolveResourceRequestOptions(options, (options) => uploads_multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client)));
@@ -88298,7 +89347,7 @@ function maybeParseResponse(response, params) {
  * Parses completed response text and strict function-tool arguments, matching
  * namespaced functions by both namespace and name.
  *
- * Incomplete or nonterminal responses keep their parsed values as `null`, and
+ * Incomplete responses and messages with an explicit non-final phase stay unparsed.
  * `output_parsed` returns the first successfully parsed output-text item.
  */
 function parseResponse(response, params) {
@@ -88312,7 +89361,9 @@ function parseResponse(response, params) {
                 if (content.type === 'output_text') {
                     return {
                         ...content,
-                        parsed: shouldParse ? parseTextFormat(params, content.text) : null,
+                        parsed: shouldParse && (item.phase == null || item.phase === 'final_answer')
+                            ? parseTextFormat(params, content.text)
+                            : null,
                     };
                 }
                 return content;
@@ -88395,6 +89446,11 @@ function getInputToolByName(input_tools, name, namespace) {
         else if (tool.type === 'namespace' && tool.name === namespace) {
             return tool.tools.find((nested) => nested.type === 'function' && nested.name === name);
         }
+    }
+    // Hosted discovery exposes a deferred top-level function under its own name.
+    // A declared namespace above owns that identity, even if it has no matching function.
+    if (namespace === name) {
+        return input_tools.find((tool) => tool.type === 'function' && tool.name === name && tool.defer_loading === true);
     }
     return undefined;
 }
@@ -91620,8 +92676,454 @@ webhooks_Webhooks.EventTypes = EventTypes;
 
 
 
+
 //# sourceMappingURL=index.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/bedrock.mjs
+
+
+/** Identifies legacy Bedrock clients without importing the client class into WebSocket modules. */
+const brand_privateBedrockClient = Symbol.for('openai.privateBedrockClient');
+/** Wraps a provider failure in an SDK error while preserving its original cause. */
+function errorWithCause(message, cause) {
+    // SAFETY: This SDK error is created locally and receives its optional cause immediately below; no existing error shape is trusted.
+    const error = new Errors.OpenAIError(message);
+    error.cause = cause;
+    return error;
+}
+/** Trims a configuration string, treating missing and whitespace-only values as absent. */
+function normalizeOptionalString(value) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
+    const normalized = typeof value === 'string' ? value.trim() : undefined;
+    return normalized || undefined;
+}
+function normalizeBaseURL(baseURL) {
+    const url = new URL(baseURL);
+    const responsesMatch = url.pathname.match(/\/responses(?:\/.*)?$/);
+    if (responsesMatch?.index !== undefined) {
+        url.pathname = url.pathname.slice(0, responsesMatch.index) || '/';
+    }
+    return url.toString().replace(/\/$/, '');
+}
+function resolveRuntimeDnsSuffixes(region) {
+    if (region.startsWith('cn-')) {
+        return ['amazonaws.com.cn', 'api.amazonwebservices.com.cn'];
+    }
+    if (region.startsWith('eusc-')) {
+        return ['amazonaws.eu', 'api.amazonwebservices.eu'];
+    }
+    if (region.startsWith('us-iso-')) {
+        return ['c2s.ic.gov', 'api.aws.ic.gov'];
+    }
+    if (region.startsWith('us-isob-')) {
+        return ['sc2s.sgov.gov', 'api.aws.scloud'];
+    }
+    if (region.startsWith('eu-isoe-')) {
+        return ['cloud.adc-e.uk', 'api.cloud-aws.adc-e.uk'];
+    }
+    if (region.startsWith('us-isof-')) {
+        return ['csp.hci.ic.gov', 'api.aws.hci.ic.gov'];
+    }
+    return ['amazonaws.com', 'api.aws'];
+}
+/** Identifies a canonical Amazon Bedrock hostname and its embedded AWS region. */
+function parseBedrockEndpointHostname(hostname) {
+    const canonicalHostname = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
+    const [service, region, ...suffixParts] = canonicalHostname.toLowerCase().split('.');
+    const suffix = suffixParts.join('.');
+    if (service === 'bedrock-mantle' && region && /^[a-z0-9-]+$/.test(region) && suffix === 'api.aws') {
+        return { endpoint: 'mantle', region };
+    }
+    if ((service === 'bedrock-runtime' || service === 'bedrock-runtime-fips') && region) {
+        const [standardSuffix, dualStackSuffix] = resolveRuntimeDnsSuffixes(region);
+        if (suffix === standardSuffix || suffix === dualStackSuffix) {
+            return { endpoint: 'runtime', region };
+        }
+    }
+    return undefined;
+}
+/** Rejects insecure or mismatched canonical Amazon Bedrock endpoint overrides. */
+function validateCanonicalBedrockEndpoint(baseURL, endpoint, region) {
+    const parsedBaseURL = new URL(baseURL);
+    const canonicalEndpoint = parseBedrockEndpointHostname(parsedBaseURL.hostname);
+    if (canonicalEndpoint && parsedBaseURL.protocol !== 'https:') {
+        throw new Errors.OpenAIError('Canonical Amazon Bedrock endpoints require HTTPS.');
+    }
+    if (canonicalEndpoint && canonicalEndpoint.endpoint !== endpoint) {
+        throw new Errors.OpenAIError(`The Bedrock ${canonicalEndpoint.endpoint} hostname does not match the selected \`${endpoint}\` endpoint. Set \`endpoint: '${canonicalEndpoint.endpoint}'\` to use this hostname.`);
+    }
+    if (canonicalEndpoint && region && canonicalEndpoint.region !== region) {
+        throw new Errors.OpenAIError(`The Bedrock endpoint region \`${canonicalEndpoint.region}\` does not match the configured AWS region \`${region}\`.`);
+    }
+}
+function validateBedrockEndpointSelection(endpoint) {
+    if (endpoint !== undefined && endpoint !== 'mantle' && endpoint !== 'runtime') {
+        throw new Errors.OpenAIError('The Bedrock `endpoint` must be either `mantle` or `runtime`.');
+    }
+}
+/**
+ * Resolves the Bedrock endpoint family, region, and API root from configuration.
+ *
+ * Region precedence is `region`, `AWS_REGION`, then `AWS_DEFAULT_REGION`.
+ * Endpoint precedence is `baseURL`, `AWS_BEDROCK_BASE_URL`, then the regional
+ * selected endpoint; an explicit `null` base URL skips the environment override.
+ * Existing `/responses` suffixes and trailing slashes are removed. Canonical
+ * AWS hostnames infer the endpoint family when none is selected explicitly.
+ * Other configured URLs and derived endpoints default to Mantle.
+ *
+ * @throws {Errors.OpenAIError} If an option is invalid, a canonical hostname
+ * conflicts with the endpoint family, or the default endpoint needs a region.
+ */
+function resolveBedrockEndpoint(options) {
+    validateBedrockEndpointSelection(options.endpoint);
+    if (options.region !== undefined && !normalizeOptionalString(options.region)) {
+        throw new Errors.OpenAIError('The Bedrock AWS `region` must not be empty.');
+    }
+    if (options.baseURL !== undefined &&
+        options.baseURL !== null &&
+        !normalizeOptionalString(options.baseURL)) {
+        throw new Errors.OpenAIError('The Bedrock `baseURL` must not be empty.');
+    }
+    const region = normalizeOptionalString(options.region) ??
+        normalizeOptionalString(readEnv('AWS_REGION')) ??
+        normalizeOptionalString(readEnv('AWS_DEFAULT_REGION'));
+    if (region && !/^[a-z]{2,8}(?:-[a-z0-9]+)+-\d+$/.test(region)) {
+        throw new Errors.OpenAIError('The Bedrock AWS `region` is invalid. Use a standard AWS region such as `us-east-1`.');
+    }
+    const configuredBaseURL = options.baseURL === undefined
+        ? normalizeOptionalString(readEnv('AWS_BEDROCK_BASE_URL'))
+        : normalizeOptionalString(options.baseURL);
+    if (configuredBaseURL) {
+        const baseURL = normalizeBaseURL(configuredBaseURL);
+        const endpoint = options.endpoint ?? parseBedrockEndpointHostname(new URL(baseURL).hostname)?.endpoint ?? 'mantle';
+        validateCanonicalBedrockEndpoint(baseURL, endpoint, region);
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the declared endpoint resolver contract across configured URLs and inferred regions.
+        return { endpoint, region, baseURL };
+    }
+    const endpoint = options.endpoint ?? 'mantle';
+    if (!region) {
+        throw new Errors.OpenAIError('Bedrock requires an AWS region. Pass `region` to `bedrock(...)`, or set `AWS_REGION` or `AWS_DEFAULT_REGION`.');
+    }
+    const hostname = endpoint === 'runtime'
+        ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffixes(region)[0]}`
+        : `bedrock-mantle.${region}.api.aws`;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The resolver intentionally returns its declared endpoint contract across all configuration paths.
+    return { endpoint, region, baseURL: `https://${hostname}/openai/v1` };
+}
+/**
+ * Ensures Bedrock credentials are only attached to the configured endpoint origin.
+ *
+ * @throws {Errors.OpenAIError} If either URL is not HTTP(S) or the request targets a different origin.
+ */
+function assertBedrockRequestOrigin(baseURL, requestURL) {
+    const expectedURL = new URL(baseURL);
+    const request = new URL(requestURL);
+    const expectedOrigin = expectedURL.origin;
+    const requestOrigin = request.origin;
+    if ((expectedURL.protocol !== 'http:' && expectedURL.protocol !== 'https:') ||
+        (request.protocol !== 'http:' && request.protocol !== 'https:') ||
+        requestOrigin !== expectedOrigin) {
+        throw new error_OpenAIError(`Bedrock request origin \`${requestOrigin}\` does not match the configured base URL origin \`${expectedOrigin}\`.`);
+    }
+}
+/** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The WebSocket authentication boundary verifies the caller client at runtime before trusting provider metadata.
+function assertBedrockWebSocketOrigin(client, requestURL) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
+    if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
+        return;
+    }
+    const normalizedRequestURL = new URL(requestURL);
+    if (normalizedRequestURL.protocol === 'wss:') {
+        normalizedRequestURL.protocol = 'https:';
+    }
+    else if (normalizedRequestURL.protocol === 'ws:') {
+        normalizedRequestURL.protocol = 'http:';
+    }
+    // SAFETY: The private Bedrock brand checked above identifies the client whose baseURL is validated against the finalized request origin.
+    assertBedrockRequestOrigin(
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The private Bedrock client brand checked above identifies the client baseURL contract.
+    client.baseURL, normalizedRequestURL.toString());
+}
+/**
+ * Rejects caller-provided authorization headers that conflict with provider authentication.
+ *
+ * @throws {Errors.OpenAIError} If an `Authorization` header is already present.
+ */
+function assertProviderOwnsAuthorization(headers) {
+    if (headers.has('authorization')) {
+        throw new Errors.OpenAIError('Bedrock provider authentication cannot be combined with a custom `Authorization` header.');
+    }
+}
+/** Rejects non-HTTP field bytes without retaining or exposing a bearer credential. */
+function assertValidBedrockBearerCredential(credential) {
+    if (/^[\t ]|[\t ]$/.test(credential)) {
+        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+    }
+    for (const character of credential) {
+        const value = character.codePointAt(0) ?? 0;
+        if ((value < 0x20 && value !== 0x09) || value === 0x7f || value > 0xff) {
+            throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+        }
+    }
+}
+function createBedrockUserAbortError(signal) {
+    const error = new Errors.APIUserAbortError();
+    Object.defineProperty(error, 'cause', {
+        value: signal.reason,
+        writable: true,
+        configurable: true,
+    });
+    return error;
+}
+function removeBedrockAbortListener(signal, listener) {
+    try {
+        signal.removeEventListener('abort', listener);
+    }
+    catch {
+        // A nonstandard AbortSignal must not replace the actual request outcome.
+    }
+}
+function resolveAbortableBedrockAuth(operation, signals, failure) {
+    // oxlint-disable-next-line promise/avoid-new -- AbortSignal events require a Promise callback bridge.
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const listeners = [];
+        const removeListeners = () => {
+            while (listeners.length > 0) {
+                const registered = listeners.pop();
+                if (registered) {
+                    removeBedrockAbortListener(registered.signal, registered.listener);
+                }
+            }
+        };
+        failure.removeListeners = removeListeners;
+        const settle = (result) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            if ('value' in result) {
+                resolve(result.value);
+            }
+            else {
+                removeListeners();
+                reject(result.error);
+            }
+        };
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
+        const rejectSignalFailure = (error) => {
+            if (failure.error) {
+                return;
+            }
+            failure.error = { value: error };
+            settle({ error });
+        };
+        const registerAbortListener = (signal) => {
+            const onAbort = () => {
+                if (failure.error) {
+                    return;
+                }
+                try {
+                    rejectSignalFailure(createBedrockUserAbortError(signal));
+                }
+                catch (error) {
+                    rejectSignalFailure(error);
+                }
+            };
+            try {
+                if (signal.aborted) {
+                    onAbort();
+                    return false;
+                }
+                listeners.push({ signal, listener: onAbort });
+                signal.addEventListener('abort', onAbort, { once: true });
+                if (settled) {
+                    removeBedrockAbortListener(signal, onAbort);
+                    return false;
+                }
+                if (signal.aborted) {
+                    onAbort();
+                    return false;
+                }
+            }
+            catch (error) {
+                if (settled) {
+                    removeBedrockAbortListener(signal, onAbort);
+                }
+                else {
+                    rejectSignalFailure(error);
+                }
+                return false;
+            }
+            return true;
+        };
+        for (const signal of signals) {
+            if (!registerAbortListener(signal)) {
+                return;
+            }
+        }
+        let pending;
+        try {
+            pending = operation();
+        }
+        catch (error) {
+            settle({ error });
+            return;
+        }
+        const observeResult = async () => {
+            try {
+                settle({ value: await pending });
+            }
+            catch (error) {
+                settle({ error });
+            }
+        };
+        // Observe the result even if the provider synchronously triggered cancellation.
+        void observeResult();
+    });
+}
+/**
+ * Resolves Bedrock authentication work with caller cancellation, then applies
+ * its result synchronously after the final cancellation checks.
+ *
+ * @internal
+ */
+async function prepareBedrockAuth(request, context, operation) {
+    const signals = [];
+    for (const signal of [context.options.signal, request.signal]) {
+        if (signal != null && !signals.includes(signal)) {
+            signals.push(signal);
+        }
+    }
+    const signalFailure = {};
+    let value;
+    try {
+        try {
+            value =
+                signals.length > 0
+                    ? await resolveAbortableBedrockAuth(operation.resolve, signals, signalFailure)
+                    : await operation.resolve();
+        }
+        catch (cause) {
+            if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
+                throw cause;
+            }
+            throw errorWithCause(operation.failureMessage, cause);
+        }
+        if (signalFailure.error) {
+            throw signalFailure.error.value;
+        }
+        for (const signal of signals) {
+            if (signal.aborted) {
+                throw createBedrockUserAbortError(signal);
+            }
+        }
+    }
+    finally {
+        signalFailure.removeListeners?.();
+    }
+    operation.apply(value);
+}
+class BedrockBearerAuth {
+    constructor(tokenProvider) {
+        this.tokenProvider = tokenProvider;
+    }
+    async prepareRequest(request, context) {
+        const headers = new Headers(request.headers);
+        assertProviderOwnsAuthorization(headers);
+        await prepareBedrockAuth(request, context, {
+            resolve: () => this.tokenProvider(),
+            failureMessage: 'Failed to resolve a bearer credential for Bedrock.',
+            apply: (token) => {
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
+                if (typeof token !== 'string' || !token.trim()) {
+                    throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
+                }
+                assertValidBedrockBearerCredential(token);
+                try {
+                    headers.set('authorization', `Bearer ${token}`);
+                }
+                catch (error) {
+                    if (error instanceof TypeError) {
+                        // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
+                        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+                    }
+                    throw error;
+                }
+                request.redirect = 'manual';
+                request.headers = headers;
+            },
+        });
+    }
+}
+/**
+ * Resolves a bearer-authentication factory without calling token providers eagerly.
+ *
+ * Explicit `tokenProvider` and `apiKey` options are mutually exclusive. When
+ * neither is set, `AWS_BEARER_TOKEN_BEDROCK` is used unless environment
+ * credentials are disabled or `apiKey` is explicitly `null`.
+ *
+ * @throws {Errors.OpenAIError} If an explicit key is empty or multiple bearer
+ * credential sources are configured.
+ */
+function resolveBedrockBearerAuth(options, { allowEnvironment = true, } = {}) {
+    if (options.apiKey !== undefined &&
+        options.apiKey !== null &&
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
+        (typeof options.apiKey !== 'string' || !options.apiKey.trim())) {
+        throw new Errors.OpenAIError('The Bedrock bearer credential must not be empty.');
+    }
+    if (options.apiKey != null && options.tokenProvider) {
+        throw new Errors.OpenAIError('The `apiKey` and `tokenProvider` options are mutually exclusive. Configure only one.');
+    }
+    if (options.tokenProvider) {
+        const tokenProvider = options.tokenProvider;
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared bearer-auth contract hides concrete authenticator implementations behind their factory.
+        return { factory: () => new BedrockBearerAuth(tokenProvider), explicit: true };
+    }
+    if (options.apiKey != null) {
+        const apiKey = options.apiKey;
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Explicit API keys use the same declared auth-factory contract as token providers.
+        return { factory: () => new BedrockBearerAuth(async () => apiKey), explicit: true };
+    }
+    if (allowEnvironment && options.apiKey !== null && readEnv('AWS_BEARER_TOKEN_BEDROCK')) {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Environment credentials must preserve the same declared auth-factory contract as explicit options.
+        return {
+            explicit: false,
+            factory: () => new BedrockBearerAuth(async () => {
+                const token = readEnv('AWS_BEARER_TOKEN_BEDROCK');
+                if (!token) {
+                    throw new Errors.OpenAIError('Could not find credentials for Bedrock. Set `AWS_BEARER_TOKEN_BEDROCK` or configure AWS credential authentication.');
+                }
+                return token;
+            }),
+        };
+    }
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared optional factory contract also represents the absence of bearer credentials.
+    return { factory: undefined, explicit: false };
+}
+//# sourceMappingURL=bedrock.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/realtime-credentials.mjs
+
+// Only the key crosses module formats: the context belongs to each participating client.
+const realtimeCacheContext = Symbol.for('openai.realtimeAPIKeyCacheContext');
+let cacheContext;
+/** Installs the Node transport's invocation context without loading Node in the base client. @internal */
+function setRealtimeAPIKeyCacheContext(context) {
+    cacheContext = context;
+}
+/** Reserves a deferred commit when the base hook is entered for this invocation. @internal */
+function getDeferredRealtimeAPIKeyCache(client) {
+    const deferred = client[realtimeCacheContext]?.getStore();
+    return deferred?.client === client ? deferred : undefined;
+}
+/** Applies the Bedrock getter's validation when a captured credential does not enter the cache. @internal */
+function validateCapturedAPIKey(client, credential) {
+    if (credential !== null && brand_privateBedrockClient in client) {
+        assertValidBedrockBearerCredential(credential);
+    }
+    return credential;
+}
 /** Selects a captured credential without treating an explicit null as absent. @internal */
 function getRealtimeAPIKey(client, captured) {
     return captured === undefined ? client?.apiKey : captured;
@@ -91633,14 +93135,422 @@ function getRealtimeAPIKey(client, captured) {
  * synchronizing concurrent credential updates.
  * @internal
  */
-async function resolveRealtimeAPIKey(client) {
+async function resolveRealtimeAPIKey(client, deferCache = false) {
     let apiKey;
-    const isProvider = await client._callApiKey((resolved) => {
+    const current = {
+        client,
+        commit: () => (apiKey === undefined ? client.apiKey : apiKey),
+    };
+    const capture = (resolved) => {
         apiKey = resolved;
-    });
-    return { apiKey: apiKey === undefined ? client.apiKey : apiKey, isProvider };
+    };
+    const invoke = () => client._callApiKey(capture);
+    const context = client[realtimeCacheContext] ?? cacheContext;
+    if (deferCache && context && !client[realtimeCacheContext]) {
+        Object.defineProperty(client, realtimeCacheContext, { value: context });
+    }
+    // An HTTP or ordinary Realtime request nested inside a WebSocket hook owns its own cache writes.
+    const isProvider = await (context ? context.run(deferCache ? current : undefined, invoke) : invoke());
+    return {
+        apiKey: apiKey === undefined ? client.apiKey : apiKey,
+        isProvider,
+        commit: () => {
+            const hookKey = current.providerKey !== undefined && apiKey !== undefined && apiKey !== current.providerKey
+                ? validateCapturedAPIKey(client, apiKey)
+                : undefined;
+            const cached = current.commit();
+            return hookKey === undefined ? validateCapturedAPIKey(client, cached) : hookKey;
+        },
+    };
 }
 //# sourceMappingURL=realtime-credentials.mjs.map
+;// CONCATENATED MODULE: ./node_modules/openai/internal/ws.mjs
+
+
+const webSocketErrors = new WeakMap();
+/** Records physical failure before transport callbacks notify public observers. @internal */
+function recordWebSocketError(socket, error) {
+    webSocketErrors.set(socket, error);
+}
+/** Returns physical failure for this socket instance, never for a replacement. @internal */
+function getWebSocketError(socket) {
+    return webSocketErrors.get(socket);
+}
+/** Snapshots and validates the iterator's limit before listeners are attached. */
+function getMaxBufferedEvents(options) {
+    const limit = options?.maxBufferedEvents;
+    if (limit !== undefined && (!Number.isSafeInteger(limit) || limit <= 0)) {
+        throw new OpenAIError('maxBufferedEvents must be a positive safe integer');
+    }
+    return limit;
+}
+const REDIRECT_SAFE_WEBSOCKET_HEADERS = new Set([
+    'connection',
+    'host',
+    'openai-beta',
+    'origin',
+    'sec-websocket-extensions',
+    'sec-websocket-key',
+    'sec-websocket-version',
+    'upgrade',
+    'user-agent',
+    'x-access-level',
+    'x-auth-metadata',
+    'x-auth-tokenization',
+    'x-authentication-metadata',
+    'x-authentication-tokenization',
+    'x-security-policy',
+    'x-token-budget',
+    'x-trace-id',
+]);
+const WEBSOCKET_METADATA_HEADER_NAMES = new Set([
+    'accept',
+    'accept-encoding',
+    'accept-language',
+    'content-type',
+    'x-request-id',
+    'x-client-request-id',
+    'x-correlation-id',
+    'traceparent',
+    'tracestate',
+    'sentry-trace',
+    'x-amzn-trace-id',
+    'x-cloud-trace-context',
+    'x-datadog-trace-id',
+    'x-datadog-parent-id',
+    'x-datadog-sampling-priority',
+    'x-datadog-origin',
+    'x-datadog-tags',
+    'baggage',
+    'b3',
+]);
+// Request and tracing metadata do not authenticate a Responses socket, but remain protected on redirects.
+const WEBSOCKET_METADATA_HEADERS = {
+    has: (name, values) => WEBSOCKET_METADATA_HEADER_NAMES.has(name) ||
+        name.startsWith('x-b3-') ||
+        (name === 'sec-websocket-protocol' &&
+            !values.some((value) => typeof value === 'string' &&
+                value.split(',').some((protocol) => protocol.trim().startsWith('openai-insecure-api-key.')))),
+};
+function isWebSocketCredentialHeader(name) {
+    return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(name.toLowerCase().split('_').join('-'));
+}
+/**
+ * Snapshots credential values in final socket options before validation and dispatch.
+ * Reports potential caller authentication, excluding additional metadata when requested.
+ * The server remains responsible for validating credentials. Noncredential headers are left intact.
+ */
+function snapshotWebSocketCredentials(options, metadataHeaders) {
+    if (options.auth !== null && options.auth !== undefined) {
+        options.auth = String(options.auth);
+    }
+    const credentials = new Map();
+    const headers = options.headers ?? {};
+    for (const [name, value] of Object.entries(headers)) {
+        const normalizedName = name.toLowerCase().split('_').join('-');
+        // Routing metadata is still protected on redirects, but cannot authenticate a socket.
+        if (!isWebSocketCredentialHeader(name) ||
+            normalizedName === 'openai-organization' ||
+            normalizedName === 'openai-project') {
+            continue;
+        }
+        let snapshot = value;
+        if (Array.isArray(value)) {
+            snapshot = value.map(String);
+        }
+        else if (value !== null && value !== undefined) {
+            snapshot = String(value);
+        }
+        headers[name] = snapshot;
+        const values = Array.isArray(snapshot) ? snapshot : [snapshot];
+        if (!metadataHeaders?.has(normalizedName, values)) {
+            credentials.set(name.toLowerCase(), values.some((item) => typeof item === 'string' && item.trim().length > 0));
+        }
+    }
+    // Node applies header names case-insensitively, and Authorization overrides Basic auth.
+    return ([...credentials.values()].some(Boolean) ||
+        (!credentials.has('authorization') && typeof options.auth === 'string' && options.auth.trim().length > 0));
+}
+/** Merge transport authentication before explicit caller overrides and header removals. */
+function mergeWebSocketAuthHeaders(options, authHeaders, removedHeaders) {
+    const headers = new Map(Object.entries(authHeaders).map(([name, value]) => [name.toLowerCase(), value]));
+    for (const name of removedHeaders) {
+        headers.delete(name);
+    }
+    for (const [name, value] of Object.entries(options.headers ?? {})) {
+        headers.set(name, value);
+    }
+    return { ...options, headers: Object.fromEntries(headers) };
+}
+/** Removal sink for one synchronous header-hook call, including legacy one-argument overrides. */
+const webSocketHeaderRemovals = new WeakMap();
+const preparedWebSocketHeaders = new WeakMap();
+/** Build a WebSocket handshake with explicit caller headers applied after the client defaults. */
+function buildWebSocketOptions(client, authHeaders, options, removedHeaders, usePreparedHeaders = false) {
+    // Capture the base result even through older overrides that forward only one argument.
+    const previous = webSocketHeaderRemovals.get(client);
+    const prepared = usePreparedHeaders && options ? preparedWebSocketHeaders.get(options) : undefined;
+    const context = {
+        removedHeaders,
+        baseHeaders: prepared?.baseHeaders,
+    };
+    webSocketHeaderRemovals.set(client, context);
+    let headers;
+    try {
+        headers = new Map(Object.entries(client._buildWebSocketHeaders(authHeaders, removedHeaders)).map(([name, value]) => [
+            name.toLowerCase(),
+            value,
+        ]));
+    }
+    finally {
+        if (previous) {
+            webSocketHeaderRemovals.set(client, previous);
+        }
+        else {
+            webSocketHeaderRemovals.delete(client);
+        }
+    }
+    // The first hook output is not a caller override of the final, credentialed hook.
+    // Save transport names and explicit nulls separately, then reuse their validated values.
+    const transportHeaders = new Map();
+    const currentHeaders = new Map(Object.entries(options?.headers ?? {}));
+    const overrides = prepared
+        ? [...prepared.transportHeaders].map(([name, removed]) => [name, removed ? null : currentHeaders.get(name)])
+        : currentHeaders;
+    for (const [name, value] of overrides) {
+        const normalizedName = name.toLowerCase();
+        if (value === null) {
+            headers.delete(normalizedName);
+            removedHeaders?.add(normalizedName);
+            transportHeaders.set(normalizedName, true);
+        }
+        else if (value !== undefined) {
+            headers.set(normalizedName, value);
+            removedHeaders?.delete(normalizedName);
+            transportHeaders.set(normalizedName, false);
+        }
+    }
+    const result = {
+        ...options,
+        headers: Object.fromEntries(headers),
+        followRedirects: false,
+    };
+    preparedWebSocketHeaders.set(result, { baseHeaders: context.baseHeaders, transportHeaders });
+    return result;
+}
+/** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */
+function protectWebSocketOptionsFromCredentialRedirects(options) {
+    const hasSensitiveHeader = Object.keys(options.headers ?? {}).some(isWebSocketCredentialHeader);
+    if (!options.auth && !hasSensitiveHeader) {
+        return options;
+    }
+    return { ...options, followRedirects: false };
+}
+function toUint8Array(view) {
+    if (view instanceof Uint8Array) {
+        return view;
+    }
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+}
+/**
+ * Flatten `ArrayBufferView[]` fragments into a single `Uint8Array` so that
+ * `ws.send()` transmits the correct bytes.
+ */
+function flattenRawData(data) {
+    if (Array.isArray(data)) {
+        return concatBytes(data.map(toUint8Array));
+    }
+    return data;
+}
+function snapshotRawData(data) {
+    if (typeof data === 'string') {
+        return data;
+    }
+    if (Array.isArray(data)) {
+        return concatBytes(data.map(toUint8Array));
+    }
+    if (ArrayBuffer.isView(data)) {
+        const copy = new Uint8Array(data.byteLength);
+        copy.set(toUint8Array(data));
+        return copy;
+    }
+    // oxlint-disable-next-line unicorn/prefer-spread -- ArrayBufferLike.slice copies bytes while spread changes the return type.
+    return data.slice(0);
+}
+/** Counts wire bytes without allocating another payload-sized buffer. */
+function rawByteLength(data) {
+    if (typeof data === 'string') {
+        let bytes = 0;
+        for (let index = 0; index < data.length; index += 1) {
+            const code = data.codePointAt(index);
+            if (code < 128) {
+                bytes += 1;
+            }
+            else if (code < 2048) {
+                bytes += 2;
+            }
+            else if (code <= 65535) {
+                bytes += 3;
+            }
+            else {
+                bytes += 4;
+                index += 1;
+            }
+        }
+        return bytes;
+    }
+    if (Array.isArray(data)) {
+        return data.reduce((sum, buf) => sum + buf.byteLength, 0);
+    }
+    if ('byteLength' in data) {
+        return data.byteLength;
+    }
+    return 0;
+}
+/**
+ * Buffers outgoing WebSocket messages while a connection is unavailable.
+ *
+ * JSON values are serialized immediately, and raw binary payloads are copied,
+ * so later caller mutations cannot change queued messages. A single oversized
+ * message is accepted when the queue is empty; further messages are rejected
+ * whenever they would exceed the configured byte budget.
+ */
+class SendQueue {
+    /** Creates a queue with a one-mebibyte default byte budget. */
+    constructor(maxBytes = 1048576) {
+        this._queue = [];
+        this._bytes = 0;
+        this._maxBytes = maxBytes;
+    }
+    /**
+     * Serializes and snapshots a JSON message before queueing it.
+     *
+     * @returns `true` when accepted, including an oversized first message; `false`
+     * when adding it to a nonempty queue would exceed the byte budget.
+     */
+    enqueue(event) {
+        const data = JSON.stringify(event);
+        const byteLength = encodeUTF8(data).byteLength;
+        if (this._bytes + byteLength > this._maxBytes && this._queue.length > 0) {
+            return false;
+        }
+        this._queue.push({ kind: 'json', data, byteLength });
+        this._bytes += byteLength;
+        return true;
+    }
+    /**
+     * Queues a raw string or a defensive copy of a binary WebSocket payload.
+     * Fragmented typed-array payloads are flattened before storage.
+     *
+     * @returns `true` when accepted, including an oversized first frame; `false`
+     * when adding it to a nonempty queue would exceed the byte budget.
+     */
+    enqueueRaw(data) {
+        const snapshot = snapshotRawData(data);
+        const byteLength = rawByteLength(snapshot);
+        if (this._bytes + byteLength > this._maxBytes && this._queue.length > 0) {
+            return false;
+        }
+        this._queue.push({ kind: 'raw', data: snapshot, byteLength });
+        this._bytes += byteLength;
+        return true;
+    }
+    /**
+     * Send every queued message via `send`. If `send` throws, the failing
+     * message and all subsequent messages are re-queued and the error is
+     * re-thrown so the caller can report it. Endpoints that cannot safely replay
+     * an attempted write use `requeueFailed: false`. Never-attempted messages
+     * remain queued, including messages enqueued during the failed send.
+     */
+    flush(send, options) {
+        const pending = this._queue.splice(0);
+        this._bytes = 0;
+        for (let i = 0; i < pending.length; i++) {
+            try {
+                send(pending[i].data);
+            }
+            catch (err) {
+                const remaining = pending.slice(options?.requeueFailed === false ? i + 1 : i);
+                this._queue = [...remaining, ...this._queue];
+                this._bytes = this._queue.reduce((sum, item) => sum + item.byteLength, 0);
+                throw err;
+            }
+        }
+    }
+    /**
+     * Drain the queue and return the unsent messages. JSON messages are
+     * deserialized back to their original form. Resets byte tracking to zero.
+     */
+    drain() {
+        const unsent = this._queue.map((entry) => {
+            if (entry.kind === 'raw') {
+                return { type: 'raw', data: entry.data };
+            }
+            // SAFETY: T is the transport caller's event contract; JSON syntax is parsed here without imposing a runtime schema on forward-compatible events.
+            return { type: 'message', message: JSON.parse(entry.data) };
+        });
+        this._queue = [];
+        this._bytes = 0;
+        return unsent;
+    }
+}
+/**
+ * Reports whether an RFC 6455 close code represents a recoverable interruption.
+ *
+ * Network failures, service restarts, temporary server errors, and TLS
+ * handshake failures can be retried; normal closure, protocol violations,
+ * invalid payloads, and unrecognized codes cannot.
+ */
+function isRecoverableClose(code) {
+    switch (code) {
+        case 1000: {
+            return false;
+        } // Normal closure
+        case 1001: {
+            return true;
+        } // Going away (server shutting down)
+        case 1002: {
+            return false;
+        } // Protocol error
+        case 1003: {
+            return false;
+        } // Unsupported data
+        case 1005: {
+            return true;
+        } // No status code (abnormal)
+        case 1006: {
+            return true;
+        } // Abnormal closure (network drop)
+        case 1007: {
+            return false;
+        } // Invalid payload
+        case 1008: {
+            return false;
+        } // Policy violation
+        case 1009: {
+            return false;
+        } // Message too big
+        case 1010: {
+            return false;
+        } // Missing extension
+        case 1011: {
+            return true;
+        } // Internal server error
+        case 1012: {
+            return true;
+        } // Service restart
+        case 1013: {
+            return true;
+        } // Try again later
+        case 1015: {
+            return true;
+        } // TLS handshake failure
+        default: {
+            return false;
+        }
+    }
+}
+//# sourceMappingURL=ws.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/provider.mjs
 /**
  * A provider factory such as `bedrock(options)` captures configuration in a
@@ -91748,6 +93658,8 @@ var _OpenAI_instances, client_a, _OpenAI_encoder, _OpenAI_x509Authentication, _O
 
 
 
+
+
 function isRunningInBrowserOrBrowserWorker() {
     if (detect_platform_isRunningInBrowser())
         return true;
@@ -91797,6 +93709,9 @@ class OpenAI {
         // Preserve an explicit global selection without storing a second routing URL.
         _OpenAI_explicitDataResidency.set(this, false);
         _OpenAI_responseAttempts.set(this, new WeakMap());
+        this._apiKeyInvocation = 0;
+        this._lastCachedAPIKeyInvocation = 0;
+        this.decisions = new Decisions(this);
         /**
          * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
          */
@@ -92029,8 +93944,12 @@ class OpenAI {
         return this._options.defaultQuery;
     }
     /** @internal Client request headers for each new WebSocket handshake. */
-    _buildWebSocketHeaders(authHeaders) {
-        return Object.fromEntries(headers_buildHeaders([
+    _buildWebSocketHeaders(authHeaders, removedHeaders) {
+        const context = webSocketHeaderRemovals.get(this);
+        if (context?.baseHeaders) {
+            return mergeWebSocketAuthHeaders({ headers: context.baseHeaders }, authHeaders, context.removedHeaders ?? new Set()).headers;
+        }
+        const headers = headers_buildHeaders([
             {
                 'User-Agent': this.getUserAgent(),
                 'OpenAI-Organization': this.organization,
@@ -92038,7 +93957,13 @@ class OpenAI {
             },
             authHeaders,
             this._options.defaultHeaders,
-        ]).values);
+        ]);
+        headers.nulls.forEach((name) => (removedHeaders ?? context?.removedHeaders)?.add(name));
+        const result = Object.fromEntries(headers.values);
+        if (context) {
+            context.baseHeaders = { ...result };
+        }
+        return result;
     }
     validateHeaders({ values, nulls }, schemes = {
         bearerAuth: true,
@@ -92124,11 +94049,8 @@ class OpenAI {
         return typeof this._options.apiKey === 'function';
     }
     /**
-     * Resolves a function-based API key and retains the resolved value on this client.
-     * Returns whether a provider was invoked. Internal callers can capture this
-     * invocation's key before another request updates the shared `apiKey` property.
-     * Overrides should forward `capture` or invoke it with their own resolved key
-     * to preserve invocation-local credentials in concurrent requests and Realtime factories.
+     * Resolves and retains a provider key, returning whether a provider was invoked.
+     * Overrides should forward `capture` (or call it with their resolved key) for local credentials.
      * @internal
      */
     async _callApiKey(capture) {
@@ -92141,6 +94063,8 @@ class OpenAI {
             capture?.(this.apiKey);
             return false;
         }
+        const deferredCache = getDeferredRealtimeAPIKeyCache(this);
+        const invocation = ++this._apiKeyInvocation;
         let token;
         try {
             token = await apiKey();
@@ -92155,8 +94079,24 @@ class OpenAI {
         if (typeof token !== 'string' || !token) {
             throw new error_OpenAIError(`Expected 'apiKey' function argument to return a string but it returned ${token}`);
         }
-        this.apiKey = token;
-        capture?.(this.apiKey);
+        const resolvedToken = token;
+        const commit = () => {
+            if (capture)
+                validateCapturedAPIKey(this, resolvedToken);
+            if (invocation < this._lastCachedAPIKeyInvocation) {
+                return resolvedToken;
+            }
+            this.apiKey = resolvedToken;
+            const cached = capture ? this.apiKey : resolvedToken;
+            this._lastCachedAPIKeyInvocation = invocation;
+            return cached;
+        };
+        if (deferredCache) {
+            deferredCache.providerKey = resolvedToken;
+            deferredCache.commit = commit;
+        }
+        const cached = deferredCache ? validateCapturedAPIKey(this, resolvedToken) : commit();
+        capture?.(cached);
         return true;
     }
     buildURL(path, query, defaultBaseURL) {
@@ -93345,6 +95285,7 @@ OpenAI.UnprocessableEntityError = UnprocessableEntityError;
 OpenAI.InvalidWebhookSignatureError = InvalidWebhookSignatureError;
 OpenAI.toFile = to_file_toFile;
 OpenAI.toStreamingFile = toStreamingFile;
+OpenAI.Decisions = Decisions;
 OpenAI.Completions = resources_completions_Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -93568,431 +95509,6 @@ const _deployments_endpoints = new Set([
     '/images/edits',
 ]);
 //# sourceMappingURL=azure.mjs.map
-;// CONCATENATED MODULE: ./node_modules/openai/internal/bedrock.mjs
-
-
-/** Identifies legacy Bedrock clients without importing the client class into WebSocket modules. */
-const brand_privateBedrockClient = Symbol.for('openai.privateBedrockClient');
-/** Wraps a provider failure in an SDK error while preserving its original cause. */
-function errorWithCause(message, cause) {
-    // SAFETY: This SDK error is created locally and receives its optional cause immediately below; no existing error shape is trusted.
-    const error = new Errors.OpenAIError(message);
-    error.cause = cause;
-    return error;
-}
-/** Trims a configuration string, treating missing and whitespace-only values as absent. */
-function normalizeOptionalString(value) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
-    const normalized = typeof value === 'string' ? value.trim() : undefined;
-    return normalized || undefined;
-}
-function normalizeBaseURL(baseURL) {
-    const url = new URL(baseURL);
-    const responsesMatch = url.pathname.match(/\/responses(?:\/.*)?$/);
-    if (responsesMatch?.index !== undefined) {
-        url.pathname = url.pathname.slice(0, responsesMatch.index) || '/';
-    }
-    return url.toString().replace(/\/$/, '');
-}
-function resolveRuntimeDnsSuffixes(region) {
-    if (region.startsWith('cn-')) {
-        return ['amazonaws.com.cn', 'api.amazonwebservices.com.cn'];
-    }
-    if (region.startsWith('eusc-')) {
-        return ['amazonaws.eu', 'api.amazonwebservices.eu'];
-    }
-    if (region.startsWith('us-iso-')) {
-        return ['c2s.ic.gov', 'api.aws.ic.gov'];
-    }
-    if (region.startsWith('us-isob-')) {
-        return ['sc2s.sgov.gov', 'api.aws.scloud'];
-    }
-    if (region.startsWith('eu-isoe-')) {
-        return ['cloud.adc-e.uk', 'api.cloud-aws.adc-e.uk'];
-    }
-    if (region.startsWith('us-isof-')) {
-        return ['csp.hci.ic.gov', 'api.aws.hci.ic.gov'];
-    }
-    return ['amazonaws.com', 'api.aws'];
-}
-/** Identifies a canonical Amazon Bedrock hostname and its embedded AWS region. */
-function parseBedrockEndpointHostname(hostname) {
-    const canonicalHostname = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
-    const [service, region, ...suffixParts] = canonicalHostname.toLowerCase().split('.');
-    const suffix = suffixParts.join('.');
-    if (service === 'bedrock-mantle' && region && /^[a-z0-9-]+$/.test(region) && suffix === 'api.aws') {
-        return { endpoint: 'mantle', region };
-    }
-    if ((service === 'bedrock-runtime' || service === 'bedrock-runtime-fips') && region) {
-        const [standardSuffix, dualStackSuffix] = resolveRuntimeDnsSuffixes(region);
-        if (suffix === standardSuffix || suffix === dualStackSuffix) {
-            return { endpoint: 'runtime', region };
-        }
-    }
-    return undefined;
-}
-/** Rejects insecure or mismatched canonical Amazon Bedrock endpoint overrides. */
-function validateCanonicalBedrockEndpoint(baseURL, endpoint, region) {
-    const parsedBaseURL = new URL(baseURL);
-    const canonicalEndpoint = parseBedrockEndpointHostname(parsedBaseURL.hostname);
-    if (canonicalEndpoint && parsedBaseURL.protocol !== 'https:') {
-        throw new Errors.OpenAIError('Canonical Amazon Bedrock endpoints require HTTPS.');
-    }
-    if (canonicalEndpoint && canonicalEndpoint.endpoint !== endpoint) {
-        throw new Errors.OpenAIError(`The Bedrock ${canonicalEndpoint.endpoint} hostname does not match the selected \`${endpoint}\` endpoint. Set \`endpoint: '${canonicalEndpoint.endpoint}'\` to use this hostname.`);
-    }
-    if (canonicalEndpoint && region && canonicalEndpoint.region !== region) {
-        throw new Errors.OpenAIError(`The Bedrock endpoint region \`${canonicalEndpoint.region}\` does not match the configured AWS region \`${region}\`.`);
-    }
-}
-function validateBedrockEndpointSelection(endpoint) {
-    if (endpoint !== undefined && endpoint !== 'mantle' && endpoint !== 'runtime') {
-        throw new Errors.OpenAIError('The Bedrock `endpoint` must be either `mantle` or `runtime`.');
-    }
-}
-/**
- * Resolves the Bedrock endpoint family, region, and API root from configuration.
- *
- * Region precedence is `region`, `AWS_REGION`, then `AWS_DEFAULT_REGION`.
- * Endpoint precedence is `baseURL`, `AWS_BEDROCK_BASE_URL`, then the regional
- * selected endpoint; an explicit `null` base URL skips the environment override.
- * Existing `/responses` suffixes and trailing slashes are removed. Canonical
- * AWS hostnames infer the endpoint family when none is selected explicitly.
- * Other configured URLs and derived endpoints default to Mantle.
- *
- * @throws {Errors.OpenAIError} If an option is invalid, a canonical hostname
- * conflicts with the endpoint family, or the default endpoint needs a region.
- */
-function resolveBedrockEndpoint(options) {
-    validateBedrockEndpointSelection(options.endpoint);
-    if (options.region !== undefined && !normalizeOptionalString(options.region)) {
-        throw new Errors.OpenAIError('The Bedrock AWS `region` must not be empty.');
-    }
-    if (options.baseURL !== undefined &&
-        options.baseURL !== null &&
-        !normalizeOptionalString(options.baseURL)) {
-        throw new Errors.OpenAIError('The Bedrock `baseURL` must not be empty.');
-    }
-    const region = normalizeOptionalString(options.region) ??
-        normalizeOptionalString(readEnv('AWS_REGION')) ??
-        normalizeOptionalString(readEnv('AWS_DEFAULT_REGION'));
-    if (region && !/^[a-z]{2,8}(?:-[a-z0-9]+)+-\d+$/.test(region)) {
-        throw new Errors.OpenAIError('The Bedrock AWS `region` is invalid. Use a standard AWS region such as `us-east-1`.');
-    }
-    const configuredBaseURL = options.baseURL === undefined
-        ? normalizeOptionalString(readEnv('AWS_BEDROCK_BASE_URL'))
-        : normalizeOptionalString(options.baseURL);
-    if (configuredBaseURL) {
-        const baseURL = normalizeBaseURL(configuredBaseURL);
-        const endpoint = options.endpoint ?? parseBedrockEndpointHostname(new URL(baseURL).hostname)?.endpoint ?? 'mantle';
-        validateCanonicalBedrockEndpoint(baseURL, endpoint, region);
-        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the declared endpoint resolver contract across configured URLs and inferred regions.
-        return { endpoint, region, baseURL };
-    }
-    const endpoint = options.endpoint ?? 'mantle';
-    if (!region) {
-        throw new Errors.OpenAIError('Bedrock requires an AWS region. Pass `region` to `bedrock(...)`, or set `AWS_REGION` or `AWS_DEFAULT_REGION`.');
-    }
-    const hostname = endpoint === 'runtime'
-        ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffixes(region)[0]}`
-        : `bedrock-mantle.${region}.api.aws`;
-    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The resolver intentionally returns its declared endpoint contract across all configuration paths.
-    return { endpoint, region, baseURL: `https://${hostname}/openai/v1` };
-}
-/**
- * Ensures Bedrock credentials are only attached to the configured endpoint origin.
- *
- * @throws {Errors.OpenAIError} If either URL is not HTTP(S) or the request targets a different origin.
- */
-function assertBedrockRequestOrigin(baseURL, requestURL) {
-    const expectedURL = new URL(baseURL);
-    const request = new URL(requestURL);
-    const expectedOrigin = expectedURL.origin;
-    const requestOrigin = request.origin;
-    if ((expectedURL.protocol !== 'http:' && expectedURL.protocol !== 'https:') ||
-        (request.protocol !== 'http:' && request.protocol !== 'https:') ||
-        requestOrigin !== expectedOrigin) {
-        throw new error_OpenAIError(`Bedrock request origin \`${requestOrigin}\` does not match the configured base URL origin \`${expectedOrigin}\`.`);
-    }
-}
-/** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The WebSocket authentication boundary verifies the caller client at runtime before trusting provider metadata.
-function assertBedrockWebSocketOrigin(client, requestURL) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
-    if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
-        return;
-    }
-    const normalizedRequestURL = new URL(requestURL);
-    if (normalizedRequestURL.protocol === 'wss:') {
-        normalizedRequestURL.protocol = 'https:';
-    }
-    else if (normalizedRequestURL.protocol === 'ws:') {
-        normalizedRequestURL.protocol = 'http:';
-    }
-    // SAFETY: The private Bedrock brand checked above identifies the client whose baseURL is validated against the finalized request origin.
-    assertBedrockRequestOrigin(
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The private Bedrock client brand checked above identifies the client baseURL contract.
-    client.baseURL, normalizedRequestURL.toString());
-}
-/**
- * Rejects caller-provided authorization headers that conflict with provider authentication.
- *
- * @throws {Errors.OpenAIError} If an `Authorization` header is already present.
- */
-function assertProviderOwnsAuthorization(headers) {
-    if (headers.has('authorization')) {
-        throw new Errors.OpenAIError('Bedrock provider authentication cannot be combined with a custom `Authorization` header.');
-    }
-}
-/** Rejects non-HTTP field bytes without retaining or exposing a bearer credential. */
-function assertValidBedrockBearerCredential(credential) {
-    if (/^[\t ]|[\t ]$/.test(credential)) {
-        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
-    }
-    for (const character of credential) {
-        const value = character.codePointAt(0) ?? 0;
-        if ((value < 0x20 && value !== 0x09) || value === 0x7f || value > 0xff) {
-            throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
-        }
-    }
-}
-function createBedrockUserAbortError(signal) {
-    const error = new Errors.APIUserAbortError();
-    Object.defineProperty(error, 'cause', {
-        value: signal.reason,
-        writable: true,
-        configurable: true,
-    });
-    return error;
-}
-function removeBedrockAbortListener(signal, listener) {
-    try {
-        signal.removeEventListener('abort', listener);
-    }
-    catch {
-        // A nonstandard AbortSignal must not replace the actual request outcome.
-    }
-}
-function resolveAbortableBedrockAuth(operation, signals, failure) {
-    // oxlint-disable-next-line promise/avoid-new -- AbortSignal events require a Promise callback bridge.
-    return new Promise((resolve, reject) => {
-        let settled = false;
-        const listeners = [];
-        const removeListeners = () => {
-            while (listeners.length > 0) {
-                const registered = listeners.pop();
-                if (registered) {
-                    removeBedrockAbortListener(registered.signal, registered.listener);
-                }
-            }
-        };
-        failure.removeListeners = removeListeners;
-        const settle = (result) => {
-            if (settled) {
-                return;
-            }
-            settled = true;
-            if ('value' in result) {
-                resolve(result.value);
-            }
-            else {
-                removeListeners();
-                reject(result.error);
-            }
-        };
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
-        const rejectSignalFailure = (error) => {
-            if (failure.error) {
-                return;
-            }
-            failure.error = { value: error };
-            settle({ error });
-        };
-        const registerAbortListener = (signal) => {
-            const onAbort = () => {
-                if (failure.error) {
-                    return;
-                }
-                try {
-                    rejectSignalFailure(createBedrockUserAbortError(signal));
-                }
-                catch (error) {
-                    rejectSignalFailure(error);
-                }
-            };
-            try {
-                if (signal.aborted) {
-                    onAbort();
-                    return false;
-                }
-                listeners.push({ signal, listener: onAbort });
-                signal.addEventListener('abort', onAbort, { once: true });
-                if (settled) {
-                    removeBedrockAbortListener(signal, onAbort);
-                    return false;
-                }
-                if (signal.aborted) {
-                    onAbort();
-                    return false;
-                }
-            }
-            catch (error) {
-                if (settled) {
-                    removeBedrockAbortListener(signal, onAbort);
-                }
-                else {
-                    rejectSignalFailure(error);
-                }
-                return false;
-            }
-            return true;
-        };
-        for (const signal of signals) {
-            if (!registerAbortListener(signal)) {
-                return;
-            }
-        }
-        let pending;
-        try {
-            pending = operation();
-        }
-        catch (error) {
-            settle({ error });
-            return;
-        }
-        const observeResult = async () => {
-            try {
-                settle({ value: await pending });
-            }
-            catch (error) {
-                settle({ error });
-            }
-        };
-        // Observe the result even if the provider synchronously triggered cancellation.
-        void observeResult();
-    });
-}
-/**
- * Resolves Bedrock authentication work with caller cancellation, then applies
- * its result synchronously after the final cancellation checks.
- *
- * @internal
- */
-async function prepareBedrockAuth(request, context, operation) {
-    const signals = [];
-    for (const signal of [context.options.signal, request.signal]) {
-        if (signal != null && !signals.includes(signal)) {
-            signals.push(signal);
-        }
-    }
-    const signalFailure = {};
-    let value;
-    try {
-        try {
-            value =
-                signals.length > 0
-                    ? await resolveAbortableBedrockAuth(operation.resolve, signals, signalFailure)
-                    : await operation.resolve();
-        }
-        catch (cause) {
-            if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
-                throw cause;
-            }
-            throw errorWithCause(operation.failureMessage, cause);
-        }
-        if (signalFailure.error) {
-            throw signalFailure.error.value;
-        }
-        for (const signal of signals) {
-            if (signal.aborted) {
-                throw createBedrockUserAbortError(signal);
-            }
-        }
-    }
-    finally {
-        signalFailure.removeListeners?.();
-    }
-    operation.apply(value);
-}
-class BedrockBearerAuth {
-    constructor(tokenProvider) {
-        this.tokenProvider = tokenProvider;
-    }
-    async prepareRequest(request, context) {
-        const headers = new Headers(request.headers);
-        assertProviderOwnsAuthorization(headers);
-        await prepareBedrockAuth(request, context, {
-            resolve: () => this.tokenProvider(),
-            failureMessage: 'Failed to resolve a bearer credential for Bedrock.',
-            apply: (token) => {
-                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
-                if (typeof token !== 'string' || !token.trim()) {
-                    throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
-                }
-                assertValidBedrockBearerCredential(token);
-                try {
-                    headers.set('authorization', `Bearer ${token}`);
-                }
-                catch (error) {
-                    if (error instanceof TypeError) {
-                        // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
-                        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
-                    }
-                    throw error;
-                }
-                request.redirect = 'manual';
-                request.headers = headers;
-            },
-        });
-    }
-}
-/**
- * Resolves a bearer-authentication factory without calling token providers eagerly.
- *
- * Explicit `tokenProvider` and `apiKey` options are mutually exclusive. When
- * neither is set, `AWS_BEARER_TOKEN_BEDROCK` is used unless environment
- * credentials are disabled or `apiKey` is explicitly `null`.
- *
- * @throws {Errors.OpenAIError} If an explicit key is empty or multiple bearer
- * credential sources are configured.
- */
-function resolveBedrockBearerAuth(options, { allowEnvironment = true, } = {}) {
-    if (options.apiKey !== undefined &&
-        options.apiKey !== null &&
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
-        (typeof options.apiKey !== 'string' || !options.apiKey.trim())) {
-        throw new Errors.OpenAIError('The Bedrock bearer credential must not be empty.');
-    }
-    if (options.apiKey != null && options.tokenProvider) {
-        throw new Errors.OpenAIError('The `apiKey` and `tokenProvider` options are mutually exclusive. Configure only one.');
-    }
-    if (options.tokenProvider) {
-        const tokenProvider = options.tokenProvider;
-        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared bearer-auth contract hides concrete authenticator implementations behind their factory.
-        return { factory: () => new BedrockBearerAuth(tokenProvider), explicit: true };
-    }
-    if (options.apiKey != null) {
-        const apiKey = options.apiKey;
-        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Explicit API keys use the same declared auth-factory contract as token providers.
-        return { factory: () => new BedrockBearerAuth(async () => apiKey), explicit: true };
-    }
-    if (allowEnvironment && options.apiKey !== null && readEnv('AWS_BEARER_TOKEN_BEDROCK')) {
-        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Environment credentials must preserve the same declared auth-factory contract as explicit options.
-        return {
-            explicit: false,
-            factory: () => new BedrockBearerAuth(async () => {
-                const token = readEnv('AWS_BEARER_TOKEN_BEDROCK');
-                if (!token) {
-                    throw new Errors.OpenAIError('Could not find credentials for Bedrock. Set `AWS_BEARER_TOKEN_BEDROCK` or configure AWS credential authentication.');
-                }
-                return token;
-            }),
-        };
-    }
-    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared optional factory contract also represents the absence of bearer credentials.
-    return { factory: undefined, explicit: false };
-}
-//# sourceMappingURL=bedrock.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/bedrock.mjs
 var bedrock_a;
 
