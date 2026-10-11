@@ -132,7 +132,8 @@ river run . --dry-run --output html \
 ```
 
 All three flags are required together and are only accepted by `river run`
-with `--output html`. Input validation executes before the review starts.
+with `--output html`. They cannot be combined with `--estimate`, which never
+builds the HTML report; that combination is a usage error (exit 1). Input validation executes before the review starts.
 Changed/missing/malicious inputs exit nonzero with no success HTML.
 
 This feature is explicit. It never takes approval from browser text and

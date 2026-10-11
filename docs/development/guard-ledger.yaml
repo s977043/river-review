@@ -223,13 +223,18 @@ guards:
 
   - id: review-doc-ssot-sync
     title: Review-doc SSoT sync
-    mechanized: none
-    verifiedBy: []
+    mechanized: partial
+    verifiedBy:
+      - scripts/check-doc-enumerations.mjs
+      - tests/check-doc-enumerations.test.mjs
     addedAt: '2026-06-18'
     reviewAfter: '2027-01-06'
     notes: >-
-      docs/review/*.md と pages/reference/review-policy.md の内容一致を検証する script は存在しない。機械化の候補。
-      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2606
+      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2606。
+      Issue #2606 で check-doc-enumerations の review-doc-* spec 3 件を追加した。出力節見出し（§2）、
+      重要度ラベル（§6）、フェーズ見出し（§4）を派生文書と review-policy（ja / en）で照合する。
+      partial の理由は 3 点ある。表・注記・散文の変更は誤検知回避のため見ない。
+      en の §2 は節数だけを比べる。過去に SSoT へ先行した出力描画の規則（PR #1914）は検知できない。
 
   - id: skill-check-fixture-drift
     title: Skill-check fixture/description drift
@@ -246,13 +251,17 @@ guards:
 
   - id: verify-agent-completion-reports
     title: Verify agent completion reports
-    mechanized: none
-    verifiedBy: []
+    mechanized: partial
+    verifiedBy:
+      - scripts/verify-agent-report.sh
+      - tests/scripts-verify-agent-report.test.mjs
     addedAt: '2026-07-02'
     reviewAfter: '2027-01-06'
     notes: >-
-      /verify-agent-report が手順を提供するのみ。報告の裏取りを実行したかは検証されない。
-      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2607
+      2026-10-08: Step 9 (c) で延長。機械化 Issue: #2607。
+      #2607 で /verify-agent-report の Step 1〜4（branch / PR / SHA / ファイル）を
+      scripts/verify-agent-report.sh に移した。partial に留まる理由は、
+      Step 5（テスト主張の再実行）が手動のままであり、script を呼んだかも検証されないため。
 
   - id: n-of-n-required-checks-bot-push
     title: '`N of N required checks are expected` = bot/GITHUB_TOKEN push'
