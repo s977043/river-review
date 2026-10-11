@@ -47,6 +47,14 @@ main にマージされただけの変更は、まだ誰にも届いていませ
 - PR が `MERGED` でない、または merge commit が `origin/main` に無い（exit 3）
 - `revert/pr-<N>` がローカルか remote に既にある（exit 3）
 - revert が `origin/main` と衝突する（exit 1）。何も作らずに止まるので、fix-forward を検討する
+- push 後に `gh pr create` が失敗する（exit 2）。branch は remote に残る
+
+最後の場合は、スクリプトを再実行しても branch が既にあるため exit 3 で止まります。
+gh アカウントを確かめ、スクリプトが表示した次のコマンドで PR だけを作ります。
+
+```bash
+gh pr create --repo s977043/river-review --base main --head revert/pr-<N> --title 'revert: <title> (#<N>)' --body 'Reverts #<N>'
+```
 
 ## dist に影響する revert
 

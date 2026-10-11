@@ -14,8 +14,11 @@
 #   REMOTE=origin REPO=owner/repo  override the remote / the gh repository
 #
 # Exit codes:
-#   0   PASS: every claim matched
+#   0   PASS: every claim matched (WARN rows allowed)
 #   1   FABRICATION_SUSPECTED: at least one claim did not match
+#
+# WARN marks a claim that is real but no longer the tip: the claimed SHA is an
+# ancestor of the branch / PR head (e.g. a bot pushed a dist rebuild on top).
 #   64  usage error
 #
 # The judging functions (`judge_sha`, `judge_pr`) take strings / JSON and call
@@ -34,7 +37,7 @@ usage() {
 row() {
   local verdict="$1" check="$2" detail="$3"
   printf '%s\t%s\t%s\n' "${verdict}" "${check}" "${detail}"
-  [ "${verdict}" = "PASS" ] || FAILED=1
+  case "${verdict}" in PASS | WARN) ;; *) FAILED=1 ;; esac
 }
 
 # judge_sha <claimed> <actual>
@@ -80,6 +83,8 @@ main() {
   [ "${#positional[@]}" -ge 1 ] || usage
   local branch="${positional[0]}" pr="${positional[1]:--}" sha="${positional[2]:--}"
   local files=("${positional[@]:3}")
+  # Bash 3.2 has no ${var,,}; git prints lowercase, so compare in lowercase.
+  sha=$(printf '%s' "${sha}" | tr 'A-F' 'a-f')
   [ -n "${branch}" ] || usage
   if [ "${pr}" != "-" ] && [[ ! "${pr}" =~ ^[0-9]+$ ]]; then
     echo "error: '${pr}' is not a PR number." >&2
@@ -97,44 +102,66 @@ main() {
     row FAIL branch "${REMOTE}/${branch} not found (ls-remote exit $?)"
   fi
 
+  # Fetch once so ancestry can tell "tip advanced" from "not on the branch".
+  local fetched=0 on_branch=0
+  if [ -n "${remote_sha}" ] && git -C "${repo_dir}" fetch --quiet "${REMOTE}" "refs/heads/${branch}" 2>/dev/null; then
+    fetched=1
+    if [ "${sha}" != "-" ] && git -C "${repo_dir}" merge-base --is-ancestor "${sha}" FETCH_HEAD 2>/dev/null; then
+      on_branch=1
+    fi
+  fi
+
   if [ "${sha}" != "-" ]; then
     local v
     v=$(judge_sha "${sha}" "${remote_sha}")
+    if [ "${v%% *}" = FAIL ] && [ "${on_branch}" -eq 1 ]; then
+      v="WARN tip advanced (e.g. bot dist push): ${sha} is an ancestor of ${remote_sha}"
+    fi
     row "${v%% *}" branch-head "${v#* }"
   fi
 
   # Step 2
   if [ "${pr}" != "-" ]; then
-    local repo pr_json v
+    local repo pr_json v pr_head
     repo="${REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)}"
     if pr_json=$(gh pr view "${pr}" --repo "${repo}" --json url,headRefOid,state 2>&1); then
       v=$(judge_pr "${pr_json}" "${repo}" "${sha}")
+      pr_head=$(printf '%s' "${pr_json}" | jq -r '.headRefOid // ""')
+      if [[ "${v}" == "FAIL claimed "* ]] && [ "${on_branch}" -eq 1 ] && [ -n "${pr_head}" ] &&
+        git -C "${repo_dir}" merge-base --is-ancestor "${sha}" "${pr_head}" 2>/dev/null; then
+        v="WARN tip advanced (e.g. bot dist push): ${sha} is an ancestor of PR head ${pr_head}"
+      fi
       row "${v%% *}" pr "#${pr} $(printf '%s' "${pr_json}" | jq -r '.state') ${v#* }"
     else
       row FAIL pr "#${pr} not readable in ${repo} (check gh account first: gh api user --jq .login)"
     fi
   fi
 
-  # Steps 3-4: the claimed SHA (or the branch tip) must contain the files.
-  local ref=''
-  if [ -n "${remote_sha}" ] && git -C "${repo_dir}" fetch --quiet "${REMOTE}" "refs/heads/${branch}" 2>/dev/null; then
+  # Steps 3-4: the claimed SHA (or, when none is claimed, the branch tip) must contain the files.
+  local ref='' ref_note=''
+  if [ "${fetched}" -eq 1 ]; then
     ref="${remote_sha}"
+    [ "${sha}" = "-" ] || ref_note=" (branch tip: claimed SHA not on branch)"
     if [ "${sha}" != "-" ]; then
-      if git -C "${repo_dir}" merge-base --is-ancestor "${sha}" FETCH_HEAD 2>/dev/null; then
+      if [ "${on_branch}" -eq 1 ]; then
         row PASS commit "${sha} is on ${branch}"
         ref="${sha}"
+        ref_note=''
       else
         row FAIL commit "${sha} is not on ${branch}"
       fi
     fi
+  elif [ -n "${remote_sha}" ]; then
+    row FAIL commit "git fetch ${REMOTE} ${branch} failed; ancestry and files unchecked"
+    ref_note=" (fetch failed)"
   fi
 
   local f
   for f in ${files[@]+"${files[@]}"}; do
     if [ -n "${ref}" ] && git -C "${repo_dir}" cat-file -e "${ref}:${f}" 2>/dev/null; then
-      row PASS file "${f} in ${ref:0:12}"
+      row PASS file "${f} in ${ref:0:12}${ref_note}"
     else
-      row FAIL file "${f} missing in ${ref:-<no ref>}"
+      row FAIL file "${f} missing in ${ref:-<no ref>}${ref_note}"
     fi
   done
 

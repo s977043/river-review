@@ -155,6 +155,25 @@ test('--execute pushes the revert from a temp worktree and leaves the checkout u
   );
 });
 
+test('push ok but gh pr create fails -> exit 2 with the recovery command', (t) => {
+  const repo = setup(t);
+  const stub = createGhStub([
+    { match: PR_VIEW, body: view(repo.sha) },
+    { match: /^api user$/, body: JSON.stringify({ login: 'owner' }) },
+    { match: PR_CREATE, body: 'boom', exit: 1 },
+  ]);
+  const r = run(repo, stub, ['7', '--execute']);
+  assert.equal(r.status, 2, r.stderr);
+  git(repo.bare, 'rev-parse', 'refs/heads/revert/pr-7');
+  assert.match(r.stderr, /was pushed but gh pr create failed/);
+  assert.ok(
+    r.stderr.includes(
+      'gh pr create --repo owner/repo --base main --head revert/pr-7 --title revert:\\ feat:\\ x\\ \\(#7\\) --body Reverts\\ #7'
+    ),
+    r.stderr
+  );
+});
+
 test('refuses (exit 3) when revert/pr-<N> already exists locally', (t) => {
   const repo = setup(t);
   git(repo.clone, 'branch', 'revert/pr-7');

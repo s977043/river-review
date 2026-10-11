@@ -25,9 +25,11 @@ permissions:
   actions: read
   contents: read
 
-# One alert at a time per workflow, so two red runs cannot both miss the
-# open issue and create duplicates. Never cancel: a queued success must still
-# close the issue a failure opened.
+# One alert at a time, so two red runs cannot both miss the open issue and
+# create duplicates. cancel-in-progress: false keeps the running alert alive,
+# but GitHub keeps at most one pending run per group: a newer pending run
+# replaces an older pending one. The end state therefore tracks the latest
+# result, not every intermediate one.
 concurrency:
   group: main-ci-red-alert
   cancel-in-progress: false

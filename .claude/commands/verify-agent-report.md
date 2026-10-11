@@ -30,6 +30,8 @@ scripts/verify-agent-report.sh [--worktree <path>] <branch> [PR|-] [SHA|-] [file
 
 Step 1〜4 を実行し、項目ごとの PASS / FAIL 表と `VERDICT` を出す。exit 0 は PASS、exit 1 は FABRICATION_SUSPECTED、exit 64 は引数誤りを表す。PR の読み取り失敗は gh アカウントの切り替わりでも起こるため、FAIL が `pr` 行だけなら `gh api user --jq .login` を確認してから再実行する。script が使えない場合は以下の Step 1〜4 を手で実行する。Step 5 は script の対象外である。
 
+`WARN` は FABRICATION_SUSPECTED に数えない。報告された SHA が branch / PR の先端ではないが、先端の祖先である場合に `branch-head` と `pr` 行が `WARN tip advanced` になる。bot の dist push などで先端が進んだ状態で、`commit` 行が PASS なら報告は実在する。SHA が branch に無い場合は従来どおり FAIL である。SHA は大文字でも受け付ける。`git fetch` が失敗すると `commit` 行が FAIL になり、祖先関係とファイルは未確認のまま残る。
+
 ### Step 1. branch の実在確認
 
 ```bash
