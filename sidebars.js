@@ -74,9 +74,11 @@ module.exports = {
           label: 'ガバナンス',
           items: [
             'guides/governance/CONTRIBUTING',
+            'guides/governance/practice-evolution',
             'guides/governance/WRITING_GUIDE',
             'guides/governance/roadmap-guide',
             'guides/governance/issue-management',
+            'guides/governance/issue-triage',
             'guides/governance/skill-policy',
           ],
         },

@@ -7,6 +7,12 @@ The Japanese guide in `CONTRIBUTING.md` is the source of truth; this English cop
 
 We aim for an open, welcoming community. Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) when you participate.
 
+## Values and OSS practice evolution
+
+River Review follows a [public Practice Evolution policy](pages/guides/governance/practice-evolution.en.md), guided by agile values, user dialogue, verifiable outcomes, and responsiveness to change. We weigh local evidence and external knowledge to **adopt, adapt, transform, or defer** proposals.
+
+We welcome suggestions that simplify review, reduce false positives, or remove unnecessary process, not just new skills and gates. When possible, share the problem, evidence, smallest useful experiment, and a reason to revisit the decision. This is not a new required template. Existing security, approval, CI, and maintainer authority rules still apply.
+
 ## 💡 Ways to contribute
 
 ### ✅ Before opening an issue
@@ -113,7 +119,7 @@ If you have a security concern, please report it privately following `SECURITY.m
 - JS/Node uses ESM; tests use `node --test`
 - Formatting is enforced by Prettier (checked via `npm run lint`)
 - Do not commit secrets in `.env*` files; use dummy values in examples
-- Doc site sources live under `pages/` (Docusaurus). The `docs/` directory is for internal/ops docs and may be referenced from `pages/`
+- Public documentation lives under `pages/` (Docusaurus). Treat `docs/` as internal materials; avoid direct links from published pages.
 - Do not hand-edit `package-lock.json`; update it by running `npm install` when you change dependencies in `package.json` (`npm ci` installs from the lock file)
 
 ## 📚 Documentation contributions

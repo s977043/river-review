@@ -46,7 +46,7 @@ import {
   // module does not become the third private copy.
   sha256Hex,
 } from './shadow-aggregate.mjs';
-import { redactText } from './secret-redactor.mjs';
+import { REDACTION_PATTERN_IDS, redactText } from './secret-redactor.mjs';
 
 /** Schema version of the manifest document. */
 export const EXECUTION_MANIFEST_SCHEMA_VERSION = 1;
@@ -533,7 +533,11 @@ export function buildExecutionManifest(spec, { now = new Date() } = {}) {
   // it must not be the one derived early.
   redacted.skills.skillSetHash = computeSkillSetHash(redacted.skills.entries);
   redacted.redaction = {
+    // "applied" means pattern-based scanning ran; it does NOT attest that
+    // every possible secret has been detected. Record the actual scanner
+    // categories so later readers can distinguish coverage from a guarantee.
     applied: true,
+    appliedPatterns: [...REDACTION_PATTERN_IDS],
     hits: [...acc.hits.entries()]
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => compareStrings(a.category, b.category)),

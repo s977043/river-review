@@ -17,7 +17,7 @@ River Review には、レビュー結果の正しさ・完全性・出自・人�
 - Evidence State (#2267 Phase 6): finding-level truth / epistemic state。owning helper は実装済み
 - Semantic Precision (#1857 / ADR-007): materiality / disposition。architecture owner は定義済みだが、finding-level disposition の主経路実装は未完了
 - Review Coverage (#2212): review execution completeness。runtime contract は実装済み
-- Reviewer Independence: finder / verifier の logical execution separation。helper は実装済みだが runtime 未配線
+- Reviewer Independence: finder / verifier の logical execution separation。ADR受理時は helper-only（実装後の観測経路は D6 の追記を参照）
 - Execution Manifest: execution provenance。additive / optional runtime contract
 - Review Resolution (#2322 / ADR-011): author / human handling と後続 verification。ADR で owner / sidecar 方針は定義済みだが、Review Resolution sidecar schema は未実装
 - Human Attention (#2368 / ADR-012): human-facing projection。L1 Decision Surface は実装済み
@@ -198,9 +198,17 @@ finderRunId != verifierRunId
 
 したがって Review Evidence Projection は、distinct run IDs を「強い独立検証」へ拡大解釈してはならない。
 
-さらに、現行の `reviewer-independence.mjs` は Phase 5A の helper であり、runtime には未配線です。
-そのため、runtime artifact に Reviewer Independence が存在する前提で projection してはいけません。
-将来 runtime へ配線された場合だけ、owning contract が出力した状態を参照できます。
+**受理時点（Phase 5A）の観測:** `reviewer-independence.mjs` は helper-only で、runtime には未配線でした。この記述は当時の基準状態を記録しています。
+
+**実装後の更新（2026-10-10確認、#2481 / PR #2501、#2543 / PR #2571）:** Finding Critic は既存の `evaluateReviewerIndependence()` を利用します。観測値は `src/lib/finding-critic-stage.mjs:buildExecutionIndependence` が生成します。
+
+入力は orchestrator が事前割当てした verifier execution ID と、finding の `sourceExecutionIds[]` です。結果は `debug.findingCritic.executionIndependence[]` に保持されます。
+
+Finding Critic は opt-in（既定 off）です。この値は debug observation であり、Review Artifact の必須・トップレベル independence field ではありません。利用可能性は呼び出し経路に依存します。
+
+この更新の保証は **logical execution ID の比較**だけです。distinct ID は actor identity、別 provider/model、prompt/context isolation、trusted provenance を証明しません。finding correctness や independent adversarial verification の品質も証明しません。
+
+Critic 未実行や ID 欠落を独立性の証明にせず、結果を severity・validation・`decision`・Gate・Human authority に昇格させません。Review Evidence Projection は既存の debug observation を参照できます。ただし、canonical finding truth や新たな判断権限として再解釈しません。
 
 より強い actor / provider / model / prompt / signature provenance は #1760 の責務を再利用する。
 

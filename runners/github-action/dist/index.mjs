@@ -34739,7 +34739,11 @@ function buildExecutionManifest(spec, { now = new Date() } = {}) {
   // it must not be the one derived early.
   redacted.skills.skillSetHash = computeSkillSetHash(redacted.skills.entries);
   redacted.redaction = {
+    // "applied" means pattern-based scanning ran; it does NOT attest that
+    // every possible secret has been detected. Record the actual scanner
+    // categories so later readers can distinguish coverage from a guarantee.
     applied: true,
+    appliedPatterns: [..._secret_redactor_mjs__WEBPACK_IMPORTED_MODULE_2__/* .REDACTION_PATTERN_IDS */ .E2],
     hits: [...acc.hits.entries()]
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => compareStrings(a.category, b.category)),
@@ -47022,8 +47026,14 @@ const ASSIGNMENT_PATTERNS = [
       /(["']?)\b(password|passwd|pwd)\b\1(\s*[:=]\s*)("[^"\n]{4,}"|'[^'\n]{4,}'|[^\s'"`,;)\]}&]{4,})/gi,
     redact: (_m, quote, name, sep, value) => {
       if (NON_SECRET_PWD_NAMES.has(name)) return null;
-      if (!isCredentialLiteral(value)) return null;
-      return `${quote}${name}${quote}${sep}${REPLACEMENT('passwordAssignment')}`;
+      // A compact `password=value` in an env/config/query string is more
+      // likely to be a literal than an identifier reference. Keep spaced
+      // assignments and colon-style source-code declarations conservative.
+      if (!isCredentialLiteral(value, { compactEquals: sep === '=' })) return null;
+      const valueQuote = value[0];
+      const quoted = (valueQuote === '"' || valueQuote === "'") && value.endsWith(valueQuote);
+      const replacement = REPLACEMENT('passwordAssignment');
+      return `${quote}${name}${quote}${sep}${quoted ? valueQuote : ''}${replacement}${quoted ? valueQuote : ''}`;
     },
   },
 ];
@@ -47045,12 +47055,11 @@ const REFERENCE_EXPRESSION_RE = /^[A-Za-z_$][\w$]*(?:\.[\w$]+)+$/;
 // A bare identifier written the way source code names things — camelCase
 // (`hashedPassword`) or snake_case (`user_password`), letters only. A literal
 // credential is not spelled like a symbol, so this shape is a reference to
-// one. Deliberately NOT `^[A-Za-z_$][\w$]*$`: that also covers `hunter2`,
-// which is the canonical leaked-password form and must stay redacted. Digits
-// disqualify the identifier reading for the same reason — `MyS3cret` after a
-// `password=` key is a credential, not a symbol. Residual gap: an unquoted,
-// digit-free camelCase password (`password=MyPassword`) is not redacted;
-// quoted, SCREAMING_CASE (`envAssignment`) and high-entropy forms still are.
+// one. Deliberately NOT a generic identifier regex: that also covers
+// digit-bearing leaked passwords such as hunter2. Whitespace-separated
+// and colon-style source assignments remain conservative about digit-free
+// identifiers. Compact password=value is a security-biased exception that
+// masks more credential forms but can hide ambiguous code references.
 const IDENTIFIER_SHAPED_RE =
   /^(?:[A-Za-z][a-z]*(?:[A-Z][a-z]*)+|[A-Za-z_$][A-Za-z_$]*[_$][A-Za-z_$]*)$/;
 // Names that match the `pwd` alternative but never hold a password: `PWD` and
@@ -47058,7 +47067,7 @@ const IDENTIFIER_SHAPED_RE =
 // CI log. Case-sensitive — lowercase `pwd = '...'` is still a password key.
 const NON_SECRET_PWD_NAMES = new Set(['PWD', 'OLDPWD']);
 
-function isCredentialLiteral(raw) {
+function isCredentialLiteral(raw, { compactEquals = false } = {}) {
   const quoted = /^(["']).*\1$/s.test(raw);
   const value = raw.replace(/^["']/, '').replace(/["']$/, '').trim();
   if (value.length < 4) return false;
@@ -47077,8 +47086,12 @@ function isCredentialLiteral(raw) {
     // `getPassword(` — the value class stops before `)`, so a call site is
     // recognised by the opening paren alone. Redacting it would also leave
     // the stray `)` behind and break the syntax the reviewer is reading.
-    if (value.includes('(')) return false;
-    if (IDENTIFIER_SHAPED_RE.test(value)) return false;
+    // Preserve function-call expressions even when there is no whitespace
+    // around '='. A non-identifier literal such as 'P@ss(word1' is different.
+    if (value.includes('(') && (!compactEquals || /^[A-Za-z_$][\w$.]*\(/.test(value))) {
+      return false;
+    }
+    if (IDENTIFIER_SHAPED_RE.test(value) && !compactEquals) return false;
   }
   return true;
 }
@@ -47096,6 +47109,11 @@ function isCredentialLiteral(raw) {
 const ENV_VAR_RE = /^[ \t]*(?:export[ \t]+)?([A-Z][A-Z0-9_]*)\s*=\s*(.+)$/gm;
 const SENSITIVE_NAME_RE =
   /(?:^|_)(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|CREDENTIALS|API_KEY|ACCESS_KEY|PRIVATE_KEY)$/;
+// A complete first-pass mask should not be counted again as envAssignment.
+// Anchoring to the entire value (optionally wrapped by matching quotes) is
+// critical: '<REDACTED:...>secret' still needs the env fallback.
+// The captured category is verified against THIS invocation's first-pass hits.
+const COMPLETE_REDACTED_VALUE_RE = /^(["']?)<REDACTED:([A-Za-z][A-Za-z0-9]*)>\1$/;
 
 /**
  * The pattern set `redactText` applies, as stable category ids (#2033).
@@ -47189,6 +47207,10 @@ function redactText(text, opts = {}) {
   const skipMatch = (full) => isAllowlisted(full) || (extraAllow ? extraAllow.test(full) : false);
 
   let out = String(text);
+  // Preserve source-vs-generated provenance without re-scanning the entire
+  // input once for each environment variable. Caller-owned mask syntax is
+  // untrusted, even when another match discovers the same category later.
+  const inputMarkers = new Set(out.match(/<REDACTED:[A-Za-z][A-Za-z0-9]*>/g) ?? []);
 
   for (const { id, regex, redact } of [...PATTERNS, ...ASSIGNMENT_PATTERNS]) {
     out = out.replace(regex, (m, ...groups) => {
@@ -47204,10 +47226,23 @@ function redactText(text, opts = {}) {
     });
   }
 
+  const firstPassCategories = new Set(hits.keys());
   out = out.replace(ENV_VAR_RE, (full, name, value) => {
     if (skipMatch(full)) return full;
     if (!SENSITIVE_NAME_RE.test(name)) return full;
     if (!value || value.trim().length < 8) return full;
+    // Only a category detected by a named pass in THIS invocation can skip
+    // another env hit. A marker supplied by the caller is not such evidence.
+    // When original text already has the same marker, conservatively mask
+    // again rather than mistake attacker-controlled text for provenance.
+    const complete = COMPLETE_REDACTED_VALUE_RE.exec(value.trim());
+    if (
+      complete &&
+      firstPassCategories.has(complete[2]) &&
+      !inputMarkers.has(REPLACEMENT(complete[2]))
+    ) {
+      return full;
+    }
     bump('envAssignment');
     // Reconstruct so we keep the (optional) `export ` prefix and the exact
     // whitespace around `=`. Slicing `full` up to the start of `value` is

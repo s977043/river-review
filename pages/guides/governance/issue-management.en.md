@@ -6,6 +6,8 @@ To sustainably proceed with feature development, skill design, and agent foundat
 
 This document summarizes operation rules so that Issue creators, reviewers, and maintainers can proceed with the same premises.
 
+For reversible small-batch triage and work that can proceed before an owner decision, see the [Issue Triage Living Playbook](./issue-triage.en.md). That page describes an adaptable practice; it does **not** override the labels, approval, CI or merge rules below.
+
 ## 📍 1. Issue Creation Rules (Mandatory)
 
 ### 1-1. Always Use Issue Templates

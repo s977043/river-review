@@ -1,7 +1,7 @@
 {
-  "manifestId": "RR-EXM-b3208c770b91",
-  "manifestKey": "b3208c770b916ad459bf76fd021869e8e6e0638a0bb7ac03bed200d6d8b42d17",
-  "manifestHash": "e89d462c9664f2b607b2dae74634918d16ace7980afd01b9a46c9cbe73e1fb73",
+  "manifestId": "RR-EXM-b2e05025f7c5",
+  "manifestKey": "b2e05025f7c51248b0683f48f1c4bb24a198b7add6dc832df92a7cad545daa23",
+  "manifestHash": "4e22f8233ae34e371386c6417e6429d23fc401633b6f6c366ca4f1616ab981ec",
   "createdAt": "2026-09-03T00:00:00.000Z",
   "schemaVersion": 1,
   "kind": "execution-manifest",
@@ -84,6 +84,23 @@
   "writeEffects": [],
   "redaction": {
     "applied": true,
+    "appliedPatterns": [
+      "githubToken",
+      "openaiKey",
+      "anthropicKey",
+      "googleApiKey",
+      "awsAccessKey",
+      "privateKey",
+      "bearerToken",
+      "databaseUrl",
+      "webhookUrl",
+      "urlUserInfo",
+      "awsSecretKey",
+      "oauthSecret",
+      "passwordAssignment",
+      "envAssignment",
+      "highEntropy"
+    ],
     "hits": []
   }
 }

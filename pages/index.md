@@ -24,6 +24,7 @@ AI は findings と判断材料を出し、GO / NO-GO や最終承認は人間�
 
 - **まず 5 分で試す**: [クイックスタート](/guides/quickstart)
 - **既存のレビュー観点から始める**: [Starter Cookbook](/guides/starter-cookbook)
+- **OSSの開発・貢献方針を知る**: [実践進化方針](/guides/governance/practice-evolution)
 - **PR 前 + PR 後の 2 段構えで運用する**: [2 段構えレビューゲート](/guides/two-stage-review-gate)
 - **他の AI レビューツールと比較する**: [AI コードレビュー比較](/comparison/ai-code-review-tools)
 - **品質・回帰・コストを測る**: [Run store / 回帰比較](/guides/track-runs-and-regressions)、[コスト見積もり](/guides/cost-estimation)、[ダッシュボード](/dashboard)

@@ -30,7 +30,7 @@ River Review helps you answer questions like:
 
 ⭐ If this helps your team's review workflow in AI-assisted development, please [Star the repo](https://github.com/s977043/river-review). It keeps you posted on updates and helps other teams with the same problem find River Review.
 
-For the problems River Review addresses, its design intent, and its relationship to PlanGate and Harness Engineering, see [Design philosophy (Japanese)](docs/philosophy.md).
+For design intent and boundaries, see the [public Design Philosophy](pages/explanation/design-philosophy.en.md). Our OSS governance values are published in the [Practice Evolution policy](pages/guides/governance/practice-evolution.en.md).
 
 ## Why River Review?
 

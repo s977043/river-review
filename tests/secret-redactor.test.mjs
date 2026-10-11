@@ -149,6 +149,64 @@ test('redactText catches dotenv-style secret assignments by variable name', () =
   assert.equal(hits.find((h) => h.category === 'envAssignment')?.count, 2);
 });
 
+test('#2203 tracks a secret once when named-pattern masking precedes env masking', () => {
+  // Masking a first-pass token is not a second secret discovery in ENV_VAR_RE.
+  const cases = [
+    ['PASSWORD = hunter2', 'PASSWORD = <REDACTED:passwordAssignment>', 'passwordAssignment'],
+    ["PASSWORD='hunter2'", "PASSWORD='<REDACTED:passwordAssignment>'", 'passwordAssignment'],
+    ['PASSWORD="hunter2"', 'PASSWORD="<REDACTED:passwordAssignment>"', 'passwordAssignment'],
+    [
+      'export PASSWORD=hunter2',
+      'export PASSWORD=<REDACTED:passwordAssignment>',
+      'passwordAssignment',
+    ],
+    ['TOKEN=sk-proj-' + TOKEN_BODY_48, 'TOKEN=<REDACTED:openaiKey>', 'openaiKey'],
+  ];
+  for (const [sample, expected, category] of cases) {
+    const { text, hits } = redactText(sample, { highEntropy: false });
+    assert.equal(text, expected, sample);
+    assert.deepEqual(hits, [{ category, count: 1 }], sample);
+  }
+});
+
+test('#2203 treats caller-supplied masks as untrusted, even with plausible categories', () => {
+  // Marker syntax does not prove the value was masked in this invocation.
+  // Unknown, known, and quoted caller-owned markers must reach ENV_VAR_RE.
+  for (const source of [
+    'PASSWORD=<REDACTED:unknownMarker>',
+    'PASSWORD=<REDACTED:passwordAssignment>',
+    'PASSWORD="<REDACTED:passwordAssignment>"',
+  ]) {
+    const { text, hits } = redactText(source, { highEntropy: false });
+    assert.equal(text, 'PASSWORD=<REDACTED:envAssignment>', source);
+    assert.deepEqual(hits, [{ category: 'envAssignment', count: 1 }], source);
+  }
+
+  // Input-owned marker collision forces a conservative second mask.
+  const source = 'PASSWORD = hunter2\nTOKEN=<REDACTED:passwordAssignment>';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  const expected = 'PASSWORD = <REDACTED:envAssignment>\nTOKEN=<REDACTED:envAssignment>';
+  assert.equal(text, expected);
+  assert.deepEqual(hits, [
+    { category: 'passwordAssignment', count: 1 },
+    { category: 'envAssignment', count: 2 },
+  ]);
+});
+
+test('#2203 only skips a complete redacted env value, never trailing raw material', () => {
+  // A forged placeholder with extra raw bytes must not bypass the env pass.
+  const source = 'PASSWORD=<REDACTED:passwordAssignment>secretSuffix';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  assert.equal(text, 'PASSWORD=<REDACTED:envAssignment>');
+  assert.deepEqual(hits, [{ category: 'envAssignment', count: 1 }]);
+
+  for (const clean of ['PORT=3000', 'PWD=/tmp/workdir']) {
+    const { text: untouched, hits: noHits } = redactText(clean, { highEntropy: false });
+    assert.equal(untouched, clean);
+    assert.deepEqual(noHits, []);
+  }
+});
+
 test('redactText catches short and unprefixed secret-named variables', () => {
   // Cases the original ENV_VAR_RE (which required `_KIND` suffix on a 3+
   // char prefix) missed: bare `TOKEN=`, two-char-prefix `MY_TOKEN`, and
@@ -273,18 +331,50 @@ test('#2033 redactText leaves AWS-shaped identifiers that are not keys alone', (
 
 test('#2033 redactText redacts password / passwd / pwd assignments', () => {
   const cases = [
-    ['password=hunter2', 'password='],
-    ['passwd: "hunter2xyz"', 'passwd: '],
-    ["pwd = 's0meThing'", 'pwd = '],
+    ['password=hunter2', 'password=<REDACTED:passwordAssignment>'],
+    ['passwd: "hunter2xyz"', 'passwd: "<REDACTED:passwordAssignment>"'],
+    ["pwd = 's0meThing'", "pwd = '<REDACTED:passwordAssignment>'"],
   ];
-  for (const [sample, keptPrefix] of cases) {
+  for (const [sample, expected] of cases) {
     const { text, hits } = redactText(sample, { highEntropy: false });
-    assert.equal(
-      text,
-      keptPrefix + '<REDACTED:passwordAssignment>',
-      'not redacted as expected: ' + sample
-    );
+    assert.equal(text, expected, 'not redacted as expected: ' + sample);
     assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  }
+});
+
+test('#2203 compact unquoted credential literals are not silently skipped', () => {
+  // Synthetic examples only. These are compact key=value configuration
+  // values, not assertions that redaction is an exhaustive security scan.
+  const inputs = ['password=SuperSecretPass', 'password=my_secret_pass', 'password=P@ss(word1'];
+  for (const source of inputs) {
+    const { text, hits } = redactText(source, { highEntropy: false });
+    assert.equal(text, 'password=<REDACTED:passwordAssignment>', source);
+    assert.deepEqual(hits, [{ category: 'passwordAssignment', count: 1 }], source);
+  }
+});
+
+test('#2203 compact password redaction preserves query neighbors', () => {
+  const source = '?user=viewer&password=SuperSecretPass&debug=1';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  assert.equal(text, '?user=viewer&password=<REDACTED:passwordAssignment>&debug=1');
+  assert.deepEqual(hits, [{ category: 'passwordAssignment', count: 1 }]);
+});
+
+test('#2203 compact credential correction preserves source references and calls', () => {
+  const sourceRefs = [
+    'password: hashedPassword',
+    'password: user_password',
+    'password = hashedPassword',
+    'password = getPassword()',
+    'password=getPassword()',
+    'password=process.env.DB_PASSWORD',
+    'password=${DB_PASSWORD}',
+    'password=example-value',
+  ];
+  for (const source of sourceRefs) {
+    const { text, hits } = redactText(source, { highEntropy: false });
+    assert.equal(text, source, source);
+    assert.equal(hits.length, 0, source);
   }
 });
 
@@ -350,6 +440,19 @@ test('#2033 redactText redacts JSON-shaped password keys', () => {
     assert.equal(text.includes('hunter2'), false, 'leaked: ' + sample);
     assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
   }
+});
+
+test('#2203 preserve valid JSON after password redaction', () => {
+  // Preserve syntactic delimiters so downstream config readers can parse it.
+  const source = '{"password":"hunter2","enabled":true,"label":"public"}';
+  const { text, hits } = redactText(source, { highEntropy: false });
+  assert.deepEqual(JSON.parse(text), {
+    password: '<REDACTED:passwordAssignment>',
+    enabled: true,
+    label: 'public',
+  });
+  assert.equal(hits.find((h) => h.category === 'passwordAssignment')?.count, 1);
+  assert.equal(text.includes('hunter2'), false);
 });
 
 test('#2033 redactText redacts quoted non-ASCII password values', () => {

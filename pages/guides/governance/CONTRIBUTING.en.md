@@ -5,6 +5,10 @@
 
 Thank you for your interest in River Review. We accept Pull Requests and Issues according to the following policies.
 
+## How we evolve this OSS project
+
+We evaluate proposals against local evidence and external knowledge. Contributions may simplify or remove an unhelpful step, not only add new skills or checks. See our [Practice Evolution policy](./practice-evolution.en.md) for adopt, adapt, transform, and defer decisions. Existing submission, review, and CI rules still apply.
+
 ## PR Basic Policy
 
 - Limit one PR to one purpose. Split multiple changes.
