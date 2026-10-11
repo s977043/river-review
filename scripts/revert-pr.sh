@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
-# Revert a merged (squash) PR on a new branch and, with --execute, open the
-# revert PR. Procedure and timing: docs/runbook/revert.md.
+# Revert a merged (squash) PR and, with --execute, open the revert PR.
+# The caller's checkout is never switched or modified: the revert is made in a
+# temporary worktree that is always removed. Procedure: docs/runbook/revert.md.
 #
 #   1. read the PR with `gh pr view <N> --json mergeCommit,state,title`;
 #      refuse unless state is MERGED and the merge commit is on <remote>/main
-#   2. create branch revert/pr-<N> from <remote>/main (refuse if it exists)
-#   3. `git revert --no-edit <sha>` (never reset); on conflict abort the
-#      revert, leave the branch, and stop
+#   2. refuse if branch revert/pr-<N> exists locally or on <remote>
+#   3. check that the revert applies to <remote>/main with
+#      `git merge-tree --write-tree` (writes objects only, no ref or worktree);
+#      on conflict list the paths and stop
 #   4. warn when the reverted commit touches the Action bundle or its inputs
 #      (runners/github-action/dist/**, runners/github-action/src/**, src/**):
 #      the dist may need a rebuild and the bot push can stall CI
 #      (scripts/pr-unstall.sh)
-#   5. with --execute only: check the active gh account, push the branch, and
-#      open the PR "revert: <title> (#<N>)"
+#   5. with --execute only: check the active gh account, add a detached
+#      worktree at <remote>/main under `mktemp -d`, create revert/pr-<N> there,
+#      `git revert --no-edit <sha>` (never reset), push, open the PR
+#      "revert: <title> (#<N>)", and remove the worktree on exit
 #
 # Usage:
-#   scripts/revert-pr.sh <pr-number>            # dry-run (default): no push
+#   scripts/revert-pr.sh <pr-number>            # dry-run (default): creates nothing
 #   scripts/revert-pr.sh <pr-number> --execute  # push and open the PR
 #
 # Environment:
@@ -23,14 +27,18 @@
 #   REMOTE  git remote that points at REPO (default: origin)
 #
 # Exit codes:
-#   0  reverted (and pushed + PR opened with --execute)
-#   1  stopped: the revert conflicts (branch kept, revert aborted)
+#   0  revert applies cleanly (dry-run), or pushed and PR opened (--execute)
+#   1  stopped: the revert conflicts with <remote>/main
 #   2  a gh or git command failed
 #   3  refused: PR not MERGED, no merge commit, merge commit not on main,
-#      branch revert/pr-<N> already exists, or the working tree is dirty
+#      or branch revert/pr-<N> already exists
 #   64 usage error
 
 set -euo pipefail
+
+WORKTREE=''
+CREATED_BRANCH=''
+PUSHED=0
 
 usage() {
   echo "usage: scripts/revert-pr.sh <pr-number> [--execute]" >&2
@@ -42,6 +50,17 @@ die() {
   shift
   echo "revert-pr: $*" >&2
   exit "${code}"
+}
+
+# cleanup: remove only the worktree (and unpushed branch) this run created.
+cleanup() {
+  if [ -n "${WORKTREE}" ]; then
+    git worktree remove --force "${WORKTREE}" || echo "revert-pr: could not remove ${WORKTREE}" >&2
+    [ ! -d "${WORKTREE}" ] || rmdir "${WORKTREE}" 2>/dev/null || true
+  fi
+  if [ -n "${CREATED_BRANCH}" ] && [ "${PUSHED}" -eq 0 ]; then
+    git branch -q -D "${CREATED_BRANCH}" || true
+  fi
 }
 
 # touches_bundle: read paths on stdin, print those that feed the Action bundle.
@@ -72,9 +91,6 @@ main() {
       die 2 "gh repo view failed (wrong gh account? gh api user --jq .login)"
   fi
 
-  [ -z "$(git status --porcelain --untracked-files=no)" ] ||
-    die 3 "working tree has uncommitted changes; commit or use a clean worktree"
-
   local info state sha title
   info="$(gh pr view "${pr}" --repo "${repo}" --json mergeCommit,state,title)" ||
     die 2 "gh pr view ${pr} failed (wrong gh account? gh api user --jq .login)"
@@ -99,20 +115,18 @@ main() {
     die 3 "branch ${branch} already exists on ${remote}"
   fi
 
+  # Reverting sha onto main == merging sha^ into main with sha as the base.
+  local mt rc=0
+  mt="$(git merge-tree --write-tree --name-only --merge-base="${sha}" "${remote}/main" "${sha}^")" || rc=$?
+  if [ "${rc}" -eq 1 ]; then
+    echo "revert-pr: conflict while reverting ${sha} onto ${remote}/main:" >&2
+    sed -n '2,/^$/p' <<<"${mt}" | sed '/^$/d; s/^/  /' >&2
+    die 1 "stopped. Nothing was created; resolve by hand or fix forward"
+  fi
+  [ "${rc}" -eq 0 ] || die 2 "git merge-tree failed"
+
   local bundle path
   bundle="$(git diff-tree --no-commit-id --name-only -r "${sha}" | touches_bundle)"
-
-  git switch -q -c "${branch}" "${remote}/main" || die 2 "git switch -c ${branch} failed"
-  [ "$(git rev-parse --abbrev-ref HEAD)" = "${branch}" ] || die 2 "not on ${branch} after switch"
-
-  if ! git revert --no-edit "${sha}"; then
-    echo "revert-pr: conflict while reverting ${sha}:" >&2
-    git diff --name-only --diff-filter=U >&2 || true
-    git revert --abort || true
-    die 1 "stopped. Branch ${branch} is left at ${remote}/main; resolve by hand or fix forward"
-  fi
-
-  echo "reverted PR #${pr} (${sha}) on ${branch}: $(git rev-parse HEAD)"
   if [ -n "${bundle}" ]; then
     echo "WARNING: the reverted commit touches the Action bundle or its sources:" >&2
     while IFS= read -r path; do echo "  ${path}" >&2; done <<<"${bundle}"
@@ -123,8 +137,8 @@ main() {
 
   local pr_title="revert: ${title} (#${pr})"
   if [ "${execute}" -eq 0 ]; then
-    echo "dry-run: not pushed. To publish: scripts/revert-pr.sh ${pr} --execute"
-    echo "         (delete the local branch first: git branch -D ${branch})"
+    echo "dry-run: PR #${pr} (${sha}) reverts cleanly onto ${remote}/main; nothing created."
+    echo "         To publish: scripts/revert-pr.sh ${pr} --execute"
     echo "         PR title would be: ${pr_title}"
     return 0
   fi
@@ -135,9 +149,23 @@ main() {
     gh auth switch -u "${owner}" >&2 || die 2 "gh account is ${login}; switch to ${owner} failed"
   fi
 
-  git push -u "${remote}" "${branch}" || die 2 "git push failed"
-  [ "$(git ls-remote "${remote}" "refs/heads/${branch}" | cut -f1)" = "$(git rev-parse HEAD)" ] ||
-    die 2 "pushed ref does not match local HEAD"
+  trap cleanup EXIT
+  WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/revert-pr-${pr}.XXXXXX")" || die 2 "mktemp failed"
+  git worktree add -q --detach "${WORKTREE}" "${remote}/main" || die 2 "git worktree add failed"
+  git -C "${WORKTREE}" switch -q -c "${branch}" || die 2 "git switch -c ${branch} failed"
+  CREATED_BRANCH="${branch}"
+  [ "$(git -C "${WORKTREE}" rev-parse --abbrev-ref HEAD)" = "${branch}" ] ||
+    die 2 "worktree is not on ${branch}"
+
+  git -C "${WORKTREE}" revert --no-edit "${sha}" || die 2 "git revert failed"
+  local head
+  head="$(git -C "${WORKTREE}" rev-parse HEAD)"
+  echo "reverted PR #${pr} (${sha}) on ${branch}: ${head}"
+
+  git -C "${WORKTREE}" push -q -u "${remote}" "${branch}" || die 2 "git push failed"
+  PUSHED=1
+  [ "$(git ls-remote "${remote}" "refs/heads/${branch}" | cut -f1)" = "${head}" ] ||
+    die 2 "pushed ref does not match ${head}"
 
   local body
   body="$(printf 'Reverts #%s\n\n## 理由\n\n<!-- なぜ fix-forward ではなく revert か -->\n' "${pr}")"

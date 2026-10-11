@@ -38,16 +38,15 @@ main にマージされただけの変更は、まだ誰にも届いていませ
 ## 手順
 
 1. `gh api user --jq .login` が `s977043` であることを確かめる（スクリプトも `--execute` 時に確認する）
-2. クリーンな worktree で `scripts/revert-pr.sh <PR番号>` を実行し、dry-run の結果を読む
-3. 問題がなければ `git switch main` と `git branch -D revert/pr-<PR番号>` で後片付けをする
-4. `scripts/revert-pr.sh <PR番号> --execute` で push と PR 作成を行う
-5. PR 本文の「理由」を埋め、CI の green を確かめてからマージ前チェックリストに沿ってマージする
+2. `scripts/revert-pr.sh <PR番号>` で dry-run を実行し、衝突の有無と dist 警告を読む
+3. `scripts/revert-pr.sh <PR番号> --execute` で push と PR 作成を行う
+4. PR 本文の「理由」を埋め、CI の green を確かめてからマージ前チェックリストに沿ってマージする
 
 スクリプトは次の場合に止まります。
 
 - PR が `MERGED` でない、または merge commit が `origin/main` に無い（exit 3）
-- `revert/pr-<N>` が既にある、または作業ツリーに未コミット変更がある（exit 3）
-- revert が衝突した（exit 1）。revert は中断され、fix-forward を検討する
+- `revert/pr-<N>` がローカルか remote に既にある（exit 3）
+- revert が `origin/main` と衝突する（exit 1）。何も作らずに止まるので、fix-forward を検討する
 
 ## dist に影響する revert
 
@@ -87,5 +86,7 @@ docs のみの PR #2653 をマージし、本スクリプトで revert しまし
 
 目標（15 分以内・手作業 3 回未満）は満たしました。
 dist に影響しない revert での値であり、dist 再ビルドや bot push の停止が絡むと延びます。
-なお、スクリプトは実行したディレクトリの checkout を `revert/pr-<N>` へ切り替えます。
-作業中のブランチに戻るには `git switch <元のブランチ>` を実行してください。
+スクリプトは呼び出し元の checkout を切り替えず、作業ツリーも変更しません。
+衝突判定は `git merge-tree` で行い、dry-run は worktree とブランチを作りません。
+`--execute` は `mktemp -d` 配下の一時 worktree で revert し、終了時に必ずその worktree を削除します。
+（ドリル時点の版は呼び出し元の checkout を切り替えていたため、この方式に改めました。）
