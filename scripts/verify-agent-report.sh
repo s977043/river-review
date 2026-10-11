@@ -130,7 +130,7 @@ main() {
   fi
 
   local f
-  for f in "${files[@]}"; do
+  for f in ${files[@]+"${files[@]}"}; do
     if [ -n "${ref}" ] && git -C "${repo_dir}" cat-file -e "${ref}:${f}" 2>/dev/null; then
       row PASS file "${f} in ${ref:0:12}"
     else
@@ -150,7 +150,7 @@ main() {
     else
       row FAIL worktree-status "uncommitted or unreadable: ${dirty%%$'\n'*}"
     fi
-    for f in "${files[@]}"; do
+    for f in ${files[@]+"${files[@]}"}; do
       if [ -e "${worktree}/${f}" ]; then
         row PASS worktree-file "${f}"
       else
