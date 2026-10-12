@@ -96,6 +96,17 @@ const ALLOWLIST_RE = new RegExp(
   'i'
 );
 
+// Provider-specific token formats are strong enough that a documentation
+// word INSIDE the opaque credential body is not reliable evidence of a
+// placeholder. Keep explicit caller allowlists as the intentional override.
+// Other patterns retain the built-in documentation allowlist.
+const STRUCTURED_PROVIDER_KEY_IDS = new Set([
+  'githubToken',
+  'openaiKey',
+  'anthropicKey',
+  'googleApiKey',
+]);
+
 const REPLACEMENT = (category) => `<REDACTED:${category}>`;
 
 /**
@@ -400,7 +411,8 @@ export function redactText(text, opts = {}) {
 
   for (const { id, regex, redact } of [...PATTERNS, ...ASSIGNMENT_PATTERNS]) {
     out = out.replace(regex, (m, ...groups) => {
-      if (skipMatch(m)) return m;
+      const exemptFromBuiltInAllowlist = STRUCTURED_PROVIDER_KEY_IDS.has(id);
+      if (exemptFromBuiltInAllowlist ? extraAllow?.test(m) : skipMatch(m)) return m;
       if (redact) {
         const replaced = redact(m, ...extractCaptureGroups(groups));
         if (replaced == null) return m;
