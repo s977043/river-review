@@ -66,18 +66,101 @@ test('non-gh command passes without invoking gh', () => {
   assert.equal(r.calls, '');
 });
 
-test('gh read ops pass without invoking gh', () => {
+const READ_OPS = [
+  'gh pr view 123 --json url',
+  'gh pr checks 1368',
+  'gh api repos/s977043/river-review/pulls/1',
+  'gh api user --jq .login',
+  'gh release list',
+];
+
+test('gh read op with expected account passes (login checked, no switch)', () => {
+  for (const cmd of READ_OPS) {
+    const r = runHook(cmd, { login: 's977043' });
+    assert.equal(r.status, 0, cmd);
+    assert.match(r.calls, /api user --jq \.login/, cmd);
+    assert.doesNotMatch(r.calls, /auth switch/, cmd);
+  }
+});
+
+test('gh read op with wrong account switches and proceeds', () => {
+  for (const cmd of READ_OPS) {
+    const r = runHook(cmd, { login: 'kominem-unilabo' });
+    assert.equal(r.status, 0, cmd);
+    assert.match(r.calls, /auth switch -u s977043/, cmd);
+    assert.match(r.stderr, /switched to 's977043' before gh read op/, cmd);
+  }
+});
+
+test('gh read op only warns (exit 0) when switch fails', () => {
+  const r = runHook('gh pr view 123', { login: 'kominem-unilabo', switchExit: 1 });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /WARNING/);
+  assert.doesNotMatch(r.stderr, /BLOCKED/);
+});
+
+test('gh auth commands are not guarded', () => {
   for (const cmd of [
-    'gh pr view 123 --json url',
-    'gh pr checks 1368',
-    'gh api repos/s977043/river-review/pulls/1',
-    'gh api user --jq .login',
-    'gh release list',
     'gh auth status',
+    'gh auth switch -u s977043',
+    'gh auth token -u s977043',
+    'gh --hostname github.com auth status',
   ]) {
-    const r = runHook(cmd);
+    const r = runHook(cmd, { login: 'kominem-unilabo' });
     assert.equal(r.status, 0, cmd);
     assert.equal(r.calls, '', cmd);
+  }
+});
+
+test('gh auth in a compound command does not exempt the other gh call', () => {
+  for (const cmd of [
+    'gh auth status && gh pr view 1',
+    'gh pr create --title t --body "run gh auth status first"',
+  ]) {
+    const r = runHook(cmd, { login: 'kominem-unilabo' });
+    assert.equal(r.status, 0, cmd);
+    assert.match(r.calls, /auth switch -u s977043/, cmd);
+  }
+});
+
+test('gh calls that name another owner are not guarded (read and write)', () => {
+  for (const cmd of [
+    'gh pr view 12 -R kominem-unilabo/app',
+    'gh -Rwork-org/app issue list',
+    'gh --repo=work-org/app pr create --fill',
+    'gh --repo "work-org/app" pr merge 3 --squash',
+    'gh api repos/work-org/app/pulls/1',
+    'gh api /repos/Work-Org/app/issues -X PATCH -f state=closed',
+    'gh api "repos/work-org/app/pulls?per_page=100"',
+    'gh pr view https://github.com/work-org/app/pull/3',
+    'gh pr view 1 -R s977043/river-review && gh pr view 2 -R work-org/app',
+  ]) {
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
+    assert.equal(r.status, 0, cmd);
+    assert.equal(r.calls, '', cmd);
+  }
+});
+
+test('explicit expected owner (any case) and placeholders stay guarded', () => {
+  for (const cmd of [
+    'gh -R S977043/river-review pr view 1',
+    'gh api repos/{owner}/{repo}/pulls/1',
+    'gh pr view https://github.com/s977043/river-review/pull/3',
+  ]) {
+    const r = runHook(cmd, { login: 'kominem-unilabo' });
+    assert.equal(r.status, 0, cmd);
+    assert.match(r.calls, /auth switch -u s977043/, cmd);
+  }
+});
+
+test('another owner inside a quoted title/body does not bypass the write guard', () => {
+  for (const cmd of [
+    'gh pr create --title t --body "see https://github.com/work-org/app/pull/1"',
+    "gh issue comment 9 --body 'compare with -R work-org/app and repos/work-org/app/'",
+  ]) {
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
+    assert.equal(r.status, 2, cmd);
+    assert.match(r.stderr, /BLOCKED/, cmd);
   }
 });
 
@@ -106,15 +189,15 @@ test('gh write op blocks (exit 2) when switch also fails', () => {
 
 test('write-op detection covers api methods, body fields, and compound commands', () => {
   for (const cmd of [
-    'gh api repos/a/b/pulls/1/update-branch -X PUT',
-    'gh api repos/a/b/issues -f title=hi',
+    'gh api repos/s977043/river-review/pulls/1/update-branch -X PUT',
+    'gh api repos/s977043/river-review/issues -f title=hi',
     'git push origin HEAD && gh pr create --fill',
     'gh workflow run release-please.yml',
     'gh release create v1.0.0',
   ]) {
-    const r = runHook(cmd, { login: 'kominem-unilabo' });
-    assert.equal(r.status, 0, cmd);
-    assert.match(r.calls, /auth switch -u s977043/, cmd);
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
+    assert.equal(r.status, 2, cmd);
+    assert.match(r.stderr, /BLOCKED/, cmd);
   }
 });
 
@@ -125,42 +208,44 @@ test('write op with global options between gh and subcommand is detected', () =>
     'gh --repo=s977043/river-review issue close 9',
     'gh -R s977043/river-review api repos/{owner}/{repo}/issues -f title=hi',
   ]) {
-    const r = runHook(cmd, { login: 'kominem-unilabo' });
-    assert.equal(r.status, 0, cmd);
-    assert.match(r.calls, /auth switch -u s977043/, cmd);
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
+    assert.equal(r.status, 2, cmd);
+    assert.match(r.stderr, /BLOCKED/, cmd);
   }
 });
 
 test('quoted -X / --method values are detected as write', () => {
   for (const cmd of [
-    'gh api repos/a/b/pulls/1/update-branch -X "PUT"',
-    "gh api repos/a/b/issues --method='POST' --input body.json",
+    'gh api repos/s977043/river-review/pulls/1/update-branch -X "PUT"',
+    "gh api repos/s977043/river-review/issues --method='POST' --input body.json",
     'gh api graphql --method "post"',
   ]) {
-    const r = runHook(cmd, { login: 'kominem-unilabo' });
-    assert.equal(r.status, 0, cmd);
-    assert.match(r.calls, /auth switch -u s977043/, cmd);
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
+    assert.equal(r.status, 2, cmd);
+    assert.match(r.stderr, /BLOCKED/, cmd);
   }
 });
 
+// read と write の区別は「switch 失敗時に止めるか」で観測する（read は警告のみ、write は exit 2）。
 test('read ops with global options are not misdetected as write', () => {
   for (const cmd of [
     'gh -R s977043/river-review pr view 1375',
     'gh --repo s977043/river-review pr list --search "create"',
     'gh -R s977043/river-review api repos/{owner}/{repo}/pulls/1',
   ]) {
-    const r = runHook(cmd, { login: 'kominem-unilabo' });
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
     assert.equal(r.status, 0, cmd);
-    assert.equal(r.calls, '', cmd);
+    assert.match(r.stderr, /WARNING/, cmd);
   }
 });
 
 test('gh api with explicit GET is treated as read', () => {
-  const r = runHook('gh api repos/a/b/pulls -X GET | jq .[0]', {
+  const r = runHook('gh api repos/s977043/river-review/pulls -X GET | jq .[0]', {
     login: 'kominem-unilabo',
+    switchExit: 1,
   });
   assert.equal(r.status, 0);
-  assert.equal(r.calls, '');
+  assert.match(r.stderr, /WARNING/);
 });
 
 test('empty or malformed stdin payload passes', () => {

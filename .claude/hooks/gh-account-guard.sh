@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# PreToolUse hook (matcher: Bash): guard the active gh CLI account before gh write ops.
+# PreToolUse hook (matcher: Bash): guard the active gh CLI account before gh ops.
 #
 # Background: the local gh keyring holds two accounts (s977043 for this repo,
 # kominem-unilabo for work) and the active account silently switches mid-session,
-# causing 404 / permission errors on gh pr create / merge / gh api write calls.
+# causing 404 / permission errors on gh pr create / merge / gh api write calls,
+# and 404 / "Could not resolve to a Repository" on read calls (#2604).
 # This hook makes the prose guard in CLAUDE.md ("Verify gh active account before
-# write ops") deterministic.
+# write ops") deterministic for both reads and writes.
 #
 # Contract (PreToolUse):
 #   stdin  : JSON payload; the Bash tool command is .tool_input.command
@@ -13,11 +14,18 @@
 #   exit 2 : block the tool call; stderr is fed back to Claude
 #
 # Behavior:
-#   - Non-gh commands and gh READ ops: exit 0 immediately (minimal overhead).
-#   - gh WRITE ops: verify `gh api user --jq .login` == expected account.
+#   - Non-gh commands and `gh auth ...`: exit 0 without calling gh.
+#   - gh calls that name another owner explicitly (`--repo`/`-R owner/repo`,
+#     a `repos/<owner>/` api path, a `github.com/<owner>/` URL): exit 0 without
+#     calling gh, so work-repo calls are never switched to the expected account.
+#     Quoted strings containing whitespace (titles, bodies) are ignored here so
+#     a link in a PR body cannot bypass the guard.
+#   - Every other gh call: verify `gh api user --jq .login` == expected account.
 #     If it differs, run `gh auth switch -u <expected>` and notify via stderr
 #     (exit 0 so the original command proceeds on the corrected account).
-#     If the switch itself fails, exit 2 to block the write op.
+#     If the switch itself fails, a WRITE op is blocked with exit 2; a READ op
+#     only gets a stderr warning (exit 0), because a failed read breaks nothing
+#     and blocking it would make the guard itself the cause of failed reads.
 #
 # Testability: expected account overridable via GH_ACCOUNT_GUARD_EXPECTED;
 # `gh` is resolved via PATH so tests can inject a stub.
@@ -65,8 +73,27 @@ WRITE_RE="${WRITE_RE}|${G}repo[[:space:]]+(create|delete|edit|rename|archive|una
 WRITE_RE="${WRITE_RE}|${G}label[[:space:]]+(create|edit|delete|clone)"
 WRITE_RE="${WRITE_RE}|${G}(secret|variable)[[:space:]]+(set|delete)"
 
-if ! printf '%s' "$COMMAND" | grep -qE "$WRITE_RE"; then
-  # Read op or unrelated gh usage (includes `gh auth ...`): allow.
+IS_WRITE=0
+if printf '%s' "$COMMAND" | grep -qE "$WRITE_RE"; then
+  IS_WRITE=1
+fi
+
+# --- Collect gh invocations, minus `gh auth ...` -----------------------------
+SEGMENTS="$(printf '%s\n' "$COMMAND" | grep -oE "${G}[^;&|]*" || true)"
+GUARDED="$(printf '%s\n' "$SEGMENTS" | grep -vE "^[;&|([:space:]]?gh[[:space:]]+${GH_OPT}auth([[:space:]]|\$)" | grep -v '^$' || true)"
+if [ -z "$GUARDED" ]; then
+  exit 0
+fi
+
+# --- Skip calls that explicitly target another owner -------------------------
+OWNER_TOKEN='[A-Za-z0-9][A-Za-z0-9_.-]*'
+OWNERS="$(printf '%s\n' "$GUARDED" |
+  sed -E "s/\"[^\"]*[[:space:]][^\"]*\"//g; s/'[^']*[[:space:]][^']*'//g" |
+  grep -oE "(^|[[:space:]])((--repo|-R)(=|[[:space:]]*)[\"']?|[\"']?/?repos/|[\"']?https?://(www\.)?github\.com/)${OWNER_TOKEN}/" |
+  sed -E "s#^[[:space:]]?(--repo|-R)[=[:space:]]*[\"']?##; s#^[[:space:]]?[\"']?/?repos/##; s#^[[:space:]]?[\"']?https?://(www\.)?github\.com/##; s#/\$##" |
+  tr '[:upper:]' '[:lower:]' || true)"
+EXPECTED_LOWER="$(printf '%s' "$EXPECTED_ACCOUNT" | tr '[:upper:]' '[:lower:]')"
+if printf '%s\n' "$OWNERS" | grep -v '^$' | grep -qvxF "$EXPECTED_LOWER"; then
   exit 0
 fi
 
@@ -81,8 +108,18 @@ if [ "$ACTIVE_LOGIN" = "$EXPECTED_ACCOUNT" ]; then
   exit 0
 fi
 
+OP_KIND='read'
+if [ "$IS_WRITE" = 1 ]; then
+  OP_KIND='write'
+fi
+
 if gh auth switch -u "$EXPECTED_ACCOUNT" >/dev/null 2>&1; then
-  echo "[gh-account-guard] active gh account was '${ACTIVE_LOGIN:-unknown}'; switched to '${EXPECTED_ACCOUNT}' before gh write op" >&2
+  echo "[gh-account-guard] active gh account was '${ACTIVE_LOGIN:-unknown}'; switched to '${EXPECTED_ACCOUNT}' before gh ${OP_KIND} op" >&2
+  exit 0
+fi
+
+if [ "$IS_WRITE" = 0 ]; then
+  echo "[gh-account-guard] WARNING: active gh account is '${ACTIVE_LOGIN:-unknown}' (expected '${EXPECTED_ACCOUNT}') and 'gh auth switch -u ${EXPECTED_ACCOUNT}' failed. A 404 or 'Could not resolve to a Repository' from this read means the account, not a missing resource." >&2
   exit 0
 fi
 
