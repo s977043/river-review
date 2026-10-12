@@ -28,6 +28,7 @@ function runHook(command) {
       tool_input: { command },
     }),
     encoding: 'utf8',
+    env: { ...process.env, HARNESS_EVENTS_PATH: '/dev/null' },
   });
   return { status: res.status, stderr: res.stderr };
 }
@@ -173,7 +174,11 @@ test('passing commands produce no stderr noise', () => {
 
 test('empty or malformed stdin payload passes', () => {
   for (const input of ['', '{not json', '{}', '{"tool_input":{}}']) {
-    const res = spawnSyncGuarded('bash', [HOOK], { input, encoding: 'utf8' });
+    const res = spawnSyncGuarded('bash', [HOOK], {
+      input,
+      encoding: 'utf8',
+      env: { ...process.env, HARNESS_EVENTS_PATH: '/dev/null' },
+    });
     assert.equal(res.status, 0, JSON.stringify(input));
   }
 });
