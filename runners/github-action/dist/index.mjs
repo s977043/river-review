@@ -46838,9 +46838,9 @@ const VERDICT_THRESHOLDS = {
 //   (interaction with #687 PR-B applySuppressions).
 // - High-entropy detection is opt-in by config and runs LAST so that named
 //   categories take priority and avoid double-counting.
-// - Allowlist substrings (example, dummy, placeholder, missing, xxxxx)
-//   suppress redaction on the surrounding token to protect documentation
-//   examples and obvious test fixtures from being mangled.
+// - Built-in allowlist substrings protect documentation fixtures in ambiguous
+//   patterns, but never override structurally recognizable provider API keys
+//   (#2203). Explicit caller allowlists remain an operator-owned exception.
 // - DEFAULT_DENY_GLOBS is exported separately so that path-level exclusion
 //   can run BEFORE redaction (avoids reading .env / *.pem files at all).
 
@@ -46910,6 +46910,17 @@ const ALLOWLIST_RE = new RegExp(
   ALLOWLIST_TOKENS.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
   'i'
 );
+
+// Provider-specific token formats are strong enough that a documentation
+// word INSIDE the opaque credential body is not reliable evidence of a
+// placeholder. Keep explicit caller allowlists as the intentional override.
+// Other patterns retain the built-in documentation allowlist.
+const STRUCTURED_PROVIDER_KEY_IDS = new Set([
+  'githubToken',
+  'openaiKey',
+  'anthropicKey',
+  'googleApiKey',
+]);
 
 const REPLACEMENT = (category) => `<REDACTED:${category}>`;
 
@@ -47215,7 +47226,8 @@ function redactText(text, opts = {}) {
 
   for (const { id, regex, redact } of [...PATTERNS, ...ASSIGNMENT_PATTERNS]) {
     out = out.replace(regex, (m, ...groups) => {
-      if (skipMatch(m)) return m;
+      const exemptFromBuiltInAllowlist = STRUCTURED_PROVIDER_KEY_IDS.has(id);
+      if (exemptFromBuiltInAllowlist ? extraAllow?.test(m) : skipMatch(m)) return m;
       if (redact) {
         const replaced = redact(m, ...extractCaptureGroups(groups));
         if (replaced == null) return m;

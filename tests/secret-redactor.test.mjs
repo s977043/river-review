@@ -599,6 +599,40 @@ test('redactText skips example / placeholder strings', () => {
   assert.equal(text.includes('<missing>'), true);
 });
 
+test('#2203 does not let built-in sample words inside provider keys bypass masking', () => {
+  // All values are synthetic. The opaque credential body may contain an
+  // English word without turning the surrounding provider-format key into
+  // harmless documentation.
+  const examples = [
+    ['githubToken', 'ghp_' + 'A'.repeat(12) + 'example' + 'B'.repeat(21)],
+    ['openaiKey', 'sk-proj-' + 'A'.repeat(16) + 'example' + 'B'.repeat(20)],
+    ['anthropicKey', 'sk-ant-' + 'A'.repeat(16) + 'dummy' + 'B'.repeat(20)],
+    ['googleApiKey', 'AIza' + 'A'.repeat(10) + 'example' + 'B'.repeat(18)],
+  ];
+  for (const [category, token] of examples) {
+    const sample = 'credential: ' + token;
+    const masked = redactText(sample, { highEntropy: false });
+    assert.equal(masked.text, 'credential: <REDACTED:' + category + '>');
+    assert.deepEqual(masked.hits, [{ category, count: 1 }]);
+
+    // An explicit repository allowlist is a separate user-controlled escape.
+    // This does not imply that using it for real secrets is safe.
+    const userOptOut = redactText(sample, {
+      highEntropy: false,
+      allowlist: ['example', 'dummy'],
+    });
+    assert.equal(userOptOut.text, sample);
+    assert.deepEqual(userOptOut.hits, []);
+  }
+
+  // AWS documentation examples are unchanged until their separate,
+  // format-specific allowlist policy is reviewed.
+  assert.equal(
+    redactText('AKIAEXAMPLEEXAMPLE0', { highEntropy: false }).text,
+    'AKIAEXAMPLEEXAMPLE0'
+  );
+});
+
 test('redactText respects caller-supplied allowlist substrings', () => {
   // Allowlist matches against the captured token, so the substring must
   // appear inside the AKIA + 16 char body. AKIA + "TESTFIXTURE12345"
