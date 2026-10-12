@@ -32,9 +32,10 @@ export function resolveEventsPath(env = process.env) {
 }
 
 export function truncateExcerpt(text) {
-  return Array.from(String(text ?? '').replace(/[\n\r\t]/g, ' '))
-    .slice(0, EXCERPT_MAX)
-    .join('');
+  const flat = String(text ?? '')
+    .replace(/[\n\r\t]/g, ' ')
+    .replace(/^ +| +$/g, '');
+  return Array.from(flat).slice(0, EXCERPT_MAX).join('');
 }
 
 /**

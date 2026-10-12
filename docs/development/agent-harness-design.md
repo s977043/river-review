@@ -36,29 +36,45 @@
 
 確認ダイアログのログの行は `{ts, cwd, session_id, permission_mode, tool_name, tool_input}` です。記録は 2026-10-06T16:32Z に始まり、全リポジトリの呼び出しが混ざります。
 
-### 追加する signal（設計のみ）
+### 追加する signal: イベントログ
 
-hook がガードとして止めた事象も、確認ダイアログと同じく失敗の手前で観測できます。各 hook が次の共通形式で `~/.claude/state/harness-events.jsonl` へ 1 行追記する設計にします。user 設定の hook の変更は本 PR に含めません。
+hook がガードとして止めた事象も、確認ダイアログと同じく失敗の手前で観測できます。各 hook は次の共通形式で `~/.claude/state/harness-events.jsonl` へ 1 行追記します。記録先は環境変数 `HARNESS_EVENTS_PATH` で差し替えられます（テストは必ず一時領域へ向ける）。
 
 ```json
 {
   "ts": "2026-10-07T01:02:03Z",
   "source": "hook:no-force-push",
   "kind": "block",
-  "ruleId": "no-force-push",
+  "ruleId": "",
   "cwd": "/path/to/repo",
   "session_id": "…",
-  "detail": { "tool_name": "Bash", "excerpt": "git push --force …" }
+  "detail": { "tool_name": "Bash", "excerpt": "git push --force" }
 }
 ```
+
+実装は次の 2 つで、どちらも同じ行を出します。集計（`harness:report` への取り込み）はまだありません。
+
+| 書き手                                                                       | 使う側                 | 記録する事象                                                                                                                                |
+| ---------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.claude/hooks/harness-event.sh`](../../.claude/hooks/harness-event.sh)     | repo の hook（source） | `no-force-push.sh` の block（`ruleId` は空）、`gh-account-guard.sh` の write の block と read の warn（`ruleId: verify-gh-active-account`） |
+| [`scripts/harness/record-event.mjs`](../../scripts/harness/record-event.mjs) | オーガナイザー・agent  | 自己申告など。`npm run harness:record` で呼ぶ                                                                                               |
+
+`no-force-push` は AGENTS.md Safety の規律で、`guard-ledger.yaml` と `harness-signals.yaml` のどちらにも id が無いため `ruleId` は空文字にしています。user 設定の hook（`~/.claude` 配下）は変更していません。
 
 - `source` は追記した主体である。`hook:<name>`・`command:range-review`・`script:<name>` の形にする
 - `kind` は `block`（止めた）・`warn`（通したが警告した）・`self-report`（agent の自己申告）の 3 つに限る
 - `ruleId` は `harness-signals.yaml` または `guard-ledger.yaml` の `id` と一致させる。対応するルールが無い事象は空文字にする
-- `detail` は原文を全部は残さない。秘密情報の混入を避けるため、照合に要る抜粋だけにする
-- 追記に失敗しても hook の判定は変えない（`log-permission-request.sh` と同じく、記録は常に best effort）
+- `detail` は原文を全部は残さない。秘密情報の混入を避けるため、照合に要る抜粋だけにする。`excerpt` は書き手の両方が改行とタブを空白にし、前後の空白を除いてから 120 文字（code point）で切る。`no-force-push.sh` はクォートを除いたコマンドのうち一致した segment を、`gh-account-guard.sh` は空白を含むクォート文字列を除いた gh 呼び出しの先頭 4 語を渡す
+- 追記に失敗しても hook の判定は変えない（`log-permission-request.sh` と同じく、記録は常に best effort）。`harness-event.sh` は stdout・stderr に何も出さず、常に 0 を返す
 
 range-review の自己申告は、オーガナイザーが出力を受け取った時点で `kind: self-report` として追記します。会話ログ（transcript）の採掘は前提にしません。
+
+```bash
+npm run harness:record -- --source command:range-review --kind self-report \
+  --rule-id no-cd-in-bash --excerpt "reviewer ran cd in Bash"
+```
+
+`--rule-id` は省略できます（空文字になる）。指定した場合は `guard-ledger.yaml` の guards か `harness-signals.yaml` の rules の id でなければ exit 2 で拒否します。`--kind`・`--source` の形式違反も exit 2、書き込みの失敗は exit 1 です。`--session-id` と `--cwd`（既定はカレントディレクトリ）も渡せます。
 
 ### signal の定義: 先頭コマンド語
 

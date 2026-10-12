@@ -115,8 +115,7 @@ describe('harness event log', () => {
       );
       assert.equal(r.status, 2);
       const [e] = readEvents(log);
-      assert.match(e.detail.excerpt, /push origin feat\/x --force/);
-      assert.doesNotMatch(e.detail.excerpt, /SECRETVALUE|commit/);
+      assert.equal(e.detail.excerpt, 'git push origin feat/x --force');
     });
 
     test('an allowed command writes nothing', () => {

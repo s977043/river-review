@@ -52,7 +52,7 @@ harness_event() {
             session_id: ($p.session_id // "" | tostring),
             detail: {
               tool_name: ($p.tool_name // "Bash" | tostring),
-              excerpt: ($excerpt | gsub("[\\n\\r\\t]"; " ") | .[0:120])
+              excerpt: ($excerpt | gsub("[\\n\\r\\t]"; " ") | sub("^ +"; "") | sub(" +$"; "") | .[0:120])
             }
           }'
     )" || exit 0
