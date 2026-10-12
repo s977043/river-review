@@ -276,14 +276,6 @@ guards:
       診断・回復手順であり違反の概念が無い。scripts/release-please-kick.sh は手順の実装であって遵守の検証ではない。
       2026-10-08: Step 9 (c) で延長。機械化 Issue: #2605
 
-  - id: prefix-skill-invocations
-    title: Prefix skill invocations
-    mechanized: none
-    verifiedBy: []
-    addedAt: '2026-07-11'
-    reviewAfter: '2026-10-09'
-    notes: skill 呼び出しは対話時の挙動でリポジトリに痕跡が残らない。
-
   - id: import-the-ssot
     title: Import the SSoT, never re-derive it
     mechanized: partial

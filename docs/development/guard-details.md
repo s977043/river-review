@@ -12,7 +12,7 @@ The codification process in `docs/development/improvement-flow.md` produced thes
 - `pipeline-params-checklist.md`, `dist-check-rebuild-guide.md`, and `heuristic-detector-checklist.md`
 - the guards "Research before proposing", "Propagate signatures", and "Plan merge order"
 - the guards "Commit before branch switches", "Verify git output before chaining", and "Verify agent completion reports"
-- the guards "`N of N required checks are expected` = bot/GITHUB_TOKEN push" and "Prefix skill invocations"
+- the guard "`N of N required checks are expected` = bot/GITHUB_TOKEN push"
 - the guards "Import the SSoT, never re-derive it" and "Fact-check what you author"
 - the guards "Execute what you document" and "Check what the previous change pinned"
 - the guard "An input shape is not a safety argument"
