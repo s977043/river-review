@@ -40,6 +40,7 @@ const LEDGER_TEXT = [
   '  - { id: past, title: Past, mechanized: none, verifiedBy: [], addedAt: unknown, reviewAfter: "2026-09-01" }',
   '  - { id: today, title: Today, mechanized: none, verifiedBy: [], addedAt: unknown, reviewAfter: "2026-10-07" }',
   '  - { id: future, title: Future, mechanized: none, verifiedBy: [], addedAt: unknown, reviewAfter: "2026-11-01" }',
+  '  - { id: retired, title: Retired, mechanized: full, verifiedBy: [x.mjs], addedAt: unknown, reviewAfter: "2026-09-01", proseRetiredAt: "2026-10-01" }',
 ].join('\n');
 
 /**
@@ -205,6 +206,19 @@ describe('ログと台帳の読み込み', () => {
     assert.deepEqual(
       listOverdueGuards(LEDGER_TEXT, '2026-10-07').map((guard) => guard.id),
       ['past', 'today']
+    );
+  });
+
+  test('proseRetiredAt を持つガードは期日到来でも列挙しない', () => {
+    const ledger = [
+      'guards:',
+      '  - { id: overdue-full, title: A, mechanized: full, verifiedBy: [x.mjs], addedAt: unknown, reviewAfter: "2026-09-01" }',
+      '  - { id: overdue-retired, title: B, mechanized: full, verifiedBy: [x.mjs], addedAt: unknown, reviewAfter: "2026-09-01", proseRetiredAt: "2026-10-01" }',
+      '  - { id: future-retired, title: C, mechanized: full, verifiedBy: [x.mjs], addedAt: unknown, reviewAfter: "2026-11-01", proseRetiredAt: "2026-10-01" }',
+    ].join('\n');
+    assert.deepEqual(
+      listOverdueGuards(ledger, '2026-10-07').map((guard) => guard.id),
+      ['overdue-full']
     );
   });
 
