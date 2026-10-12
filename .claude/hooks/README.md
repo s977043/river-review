@@ -83,33 +83,48 @@ command: `npm test -- tests/no-force-push-hook.test.mjs`
 ## gh-account-guard.sh
 
 PreToolUse hook (matcher: `Bash`) that verifies the active `gh` CLI account
-before gh **write** operations.
+before gh **read and write** operations.
 
 ### Purpose
 
 The local gh keyring holds two accounts (`s977043` for this repo,
 `kominem-unilabo` for work) and the active account silently switches
 mid-session, causing 404 / permission errors on `gh pr create` / `gh pr merge`
-/ `gh api` write calls. This hook makes the prose guard in CLAUDE.md ("Verify
-gh active account before write ops") deterministic.
+/ `gh api` write calls, and 404 / `Could not resolve to a Repository` on read
+calls (#2604). This hook makes the prose guard in CLAUDE.md ("Verify gh active
+account before write ops") deterministic.
 
 ### How it works
 
 1. Reads the PreToolUse stdin JSON and extracts `.tool_input.command`.
-2. Non-gh commands and gh read ops exit 0 immediately (no gh call, minimal
-   overhead).
-3. gh write ops (`gh pr create|merge|edit|close|comment|ready|reopen|review|update-branch`,
+2. Non-gh commands and `gh auth ...` exit 0 immediately (no gh call).
+3. The command is split into gh calls (segments). A segment that explicitly
+   names another owner — the `--repo`/`-R owner/repo` value, or a
+   `repos/<owner>/` endpoint as the first positional argument of `gh api` — is
+   dropped, so work-repo calls are never switched to the expected account.
+   Title/body text and `#` comments are not read for owners, so a link in a PR
+   body does not exempt a write. Exception: an unquoted value shaped like
+   `-R…` or `--repo=…` (e.g. `gh pr merge 2 --body -Rother/x`) is mistaken for
+   an owner, and that write is left unchecked. The remaining segments decide:
+   if any of them is a write, the command is a write.
+4. A read is also left unchecked when the command contains `cd`/`pushd` or
+   `GH_REPO=` — even inside a comment or a quoted string — or when the payload
+   `.cwd` is outside this repository (compared by git common dir, so linked
+   worktrees count as inside). Writes are checked regardless.
+5. Every remaining gh call triggers an account check via `gh api user --jq .login`
+   (about +0.45 s per gh call with the real gh). gh write ops
+   (`gh pr create|merge|edit|close|comment|ready|reopen|review|update-branch`,
    `gh issue <write subcommands>`, `gh api` with `-X`/`--method`
    POST/PATCH/PUT/DELETE or body fields (`-f`/`-F`/`--field`/`--raw-field`/`--input`,
    which default `gh api` to POST), `gh release <write subcommands>`,
    `gh workflow run|enable|disable`, `gh run rerun|cancel|delete`,
    `gh repo <write subcommands>`, `gh label <write subcommands>`,
-   `gh secret|variable set|delete`) trigger an account check via
-   `gh api user --jq .login`.
-4. If the active account is not the expected one, runs
+   `gh secret|variable set|delete`) are classified as write; the rest as read.
+6. If the active account is not the expected one, runs
    `gh auth switch -u <expected>` and notifies via stderr, then allows the
-   command to proceed (exit 0). If the switch itself fails, exits 2 to block
-   the tool call — stderr is fed back to Claude.
+   command to proceed (exit 0). If the switch itself fails, a write op exits 2
+   to block the tool call (stderr is fed back to Claude); a read op only gets a
+   stderr warning and proceeds, because a failed read breaks nothing.
 
 Expected account defaults to `s977043`; override with
 `GH_ACCOUNT_GUARD_EXPECTED` (used by tests to stay hermetic).
