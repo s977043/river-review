@@ -31,6 +31,19 @@ Source artifacts may exist outside these PR comments.
 The read-only audit did not inspect private Host evidence.
 The detailed evidence audit is recorded in issue #2575.
 
+## Canonical proposal ownership
+
+Use only `src/lib/review-resolution-feedback.mjs` to produce Feedback proposals.
+The companion approval adapter is `src/lib/review-resolution-feedback-approval.mjs`.
+The alternate internal proposal-only module from #2624 was retired in #2672.
+It had a different candidate shape and no original Finding binding.
+Its candidate was not an approval or canonical Feedback entry.
+
+Always supply original source findings and a trusted Skill mapping.
+Supply the current target revision for a verified fix.
+Missing source evidence must produce a held outcome.
+A PR merge or review comment is not source Finding attestation.
+
 ## Required source evidence
 
 The operator must select five to ten real PRs.

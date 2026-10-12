@@ -194,6 +194,29 @@ describe('Resolution -> Feedback proposals (#2575)', () => {
     }
   });
 
+  test('holds verified fixes that conflict with Author or Resolution intent', () => {
+    for (const variant of [
+      { resolutionState: 'open' },
+      { authorState: 'wont_fix' },
+      { authorState: 'postpones' },
+    ]) {
+      const [proposal] = buildReviewResolutionFeedbackProposals({
+        reviewResolution: document([item(variant)]),
+        skillIdByFingerprint: { [FP]: 'review/skill' },
+      });
+      assert.equal(proposal.status, 'needs_human');
+      assert.equal(proposal.reasonCode, 'requires_human_classification');
+      assert.equal(proposal.feedbackType, null);
+    }
+
+    const [valid] = buildReviewResolutionFeedbackProposals({
+      reviewResolution: document([item({ authorState: 'none' })]),
+      skillIdByFingerprint: { [FP]: 'review/skill' },
+    });
+    assert.equal(valid.status, 'candidate');
+    assert.equal(valid.feedbackType, 'accepted');
+  });
+
   test('holds incompatible feedback fingerprints and missing skill mappings', () => {
     const bad = buildReviewResolutionFeedbackProposals({
       reviewResolution: document([item({ fingerprint: 'fp:legacy-id' })]),
