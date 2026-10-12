@@ -799,7 +799,7 @@ test('the real ledger covers every guard and keeps reviewAfter on or after added
 test('claude-md-guard-ledger spec fails when a guard is removed from CLAUDE.md', async () => {
   const spec = realSpec('claude-md-guard-ledger');
   const realText = await readRepoFile('CLAUDE.md');
-  const mutated = realText.replace(/^-\s+\*\*Prefix skill invocations\*\*:.*\r?\n/m, '');
+  const mutated = realText.replace(/^-\s+\*\*Read before referencing\*\*:.*\r?\n/m, '');
   assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
 
   const { errors, checked } = await checkDocEnumerations({
@@ -808,7 +808,7 @@ test('claude-md-guard-ledger spec fails when a guard is removed from CLAUDE.md',
   });
   assert.equal(checked, 1);
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /実体に "Prefix skill invocations" があるが .* に載っていない/);
+  assert.match(errors[0], /実体に "Read before referencing" があるが .* に載っていない/);
 });
 
 test('claude-md-guard-ledger spec passes when a prose-retired guard is absent from CLAUDE.md', async () => {
@@ -830,7 +830,7 @@ test('claude-md-guard-ledger spec passes when a prose-retired guard is absent fr
 test('claude-md-guard-ledger spec fails when a prose-retired guard is still in CLAUDE.md', async () => {
   const realText = await readRepoFile('CLAUDE.md');
   const mutated = realText.replace(
-    /^(-\s+\*\*Prefix skill invocations\*\*:)/m,
+    /^(-\s+\*\*Read before referencing\*\*:)/m,
     '- **Doc-edit textlint**: prose that should have been retired.\n$1'
   );
   assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
@@ -861,7 +861,7 @@ test('claude-md-guard-ledger spec fails when a phantom guard is added to CLAUDE.
   const spec = realSpec('claude-md-guard-ledger');
   const realText = await readRepoFile('CLAUDE.md');
   const mutated = realText.replace(
-    /^(-\s+\*\*Prefix skill invocations\*\*:)/m,
+    /^(-\s+\*\*Read before referencing\*\*:)/m,
     '- **Phantom guard**: not in the ledger.\n$1'
   );
   assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
@@ -879,19 +879,19 @@ test('claude-md-guard-ledger spec reports both directions when a guard is rename
   const spec = realSpec('claude-md-guard-ledger');
   const realText = await readRepoFile('CLAUDE.md');
   const mutated = realText.replace(
-    /^-\s+\*\*Prefix skill invocations\*\*:/m,
-    '- **Prefix skill invocations (renamed)**:'
+    /^-\s+\*\*Read before referencing\*\*:/m,
+    '- **Read before referencing (renamed)**:'
   );
   assert.notEqual(mutated, realText, 'fixture precondition: the guard bullet must exist');
 
   const { errors } = await checkDocEnumerations({ specs: [spec], readDoc: async () => mutated });
   assert.equal(errors.length, 2);
   assert.ok(
-    errors.some((e) => e.includes('"Prefix skill invocations"') && e.includes('載っていない'))
+    errors.some((e) => e.includes('"Read before referencing"') && e.includes('載っていない'))
   );
   assert.ok(
     errors.some(
-      (e) => e.includes('"Prefix skill invocations (renamed)"') && e.includes('実体に存在しない')
+      (e) => e.includes('"Read before referencing (renamed)"') && e.includes('実体に存在しない')
     )
   );
 });

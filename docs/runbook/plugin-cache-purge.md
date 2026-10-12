@@ -16,7 +16,7 @@ Claude Code はインストール済みプラグインをバージョンごと�
 ~/.claude/plugins/cache/river-review-marketplace/river-review/<version>/
 ```
 
-同一プラグインの複数バージョンが cache に共存すると、skill 解決が古い版へ引き寄せられることがあります。素の（prefix なしの）`review-team` 呼び出しは、同名 skill と衝突して誤解決した実績があります。ここでの同名 skill とは growth-core 版や旧バージョン cache を指します。呼び出し側の一次対策は namespace prefix の徹底です。詳細は CLAUDE.md の AI Misoperation Guards「Prefix skill invocations」を参照してください。cache 起因が疑われる場合は、本 runbook の purge 手順で二次対策を行います。
+同一プラグインの複数バージョンが cache に共存すると、skill 解決が古い版へ引き寄せられることがあります。素の（prefix なしの）`review-team` 呼び出しは、同名 skill と衝突して誤解決した実績があります。ここでの同名 skill とは growth-core 版や旧バージョン cache を指します。呼び出し側の一次対策は namespace prefix 付きの呼び出し（`river-review:review-team`）です。cache 起因が疑われる場合は、本 runbook の purge 手順で二次対策を行います。
 
 ## 診断: cache 内バージョンの確認
 
@@ -178,5 +178,4 @@ marketplace クローン（`~/.claude/plugins/marketplaces/river-review-marketpl
 
 ## 関連
 
-- CLAUDE.md AI Misoperation Guards「Prefix skill invocations」（呼び出し側の一次対策）
 - 計画書 [#1463](https://github.com/s977043/river-review/issues/1463)（review-team 改名保留と消極的対策）
