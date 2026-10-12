@@ -69,6 +69,14 @@ function proposedType(item, sourceRevision) {
   }
 
   if (item?.verification?.state === 'verified_resolved') {
+    // Even targeted verifier evidence cannot override a conflicting author
+    // response or an action that was never submitted. Require Human review.
+    if (
+      item?.resolution?.state !== 'action_submitted' ||
+      !['none', 'will_fix'].includes(item?.authorResponse?.state)
+    ) {
+      return { feedbackType: null, reasonCode: 'requires_human_classification' };
+    }
     return hasTargetedVerification(item, sourceRevision)
       ? { feedbackType: 'accepted', reasonCode: null }
       : { feedbackType: null, reasonCode: 'verification_evidence_insufficient' };
