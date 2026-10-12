@@ -37,10 +37,10 @@ function makeStub() {
   return { dir, log };
 }
 
-function runHook(command, { login = 's977043', switchExit = 0 } = {}) {
+function runHook(command, { login = 's977043', switchExit = 0, cwd } = {}) {
   const { dir, log } = makeStub();
   try {
-    const input = JSON.stringify({ tool_input: { command } });
+    const input = JSON.stringify({ tool_input: { command }, ...(cwd ? { cwd } : {}) });
     const res = spawnSync('bash', [HOOK], {
       input,
       encoding: 'utf8',
@@ -132,8 +132,7 @@ test('gh calls that name another owner are not guarded (read and write)', () => 
     'gh api repos/work-org/app/pulls/1',
     'gh api /repos/Work-Org/app/issues -X PATCH -f state=closed',
     'gh api "repos/work-org/app/pulls?per_page=100"',
-    'gh pr view https://github.com/work-org/app/pull/3',
-    'gh pr view 1 -R s977043/river-review && gh pr view 2 -R work-org/app',
+    'gh api --paginate repos/work-org/app/pulls',
   ]) {
     const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
     assert.equal(r.status, 0, cmd);
@@ -153,15 +152,89 @@ test('explicit expected owner (any case) and placeholders stay guarded', () => {
   }
 });
 
-test('another owner inside a quoted title/body does not bypass the write guard', () => {
+test('another owner in title/body/comment text does not bypass the write guard', () => {
   for (const cmd of [
+    'gh pr create --title t --body https://github.com/other/x',
+    'gh pr create --title t -b repos/other/x/',
+    'gh pr create --title t --body "https://github.com/other/x/pull/1"',
     'gh pr create --title t --body "see https://github.com/work-org/app/pull/1"',
     "gh issue comment 9 --body 'compare with -R work-org/app and repos/work-org/app/'",
+    'gh pr merge 1 --squash # see repos/other/x/',
+    'gh pr merge 1 --squash # -R other/x',
   ]) {
     const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
     assert.equal(r.status, 2, cmd);
     assert.match(r.stderr, /BLOCKED/, cmd);
   }
+});
+
+test('a github.com URL argument does not exempt a read', () => {
+  const r = runHook('gh pr view https://github.com/work-org/app/pull/3', {
+    login: 'kominem-unilabo',
+    switchExit: 1,
+  });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /WARNING/);
+});
+
+test('only the segment naming another owner is exempt in a compound command', () => {
+  for (const cmd of [
+    'gh pr merge 1 && gh pr view 2 -R proni/foo',
+    'gh pr merge 1 --squash; gh api repos/proni/foo/pulls',
+    'gh pr view 2 -R proni/foo && gh pr create --fill',
+  ]) {
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
+    assert.equal(r.status, 2, cmd);
+    assert.match(r.stderr, /BLOCKED/, cmd);
+  }
+  const r = runHook('gh pr view 1 -R s977043/river-review && gh pr view 2 -R work-org/app', {
+    login: 'kominem-unilabo',
+    switchExit: 1,
+  });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /WARNING/);
+});
+
+test('reads that may target another repo implicitly are not guarded', () => {
+  for (const cmd of [
+    'cd ../work-app && gh pr view 1',
+    'pushd /tmp/work && gh pr list',
+    'GH_REPO=work-org/app gh pr view 1',
+  ]) {
+    const r = runHook(cmd, { login: 'kominem-unilabo' });
+    assert.equal(r.status, 0, cmd);
+    assert.equal(r.calls, '', cmd);
+  }
+});
+
+test('writes are guarded even after cd or with GH_REPO', () => {
+  for (const cmd of ['cd ../work-app && gh pr create --fill', 'GH_REPO=s977043/x gh pr merge 1']) {
+    const r = runHook(cmd, { login: 'kominem-unilabo', switchExit: 1 });
+    assert.equal(r.status, 2, cmd);
+    assert.match(r.stderr, /BLOCKED/, cmd);
+  }
+});
+
+test('payload cwd outside this repository skips reads but not writes', () => {
+  const outside = mkdtempSync(join(tmpdir(), 'rr-gh-guard-cwd-'));
+  try {
+    spawnSync('git', ['init', '-q', outside]);
+    for (const cwd of [outside, join(outside, 'missing')]) {
+      const read = runHook('gh pr view 1', { login: 'kominem-unilabo', cwd });
+      assert.equal(read.status, 0, cwd);
+      assert.equal(read.calls, '', cwd);
+      const write = runHook('gh pr merge 1', { login: 'kominem-unilabo', switchExit: 1, cwd });
+      assert.equal(write.status, 2, cwd);
+    }
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('payload cwd inside this repository keeps reads guarded', () => {
+  const r = runHook('gh pr view 1', { login: 'kominem-unilabo', cwd: join(dirname(HOOK), '..') });
+  assert.equal(r.status, 0);
+  assert.match(r.calls, /auth switch -u s977043/);
 });
 
 test('gh write op with expected account passes (login checked, no switch)', () => {

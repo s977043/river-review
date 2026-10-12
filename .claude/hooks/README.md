@@ -98,13 +98,18 @@ account before write ops") deterministic.
 
 1. Reads the PreToolUse stdin JSON and extracts `.tool_input.command`.
 2. Non-gh commands and `gh auth ...` exit 0 immediately (no gh call).
-3. gh calls that explicitly name another owner (`--repo`/`-R owner/repo`, a
-   `repos/<owner>/` api path, or a `github.com/<owner>/` URL) exit 0 without a
-   gh call, so work-repo calls are never switched to the expected account.
-   Quoted strings that contain whitespace (titles, bodies) are ignored for this
-   check, so a link in a PR body does not bypass the guard. If a compound
-   command names another owner anywhere, the whole command is left unguarded.
-4. Every other gh call triggers an account check via `gh api user --jq .login`
+3. The command is split into gh calls (segments). A segment that explicitly
+   names another owner — the `--repo`/`-R owner/repo` value, or a
+   `repos/<owner>/` endpoint as the first positional argument of `gh api` — is
+   dropped, so work-repo calls are never switched to the expected account.
+   Title/body text and `#` comments are not read for owners, so a link in a PR
+   body does not exempt a write. The remaining segments decide: if any of them
+   is a write, the command is a write.
+4. A read is also left unchecked when the command contains `cd`/`pushd` or
+   `GH_REPO=`, or when the payload `.cwd` is outside this repository (compared
+   by git common dir, so linked worktrees count as inside). Writes are checked
+   regardless.
+5. Every remaining gh call triggers an account check via `gh api user --jq .login`
    (about +0.45 s per gh call with the real gh). gh write ops
    (`gh pr create|merge|edit|close|comment|ready|reopen|review|update-branch`,
    `gh issue <write subcommands>`, `gh api` with `-X`/`--method`
@@ -113,7 +118,7 @@ account before write ops") deterministic.
    `gh workflow run|enable|disable`, `gh run rerun|cancel|delete`,
    `gh repo <write subcommands>`, `gh label <write subcommands>`,
    `gh secret|variable set|delete`) are classified as write; the rest as read.
-5. If the active account is not the expected one, runs
+6. If the active account is not the expected one, runs
    `gh auth switch -u <expected>` and notifies via stderr, then allows the
    command to proceed (exit 0). If the switch itself fails, a write op exits 2
    to block the tool call (stderr is fed back to Claude); a read op only gets a

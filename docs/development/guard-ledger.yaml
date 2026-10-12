@@ -157,7 +157,7 @@ guards:
     addedAt: '2026-06-11'
     reviewAfter: '2027-01-06'
     notes: >-
-      PreToolUse hook が gh の read と write の両方でアカウントを判定し、期待アカウントでなければ gh auth switch してから通す（#2604）。switch に失敗したとき write は exit 2 で止め、read は stderr 警告のみで通す（read の失敗は壊さないため）。gh auth と、--repo/-R・repos/<owner>/・github.com/<owner>/ で別 owner を明示した呼び出しは対象外にしている。挙動は tests/gh-account-guard-hook.test.mjs が stub gh で固定する。full にしない理由として残余が 3 つある。1 つ目は Claude Code の Bash ツール以外の経路（端末での直接実行）。2 つ目は別 owner の判定が明示の印だけに依ることで、cd や cwd・GH_REPO・graphql の変数で別 owner を指す呼び出しは期待アカウントへ切り替わる。3 つ目は、別 owner を含む複合コマンドは全体が無検査で通ること。3 つとも違反が決定論のチェックで必ず失敗になるとはいえないため、mechanized は partial のままにしている。
+      PreToolUse hook が gh の read と write の両方でアカウントを判定し、期待アカウントでなければ gh auth switch してから通す（#2604）。switch に失敗したとき write は exit 2 で止め、read は stderr 警告のみで通す（read の失敗は壊さないため）。gh auth と、--repo/-R の値または gh api の第 1 位置引数 repos/<owner>/ で別 owner を明示した gh 呼び出し（セグメント単位）は対象外にしている。read はさらに、cd/pushd・GH_REPO= を含むときと、payload の cwd がこのリポジトリ外のときに検査しない。write はこれらに関係なく検査する。挙動は tests/gh-account-guard-hook.test.mjs が stub gh で固定する。full にしない理由として残余が 3 つある。1 つ目は Claude Code の Bash ツール以外の経路（端末での直接実行）。2 つ目は、owner を明示しない write（graphql の変数や cwd で別 repo を指すもの）が期待アカウントへ切り替わること。3 つ目は、bash -c "gh ..."、バッククォート、絶対パスの gh を hook が gh 呼び出しとして認識しないこと（base から存在）。3 つとも違反が決定論のチェックで必ず失敗になるとはいえないため、mechanized は partial のままにしている。
       2026-10-08: Step 9 (c) で延長。機械化 Issue: #2604
 
   - id: merge-time-checks
