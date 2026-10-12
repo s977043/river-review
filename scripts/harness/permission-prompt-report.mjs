@@ -199,13 +199,14 @@ export function analyzeRule(rule, rows, coverage) {
 
 /**
  * reviewAfter が today 以前のガードを返す（improvement-flow.md Step 9 の列挙条件と同じ `<=`）。
+ * Step 9 (a) で散文を退役した（proseRetiredAt を持つ）エントリは判断済みの記録なので除く。
  *
  * @param {string} ledgerText
  * @param {string} today YYYY-MM-DD
  */
 export function listOverdueGuards(ledgerText, today) {
   return parseGuardLedger(ledgerText)
-    .filter((guard) => String(guard.reviewAfter) <= today)
+    .filter((guard) => guard.proseRetiredAt === undefined && String(guard.reviewAfter) <= today)
     .sort((a, b) => String(a.reviewAfter).localeCompare(String(b.reviewAfter)))
     .map((guard) => ({
       id: guard.id,

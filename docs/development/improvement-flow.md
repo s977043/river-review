@@ -126,12 +126,12 @@ Step 1〜8 はすべて追加の手順です。追加だけを繰り返した結
 
 - **発動条件**: 台帳の `reviewAfter`（ガードの既定は `addedAt` + 90 日）が到来していること。日付の到来だけが条件であり、ミスの再発や体感は条件に含めない
 - **判断者**: リポジトリのメンテナ（`s977043`）。判断は PR として提出し、通常のレビュー経路に載せる
-- **棚卸しの起点**: セッション開始時の sanity check、またはリリース直後。`guards:` と `decisions:` の両方を次のコマンドで列挙する。対象は `reviewAfter` が今日以前のエントリと、`reviewAfter: undecided` のエントリである
+- **棚卸しの起点**: セッション開始時の sanity check、またはリリース直後。`guards:` と `decisions:` の両方を次のコマンドで列挙する。対象は `reviewAfter` が今日以前のエントリと、`reviewAfter: undecided` のエントリである。(a) で `proseRetiredAt` を付けたガードは判断済みの記録なので対象から外す
 
 ```bash
 node -e "const y=require('js-yaml'),f=require('node:fs');const t=new Date().toISOString().slice(0,10);
 const d=y.load(f.readFileSync('docs/development/guard-ledger.yaml','utf8'));
-for(const g of d.guards) if(g.reviewAfter<=t) console.log('guard',g.reviewAfter,g.mechanized,g.id);
+for(const g of d.guards) if(g.proseRetiredAt===undefined&&g.reviewAfter<=t) console.log('guard',g.reviewAfter,g.mechanized,g.id);
 for(const e of d.decisions??[]) if(e.reviewAfter==='undecided'||e.reviewAfter<=t)
   console.log('decision',e.reviewAfter,e.kind,e.id);"
 ```
