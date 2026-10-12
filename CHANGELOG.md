@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.128.0](https://github.com/s977043/river-review/compare/v1.127.0...v1.128.0) (2026-10-12)
+
+
+### Features
+
+* **suppression:** opt-in skill-version mismatch guard ([#2670](https://github.com/s977043/river-review/issues/2670)) ([5c46882](https://github.com/s977043/river-review/commit/5c46882788f9258e4fcef986afaa34c374155bf3))
+
+
+### Bug Fixes
+
+* **hooks:** guard gh active account on read ops too ([#2675](https://github.com/s977043/river-review/issues/2675)) ([a04272e](https://github.com/s977043/river-review/commit/a04272e6d0f795e8e87fc3be47451c75522efde4))
+* **security:** mask structured provider keys despite sample words ([#2674](https://github.com/s977043/river-review/issues/2674)) ([81cd109](https://github.com/s977043/river-review/commit/81cd109e712afc35b915d7461634b5265cd6b534))
+
 ## [1.127.0](https://github.com/s977043/river-review/compare/v1.126.0...v1.127.0) (2026-10-11)
 
 
