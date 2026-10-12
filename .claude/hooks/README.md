@@ -103,12 +103,14 @@ account before write ops") deterministic.
    `repos/<owner>/` endpoint as the first positional argument of `gh api` — is
    dropped, so work-repo calls are never switched to the expected account.
    Title/body text and `#` comments are not read for owners, so a link in a PR
-   body does not exempt a write. The remaining segments decide: if any of them
-   is a write, the command is a write.
+   body does not exempt a write. Exception: an unquoted value shaped like
+   `-R…` or `--repo=…` (e.g. `gh pr merge 2 --body -Rother/x`) is mistaken for
+   an owner, and that write is left unchecked. The remaining segments decide:
+   if any of them is a write, the command is a write.
 4. A read is also left unchecked when the command contains `cd`/`pushd` or
-   `GH_REPO=`, or when the payload `.cwd` is outside this repository (compared
-   by git common dir, so linked worktrees count as inside). Writes are checked
-   regardless.
+   `GH_REPO=` — even inside a comment or a quoted string — or when the payload
+   `.cwd` is outside this repository (compared by git common dir, so linked
+   worktrees count as inside). Writes are checked regardless.
 5. Every remaining gh call triggers an account check via `gh api user --jq .login`
    (about +0.45 s per gh call with the real gh). gh write ops
    (`gh pr create|merge|edit|close|comment|ready|reopen|review|update-branch`,

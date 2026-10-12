@@ -18,7 +18,9 @@
 #   - Each gh call (segment) that names another owner explicitly — the
 #     `--repo`/`-R owner/repo` value, or a `repos/<owner>/` endpoint as the
 #     first positional argument of `gh api` — is dropped, so work-repo calls are
-#     never switched. Title/body text and `#` comments are not read for owners.
+#     never switched. Title/body text and `#` comments are not read for owners,
+#     except an unquoted value shaped like `-R…` / `--repo=…` (e.g.
+#     `--body -Rother/x`), which is mistaken for an owner and exempts the call.
 #     The remaining segments decide: any write among them makes it a write.
 #   - A read is also skipped when the command contains `cd`/`pushd` or
 #     `GH_REPO=`, or the payload `.cwd` is outside this repository (by git
