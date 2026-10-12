@@ -23,9 +23,9 @@
 //   (interaction with #687 PR-B applySuppressions).
 // - High-entropy detection is opt-in by config and runs LAST so that named
 //   categories take priority and avoid double-counting.
-// - Allowlist substrings (example, dummy, placeholder, missing, xxxxx)
-//   suppress redaction on the surrounding token to protect documentation
-//   examples and obvious test fixtures from being mangled.
+// - Built-in allowlist substrings protect documentation fixtures in ambiguous
+//   patterns, but never override structurally recognizable provider API keys
+//   (#2203). Explicit caller allowlists remain an operator-owned exception.
 // - DEFAULT_DENY_GLOBS is exported separately so that path-level exclusion
 //   can run BEFORE redaction (avoids reading .env / *.pem files at all).
 
