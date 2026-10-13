@@ -139,14 +139,18 @@ export async function main(argv, env = process.env) {
   }
   const file = resolveEventsPath(env);
   try {
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    const stat = await fs.stat(file).catch((error) => {
+    // Keep newly created local event logs private (cwd/session IDs included).
+    await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+    const stat = await fs.lstat(file).catch((error) => {
       if (error.code === 'ENOENT') return null;
       throw error;
     });
-    // FIFO などは open が塞がるため、通常ファイルか未作成のときだけ追記する。
+    // lstat rejects symlinks as well as FIFOs and devices.
     if (stat && !stat.isFile()) throw new Error('通常ファイルではない');
-    await fs.appendFile(file, `${JSON.stringify(event)}\n`, 'utf8');
+    await fs.appendFile(file, `${JSON.stringify(event)}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
   } catch (error) {
     console.error(`${file} へ追記できなかった: ${error.message}`);
     return 1;

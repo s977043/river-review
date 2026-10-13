@@ -36,8 +36,12 @@ harness_event() {
     else
       exit 0
     fi
+    # Event metadata includes cwd and session_id. New log files and
+    # directories should not be readable by other local users.
+    umask 077
     mkdir -p "$(dirname "$events_path")" || exit 0
-    # A FIFO or device would block the open and delay the hook's decision.
+    # Do not append through a symlink, FIFO or device.
+    [ ! -L "$events_path" ] || exit 0
     [ -f "$events_path" ] || [ ! -e "$events_path" ] || exit 0
     line="$(
       printf '%s' "${HOOK_INPUT:-}" | jq -c -R -s \

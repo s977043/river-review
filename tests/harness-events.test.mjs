@@ -160,6 +160,18 @@ describe('harness event log', () => {
     }
   });
 
+  test('new hook logs are private; existing symlinks are not followed', () => {
+    const log = freshLog();
+    assert.equal(runHook('no-force-push.sh', 'git push --force', { eventsPath: log }).status, 2);
+    assert.equal(fs.statSync(log).mode & 0o077, 0);
+    const victim = path.join(tmp, 'protected-target.log');
+    fs.writeFileSync(victim, 'unchanged\n');
+    const link = path.join(tmp, 'event-link.jsonl');
+    fs.symlinkSync(victim, link);
+    assert.equal(runHook('no-force-push.sh', 'git push --force', { eventsPath: link }).status, 2);
+    assert.equal(fs.readFileSync(victim, 'utf8'), 'unchanged\n');
+  });
+
   test('a FIFO as the log path does not delay the block', () => {
     const fifo = path.join(tmp, 'events.fifo');
     assert.equal(spawnSyncGuarded('mkfifo', [fifo]).status, 0);
@@ -405,6 +417,18 @@ describe('harness event log', () => {
 
     test('an unwritable log exits 1', async () => {
       assert.equal(await main(base, { HARNESS_EVENTS_PATH: unwritable }), 1);
+    });
+
+    test('new CLI logs are private and existing symlinks are rejected', async () => {
+      const log = freshLog();
+      assert.equal(await main(base, { HARNESS_EVENTS_PATH: log }), 0);
+      assert.equal(fs.statSync(log).mode & 0o077, 0);
+      const victim = path.join(tmp, 'protected-cli-target.log');
+      fs.writeFileSync(victim, 'unchanged\n');
+      const link = path.join(tmp, 'cli-event-link.jsonl');
+      fs.symlinkSync(victim, link);
+      assert.equal(await main(base, { HARNESS_EVENTS_PATH: link }), 1);
+      assert.equal(fs.readFileSync(victim, 'utf8'), 'unchanged\n');
     });
 
     test('a FIFO as the log path exits 1 without opening it', async () => {

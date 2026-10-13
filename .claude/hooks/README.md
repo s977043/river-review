@@ -185,7 +185,8 @@ same keys with the same excerpt rule; its `detail.tool_name` comes from
 
 Tests: `tests/harness-events.test.mjs` (event shape, excerpt masking against
 credential shapes, truncation, writer parity, a missing library under POSIX
-mode, a FIFO log path, and an unwritable log leaving exit code and output
+mode, a FIFO log path, a symlink log path, owner-only permissions
+for newly created logs, and an unwritable log leaving exit code and output
 unchanged). The hook tests point
 `HARNESS_EVENTS_PATH` at `/dev/null` so they never write to the real home.
 
