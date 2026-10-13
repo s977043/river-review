@@ -8,7 +8,7 @@ import {
   EXCERPT_MAX,
   loadKnownRuleIds,
   main,
-  truncateExcerpt,
+  sanitizeExcerpt,
 } from '../scripts/harness/record-event.mjs';
 import { spawnSyncGuarded } from './helpers/spawn-guard.mjs';
 
@@ -66,8 +66,13 @@ describe('harness event log', () => {
     return path.join(tmp, `events-${counter}`, 'harness-events.jsonl');
   }
 
-  function runHook(name, command, { eventsPath, login = 's977043', switchExit = 0 } = {}) {
-    const res = spawnSyncGuarded('bash', [path.join(HOOKS, name)], {
+  function runHook(
+    name,
+    command,
+    { eventsPath, login = 's977043', switchExit = 0, hookDir = HOOKS, env = {}, timeout } = {}
+  ) {
+    const res = spawnSyncGuarded('bash', [path.join(hookDir, name)], {
+      timeout,
       input: JSON.stringify({
         session_id: 'sess-1',
         cwd: REPO_ROOT,
@@ -82,10 +87,86 @@ describe('harness event log', () => {
         FAKE_GH_SWITCH_EXIT: String(switchExit),
         GH_ACCOUNT_GUARD_EXPECTED: 's977043',
         HARNESS_EVENTS_PATH: eventsPath,
+        ...env,
       },
     });
     return { status: res.status, stdout: res.stdout, stderr: res.stderr };
   }
+
+  // 秘密情報を含む実在の形。denylist ではなく allowlist で落とすことを、列挙していない形
+  // （-bghp_… / x-access-token URL / クエリ文字列）でも確かめる。
+  const SECRET_ROWS = [
+    [
+      'no-force-push.sh',
+      'git push https://u:ghp_SECRET123@github.com/o/r.git main --force',
+      'git push * main --force',
+    ],
+    [
+      'no-force-push.sh',
+      'git -c http.extraheader=AUTHORIZATION:bearer_SECRET456 push -f',
+      'git -c * push -f',
+    ],
+    [
+      'no-force-push.sh',
+      'git push https://x-access-token:ghp_SECRET1@github.com/o/r.git HEAD --force',
+      'git push * * --force',
+    ],
+    [
+      'gh-account-guard.sh',
+      'gh api -H Authorization:token_SECRET789 -X POST repos/s977043/river-review/issues',
+      'gh api * *',
+    ],
+    [
+      'gh-account-guard.sh',
+      'gh api "repos/s977043/river-review/issues?access_token=ghp_SECRET2" -X POST',
+      'gh api * *',
+    ],
+    [
+      'gh-account-guard.sh',
+      'gh api repos/s977043/river-review/issues?access_token=ghp_SECRET3 -X POST',
+      'gh api * *',
+    ],
+    ['gh-account-guard.sh', 'gh secret set -bghp_SECRET4 NAME', 'gh secret set *'],
+  ];
+
+  test('credentials in the command never reach the log', () => {
+    for (const [hook, cmd, expected] of SECRET_ROWS) {
+      const log = freshLog();
+      const r = runHook(hook, cmd, { eventsPath: log, login: 'kominem-unilabo', switchExit: 1 });
+      assert.equal(r.status, 2, cmd);
+      const text = fs.readFileSync(log, 'utf8');
+      assert.doesNotMatch(text, /SECRET|ghp_|token_|bearer_/, cmd);
+      const [e] = readEvents(log);
+      assert.doesNotMatch(e.detail.excerpt, /@/, cmd);
+      assert.equal(e.detail.excerpt, expected, cmd);
+    }
+  });
+
+  test('a missing harness-event.sh keeps the block at exit 2, also in POSIX mode', () => {
+    const dir = fs.mkdtempSync(path.join(tmp, 'no-lib-'));
+    for (const name of ['no-force-push.sh', 'gh-account-guard.sh']) {
+      fs.copyFileSync(path.join(HOOKS, name), path.join(dir, name));
+    }
+    for (const env of [{}, { POSIXLY_CORRECT: '1' }]) {
+      const opts = { eventsPath: freshLog(), hookDir: dir, env };
+      const tag = JSON.stringify(env);
+      assert.equal(runHook('no-force-push.sh', 'git push --force', opts).status, 2, tag);
+      const gh = runHook('gh-account-guard.sh', 'gh pr merge 1', {
+        ...opts,
+        login: 'kominem-unilabo',
+        switchExit: 1,
+      });
+      assert.equal(gh.status, 2, tag);
+    }
+  });
+
+  test('a FIFO as the log path does not delay the block', () => {
+    const fifo = path.join(tmp, 'events.fifo');
+    assert.equal(spawnSyncGuarded('mkfifo', [fifo]).status, 0);
+    const opts = { eventsPath: fifo, login: 'kominem-unilabo', switchExit: 1, timeout: 5_000 };
+    assert.equal(runHook('no-force-push.sh', 'git push --force', opts).status, 2);
+    assert.equal(runHook('gh-account-guard.sh', 'gh pr merge 1', opts).status, 2);
+  });
 
   describe('no-force-push.sh', () => {
     test('a block appends one event in the common format', () => {
@@ -115,7 +196,7 @@ describe('harness event log', () => {
       );
       assert.equal(r.status, 2);
       const [e] = readEvents(log);
-      assert.equal(e.detail.excerpt, 'git push origin feat/x --force');
+      assert.equal(e.detail.excerpt, 'git push origin * --force');
     });
 
     test('an allowed command writes nothing', () => {
@@ -164,7 +245,7 @@ describe('harness event log', () => {
         login: 'kominem-unilabo',
         switchExit: 1,
       });
-      assert.equal(readEvents(log)[0].detail.excerpt, 'gh pr merge 2');
+      assert.equal(readEvents(log)[0].detail.excerpt, 'gh pr merge *');
     });
 
     test('a read whose switch fails appends a warn event', () => {
@@ -178,7 +259,7 @@ describe('harness event log', () => {
       const events = readEvents(log);
       assert.equal(events.length, 1);
       assert.equal(events[0].kind, 'warn');
-      assert.equal(events[0].detail.excerpt, 'gh pr view 123');
+      assert.equal(events[0].detail.excerpt, 'gh pr view *');
     });
 
     test('a successful switch or the expected account writes nothing', () => {
@@ -221,14 +302,29 @@ describe('harness event log', () => {
 
     test('truncates the excerpt to EXCERPT_MAX code points and flattens newlines', () => {
       const log = freshLog();
-      const long = `a\nb${'あ'.repeat(200)}`;
+      const long = `a\n\tb ${'word '.repeat(60)}`;
       const r = callWriter(['script:test', 'self-report', '', long], log);
       assert.equal(r.stdout, 'rc=0\n');
       assert.equal(r.stderr, '');
       const [e] = readEvents(log);
-      assert.equal(e.detail.excerpt, truncateExcerpt(long));
       assert.equal(Array.from(e.detail.excerpt).length, EXCERPT_MAX);
-      assert.ok(e.detail.excerpt.startsWith('a b'));
+      assert.ok(e.detail.excerpt.startsWith('a b word'));
+    });
+
+    // 2 つの書き手が同じ excerpt を出すことを、record-event.mjs の実装と突き合わせる。
+    test('masks the same tokens as record-event.mjs', () => {
+      const inputs = [
+        '  git push  https://u:p@h/x main --force  ',
+        'gh api -H Authorization:t -X POST --input=body.json -f a=b',
+        'Bash ran cd in /tmp; -fu --force-with-lease=ref -X2 x_y あいう',
+        `${'abc '.repeat(40)}`,
+        '',
+      ];
+      for (const input of inputs) {
+        const log = freshLog();
+        callWriter(['script:test', 'warn', '', input], log);
+        assert.equal(readEvents(log)[0].detail.excerpt, sanitizeExcerpt(input), input);
+      }
     });
 
     test('rejects an unknown kind or a malformed source silently', () => {
@@ -252,7 +348,11 @@ describe('harness event log', () => {
     test('appends a self-report in the same shape as the hook writer', async () => {
       const log = freshLog();
       const code = await main(
-        [...base, '--rule-id', 'no-cd-in-bash', '--excerpt', 'ran cd in Bash', '--session-id', 's'],
+        [
+          ...base,
+          ...['--rule-id', 'no-cd-in-bash', '--excerpt', 'ran cd in Bash /tmp'],
+          ...['--session-id', 's', '--tool-name', 'Agent'],
+        ],
         { HARNESS_EVENTS_PATH: log }
       );
       assert.equal(code, 0);
@@ -264,7 +364,8 @@ describe('harness event log', () => {
       assert.equal(e.kind, 'self-report');
       assert.equal(e.ruleId, 'no-cd-in-bash');
       assert.equal(e.cwd, process.cwd());
-      assert.equal(e.detail.excerpt, 'ran cd in Bash');
+      assert.equal(e.detail.excerpt, 'ran cd in * *');
+      assert.equal(e.detail.tool_name, 'Agent');
     });
 
     test('accepts guard-ledger ids and an empty rule id', async () => {
@@ -284,7 +385,7 @@ describe('harness event log', () => {
 
     test('truncates the excerpt', async () => {
       const log = freshLog();
-      await main([...base, '--excerpt', '🙂'.repeat(500)], { HARNESS_EVENTS_PATH: log });
+      await main([...base, '--excerpt', 'word '.repeat(100)], { HARNESS_EVENTS_PATH: log });
       assert.equal(Array.from(readEvents(log)[0].detail.excerpt).length, EXCERPT_MAX);
     });
 
@@ -304,6 +405,12 @@ describe('harness event log', () => {
 
     test('an unwritable log exits 1', async () => {
       assert.equal(await main(base, { HARNESS_EVENTS_PATH: unwritable }), 1);
+    });
+
+    test('a FIFO as the log path exits 1 without opening it', async () => {
+      const fifo = path.join(tmp, 'cli.fifo');
+      assert.equal(spawnSyncGuarded('mkfifo', [fifo]).status, 0);
+      assert.equal(await main(base, { HARNESS_EVENTS_PATH: fifo }), 1);
     });
 
     test('runs as a CLI', () => {

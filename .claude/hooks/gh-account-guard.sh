@@ -108,8 +108,8 @@ while IFS= read -r SEG; do
     continue
   fi
   HAS_GUARDED=1
-  # First 4 words of the call with spaced quoted text dropped: enough to tell
-  # which gh op it was, short of body/field values.
+  # First 4 words of the call with spaced quoted text dropped; the writer then
+  # masks every token that is not a plain word or a bare flag.
   WORDS="$(printf '%s\n' "$NORM" | awk '{ print $1, $2, $3, $4 }')"
   [ -n "$EXCERPT" ] || EXCERPT="$WORDS"
   if printf '%s\n' "$SEG" | grep -qE "$WRITE_RE"; then
@@ -157,9 +157,14 @@ if [ "$IS_WRITE" = 1 ]; then
 fi
 
 # Record the failed switch in the harness event log (best effort; see harness-event.sh).
+# The no-op is defined first and the library sourced only if readable: a failed
+# `.` exits the shell under POSIX mode, which would turn exit 2 into 1.
 record_event() {
+  harness_event() { :; }
+  local lib
+  lib="$(dirname "$0")/harness-event.sh"
   # shellcheck source=.claude/hooks/harness-event.sh
-  . "$(dirname "$0")/harness-event.sh" 2>/dev/null || harness_event() { :; }
+  if [ -r "$lib" ]; then . "$lib"; fi
   harness_event 'hook:gh-account-guard' "$1" 'verify-gh-active-account' "$EXCERPT"
 }
 

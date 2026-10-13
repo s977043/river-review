@@ -161,18 +161,32 @@ and not registered in `.claude/settings.json`. `harness_event <source> <kind>
 <ruleId> <excerpt>` appends one line to
 `${HARNESS_EVENTS_PATH:-~/.claude/state/harness-events.jsonl}` in the format
 defined by `docs/development/agent-harness-design.md` (the SSoT). `cwd`,
-`session_id` and `tool_name` come from `$HOOK_INPUT`; the excerpt is cut to 120
-characters.
+`session_id` and `tool_name` come from `$HOOK_INPUT`.
 
-It is best effort: without `jq`, with an unwritable path, or with an invalid
-`kind` / `source`, it writes nothing. It never prints to stdout/stderr and
-always returns 0, so a hook's exit code and messages are the same whether or not
-the log is written. Organizer and agent records use the Node writer
+The excerpt is split on whitespace, and every token that is not a lowercase word
+(`^[a-z][a-z0-9-]*$`) or a bare flag without a value (`^--?[a-z][a-z-]*$`) is
+replaced by `*` before the 120-character cut. This is an allowlist: URLs with
+credentials, `-H Authorization:…` and `-bghp_…` are masked without being
+listed. A secret made only of lowercase letters and hyphens still passes, and
+uppercase flags such as `-X` are masked too.
+
+It is best effort: without `jq`, with an unwritable path, with a path that
+exists but is not a regular file (a FIFO would block the open), or with an
+invalid `kind` / `source`, it writes nothing. It never prints to stdout/stderr
+and always returns 0. Each hook defines a no-op `harness_event` first and
+sources the library only if it is readable, so a missing library cannot exit
+the shell (a failed `.` does under POSIX mode). The hook's exit code and
+messages are therefore the same whether or not the log is written.
+
+Organizer and agent records use the Node writer
 `scripts/harness/record-event.mjs` (`npm run harness:record`), which emits the
-same line.
+same keys with the same excerpt rule; its `detail.tool_name` comes from
+`--tool-name` (default empty) rather than a payload.
 
-Tests: `tests/harness-events.test.mjs` (event shape, excerpt, truncation, and an
-unwritable log leaving exit code and output unchanged). The hook tests point
+Tests: `tests/harness-events.test.mjs` (event shape, excerpt masking against
+credential shapes, truncation, writer parity, a missing library under POSIX
+mode, a FIFO log path, and an unwritable log leaving exit code and output
+unchanged). The hook tests point
 `HARNESS_EVENTS_PATH` at `/dev/null` so they never write to the real home.
 
 ## after-change-observe.sh

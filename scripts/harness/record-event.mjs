@@ -5,7 +5,8 @@
 // hook 側の書き手 .claude/hooks/harness-event.sh と同じ行を出す。
 //
 // 使い方: npm run harness:record -- --source command:range-review --kind self-report \
-//           [--rule-id <id>] [--excerpt "..."] [--session-id <id>] [--cwd <path>]
+//           [--rule-id <id>] [--excerpt "..."] [--session-id <id>] [--tool-name <name>] [--cwd <path>]
+// --tool-name の既定は空文字（hook 側は payload の tool_name、無ければ "Bash"）。
 // 記録先は HARNESS_EVENTS_PATH、未設定なら ~/.claude/state/harness-events.jsonl。
 // 成功で exit 0、引数の誤りで exit 2、書き込み失敗で exit 1。
 
@@ -22,8 +23,7 @@ import { SIGNAL_REGISTRY_PATH, parseSignalRegistry } from './permission-prompt-r
 const ROOT = path.resolve(import.meta.dirname, '../..');
 
 export const EVENT_KINDS = Object.freeze(['block', 'warn', 'self-report']);
-/** detail.excerpt の最大文字数（code point）。harness-event.sh の `.[0:120]` と揃える。 */
-export const EXCERPT_MAX = 120;
+/** detail.excerpt の最大文字数（code point）。harness-event.sh の `.[0:120]` と揃える。 */ export const EXCERPT_MAX = 120;
 const SOURCE_RE = /^(hook|command|script):[a-z0-9-]+$/;
 
 export function resolveEventsPath(env = process.env) {
@@ -31,11 +31,21 @@ export function resolveEventsPath(env = process.env) {
   return path.join(os.homedir(), '.claude/state/harness-events.jsonl');
 }
 
-export function truncateExcerpt(text) {
-  const flat = String(text ?? '')
-    .replace(/[\n\r\t]/g, ' ')
-    .replace(/^ +| +$/g, '');
-  return Array.from(flat).slice(0, EXCERPT_MAX).join('');
+const PLAIN_WORD_RE = /^[a-z][a-z0-9-]*$/;
+const BARE_FLAG_RE = /^--?[a-z][a-z-]*$/;
+
+/**
+ * excerpt を空白で語に分け、小文字の語と値を伴わないフラグ以外を `*` に置き換えてから
+ * EXCERPT_MAX 文字で切る。秘密の形を列挙する denylist は必ず形を取りこぼすため allowlist にしている。
+ * harness-event.sh の jq 式と同じ規則。
+ */
+export function sanitizeExcerpt(text) {
+  const masked = String(text ?? '')
+    .split(/\s+/)
+    .filter((t) => t !== '')
+    .map((t) => (PLAIN_WORD_RE.test(t) || BARE_FLAG_RE.test(t) ? t : '*'))
+    .join(' ');
+  return Array.from(masked).slice(0, EXCERPT_MAX).join('');
 }
 
 /**
@@ -77,7 +87,7 @@ export function buildEvent({
     ruleId,
     cwd,
     session_id: sessionId,
-    detail: { tool_name: toolName, excerpt: truncateExcerpt(excerpt) },
+    detail: { tool_name: toolName, excerpt: sanitizeExcerpt(excerpt) },
   };
 }
 
@@ -109,6 +119,7 @@ export async function main(argv, env = process.env) {
         'rule-id': { type: 'string', default: '' },
         excerpt: { type: 'string', default: '' },
         'session-id': { type: 'string', default: '' },
+        'tool-name': { type: 'string', default: '' },
         cwd: { type: 'string', default: process.cwd() },
       },
     });
@@ -119,6 +130,7 @@ export async function main(argv, env = process.env) {
       excerpt: values.excerpt,
       cwd: path.resolve(values.cwd),
       sessionId: values['session-id'],
+      toolName: values['tool-name'],
       knownRuleIds: await loadKnownRuleIds(),
     });
   } catch (error) {
@@ -128,6 +140,12 @@ export async function main(argv, env = process.env) {
   const file = resolveEventsPath(env);
   try {
     await fs.mkdir(path.dirname(file), { recursive: true });
+    const stat = await fs.stat(file).catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    // FIFO などは open が塞がるため、通常ファイルか未作成のときだけ追記する。
+    if (stat && !stat.isFile()) throw new Error('通常ファイルではない');
     await fs.appendFile(file, `${JSON.stringify(event)}\n`, 'utf8');
   } catch (error) {
     console.error(`${file} へ追記できなかった: ${error.message}`);

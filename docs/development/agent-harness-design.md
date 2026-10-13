@@ -52,7 +52,7 @@ hook がガードとして止めた事象も、確認ダイアログと同じく
 }
 ```
 
-実装は次の 2 つで、どちらも同じ行を出します。集計（`harness:report` への取り込み）はまだありません。
+実装は次の 2 つで、どちらも同じキーと同じ excerpt の規則で行を出します。`detail.tool_name` だけは出どころが違い、hook は payload の値（無ければ `Bash`）、CLI は `--tool-name`（既定は空文字）を使います。集計（`harness:report` への取り込み）はまだありません。ログは今のところ無制限に伸びます。ローテーションは `harness:report` への取り込みと一緒に後続で扱います。
 
 | 書き手                                                                       | 使う側                 | 記録する事象                                                                                                                                |
 | ---------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -64,17 +64,17 @@ hook がガードとして止めた事象も、確認ダイアログと同じく
 - `source` は追記した主体である。`hook:<name>`・`command:range-review`・`script:<name>` の形にする
 - `kind` は `block`（止めた）・`warn`（通したが警告した）・`self-report`（agent の自己申告）の 3 つに限る
 - `ruleId` は `harness-signals.yaml` または `guard-ledger.yaml` の `id` と一致させる。対応するルールが無い事象は空文字にする
-- `detail` は原文を全部は残さない。秘密情報の混入を避けるため、照合に要る抜粋だけにする。`excerpt` は書き手の両方が改行とタブを空白にし、前後の空白を除いてから 120 文字（code point）で切る。`no-force-push.sh` はクォートを除いたコマンドのうち一致した segment を、`gh-account-guard.sh` は空白を含むクォート文字列を除いた gh 呼び出しの先頭 4 語を渡す
-- 追記に失敗しても hook の判定は変えない（`log-permission-request.sh` と同じく、記録は常に best effort）。`harness-event.sh` は stdout・stderr に何も出さず、常に 0 を返す
+- `detail` は原文を全部は残さない。秘密情報の混入を避けるため、照合に要る抜粋だけにする。`excerpt` は書き手の両方が空白で語に分け、小文字の語（`^[a-z][a-z0-9-]*$`）と値を伴わないフラグ（`^--?[a-z][a-z-]*$`）以外を `*` に置き換えてから 120 文字（code point）で切る。秘密の形を列挙する方式は必ず形を取りこぼすため、残す側を列挙している。小文字とハイフンだけでできた秘密は語と区別できず、残る。大文字のフラグ（`-X`・`-H`）も `*` になる。`no-force-push.sh` はクォートを除いたコマンドのうち一致した segment を、`gh-account-guard.sh` は空白を含むクォート文字列を除いた gh 呼び出しの先頭 4 語を渡す
+- 追記に失敗しても hook の判定は変えない（`log-permission-request.sh` と同じく、記録は常に best effort）。`harness-event.sh` は stdout・stderr に何も出さず、常に 0 を返す。記録先が既に存在し、かつ通常ファイルではない場合（FIFO など）は open で止まるため書かない。hook は書き手を読める場合だけ source するので、書き手が無くても判定は変わらない
 
 range-review の自己申告は、オーガナイザーが出力を受け取った時点で `kind: self-report` として追記します。会話ログ（transcript）の採掘は前提にしません。
 
 ```bash
 npm run harness:record -- --source command:range-review --kind self-report \
-  --rule-id no-cd-in-bash --excerpt "reviewer ran cd in Bash"
+  --rule-id no-cd-in-bash --excerpt "reviewer ran cd in bash"
 ```
 
-`--rule-id` は省略できます（空文字になる）。指定した場合は `guard-ledger.yaml` の guards か `harness-signals.yaml` の rules の id でなければ exit 2 で拒否します。`--kind`・`--source` の形式違反も exit 2、書き込みの失敗は exit 1 です。`--session-id` と `--cwd`（既定はカレントディレクトリ）も渡せます。
+`--rule-id` は省略できます（空文字になる）。指定した場合は `guard-ledger.yaml` の guards か `harness-signals.yaml` の rules の id でなければ exit 2 で拒否します。`--kind`・`--source` の形式違反も exit 2、書き込みの失敗と記録先が通常ファイルでない場合は exit 1 です。`--session-id`・`--tool-name`（既定は空文字）・`--cwd`（既定はカレントディレクトリ）も渡せます。excerpt は上の規則で伏せられるため、小文字の語で書きます。
 
 ### signal の定義: 先頭コマンド語
 

@@ -10,11 +10,15 @@
 # Usage (after sourcing):
 #   harness_event <source> <kind> <ruleId> <excerpt>
 # The caller's stdin payload is read from $HOOK_INPUT when set (cwd, session_id,
-# tool_name). The excerpt is truncated to 120 characters; pass only the part
-# needed to recognise the event, never the whole command.
+# tool_name). The excerpt is split on whitespace and every token that is not a
+# plain lowercase word (`^[a-z][a-z0-9-]*$`) or a bare flag without a value
+# (`^--?[a-z][a-z-]*$`) is replaced by `*`, then cut to 120 characters. This is
+# an allowlist so that credential shapes nobody listed (URLs with userinfo,
+# `-H Authorization:...`, `-bghp_...`) never reach the log. A secret made only
+# of lowercase letters and hyphens is indistinguishable from a word and is kept.
 #
-# Best effort: every failure (no jq, unwritable path, invalid arguments) is
-# swallowed. The function never writes to stdout/stderr and always returns 0,
+# Best effort: every failure (no jq, unwritable path, a path that is not a
+# regular file, invalid arguments) is swallowed. The function never writes to stdout/stderr and always returns 0,
 # so it cannot change a hook's exit code or message contract.
 
 harness_event() {
@@ -33,6 +37,8 @@ harness_event() {
       exit 0
     fi
     mkdir -p "$(dirname "$events_path")" || exit 0
+    # A FIFO or device would block the open and delay the hook's decision.
+    [ -f "$events_path" ] || [ ! -e "$events_path" ] || exit 0
     line="$(
       printf '%s' "${HOOK_INPUT:-}" | jq -c -R -s \
         --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -52,7 +58,11 @@ harness_event() {
             session_id: ($p.session_id // "" | tostring),
             detail: {
               tool_name: ($p.tool_name // "Bash" | tostring),
-              excerpt: ($excerpt | gsub("[\\n\\r\\t]"; " ") | sub("^ +"; "") | sub(" +$"; "") | .[0:120])
+              excerpt: (
+                [$excerpt | splits("\\s+") | select(. != "")
+                  | if test("^[a-z][a-z0-9-]*$") or test("^--?[a-z][a-z-]*$") then . else "*" end]
+                | join(" ") | .[0:120]
+              )
             }
           }'
     )" || exit 0
