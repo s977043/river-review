@@ -62,6 +62,10 @@ does force is caught by the `--force-with-lease` rule.
 Ambiguous input is allowed: a false positive stalls all development, a miss
 costs one incident.
 
+Each block is also appended to the harness event log (see
+[harness-event.sh](#harness-eventsh)) with `ruleId` empty, since AGENTS.md
+Safety has no ledger id.
+
 ### Known limitation
 
 Quoted text is treated as data, so an interpreter form such as
@@ -125,6 +129,9 @@ account before write ops") deterministic.
    command to proceed (exit 0). If the switch itself fails, a write op exits 2
    to block the tool call (stderr is fed back to Claude); a read op only gets a
    stderr warning and proceeds, because a failed read breaks nothing.
+7. The write block and the read warning are appended to the harness event log
+   (see [harness-event.sh](#harness-eventsh)) as `block` / `warn` with
+   `ruleId: verify-gh-active-account`. A successful switch is not recorded.
 
 Expected account defaults to `s977043`; override with
 `GH_ACCOUNT_GUARD_EXPECTED` (used by tests to stay hermetic).
@@ -146,6 +153,42 @@ PreToolUse passes its input as a stdin JSON payload; the Bash command is
 `.tool_input.command`. Exit 0 allows the tool call, exit 2 blocks it and
 feeds stderr back to Claude. The hook is defense-in-depth: the session-start
 account sanity check in CLAUDE.md remains in place.
+
+## harness-event.sh
+
+Not a hook: a library sourced by `no-force-push.sh` and `gh-account-guard.sh`,
+and not registered in `.claude/settings.json`. `harness_event <source> <kind>
+<ruleId> <excerpt>` appends one line to
+`${HARNESS_EVENTS_PATH:-~/.claude/state/harness-events.jsonl}` in the format
+defined by `docs/development/agent-harness-design.md` (the SSoT). `cwd`,
+`session_id` and `tool_name` come from `$HOOK_INPUT`.
+
+The excerpt is split on whitespace, and every token that is not a lowercase word
+(`^[a-z][a-z0-9-]*$`) or a bare flag without a value (`^--?[a-z][a-z-]*$`) is
+replaced by `*` before the 120-character cut. This is an allowlist: URLs with
+credentials, `-H Authorization:…` and `-bghp_…` are masked without being
+listed. A secret made only of lowercase letters and hyphens still passes, and
+uppercase flags such as `-X` are masked too.
+
+It is best effort: without `jq`, with an unwritable path, with a path that
+exists but is not a regular file (a FIFO would block the open), or with an
+invalid `kind` / `source`, it writes nothing. It never prints to stdout/stderr
+and always returns 0. Each hook defines a no-op `harness_event` first and
+sources the library only if it is readable, so a missing library cannot exit
+the shell (a failed `.` does under POSIX mode). The hook's exit code and
+messages are therefore the same whether or not the log is written.
+
+Organizer and agent records use the Node writer
+`scripts/harness/record-event.mjs` (`npm run harness:record`), which emits the
+same keys with the same excerpt rule; its `detail.tool_name` comes from
+`--tool-name` (default empty) rather than a payload.
+
+Tests: `tests/harness-events.test.mjs` (event shape, excerpt masking against
+credential shapes, truncation, writer parity, a missing library under POSIX
+mode, a FIFO log path, a symlink log path, owner-only permissions
+for newly created logs, and an unwritable log leaving exit code and output
+unchanged). The hook tests point
+`HARNESS_EVENTS_PATH` at `/dev/null` so they never write to the real home.
 
 ## after-change-observe.sh
 

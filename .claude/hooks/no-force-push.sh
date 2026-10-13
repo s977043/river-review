@@ -180,4 +180,17 @@ BLOCKED_MESSAGE="[no-force-push] BLOCKED: destructive git command.
   If history still looks like it must be rewritten, do not work around this
   hook — stop and escalate to the organizer / human."
 printf '%s\n' "$BLOCKED_MESSAGE" >&2
+
+# Record the block in the harness event log (best effort; see harness-event.sh).
+# The excerpt is the matched segment of the sanitized command (quoted text
+# already replaced by a space); the writer then masks every token that is not a
+# plain word or a bare flag. AGENTS.md Safety has no ledger id, so ruleId stays
+# empty. The no-op is defined first and the library sourced only if readable:
+# a failed `.` exits the shell under POSIX mode, which would turn exit 2 into 1.
+harness_event() { :; }
+HARNESS_EVENT_LIB="$(dirname "$0")/harness-event.sh"
+# shellcheck source=.claude/hooks/harness-event.sh
+if [ -r "$HARNESS_EVENT_LIB" ]; then . "$HARNESS_EVENT_LIB"; fi
+harness_event 'hook:no-force-push' block '' \
+  "$(printf '%s\n' "$SANITIZED" | grep -oE "$BLOCK_RE" 2>/dev/null | head -n 1)"
 exit 2

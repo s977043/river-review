@@ -93,6 +93,7 @@ API_PATH_RE="^[;&|([:space:]]?gh[[:space:]]+${GH_OPT}api[[:space:]]+${GH_OPT}[\"
 EXPECTED_LOWER="$(printf '%s' "$EXPECTED_ACCOUNT" | tr '[:upper:]' '[:lower:]')"
 HAS_GUARDED=0
 IS_WRITE=0
+EXCERPT=''
 while IFS= read -r SEG; do
   [ -n "$SEG" ] || continue
   if printf '%s\n' "$SEG" | grep -qE "$AUTH_RE"; then
@@ -107,7 +108,12 @@ while IFS= read -r SEG; do
     continue
   fi
   HAS_GUARDED=1
+  # First 4 words of the call with spaced quoted text dropped; the writer then
+  # masks every token that is not a plain word or a bare flag.
+  WORDS="$(printf '%s\n' "$NORM" | awk '{ print $1, $2, $3, $4 }')"
+  [ -n "$EXCERPT" ] || EXCERPT="$WORDS"
   if printf '%s\n' "$SEG" | grep -qE "$WRITE_RE"; then
+    [ "$IS_WRITE" = 1 ] || EXCERPT="$WORDS"
     IS_WRITE=1
   fi
 done < <(printf '%s\n' "$COMMAND" | grep -oE "${G}[^;&|]*" || true)
@@ -150,6 +156,18 @@ if [ "$IS_WRITE" = 1 ]; then
   OP_KIND='write'
 fi
 
+# Record the failed switch in the harness event log (best effort; see harness-event.sh).
+# The no-op is defined first and the library sourced only if readable: a failed
+# `.` exits the shell under POSIX mode, which would turn exit 2 into 1.
+record_event() {
+  harness_event() { :; }
+  local lib
+  lib="$(dirname "$0")/harness-event.sh"
+  # shellcheck source=.claude/hooks/harness-event.sh
+  if [ -r "$lib" ]; then . "$lib"; fi
+  harness_event 'hook:gh-account-guard' "$1" 'verify-gh-active-account' "$EXCERPT"
+}
+
 if gh auth switch -u "$EXPECTED_ACCOUNT" >/dev/null 2>&1; then
   echo "[gh-account-guard] active gh account was '${ACTIVE_LOGIN:-unknown}'; switched to '${EXPECTED_ACCOUNT}' before gh ${OP_KIND} op" >&2
   exit 0
@@ -157,8 +175,10 @@ fi
 
 if [ "$IS_WRITE" = 0 ]; then
   echo "[gh-account-guard] WARNING: active gh account is '${ACTIVE_LOGIN:-unknown}' (expected '${EXPECTED_ACCOUNT}') and 'gh auth switch -u ${EXPECTED_ACCOUNT}' failed. A 404 or 'Could not resolve to a Repository' from this read means the account, not a missing resource." >&2
+  record_event warn
   exit 0
 fi
 
 echo "[gh-account-guard] BLOCKED: active gh account is '${ACTIVE_LOGIN:-unknown}' (expected '${EXPECTED_ACCOUNT}') and 'gh auth switch -u ${EXPECTED_ACCOUNT}' failed. Run 'gh auth status' and switch manually before retrying." >&2
+record_event block
 exit 2

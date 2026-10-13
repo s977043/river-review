@@ -51,6 +51,7 @@ function runHook(command, { login = 's977043', switchExit = 0, cwd } = {}) {
         FAKE_GH_LOGIN: login,
         FAKE_GH_SWITCH_EXIT: String(switchExit),
         GH_ACCOUNT_GUARD_EXPECTED: 's977043',
+        HARNESS_EVENTS_PATH: '/dev/null',
       },
     });
     const calls = existsSync(log) ? readFileSync(log, 'utf8').trim() : '';
@@ -323,7 +324,11 @@ test('gh api with explicit GET is treated as read', () => {
 
 test('empty or malformed stdin payload passes', () => {
   for (const input of ['', '{not json']) {
-    const res = spawnSync('bash', [HOOK], { input, encoding: 'utf8' });
+    const res = spawnSync('bash', [HOOK], {
+      input,
+      encoding: 'utf8',
+      env: { ...process.env, HARNESS_EVENTS_PATH: '/dev/null' },
+    });
     assert.equal(res.status, 0, JSON.stringify(input));
   }
 });
