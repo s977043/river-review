@@ -46921,7 +46921,11 @@ const STRUCTURED_CREDENTIAL_IDS = new Set([
   'anthropicKey',
   'googleApiKey',
   'bearerToken',
+  'awsAccessKey',
 ]);
+// Even published AWS documentation tokens are masked by default. A caller
+// may explicitly allowlist a known sample, but that choice must not silently
+// apply to other structurally recognized credential IDs.
 
 const REPLACEMENT = (category) => `<REDACTED:${category}>`;
 

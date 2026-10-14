@@ -276,10 +276,8 @@ test('#2033 redactText leaves port-bearing and credential-free URLs alone', () =
 });
 
 test('#2033 redactText redacts AWS access key ids without relying on entropy', () => {
-  // The issue reported `AKIAIOSFODNN7EXAMPLE` passing through. That is the
-  // allowlist (`example`) doing its job on a documentation literal, not a hole
-  // in the pattern: a non-documentation key of the same shape IS redacted, and
-  // with highEntropy off so the awsAccessKey pattern is what proves it.
+  // A public documentation fixture shares the exact format with real key
+  // IDs. Mask it by default; allowlisting a known sample is an explicit choice.
   for (const key of ['AKIAQ7WZ3TVMNPLKJHGF', 'ASIAZXCVBNMLKJHGFDSA']) {
     const { text, hits } = redactText('creds: ' + key, { highEntropy: false });
     assert.equal(text, 'creds: <REDACTED:awsAccessKey>');
@@ -625,12 +623,48 @@ test('#2203 does not let built-in sample words inside provider keys bypass maski
     assert.deepEqual(userOptOut.hits, []);
   }
 
-  // AWS documentation examples are unchanged until their separate,
-  // format-specific allowlist policy is reviewed.
-  assert.equal(
-    redactText('AKIAEXAMPLEEXAMPLE0', { highEntropy: false }).text,
-    'AKIAEXAMPLEEXAMPLE0'
-  );
+  // This 19-character text is too short to be an AWS access key ID.
+  // It is not exempt because of an embedded sample word.
+  const shortExample = 'AKIAEXAMPLEEXAMPLE0';
+  assert.equal(shortExample.length, 19);
+  assert.equal(redactText(shortExample, { highEntropy: false }).text, shortExample);
+});
+
+test('#2683 AWS-shaped keys with embedded example words are still masked', () => {
+  // Synthetic keys only. A documentation word inside an otherwise valid
+  // structural key ID must not silently disable the named-pattern redactor.
+  for (const token of [
+    'AKIA' + 'A'.repeat(4) + 'EXAMPLE' + 'B'.repeat(5),
+    'ASIA' + 'C'.repeat(5) + 'DUMMY' + 'D'.repeat(6),
+  ]) {
+    assert.equal(token.length, 20);
+    const source = 'AWS_KEY_ID=' + token;
+    const masked = redactText(source, { highEntropy: false });
+    assert.equal(masked.text, 'AWS_KEY_ID=<REDACTED:awsAccessKey>');
+    assert.deepEqual(masked.hits, [{ category: 'awsAccessKey', count: 1 }]);
+
+    // The caller-controlled override is intentional and not safe for secrets.
+    const explicit = redactText(source, {
+      highEntropy: false,
+      allowlist: ['example', 'dummy'],
+    });
+    assert.equal(explicit.text, source);
+    assert.deepEqual(explicit.hits, []);
+  }
+
+  // AWS's public documentation example also matches the structural pattern.
+  // Prefer masking by default rather than trusting a generic sample substring.
+  const documented = 'AKIAIOSFODNN7EXAMPLE';
+  const demo = redactText('Example: ' + documented, { highEntropy: false });
+  assert.equal(demo.text, 'Example: <REDACTED:awsAccessKey>');
+  assert.deepEqual(demo.hits, [{ category: 'awsAccessKey', count: 1 }]);
+
+  const sampleOptOut = redactText('Example: ' + documented, {
+    highEntropy: false,
+    allowlist: [documented],
+  });
+  assert.equal(sampleOptOut.text, 'Example: ' + documented);
+  assert.deepEqual(sampleOptOut.hits, []);
 });
 
 test('#2203 Bearer credentials are not bypassed by built-in example words', () => {
