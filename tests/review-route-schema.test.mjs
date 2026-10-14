@@ -16,7 +16,9 @@ const validateResult = (result) => {
 
 const protectedRiskMap = {
   defaults: { action: 'comment_only' },
-  rules: [{ pattern: 'src/auth/**', action: 'require_human_review', reason: 'Human security review' }],
+  rules: [
+    { pattern: 'src/auth/**', action: 'require_human_review', reason: 'Human security review' },
+  ],
 };
 
 test('current route output validates across all four modes', () => {
@@ -24,7 +26,11 @@ test('current route output validates across all four modes', () => {
     { changedFiles: ['docs/overview.md'], expected: 'light' },
     { changedFiles: ['src/lib/example.mjs'], expected: 'standard' },
     { changedFiles: ['schemas/review-artifact.schema.json'], expected: 'team' },
-    { changedFiles: ['src/auth/login.mjs'], riskMap: protectedRiskMap, expected: 'human-required' },
+    {
+      changedFiles: ['src/auth/login.mjs'],
+      riskMap: protectedRiskMap,
+      expected: 'human-required',
+    },
   ];
   for (const { expected, ...input } of cases) {
     const result = routeReviewMode(input);
