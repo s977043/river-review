@@ -1,79 +1,75 @@
-# Review Mode Router adoption — contract baseline (#2034)
+# Review Mode Router adoption: contract baseline (#2034)
 
 ## Decision and scope
 
-River Review is plugin-first for Claude Code and Codex. The **existing** deterministic
-`src/lib/review-mode-router.mjs` recommends a review depth from changed files,
-diff size and the repository risk map. It does not perform review, determine
-finding truth, execute suggested commands, or grant merge authority.
+River Review is plugin-first for Claude Code and Codex.
+The existing `src/lib/review-mode-router.mjs` recommends review depth.
+It uses changed files plus diff size and the repository risk map.
+It does not perform reviews or determine finding truth.
+It cannot grant execution or merge authority.
 
-Do not copy a second `.claude/commands` router from the source article.
-Keep the classifier, risk map, reviewer-role selection and Flow contracts as
-separate single sources of truth.
+Do not copy another `.claude/commands` router from the source article.
+Preserve the existing classifier and risk map.
+Use the existing reviewer role selector and Flow contract as their owners.
 
-This slice adds `schemas/review-route.schema.json` and regression tests for
-the **current** `river review route --format json` response. It changes no
-default routing rule or runtime semantics. This schema is **Experimental**;
-the CLI remains **Internal** under `pages/reference/stable-interfaces.md`.
+This change adds `schemas/review-route.schema.json`.
+It also adds deterministic regression tests for the current JSON response.
+There is no change to routing behavior or plugin execution.
+The new schema is Experimental.
+The CLI is Internal under `pages/reference/stable-interfaces.md`.
 
-## Existing architecture and ownership
+## Responsibilities
 
-| Surface | Responsibility |
-| --- | --- |
-| `src/lib/review-mode-router.mjs` | Pre-flow, deterministic depth recommendation |
-| `src/lib/file-classifier.mjs` | Coarse changed-file classification |
-| `src/lib/risk-map.mjs` | Repository-owned risk escalation and human-review requirement |
-| `src/lib/reviewer-orchestrator.mjs` | Reviewer-role definitions and `selectRolesAuto()` |
-| `schemas/flow.schema.json` | Runtime-independent ordering and execution protocol |
-| `schemas/agent-contract.schema.json` | Logical agent roles and authority boundaries |
-| `schemas/review-route.schema.json` | Experimental v1 route result; no executable policy |
-| Review Artifact / Execution Manifest | Actual selected/executed/skipped work and provenance |
+- `src/lib/review-mode-router.mjs` owns pre-flow depth recommendations.
+- `src/lib/file-classifier.mjs` owns changed-file classification.
+- `src/lib/risk-map.mjs` owns risk escalation and human review requirements.
+- `src/lib/reviewer-orchestrator.mjs` owns the reviewer role ledger.
+- `schemas/flow.schema.json` owns runtime-independent execution ordering.
+- `schemas/agent-contract.schema.json` owns logical agent authority.
+- `schemas/review-route.schema.json` defines an advisory result.
+- Review Artifact and Execution Manifest record actual work and provenance.
 
-The router is a **pre-flow advisor**. It must not redefine judgment, reviewer
-roles, skill selection rules, Flow thresholds, reviewer independence, or
-human authorization. Plugin adapters may present its advice, but must not
-silently turn it into execution or a passing gate.
+The route is advice before a Flow starts.
+It must not redefine reviewer roles or selection thresholds.
+It must not grant human approval or turn missing evidence into a passing gate.
 
 ## v1 contract
 
 `selectedMode` is `light | standard | team | human-required`.
-`confidence` describes the heuristic route, **not** the correctness of a
-finding. `reasons` and `matchedTriggers` explain the decision.
-`riskAction` retains the canonical risk-map action.
-`nextCommand` is an untrusted **suggestion**, not a command to auto-run.
+`confidence` describes the heuristic recommendation.
+It is not evidence of finding correctness or completed coverage.
 
-`recommendedReviewers` is currently `"auto" | "none"`: this is a legacy
-hint consumed by existing flows. The actual reviewer list belongs to
-`selectRolesAuto()`; it is not the same as completed Review Coverage.
-Changing this field to an array would break existing consumers and must be
-handled in a separate versioned contract/compatibility slice.
+`reasons` and `matchedTriggers` explain the route.
+`riskAction` retains the existing risk map action.
+`nextCommand` is a suggestion and is never executed automatically.
 
-## Explicit next slices (not implemented here)
+`recommendedReviewers` is currently `"auto" | "none"`.
+This is a hint rather than a list of executed reviewer roles.
+The real role list comes from `selectRolesAuto()`.
+Moving to an array requires an explicit compatibility decision.
 
-1. **Risk-trigger review:** compare dependency manifest/lock, CI workflow and
-   generic config changes using a fixed test matrix. Keep existing risk-map
-   `require_human_review` as the stronger decision. Do not simply escalate
-   every configuration change.
-2. **Explain roles without duplicate selection logic:** use
-   `selectRolesAuto()` and its current auto-selection contract; introduce an
-   additive role explanation or a versioned array response after checking
-   plugin consumers and compatibility.
-3. **Plugin-first route-first guide:** document a route recommendation as
-   optional/advisory and preserve no-CLI skill execution. Neither Claude Code
-   nor Codex may acquire new approvals via adapter behavior.
-4. **Evidence-backed evaluation:** pair the same changed-file/risk cases
-   under baseline and candidate routing; measure review coverage, misses,
-   precision, cost, latency and added human escalations. Use existing
-   Review Evolution (#1574), not another evaluation engine.
+## Next implementation slices
 
-## Review checks for every follow-up
+1. Review the risk routing of dependency manifests and lock files.
+   Review CI workflows separately from generic configuration.
+   Never downgrade a `require_human_review` decision.
+2. Explain the selected roles with the existing `selectRolesAuto()`.
+   Add fields without duplicating the role ledger.
+   Assess consumers before introducing a new output version.
+3. Document route-first usage for Claude Code and Codex.
+   Keep the plugin usable without an installed CLI.
+   Preserve all execution and approval boundaries.
+4. Compare the baseline with the proposed routing behavior.
+   Use fixed inputs and the existing Review Evolution pipeline.
+   Include review quality and cost in the acceptance criteria.
 
-- Deterministic output with no API key; JSON conforms to its declared version.
-- `human-required` cannot downgrade to a pure AI review.
-- Routing recommendation cannot be mistaken for actual reviewer execution.
-- Unknown/missing evidence does not become `pass` or `verified`.
-- No duplicated role maps, Flow policy, authority, or new dependencies.
-- Regression tests, formatter, markdown lint, exact-head CI and independent
-  review must be green before any merge.
+## Review checks
 
-Related: #2011, #2034, #2054, #2213, #1545, #1574.
+- Deterministic output validates without a provider API key.
+- Human-required cannot downgrade to AI-only review.
+- A routing hint is not evidence of executed reviewer coverage.
+- Unknown and missing evidence must never become verified success.
+- No duplicate role maps or new dependencies are introduced.
+- All exact-head tests must pass before merge.
+
+Related: #2011 #2034 #2054 #2213 #1545 #1574.
