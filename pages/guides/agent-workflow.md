@@ -31,14 +31,39 @@ river run . --dry-run
 river run . --output json
 ```
 
+### レビュー深度を先に確認する
+
+CLI が利用できる場合、変更リスクに応じたレビュー深度を事前に確認できます。
+このコマンドはレビューを実行せず、推奨内容を表示するだけです。
+
+```bash
+river review route . --format markdown
+river review route . --format json
+```
+
+判定結果は `light`、`standard`、`team`、`human-required` のいずれかです。
+`recommendedReviewers` は実行済みロールの記録ではありません。
+`nextCommand` も実行許可ではなく、参考コマンドです。
+
+`human-required` の場合は人間によるレビューが必要です。
+CLI がない場合は従来どおりプラグインの Skill 経由でレビューできます。
+CLI の導入を必須条件にしないでください。
+
 ### `--reviewers auto` の仕組み
 
 `auto` を指定すると、diff の内容を解析してレビュアーロールを自動選択します。常に `bug-hunter` が含まれ、以下のシグナルに基づいて追加ロールが加わります。
 
-| シグナル                                                                                             | 追加されるロール   |
-| ---------------------------------------------------------------------------------------------------- | ------------------ |
-| config / schema / migration / infra ファイルが変更されている、またはリスク評価済みファイルが存在する | `security-scanner` |
-| test ファイルが変更されている、または app ファイルが 3 件以上ある                                    | `test-gap`         |
+追加ロールの代表的な選択条件は次のとおりです。
+
+- `config`、`schema`、`migration`、`infra` の変更: `security-scanner`
+- テスト変更、またはアプリコード3ファイル以上の変更: `test-gap`
+- `package.json` や対応する lockfile の変更: `dependency-reviewer`
+- UI / CSS 等のフロントエンド変更: `frontend-reviewer`
+- `.github/workflows/**` の変更: `ci-cd-reviewer`
+
+工程や明示的なリスクシグナルによっても追加ロールを選択します。
+`river review route` は深度の推奨のみを行います。
+実際に選択したレビュアーはレビュー実行結果で確認してください。
 
 どのロールが選択されたかは、JSON 出力の `autoSelectedRoles` フィールドで確認できます。
 
