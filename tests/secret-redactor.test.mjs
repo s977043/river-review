@@ -633,6 +633,29 @@ test('#2203 does not let built-in sample words inside provider keys bypass maski
   );
 });
 
+test('#2203 Bearer credentials are not bypassed by built-in example words', () => {
+  // Synthetic bearer material: the embedded documentation word is not proof
+  // that the token is non-secret when the full Bearer form matches.
+  const credential = 'A'.repeat(10) + 'example' + 'B'.repeat(14);
+  const input = 'Authorization: Bearer ' + credential;
+  const { text, hits } = redactText(input, { highEntropy: false });
+  assert.equal(text, 'Authorization: <REDACTED:bearerToken>');
+  assert.deepEqual(hits, [{ category: 'bearerToken', count: 1 }]);
+
+  const explicit = redactText(input, {
+    highEntropy: false,
+    allowlist: ['example'],
+  });
+  assert.equal(explicit.text, input);
+  assert.deepEqual(explicit.hits, []);
+
+  for (const prose of ['Authorization: Bearer example', 'Bearer dummy']) {
+    const untouched = redactText(prose, { highEntropy: false });
+    assert.equal(untouched.text, prose);
+    assert.deepEqual(untouched.hits, []);
+  }
+});
+
 test('redactText respects caller-supplied allowlist substrings', () => {
   // Allowlist matches against the captured token, so the substring must
   // appear inside the AKIA + 16 char body. AKIA + "TESTFIXTURE12345"
