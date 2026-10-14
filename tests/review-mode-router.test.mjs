@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { classifyChangedFiles } from '../src/lib/file-classifier.mjs';
 import { routeReviewMode, formatRouterResultMarkdown } from '../src/lib/review-mode-router.mjs';
+import { selectRolesAuto } from '../src/lib/reviewer-orchestrator.mjs';
 
 // --- routeReviewMode ---
 
@@ -71,22 +73,51 @@ test('large changedLines → team mode', () => {
   assert.ok(result.matchedTriggers.includes('diffSize:changedLines'));
 });
 
-test('infra file → standard mode (not demoted to light)', () => {
+test('CI workflow → team mode with explicit trigger', () => {
   const result = routeReviewMode({
     changedFiles: ['.github/workflows/ci.yml'],
     riskMap: null,
   });
+  assert.equal(result.selectedMode, 'team');
+  assert.ok(result.matchedTriggers.includes('fileType:ci'));
+  assert.equal(result.confidence, 'high');
+});
+
+test('generic infra file → standard mode', () => {
+  const result = routeReviewMode({ changedFiles: ['Dockerfile'], riskMap: null });
   assert.equal(result.selectedMode, 'standard');
   assert.ok(result.matchedTriggers.includes('fileType:infra'));
 });
 
-test('config file → standard mode', () => {
+test('generic config file → standard mode', () => {
   const result = routeReviewMode({
-    changedFiles: ['package.json'],
+    changedFiles: ['tsconfig.json'],
     riskMap: null,
   });
   assert.equal(result.selectedMode, 'standard');
   assert.ok(result.matchedTriggers.includes('fileType:config'));
+});
+
+test('package manifest and lockfiles → team mode', () => {
+  for (const file of ['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']) {
+    const result = routeReviewMode({ changedFiles: [file], riskMap: null });
+    assert.equal(result.selectedMode, 'team', file);
+    assert.ok(result.matchedTriggers.includes('fileType:dependency'), file);
+    assert.equal(result.confidence, 'high');
+    assert.equal(result.recommendedReviewers, 'auto');
+  }
+});
+
+test('human requirement wins even with dependency trigger', () => {
+  const riskMap = {
+    defaults: { action: 'comment_only' },
+    rules: [
+      { pattern: 'package-lock.json', action: 'require_human_review', reason: 'Supply chain' },
+    ],
+  };
+  const result = routeReviewMode({ changedFiles: ['package-lock.json'], riskMap });
+  assert.equal(result.selectedMode, 'human-required');
+  assert.ok(result.matchedTriggers.includes('fileType:dependency'));
 });
 
 test('risk-map require_human_review → human-required mode', () => {
@@ -182,4 +213,20 @@ test('formatRouterResultMarkdown produces markdown table', () => {
   assert.ok(md.includes('`light`'));
   assert.ok(md.includes('```bash'));
   assert.ok(md.includes('river review plan . --depth quick'));
+});
+
+test('auto specialist selection aligns with dependency and CI route signals', () => {
+  const scenarios = [
+    { path: 'package-lock.json', specialist: 'dependency-reviewer' },
+    { path: 'pnpm-lock.yaml', specialist: 'dependency-reviewer' },
+    { path: '.github/workflows/ci.yml', specialist: 'ci-cd-reviewer' },
+  ];
+  for (const { path, specialist } of scenarios) {
+    const files = [path];
+    const routed = routeReviewMode({ changedFiles: files });
+    assert.equal(routed.selectedMode, 'team', path);
+    const roles = selectRolesAuto(classifyChangedFiles(files));
+    assert.ok(roles.includes('bug-hunter'), path);
+    assert.ok(roles.includes(specialist), path);
+  }
 });

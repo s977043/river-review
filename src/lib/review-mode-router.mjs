@@ -1,4 +1,4 @@
-import { classifyChangedFiles } from './file-classifier.mjs';
+import { classifyChangedFiles, isCIWorkflowFile, isDependencyFile } from './file-classifier.mjs';
 import { countChangedLinesFromText } from './diff-processor.mjs';
 import { evaluateRisk } from './risk-map.mjs';
 
@@ -90,7 +90,20 @@ export function routeReviewMode({
     matchedTriggers.push('fileType:schema');
   }
 
-  // Rule 4: large diff
+  // Rule 4: deliberate team review for dependency and CI workflow changes.
+  // Shared path predicates also drive the existing specialist role selection.
+  if (changedFiles.some(isDependencyFile)) {
+    mode = raiseMode(mode, 'team');
+    reasons.push('依存関係の宣言またはロックファイルが変更されています');
+    matchedTriggers.push('fileType:dependency');
+  }
+  if (changedFiles.some(isCIWorkflowFile)) {
+    mode = raiseMode(mode, 'team');
+    reasons.push('CI ワークフローが変更されています');
+    matchedTriggers.push('fileType:ci');
+  }
+
+  // Rule 5: large diff
   if (fileCount >= 20) {
     mode = raiseMode(mode, 'team');
     reasons.push(`変更ファイル数が多い (${fileCount} 件)`);
@@ -102,7 +115,7 @@ export function routeReviewMode({
     matchedTriggers.push('diffSize:changedLines');
   }
 
-  // Rule 5: infra/config keeps the mode at standard; skip when a higher trigger already fired
+  // Rule 6: infra/config keeps the mode at standard; skip when a higher trigger already fired
   // (avoids adding redundant reasons when team/human-required is already decided)
   if (mode !== 'human-required' && mode !== 'team') {
     if (fileTypes.infra.length > 0) {
@@ -117,7 +130,7 @@ export function routeReviewMode({
     }
   }
 
-  // Rule 6: docs/test only → light (only when there are files to classify)
+  // Rule 7: docs/test only → light (only when there are files to classify)
   const hasSubstantiveFiles =
     fileTypes.app.length > 0 ||
     fileTypes.config.length > 0 ||
@@ -142,7 +155,9 @@ export function routeReviewMode({
     matchedTriggers.includes('risk-map:require_human_review') ||
     matchedTriggers.includes('risk-map:escalate') ||
     matchedTriggers.includes('fileType:migration') ||
-    matchedTriggers.includes('fileType:schema')
+    matchedTriggers.includes('fileType:schema') ||
+    matchedTriggers.includes('fileType:dependency') ||
+    matchedTriggers.includes('fileType:ci')
   ) {
     confidence = 'high';
   } else {

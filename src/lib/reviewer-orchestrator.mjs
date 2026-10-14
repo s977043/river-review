@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isCIWorkflowFile, isDependencyFile } from './file-classifier.mjs';
 import { generateReview, resolveRedactOptions } from './review-engine.mjs';
 import { mergeConfig } from '../config/loader.mjs';
 import { defaultConfig } from '../config/default.mjs';
@@ -362,7 +363,7 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
   }
 
   const configList = fileTypes?.config ?? [];
-  if (configList.some((f) => RE_DEPENDENCY_FILE.test(basenameOf(f)))) {
+  if (configList.some(isDependencyFile)) {
     add('dependency-reviewer', 'files:manifest-or-lockfile');
   }
 
@@ -372,7 +373,7 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
   }
 
   const infraList = fileTypes?.infra ?? [];
-  if (infraList.some((f) => RE_CI_WORKFLOW.test(normalizePath(f)))) {
+  if (infraList.some(isCIWorkflowFile)) {
     add('ci-cd-reviewer', 'files:workflow');
   }
 
@@ -394,16 +395,11 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
 
 // Sub-classification patterns for auto role selection (#1196 S3). These refine
 // the coarse file-classifier buckets (config/app/infra) without changing them.
-const RE_DEPENDENCY_FILE = /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/;
 const RE_FRONTEND_FILE = /\.(?:tsx|jsx|css|scss|sass|less|vue|svelte)$/;
-const RE_CI_WORKFLOW = /\.github\/workflows\//;
 
 // Null-safe path helpers: list elements may be non-strings in malformed input.
 function normalizePath(f) {
   return typeof f === 'string' ? f.replaceAll('\\', '/') : '';
-}
-function basenameOf(f) {
-  return normalizePath(f).split('/').pop() ?? '';
 }
 
 /**

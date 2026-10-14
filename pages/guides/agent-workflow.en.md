@@ -31,14 +31,39 @@ river run . --dry-run
 river run . --output json
 ```
 
+### Preview review depth before running
+
+With the optional CLI installed, you can inspect the recommended depth.
+This command is advisory only and does not execute a review.
+
+```bash
+river review route . --format markdown
+river review route . --format json
+```
+
+The result is `light`, `standard`, `team`, or `human-required`.
+`recommendedReviewers` does not prove which roles actually executed.
+`nextCommand` is a suggestion, not permission to execute it.
+
+For `human-required`, assign a human reviewer.
+Without the CLI, continue to use the bundled plugin Skills directly.
+The CLI must not become a mandatory plugin dependency.
+
 ### How `--reviewers auto` works
 
 When `auto` is specified, River Review analyzes the diff content and selects reviewer roles automatically. `bug-hunter` is always included; additional roles are added based on the following signals:
 
-| Signal                                                                           | Role added         |
-| -------------------------------------------------------------------------------- | ------------------ |
-| config / schema / migration / infra files changed, or risk-escalated files exist | `security-scanner` |
-| test files changed, or 3 or more app files changed                               | `test-gap`         |
+Typical signals that add specialist roles include:
+
+- Configuration, schema, migration, or infrastructure changes: `security-scanner`
+- Test changes or three or more application files: `test-gap`
+- `package.json` and supported lockfile changes: `dependency-reviewer`
+- Frontend component or style changes: `frontend-reviewer`
+- `.github/workflows/**` changes: `ci-cd-reviewer`
+
+Optional stage and risk signals can add further roles.
+`river review route` recommends depth only.
+Use the actual review result to confirm which reviewers ran.
 
 To see which roles were selected, check the `autoSelectedRoles` field in the JSON output:
 

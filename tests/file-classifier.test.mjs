@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { classifyChangedFiles } from '../src/lib/file-classifier.mjs';
+import {
+  classifyChangedFiles,
+  isCIWorkflowFile,
+  isDependencyFile,
+} from '../src/lib/file-classifier.mjs';
 
 test('classifyChangedFiles: categorizes mixed file set', () => {
   const result = classifyChangedFiles([
@@ -101,4 +105,20 @@ test('classifyChangedFiles: migration patterns', () => {
     'src/migrations/20240101_add_users.ts',
   ]);
   assert.equal(result.migration.length, 2);
+});
+
+test('dependency lockfiles classify as config, including workspace paths', () => {
+  const files = ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'apps/web/package.json'];
+  const classified = classifyChangedFiles(files);
+  assert.deepEqual(classified.config, files);
+  assert.deepEqual(classified.unknown, []);
+  for (const file of files) assert.equal(isDependencyFile(file), true);
+  assert.equal(isDependencyFile('tsconfig.json'), false);
+  assert.equal(isDependencyFile(null), false);
+});
+
+test('CI workflow predicate excludes generic infrastructure', () => {
+  assert.equal(isCIWorkflowFile('.github/workflows/ci.yml'), true);
+  assert.equal(isCIWorkflowFile('Dockerfile'), false);
+  assert.equal(isCIWorkflowFile(undefined), false);
 });
