@@ -17,19 +17,11 @@
   "properties": {
     "selectedMode": {
       "type": "string",
-      "enum": [
-        "light",
-        "standard",
-        "team",
-        "human-required"
-      ]
+      "enum": ["light", "standard", "team", "human-required"]
     },
     "confidence": {
       "type": "string",
-      "enum": [
-        "high",
-        "medium"
-      ],
+      "enum": ["high", "medium"],
       "description": "Heuristic routing confidence, not finding truth or review coverage."
     },
     "reasons": {
@@ -48,19 +40,12 @@
     },
     "recommendedReviewers": {
       "type": "string",
-      "enum": [
-        "auto",
-        "none"
-      ],
+      "enum": ["auto", "none"],
       "description": "Legacy v1 selection hint; actual role list is resolved separately by the existing reviewer orchestrator. Do not silently change to an array."
     },
     "riskAction": {
       "type": "string",
-      "enum": [
-        "comment_only",
-        "escalate",
-        "require_human_review"
-      ]
+      "enum": ["comment_only", "escalate", "require_human_review"]
     },
     "nextCommand": {
       "type": "string",
