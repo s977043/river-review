@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.129.0](https://github.com/s977043/river-review/compare/v1.128.0...v1.129.0) (2026-10-14)
+
+
+### Features
+
+* **harness:** capture guarded hook events with private logs ([#2681](https://github.com/s977043/river-review/issues/2681)) ([9e0f0c7](https://github.com/s977043/river-review/commit/9e0f0c7d79b4212aa10a6c6a967624dd9d53ba9d))
+* **router:** escalate dependency and CI changes to team review ([#2034](https://github.com/s977043/river-review/issues/2034)) ([1ff6965](https://github.com/s977043/river-review/commit/1ff6965ee3937a7a669d2ddd52fca9afbe03e19c))
+
+
+### Bug Fixes
+
+* **harness:** exclude prose-retired guards from overdue candidates ([#2678](https://github.com/s977043/river-review/issues/2678)) ([0685d96](https://github.com/s977043/river-review/commit/0685d961e86eef2cc1d6991bf1c534fd06691c94))
+* **redaction:** mask AWS access key IDs containing sample words ([#2685](https://github.com/s977043/river-review/issues/2685)) ([b07dfda](https://github.com/s977043/river-review/commit/b07dfdaa06d9575c81b42f11cbc78655063d6c2d))
+* **security:** mask Bearer credentials containing sample words ([#2682](https://github.com/s977043/river-review/issues/2682)) ([77cd666](https://github.com/s977043/river-review/commit/77cd66658cd3062e480d3fa817a301a9ad214f8d))
+
 ## [1.128.0](https://github.com/s977043/river-review/compare/v1.127.0...v1.128.0) (2026-10-12)
 
 
