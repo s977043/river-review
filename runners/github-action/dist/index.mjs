@@ -31058,7 +31058,7 @@ function inferPhase(fileTypes) {
  * @returns {{ appFilesChanged: number, testFilesChanged: number, gapFiles: string[], coverageRatio: number, riskLevel: 'low'|'medium'|'high' }}
  */
 function analyzeTestImpact(changedFiles) {
-  const classified = (0,file_classifier/* classifyChangedFiles */.q)(changedFiles);
+  const classified = (0,file_classifier/* classifyChangedFiles */.qS)(changedFiles);
 
   const appFiles = classified.app;
   const testFiles = classified.test;
@@ -31490,7 +31490,7 @@ async function buildExecutionPlan(options) {
     llmEnabled,
   });
   const impactTags = inferImpactTags(changedFiles, { diffText });
-  const fileTypes = (0,file_classifier/* classifyChangedFiles */.q)(changedFiles);
+  const fileTypes = (0,file_classifier/* classifyChangedFiles */.qS)(changedFiles);
   // #1565 Stage 1 (observe): deterministically infer a phase from fileTypes and
   // record it on the snapshot for measurement only. `applied: false` documents
   // that the inferred phase does NOT drive selection — the actual `phase` is
@@ -34189,7 +34189,7 @@ function countChangedLinesFromText(diffText) {
 function extractDiffMeta(diff) {
   const changedFiles = diff?.changedFiles ?? [];
   const changedLines = countChangedLinesFromText(diff?.diffText);
-  const fileTypes = (0,_file_classifier_mjs__WEBPACK_IMPORTED_MODULE_1__/* .classifyChangedFiles */ .q)(changedFiles);
+  const fileTypes = (0,_file_classifier_mjs__WEBPACK_IMPORTED_MODULE_1__/* .classifyChangedFiles */ .qS)(changedFiles);
 
   return {
     fileCount: changedFiles.length,
@@ -35517,7 +35517,9 @@ function buildFeedbackScaffold(entry) {
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
-/* harmony export */   q: () => (/* binding */ classifyChangedFiles)
+/* harmony export */   Wb: () => (/* binding */ isDependencyFile),
+/* harmony export */   cw: () => (/* binding */ isCIWorkflowFile),
+/* harmony export */   qS: () => (/* binding */ classifyChangedFiles)
 /* harmony export */ });
 // Module-scope regexes to avoid re-creation per call
 const RE_TEST_EXT = /\.(?:test|spec)\.(?:[jt]sx?|mjs)$/;
@@ -35532,6 +35534,8 @@ const RE_TSCONFIG = /^tsconfig.*\.json$/;
 const RE_TEXTLINTRC = /(?:^|\.)textlintrc(?:\.[a-z]+)?$/;
 const RE_DOCKERFILE = /^Dockerfile/;
 const RE_DOCKER_COMPOSE = /^docker-compose/;
+const RE_DEPENDENCY_FILE = /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/;
+const RE_CI_WORKFLOW = /\.github\/workflows\//;
 
 const CONFIG_NAMES = new Set([
   'package.json',
@@ -35542,6 +35546,18 @@ const CONFIG_NAMES = new Set([
   '.textlintrc.json',
   '.textlintignore',
 ]);
+
+/** Path classifier shared by review-depth routing and specialist selection. */
+function isDependencyFile(file) {
+  if (typeof file !== 'string') return false;
+  const basename = file.replaceAll('\\', '/').split('/').pop() ?? '';
+  return RE_DEPENDENCY_FILE.test(basename);
+}
+
+/** CI workflow paths are inspected independently from generic infra files. */
+function isCIWorkflowFile(file) {
+  return typeof file === 'string' && RE_CI_WORKFLOW.test(file.replaceAll('\\', '/'));
+}
 
 /**
  * Classify changed files by type for routing and evidence collection.
@@ -35599,6 +35615,7 @@ function isMigration(file) {
 }
 
 function isConfig(file, basename) {
+  if (isDependencyFile(file)) return true;
   if (RE_CONFIG_EXT.test(basename)) return true;
   if (RE_RC_FILE.test(basename)) return true;
   if (CONFIG_NAMES.has(basename) || basename.startsWith('.env')) return true;
@@ -97150,6 +97167,8 @@ async function resolveSelectionSkillIds(
 
 // EXTERNAL MODULE: ./src/lib/review-engine.mjs + 14 modules
 var review_engine = __nccwpck_require__(7156);
+// EXTERNAL MODULE: ./src/lib/file-classifier.mjs
+var file_classifier = __nccwpck_require__(4673);
 // EXTERNAL MODULE: ./src/config/default.mjs
 var config_default = __nccwpck_require__(4807);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
@@ -97256,6 +97275,7 @@ var review_coverage = __nccwpck_require__(3054);
 // EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
 var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
+
 
 
 
@@ -97611,7 +97631,7 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
   }
 
   const configList = fileTypes?.config ?? [];
-  if (configList.some((f) => RE_DEPENDENCY_FILE.test(basenameOf(f)))) {
+  if (configList.some(file_classifier/* isDependencyFile */.Wb)) {
     add('dependency-reviewer', 'files:manifest-or-lockfile');
   }
 
@@ -97621,7 +97641,7 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
   }
 
   const infraList = fileTypes?.infra ?? [];
-  if (infraList.some((f) => RE_CI_WORKFLOW.test(normalizePath(f)))) {
+  if (infraList.some(file_classifier/* isCIWorkflowFile */.cw)) {
     add('ci-cd-reviewer', 'files:workflow');
   }
 
@@ -97643,16 +97663,11 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
 
 // Sub-classification patterns for auto role selection (#1196 S3). These refine
 // the coarse file-classifier buckets (config/app/infra) without changing them.
-const RE_DEPENDENCY_FILE = /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/;
 const RE_FRONTEND_FILE = /\.(?:tsx|jsx|css|scss|sass|less|vue|svelte)$/;
-const RE_CI_WORKFLOW = /\.github\/workflows\//;
 
 // Null-safe path helpers: list elements may be non-strings in malformed input.
 function normalizePath(f) {
   return typeof f === 'string' ? f.replaceAll('\\', '/') : '';
-}
-function basenameOf(f) {
-  return normalizePath(f).split('/').pop() ?? '';
 }
 
 /**
@@ -99541,8 +99556,6 @@ function buildExecutionStrategyShadowObservation({
   };
 }
 
-// EXTERNAL MODULE: ./src/lib/file-classifier.mjs
-var file_classifier = __nccwpck_require__(4673);
 ;// CONCATENATED MODULE: ./src/lib/review-concern-planning-bridge.mjs
 
 
@@ -99664,7 +99677,7 @@ function buildReviewConcernPlanningObservation({
     seenConcernIds.add(concernRef);
 
     const subjects = concernSubjects(concern);
-    const reviewerRoles = selectRolesAuto((0,file_classifier/* classifyChangedFiles */.q)(subjects), null, null);
+    const reviewerRoles = selectRolesAuto((0,file_classifier/* classifyChangedFiles */.qS)(subjects), null, null);
     const skillRecommendations = (Array.isArray(selectedSkills) ? selectedSkills : [])
       .map((skill) => {
         const id = skillId(skill);
