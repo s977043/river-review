@@ -11,6 +11,8 @@ const RE_TSCONFIG = /^tsconfig.*\.json$/;
 const RE_TEXTLINTRC = /(?:^|\.)textlintrc(?:\.[a-z]+)?$/;
 const RE_DOCKERFILE = /^Dockerfile/;
 const RE_DOCKER_COMPOSE = /^docker-compose/;
+const RE_DEPENDENCY_FILE = /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/;
+const RE_CI_WORKFLOW = /\.github\/workflows\//;
 
 const CONFIG_NAMES = new Set([
   'package.json',
@@ -21,6 +23,18 @@ const CONFIG_NAMES = new Set([
   '.textlintrc.json',
   '.textlintignore',
 ]);
+
+/** Path classifier shared by review-depth routing and specialist selection. */
+export function isDependencyFile(file) {
+  if (typeof file !== 'string') return false;
+  const basename = file.replaceAll('\\', '/').split('/').pop() ?? '';
+  return RE_DEPENDENCY_FILE.test(basename);
+}
+
+/** CI workflow paths are inspected independently from generic infra files. */
+export function isCIWorkflowFile(file) {
+  return typeof file === 'string' && RE_CI_WORKFLOW.test(file.replaceAll('\\', '/'));
+}
 
 /**
  * Classify changed files by type for routing and evidence collection.
@@ -78,6 +92,7 @@ function isMigration(file) {
 }
 
 function isConfig(file, basename) {
+  if (isDependencyFile(file)) return true;
   if (RE_CONFIG_EXT.test(basename)) return true;
   if (RE_RC_FILE.test(basename)) return true;
   if (CONFIG_NAMES.has(basename) || basename.startsWith('.env')) return true;
