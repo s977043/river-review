@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/review-route.schema.json",
+  "title": "River Review route result v1 (experimental)",
+  "description": "Current deterministic output of river review route. This schema freezes the existing advisory JSON shape without changing routing or reviewer execution. Review modes are recommendations, not approval or merge authority. Evolution to a reviewer-id array requires an explicit versioned migration.",
+  "type": "object",
+  "required": [
+    "selectedMode",
+    "confidence",
+    "reasons",
+    "matchedTriggers",
+    "recommendedReviewers",
+    "riskAction",
+    "nextCommand"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "selectedMode": {
+      "type": "string",
+      "enum": [
+        "light",
+        "standard",
+        "team",
+        "human-required"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium"
+      ],
+      "description": "Heuristic routing confidence, not finding truth or review coverage."
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "matchedTriggers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      },
+      "description": "Trace of matched routing heuristics, not trusted execution evidence."
+    },
+    "recommendedReviewers": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "none"
+      ],
+      "description": "Legacy v1 selection hint; actual role list is resolved separately by the existing reviewer orchestrator. Do not silently change to an array."
+    },
+    "riskAction": {
+      "type": "string",
+      "enum": [
+        "comment_only",
+        "escalate",
+        "require_human_review"
+      ]
+    },
+    "nextCommand": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Advisory suggested command, not an authorization to execute it."
+    }
+  }
+}
