@@ -263,7 +263,7 @@
 ```text
 ## セットアップ
 cd /Users/user/Documents/GitHub/river-review
-scripts/node22.sh bash scripts/worker-bootstrap.sh <branch>
+bash scripts/worker-bootstrap.sh <branch>
 cd .claude/worktrees/<slug>
 bootstrap の出力（node 行と manifest 行）を完了報告へそのまま転記すること。
 `docs/development/worker-discipline-template.md` を読んで従うこと。

@@ -15,6 +15,14 @@ if [ "$#" -eq 0 ]; then
   echo "usage: scripts/node22.sh <cmd> [args...]" >&2
   exit 64
 fi
+# Only node/npm/npx, so the allow rule for this script grants no more than Bash(node:*) / Bash(npm:*).
+case "$1" in
+  node | npm | npx) ;;
+  *)
+    echo "error: scripts/node22.sh runs only node, npm, or npx (got: $1)" >&2
+    exit 64
+    ;;
+esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WANT="$(tr -d '[:space:]' < "${REPO_ROOT}/.nvmrc")"
