@@ -192,7 +192,7 @@ version_satisfies() {
 }
 if [ -n "${WANT}" ] && ! version_satisfies "${HAVE}" "${WANT}"; then
   echo "WARNING: node v${HAVE} does not match .nvmrc ${WANT}. CI runs ${WANT}; runners/github-action/dist built here may differ from CI."
-  echo "         align with: nvm use / fnm use / volta pin / mise use, or export PATH=/opt/homebrew/opt/node@${WANT_MAJOR}/bin:\$PATH"
+  echo "         align with: nvm use / fnm use / volta pin / mise use, or run commands via scripts/node22.sh (NODE22_BIN=<Node ${WANT_MAJOR} bin dir>)"
 fi
 
 echo "== 3. npm ci"
@@ -223,8 +223,7 @@ echo "manifest: ${MANIFEST} ($(grep -cv '^#' "${MANIFEST}" || true) untracked pa
 
 echo "== 6. first verification commands"
 echo "  cd ${WORKTREE}"
-[ -n "${NODE_BIN}" ] && echo "  export PATH=$(dirname "${NODE_BIN}"):\$PATH"
-echo "  npm test"
-echo "  npm run lint"
+echo "  scripts/node22.sh npm test"
+echo "  scripts/node22.sh npm run lint"
 echo "  scripts/tree-pollution-check.sh ${WORKTREE}   # organizer, after the worker finishes"
 exit 0

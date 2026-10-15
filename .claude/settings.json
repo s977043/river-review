@@ -9,6 +9,8 @@
       "Bash(yarn:*)",
       "Bash(make:*)",
       "Bash(node:*)",
+      "Bash(scripts/node22.sh:*)",
+      "Bash(/Users/user/Documents/GitHub/river-review/scripts/node22.sh:*)",
       "Bash(rg:*)",
       "Bash(fd:*)",
       "Bash(ls:*)",
