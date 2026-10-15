@@ -35,6 +35,9 @@ jobs:
           dry_run: false # LLM review enabled (Stage1: label opt-in)
           debug: true
           gate: false # advisory only — never fail the job
+          # #2396: reviewer orchestration emits reviewCoverage into the run
+          # record as observe-only telemetry; the coverage gate stays off.
+          reviewers: auto
           max_cost: '0.50' # safety cap (OPENAI_MODEL とセットで有効)
         env:
           # GitHub Models は 2026-07-30 にretire済み。repository standardの
