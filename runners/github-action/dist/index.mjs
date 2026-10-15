@@ -47105,15 +47105,20 @@ const IDENTIFIER_SHAPED_RE =
 // CI log. Case-sensitive — lowercase `pwd = '...'` is still a password key.
 const NON_SECRET_PWD_NAMES = new Set(['PWD', 'OLDPWD']);
 
-// A lexical heuristic, not a general "path implies safe" rule: lower-case
-// pwd can also be a password key. Limit this exception to unquoted, absolute
-// working-directory paths with recognizable directory basenames and preserve masking on
-// password=..., quoted paths, and ambiguous /secret/path values (#2203).
+// A lexical heuristic, not a general "path implies safe" rule: lowercase
+// pwd can also be a password key. Only unquoted conventional working-directory
+// roots with recognizable directory basenames are exempt (#2203).
+const WORKDIR_ROOT_RE = /^\/(?:tmp|home|Users|workspace|workspaces|mnt|var|opt)\//;
+const WORKDIR_BASENAME_RE = /\/(?:workdir|workspace|work|repo|project|src|app|build|river-review)$/;
+const WORKDIR_PATH_RE = /^\/[A-Za-z0-9._/-]+$/;
+
 function isRecognizablePwdWorkingDirectory(name, sep, value) {
   return (
     name === 'pwd' &&
     sep.trim() === '=' &&
-    /^\/(?:tmp|home|Users|workspace|workspaces|mnt|var|opt)\/(?:[A-Za-z0-9._-]+\/)*(?:workdir|workspace|work|repo|project|src|app|build|river-review)$/.test(value)
+    WORKDIR_ROOT_RE.test(value) &&
+    WORKDIR_BASENAME_RE.test(value) &&
+    WORKDIR_PATH_RE.test(value)
   );
 }
 
