@@ -47107,13 +47107,13 @@ const NON_SECRET_PWD_NAMES = new Set(['PWD', 'OLDPWD']);
 
 // A lexical heuristic, not a general "path implies safe" rule: lower-case
 // pwd can also be a password key. Limit this exception to unquoted, absolute
-// working-directory paths under familiar roots and preserve masking on
+// working-directory paths with recognizable directory basenames and preserve masking on
 // password=..., quoted paths, and ambiguous /secret/path values (#2203).
 function isRecognizablePwdWorkingDirectory(name, sep, value) {
   return (
     name === 'pwd' &&
     sep.trim() === '=' &&
-    /^\/(?:tmp|home|Users|workspace|workspaces|mnt|var|opt)\/[A-Za-z0-9._/-]+$/.test(value)
+    /^\/(?:tmp|home|Users|workspace|workspaces|mnt|var|opt)\/(?:[A-Za-z0-9._-]+\/)*(?:workdir|workspace|work|repo|project|src|app|build|river-review)$/.test(value)
   );
 }
 
