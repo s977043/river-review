@@ -10,7 +10,7 @@
 異なるモデル系列のレビューに効果があるか、同じ変更と同じ評価条件で検証する。
 
 Greptile の改善率は外部事例であり、River Review の実測値ではない。
-モデルが異なるだけでは、独立性も正確性も保証されない。
+異なるモデルを使っても、独立性と正確性は保証されない。
 
 この段階で新しい Reviewer、Gate、Runtime、Schema は追加しない。
 
@@ -107,10 +107,12 @@ npm run river -- evolve replay --spec ./path/to/verified-experiment.json --outpu
 新しい LLM 呼び出しは行わない。
 終了コード 0 は評価の実行成功であり、採用の承認ではない。
 
-8. Manifest の整合性、activation、paired case 数、評価不能な指標を確認する。
-9. 別担当が正解ラベルと finding を照合する。誤検知や実行費用も記録する。
-10. 評価方法とセキュリティの独立レビューを受ける。
-11. 採用、再実験、棄却は人間が判断する。
+### 比較結果の確認
+
+1. Manifest の整合性、activation、paired case 数、評価不能な指標を確認する。
+2. 別担当が正解ラベルと finding を照合する。誤検知や実行費用も記録する。
+3. 評価方法とセキュリティの独立レビューを受ける。
+4. 採用、再実験、棄却は人間が判断する。
 
 実行モデルが使えない場合は `blocked: provider execution unavailable` と記録する。
 結果を捏造して比較器へ入力しない。
