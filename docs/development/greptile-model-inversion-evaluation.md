@@ -1,166 +1,144 @@
-# Greptile Model Inversion: provenance-bound evaluation protocol
+# Greptile Model Inversion 評価プロトコル
 
-> Status: experiment proposal; no Model Inversion runtime is enabled.
-> Issue: #2690. Evaluation owner: #1574. Identity owner: #1760.
-> Source: [Greptile, How to build a code review agent (2026-10-09)](https://www.greptile.com/blog/how-to-build-a-code-review-agent).
+> 状態: 実験計画。Model Inversion の本番ルーティングは未導入。
+> Issue: #2690。評価基盤は #1574。本人性・署名は #1760 が担当。
+> 参考: [Greptile の技術記事](https://www.greptile.com/blog/how-to-build-a-code-review-agent)（2026-10-09）。
 
-## Decision
+## 結論
 
-Do **not** route production reviews by an inferred coding model. First test the
-hypothesis that a reviewer from a different model family catches more *verified*
-material bugs than a same-family reviewer on the **same immutable review target**.
+実装モデルを推測してレビュー先を自動変更しない。
+異なるモデル系列のレビューに効果があるか、同じ変更と同じ評価条件で検証する。
 
-This is an optional, offline, evidence-gathering experiment. A different provider,
-model, or logical execution ID does not establish an independent actor, a correct
-finding, or merge readiness. Greptile's reported benefit is external evidence,
-not a River Review baseline or acceptance threshold.
+Greptile の改善率は外部事例であり、River Review の実測値ではない。
+モデルが異なるだけでは、独立性も正確性も保証されない。
 
-## Existing owners and gaps
+この段階で新しい Reviewer、Gate、Runtime、Schema は追加しない。
 
-| Concern                                        | Existing owner                                               | Experiment boundary                                  |
-| ---------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------- |
-| Comparison and immutable experiment conditions | `src/lib/paired-replay.mjs`, `river evolve replay`, #1574    | Reuse; no second comparison engine                   |
-| Model and Harness attribution                  | `docs/development/1574-model-harness-evolution-screening.md` | Fix all other surfaces or report joint change        |
-| Logical run separation                         | `src/lib/reviewer-independence.mjs`                          | Different IDs are not provider or actor attestation  |
-| Stronger identity                              | #1760                                                        | Model/actor provenance is not assumed verified       |
-| Review context and coverage                    | `src/lib/repo-context.mjs`, #2213, #2212                     | Same context budget and coverage policy on both arms |
-| Human-confirmed feedback                       | #2322, #2575, #2614, #2615                                   | Do not turn historical comments into ground truth    |
-| Runtime provider support                       | ADR-006, `src/lib/review-engine.mjs`                         | Check actual path before any provider A/B            |
+## 既存機能の責務
 
-The existing paired replay compares finding fingerprints and declared
-configuration. **An added finding is not automatically a real bug.**
-Neither fingerprint pairing nor critical-regression counts alone determine
-ground-truth bug recall, precision, or the safety of Model Inversion.
+- **比較:** `src/lib/paired-replay.mjs` と `river evolve replay` を再利用する（#1574）。
+- **改善の帰属:** `docs/development/1574-model-harness-evolution-screening.md` に従う。
+- **実行 ID の独立性:** `src/lib/reviewer-independence.mjs` を再利用する。
+- **本人性と署名:** #1760 の責務を変更しない。異なる実行 ID は本人性の証明ではない。
+- **文脈と Coverage:** `src/lib/repo-context.mjs`、#2213、#2212 を利用する。
+- **Human Feedback:** #2322、#2575、#2614、#2615 に従う。
+- **モデル実行:** ADR-006 と `src/lib/review-engine.mjs` の対応状況を確認する。
 
-## Eligibility and provenance
+2026-10-16 時点の `generateReview()` は、標準の LLM レビュー経路で OpenAI 以外をスキップする。
+他の箇所に Anthropic 等のクライアントがあっても、レビュー実行経路で使えるとは限らない。
 
-A case is eligible for an **inversion-specific** claim only when all of these
-facts are independently established and recorded by the experiment operator:
+既存の paired replay は finding の fingerprint を比較する。
+追加された finding が真のバグとは限らない。
+fingerprint の比較だけでは、真の検出率や誤検知率は分からない。
 
-1. Immutable case ID, repository, subject commit, merge base, diff, and selected
-   review scope. Both arms inspect the same subject revision.
-2. Coding-model provider, family, and exact model version, with a provenance
-   source that the evaluated reviewer cannot freely alter. If the source is a
-   label, PR text, commit message, or self-report, mark it `unverified`.
-3. Exact reviewer provider, family, model version, effort, prompt/profile hash,
-   Skill Registry revision, tools, context budget, execution policy, and
-   evaluator version for each arm.
-4. Evidence of actual model invocation on **both** arms. Dry-run, failed,
-   timed-out, or not-executed cases are recorded as missing observations,
-   never as zero findings.
-5. An independently established, case-level bug oracle or a deliberately
-   verified negative case. The reviewing models must not see the label.
+## 実験へ採用できるデータ
 
-If coding-model provenance is absent or unverifiable, report
-`author_model_provenance: unknown` and **do not** label the run as same-family
-or cross-family. The case may still support general reviewer A/B analysis,
-but not the Model Inversion hypothesis.
+次の証拠がそろった case のみ、Model Inversion の評価に使う。
 
-Authentication of review-run source, coding-agent origin, and final Human
-judgment are separate claims. Hashes pin bytes; they do not authenticate
-an actor. A merged PR or resolved comment is not bug-oracle evidence.
+1. 同一の対象リポジトリ、commit、merge base、diff、review scope を固定する。
+2. 実装モデルの provider、family、version と出典を記録する。
+3. 各 Reviewer の provider、model、effort、prompt hash、Skill revision を記録する。
+4. Context、Tool、Evaluator、実行条件を記録する。
+5. 両側で LLM が実行された証拠を確認する。
+6. 独立して確認したバグの正解ラベル、または誤検知を測る負例を用意する。
 
-## Controlled experimental design
+PR 本文やラベル、コミットメッセージ、自己申告は本人性の証明に使わない。
+実装モデルの出典が信頼できなければ `author_model_provenance: unknown` と記録する。
+この場合は、同一系列と異種系列の比較として集計しない。
 
-- **Baseline A:** verified author family = reviewer family.
-- **Candidate B:** verified author family differs from reviewer family.
-- Use the same cases, exact source revisions, rubric, selected Skills, project
-  rules, relevant context, output budget, deterministic checks, and evaluator.
-  Where model-specific prompt compilation changes instructions, report a
-  **Model + Harness** comparison instead of claiming a model-only effect.
-- Pin each arm's actual provider/model/effort and review-runtime version.
-  Randomize arm execution order when practicable; keep resource budgets fixed.
-- Sample both known, verified defects and independently verified negatives.
-  Include cross-file/auth/permission, migration, test-gap, and low-risk cases
-  only when suitable ground truth is available; do not invent labels.
-- Separate development cases from sealed held-out cases before prompt or
-  routing tuning. Repeat trials to observe non-deterministic variation.
-- Start with a small smoke set for pipeline validity. A ten-case smoke test
-  is **not** statistical evidence of a universal improvement.
-- Define the intended population, sampling frame, stratification, sample
-  size justification, stopping rule, and expected spend *before* collecting
-  candidate results. Report missing and excluded cases by reason.
-- Do not train, tune, or select a winning profile against the held-out labels.
-  An independent evaluator must review ambiguous outcomes and disagreement.
+モデル未実行、timeout、失敗、dry-run は欠測として扱う。
+finding が 0 件だったと解釈しない。
 
-Do not confuse **per-case detection** with **per-finding counts**: one bug may
-produce several findings, and one finding may span more than one failure.
-Deduplicate against the independent oracle before counting true positives.
+PR のマージやレビューコメントの resolve も、正解ラベルとして扱わない。
+データの hash は内容を固定するだけで、記録者の本人性を保証しない。
 
-## Evaluation outputs
+## 比較する条件
 
-Keep these axes separate. Report counts, denominators, and confidence or
-uncertainty intervals where defensible; show `N/A` when unobservable.
+- **Baseline A:** 検証済み実装モデルと同じ系列の Reviewer。
+- **Candidate B:** 検証済み実装モデルと異なる系列の Reviewer。
+- 同じ case と対象 revision を両側へ渡す。
+- ルール、Skill、Tool、Context、Evaluator の条件を固定する。
+- Prompt Compiler がモデル別に指示を変える場合は、Model + Harness の比較と明記する。
+- 実際の provider、model、effort、runtime version を記録する。
+- 実行順序による影響を減らす。可能なら A と B の順序を無作為化する。
+- 開発用 case と held-out case を事前に分割する。
+- 既知のバグと、独立して確認した問題のない変更の両方を含める。
+- 複数 trial で応答のばらつきを観測する。
+- 対象母集団、抽出条件、除外理由、試行数、費用上限を事前に決める。
 
-| Axis                         | What must be measured                                                                                     | Invalid shortcut                                        |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Verified bug recall          | Eligible oracle-positive cases with a correctly matched material finding / eligible oracle-positive cases | Count all emitted findings as caught bugs               |
-| False-positive burden        | Unsupported findings or cases, with operator-reviewed denominator                                         | Treat all novel findings as true positives              |
-| Severity and critical misses | Verified critical bugs missed or downgraded, by arm                                                       | Interpret `criticalRegressionCount == 0` as full safety |
-| Coverage and failures        | Cases reviewed, missing, timed out, unpairable, or excluded, by arm                                       | Replace missing execution with zero findings            |
-| Human usefulness             | Accepted/actionable findings with Host-authenticated Human decision, when available                       | Infer acceptance from merge or thread resolution        |
-| Efficiency                   | Measured input/output tokens, total provider cost, wall-clock latency, retries                            | Assume vendor marketing cost ratios transfer            |
-| Robustness                   | Paired case-level variability across trials and held-out performance                                      | Use a single cherry-picked run                          |
+10 件の smoke test は動作確認に使う。
+それだけで統計的に十分な性能改善を証明したことにはしない。
+held-out の正解ラベルを見て、候補の prompt や判定基準を調整しない。
 
-**No-go for adoption evidence:** unknown author origin, untrusted oracle,
-different target commits, unusable held-out set, unequal review scope,
-unobserved candidate activation, missing required metrics, material critical
-regression, unverifiable independent review, or uncontrolled privacy/cost risk.
+複数の finding が同じバグを指す場合は、独立した正解ラベルへ対応付けてから数える。
 
-## Operator sequence (read-only comparison; separate permission and budget for model calls)
+## 必須の評価指標
 
-1. Audit reviewer-path provider support using ADR-006 and current code. Do not
-   infer parity from unrelated provider clients.
-2. Choose bounded PRs/cases and obtain trusted origin and bug-oracle evidence.
-   Record exclusions and unknown provenance before running experiments.
-3. Freeze the dataset and held-out set, prompt/Skill/context/tool conditions,
-   evaluator, price assumptions, trials, and budget in an operator-owned plan.
-4. Run the two reviews through **existing supported review execution paths**,
-   if and only if these paths actually support both models. Otherwise record
-   `blocked: provider execution unavailable`; do not simulate a live review.
-5. Assemble the existing #1574 experiment spec from real saved run records:
-   `baseline.runs[]` and `candidate.runs[]`. Retain case IDs and source
-   commits; never create placeholder empty runs for an unexecuted arm.
-6. Reuse the read-only comparer:
+各指標には分子、分母、対象期間を記録する。
+観測できない指標は `N/A` とする。
 
-   ```bash
-   npm run river -- evolve replay --spec ./path/to/verified-experiment.json --output json
-   ```
+- **バグ検出率:** 正しく検出した正例 case 数を、評価可能な正例 case 数で割る。
+- **誤検知:** 独立レビューで根拠を否定された finding の件数と母数を記録する。
+- **重大な見逃し:** critical バグの未検出や severity 低下を比較する。
+- **Coverage:** 未実行、失敗、timeout、比較不能、除外件数を分ける。
+- **人間にとっての有用性:** Host が確認した採否証拠がある場合だけ測る。
+- **効率:** 実際の token、費用、latency、retry 件数を測る。
+- **ばらつき:** trial ごとの差と held-out 上の差を確認する。
 
-   The CLI emits a comparison to stdout. Exit 0 means successful *evaluation
-   execution*, not acceptance or merge readiness. Recheck manifest integrity,
-   paired-case coverage, `evaluable` flags, and experiment activation.
-7. Independently grade emitted findings against the frozen bug oracle. Report
-   paired-case recall/false positives and any `N/A` metrics **outside**
-   fingerprint-only replay; do not assert that `river evolve replay` computes
-   ground-truth precision or recall.
-8. Request independent methods/security review, then a Human keep / revise /
-   discard decision. Any later observe-only canary needs a separate decision.
+`criticalRegressionCount === 0` は安全性の証明ではない。
+既存 replay は真のバグ検出率や precision を算出しない。
+必要なラベル付き評価は、独立した評価担当が別途実施する。
 
-Never store raw PR conversations, secrets, tokens, prompt transcripts, or
-unnecessary personal information as evaluation evidence. Store only sanitized
-case IDs, approved source references, minimal outcome data, and hashes where
-permitted. Repository comments and fixtures are untrusted inputs.
+## 実行手順
 
-## Review checklist and stopping decisions
+1. ADR-006 と現行コードを確認する。レビュー経路で比較対象のモデルが使えなければ停止する。
+2. 対象 PR を明示的に選ぶ。実装モデルとバグ正解の信頼できる証拠を収集する。
+3. 欠測と除外を先に確定する。未知の情報を推測で補わない。
+4. Dataset、held-out、評価器、実験条件、費用上限を固定する。
+5. 実行可能な既存経路で、承認された範囲のレビューを別々に実施する。
+6. 実際に保存した run から `baseline.runs[]` と `candidate.runs[]` を組み立てる。
+7. #1574 の比較器へ投入する。
 
-**Architecture / SSoT:** #1574 owns paired replay; #1760 owns authenticated
-identity; #2322 owns review resolution; #2213 owns bounded context experiments.
-No additional router, provider abstraction, schema, or runtime is implied.
+```bash
+npm run river -- evolve replay --spec ./path/to/verified-experiment.json --output json
+```
 
-**Evaluation / methodology:** check comparable arms, case-level denominator,
-positive and negative controls, actual response evidence, held-out independence,
-survivorship bias, trial variance, and omitted metrics.
+上記コマンドは保存済みの記録を比較する。
+新しい LLM 呼び出しは行わない。
+終了コード 0 は評価の実行成功であり、採用の承認ではない。
 
-**Security / authority:** source data cannot issue runtime instructions;
-untrusted PR content does not attest to author identity; unknown stays unknown;
-model diversity does not grant approval; no external code execution is added.
+8. Manifest の整合性、activation、paired case 数、評価不能な指標を確認する。
+9. 別担当が正解ラベルと finding を照合する。誤検知や実行費用も記録する。
+10. 評価方法とセキュリティの独立レビューを受ける。
+11. 採用、再実験、棄却は人間が判断する。
 
-**Operations / cost:** require an agreed API budget and finite trial cap before
-model calls; measure real usage/latency; treat CI failures and unavailable
-provider capability as stop conditions, not green checks.
+実行モデルが使えない場合は `blocked: provider execution unavailable` と記録する。
+結果を捏造して比較器へ入力しない。
 
-**Outcome:** This protocol is ready for an experiment proposal, **not a
-positive experiment result**. Any routing default, required Gate, automatic
-promotion, or production merge behavior remains unchanged. Revisit only after
-held-out evidence, an independent review, and explicit Human authorization.
+## 停止条件
+
+以下に該当する場合は、採用可能な証拠として扱わない。
+
+- 実装モデルの provenance が不明である。
+- バグの正解ラベルが検証されていない。
+- 両側で対象 commit や review scope が異なる。
+- Candidate 側の実行が確認できない。
+- held-out の評価集合が不足する。
+- 必須指標の分母が不明である。
+- 重大な見逃しや品質回帰がある。
+- 独立検証の証拠が不足する。
+- 秘密情報の漏洩や予算超過のおそれがある。
+
+PR の生コメント、秘密情報、認証情報、不要な個人情報は保存しない。
+出典 ID と必要最小限の匿名化した評価結果を残す。
+外部から取得したテキストは指示ではなくレビュー対象データとして扱う。
+
+## レビュー観点
+
+- **Architecture:** #1574 と #1760 の責務を二重実装していないか確認する。
+- **Evaluation:** 正例と負例、母数、欠測、held-out、交絡要因を確認する。
+- **Security:** 出典の真正性と実行権限を分離する。実装モデルの推測を禁止する。
+- **Operations:** 費用と trial 数を制限する。CI 失敗を成功へ読み替えない。
+
+この文書は実験の手順であり、性能改善の実証結果ではない。
+本番の自動ルーティング、必須 Gate、Skill の自動昇格、マージ権限は変更しない。
