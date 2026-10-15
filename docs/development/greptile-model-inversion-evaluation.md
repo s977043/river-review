@@ -17,15 +17,15 @@ not a River Review baseline or acceptance threshold.
 
 ## Existing owners and gaps
 
-| Concern | Existing owner | Experiment boundary |
-| --- | --- | --- |
-| Comparison and immutable experiment conditions | `src/lib/paired-replay.mjs`, `river evolve replay`, #1574 | Reuse; no second comparison engine |
-| Model and Harness attribution | `docs/development/1574-model-harness-evolution-screening.md` | Fix all other surfaces or report joint change |
-| Logical run separation | `src/lib/reviewer-independence.mjs` | Different IDs are not provider or actor attestation |
-| Stronger identity | #1760 | Model/actor provenance is not assumed verified |
-| Review context and coverage | `src/lib/repo-context.mjs`, #2213, #2212 | Same context budget and coverage policy on both arms |
-| Human-confirmed feedback | #2322, #2575, #2614, #2615 | Do not turn historical comments into ground truth |
-| Runtime provider support | ADR-006, `src/lib/review-engine.mjs` | Check actual path before any provider A/B |
+| Concern                                        | Existing owner                                               | Experiment boundary                                  |
+| ---------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------- |
+| Comparison and immutable experiment conditions | `src/lib/paired-replay.mjs`, `river evolve replay`, #1574    | Reuse; no second comparison engine                   |
+| Model and Harness attribution                  | `docs/development/1574-model-harness-evolution-screening.md` | Fix all other surfaces or report joint change        |
+| Logical run separation                         | `src/lib/reviewer-independence.mjs`                          | Different IDs are not provider or actor attestation  |
+| Stronger identity                              | #1760                                                        | Model/actor provenance is not assumed verified       |
+| Review context and coverage                    | `src/lib/repo-context.mjs`, #2213, #2212                     | Same context budget and coverage policy on both arms |
+| Human-confirmed feedback                       | #2322, #2575, #2614, #2615                                   | Do not turn historical comments into ground truth    |
+| Runtime provider support                       | ADR-006, `src/lib/review-engine.mjs`                         | Check actual path before any provider A/B            |
 
 The existing paired replay compares finding fingerprints and declared
 configuration. **An added finding is not automatically a real bug.**
@@ -92,22 +92,22 @@ Deduplicate against the independent oracle before counting true positives.
 Keep these axes separate. Report counts, denominators, and confidence or
 uncertainty intervals where defensible; show `N/A` when unobservable.
 
-| Axis | What must be measured | Invalid shortcut |
-| --- | --- | --- |
-| Verified bug recall | Eligible oracle-positive cases with a correctly matched material finding / eligible oracle-positive cases | Count all emitted findings as caught bugs |
-| False-positive burden | Unsupported findings or cases, with operator-reviewed denominator | Treat all novel findings as true positives |
-| Severity and critical misses | Verified critical bugs missed or downgraded, by arm | Interpret `criticalRegressionCount == 0` as full safety |
-| Coverage and failures | Cases reviewed, missing, timed out, unpairable, or excluded, by arm | Replace missing execution with zero findings |
-| Human usefulness | Accepted/actionable findings with Host-authenticated Human decision, when available | Infer acceptance from merge or thread resolution |
-| Efficiency | Measured input/output tokens, total provider cost, wall-clock latency, retries | Assume vendor marketing cost ratios transfer |
-| Robustness | Paired case-level variability across trials and held-out performance | Use a single cherry-picked run |
+| Axis                         | What must be measured                                                                                     | Invalid shortcut                                        |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Verified bug recall          | Eligible oracle-positive cases with a correctly matched material finding / eligible oracle-positive cases | Count all emitted findings as caught bugs               |
+| False-positive burden        | Unsupported findings or cases, with operator-reviewed denominator                                         | Treat all novel findings as true positives              |
+| Severity and critical misses | Verified critical bugs missed or downgraded, by arm                                                       | Interpret `criticalRegressionCount == 0` as full safety |
+| Coverage and failures        | Cases reviewed, missing, timed out, unpairable, or excluded, by arm                                       | Replace missing execution with zero findings            |
+| Human usefulness             | Accepted/actionable findings with Host-authenticated Human decision, when available                       | Infer acceptance from merge or thread resolution        |
+| Efficiency                   | Measured input/output tokens, total provider cost, wall-clock latency, retries                            | Assume vendor marketing cost ratios transfer            |
+| Robustness                   | Paired case-level variability across trials and held-out performance                                      | Use a single cherry-picked run                          |
 
 **No-go for adoption evidence:** unknown author origin, untrusted oracle,
 different target commits, unusable held-out set, unequal review scope,
 unobserved candidate activation, missing required metrics, material critical
 regression, unverifiable independent review, or uncontrolled privacy/cost risk.
 
-## Operator sequence (read-only until explicit separately authorized execution)
+## Operator sequence (read-only comparison; separate permission and budget for model calls)
 
 1. Audit reviewer-path provider support using ADR-006 and current code. Do not
    infer parity from unrelated provider clients.
