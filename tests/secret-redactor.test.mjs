@@ -448,9 +448,10 @@ test('#2203 lowercase pwd working-directory exception is scoped to recognizable 
   const mustMask = [
     ['pwd=hunter2', 'pwd=<REDACTED:passwordAssignment>'],
     ['pwd=/secret/path', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd : /tmp/workdir', 'pwd : <REDACTED:passwordAssignment>'],
     ['password=/tmp/workdir', 'password=<REDACTED:passwordAssignment>'],
     ['passwd=/home/user/work', 'passwd=<REDACTED:passwordAssignment>'],
-    ['pwd="/tmp/workdir"', 'pwd="<REDACTED:passwordAssignment>"'],
+    ['pwd="/home/runner/workdir"', 'pwd="<REDACTED:passwordAssignment>"'],
     ['pwd=/tmp/workdir?token=hunter2', 'pwd=<REDACTED:passwordAssignment>'],
   ];
   for (const [input, expected] of mustMask) {
