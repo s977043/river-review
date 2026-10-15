@@ -218,8 +218,9 @@
   表示された Node の版と経路は完了報告へそのまま転記すること（`.nvmrc` と不一致なら警告が出る。
   停止はしないが、その状態で作った `runners/github-action/dist/**` は CI と差分が出うる）。
   完了後にオーガナイザーが `scripts/tree-pollution-check.sh <worktree>` で基準線との差分を検査する。
-- bootstrap を使わない場合は、作業前に `export PATH=/opt/homebrew/opt/node@22/bin:$PATH` を実行して
-  `.nvmrc` の Node を使うこと。この機材の Node 22 は Homebrew keg にあり PATH に載っていない。
+- node / npm は `scripts/node22.sh npm test` のようにラッパー経由で呼び、`.nvmrc` の Node を使うこと。
+  `export PATH=...` 始まりのコマンドは許可リストに前方一致せず確認ダイアログに回る（#2583）。
+  この機材の Node 22 は Homebrew keg にあり PATH に載っていない。
   「Node 22 が無い」と報告したワーカー 4 名は全員この PATH 差だった。
 - 並列に委託された別 PR が生成するデータ形（schema / registry / fixture）を前提にする場合は、
   設計案の形でテストを書いて終わらず、その PR のブランチを `git fetch` して実物で通ることを
@@ -262,7 +263,6 @@
 ```text
 ## セットアップ
 cd /Users/user/Documents/GitHub/river-review
-export PATH=/opt/homebrew/opt/node@22/bin:$PATH
 bash scripts/worker-bootstrap.sh <branch>
 cd .claude/worktrees/<slug>
 bootstrap の出力（node 行と manifest 行）を完了報告へそのまま転記すること。
