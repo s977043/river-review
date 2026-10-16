@@ -11,6 +11,8 @@ Anthropic reports optimizing human review time with reversions and incidents as 
 
 River Review already owns review findings, resolution, review improvement, and human judgment contracts. We adopt ideas into existing components; we do not reproduce Anthropic's internal infrastructure.
 
+The detailed team-learning lifecycle, trust classification and Human approval flow are documented in [Review Judgment Learning Loop](./review-judgment-learning-loop.md). Historical PR observations are not automatically accepted as reviewer ground truth.
+
 ## Existing ownership and gap map
 
 | Anthropic practice | Existing River Review source of truth | Decision / gap |
