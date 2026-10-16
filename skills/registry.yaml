@@ -78,7 +78,7 @@ skills:
     description: 'Always-on sample skill for testing the skill system'
 
   - id: security-basic
-    version: '0.1.0'
+    version: '0.2.0'
     name: Baseline Security Checks
     path: skills/midstream/security-basic/SKILL.md
     category: midstream

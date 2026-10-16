@@ -2,7 +2,7 @@
 id: 'security-basic'
 name: Baseline Security Checks
 description: Check common security risks in application code (SQLi, XSS, secrets, open redirect).
-version: 0.1.0
+version: 0.2.0
 category: midstream
 phase: midstream
 applyTo:
@@ -40,6 +40,7 @@ Why: セキュリティチェックはチェックリスト型評価が主だが
   - If the value is decoded again after the check (double encoding, a later `urldecode`), reject `%5C` as well.
   - Rejecting `\` / `%5C` alone is not enough. A check that skips values without a `parse_url` host lets `http:evil.example` and `/<TAB>/evil.example` through. Browsers resolve both to `evil.example`.
   - Raise confidence when a sibling implementation in the same repository already rejects `\` / `%5C`.
+- Lexical-shape exemptions: when a diff adds or widens an allowlist that skips masking/validation because a value _looks like_ a path or variable reference, check non-canonical forms that would wrongly hit it (`..` segments, empty segments `//`, trailing delimiters, case variants, `%2F`, a second assignment on the same line), and expect tests pinning that those forms stay masked/rejected.
 
 ## Non-goals
 
