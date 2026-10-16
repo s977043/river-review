@@ -41,7 +41,7 @@ flowchart TD
     P -. "次のレビューへ再利用" .-> A1
 ```
 
-**Incident/Revertから作った正解ケースは、Reviewerを評価するためのoracleである。Canonical Feedbackではない。**
+**Incident/Revertから作った正解ケースは、Reviewerを評価するoracleです。Canonical Feedbackではありません。**
 
 missed_issue等のFeedbackにする場合、元Reviewer実行とHuman decisionを別途対応付ける。既存のFeedback承認経路を通す。過去PRの未確認Observationも直接promotionしない。
 
