@@ -171,6 +171,141 @@ word `secret` because the deny glob would otherwise block editing the hook.
 
 A path argument is denied when it contains `secret`. The command is split into
 segments on `;` `&` `|` `(` `)` backticks and newlines; heredoc bodies are
+dropped and `#` comments ignored. Leading wrappers and keywords (`sudo` `env`
+`then` `do` `else` `{` `!` `nice` `xargs` `timeout <n>` …) are unwrapped before
+the verb is resolved.
+
+Blocked:
+
+- Recursive search (`grep -r` / `-R` / `--recursive`, `rg`, `git grep`) when any
+  argument, pattern or target, contains `secret`, unless an exclusion for it is
+  present (`--exclude=*secret*`, `-g '!*secret*'`, `':!*secret*'`).
+- A reader verb (`cat` `head` `tail` `less` `more` `sed` `awk` `grep` `bat`
+  `nl` `od` `xxd` `strings` `cut` `sort` `diff` `jq` `perl` `paste` `fold` `tr`
+  …) with a denied file argument. The first positional of non-recursive
+  grep/sed/awk/jq/perl is a pattern or script, not a path.
+- `git show` / `git cat-file` / `git blame` / `git diff` with a denied argument
+  (incl. `<ref>:<path>`).
+- `< <path>` input redirection of a denied path.
+
+Not blocked: `ls`, `git add`, `git commit`, `git log -- <path>`,
+`node --test tests/secret-redactor.test.mjs`, `cat README.md | grep secret`
+(stdin only), and `git diff` / `git show` with `--stat` / `--name-only` /
+`--name-status` / `--numstat` for plain paths. That exemption is lost when
+`-p` / `--patch` / `-u` / `-U` is also present and never covers `<ref>:<path>`.
+
+The exemption is decided per segment, so `git diff --stat; cat <path>` is still
+blocked.
+
+### Fail-open and known residual bypasses
+
+The hook exits 0 (allows) on malformed JSON, a payload without a command, or
+when `jq` / `awk` is missing.
+
+Defense-in-depth, not a sandbox. Not covered:
+
+- Path-less `git show <sha>`, `git diff A..B`, `git log -p`, `gh pr diff <N>`:
+  a static hook cannot see which files a commit contains.
+- Interpreters (`node -e`, `python -c`, `bash -c "…"`).
+- `cp` / `mv` then read.
+- Globs or variables that expand to a denied path (`cat src/lib/*redactor*`,
+  `cat "$F"`).
+- Names split by quotes (`cat src/lib/sec"ret"-x`) and case variants (`SECRET`).
+- Reader verbs not in the list.
+
+### Tests
+
+`tests/no-force-push-hook.test.mjs` spawns the script with real PreToolUse JSON
+payloads on stdin and asserts the exit code for every blocked and allowed
+command: `npm test -- tests/no-force-push-hook.test.mjs`
+
+## gh-account-guard.sh
+
+PreToolUse hook (matcher: `Bash`) that verifies the active `gh` CLI account
+before gh **read and write** operations.
+
+### Purpose
+
+The local gh keyring holds two accounts (`s977043` for this repo,
+`kominem-unilabo` for work) and the active account silently switches
+mid-session, causing 404 / permission errors on `gh pr create` / `gh pr merge`
+/ `gh api` write calls, and 404 / `Could not resolve to a Repository` on read
+calls (#2604). This hook makes the prose guard in CLAUDE.md ("Verify gh active
+account before write ops") deterministic.
+
+### How it works
+
+1. Reads the PreToolUse stdin JSON and extracts `.tool_input.command`.
+2. Non-gh commands and `gh auth ...` exit 0 immediately (no gh call).
+3. The command is split into gh calls (segments). A segment that explicitly
+   names another owner — the `--repo`/`-R owner/repo` value, or a
+   `repos/<owner>/` endpoint as the first positional argument of `gh api` — is
+   dropped, so work-repo calls are never switched to the expected account.
+   Title/body text and `#` comments are not read for owners, so a link in a PR
+   body does not exempt a write. Exception: an unquoted value shaped like
+   `-R…` or `--repo=…` (e.g. `gh pr merge 2 --body -Rother/x`) is mistaken for
+   an owner, and that write is left unchecked. The remaining segments decide:
+   if any of them is a write, the command is a write.
+4. A read is also left unchecked when the command contains `cd`/`pushd` or
+   `GH_REPO=` — even inside a comment or a quoted string — or when the payload
+   `.cwd` is outside this repository (compared by git common dir, so linked
+   worktrees count as inside). Writes are checked regardless.
+5. Every remaining gh call triggers an account check via `gh api user --jq .login`
+   (about +0.45 s per gh call with the real gh). gh write ops
+   (`gh pr create|merge|edit|close|comment|ready|reopen|review|update-branch`,
+   `gh issue <write subcommands>`, `gh api` with `-X`/`--method`
+   POST/PATCH/PUT/DELETE or body fields (`-f`/`-F`/`--field`/`--raw-field`/`--input`,
+   which default `gh api` to POST), `gh release <write subcommands>`,
+   `gh workflow run|enable|disable`, `gh run rerun|cancel|delete`,
+   `gh repo <write subcommands>`, `gh label <write subcommands>`,
+   `gh secret|variable set|delete`) are classified as write; the rest as read.
+6. If the active account is not the expected one, runs
+   `gh auth switch -u <expected>` and notifies via stderr, then allows the
+   command to proceed (exit 0). If the switch itself fails, a write op exits 2
+   to block the tool call (stderr is fed back to Claude); a read op only gets a
+   stderr warning and proceeds, because a failed read breaks nothing.
+7. The write block and the read warning are appended to the harness event log
+   (see [harness-event.sh](#harness-eventsh)) as `block` / `warn` with
+   `ruleId: verify-gh-active-account`. A successful switch is not recorded.
+
+Expected account defaults to `s977043`; override with
+`GH_ACCOUNT_GUARD_EXPECTED` (used by tests to stay hermetic).
+
+### Setup
+
+```bash
+chmod +x .claude/hooks/gh-account-guard.sh
+```
+
+### Tests
+
+`tests/gh-account-guard-hook.test.mjs` runs the script with a stubbed `gh` on
+PATH (never touches the real keyring): `npm test -- tests/gh-account-guard-hook.test.mjs`
+
+### Hook input contract
+
+PreToolUse passes its input as a stdin JSON payload; the Bash command is
+`.tool_input.command`. Exit 0 allows the tool call, exit 2 blocks it and
+feeds stderr back to Claude. The hook is defense-in-depth: the session-start
+account sanity check in CLAUDE.md remains in place.
+
+## denied-read-guard.sh
+
+PreToolUse hook (matcher: `Bash`) that blocks Bash commands which read the
+contents of paths the Read tool is denied by `.claude/settings.json`
+(`Read(./secrets/**)`, `Read(./**/*secret*)`).
+
+### Purpose
+
+The deny covers only the Read tool. `cat src/lib/secret-redactor.mjs` or
+`git show <ref>:src/lib/secret-redactor.mjs` printed the same content and
+bypassed it during the PR #2691 review (2026-10-16). The file name avoids the
+word `secret` because the deny glob would otherwise block editing the hook.
+
+### What it blocks
+
+A path argument is denied when it contains `secret`. The command is split into
+segments on `;` `&` `|` `(` `)` backticks and newlines; heredoc bodies are
 dropped and `#` comments ignored.
 
 | Blocked                                                                                                                                                     | Not blocked                                                                   |

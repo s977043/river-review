@@ -15,23 +15,34 @@
 #
 # Scope: a path argument is "denied" when it contains `secret` (this covers both
 # `*secret*` and `secrets/`). The command is split into segments on ; & | ( )
-# backticks and newlines; heredoc bodies are dropped. A segment is blocked when:
+# backticks and newlines; heredoc bodies are dropped. Leading assignments and
+# sudo env command exec time nohup then do else elif if while until { ! nice
+# xargs and `timeout <n>` are unwrapped before the verb. A segment is blocked when:
+#   - it is a recursive search (`grep -r/-R/--recursive`, `rg`, `git grep`) and
+#     ANY argument (pattern or target) is denied, unless an exclusion naming it
+#     is present (`--exclude=*secret*`, `-g '!*secret*'`, `':!*secret*'`);
 #   - its verb is a content reader (cat head tail less more sed awk grep egrep
-#     fgrep rg bat nl od xxd hexdump strings cut sort uniq tac rev base64 diff
-#     cmp vim vi view nano) and a file argument is denied. For grep/egrep/fgrep/
-#     rg/sed/awk the first positional argument is the pattern/script and is not
-#     a path, unless the pattern was given with -e / -f;
-#   - it is `git show` / `git cat-file` with a denied argument (incl. <ref>:path);
-#   - it is `git diff` with a denied argument and none of --stat / --numstat /
-#     --shortstat / --name-only / --name-status / --summary / --dirstat;
+#     fgrep bat nl od xxd hexdump strings cut sort uniq tac rev base64 diff cmp
+#     vim vi view nano jq perl paste fold tr) and a file argument is denied. For
+#     grep/egrep/fgrep/sed/awk/jq/perl the first positional argument is the
+#     pattern/script and is not a path, unless it was given with -e / -f;
+#   - it is `git show` / `git cat-file` / `git blame` / `git diff` with a denied
+#     argument. `git diff` / `git show` with --stat / --numstat / --shortstat /
+#     --name-only / --name-status / --summary / --dirstat are exempt for plain
+#     paths, but not for <ref>:path and not when -p / --patch / -u / -U is present;
 #   - it redirects a denied path into stdin (`< path`).
 # Commands that only name a path (ls, git add, git commit, git log -- path,
 # git diff --stat, node --test tests/secret-redactor.test.mjs) are allowed.
 #
-# Known residual bypasses (defense-in-depth, not a sandbox): interpreters
-# (`node -e`, `python -c`, `bash -c "..."`), `git log -p`, `gh pr diff`,
-# `git grep`, `cp`/`mv` then read, globs or variables that expand to a denied
-# path (`cat src/lib/*redactor*`, `cat "$F"`), and reader verbs not listed.
+# Fail-open: malformed JSON, a missing command, or missing jq/awk exits 0.
+#
+# Known residual bypasses (defense-in-depth, not a sandbox): path-less
+# `git show <sha>`, `git diff A..B`, `git log -p`, `gh pr diff <N>` (a static
+# hook cannot see which files a commit contains); interpreters (`node -e`,
+# `python -c`, `bash -c "..."`); `cp`/`mv` then read; globs or variables that
+# expand to a denied path (`cat src/lib/*redactor*`, `cat "$F"`); names split
+# by quotes (`cat src/lib/sec"ret"-x`); case variants (`SECRET`); and reader
+# verbs not listed.
 set -u
 
 if [ -t 0 ]; then
@@ -97,13 +108,30 @@ function endtok() {
   }
   tok = ""; has = 0
 }
-function check(   i, v, n, a, skip, stat, sc) {
+function excluded(   n) {
+  for (n = 1; n <= nt; n++) { if (T[n] ~ /^!.*secret|exclude.*secret|^:!.*secret|^:\^.*secret/) { return 1 } }
+  return 0
+}
+function anydenied(from,   n) {
+  for (n = from; n <= nt; n++) { if (denied(T[n])) { return T[n] } }
+  return ""
+}
+function check(   i, v, n, a, skip, stat, sc, rec) {
   i = 1
-  while (i <= nt && (T[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || T[i] ~ /^(sudo|env|command|exec|time|nohup)$/)) { i++ }
+  while (i <= nt) {
+    if (T[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || T[i] ~ /^(sudo|env|command|exec|time|nohup|then|do|else|elif|if|while|until|[{]|!|nice|xargs)$/) { i++; continue }
+    if (T[i] == "timeout") { i++; while (i <= nt && T[i] ~ /^-/) { i++ } ; i++; continue }
+    if (T[i] ~ /^-/ && i > 1 && T[i - 1] ~ /^(nice|xargs|env|sudo|-n|-I|-L|-P)$|^-/) { if (T[i] ~ /^-(n|I|L|P)$/) { i++ } ; i++; continue }
+    break
+  }
   if (i > nt) { return "" }
   v = T[i]; sub(/.*\//, "", v); i++
-  if (v ~ /^(cat|head|tail|less|more|sed|awk|gawk|grep|egrep|fgrep|rg|bat|nl|od|xxd|hexdump|strings|cut|sort|uniq|tac|rev|base64|diff|cmp|vim|vi|view|nano)$/) {
-    skip = (v ~ /^(sed|awk|gawk|grep|egrep|fgrep|rg)$/)
+  if (v == "rg" || (v ~ /^(grep|egrep|fgrep)$/ && rec_flag(i))) {
+    if (excluded()) { return "" }
+    return anydenied(i)
+  }
+  if (v ~ /^(cat|head|tail|less|more|sed|awk|gawk|grep|egrep|fgrep|bat|nl|od|xxd|hexdump|strings|cut|sort|uniq|tac|rev|base64|diff|cmp|vim|vi|view|nano|jq|perl|paste|fold|tr)$/) {
+    skip = (v ~ /^(sed|awk|gawk|grep|egrep|fgrep|jq|perl)$/)
     for (n = i; n <= nt; n++) {
       a = T[n]
       if (skip && (a ~ /^-(e|f)/ || a ~ /^--(regexp|file)/ || a ~ /^--expression/)) {
@@ -124,16 +152,31 @@ function check(   i, v, n, a, skip, stat, sc) {
     }
     if (i > nt) { return "" }
     sc = T[i]; i++
-    if (sc == "show" || sc == "cat-file" || sc == "diff") {
+    if (sc == "grep") {
+      if (excluded()) { return "" }
+      return anydenied(i)
+    }
+    if (sc == "show" || sc == "cat-file" || sc == "diff" || sc == "blame") {
       stat = 0
-      if (sc == "diff") {
+      if (sc == "diff" || sc == "show") {
         for (n = i; n <= nt; n++) { if (T[n] ~ /^--(stat|numstat|shortstat|name-only|name-status|summary|dirstat)(=|$)/) { stat = 1 } }
+        for (n = i; n <= nt; n++) { if (T[n] ~ /^(-p|-u|--patch|--patch-with-stat|--patch-with-raw|-U[0-9]*|--unified(=.*)?)$/) { stat = 0 } }
       }
-      if (stat) { return "" }
-      for (n = i; n <= nt; n++) { if (denied(T[n])) { return T[n] } }
+      for (n = i; n <= nt; n++) {
+        if (!denied(T[n])) { continue }
+        if (stat && !(T[n] ~ /^[^:-][^:]*:/)) { continue }
+        return T[n]
+      }
     }
   }
   return ""
+}
+function rec_flag(from,   n) {
+  for (n = from; n <= nt; n++) {
+    if (T[n] == "--") { return 0 }
+    if (T[n] ~ /^--(recursive|dereference-recursive)$/ || T[n] ~ /^-[A-Za-z]*[rR]/) { return 1 }
+  }
+  return 0
 }
 function endseg(   r) {
   endtok()
