@@ -135,12 +135,12 @@ A high-confidence review result does not authorize the proposed action. Keep thr
 - **Action risk**: scope, external side effects, sensitivity, irreversibility, and failure impact. Evaluate this independently of classification confidence.
 - **Execution authorization**: enforceable policy, actor permissions, and action-specific approval owned by the Caller, Host, PlanGate, or Human. A River Review verdict is not a permission token.
 
-| Example | What review can supply | Caller / Host responsibility |
-| --- | --- | --- |
-| Rerun lint within an already authorized scope | Preconditions and expected verification result | Confirm existing execution permission before proceeding |
-| High-confidence plan to delete production data | Evidence of blast radius, preflight checks, and recoverability | Preserve protected Human approval regardless of confidence |
-| Low-risk investigation with missing context | Unknowns and proposed evidence gathering | Limit work to authorized read-only investigation; do not infer write permission |
-| Repository write with unknown policy or actor authority | Explain why the decision is inconclusive | Hold or deny execution and use the formal approval path |
+Keep that separation in these four examples:
+
+- **Rerun lint within an already authorized scope**: Review the preconditions; the Caller confirms existing execution permission.
+- **High-confidence plan to delete production data**: Assess blast radius and recovery, but preserve protected Human approval.
+- **Low-risk investigation with missing context**: Surface unknowns and limit follow-up work to authorized read-only investigation.
+- **Repository write with unknown policy or actor authority**: Mark the judgment inconclusive; hold or deny execution and use the formal approval path.
 
 To reduce approval fatigue, repeatable **judgments** can move into reproducible checks. This is not a transfer of Human-owned **permission** to an AI or classifier. Before promoting a judgment, compare critical detection, evidence provenance, false approvals, and reversals; reject promotion when safety regresses.
 
