@@ -62,6 +62,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/gh-account-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/denied-read-guard.sh"
           }
         ]
       }

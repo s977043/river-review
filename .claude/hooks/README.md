@@ -154,9 +154,49 @@ PreToolUse passes its input as a stdin JSON payload; the Bash command is
 feeds stderr back to Claude. The hook is defense-in-depth: the session-start
 account sanity check in CLAUDE.md remains in place.
 
+## denied-read-guard.sh
+
+PreToolUse hook (matcher: `Bash`) that blocks Bash commands which read the
+contents of paths the Read tool is denied by `.claude/settings.json`
+(`Read(./secrets/**)`, `Read(./**/*secret*)`).
+
+### Purpose
+
+The deny covers only the Read tool. `cat src/lib/secret-redactor.mjs` or
+`git show <ref>:src/lib/secret-redactor.mjs` printed the same content and
+bypassed it during the PR #2691 review (2026-10-16). The file name avoids the
+word `secret` because the deny glob would otherwise block editing the hook.
+
+### What it blocks
+
+A path argument is denied when it contains `secret`. The command is split into
+segments on `;` `&` `|` `(` `)` backticks and newlines; heredoc bodies are
+dropped and `#` comments ignored.
+
+| Blocked                                                                                                                                                     | Not blocked                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| A reader verb (`cat` `head` `tail` `less` `more` `sed` `awk` `grep` `rg` `bat` `nl` `od` `xxd` `strings` `cut` `sort` `diff` …) with a denied file argument | `ls`, `git add`, `git commit`, `git log -- <path>`                            |
+| `git show` / `git cat-file` with a denied argument (incl. `<ref>:<path>`)                                                                                   | `git diff --stat` / `--name-only` / `--name-status` / `--numstat`             |
+| `git diff` with a denied argument and no stat/name flag                                                                                                     | `node --test tests/secret-redactor.test.mjs`, `gh pr diff --name-only`        |
+| `< <path>` input redirection of a denied path                                                                                                               | `grep -rn secret src/` (the first positional of grep/rg/sed/awk is a pattern) |
+
+The stat/name exemption is decided per segment, so `git diff --stat; cat <path>`
+is still blocked.
+
+### Known residual bypasses
+
+Defense-in-depth, not a sandbox: interpreters (`node -e`, `python -c`,
+`bash -c "…"`), `git log -p`, `gh pr diff`, `git grep`, copying then reading,
+globs or variables that expand to a denied path (`cat src/lib/*redactor*`,
+`cat "$F"`), and reader verbs not in the list.
+
+### Tests
+
+`tests/denied-read-guard-hook.test.mjs`: `node --test tests/denied-read-guard-hook.test.mjs`
+
 ## harness-event.sh
 
-Not a hook: a library sourced by `no-force-push.sh` and `gh-account-guard.sh`,
+Not a hook: a library sourced by `no-force-push.sh`, `gh-account-guard.sh` and `denied-read-guard.sh`,
 and not registered in `.claude/settings.json`. `harness_event <source> <kind>
 <ruleId> <excerpt>` appends one line to
 `${HARNESS_EVENTS_PATH:-~/.claude/state/harness-events.jsonl}` in the format
