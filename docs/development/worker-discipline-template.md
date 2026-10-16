@@ -252,6 +252,7 @@
   `body-max-line-length`）。長い URL やパスは行を分ける。
 - テストやコマンドの出力を worktree の直下へリダイレクトしないこと（`> test.log` など）。`mktemp -d` のディレクトリへ書く。
   `rm` が拒否されると未追跡ファイルが残り、worktree を強制削除しないと片付かない（2026-10-09〜11 に 2 本で発生）。
+- パス名に `secret` を含むファイル（`src/lib/secret-redactor.mjs` など）は `.claude/settings.json` の deny `Read(./**/*secret*)` で読めない。`git show` や `cat` で迂回せず、その旨を報告して停止すること（2026-10-16 の PR #2691 で、読み取り専用のレビュアーが `git show` で迂回し、編集担当のワーカーは停止した）。
 ```
 
 ## 委託プロンプト骨格
