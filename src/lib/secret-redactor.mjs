@@ -228,6 +228,10 @@ const ASSIGNMENT_PATTERNS = [
       /(["']?)\b(password|passwd|pwd)\b\1(\s*[:=]\s*)("[^"\n]{4,}"|'[^'\n]{4,}'|[^\s'"`,;)\]}&]{4,})/gi,
     redact: (_m, quote, name, sep, value) => {
       if (NON_SECRET_PWD_NAMES.has(name)) return null;
+      // Lowercase pwd is ambiguous: it is used for a password AND for a
+      // working-directory setting. Exempt only unquoted absolute paths under
+      // conventional workdir roots. Other pwd values still get masked.
+      if (isRecognizablePwdWorkingDirectory(name, sep, value)) return null;
       // A compact `password=value` in an env/config/query string is more
       // likely to be a literal than an identifier reference. Keep spaced
       // assignments and colon-style source-code declarations conservative.
@@ -268,6 +272,23 @@ const IDENTIFIER_SHAPED_RE =
 // `OLDPWD` are the shell's working directory and appear in every env dump and
 // CI log. Case-sensitive — lowercase `pwd = '...'` is still a password key.
 const NON_SECRET_PWD_NAMES = new Set(['PWD', 'OLDPWD']);
+
+// A lexical heuristic, not a general "path implies safe" rule: lowercase
+// pwd can also be a password key. Only unquoted conventional working-directory
+// roots with recognizable directory basenames are exempt (#2203).
+const WORKDIR_ROOT_RE = /^\/(?:tmp|home|Users|workspace|workspaces|mnt|var|opt)\//;
+const WORKDIR_BASENAME_RE = /\/(?:workdir|workspace|work|repo|project|src|app|build|river-review)$/;
+const WORKDIR_PATH_RE = /^\/[A-Za-z0-9._/-]+$/;
+
+function isRecognizablePwdWorkingDirectory(name, sep, value) {
+  return (
+    name === 'pwd' &&
+    sep.trim() === '=' &&
+    WORKDIR_ROOT_RE.test(value) &&
+    WORKDIR_BASENAME_RE.test(value) &&
+    WORKDIR_PATH_RE.test(value)
+  );
+}
 
 function isCredentialLiteral(raw, { compactEquals = false } = {}) {
   const quoted = /^(["']).*\1$/s.test(raw);

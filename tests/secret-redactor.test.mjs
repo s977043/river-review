@@ -430,6 +430,39 @@ test('#2033 redactText leaves the PWD / OLDPWD shell variables alone', () => {
   assert.equal(text, 'pwd = <REDACTED:passwordAssignment>');
 });
 
+test('#2203 lowercase pwd working-directory exception is scoped to recognizable paths', () => {
+  // Keep known working-directory paths readable without hiding credentials
+  // supplied through password/passwd or through an ambiguous pwd value.
+  const workdirs = [
+    'pwd=/tmp/workdir',
+    'pwd = /home/runner/work/repo',
+    'pwd=/Users/dev/src/river-review',
+    'pwd=/workspace/app',
+  ];
+  for (const input of workdirs) {
+    const result = redactText(input, { highEntropy: false });
+    assert.equal(result.text, input);
+    assert.deepEqual(result.hits, []);
+  }
+
+  const mustMask = [
+    ['pwd=hunter2', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd=/secret/path', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd=/tmp/hunter2', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd=/home/runner/secret99', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd : /tmp/workdir', 'pwd : <REDACTED:passwordAssignment>'],
+    ['password=/tmp/workdir', 'password=<REDACTED:passwordAssignment>'],
+    ['passwd=/home/user/work', 'passwd=<REDACTED:passwordAssignment>'],
+    ['pwd="/home/runner/workdir"', 'pwd="<REDACTED:passwordAssignment>"'],
+    ['pwd=/tmp/workdir?token=hunter2', 'pwd=<REDACTED:passwordAssignment>'],
+  ];
+  for (const [input, expected] of mustMask) {
+    const result = redactText(input, { highEntropy: false });
+    assert.equal(result.text, expected, input);
+    assert.deepEqual(result.hits, [{ category: 'passwordAssignment', count: 1 }]);
+  }
+});
+
 test('#2033 redactText redacts JSON-shaped password keys', () => {
   // B-3: the quoted-key form is the most common config-dump shape.
   for (const sample of ['{"password": "hunter2"}', "{'passwd': 'hunter2'}"]) {
