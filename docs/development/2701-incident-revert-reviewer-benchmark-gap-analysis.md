@@ -76,7 +76,7 @@ For **each** proposed positive case, collect and independently review:
 
 For **clean negative cases**, require an independently supported absence of
 the particular class of defect within the reviewed scope. No reported
-incident is *not* proof of a clean change. Record the scope and limitations
+incident is _not_ proof of a clean change. Record the scope and limitations
 of the negative adjudication.
 
 Use `unknown` or `ineligible` for missing source, inaccessible evidence,
