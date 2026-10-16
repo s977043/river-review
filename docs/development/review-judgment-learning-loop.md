@@ -16,24 +16,32 @@
 
 ~~~mermaid
 flowchart TD
-    A["PRのレビュー / 過去PR / Incident・Revert"] --> B["Observation: 出典・revision・coverageを照合"]
-    B --> C{"独立に確認できる証拠か"}
-    C -- "欠損・矛盾" --> U["unknown / inconclusive → 保留"]
-    C -- "確認可" --> D["Finding検証・Review Resolution"]
-    D --> E["Author/Humanによる対応と再検証"]
-    E --> F{"Host認証されたHumanが確定したか"}
-    F -- "いいえ" --> H["proposal/observation のまま保持"]
-    F -- "はい" --> G["Canonical Feedback"]
-    G --> I["反復パターン集約・根因仮説"]
+    A1["現在のPRレビュー"] --> B["出典・revision・coverage・finding identityの照合"]
+    A2["過去PRの観測"] --> B
+    B --> C{"Evidenceは検証可能か"}
+    C -- "不足" --> U["unknown / needs_human"]
+    C -- "確認可" --> D["Finding Critic / Review Resolution"]
+    D --> E["修正後の検証・Humanによる対応判断"]
+    E --> F{"Host認証された明示承認か"}
+    F -- "未承認" --> H["Feedback proposalとして保留"]
+    F -- "承認" --> G["Canonical Feedback"]
+    G --> I["反復パターンの集約と改善仮説"]
+    A3["Incident / Revert"] --> X["事故原因・事前snapshot・検出可能性をHumanが確認"]
+    X --> Y{"評価用正解として適格か"}
+    Y -- "不明" --> U
+    Y -- "適格" --> Z["Incident評価ケース（Feedbackとは別）"]
     I --> J["1 candidate = 1 hypothesis"]
-    J --> K["Fixture / paired replay / 独立レビュー"]
-    K --> L{"重大な検出退行・信頼境界違反がないか"}
+    J --> K["Fixture / paired replay / independent eval"]
+    Z --> K
+    K --> L{"重大な退行・信頼境界違反がないか"}
     L -- "不合格・評価不能" --> M["Revise / Reject / Inconclusive"]
     L -- "合格" --> N["Human承認 → 限定Canary"]
     N --> O["効果測定 → Keep / Rollback / Retire"]
-    O --> P["Versionedなチーム判断資産"]
-    P -. "次のレビューで再利用" .-> A
+    O --> P["Versionedチーム判断資産"]
+    P -. "次のレビューへ再利用" .-> A1
 ~~~
+
+**Incident/Revertから作った正解ケースは、Reviewerの検出性能を評価するためのoracleであり、Reviewerへのcanonical Feedbackそのものではない。** 実際にmissed_issue等のFeedbackとして扱うには、元Reviewer実行とHuman decisionを別途対応付け、既存のFeedback承認経路を通す。過去PRの未確認Observationも直接promotionしない。
 
 このサイクルは**無制限の自律修正ループではない**。candidate生成と試験は自動化可能だが、信頼できるHuman approval、共有判断資産の活性化、リスクポリシー変更、merge、release、rollbackの執行は、それぞれ既存のHost/CI/Human権限に従う。
 
@@ -136,8 +144,8 @@ Owner: #2007、`pages/reference/loop-convergence-contract.md`。
 ## 実際の導入順とExit
 
 1. **Phase 5 dogfood（#2575）:** 5〜10件の実PRについて、Host-backed Human decision、元finding、修正後検証、承認監査を確保。未完の間は次段を完了認定しない。
-2. **Historical knowledge observe-only（#2614）:** 20〜30件を明示指定し、未確認観測だけを抽出。Host認証されたHuman確認後にcanonical Feedbackへ渡す。
-3. **Incident corpus（#2701）:** 少数のSanitized・Human-confirmed failure/cleanケースを作成。#2614とは独立した証拠の扱いをする。
+2. **Historical knowledge observe-only（#2614、#2575受け入れ後）:** 20〜30件を明示指定し、未確認観測だけを抽出。Host認証されたHuman確認後にcanonical Feedbackへ渡す。
+3. **Incident corpus（#2701、Phase 5 dogfoodと独立にobserve-onlyで着手可能）:** 少数のSanitized・Human-confirmed failure/cleanケースを作成。#2614とは独立した証拠の扱いをする。
 4. **Evolution paired eval（#2615 / #1574）:** 効果を既存実験基盤で比較。欠測ならinconclusive。
 5. **収束・Attention強化（#2007 / #2378 / #1990）:** 重複指摘と人間負荷を計測し、事故/リバートガードレールを確認する。
 
