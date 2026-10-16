@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.130.0](https://github.com/s977043/river-review/compare/v1.129.0...v1.130.0) (2026-10-16)
+
+
+### Features
+
+* **hooks:** block Bash reads of paths denied by settings Read rules ([#2695](https://github.com/s977043/river-review/issues/2695)) ([be0e966](https://github.com/s977043/river-review/commit/be0e9661991ca39010e61b4379e2c81d5f00d914))
+* **skills:** add lexical-shape exemption viewpoint to security-basic ([#2697](https://github.com/s977043/river-review/issues/2697)) ([bcbc336](https://github.com/s977043/river-review/commit/bcbc336eeff97b5d955cebfb0a6170cfb4a608ae))
+
+
+### Bug Fixes
+
+* **redaction:** avoid masking lowercase pwd working-directory paths ([#2691](https://github.com/s977043/river-review/issues/2691)) ([ab6100b](https://github.com/s977043/river-review/commit/ab6100b863f214f6bb1dd3fd8866ac017eabad03))
+
 ## [1.129.0](https://github.com/s977043/river-review/compare/v1.128.0...v1.129.0) (2026-10-14)
 
 
