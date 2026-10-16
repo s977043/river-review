@@ -1,4 +1,4 @@
-# Anthropic code review practices — River Review evidence-led intake
+# Anthropic code review practices: River Review evidence-led intake
 
 > Status: design / adoption plan only. No default behavior, gate, merge authority, or reviewer implementation changes.
 >
@@ -7,7 +7,7 @@
 
 ## Why
 
-Anthropic reports optimizing human review time with reversions and incidents as guardrails. The described workflow has six layers of checks with rollback underneath, not seven independent mandatory review gates. Its incident and revert evaluation, noise feedback, and bounded re-review practices are useful inputs to River Review. Anthropic's reported merge-volume growth and revert-rate improvement are not River Review baselines, adoption targets, or causal evidence for our implementation.
+Anthropic optimizes human review time while tracking reversions and incidents as guardrails. It describes six check layers with rollback beneath them. The incident evaluation and bounded review-loop ideas can inform River Review. Its reported improvements are not River Review baselines or causal proof of our results.
 
 River Review already owns review findings, resolution, review improvement, and human judgment contracts. We adopt ideas into existing components; we do not reproduce Anthropic's internal infrastructure.
 
@@ -15,6 +15,7 @@ The detailed team-learning lifecycle, trust classification and Human approval fl
 
 ## Existing ownership and gap map
 
+<!-- prettier-ignore -->
 | Anthropic practice | Existing River Review source of truth | Decision / gap |
 | --- | --- | --- |
 | Pre-PR verification | Fast Verification, review plan/exec, existing caller workflow | Reuse; require runnable evidence in host workflows where appropriate |
@@ -29,36 +30,36 @@ The detailed team-learning lifecycle, trust classification and Human approval fl
 
 ## Dependency-aware execution plan
 
-### Slice A — Review Resolution dogfood (#2322, #2575)
+### Slice A: Review Resolution dogfood (#2322, #2575)
 
-1. Verify current Organizer exposes all findings, unresolved work, incomplete review coverage, revision freshness, and primary evidence location.
+1. Verify current Organizer exposes all findings and unresolved work. Check incomplete coverage, revision freshness, and primary evidence location.
 2. Dogfood 5–10 genuine Host-authenticated Human resolutions using the existing Phase 5 operator procedure.
 3. Distinguish author-reported fix, observed absence, and verified resolution. Never upgrade partial/not-executed coverage to confirmed.
 4. Report duplicate comment burden, repeated author explanations, and how accurately Human reviewers identify required actions.
 
 Exit: confirmed host evidence, zero unauthorized canonical Feedback writes, zero provenance loss, explicit Human signoff. As of this intake, #2575 remains open because qualifying real cases are not complete.
 
-### Slice B — Incident/revert evaluation corpus (#2701)
+### Slice B: Incident/revert evaluation corpus (#2701)
 
 1. Explicitly select 5–10 incident/revert cases, with an eventual minimum of 10 representative cases before comparing reviewer changes.
-2. Record affected revision, expected and actual failure, human-confirmed bug location, minimal evidence refs, and source digest.
+2. Record affected revision and the failure mode. Include Human-confirmed bug location, minimal evidence refs, and source digest.
 3. Keep unknown truth as unknown. Incident reports, PR titles, merged state, or closed threads alone are insufficient evidence.
 4. Separate should-detect cases from clean should-not-detect cases to measure harmful false positives.
 5. Keep a held-out split; prohibit candidate reviewer prompts from seeing ground-truth labels and post-incident fixes.
 
 Exit: human-confirmed, sanitized, replayable cases with a clear trust boundary and no automatic historical GitHub crawl.
 
-### Slice C — Reviewer effectiveness (#2615, #1574)
+### Slice C: Reviewer effectiveness (#2615, #1574)
 
 1. Reuse existing paired replay instead of creating a second evaluator.
-2. Verify same input revision, constraints, model/config where possible, activation path, and independent scoring.
+2. Verify input revision, configuration, and constraints match. Confirm activation path and independent scoring.
 3. Report major/critical detection, harmful false-positive rate, duplicate findings, cost/latency and round count.
 4. Mark reviewer failure, missing coverage, environment drift, or missing evidence as inconclusive.
 5. Do not start Phase 7 effectiveness adoption before #2575 real Human dogfood acceptance.
 
 Exit: zero critical regression, no harmful false-positive regression, no attribution without controlled paired evidence. Keep/Rollback/Retire remains Human-owned.
 
-### Slice D — Bounded review loops (#2007)
+### Slice D: Bounded review loops (#2007)
 
 1. Keep rounds-to-pass as a metric separate from finding recall and correctness.
 2. After three reviewer/author rounds, advise the caller to reassess approach, scope, and repeated findings. Do not treat three rounds as proof of convergence.
@@ -68,10 +69,10 @@ Exit: zero critical regression, no harmful false-positive regression, no attribu
 
 Exit: deterministic conformance tests for repeated findings, oscillation, missed coverage, blocking issue persistence and round count. Do not change existing gate authority.
 
-### Slice E — Human Attention dogfood (#2378, #1990)
+### Slice E: Human Attention dogfood (#2378, #1990)
 
 1. Complete fixed-fixture Human decision-extraction and visibility checks before expanding real-world observation.
-2. Observe Human approvals per PR (median/p95), Human comments, wait-on-human time, rounds-to-pass, and decision correctness when available.
+2. Observe Human approvals per PR and Human comments. Measure wait-on-human time, rounds-to-pass, and decision correctness when available.
 3. Do not interpret time savings alone as success. Treat incident/revert rates and critical/major visibility as guardrails.
 4. Record measurement mode: explicit, bounded approximation, or unavailable. Unavailable is not zero.
 5. Compare by risk level and PR size where sample size permits; do not use individuals' attention time for performance evaluation.
@@ -84,16 +85,16 @@ Exit: Human review effort improves or stays similar without correctness/visibili
 - Candidate evidence is not automatically verified evidence. A closed conversation does not validate a finding.
 - The review source, reviewed revision, baseline labels, and evaluation set must have independent provenance.
 - Changes to risk policy, required Human approvals, suppression or promotion need their existing owner and review process.
-- No automatic merge, deployment, incident import, Skill activation, feedback append, or security policy changes.
+- No automatic merge or deployment. Do not import incidents, activate Skills, append Feedback, or change security policy.
 - No new LLM provider requirement or external dependency for the initial intake.
 
 ## Review protocol
 
 Review the implementation slices independently from three perspectives:
 
-1. **Reviewer quality:** Does coverage or severe-bug detection degrade? Are harmful false positives measured?
-2. **Trust/security:** Can the authoring agent forge Human consent, revision identity, confirmed incident labels, or clean outcomes?
-3. **Architecture/operations:** Does the change duplicate an existing owner, depend on a vendor runtime, create unbounded cost or reviewer loops?
+1. **Reviewer quality:** Check coverage, severe-bug detection, and harmful false positives.
+2. **Trust/security:** Check that the authoring agent cannot forge Human consent. Validate revision identity, incident labels, and clean outcomes.
+3. **Architecture/operations:** Check for duplicate owners and vendor lock-in. Require bounded reviewer rounds and cost.
 
 For each slice use: proposal → adversarial review → narrow implementation → independent review → exact-head CI → canary observation. Rollout decisions and merges remain with the repository's authorized owners.
 
@@ -107,4 +108,4 @@ For each slice use: proposal → adversarial review → narrow implementation �
 - Human Attention: [#2378 Decision Surface eval](https://github.com/s977043/river-review/issues/2378), [#1990 Human Judgment Learning](https://github.com/s977043/river-review/issues/1990)
 - Loop convergence: [#2007 Multi-role review stopping contract](https://github.com/s977043/river-review/issues/2007)
 
-The plan is complete when each slice produces reproducible evidence, independent review, an explicit adoption/rollback decision and traceable references. Writing this document does not complete those slices.
+Each slice must produce reproducible evidence and independent review. Adoption or rollback requires explicit authorization and traceable references. This document does not complete those slices.
