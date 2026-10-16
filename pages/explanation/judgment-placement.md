@@ -127,6 +127,23 @@ deny 後は、同じ結果を別 tool で実現するだけの迂回を safer al
 retry loop を持つ consumer は circuit breaker、stop reason、escalation target、reopen condition を明示します。
 具体的な閾値は host / risk policy に依存するため、River Review core では固定しません。
 
+### 判定の確信度・操作のリスク・実行許可は別々に扱う
+
+レビュー結果の確信度が高くても、その action の実行が許可されたことにはなりません。混同しない観点は次の3つです。
+
+- **判断の確からしさ**: Finding / Evidence / Verification が、何をどの程度裏付けているか。未確認は「安全」と推定しない。
+- **操作のリスク**: 変更対象、外部への副作用、機密性、不可逆性、失敗時の影響。分類の確信度とは独立に評価する。
+- **実行許可**: Caller / Host / PlanGate / Human が実際に強制する policy、actor の権限、対象操作への承認の成立。River Review の verdict は permission token ではない。
+
+| 例 | レビューが提示できること | Caller / Host の責務 |
+| --- | --- | --- |
+| 許可済み範囲での lint 再実行 | 実行条件・期待する検証結果 | 既存の実行許可を確認して処理 |
+| 確信度の高い本番データ削除案 | 影響範囲・事前検証・復旧可能性の Evidence | 高確信度でも保護された Human 承認を省略しない |
+| 情報不足の低リスク調査 | 不足している Evidence と追加確認案 | 許可済みの read-only 調査に限る。未知を実行許可とみなさない |
+| policy / actor 権限が確認できない書き込み | 判断不能とその理由を明示 | 実行を保留・拒否し、正式な承認経路へ戻す |
+
+人間の確認疲れを軽減するために、**機械的に検証可能な判断**を移すことはできます。ただし、それは Human-owned な許可を AI / 分類器に移転することとは異なります。適用前後で重大問題の検出、証拠の来歴、誤承認、差し戻しを評価し、安全性が後退するなら promotion しません。
+
 関連: [Issue #2545](https://github.com/s977043/river-review/issues/2545)
 
 ## レビュー判断を promotion する
