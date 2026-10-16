@@ -1,4 +1,4 @@
-# Review Judgment Learning Loop — レビューからチームの判断資産への学習フロー
+# Review Judgment Learning Loop: レビューからチームの判断資産への学習フロー
 
 > **Status:** 設計・運用プロトコル。実装済みの契約と、未完了のHuman dogfood・評価を区別する。これ自体は自動学習の有効化を意味しない。
 >
@@ -14,7 +14,7 @@
 
 ## End-to-endフロー
 
-~~~mermaid
+```mermaid
 flowchart TD
     A1["現在のPRレビュー"] --> B["出典・revision・coverage・finding identityの照合"]
     A2["過去PRの観測"] --> B
@@ -39,14 +39,17 @@ flowchart TD
     N --> O["効果測定 → Keep / Rollback / Retire"]
     O --> P["Versionedチーム判断資産"]
     P -. "次のレビューへ再利用" .-> A1
-~~~
+```
 
-**Incident/Revertから作った正解ケースは、Reviewerの検出性能を評価するためのoracleであり、Reviewerへのcanonical Feedbackそのものではない。** 実際にmissed_issue等のFeedbackとして扱うには、元Reviewer実行とHuman decisionを別途対応付け、既存のFeedback承認経路を通す。過去PRの未確認Observationも直接promotionしない。
+**Incident/Revertから作った正解ケースは、Reviewerを評価するためのoracleである。Canonical Feedbackではない。**
+
+missed_issue等のFeedbackにする場合、元Reviewer実行とHuman decisionを別途対応付ける。既存のFeedback承認経路を通す。過去PRの未確認Observationも直接promotionしない。
 
 このサイクルは**無制限の自律修正ループではない**。candidate生成と試験は自動化可能だが、信頼できるHuman approval、共有判断資産の活性化、リスクポリシー変更、merge、release、rollbackの執行は、それぞれ既存のHost/CI/Human権限に従う。
 
 ## 観測の3入口と信頼境界
 
+<!-- prettier-ignore -->
 | 入口 | 観測内容 | 何があって初めて信頼できるか | 既存owner |
 | --- | --- | --- | --- |
 | A. 進行中のPR | AI findings、PR作者の修正・異議、レビューコメント | 元Review Artifact、finding identity、実行coverage、対象revision、明示的な検証、Host認証済みHuman判断 | #2322、#2575 |
@@ -57,6 +60,7 @@ flowchart TD
 
 ## 段階別SSoTとインターフェイス
 
+<!-- prettier-ignore -->
 | 段階 | 入力 → 出力 | 実装/契約のowner | やらないこと |
 | --- | --- | --- | --- |
 | 1 Review | diff / plan / tests → findings + coverage | reviewer-orchestrator、各Skill、review-coverage | 多数決だけで真偽・severityを確定 |
@@ -68,9 +72,14 @@ flowchart TD
 | 7 Evaluation | 改善候補 → baseline/candidateのpaired評価 | paired-replay.mjs、#1574、#2615 | fingerprint差だけを正解oracleとする |
 | 8 Rollout | 評価結果 → HumanのKeep/Retire判断 | 既存Promotion/Evolution、Host/CI | River Reviewが独自にmerge / releaseを実行 |
 
-**対応状態は異なる軸**。System disposition（blocking/advisory/suppressed）はレビューシステムの扱い、Resolution（action_submitted/risk_acceptedなど）は作者の対応、Verification（not_reproduced/verified_resolved/persists/inconclusive）は後続の検証、Feedback（accepted/false_positive/missed_issueなど）はレビュアー品質の信号。混合しない。
+**対応状態は異なる軸**。次の概念を混合しない。
 
-以下は同義ではない。
+- System disposition（blocking/advisory/suppressed）: レビューシステムの扱い
+- Resolution（action_submitted/risk_acceptedなど）: PR作者の対応
+- Verification（not_reproduced/verified_resolved/persists/inconclusive）: 修正後の検証
+- Feedback（accepted/false_positive/missed_issueなど）: レビュアー品質の信号
+
+次の関係を同一視しない。
 
 - `author says fixed` ≠ `verified_resolved`
 - `finding absent on next run` ≠ `verified_resolved`（reviewer未実行・timeout・coverage欠落がありうる）
@@ -82,6 +91,7 @@ Review Artifactはそのrunのimmutableな証跡、後続対応は別のResoluti
 
 ## 学習した内容をどこに置くか
 
+<!-- prettier-ignore -->
 | 確定したパターン | 第一候補 | 評価 |
 | --- | --- | --- |
 | missed_issue / 実障害 | 再現テスト、deterministic checker、should-detect fixture | 同じ不具合を事前スナップショットで検出できる |
@@ -113,7 +123,7 @@ Review Artifactはそのrunのimmutableな証跡、後続対応は別のResoluti
 5. Candidateが重大バグを見落とすなら、不要コメントが減ってもReject。正解やcoverageが不明ならInconclusive。
 6. Human承認、限定導入、incident/revertガードレールによる継続評価へ進む。
 
-#2701はincidentからのconfirmed case構築、#2615は実験・効果評価を所有する。別のEvaluatorや学習DBは作らない。
+Incidentのconfirmed case構築はIssue #2701が担当する。実験と効果評価のownerはIssue #2615。別のEvaluatorや学習DBは作らない。
 
 ## レビューの収束を学習へつなげる
 
@@ -129,6 +139,7 @@ Owner: #2007、`pages/reference/loop-convergence-contract.md`。
 
 ## 測定と採用判断
 
+<!-- prettier-ignore -->
 | 指標 | 定義と母数 | 採用の考え方 |
 | --- | --- | --- |
 | Major/Critical recall | Human-confirmed positive casesのうち正しく検出した件数/評価可能positive件数 | Baselineからの重大な検出退行は0 |
