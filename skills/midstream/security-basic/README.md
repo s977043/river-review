@@ -81,6 +81,12 @@ npx promptfoo eval
 
 - `\` / `%5C` は拒否しているが、`parse_url` のホストが無い値（`http:evil.example` など）を素通ししている
 
+### Happy Path (fixtures/06-lexical-path-exemption-happy.md)
+
+検出するケース：
+
+- 値が「パスらしい形」なら秘匿マスクを省く例外を追加しているが、`..` などの非正規形を弾いておらず、それを固定するテストも無い
+
 ## 設計判断
 
 ### なぜ midstream?

@@ -678,8 +678,8 @@
     {
       "id": "security-basic",
       "path": "skills/midstream/security-basic",
-      "checksum": "sha256:f59f3c29b80853df78463d0e2de9efe6f3c0ad97f70051e503bdd57c1f024e7d",
-      "files": 15
+      "checksum": "sha256:eb7e74eebb28fbcf851735e16919887aadd6bf5255743f67d50dbe896960acca",
+      "files": 17
     },
     {
       "id": "security-privacy-design",

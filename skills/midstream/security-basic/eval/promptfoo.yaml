@@ -114,6 +114,24 @@ tests:
         value: file://../golden/05-open-redirect-null-host-bypass-happy.md
         threshold: 0.7
 
+  - description: Lexical Path Exemption Skips Masking Without Non-canonical Form Checks (Happy Path)
+    vars:
+      diff: file://../fixtures/06-lexical-path-exemption-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must identify that the new `/^\/(tmp|home)\//` exemption skips masking
+          by the lexical shape of the value. Score 1 if it names non-canonical forms that would
+          wrongly hit the exemption (e.g. `..` segments, `//`, `%2F`, a second assignment on the
+          same line) and asks for tests pinning that those forms stay masked. Score 0 otherwise.
+
+      - type: contains
+        value: 'Severity: major'
+
+      - type: similar
+        value: file://../golden/06-lexical-path-exemption-happy.md
+        threshold: 0.7
+
 defaultTest:
   options:
     provider: openai:gpt-4o
