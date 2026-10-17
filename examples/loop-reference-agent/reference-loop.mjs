@@ -53,6 +53,8 @@ export const LOOP_ACTIONS = Object.freeze({
  *   (enables STOP_OSCILLATED). Omit/null for single-run derivation.
  * @param {number} params.iteration - 1-based iteration counter.
  * @param {number} params.maxIterations - Divergence guard (recommended 3–5).
+ * @param {number} [params.replanAfter=3] - Caller-owned advisory threshold.
+ *   Reaching it does not change the action or override a stop/escalation.
  * @param {string|null} [params.policySignal] - Caller-synthesized Layer 3 signal,
  *   e.g. 'STOP_POLICY_REQUIRED' when a cost cap or HITL label fires.
  * @returns {{signal: string, action: string, reason: string}}
@@ -74,6 +76,19 @@ export const LOOP_ACTIONS = Object.freeze({
  * the cap (infinite loop) or trip it on iteration 1. */
 function resolveIterationLimit(maxIterations) {
   return typeof maxIterations === 'number' && maxIterations > 0 ? maxIterations : 5;
+}
+
+// Caller-owned, non-blocking advice. This is not a River Review gate or an
+// extra loop signal. It only appears when the next action would be REVISE.
+function withReplanAdvice(decision, iteration, replanAfter) {
+  if (decision.action !== LOOP_ACTIONS.REVISE) return decision;
+  const threshold = Number.isSafeInteger(replanAfter) && replanAfter > 0 ? replanAfter : 3;
+  if (!Number.isSafeInteger(iteration) || iteration < threshold) return decision;
+  return {
+    ...decision,
+    replanSuggested: true,
+    replanReason: `review round ${iteration} reached the caller replan threshold (${threshold}); reassess repeated findings, scope and verification strategy before another revision`,
+  };
 }
 
 /**
@@ -157,6 +172,7 @@ export function decideLoopAction({
   iteration,
   maxIterations,
   policySignal = null,
+  replanAfter = 3,
 }) {
   // 1. Caller policy (Layer 3) — highest priority external override.
   if (policySignal === 'STOP_POLICY_REQUIRED') {
@@ -194,7 +210,7 @@ export function decideLoopAction({
       iteration,
       maxIterations,
     });
-    if (gateDecision) return gateDecision;
+    if (gateDecision) return withReplanAdvice(gateDecision, iteration, replanAfter);
   }
 
   if (signal === 'ESCALATE_HUMAN') {
@@ -223,11 +239,15 @@ export function decideLoopAction({
     };
   }
 
-  return {
-    signal,
-    action: LOOP_ACTIONS.REVISE,
-    reason: 'blocking findings remain — revise and re-run',
-  };
+  return withReplanAdvice(
+    {
+      signal,
+      action: LOOP_ACTIONS.REVISE,
+      reason: 'blocking findings remain — revise and re-run',
+    },
+    iteration,
+    replanAfter
+  );
 }
 
 /**
@@ -245,11 +265,20 @@ export function decideLoopAction({
  * @param {(ctx: {iteration: number, history: object[]}) => (({artifact: object, runsDiff?: object|null}) | Promise<{artifact: object, runsDiff?: object|null}>)} params.review
  *   Returns (or resolves to) the review result for the given iteration.
  * @param {number} [params.maxIterations=5] - Divergence guard.
+ * @param {number} [params.replanAfter=3] - Caller-side replan advice threshold.
+ * @param {(ctx: {iteration: number, history: object[], decision: object}) => (void | Promise<void>)} [params.onReplan]
+ *   Optional caller hook. It may reassess a plan but never grants merge authority.
  * @param {(ctx: {iteration: number, history: object[]}) => ((string|null) | Promise<string|null>)} [params.policyFor]
  *   Returns (or resolves to) 'STOP_POLICY_REQUIRED' to force a policy stop, else null.
  * @returns {Promise<{signal: string, action: string, reason: string, iteration: number, history: object[]}>}
  */
-export async function runReferenceLoop({ review, maxIterations = 5, policyFor = () => null }) {
+export async function runReferenceLoop({
+  review,
+  maxIterations = 5,
+  replanAfter = 3,
+  policyFor = () => null,
+  onReplan = null,
+}) {
   const history = [];
 
   for (let iteration = 1; ; iteration++) {
@@ -262,7 +291,12 @@ export async function runReferenceLoop({ review, maxIterations = 5, policyFor = 
       iteration,
       maxIterations,
       policySignal: await policyFor({ iteration, history }),
+      replanAfter,
     });
+
+    if (decision.replanSuggested && typeof onReplan === 'function') {
+      await onReplan({ iteration, history, decision });
+    }
 
     if (decision.action !== LOOP_ACTIONS.REVISE) {
       return { ...decision, iteration, history };

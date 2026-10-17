@@ -87,6 +87,54 @@ describe('decideLoopAction', () => {
     assert.equal(d.action, LOOP_ACTIONS.STOP_CONVERGED);
   });
 
+  test('round three suggests caller replan without changing REVISE', () => {
+    const earlier = decideLoopAction({ artifact: REVISE, iteration: 2, maxIterations: 5 });
+    const third = decideLoopAction({ artifact: REVISE, iteration: 3, maxIterations: 5 });
+    assert.equal(earlier.replanSuggested, undefined);
+    assert.equal(third.action, LOOP_ACTIONS.REVISE);
+    assert.equal(third.signal, 'REVISE_REQUIRED');
+    assert.equal(third.replanSuggested, true);
+    assert.match(third.replanReason, /review round 3/);
+  });
+
+  test('caller can tune replan threshold; invalid values use three', () => {
+    const late = decideLoopAction({
+      artifact: REVISE,
+      iteration: 3,
+      maxIterations: 6,
+      replanAfter: 4,
+    });
+    assert.equal(late.replanSuggested, undefined);
+    const adjusted = decideLoopAction({
+      artifact: REVISE,
+      iteration: 4,
+      maxIterations: 6,
+      replanAfter: 4,
+    });
+    assert.equal(adjusted.replanSuggested, true);
+    const invalid = decideLoopAction({
+      artifact: REVISE,
+      iteration: 3,
+      maxIterations: 5,
+      replanAfter: 0,
+    });
+    assert.equal(invalid.replanSuggested, true);
+  });
+
+  test('replan never overrides convergence, escalation, or the iteration cap', () => {
+    for (const [artifact, expected] of [
+      [CONVERGED, LOOP_ACTIONS.STOP_CONVERGED],
+      [ESCALATE, LOOP_ACTIONS.STOP_ESCALATE],
+    ]) {
+      const result = decideLoopAction({ artifact, iteration: 3, maxIterations: 5 });
+      assert.equal(result.action, expected);
+      assert.equal(result.replanSuggested, undefined);
+    }
+    const capped = decideLoopAction({ artifact: REVISE, iteration: 3, maxIterations: 3 });
+    assert.equal(capped.action, LOOP_ACTIONS.STOP_MAX_ITERATIONS);
+    assert.equal(capped.replanSuggested, undefined);
+  });
+
   test('invalid maxIterations falls back to default (no premature/absent cap)', () => {
     // null would coerce to 0 (iteration >= 0 → premature stop); guard must prevent it.
     const early = decideLoopAction({ artifact: REVISE, iteration: 1, maxIterations: null });
@@ -121,6 +169,19 @@ describe('runReferenceLoop', () => {
     });
     assert.equal(result.action, LOOP_ACTIONS.STOP_MAX_ITERATIONS);
     assert.equal(result.iteration, 3);
+  });
+
+  test('optional replan hook is invoked only before another revise', async () => {
+    const replans = [];
+    const result = await runReferenceLoop({
+      review: ({ iteration }) => ({ artifact: iteration === 4 ? CONVERGED : REVISE }),
+      maxIterations: 5,
+      onReplan: async ({ iteration, decision }) => {
+        replans.push({ iteration, action: decision.action });
+      },
+    });
+    assert.equal(result.action, LOOP_ACTIONS.STOP_CONVERGED);
+    assert.deepEqual(replans, [{ iteration: 3, action: LOOP_ACTIONS.REVISE }]);
   });
 
   test('escalates immediately on human-review-required', async () => {
@@ -202,6 +263,22 @@ describe('decideLoopAction — gate block (S4)', () => {
   test('gate ESCALATE → stop-escalate (cliff isolated from revise)', () => {
     const d = decideLoopAction({ artifact: withGate('ESCALATE'), iteration: 1, maxIterations: 5 });
     assert.equal(d.action, LOOP_ACTIONS.STOP_ESCALATE);
+  });
+
+  test('gate NO_GO gets caller replan advice without changing gate action', () => {
+    const result = decideLoopAction({
+      artifact: withGate('NO_GO'),
+      iteration: 3,
+      maxIterations: 5,
+    });
+    assert.equal(result.action, LOOP_ACTIONS.REVISE);
+    assert.equal(result.replanSuggested, true);
+    const stop = decideLoopAction({
+      artifact: withGate('ESCALATE'),
+      iteration: 3,
+      maxIterations: 5,
+    });
+    assert.equal(stop.replanSuggested, undefined);
   });
 
   test('gate NO_GO → revise (with iteration cap)', () => {

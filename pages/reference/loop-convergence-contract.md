@@ -82,6 +82,18 @@ Issue #2467 以降、saved record に `llmNotExecuted: true` を持つ run は�
 
 `gate` は advisory です。判定の執行（`--gate` モード、strict_block ルーティング）は Epic #1347 S4 で導入されます。
 
+## Caller側の再計画アドバイス（Issue #2007）
+
+`consensusLevel` は複数レビュアーの合意度です。停止条件ではありません。高い合意度だけで指摘の正しさや解決を確定しないでください。
+
+- callerはレビューのラウンド数を管理する。3ラウンド後も修正が必要なら、再計画を助言する。
+- 閾値はcaller側で変更できる。3ラウンド経過による自動承認や強制終了は行わない。
+- 重複findingは同一性と証拠を照合する。新たな根拠のない再投稿を抑制する。未解決のcritical/majorは隠さない。
+- `reviewCoverage`が不完全なら収束と解釈しない。振動検知と最大反復数の上限も併用する。
+- Human判断やコスト上限など強い停止条件を優先する。停止と承認の権限は既存Hostに残す。
+
+`examples/loop-reference-agent/reference-loop.mjs` は純関数の`replanSuggested`を返します。これは`REVISE`時だけ付く補助情報です。`runReferenceLoop`の任意`onReplan` callbackを使うと、callerが再計画できます。既存の`signal`や`action`、Gate判定は変更しません。
+
 ## 停止（収束）条件の複合式
 
 ### `decision == "auto-approve"` 単独では停止条件にならない理由
