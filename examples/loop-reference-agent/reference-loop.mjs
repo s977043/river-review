@@ -53,7 +53,9 @@ export const LOOP_ACTIONS = Object.freeze({
  *   (enables STOP_OSCILLATED). Omit/null for single-run derivation.
  * @param {number} params.iteration - 1-based iteration counter.
  * @param {number} params.maxIterations - Divergence guard (recommended 3–5).
- * @param {number} [params.replanAfter=3] - Caller-owned advisory threshold.\n *   Reaching it does not change the action or override a stop/escalation.\n * @param {string|null} [params.policySignal] - Caller-synthesized Layer 3 signal,
+ * @param {number} [params.replanAfter=3] - Caller-owned advisory threshold.
+ *   Reaching it does not change the action or override a stop/escalation.
+ * @param {string|null} [params.policySignal] - Caller-synthesized Layer 3 signal,
  *   e.g. 'STOP_POLICY_REQUIRED' when a cost cap or HITL label fires.
  * @returns {{signal: string, action: string, reason: string}}
  */
@@ -76,11 +78,6 @@ function resolveIterationLimit(maxIterations) {
   return typeof maxIterations === 'number' && maxIterations > 0 ? maxIterations : 5;
 }
 
-/**
- * Single source of truth mapping a gate decision to its loop action (Epic
- * #1347 S4). Exported so contract tests assert against the SAME map the
- * driver uses, instead of re-deriving it (which would silently drift).
- */
 // Caller-owned, non-blocking advice. This is not a River Review gate or an
 // extra loop signal. It only appears when the next action would be REVISE.
 function withReplanAdvice(decision, iteration, replanAfter) {
@@ -94,6 +91,11 @@ function withReplanAdvice(decision, iteration, replanAfter) {
   };
 }
 
+/**
+ * Single source of truth mapping a gate decision to its loop action (Epic
+ * #1347 S4). Exported so contract tests assert against the SAME map the
+ * driver uses, instead of re-deriving it (which would silently drift).
+ */
 export const GATE_DECISION_TO_ACTION = Object.freeze({
   GO: LOOP_ACTIONS.STOP_CONVERGED,
   GO_WITH_OBSERVATION: LOOP_ACTIONS.CONTINUE_WITH_OBSERVATION,
@@ -237,7 +239,15 @@ export function decideLoopAction({
     };
   }
 
-  return withReplanAdvice(\n    {\n      signal,\n      action: LOOP_ACTIONS.REVISE,\n      reason: 'blocking findings remain — revise and re-run',\n    },\n    iteration,\n    replanAfter\n  );
+  return withReplanAdvice(
+    {
+      signal,
+      action: LOOP_ACTIONS.REVISE,
+      reason: 'blocking findings remain — revise and re-run',
+    },
+    iteration,
+    replanAfter
+  );
 }
 
 /**
@@ -255,11 +265,20 @@ export function decideLoopAction({
  * @param {(ctx: {iteration: number, history: object[]}) => (({artifact: object, runsDiff?: object|null}) | Promise<{artifact: object, runsDiff?: object|null}>)} params.review
  *   Returns (or resolves to) the review result for the given iteration.
  * @param {number} [params.maxIterations=5] - Divergence guard.
- * @param {number} [params.replanAfter=3] - Caller-side replan advice threshold.\n * @param {(ctx: {iteration: number, history: object[], decision: object}) => (void | Promise<void>)} [params.onReplan]\n *   Optional caller hook. It may reassess a plan but never grants merge authority.\n * @param {(ctx: {iteration: number, history: object[]}) => ((string|null) | Promise<string|null>)} [params.policyFor]
+ * @param {number} [params.replanAfter=3] - Caller-side replan advice threshold.
+ * @param {(ctx: {iteration: number, history: object[], decision: object}) => (void | Promise<void>)} [params.onReplan]
+ *   Optional caller hook. It may reassess a plan but never grants merge authority.
+ * @param {(ctx: {iteration: number, history: object[]}) => ((string|null) | Promise<string|null>)} [params.policyFor]
  *   Returns (or resolves to) 'STOP_POLICY_REQUIRED' to force a policy stop, else null.
  * @returns {Promise<{signal: string, action: string, reason: string, iteration: number, history: object[]}>}
  */
-export async function runReferenceLoop({\n  review,\n  maxIterations = 5,\n  replanAfter = 3,\n  policyFor = () => null,\n  onReplan = null,\n}) {
+export async function runReferenceLoop({
+  review,
+  maxIterations = 5,
+  replanAfter = 3,
+  policyFor = () => null,
+  onReplan = null,
+}) {
   const history = [];
 
   for (let iteration = 1; ; iteration++) {
