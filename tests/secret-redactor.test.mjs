@@ -275,6 +275,13 @@ test('#2203 URL userinfo is masked when its credential contains a sample word', 
   assert.equal(explicit.text, sample);
   assert.deepEqual(explicit.hits, []);
 
+  // Token-only userinfo also carries credentials, even without a colon.
+  const tokenOnly = redactText('https://exampleToken42@auth.internal/policy', {
+    highEntropy: false,
+  });
+  assert.equal(tokenOnly.text, 'https://<REDACTED:urlUserInfo>@auth.internal/policy');
+  assert.deepEqual(tokenOnly.hits, [{ category: 'urlUserInfo', count: 1 }]);
+
   const negative = redactText('https://docs.example.com/public', { highEntropy: false });
   assert.equal(negative.text, 'https://docs.example.com/public');
   assert.deepEqual(negative.hits, []);
