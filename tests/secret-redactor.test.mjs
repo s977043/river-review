@@ -438,6 +438,8 @@ test('#2203 lowercase pwd working-directory exception is scoped to recognizable 
     'pwd = /home/runner/work/repo',
     'pwd=/Users/dev/src/river-review',
     'pwd=/workspace/app',
+    'pwd=/tmp/v1.2/work',
+    'pwd=/home/runner/.cache/work',
   ];
   for (const input of workdirs) {
     const result = redactText(input, { highEntropy: false });
