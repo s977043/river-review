@@ -966,8 +966,6 @@ The Node API runner is a thin wrapper around the core runner (`@river-review/cor
 ## Dependencies
 
 - `@river-review/core-runner` - Core skill loading and execution planning
-- `js-yaml` - YAML parsing for skill definitions
-- `minimatch` - Glob pattern matching for file routing
 
 ## Related Documentation
 
