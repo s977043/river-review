@@ -33,7 +33,7 @@ cat .nvmrc
 - 同一リポジトリ内ブランチからの PR（fork PR は push 不可のため対象外。従来どおり `Action dist freshness` job が staleness を検出する）
 - `release-please--` で始まる branch は対象外（自動コミットが release PR を汚染しないようにするため）
 
-トークンおよび no-recursion 制約の扱いは、`release-please-kick.yml` と同様です。`GITHUB_TOKEN` による push は GitHub の no-recursion 制約により `pull_request` workflow を再発火させません。そのため `RELEASE_KICK_PAT`（contents:write）があればそれを優先し、新しい head SHA で CI が再実行されます。`RELEASE_KICK_PAT` が未設定の場合、fallback push は warning を表示します。その際は empty commit などにより手動で CI を発火させてください。
+トークンおよび no-recursion 制約の扱いは次のとおりです。`GITHUB_TOKEN` による push は GitHub の no-recursion 制約により `pull_request` workflow を再発火させません。そのため `RELEASE_KICK_PAT`（contents:write）があればそれを優先し、新しい head SHA で CI が再実行されます。`RELEASE_KICK_PAT` が未設定の場合、fallback push は warning を表示します。その際は empty commit などにより手動で CI を発火させてください。
 
 以下の場合は次節の手動手順を fallback として使います。
 

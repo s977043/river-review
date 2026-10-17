@@ -349,19 +349,6 @@ decisions:
       the file on or after 2026-11-12 (90 days) if no caller」）の値。ROADMAP.md
       にも DEPRECATED と削除予定日の記載があるため、削除時は同じ PR で ROADMAP.md の記述も消す。
 
-  - id: deprecate-release-please-kick-workflow
-    kind: deprecation
-    target: .github/workflows/release-please-kick.yml
-    decidedIn: '#1807'
-    decidedAt: '2026-08-12'
-    reviewAfter: undecided
-    notes: >-
-      RELEASE_KICK_PAT が未登録のため常に失敗する workflow を deprecate した（#1807。本体コメントは背景 Issue の
-      #1800 を参照している）。削除期日は #1807 でも本体コメントでも決まっていない。ここで新しい日付を発明せず undecided
-      とし、棚卸しで「期日を決める」判断そのものを対象にする。判断材料は secret を登録して再採用するか
-      （gh api repos/:owner/:repo/actions/secrets で確認）、ローカル実行の
-      scripts/release-please-kick.sh へ一本化して削除するかの二択。
-
   - id: observe-denied-read-guard-hook
     kind: observation
     target: .claude/hooks/denied-read-guard.sh
