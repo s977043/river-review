@@ -5,42 +5,40 @@ sidebar_label: 保守変更のEvidenceレビュー
 
 # AI保守変更をEvidenceでレビューする（検証用ガイド）
 
-> Status: **proposed / report-only**（2026-10-17）
-> External reference: [OpenAI — Maintaining software with the GPT-6 family](https://developers.openai.com/blog/maintaining-software-with-the-gpt-6-family)
-> This guide is not a review-policy amendment or a new mandatory gate. The normative review and severity policy remains [Review Policy](../reference/review-policy.md).
+> Status: **proposed / report-only**（2026-10-17）  
+> External reference: [OpenAI — Maintaining software with the GPT-6 family](https://developers.openai.com/blog/maintaining-software-with-the-gpt-6-family)  
+> 本書は新しい必須GateやReview Policyの変更ではありません。判断基準の正本は[Review Policy](../reference/review-policy.md)です。
 
-AIが未使用コード・依存関係・古いFeature Flag・CI最適化・Flaky Testの改善候補を発見しても、**候補発見、変更の安全性、最終承認は別**である。既存のreview skillやfixtureを先に利用し、不足が再現されてからのみ新規Skillを提案する。
+AIが未使用コードや依存関係、古いFeature Flag、CI最適化、Flaky Testの改善候補を見つけても、候補の発見と変更の安全性、最終承認は別です。既存のreview skillやfixtureを先に使い、不足が再現されたときだけ新規Skillを検討します。
 
 ## 候補別の反証と停止条件
 
-| Candidate | 必須の確認（例） | 誤った承認の反証例 |
-| --- | --- | --- |
-| Unused code / dependency | 呼び出し元、動的参照、公開API、build/runtime両方の利用、lockfile整合 | 静的grepで0件でも動的importや外部consumerで使われる |
-| Stale feature flag | 設定の現在値・有効範囲、運用Kill Switch、ロールバック、owner | permanentフラグでも運用で切替が必要 |
-| CI optimization | 変更前後の実CI jobと実行時間、同等の検証範囲・exit code | テストをskipして速くなっただけ |
-| Flaky test | 元の失敗ログ、再現条件、retry/隔離の作用、修正後の実走 | greenが失敗を隠すretry増加の結果 |
-| Test or snapshot removal | 消すassert/variantが守っていた契約、残る回帰検知 | テスト件数だけ減りcoverageが失われる |
+- **Unused code / dependency**: 呼び出し元、動的参照、公開API、build/runtimeでの利用、lockfile整合を確認します。静的grepで参照が0件でも、動的importや外部consumerから利用される場合があります。
+- **Stale feature flag**: 設定の現在値、有効範囲、運用Kill Switch、ロールバック、ownerを確認します。恒久設定でも運用上の切替が必要な場合があります。
+- **CI optimization**: 変更前後の実CI job、実行時間、検証範囲、exit codeを確認します。テストをskipして速くなっただけなら効果として認めません。
+- **Flaky test**: 元の失敗ログ、再現条件、retryや隔離の作用、修正後の実走を確認します。greenになっても、retry増加で失敗が隠れた可能性があります。
+- **Test or snapshot removal**: 削除するassertやvariantの意図と、残る回帰検知を確認します。テスト件数の削減自体を改善とは扱いません。
 
-## Report-only review protocol（既存の正本を置き換えない）
+## Report-only review protocol
 
-1. **Source**: 対象repo、正確なbase/head SHA、PR/Issue・該当箇所、観測日の出典を列挙する。外部記事の成功談はこのrepoでのEvidenceではない。
-2. **Hypothesis**: 何が未使用・遅い・不安定と推定されるかを観測と区別する。動的参照、管理上の用途、実CIカバレッジなどの反証を探す。
-3. **Verification**: 使用したコマンド・実行環境・exit code・測定値・失敗・未実行を明記する。観測できなければUNKNOWNと記録し、PASSに丸めない。
-4. **Risk**: 安全性、データ／API互換性、間接consumer、rollback手段、再発検出シグナルを確認する。証拠なしの「安全に削除できる」は承認しない。
-5. **Disposition**: 既存review出力契約でfindingを報告する。誤検知、抑制、採否とHuman/Hostの承認は別の記録で扱う。AI review verdictはGitHub approvalではない。
-6. **Outcome**: 修正を別の承認済みworkflowが実行した場合のみ、CI実走・回帰・レビュー人時・改善効果を記録する。未計測を0とみなさない。
+1. **Source**: 対象repoと正確なbase/head SHA、PR/Issue、該当箇所、観測日の出典を列挙します。外部記事の成功談は、このrepoの実測とは区別します。
+2. **Hypothesis**: 未使用、遅延、不安定と推定する理由を観測と分けます。動的参照や運用用途、CIのカバレッジによる反証も調べます。
+3. **Verification**: コマンド、実行環境、exit code、測定値、失敗、未実行を記録します。確認できなければUNKNOWNとして扱います。
+4. **Risk**: データやAPIの互換性、安全性、間接consumer、rollback、再発検出シグナルを確認します。根拠がない「安全に削除できる」は承認しません。
+5. **Disposition**: 既存のreview出力契約でfindingを報告します。誤検知の扱いと、人間またはHostの承認を別の記録で管理します。AI review verdictはGitHub approvalではありません。
+6. **Outcome**: 修正が別の承認済みworkflowで実施された場合のみ、CI実走と回帰、レビュー人時、改善効果を記録します。未計測値は0にしません。
 
-## 最小dogfood（新しい判定エンジンは作らない）
+## 最小dogfood（新しい判定エンジンは作りません）
 
-- 既存の未使用依存関係整理の一例：[PR #2707](https://github.com/s977043/river-review/pull/2707)。依存ファイルの差分だけで不要と断言せず、Node APIのimports、依存のdirect/transitive位置付け、lockfile、Node 22環境でのbuild/testとCIを突き合わせる。**このガイドはPR #2707を承認したことにはならない**。
-- 正例（安全に除去できる）と負例（間接参照・運用Kill Switch・検証削除）をそれぞれ用意し、既存Skillのdetected/missed/false positiveを評価する。真偽は後知恵なしに独立確認する。
-- [Incident/revert-grounded eval #2701](https://github.com/s977043/river-review/issues/2701) と既存のpaired eval/Review Resolutionを参照し、専用corpus・別の学習エンジン・自動mergeフローを新設しない。
-- 既存の[簡素化観点 #1452](https://github.com/s977043/river-review/issues/1452)との重複を調べ、追加するなら最小のgapのみ。初期は3候補を確認し、重大なfalse accept 0件を観測する（**少数件による安全性保証ではない**）。
+- 既存PRの一例は、[PR #2707](https://github.com/s977043/river-review/pull/2707)（未使用の依存関係の整理）です。依存ファイルのdiffだけでは不要と判断しません。Node APIのimportsやdirect/transitive依存、lockfile、Node 22でのbuild/test、CIを照合します。このガイドはPR #2707の承認ではありません。
+- 正例（除去可能）と負例（間接参照、運用Kill Switch、テストの検証不足）を用意します。既存Skillでの検出、見逃し、誤検知を評価し、期待結果は独立して確認します。
+- [Incident/revert-grounded eval #2701](https://github.com/s977043/river-review/issues/2701) と既存のpaired evalやReview Resolutionを参照します。専用corpus、別の学習エンジン、自動mergeフローは追加しません。
+- 既存の[簡素化観点 #1452](https://github.com/s977043/river-review/issues/1452)と重複する部分を探します。最初は3候補を確認し、重大なfalse acceptが0件か観測します。ただし少数件で安全性を保証するものではありません。
 
 ## 拒否・保留条件
 
-判断に必要なprovenanceがない、権限や利用状況を検証できない、CIの検証範囲が削られる、実行環境が一致しない、機密が混入する、またはHuman所有の承認がない場合は**保留／エスカレーション**。データの欠測はno problemを意味しない。
+必要なprovenanceがない場合や、権限と利用状況を確認できない場合は保留します。CIの検証範囲が削られたり実行環境が一致しなかったりする場合も同様です。機密情報の混入やHuman-owned承認の欠落もエスカレーション対象です。データが欠けていることは、問題がない証拠ではありません。
 
 ## 境界
 
-本ガイドは新しいスキル、フック、必須Gate、プロダクションの修正手順、権限緩和、API依存を追加しない。既存の[実践進化方針](../guides/governance/practice-evolution.md)のAdopt / Adapt / Deferを踏襲する。採用は実PRでの再現検証後に独立判断する。
+本ガイドでは新しいスキル、フック、必須Gate、プロダクションの修正手順、権限緩和、API依存を追加しません。既存の[実践進化方針](../guides/governance/practice-evolution.md)を踏襲します。導入するかどうかは実PRでの再現検証後に独立して判断します。
