@@ -12,6 +12,7 @@ module.exports = {
         'use-cases/enforce-plan-conformance',
         'use-cases/review-design-adrs-upstream',
         'use-cases/suppress-flaky-review-comments',
+        'use-cases/maintenance-evidence-review',
       ],
     },
     {
