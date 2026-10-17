@@ -76,18 +76,47 @@ Related: #2011 #2034 #2054 #2213 #1545 #1574.
 
 ## AIDLE task-nature lens (research proposal, 2026-10-18)
 
-Source: [AIDLE Extended 2026 report, part 1](https://note.com/ai_dev_leaders/n/ndd23a2abf5be) (organizer account, 2026-10-15). Speakers distinguish exploratory/unknown work, replication of proven patterns, and known-solution work. This is **not evidence** that any River Review routing policy improves review quality.
+Source: [AIDLE Extended 2026 report, part 1](https://note.com/ai_dev_leaders/n/ndd23a2abf5be).
+The article is an organizer's report, not a measured River Review benchmark.
 
-**Separate the axes.** Task nature is a prospective *work-planning* hint. The existing `light | standard | team | human-required` mode is a deterministic **diff-risk** recommendation. Neither is proof of verified coverage, permission to write, independent reviewer approval, or Human merge authority. A known-solution task that touches auth/migration/CI must still receive its required risk escalation; an exploratory docs change does not automatically require a multi-agent team. Unknown task nature cannot silently reduce depth.
+The speakers describe three kinds of work:
 
-**No implementation/contract change in this proposal.** Keep `src/lib/review-mode-router.mjs`, `schemas/review-route.schema.json`, `risk-map`, Flow/Agent contracts and the existing reviewer role ledger as owners. Do not introduce a second route enum, overwrite `recommendedReviewers`, or auto-run the suggested command.
+- Exploratory tasks with unknown answers.
+- Replication of patterns that have worked before.
+- Known-solution tasks with testable acceptance criteria.
 
-**Possible post-baseline evaluation** (track under #2034, coordinate with PlanGate #911 and DAT #93):
+### Ownership boundaries
 
-1. Independently annotate task nature from the original Plan/AC *before* outcome review. Record unknown/disagreement and source refs.
-2. Retain exact diff-risk rules and fixed review command/Verifier for the baseline; first record shadow task-nature advice without executing a different mode.
-3. In a separate preregistered comparison, assess matched finding correctness, escaped defects, false positives, coverage, reviewer/human time and total model cost; use blinded/independent judgments where possible.
-4. Negative fixtures: “known” task with protected migration, uncertain requirements with small diff, missing AC, unknown file type, stale test evidence and Human-required risk-map. Any quality/authority regression blocks promotion.
-5. Missing ground truth, small samples, changing risk rules, or lack of matched counterfactuals => `INCONCLUSIVE`. New routing behavior requires separate versioned contract/tests/PR and Human approval.
+Task nature is a work-planning hint.
+The existing `light | standard | team | human-required` mode is a diff-risk recommendation.
+Task nature must never reduce required review depth.
 
-Self-review: source reporting is not a validated benchmark; task nature is not risk; route is advice, not execution; Human-required never downgrades.
+- A known-solution change to auth, migration, or CI still follows risk-map policy.
+- Exploratory docs changes do not automatically require a multi-agent team.
+- Unknown task nature requires more evidence, not a lower review mode.
+- A route suggestion is not executed coverage or approval.
+- Human-required never becomes AI-only review or merge authority.
+
+This document changes no runtime or contract.
+Keep `src/lib/review-mode-router.mjs` and the current risk map as owners.
+Keep the existing Flow, Agent contracts, and reviewer role ledger.
+Do not add another enum or overwrite `recommendedReviewers`.
+Do not execute `nextCommand` automatically.
+
+### Post-baseline evaluation candidate
+
+Track with #2034, PlanGate #911, and DAT #93.
+
+1. Annotate task type from Plan and AC before reviewing outcomes.
+   Preserve unknown labels, disagreement, and source references.
+2. Keep baseline review mode and verifier unchanged.
+   Record task-nature advice in shadow mode before enabling an intervention.
+3. Predeclare matched quality, coverage, escaped-defect, and cost outcomes.
+   Use independent judgments where possible.
+4. Include negative cases: protected migration and uncertain small diff.
+   Also include missing AC, unknown file types, and stale test evidence.
+5. Fail promotion on any Human-required downgrade or critical regression.
+   Missing ground truth or unmatched comparisons mean `INCONCLUSIVE`.
+
+Any new routing behavior requires a separate contract, tests, PR, and Human decision.
+Source reporting is not proof of an effective routing policy.
