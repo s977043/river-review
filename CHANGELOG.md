@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.130.1](https://github.com/s977043/river-review/compare/v1.130.0...v1.130.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **security:** reject ambiguous pwd workdir path segments ([#2704](https://github.com/s977043/river-review/issues/2704)) ([342abc6](https://github.com/s977043/river-review/commit/342abc6b333ac204bc96e33aa16bc8a3797e1f1d))
+
 ## [1.130.0](https://github.com/s977043/river-review/compare/v1.129.0...v1.130.0) (2026-10-16)
 
 
