@@ -262,6 +262,44 @@ test('#2033 redactText redacts URL userinfo even when the host says "example"', 
   assert.ok(hits.some((h) => h.category === 'urlUserInfo'));
 });
 
+test('#2203 URL userinfo is masked when its credential contains a sample word', () => {
+  const sample = 'https://alice:exampleSecret42@auth.internal/policy';
+  const result = redactText(sample, { highEntropy: false });
+  assert.equal(result.text, 'https://<REDACTED:urlUserInfo>@auth.internal/policy');
+  assert.deepEqual(result.hits, [{ category: 'urlUserInfo', count: 1 }]);
+
+  const explicit = redactText(sample, {
+    highEntropy: false,
+    allowlist: ['exampleSecret42'],
+  });
+  assert.equal(explicit.text, sample);
+  assert.deepEqual(explicit.hits, []);
+
+  // Token-only userinfo also carries credentials, even without a colon.
+  const tokenOnly = redactText('https://exampleToken42@auth.internal/policy', {
+    highEntropy: false,
+  });
+  assert.equal(tokenOnly.text, 'https://<REDACTED:urlUserInfo>@auth.internal/policy');
+  assert.deepEqual(tokenOnly.hits, [{ category: 'urlUserInfo', count: 1 }]);
+
+  const negative = redactText('https://docs.example.com/public', { highEntropy: false });
+  assert.equal(negative.text, 'https://docs.example.com/public');
+  assert.deepEqual(negative.hits, []);
+});
+
+test('#2203 AWS secret assignment ignores built-in sample-word substrings', () => {
+  const value = 'A'.repeat(11) + 'example' + 'B'.repeat(22);
+  assert.equal(value.length, 40);
+  const sample = 'aws_secret_access_key="' + value + '"';
+  const result = redactText(sample, { highEntropy: false });
+  assert.equal(result.text, '<REDACTED:awsSecretKey>');
+  assert.deepEqual(result.hits, [{ category: 'awsSecretKey', count: 1 }]);
+
+  const explicit = redactText(sample, { highEntropy: false, allowlist: ['example'] });
+  assert.equal(explicit.text, sample);
+  assert.deepEqual(explicit.hits, []);
+});
+
 test('#2033 redactText leaves port-bearing and credential-free URLs alone', () => {
   const negatives = [
     'see https://host.corp.net:8443/path/to/doc',
