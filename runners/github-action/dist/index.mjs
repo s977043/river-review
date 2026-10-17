@@ -47111,6 +47111,9 @@ const NON_SECRET_PWD_NAMES = new Set(['PWD', 'OLDPWD']);
 const WORKDIR_ROOT_RE = /^\/(?:tmp|home|Users|workspace|workspaces|mnt|var|opt)\//;
 const WORKDIR_BASENAME_RE = /\/(?:workdir|workspace|work|repo|project|src|app|build|river-review)$/;
 const WORKDIR_PATH_RE = /^\/[A-Za-z0-9._/-]+$/;
+// Traversal, dot and empty segments make a pwd= path less trustworthy as a
+// working-directory hint; do not exempt them from credential masking.
+const WORKDIR_AMBIGUOUS_SEGMENT_RE = /\/\/|\/\.{1,2}(?=\/|$)/;
 
 function isRecognizablePwdWorkingDirectory(name, sep, value) {
   return (
@@ -47118,7 +47121,8 @@ function isRecognizablePwdWorkingDirectory(name, sep, value) {
     sep.trim() === '=' &&
     WORKDIR_ROOT_RE.test(value) &&
     WORKDIR_BASENAME_RE.test(value) &&
-    WORKDIR_PATH_RE.test(value)
+    WORKDIR_PATH_RE.test(value) &&
+    !WORKDIR_AMBIGUOUS_SEGMENT_RE.test(value)
   );
 }
 
