@@ -103,6 +103,23 @@ Keep the existing Flow, Agent contracts, and reviewer role ledger.
 Do not add another enum or overwrite `recommendedReviewers`.
 Do not execute `nextCommand` automatically.
 
+### Docs-only review evidence (observed)
+
+During PR #2715, the opt-in self-review workflow finished successfully.
+It reported `No changes to review compared to main.`
+This is **not** evidence that a reviewer inspected the new text.
+
+The workflow uses `midstream`.
+The current `buildLlmDiffView()` excludes `.md` in that phase.
+Markdown is included for `upstream`, which was not run in this observation.
+The reported no-op is consistent with that documented code path.
+No `reviewCoverage` run artifact was uploaded.
+
+Track the observability gap in #2396.
+Do not count a successful no-op as review coverage or PR approval.
+If document review becomes required, test `upstream` as a separate opt-in.
+Changing the workflow default or gate requires its own approved change.
+
 ### Post-baseline evaluation candidate
 
 Track with #2034, PlanGate #911, and DAT #93.
