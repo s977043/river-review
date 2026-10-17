@@ -107,6 +107,11 @@ const STRUCTURED_CREDENTIAL_IDS = new Set([
   'googleApiKey',
   'bearerToken',
   'awsAccessKey',
+  // A credential-bearing URL or 40-character secret assignment remains
+  // sensitive even if its opaque bytes include sample words like "example".
+  // Explicit user allowlists continue to override these strict formats.
+  'urlUserInfo',
+  'awsSecretKey',
 ]);
 // Even published AWS documentation tokens are masked by default. A caller
 // may explicitly allowlist a known sample, but that choice must not silently
