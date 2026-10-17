@@ -63,7 +63,9 @@ They do return wrong conclusions, and aggregate figures whose measurement steps 
 ## `N of N required checks are expected` = bot/GITHUB_TOKEN push
 
 `docs/runbook/bot-pushed-head-kick.md` is the SSoT.
-It holds the diagnosis commands, the escape procedure, past measurements, and the `Release Please Kick` workflow and `RELEASE_KICK_PAT` requirements.
+It holds the diagnosis commands, the escape procedure, past measurements, and a note on the removed `Release Please Kick` workflow.
+That workflow needed the unregistered `RELEASE_KICK_PAT` secret and always failed.
+It was deprecated in #1807 and deleted on 2026-10-17.
 It also explains why the evidence changes shape after merge.
 
 ## Import the SSoT, never re-derive it

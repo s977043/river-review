@@ -14,7 +14,7 @@ name: Auto Rebuild Action Dist
 #   release PRs (release-please force-updates its branch and would fight any
 #   foreign commit).
 #
-# Token / no-recursion (same policy as release-please-kick.yml): pushes
+# Token / no-recursion: pushes
 # authored by `GITHUB_TOKEN` do NOT trigger `pull_request: synchronize`
 # workflows by GitHub design (no-recursion safety). With strict required
 # status checks, a GITHUB_TOKEN push would leave the new head SHA without CI
