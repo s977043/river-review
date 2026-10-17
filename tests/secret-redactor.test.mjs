@@ -438,6 +438,8 @@ test('#2203 lowercase pwd working-directory exception is scoped to recognizable 
     'pwd = /home/runner/work/repo',
     'pwd=/Users/dev/src/river-review',
     'pwd=/workspace/app',
+    'pwd=/tmp/v1.2/work',
+    'pwd=/home/runner/.cache/work',
   ];
   for (const input of workdirs) {
     const result = redactText(input, { highEntropy: false });
@@ -455,6 +457,11 @@ test('#2203 lowercase pwd working-directory exception is scoped to recognizable 
     ['passwd=/home/user/work', 'passwd=<REDACTED:passwordAssignment>'],
     ['pwd="/home/runner/workdir"', 'pwd="<REDACTED:passwordAssignment>"'],
     ['pwd=/tmp/workdir?token=hunter2', 'pwd=<REDACTED:passwordAssignment>'],
+    // Directory-looking but noncanonical paths are not safe to exempt.
+    ['pwd=/tmp/../work', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd=/tmp/./work', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd=/tmp//work', 'pwd=<REDACTED:passwordAssignment>'],
+    ['pwd=/home/runner/../../work', 'pwd=<REDACTED:passwordAssignment>'],
   ];
   for (const [input, expected] of mustMask) {
     const result = redactText(input, { highEntropy: false });
