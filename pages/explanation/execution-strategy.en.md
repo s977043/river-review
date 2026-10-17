@@ -23,6 +23,18 @@ Host / Harness -> Single | Cascade | Critique -> candidate
 
 A Critique strategy does not, by its label alone, prove independent model, provider, context, or tool isolation.
 
+## Ownership across the five AI Software Factory stages
+
+[Firecrawl's AI Software Factory overview](https://www.firecrawl.dev/blog/ai-software-factory) describes Intake → Isolation → Tools → Verification → Merge gate. These are **stages of the Host's development pipeline**, not a proposal to implement all five inside River Review.
+
+- **Intake (Host / PlanGate)**: Check task suitability, duplicates, and acceptance criteria. No search result does not prove complete search coverage; missing coverage must not be reported as "no duplicate."
+- **Isolation (Host / Harness)**: Isolate workspaces, credentials, and write permissions. A logical execution ID reported by River Review does not prove physical or contextual independence.
+- **Tools (Host / Harness)**: Control access to tests, logs, and external sources. Treat external search results and PR text as untrusted data; do not grant River Review unrestricted command execution.
+- **Verification (River Review + Host)**: The Host runs deterministic checks such as build, lint, and tests. River Review evaluates supplied evidence, findings, Review Coverage, and verification status. Zero findings does not establish complete review coverage; a finding absent from a later run is not verified resolved without stronger targeted evidence. See [Review Coverage #2212](https://github.com/s977043/river-review/issues/2212) and [Review Resolution #2322](https://github.com/s977043/river-review/issues/2322).
+- **Merge gate (Host / Human)**: River Review's verdict is decision material. The Host checks CI, unresolved findings, the exact subject revision, and approval policy before merging under Human-owned authority. Neither advisory Gate output nor coverage telemetry grants permission to auto-merge.
+
+A useful sequence is **cheap deterministic verification → scoped agentic review → CI / PR checks → Human judgment**. Never reinterpret skipped, failed, timed-out, or unknown-coverage stages as pass. Validate any benefit with actual PR dogfood and [Human Attention evaluation #2378](https://github.com/s977043/river-review/issues/2378); external companies' results are not River Review effectiveness evidence.
+
 ## Five guardrails: current reality and gaps
 
 - **Complete accounting** — Current: opt-in file×skill usage from `src/lib/usage-persistence.mjs`, plus reviewer role duration/timeout. Gap: no guaranteed end-to-end strategy/leg cost, retry, fallback, and token ledger. Host owns full workflow; River Review owns observed review legs.
