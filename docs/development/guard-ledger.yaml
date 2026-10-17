@@ -361,3 +361,15 @@ decisions:
       とし、棚卸しで「期日を決める」判断そのものを対象にする。判断材料は secret を登録して再採用するか
       （gh api repos/:owner/:repo/actions/secrets で確認）、ローカル実行の
       scripts/release-please-kick.sh へ一本化して削除するかの二択。
+
+  - id: observe-denied-read-guard-hook
+    kind: observation
+    target: .claude/hooks/denied-read-guard.sh
+    decidedIn: '#2695'
+    decidedAt: '2026-10-16'
+    reviewAfter: '2027-01-14'
+    notes: >-
+      settings.json の Read deny（secrets/・*secret*）を Bash の読み取りで迂回できる穴を塞ぐ PreToolUse
+      hook。CLAUDE.md のガードではなく AGENTS.md Safety の機械化なので guards: には載せない。期日は
+      decidedAt + 90 日。正当な操作の誤ブロック（偽陽性）と、分割規則をすり抜ける読み取り（偽陰性）を観測し、
+      期日に継続・調整・撤去を判断する。
