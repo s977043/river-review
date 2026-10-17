@@ -52,32 +52,6 @@ jobs:
           npm run packs:tier -- --strict | tee packs-tier.log
         continue-on-error: true
 
-      # #1415: a bare `node --test` fails intermittently with "Unable to
-      # deserialize cloned data" in the child->parent IPC. The `test` npm script
-      # carries `--experimental-test-isolation=none` (single process, no IPC),
-      # so calling it through `npm test` keeps this job aligned with the
-      # required `Unit tests` job without duplicating the flag.
-      - name: 'Run tests (single-process isolation, #1415)'
-        id: test
-        run: |
-          set -o pipefail
-          npm test | tee test.log
-        continue-on-error: true
-
-      - name: Run lint
-        id: lint
-        run: |
-          set -o pipefail
-          npm run lint | tee lint.log
-        continue-on-error: true
-
-      - name: Build docs
-        id: build
-        run: |
-          set -o pipefail
-          npm run build | tee build.log
-        continue-on-error: true
-
       - name: Upload log files
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -90,19 +64,13 @@ jobs:
           steps.agents-validate.outcome == 'failure' ||
           steps.agent-skills-validate.outcome == 'failure' ||
           steps.skills-validate.outcome == 'failure' ||
-          steps.packs-tier.outcome == 'failure' ||
-          steps.test.outcome == 'failure' ||
-          steps.lint.outcome == 'failure' ||
-          steps.build.outcome == 'failure'
+          steps.packs-tier.outcome == 'failure'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           OUTCOME_AGENTS_VALIDATE: ${{ steps.agents-validate.outcome }}
           OUTCOME_AGENT_SKILLS_VALIDATE: ${{ steps.agent-skills-validate.outcome }}
           OUTCOME_SKILLS_VALIDATE: ${{ steps.skills-validate.outcome }}
           OUTCOME_PACKS_TIER: ${{ steps.packs-tier.outcome }}
-          OUTCOME_TEST: ${{ steps.test.outcome }}
-          OUTCOME_LINT: ${{ steps.lint.outcome }}
-          OUTCOME_BUILD: ${{ steps.build.outcome }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -134,24 +102,6 @@ jobs:
                 title: '定期チェック: npm run packs:tier -- --strict が失敗しました',
                 outcome: process.env.OUTCOME_PACKS_TIER,
                 logPath: 'packs-tier.log',
-              },
-              {
-                key: 'test',
-                title: '定期チェック: npm test が失敗しました',
-                outcome: process.env.OUTCOME_TEST,
-                logPath: 'test.log',
-              },
-              {
-                key: 'lint',
-                title: '定期チェック: npm run lint が失敗しました',
-                outcome: process.env.OUTCOME_LINT,
-                logPath: 'lint.log',
-              },
-              {
-                key: 'build',
-                title: '定期チェック: npm run build が失敗しました',
-                outcome: process.env.OUTCOME_BUILD,
-                logPath: 'build.log',
               },
             ];
 

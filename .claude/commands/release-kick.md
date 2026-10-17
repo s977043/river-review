@@ -6,7 +6,7 @@ allowed-tools: Bash(gh api user:*), Bash(gh auth switch:*), Bash(gh pr view:*), 
 
 release PR #$ARGUMENTS を、BLOCKED 解除からマージ・リリース公開の検証まで一貫して実行する。
 
-release-please が生成するリリース PR の head は `GITHUB_TOKEN` push であるため、通常は `mergeStateStatus: BLOCKED`（"N of N required checks are expected"）になる（CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード参照）。この BLOCKED の原因・`RELEASE_KICK_PAT` のセットアップ・`workflow_dispatch` 版が deprecated である理由は `docs/runbook/bot-pushed-head-kick.md` が SSoT。kick の正規手順は `scripts/release-please-kick.sh` であり、workflow 版は使えない。本コマンドはそれを前提に、実際にマージして公開を確認するまでの実行手順を1コマンド化したもの。矛盾があれば runbook を正とし、本コマンドを修正する。
+release-please が生成するリリース PR の head は `GITHUB_TOKEN` push であるため、通常は `mergeStateStatus: BLOCKED`（"N of N required checks are expected"）になる（CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード参照）。この BLOCKED の原因は `docs/runbook/bot-pushed-head-kick.md` が SSoT。kick の正規手順は `scripts/release-please-kick.sh` である（`workflow_dispatch` 版は #1807 で削除済み）。本コマンドはそれを前提に、実際にマージして公開を確認するまでの実行手順を1コマンド化したもの。矛盾があれば runbook を正とし、本コマンドを修正する。
 
 ## 手順
 
@@ -69,7 +69,7 @@ Step 5 で `action_required` のまま止まっていた場合だけ Step 4 に�
 bash scripts/release-please-kick.sh
 ```
 
-空コミットで新しい head を作り、`pull_request: synchronize` を実ユーザー相当のトークンで発火させる。ブランチ名を省略すると open な release PR を自動検出する。詳細・`RELEASE_KICK_PAT` 未設定時のエラー・`workflow_dispatch` 経由の代替は runbook 参照。
+空コミットで新しい head を作り、`pull_request: synchronize` を実ユーザー相当のトークンで発火させる。ブランチ名を省略すると open な release PR を自動検出する。詳細は runbook 参照。
 
 ### Step 5. 新 head の CI 実発火確認
 
@@ -153,5 +153,5 @@ release-please は CHANGELOG に commit subject しか載せないため、利�
 ## 参照
 
 - `.claude/commands/merge-check.md` Step 6（SSoT: PR 本文の closing keyword 確認、閉じてよい issue かの判定基準、`closes` → `refs` の書き換え手順）
-- `docs/runbook/bot-pushed-head-kick.md`（SSoT: BLOCKED の原因、BEHIND と純 BLOCKED の判定、`RELEASE_KICK_PAT` セットアップ、`workflow_dispatch` 版が deprecated である理由）
+- `docs/runbook/bot-pushed-head-kick.md`（SSoT: BLOCKED の原因、BEHIND と純 BLOCKED の判定、`workflow_dispatch` 版を削除した経緯）
 - CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード

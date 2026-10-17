@@ -252,49 +252,13 @@ A kick fixes one head, not the PR. Any later push by the same bot stalls the new
 head the same way, so re-run Step 1 after every subsequent bot commit. PR #2021
 is the measured case: two bot pushes, two kicks.
 
-## The `Release Please Kick` workflow is not an equivalent alternative
+## The `Release Please Kick` workflow was removed
 
-`.github/workflows/release-please-kick.yml` performs the same empty-commit kick
-from the Actions tab. It works only where the `RELEASE_KICK_PAT` secret is
-registered. GitHub blocks `GITHUB_TOKEN`-authored pushes from triggering
-`pull_request: synchronize` workflows (no-recursion safety). Without the secret,
-the workflow's own push therefore unblocks nothing, and the run fails with an
-error pointing back to this runbook (#906).
-
-Check whether the secret exists before choosing this route:
-
-```bash
-gh api repos/:owner/:repo/actions/secrets --jq '.secrets[].name'
-```
-
-On this repository the call currently returns nothing: no Actions secret is
-registered. The workflow route is therefore unavailable, and the script above is
-the procedure to use. The workflow last succeeded on 2026-05-25. Every run since
-then has failed at the `Verify downstream CI actually started` step for this
-reason. The workflow is **deprecated** (refs #1800): it is in the first stage of
-a "deprecate → observe → delete" plan, and its name carries a `[DEPRECATED]`
-prefix. The file will be deleted after the observation period unless a
-maintainer registers the secret and re-adopts the workflow.
-
-### Setup (one-time, only to enable the workflow route)
-
-1. Create a fine-grained PAT with **Contents: Read and write** on this repo.
-   (Or use a GitHub App installation token if you prefer.)
-2. Add it as repo secret `RELEASE_KICK_PAT` under **Settings → Secrets and variables → Actions**.
-3. The workflow auto-detects the secret. Without it, the workflow exits 1 with a clear error
-   pointing back to this runbook.
-
-Adding the secret is a human-only operation that an agent session cannot
-perform. Treat the local script as the standing procedure until a maintainer
-completes this setup.
-
-### Running it once the secret exists
-
-1. Confirm the `RELEASE_KICK_PAT` secret is configured (above).
-2. Go to **Actions → [DEPRECATED] Release Please Kick → Run workflow**.
-3. Leave `branch` blank—the workflow auto-detects the open release-please PR.
-4. The workflow also verifies a non-Vercel check started within 90s; if not, it fails loudly
-   so the silent #906 failure mode cannot recur.
+The `workflow_dispatch` kick workflow (`release-please-kick.yml`) was deleted
+(refs #1807). It worked only where the `RELEASE_KICK_PAT` secret was registered,
+and the secret is not registered on this repository, so every run failed.
+`scripts/release-please-kick.sh` run from your own account is the only kick
+route.
 
 ## After the merge: verify the `v1` alias, not just the tag
 
@@ -325,8 +289,7 @@ pattern is recorded in `AGENT_LEARNINGS.md` (2026-05-24 entry).
 
 `.claude/commands/release-kick.md` turns this runbook into an end-to-end
 procedure for the release PR (unblock, merge, verify the release). This runbook
-stays the procedure SSoT for the BEHIND decision, which kick route to use, and
-`RELEASE_KICK_PAT` setup; `CLAUDE.md` stays the SSoT for the underlying cause.
+stays the procedure SSoT for the BEHIND decision, and which kick route to use; `CLAUDE.md` stays the SSoT for the underlying cause.
 Fix the command when the two disagree.
 
 `scripts/wait-pr-ready.sh` waits for one or more PRs to settle and surfaces the
