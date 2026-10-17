@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.131.0](https://github.com/s977043/river-review/compare/v1.130.1...v1.131.0) (2026-10-17)
+
+
+### Features
+
+* **review:** caller-owned replan advice after three review rounds ([#2711](https://github.com/s977043/river-review/issues/2711)) ([b5c3103](https://github.com/s977043/river-review/commit/b5c3103b77a9ac9b733fef675b8e6b51cb50ab1c))
+
+
+### Bug Fixes
+
+* **security:** mask structured credential formats despite sample words ([#2713](https://github.com/s977043/river-review/issues/2713)) ([a4f8d2f](https://github.com/s977043/river-review/commit/a4f8d2f094fabedde4653d87637002e7147fbff4))
+
 ## [1.130.1](https://github.com/s977043/river-review/compare/v1.130.0...v1.130.1) (2026-10-17)
 
 
