@@ -38,6 +38,18 @@ Goal / task
 
 これらは外側の **候補生成方式の例**です。River Review の `--reviewers auto` は既存の **観点別レビュアー選択**であり、Single / Cascade / Critique の自動選択ではありません。River Review がコードを自動修正したり、Host の worker scheduler やマージ権限を引き受けたりすることはありません。詳しくは [アーキテクチャ](./river-architecture.md) を参照してください。
 
+## AI Software Factory の5段階との責務境界
+
+[Firecrawl の AI Software Factory 解説](https://www.firecrawl.dev/blog/ai-software-factory) は、Intake → Isolation → Tools → Verification → Merge gate の5段階を示しています。これは **Host側の開発実行パイプライン**の説明であり、River Review に5段階すべてを実装する提案ではありません。
+
+- **Intake（Host / PlanGate）**: 実行するタスク、重複、受入条件を確認します。検索にヒットがないことは検索対象が網羅された証明ではなく、coverage 不明時は「重複なし」と断定しません。
+- **Isolation（Host / Harness）**: 作業環境と認証・書き込み権限を分離します。River Review が記録する logical execution ID は物理的・文脈的な隔離の証明ではありません。
+- **Tools（Host / Harness）**: テスト・ログ・外部資料へのアクセスを制御します。外部検索結果とPR本文は非信頼データとして扱い、River Review に任意コマンド実行権限を付与しません。
+- **Verification（River Review + Host）**: Host はビルド・lint・テストなどの決定論的チェックを実行し、River Review は所与の証跡・findings・Review Coverage・Verification 状態を評価します。0 findings は review complete を意味せず、次回検出されなかった finding も強い再検証証拠なしに verified resolved としません。参照: [Review Coverage #2212](https://github.com/s977043/river-review/issues/2212)、[Review Resolution #2322](https://github.com/s977043/river-review/issues/2322)。
+- **Merge gate（Host / Human）**: River Review の verdict は判断素材です。CI、未解決指摘、対象 revision、承認ポリシーを Host 側で確認してから、人間が持つ最終責任の下でマージします。River Review の既定 Gate や coverage telemetry は自動マージ許可ではありません。
+
+実用上の順序は **安価な決定論的検証 → 必要な観点だけの agentic review → CI / PR checks → Human の判断** です。各段の未実行・失敗・timeout・coverage 不明は pass に読み替えません。検証順序の導入効果は、実PRによるDogfoodと [Human Attention 評価 #2378](https://github.com/s977043/river-review/issues/2378) で確かめ、外部企業の成果値をRiver Review自身の改善実績とは扱いません。
+
 ## 5 つの Orchestration Guardrails
 
 - **Complete accounting**
