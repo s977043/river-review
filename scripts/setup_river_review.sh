@@ -132,13 +132,11 @@ severity: major
 
 ## Contributing
 
-See `.github/CONTRIBUTING.md` for guidance. Issues and PRs are welcome as we expand River Review.
+See the upstream contribution guide at https://github.com/s977043/river-review for guidance. Issues and PRs are welcome as we expand River Review.
 
 ## License
 
-- `LICENSE`: Apache-2.0 for repository scaffolding/config
-- `LICENSE-CODE`: MIT for code and scripts
-- `LICENSE-CONTENT`: CC BY 4.0 for docs and media' > "$ROOT/README.md"
+Refer to the upstream River Review repository for applicable license files. Code is described in `LICENSE-CODE` (MIT) and docs/media in `LICENSE-CONTENT` (CC BY 4.0). The root `LICENSE` text is MIT; the scaffolding scope is under review in issue #2721 (https://github.com/s977043/river-review/issues/2721).' > "$ROOT/README.md"
 }
 
 if [[ ! -f "$ROOT/README.md" ]]; then
