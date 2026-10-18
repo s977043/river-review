@@ -83,7 +83,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     main(process.argv.slice(2));
   } catch (error) {
     // Never print untrusted input or filesystem paths to logs.
-    process.stderr.write(`small-change-shadow-batch: ${error.code ?? error.name ?? 'invalid-input'}\n`);
+    process.stderr.write(
+      `small-change-shadow-batch: ${error.code ?? error.name ?? 'invalid-input'}\n`
+    );
     process.exitCode = 1;
   }
 }
