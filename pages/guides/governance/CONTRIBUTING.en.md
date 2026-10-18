@@ -1,6 +1,6 @@
 # Contribution Guide
 
-> **For the full contribution guide, see [`CONTRIBUTING.md`](https://github.com/s977043/river-review) in the repository.**
+> **The full contribution guide is `.github/CONTRIBUTING.md` in the [GitHub repository](https://github.com/s977043/river-review).**
 > This page is a summary for the documentation site.
 
 Thank you for your interest in River Review. We accept Pull Requests and Issues according to the following policies.

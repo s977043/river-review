@@ -53,7 +53,7 @@ npm run fix:dashes
 
 ## ダッシュの扱い
 
-[`.github/CONTRIBUTING.md`](https://github.com/s977043/river-review) §「ドキュメントスタイル（ダッシュ）」が SSoT です。要点を以下に再掲します。
+正式な貢献・執筆規則は GitHub リポジトリの `.github/CONTRIBUTING.md` §「ドキュメントスタイル（ダッシュ）」が SSoT です。要点を以下に再掲します。
 
 - 文章の区切りには em-dash（—）を使い、前後のスペースは入れない。
 - 数値範囲には en-dash（–）を使う（例: `0.0–1.0`）。
