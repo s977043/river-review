@@ -181,7 +181,7 @@ test('explicit repo-owned policy is required; invalid policies are unknown', () 
     'unknown', 'missing-repo-policy');
   hasReason(mutate((input) => { input.policy.maxServicesInclusive = 99; }),
     'unknown', 'missing-repo-policy');
-  hasReason(mutate((input) => { input.policy.excludedPathPrefixes = ['/tmp']; }),
+  hasReason(mutate((input) => { input.policy.excludedPathPrefixes = ['/absolute-not-allowed']; }),
     'unknown', 'missing-repo-policy');
 });
 
