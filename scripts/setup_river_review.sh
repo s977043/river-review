@@ -132,7 +132,7 @@ severity: major
 
 ## Contributing
 
-See `CONTRIBUTING.md` for guidance. Issues and PRs are welcome as we expand River Review.
+See `.github/CONTRIBUTING.md` for guidance. Issues and PRs are welcome as we expand River Review.
 
 ## License
 

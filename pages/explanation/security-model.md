@@ -11,7 +11,7 @@ keywords:
   - River Review
 ---
 
-River Review 自身が「なぜ設計上安全か」をまとめます。脆弱性の報告手順は [SECURITY.md](https://github.com/s977043/river-review/blob/main/SECURITY.md) を参照してください。
+River Review 自身が「なぜ設計上安全か」をまとめます。脆弱性の報告手順は [SECURITY.md](https://github.com/s977043/river-review/blob/main/.github/SECURITY.md) を参照してください。
 
 ## スキルは実行コードではない
 
@@ -60,6 +60,6 @@ rules は改竄検知性のない入力です。出所の固定（base への pi
 
 ## 関連ドキュメント
 
-- [SECURITY.md（脆弱性の報告）](https://github.com/s977043/river-review/blob/main/SECURITY.md)
+- [SECURITY.md（脆弱性の報告）](https://github.com/s977043/river-review/blob/main/.github/SECURITY.md)
 - [Human Judgment Focus](./human-judgment-focus.md)
 - [River Review とは](./what-is-river-review.md)
