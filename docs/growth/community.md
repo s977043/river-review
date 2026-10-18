@@ -6,7 +6,7 @@ River Review に関心を持った人が、Star のあとに質問・相談・�
 
 ## Star のあとの次の一歩
 
-1. **試す**: [はじめる](../../README.md#はじめる)（プラグイン / GitHub Actions、API キー不要のデモあり）。
+1. **試す**: [はじめる](../../pages/guides/quickstart.md)（プラグイン / GitHub Actions、API キー不要のデモあり）。
 2. **読む**: [plan-conformance デモ](../../examples/plan-conformance-demo/README.md)で中核価値を 5 分で把握する。
 3. **相談する**: 導入の質問は Discussions の Q&A へ。
 4. **貢献する**: `good first issue` から小さく始める（下記）。

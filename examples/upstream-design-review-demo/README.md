@@ -40,5 +40,5 @@ upstream-design-review-demo/
 
 ## 次に試すこと
 
-- 自分のリポジトリの設計プラン（ADR / RFC）で upstream レビューを動かす → [はじめる](../../README.md#はじめる)
+- 自分のリポジトリの設計プラン（ADR / RFC）で upstream レビューを動かす → [はじめる](../../pages/guides/quickstart.md)
 - 上流レビューの観点を読む → [レビュー観点](../../docs/review/viewpoints.md)

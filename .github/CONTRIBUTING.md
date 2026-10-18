@@ -9,7 +9,7 @@
 
 ## OSSとしての価値観・運営方針
 
-River Review は[アジャイルの価値観に基づく実践進化方針](pages/guides/governance/practice-evolution.md)に従い、利用者との対話、検証可能な成果、変化への対応を重視します。現場の Evidence と外部知識を比較し、**Adopt / Adapt / Transform / Defer（採用・適応・前提の変革・見送り）**を判断します。
+River Review は[アジャイルの価値観に基づく実践進化方針](../pages/guides/governance/practice-evolution.md)に従い、利用者との対話、検証可能な成果、変化への対応を重視します。現場の Evidence と外部知識を比較し、**Adopt / Adapt / Transform / Defer（採用・適応・前提の変革・見送り）**を判断します。
 
 新しい Skill やチェックの提案だけでなく、不要な手順・レビュー待ち時間・誤検知を減らす提案も歓迎します。可能なら問題・証拠・最小の検証・見直し条件を示してください。ただし新たな必須テンプレートではありません。セキュリティ、承認、CI、メンテナの最終判断に関する既存のルールは引き続き有効です。
 
@@ -35,7 +35,7 @@ Issue テンプレートは `Issues → New issue` から利用できます（�
 
 ### 💬 Discussions とコミュニティ導線
 
-質問・相談・アイデア出し・利用例の共有は Discussions を使ってください。まだ「やること」が固まっていない対話は Discussion から始め、対応方針が固まった段階で Issue 化します。Star のあとの次の一歩・Discussions カテゴリ・`good first issue` 候補は [docs/growth/community.md](docs/growth/community.md) に整理しています。
+質問・相談・アイデア出し・利用例の共有は Discussions を使ってください。まだ「やること」が固まっていない対話は Discussion から始め、対応方針が固まった段階で Issue 化します。Star のあとの次の一歩・Discussions カテゴリ・`good first issue` 候補は [docs/growth/community.md](../docs/growth/community.md) に整理しています。
 
 もしバグを発見した場合は、Issueを作成して報告してください。良いバグ報告には以下の情報が含まれます。
 
@@ -68,7 +68,7 @@ Issue テンプレートは `Issues → New issue` から利用できます（�
 
 ### コミットメッセージ規約
 
-本リポジトリでは [Conventional Commits](https://www.conventionalcommits.org/) を採用しており、`commitlint` で自動検証します（設定: [`commitlint.config.js`](./commitlint.config.js)）。リリース自動化（release-please）がコミット種別を参照してchangelogを生成するため、規約に従うことが重要です。
+本リポジトリでは [Conventional Commits](https://www.conventionalcommits.org/) を採用しており、`commitlint` で自動検証します（設定: [`commitlint.config.js`](../commitlint.config.js)）。リリース自動化（release-please）がコミット種別を参照してchangelogを生成するため、規約に従うことが重要です。
 
 代表的なコミット種別の例を示す。
 
@@ -95,7 +95,7 @@ chore: eslint を v9 にアップグレード
 
 ### ✅ ローカルでのチェック（推奨）
 
-初回は[開発ランブック](docs/runbook/dev.md)に従って、`.nvmrc` の Node.js と依存関係を用意してください。
+初回は[開発ランブック](../docs/runbook/dev.md)に従って、`.nvmrc` の Node.js と依存関係を用意してください。
 
 ```bash
 npm test

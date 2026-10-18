@@ -12,14 +12,10 @@ const ROOT_ALLOWLIST = new Set([
   'AGENT_LEARNINGS.md',
   'CHANGELOG.md',
   'CLAUDE.md',
-  'CODE_OF_CONDUCT.md',
-  'CONTRIBUTING.md',
-  'CONTRIBUTING.en.md',
   'GEMINI.md',
   'README.md',
   'README.en.md',
   'ROADMAP.md',
-  'SECURITY.md',
 ]);
 
 async function checkDocPlacement() {
@@ -30,6 +26,20 @@ async function checkDocPlacement() {
     .sort();
 
   let violations = 0;
+  const communityFiles = [
+    'CODE_OF_CONDUCT.md',
+    'CONTRIBUTING.md',
+    'CONTRIBUTING.en.md',
+    'SECURITY.md',
+  ];
+  for (const file of communityFiles) {
+    try {
+      await fs.access(path.join(repoRoot, '.github', file));
+    } catch {
+      console.error(`❌ .github/${file}: missing GitHub community document`);
+      violations++;
+    }
+  }
 
   for (const file of rootMdFiles) {
     if (ROOT_ALLOWLIST.has(file)) {

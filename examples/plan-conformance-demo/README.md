@@ -4,7 +4,7 @@
 
 River Review の中核価値は、レビュー判断を「diff だけ」ではなく **plan / diff / tests をまたいで**実行することにあります。このデモは、承認済みプランと実装差分が食い違うとき、River Review が何を指摘するのかを具体的な期待出力（`expected-findings.json`）で示します。
 
-> このデモは読み物として完結します。LLM の API キーや `npm install` は不要です。実際にレビューを動かしたい場合は [はじめる](../../README.md#はじめる) を参照してください。
+> このデモは読み物として完結します。LLM の API キーや `npm install` は不要です。実際にレビューを動かしたい場合は [はじめる](../../pages/guides/quickstart.md) を参照してください。
 
 ## シナリオ
 
@@ -48,5 +48,5 @@ plan-conformance-demo/
 
 ## 次に試すこと
 
-- 自分のリポジトリの実プランと差分で `river run` を動かす → [はじめる](../../README.md#はじめる)
+- 自分のリポジトリの実プランと差分で `river run` を動かす → [はじめる](../../pages/guides/quickstart.md)
 - plan conformance を担うスキルの考え方を読む → [レビュー観点](../../docs/review/viewpoints.md)
