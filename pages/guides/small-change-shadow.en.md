@@ -31,3 +31,18 @@ Review a small batch of _real_ PRs for recurring findings, reviewer mistakes, in
 Begin with synthetic positive/negative fixtures. Then collect 5–10 real historical PR observations in read-only mode and compare with the existing baseline. Record candidate/excluded/unknown share, p50/p95 review delay, missed Major/Critical issues and human correction burden (unobserved is **unknown**). Stop on any false-green; no authorization expansion without a separate Host/Human decision.
 
 Tracking: [#2722](https://github.com/s977043/river-review/issues/2722).
+
+## Offline historical-PR batch and missing-evidence handling
+
+The ten-PR metadata fixture (`tests/fixtures/small-change-merged-pr-metadata.json`) records only the historical merged PR heads, changed-line counts and file manifests observed via GitHub on 2026-10-18 (#2720, #2718, #2716, #2713, #2711, #2712, #2708, #2710, #2709, #2707). It does **not** include authenticated Review Coverage, applied risk-map, service experience or required-CI attestation.
+
+```bash
+node scripts/experiments/small-change-shadow-batch.mjs --input tests/fixtures/small-change-merged-pr-metadata.json
+node --test tests/small-change-shadow-batch.test.mjs
+```
+
+Expected offline results: **candidate 0 / excluded 2 / unknown 8**, with `candidateShare: null`. Two cases touched GitHub Actions workflow files, which are explicitly excluded; eight lack sufficient evidence. This is **not a 0% eligible rate**. Every result has `authorizesApproval: false`.
+
+Even with a numeric `candidateShare`, operator-editable JSON can be forged; it is an **input-based shadow statistic**, not a trusted production approval rate. Host verification of sources and HEAD SHA, independent review, scope sensitivity classification, Human confirmation, and paired baseline comparisons must precede any adoption claim. Follow up in [#2722](https://github.com/s977043/river-review/issues/2722).
+
+This metadata sample is neither confirmed historical feedback from [#2614](https://github.com/s977043/river-review/issues/2614) nor Promotion/Evolution effectiveness evidence from [#2615](https://github.com/s977043/river-review/issues/2615). PR merge state, comments and zero AI findings never prove a change was correct.

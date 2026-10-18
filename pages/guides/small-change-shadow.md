@@ -64,3 +64,20 @@ Imprint 記事の影響サービス数には「fewer than N」と N=1（frontend
 4. 承認・マージポリシー変更はこの Issue の対象外。別Issueで Human / Host が明示承認する。
 
 Tracking: [#2722](https://github.com/s977043/river-review/issues/2722)。
+
+## 既存PRのオフライン集計と証跡不足の扱い
+
+2026-10-18に、GitHubで過去にマージされたPR 10件のHEAD SHA、変更行数、変更ファイル一覧を確認しました。対象PRは #2720 / #2718 / #2716 / #2713 / #2711 / #2712 / #2708 / #2710 / #2709 / #2707 です。
+
+履歴サンプルは `tests/fixtures/small-change-merged-pr-metadata.json` に保存しています。認証済みReview Coverage、risk-map適用、サービス別の経験件数、必須CI証跡は含みません。
+
+```bash
+node scripts/experiments/small-change-shadow-batch.mjs --input tests/fixtures/small-change-merged-pr-metadata.json
+node --test tests/small-change-shadow-batch.test.mjs
+```
+
+バッチ集計の予定値は **candidate 0 / excluded 2 / unknown 8** であり、`candidateShare: null` です。2件はPR内のGitHub Actions設定変更という明示的な除外条件で分類され、8件は判定に必要な証跡が不足しています。**候補率0%ではありません**。すべての結果には `authorizesApproval: false` を付けます。
+
+任意のJSONで結果を偽装できるため、すべての証跡が揃った入力で `candidateShare` が数値になっても、それは **入力ベースのShadow集計値**であり、実運用の承認可能率ではありません。実運用での候補率や効果を主張する前に、Hostが取得元とHEAD SHAを検証し、レビューの独立性、感度分類、Human確認、ベースライン比較を別途完了する必要があります。[Issue #2722](https://github.com/s977043/river-review/issues/2722)で追跡します。
+
+この履歴サンプルは `#2614` のHistorical Team Knowledge Bootstrapの確認済み判断ではなく、`#2615` のPromotion/Evolution評価データでもありません。PRコメント、マージ済み状態、AIの0件指摘を正しさの証拠として昇格しません。

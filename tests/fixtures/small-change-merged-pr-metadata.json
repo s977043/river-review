@@ -1,0 +1,169 @@
+{
+  "kind": "small-change-shadow-batch/v1",
+  "repository": "s977043/river-review",
+  "sourceNote": "Historical merged PR head SHAs, additions+deletions and changed file paths observed via GitHub REST /pulls/{number} and /pulls/{number}/files on 2026-10-18. This is an incomplete observation sample, NOT a trusted review/CI/risk-map attestation. Missing fields are intentionally omitted.",
+  "cases": [
+    {
+      "pr": 2720,
+      "observation": {
+        "subject": {
+          "headSha": "0ef5a764e34ac4deb3c8c7d37edb5da4afa47a2a"
+        },
+        "change": {
+          "changedLines": 53,
+          "changedFiles": [
+            "runners/github-action/dist/index.mjs",
+            "runners/github-action/dist/index.mjs.map",
+            "src/lib/secret-redactor.mjs",
+            "tests/secret-redactor.test.mjs"
+          ]
+        }
+      }
+    },
+    {
+      "pr": 2718,
+      "observation": {
+        "subject": {
+          "headSha": "8ce2e27d7fac980e4bb9a501f0be712fe5887027"
+        },
+        "change": {
+          "changedLines": 39,
+          "changedFiles": [
+            "runners/github-action/dist/index.mjs",
+            "runners/github-action/dist/index.mjs.map",
+            "src/lib/secret-redactor.mjs",
+            "tests/secret-redactor.test.mjs"
+          ]
+        }
+      }
+    },
+    {
+      "pr": 2716,
+      "observation": {
+        "subject": {
+          "headSha": "fde88c0cc39f676742f0f4baefce8d037efd2973"
+        },
+        "change": {
+          "changedLines": 37,
+          "changedFiles": [
+            "runners/github-action/dist/index.mjs",
+            "runners/github-action/dist/index.mjs.map",
+            "src/lib/secret-redactor.mjs",
+            "tests/secret-redactor.test.mjs"
+          ]
+        }
+      }
+    },
+    {
+      "pr": 2713,
+      "observation": {
+        "subject": {
+          "headSha": "1b26986cc00676aa9530e5c658497d27389faa91"
+        },
+        "change": {
+          "changedLines": 50,
+          "changedFiles": [
+            "runners/github-action/dist/index.mjs",
+            "runners/github-action/dist/index.mjs.map",
+            "src/lib/secret-redactor.mjs",
+            "tests/secret-redactor.test.mjs"
+          ]
+        }
+      }
+    },
+    {
+      "pr": 2711,
+      "observation": {
+        "subject": {
+          "headSha": "fd6a2452ce402ffaa8d2b9fee2697a2b564e009e"
+        },
+        "change": {
+          "changedLines": 153,
+          "changedFiles": [
+            "docs/data/skill-manifest.json",
+            "examples/loop-reference-agent/reference-loop.mjs",
+            "pages/reference/loop-convergence-contract.md",
+            "skills/agent-skills/review-team/SKILL.md",
+            "tests/loop-reference-agent.test.mjs"
+          ]
+        }
+      }
+    },
+    {
+      "pr": 2712,
+      "observation": {
+        "subject": {
+          "headSha": "653d5442a6a82a6ffd3f58061a034d5f9414ca78"
+        },
+        "change": {
+          "changedLines": 24,
+          "changedFiles": [
+            "pages/explanation/execution-strategy.en.md",
+            "pages/explanation/execution-strategy.md"
+          ]
+        }
+      }
+    },
+    {
+      "pr": 2708,
+      "observation": {
+        "subject": {
+          "headSha": "8e99c30e9a04fab25281790bf69298af261e041c"
+        },
+        "change": {
+          "changedLines": 79,
+          "changedFiles": ["pages/use-cases/maintenance-evidence-review.md", "sidebars.js"]
+        }
+      }
+    },
+    {
+      "pr": 2710,
+      "observation": {
+        "subject": {
+          "headSha": "de09b9da15ff1da128b9af8cdc7bdeb4cd1b25e0"
+        },
+        "change": {
+          "changedLines": 54,
+          "changedFiles": [".github/workflows/README.md", ".github/workflows/skill-validation.yml"]
+        }
+      }
+    },
+    {
+      "pr": 2709,
+      "observation": {
+        "subject": {
+          "headSha": "a8228a39ad9726cca977b740789bd197fc90d778"
+        },
+        "change": {
+          "changedLines": 205,
+          "changedFiles": [
+            ".claude/commands/release-kick.md",
+            ".github/workflows/README.md",
+            ".github/workflows/auto-rebuild-action-dist.yml",
+            ".github/workflows/release-please-kick.yml",
+            "docs/development/dist-check-rebuild-guide.md",
+            "docs/development/guard-details.md",
+            "docs/development/guard-ledger.yaml",
+            "docs/runbook/bot-pushed-head-kick.md"
+          ]
+        }
+      }
+    },
+    {
+      "pr": 2707,
+      "observation": {
+        "subject": {
+          "headSha": "21d779997748b21df36dcac2031aca04174a47c5"
+        },
+        "change": {
+          "changedLines": 30,
+          "changedFiles": [
+            "package-lock.json",
+            "runners/node-api/README.md",
+            "runners/node-api/package.json"
+          ]
+        }
+      }
+    }
+  ]
+}
