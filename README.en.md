@@ -14,7 +14,7 @@ English edition. [日本語 README](./README.md) is the source of truth.
 River Review is an OSS framework for keeping review criteria as **versioned, repo-owned Skills** and applying them across plans, diffs, tests, and earlier review evidence. Use the same team criteria in local Claude Code / Codex reviews and in GitHub Actions. It does not replace human approval or auto-merge.
 
 - **Skills define judgment** — Own review criteria and evaluate them with fixtures and golden outputs.
-- **Gates execute judgment** — Review artifacts at the appropriate planning, implementation, and verification stages.
+- **Gates execute judgment** — Apply review criteria to plans, diffs, and verification evidence at the review gates that are currently available.
 - **Riverbed remembers judgment** — Store decisions and feedback to reduce repeated low-value findings.
 
 [Concept](https://river-review.the3396.com/explanation/concept-en/) / [Capabilities and execution](https://river-review.the3396.com/explanation/what-is-river-review-en/) / [Known limitations](https://river-review.the3396.com/reference/known-limitations.en/)

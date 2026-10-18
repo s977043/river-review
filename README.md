@@ -14,7 +14,7 @@ Review Judgment as Code for AI-assisted development.
 River Review は、レビュー基準を **versioned / repo-owned な Skill** として管理し、計画・差分・テスト・既存レビューの根拠を横断して実行する OSS です。Claude Code / Codex のローカルレビューと GitHub Actions に、同じチームの判断基準を持ち込めます。人間の承認や自動マージの代行はしません。
 
 - **Skills define judgment** — チームがレビュー観点を所有し、fixture / golden output で評価する。
-- **Gates execute judgment** — 計画・実装・検証に応じて適切なレビューを実行する。
+- **Gates execute judgment** — 計画・差分・検証証跡を対象に、現在利用可能なレビューゲートで判断基準を適用する。
 - **Riverbed remembers judgment** — 決定とフィードバックを記録し、不要な指摘の再発を抑える。
 
 [設計思想](https://river-review.the3396.com/explanation/concept/) / [機能と実行モデル](https://river-review.the3396.com/explanation/what-is-river-review/) / [既知の制限](https://river-review.the3396.com/reference/known-limitations/)
