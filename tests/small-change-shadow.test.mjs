@@ -138,6 +138,13 @@ test('repository path exclusions use path boundaries', () => {
     input.scope.classifiedChangedFiles = ['src/payments2/money.mjs'];
   });
   assert.equal(notExcluded.status, 'candidate');
+
+  const withDirectorySuffix = mutate((input) => {
+    input.policy.excludedPathPrefixes = ['src/payments/'];
+    input.change.changedFiles = ['src/payments/money.mjs'];
+    input.scope.classifiedChangedFiles = ['src/payments/money.mjs'];
+  });
+  hasReason(withDirectorySuffix, 'excluded', 'repo-policy-path-excluded');
 });
 
 test('policy and CI configuration changes are excluded even if self-classified as safe', () => {
