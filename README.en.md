@@ -17,7 +17,7 @@ River Review is an OSS framework for keeping review criteria as **versioned, rep
 - **Gates execute judgment** — Review artifacts at the appropriate planning, implementation, and verification stages.
 - **Riverbed remembers judgment** — Store decisions and feedback to reduce repeated low-value findings.
 
-[Concept](https://river-review.the3396.com/explanation/concept-en/) / [Capabilities and execution](https://river-review.the3396.com/explanation/what-is-river-review-en/) / [Known limitations](https://river-review.the3396.com/reference/known-limitations-en/)
+[Concept](https://river-review.the3396.com/explanation/concept-en/) / [Capabilities and execution](https://river-review.the3396.com/explanation/what-is-river-review-en/) / [Known limitations](https://river-review.the3396.com/reference/known-limitations.en/)
 
 ## Getting Started
 
@@ -80,7 +80,7 @@ Bug reports, improvements, and documentation contributions are welcome.
 
 - [Contribution guide](.github/CONTRIBUTING.en.md) / [Code of Conduct](.github/CODE_OF_CONDUCT.md)
 - [Private vulnerability reporting](.github/SECURITY.md) (do not disclose vulnerabilities in public issues)
-- [Practice evolution policy](https://river-review.the3396.com/guides/governance/practice-evolution.en/)
+- [Practice evolution policy](https://river-review.the3396.com/guides/governance/practice-evolution-en/)
 
 ## License
 

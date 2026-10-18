@@ -1,6 +1,6 @@
 # コントリビューションガイド
 
-> **正式な貢献ガイドはリポジトリの [`CONTRIBUTING.md`](https://github.com/s977043/river-review/blob/main/.github/CONTRIBUTING.md) を参照してください。**
+> **正式な貢献ガイドはリポジトリの `.github/CONTRIBUTING.md` にあります。[リポジトリ](`CONTRIBUTING.md`](https://github.com/s977043/river-review) を参照してください。**
 > このページはドキュメントサイト向けの要約版です。
 
 River Reviewへの参加ありがとうございます。このプロジェクトでは以下の方針に沿ってプルリクエストやIssueを受け付けています。

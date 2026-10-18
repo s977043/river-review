@@ -11,7 +11,7 @@ keywords:
   - River Review
 ---
 
-This page explains why River Review itself is safe by design. For how to report a vulnerability, see [SECURITY.md](https://github.com/s977043/river-review/blob/main/.github/SECURITY.md).
+This page explains why River Review itself is safe by design. For how to report a vulnerability, see [SECURITY.md](https://github.com/s977043/river-review/security/advisories/new).
 
 ## Skills are not executable code
 
@@ -60,6 +60,6 @@ Rules are an input with no tamper evidence; pinning their provenance (a base pin
 
 ## Related docs
 
-- [SECURITY.md (reporting a vulnerability)](https://github.com/s977043/river-review/blob/main/.github/SECURITY.md)
+- [SECURITY.md (reporting a vulnerability)](https://github.com/s977043/river-review/security/advisories/new)
 - [Human Judgment Focus](./human-judgment-focus.en.md)
 - [What is River Review](./what-is-river-review.en.md)
