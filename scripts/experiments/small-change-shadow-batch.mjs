@@ -5,7 +5,7 @@ import { assessSmallChangeShadow } from './small-change-shadow.mjs';
 
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_CASES = 30;
-const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const REPOSITORY = /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
