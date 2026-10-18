@@ -128,6 +128,35 @@ test('redactText catches Slack and Discord webhook URLs', () => {
   assert.equal(text.match(/<REDACTED:webhookUrl>/g)?.length, 2);
 });
 
+test('#2203 webhook URLs do not bypass masking because their path contains sample words', () => {
+  // Synthetic URLs. A credential-shaped path is not made safe by a word
+  // embedded in its opaque bytes; explicit opt-out is a separate contract.
+  const examples = [
+    'https://hooks.slack.com/T123/EXAMPLE/ABCDE123',
+    'https://discord.com/api/webhooks/123456/ABexampleXY0123456789',
+  ];
+  for (const url of examples) {
+    const masked = redactText(url, { highEntropy: false });
+    assert.equal(masked.text, '<REDACTED:webhookUrl>');
+    assert.deepEqual(masked.hits, [{ category: 'webhookUrl', count: 1 }]);
+
+    const optOut = redactText(url, {
+      highEntropy: false,
+      allowlist: ['example'],
+    });
+    assert.equal(optOut.text, url);
+    assert.deepEqual(optOut.hits, []);
+  }
+
+  // Invalid webhook syntax and ordinary descriptive URLs are not credentials.
+  for (const text of [
+    'https://discord.com/api/webhooks/not-an-id/EXAMPLE',
+    'https://hooks.slack.com/path/example',
+  ]) {
+    assert.deepEqual(redactText(text, { highEntropy: false }), { text, hits: [] });
+  }
+});
+
 test('redactText catches OAuth client_secret assignment', () => {
   const { text } = redactText('client_secret: "abc1234567890XYZ-secret-value"');
   assert.match(text, /<REDACTED:oauthSecret>/);

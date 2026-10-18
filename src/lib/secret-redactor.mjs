@@ -105,6 +105,9 @@ const STRUCTURED_CREDENTIAL_IDS = new Set([
   'openaiKey',
   'anthropicKey',
   'googleApiKey',
+  // The Slack/Discord host + webhook path is an explicit credential signal;
+  // documentation words inside an opaque URL path must not defeat it.
+  'webhookUrl',
   'bearerToken',
   'awsAccessKey',
   // A credential-bearing URL or 40-character secret assignment remains
