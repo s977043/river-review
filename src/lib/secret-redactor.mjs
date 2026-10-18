@@ -452,7 +452,14 @@ export function redactText(text, opts = {}) {
 
   for (const { id, regex, redact } of [...PATTERNS, ...ASSIGNMENT_PATTERNS]) {
     out = out.replace(regex, (m, ...groups) => {
-      const exemptFromBuiltInAllowlist = STRUCTURED_CREDENTIAL_IDS.has(id);
+      // A database URI with user:password@host has explicit credential
+      // syntax. Built-in sample words in the password or host must not
+      // suppress its mask. Bare host URLs retain documentation exemptions.
+      const credentialBearingDatabaseUrl =
+        id === 'databaseUrl' &&
+        /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#\s@]*:[^/?#\s@]+@[^/?#\s@]+/.test(m);
+      const exemptFromBuiltInAllowlist =
+        STRUCTURED_CREDENTIAL_IDS.has(id) || credentialBearingDatabaseUrl;
       if (exemptFromBuiltInAllowlist ? extraAllow?.test(m) : skipMatch(m)) return m;
       if (redact) {
         const replaced = redact(m, ...extractCaptureGroups(groups));

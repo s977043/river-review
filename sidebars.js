@@ -51,6 +51,7 @@ module.exports = {
             'guides/w-check',
             'guides/use-independent-review-synthesis',
             'guides/track-runs-and-regressions',
+            'guides/small-change-shadow',
             'guides/agent-workflow',
             'guides/ai-agent-playbook',
             'guides/figma-to-code',
