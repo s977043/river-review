@@ -68,9 +68,7 @@ test('ten actual merged PR metadata observations never invent eligibility eviden
 });
 
 test('a complete synthetic self-report remains an unverified shadow candidate', () => {
-  const result = assessSmallChangeBatch(
-    batch([{ pr: 1, observation: completeObservation() }])
-  );
+  const result = assessSmallChangeBatch(batch([{ pr: 1, observation: completeObservation() }]));
   assert.deepEqual(result.counts, { candidate: 1, excluded: 0, unknown: 0 });
   assert.equal(result.candidateShare, 1);
   assert.equal(result.authorizesApproval, false);
@@ -108,7 +106,13 @@ test('unknown cases may not be dropped from the reported denominator', () => {
 
 test('repeated or invalid PR identities reject the batch', () => {
   assert.throws(
-    () => assessSmallChangeBatch(batch([{ pr: 1, observation: {} }, { pr: 1, observation: {} }])),
+    () =>
+      assessSmallChangeBatch(
+        batch([
+          { pr: 1, observation: {} },
+          { pr: 1, observation: {} },
+        ])
+      ),
     /invalid-or-duplicate-case/
   );
   assert.throws(() => assessSmallChangeBatch(batch([{ pr: 0, observation: {} }])), /invalid/);
@@ -125,7 +129,8 @@ test('empty, oversized and malformed batches reject rather than report false zer
     /invalid-batch-contract/
   );
   assert.throws(
-    () => assessSmallChangeBatch({ ...batch([{ pr: 1, observation: {} }]), repository: '../unsafe' }),
+    () =>
+      assessSmallChangeBatch({ ...batch([{ pr: 1, observation: {} }]), repository: '../unsafe' }),
     /invalid-batch-contract/
   );
   assert.throws(
