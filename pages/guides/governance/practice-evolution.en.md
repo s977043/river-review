@@ -26,7 +26,7 @@ We respect the four values of the [Manifesto for Agile Software Development](htt
 - **Practices / Tools:** Skills, agents, evaluations, review routines, and checklists can be adapted, consolidated, or retired based on their results.
 - **Evidence / History:** Distinguish measured outcomes, review runs, code, tests, user observations, and recorded decision reasons.
 
-Being open to future improvement does **not** grant permission to bypass today's controls. Consult the [contribution rules](https://github.com/s977043/river-review/blob/main/CONTRIBUTING.en.md), [review policy](../../reference/review-policy.en.md), [design philosophy](../../explanation/design-philosophy.en.md), and [human judgment principles](../../explanation/human-judgment-focus.en.md).
+Being open to future improvement does **not** grant permission to bypass today's controls. Consult the [contribution rules](https://github.com/s977043/river-review/blob/main/.github/CONTRIBUTING.en.md), [review policy](../../reference/review-policy.en.md), [design philosophy](../../explanation/design-philosophy.en.md), and [human judgment principles](../../explanation/human-judgment-focus.en.md).
 
 ## Compare local evidence with external knowledge
 
