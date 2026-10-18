@@ -37,18 +37,27 @@ function isPathArray(value) {
   );
 }
 
-function samePaths(left, right) {
+function isSafePrefix(value) {
   return (
-    isPathArray(left) &&
-    isPathArray(right) &&
-    left.length === right.length &&
-    left.every((path) => right.includes(path))
+    typeof value === 'string' &&
+    isSafePath(value.endsWith('/') ? value.slice(0, -1) : value)
   );
 }
 
+function samePaths(left, right) {
+  if (!isPathArray(left) || !isPathArray(right) || left.length !== right.length) {
+    return false;
+  }
+  const expected = new Set(right);
+  return left.every((path) => expected.has(path));
+}
+
 function matchesPrefix(path, prefix) {
-  return path === prefix || (prefix.endsWith('/') && path.startsWith(prefix)) ||
-    path.startsWith(`${prefix}/`);
+  return (
+    path === prefix ||
+    (prefix.endsWith('/') && path.startsWith(prefix)) ||
+    path.startsWith(`${prefix}/`)
+  );
 }
 
 /**
@@ -150,7 +159,7 @@ export function assessSmallChangeShadow(input) {
     policy.maxServicesInclusive < 1 ||
     policy.maxServicesInclusive > 3 ||
     !Array.isArray(policy.excludedPathPrefixes) ||
-    !policy.excludedPathPrefixes.every(isSafePath)
+    !policy.excludedPathPrefixes.every(isSafePrefix)
   ) {
     unknown.add('missing-repo-policy');
   } else if (
