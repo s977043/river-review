@@ -119,6 +119,36 @@ test('redactText catches database connection strings', () => {
   assert.equal(hits.find((h) => h.category === 'databaseUrl')?.count, 3);
 });
 
+test('#2203 credential-bearing database URLs ignore only the built-in sample-word allowlist', () => {
+  // Synthetic credentials, with the example/dummy word in either the
+  // password or host. A database URL with no user:password@ signal keeps
+  // the historical documentation allowlist policy.
+  const credentials = [
+    'postgres://reader:examplePass99@db.corp.local:5432/app',
+    'mongodb+srv://reader:validPassword7@cluster.example.com/app',
+    'redis://:dummyPass99@cache.example.net:6379/0',
+  ];
+  for (const uri of credentials) {
+    const masked = redactText(uri, { highEntropy: false });
+    assert.equal(masked.text, '<REDACTED:databaseUrl>', uri);
+    assert.deepEqual(masked.hits, [{ category: 'databaseUrl', count: 1 }], uri);
+
+    const explicitlyAllowed = redactText(uri, {
+      highEntropy: false,
+      allowlist: ['example', 'dummy'],
+    });
+    assert.deepEqual(explicitlyAllowed, { text: uri, hits: [] }, uri);
+  }
+
+  for (const text of [
+    'postgres://docs.example.com:5432/reference',
+    'redis://sample.example.net:6379/0',
+    'https://docs.example.com/postgres',
+  ]) {
+    assert.deepEqual(redactText(text, { highEntropy: false }), { text, hits: [] });
+  }
+});
+
 test('redactText catches Slack and Discord webhook URLs', () => {
   const sample = [
     'https://hooks.slack.com/AAA1B2C3D4/EEE5F6G7H8/secrettokenpayload',
