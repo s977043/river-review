@@ -34,7 +34,7 @@ Tracking: [#2722](https://github.com/s977043/river-review/issues/2722).
 
 ## Offline historical-PR batch and missing-evidence handling
 
-The [ten-PR metadata fixture](https://github.com/s977043/river-review/blob/main/tests/fixtures/small-change-merged-pr-metadata.json) records only the historical merged PR heads, changed-line counts and file manifests observed via GitHub on 2026-10-18 (#2720, #2718, #2716, #2713, #2711, #2712, #2708, #2710, #2709, #2707). It does **not** include authenticated Review Coverage, applied risk-map, service experience or required-CI attestation.
+The ten-PR metadata fixture (`tests/fixtures/small-change-merged-pr-metadata.json`) records only the historical merged PR heads, changed-line counts and file manifests observed via GitHub on 2026-10-18 (#2720, #2718, #2716, #2713, #2711, #2712, #2708, #2710, #2709, #2707). It does **not** include authenticated Review Coverage, applied risk-map, service experience or required-CI attestation.
 
 ```bash
 node scripts/experiments/small-change-shadow-batch.mjs --input tests/fixtures/small-change-merged-pr-metadata.json
