@@ -162,6 +162,37 @@ test('redactText catches OAuth client_secret assignment', () => {
   assert.match(text, /<REDACTED:oauthSecret>/);
 });
 
+test('#2203 masks quoted OAuth secret assignments with sample words inside values', () => {
+  const samples = [
+    'client_secret: "abc123exampleVALUE98765"',
+    "consumer_secret = 'abc123dummyVALUE98765'",
+  ];
+  for (const sample of samples) {
+    const masked = redactText(sample, { highEntropy: false });
+    assert.equal(masked.text, '<REDACTED:oauthSecret>', sample);
+    assert.deepEqual(masked.hits, [{ category: 'oauthSecret', count: 1 }]);
+
+    // Explicit user allowlists are a separate, documented opt-out.
+    const optedOut = redactText(sample, {
+      highEntropy: false,
+      allowlist: ['example', 'dummy'],
+    });
+    assert.deepEqual(optedOut, { text: sample, hits: [] });
+  }
+
+  // The matcher still requires quoted values and its existing length floor.
+  for (const sample of [
+    'client_secret: "example"',
+    'consumer_secret: plainexamplepassword',
+    'secret: "abc123exampleVALUE98765"',
+  ]) {
+    assert.deepEqual(redactText(sample, { highEntropy: false }), {
+      text: sample,
+      hits: [],
+    });
+  }
+});
+
 test('redactText catches dotenv-style secret assignments by variable name', () => {
   const sample = [
     'API_KEY=abcdef0123456789',
