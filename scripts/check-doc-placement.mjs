@@ -26,7 +26,12 @@ async function checkDocPlacement() {
     .sort();
 
   let violations = 0;
-  const communityFiles = ['CODE_OF_CONDUCT.md', 'CONTRIBUTING.md', 'CONTRIBUTING.en.md', 'SECURITY.md'];
+  const communityFiles = [
+    'CODE_OF_CONDUCT.md',
+    'CONTRIBUTING.md',
+    'CONTRIBUTING.en.md',
+    'SECURITY.md',
+  ];
   for (const file of communityFiles) {
     try {
       await fs.access(path.join(repoRoot, '.github', file));

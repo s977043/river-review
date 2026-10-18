@@ -188,4 +188,4 @@ PR タイトル: `Add River Review to the Static Analysis section`
 
 - 各リストの掲載ルールは申請時点の CONTRIBUTING / PR テンプレートで再確認する。
 - 説明文は非宣伝的トーンを保ち、OpenSSF / CI / CodeQL などの trust signal は事実ベースで触れる。
-- npm 公開を前提にした説明にはしない（[プロジェクト方針](../../README.md#はじめる)）。
+- npm 公開を前提にした説明にはしない（[プロジェクト方針](../../pages/guides/quickstart.md)）。
