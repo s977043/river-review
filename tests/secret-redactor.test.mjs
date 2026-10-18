@@ -135,7 +135,9 @@ test('#2203 credential-bearing database URLs ignore only the built-in sample-wor
 
     const explicitlyAllowed = redactText(uri, {
       highEntropy: false,
-      allowlist: ['example', 'dummy'],
+      // Use values within the userinfo span: urlUserInfo can also run if
+      // the database matcher is explicitly opted out of.
+      allowlist: ['examplePass99', 'validPassword7', 'dummyPass99'],
     });
     assert.deepEqual(explicitlyAllowed, { text: uri, hits: [] }, uri);
   }
