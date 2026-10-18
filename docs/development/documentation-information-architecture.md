@@ -1,4 +1,4 @@
-# Documentation information architecture — 2026-10-18
+# Documentation information architecture—2026-10-18
 
 ## 目的
 

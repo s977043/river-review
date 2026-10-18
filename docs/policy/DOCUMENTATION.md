@@ -4,28 +4,26 @@ River Review の公式公開ドキュメントと、OSS リポジトリ内の開
 
 ## 公開範囲と単一ソース
 
-- **公式サイトのドキュメントの正（Single Source of Truth）は `pages/`** です。Docusaurus は `pages/` を読み込みます。
-- **`docs/` は公式サイトに掲載しない開発・保守資料**です。ただし River Review は公開 GitHub リポジトリなので、`docs/` も第三者から閲覧可能です。「非公開」や「機密」の意味ではありません。
-- 秘密情報、認証情報、未公開の個人情報を `docs/` を含むリポジトリにコミットしてはいけません。
-- 公式サイトに掲載する情報は `pages/` に書き、内部検討の履歴や根拠は `docs/` に書きます。同内容の全文複製は避けます。
-- 公開ページから `docs/` の不安定な実装メモへ読者を誘導しないでください。公開が必要な内容は `pages/` に説明を用意します。
+- **公式サイトのドキュメントの正（Single Source of Truth）は `pages/`** とする。Docusaurus は `pages/` を読み込む。
+- **`docs/` は公式サイトに掲載しない開発・保守資料**とする。ただし River Review は公開 GitHub リポジトリであり、`docs/` も第三者から閲覧可能である。「非公開」や「機密」の意味ではない。
+- 秘密情報、認証情報、未公開の個人情報を `docs/` を含むリポジトリにコミットしない。
+- 公式サイトに掲載する情報は `pages/` に書き、内部検討の履歴や根拠は `docs/` に記録する。同内容の全文複製は避ける。
+- 公開ページから `docs/` の不安定な実装メモへ読者を誘導しない。公開が必要な内容は `pages/` に説明を用意する。
 
 ## ファイルの配置
 
-| 場所 | 用途 |
-| --- | --- |
-| `README.md` / `README.en.md` | GitHub 上の短いプロジェクト紹介、最初の利用方法、公式ドキュメントへの導線 |
-| `pages/tutorials/` | 初めての利用者向けの順を追ったチュートリアル |
-| `pages/guides/` | 実現したい目的別の手順 |
-| `pages/reference/` | 実装済み CLI・Schema・Output contract 等の仕様 |
-| `pages/explanation/` | コンセプト、背景、設計上の理由 |
-| `docs/adr/` | Architecture Decision Records |
-| `docs/development/` | 開発メモ・検証記録・振り返り |
-| `docs/review/` | レビュー基準と運用設計 |
-| `docs/runbook/` | リリースや障害対応などの運用手順 |
-| `docs/migration/` | 移行の設計と検証記録 |
-| `docs/governance/` / `docs/policy/` | リポジトリの管理・運用方針 |
-| `.github/` | GitHub が認識する OSS 管理文書、テンプレート、ワークフロー |
+- `README.md` / `README.en.md`：短いプロジェクト紹介、初回導入、公式ドキュメントへの導線
+- `pages/tutorials/`：順を追った初回利用チュートリアル
+- `pages/guides/`：目的別の実行手順
+- `pages/reference/`：CLI、Schema、Output contract 等の実装済み仕様
+- `pages/explanation/`：コンセプト、背景、設計理由
+- `docs/adr/`：Architecture Decision Records
+- `docs/development/`：開発メモ、検証記録、振り返り
+- `docs/review/`：レビュー基準、運用設計
+- `docs/runbook/`：リリースや障害対応の手順
+- `docs/migration/`：移行の設計、検証記録
+- `docs/governance/` / `docs/policy/`：リポジトリの管理・運用方針
+- `.github/`：GitHub が認識する OSS 管理文書、テンプレート、ワークフロー
 
 `docs/ai/`・`docs/data/`・`docs/eval/`・`docs/growth/`・`docs/specs/`・`docs/use-cases/` 等の既存の分類は、用途に合致する限り維持します。単純なディレクトリ数の削減のための移動は行いません。
 

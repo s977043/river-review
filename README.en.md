@@ -54,15 +54,13 @@ Before authoring custom Skills, try the [Starter Cookbook](https://river-review.
 
 ## Documentation
 
-| Goal | Reference |
-| --- | --- |
-| First run | [Quickstart](https://river-review.the3396.com/guides/quickstart.en/) |
-| Team workflow | [Two-stage review gate](https://river-review.the3396.com/guides/two-stage-review-gate.en/) |
-| GitHub Actions | [GitHub Actions guide](https://river-review.the3396.com/guides/github-actions.en/) |
-| Skills and schemas | [Skill Catalog](https://river-review.the3396.com/reference/skills-catalog.en/) / [Schema](https://river-review.the3396.com/reference/skill-schema.en/) |
-| CLI contract | [CLI reference](https://river-review.the3396.com/reference/runner-cli-reference.en/) |
-| Troubleshooting | [Troubleshooting](https://river-review.the3396.com/guides/troubleshooting.en/) |
-| Roadmap | [ROADMAP.md](./ROADMAP.md) / [Issues](https://github.com/s977043/river-review/issues) |
+- **First run**: [Quickstart](https://river-review.the3396.com/guides/quickstart.en/)
+- **Team workflow**: [Two-stage review gate](https://river-review.the3396.com/guides/two-stage-review-gate.en/)
+- **GitHub Actions**: [GitHub Actions guide](https://river-review.the3396.com/guides/github-actions.en/)
+- **Skills and schemas**: [Skill Catalog](https://river-review.the3396.com/reference/skills-catalog.en/) / [Schema](https://river-review.the3396.com/reference/skill-schema.en/)
+- **CLI contract**: [CLI reference](https://river-review.the3396.com/reference/runner-cli-reference.en/)
+- **Troubleshooting**: [Troubleshooting](https://river-review.the3396.com/guides/troubleshooting.en/)
+- **Roadmap**: [ROADMAP.md](./ROADMAP.md) / [Issues](https://github.com/s977043/river-review/issues)
 
 The source of truth for official website documentation is `pages/`. Maintainer notes in `docs/` are not included on the published website, but both directories are publicly readable on GitHub. [Documentation policy](docs/policy/DOCUMENTATION.md)
 

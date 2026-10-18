@@ -13,9 +13,9 @@ Review Judgment as Code for AI-assisted development.
 
 River Review は、レビュー基準を **versioned / repo-owned な Skill** として管理し、計画・差分・テスト・既存レビューの根拠を横断して実行する OSS です。Claude Code / Codex のローカルレビューと GitHub Actions に、同じチームの判断基準を持ち込めます。人間の承認や自動マージの代行はしません。
 
-- **Skills define judgment** — チームがレビュー観点を所有し、fixture / golden output で評価する。
-- **Gates execute judgment** — 計画・差分・検証証跡を対象に、現在利用可能なレビューゲートで判断基準を適用する。
-- **Riverbed remembers judgment** — 決定とフィードバックを記録し、不要な指摘の再発を抑える。
+- **Skills define judgment**—チームがレビュー観点を所有し、fixture / golden output で評価する。
+- **Gates execute judgment**—計画・差分・検証証跡を対象に、現在利用可能なレビューゲートで判断基準を適用する。
+- **Riverbed remembers judgment**—決定とフィードバックを記録し、不要な指摘の再発を抑える。
 
 [設計思想](https://river-review.the3396.com/explanation/concept/) / [機能と実行モデル](https://river-review.the3396.com/explanation/what-is-river-review/) / [既知の制限](https://river-review.the3396.com/reference/known-limitations/)
 
@@ -54,15 +54,13 @@ codex plugin marketplace add s977043/river-review
 
 ## ドキュメント
 
-| 目的 | 参照先 |
-| --- | --- |
-| 初回導入 | [Quickstart](https://river-review.the3396.com/guides/quickstart/) |
-| レビュー運用 | [2段構えレビューゲート](https://river-review.the3396.com/guides/two-stage-review-gate/) |
-| GitHub Actions | [GitHub Actionsガイド](https://river-review.the3396.com/guides/github-actions/) |
-| Skill一覧とスキーマ | [Skill Catalog](https://river-review.the3396.com/reference/skills-catalog/) / [Schema](https://river-review.the3396.com/reference/skill-schema/) |
-| CLIの仕様 | [CLIリファレンス](https://river-review.the3396.com/reference/runner-cli-reference/) |
-| トラブルシューティング | [Troubleshooting](https://river-review.the3396.com/guides/troubleshooting/) |
-| ロードマップ | [ROADMAP.md](./ROADMAP.md) / [Issues](https://github.com/s977043/river-review/issues) |
+- **初回導入**：[Quickstart](https://river-review.the3396.com/guides/quickstart/)
+- **レビュー運用**：[2段構えレビューゲート](https://river-review.the3396.com/guides/two-stage-review-gate/)
+- **GitHub Actions**：[GitHub Actionsガイド](https://river-review.the3396.com/guides/github-actions/)
+- **Skill一覧とスキーマ**：[Skill Catalog](https://river-review.the3396.com/reference/skills-catalog/) / [Schema](https://river-review.the3396.com/reference/skill-schema/)
+- **CLIの仕様**：[CLIリファレンス](https://river-review.the3396.com/reference/runner-cli-reference/)
+- **トラブルシューティング**：[Troubleshooting](https://river-review.the3396.com/guides/troubleshooting/)
+- **ロードマップ**：[ROADMAP.md](./ROADMAP.md) / [Issues](https://github.com/s977043/river-review/issues)
 
 公式ドキュメントの正本は `pages/` です。`docs/` は開発・保守資料であり、公式サイトには掲載しません。ただし両ディレクトリとも公開GitHubリポジトリ上で閲覧可能です。[ドキュメント管理方針](docs/policy/DOCUMENTATION.md)
 
