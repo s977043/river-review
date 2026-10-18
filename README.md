@@ -44,6 +44,8 @@ codex plugin marketplace add s977043/river-review
 
 ## 得られるもの
 
+得られるもの（プラグイン名で名前空間化されます）:
+
 - コマンド: `/river-review:setup-team` / `/river-review:review-local` / `/river-review:review-team` / `/river-review:challenge` が含まれる。加えて `/river-review:skill` / `/river-review:check` / `/river-review:pr` も使える。
 
 - スキル: オーケストレーターの `river-review` に加えて `river-review-code` / `river-review-security` / `river-review-security-audit` / `river-review-performance` の各スキルが含まれる。さらに `river-review-architecture` / `river-review-testing` / `river-review-frontend` も含まれる。加えて `river-review-docs` / `adversarial-review` / `review-team` / `unknown-coverage-review` も含まれる。いずれも `/river-review:<skill-name>` で呼び出せる

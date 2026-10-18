@@ -44,6 +44,8 @@ Latest release: [v1.131.0](https://github.com/s977043/river-review/releases/late
 
 ## What you get
 
+What you get (namespaced by plugin name):
+
 - Commands: `/river-review:setup-team`, `/river-review:review-local`, `/river-review:review-team`, `/river-review:challenge`, `/river-review:skill`, `/river-review:check`, `/river-review:pr`
 
 - Skills: the orchestrator `river-review` plus `river-review-code`, `river-review-security`, `river-review-security-audit`, `river-review-performance`, `river-review-architecture`, `river-review-testing`, `river-review-frontend`, `river-review-docs`, `adversarial-review`, `review-team`, and `unknown-coverage-review` — addressable as `/river-review:<skill-name>`
