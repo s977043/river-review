@@ -3,11 +3,7 @@ import { pathToFileURL } from 'node:url';
 
 const SHA = /^[a-f0-9]{40}$/i;
 const MAX_INPUT_BYTES = 1024 * 1024;
-const PROTECTED_PATHS = [
-  '.small_change',
-  '.river/risk-map.yaml',
-  '.github/workflows/',
-];
+const PROTECTED_PATHS = ['.small_change', '.river/risk-map.yaml', '.github/workflows/'];
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -38,10 +34,7 @@ function isPathArray(value) {
 }
 
 function isSafePrefix(value) {
-  return (
-    typeof value === 'string' &&
-    isSafePath(value.endsWith('/') ? value.slice(0, -1) : value)
-  );
+  return typeof value === 'string' && isSafePath(value.endsWith('/') ? value.slice(0, -1) : value);
 }
 
 function samePaths(left, right) {
@@ -199,8 +192,10 @@ export function assessSmallChangeShadow(input) {
         excluded.add('insufficient-service-experience');
       }
     }
-    if (Number.isSafeInteger(policy?.maxServicesInclusive) &&
-        scope.services.length > policy.maxServicesInclusive) {
+    if (
+      Number.isSafeInteger(policy?.maxServicesInclusive) &&
+      scope.services.length > policy.maxServicesInclusive
+    ) {
       excluded.add('too-many-services');
     }
   }
