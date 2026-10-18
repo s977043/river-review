@@ -50,4 +50,4 @@ Experimental な Review Coverage Contract は、review unit ごとの完了状�
 - **How-to**: GitHub Actions 連携やトレーシングなどの実践ガイド
 - **Reference**: スキーマや設定のリファレンス
 
-次に読むページは目的によって分かれます。コンセプトの全体像は [コンセプト](./concept.md)、機能・利用方法・実行モデルは [River Review とは](./what-is-river-review.md) を参照してください。レビュー対象の整理は [レビュー対象と使いどころ](./review-scope.md) にまとめています。人間監督を崖・丘・原っぱの 3 階層で配分する考え方は [Human Judgment Focus](./human-judgment-focus.md) が扱います。コンセプトの内部 SSoT は repo root の [`docs/vision.md`](https://github.com/s977043/river-review/blob/main/docs/vision.md) です。
+次に読むページは目的によって分かれます。コンセプトの全体像は [コンセプト](./concept.md)、機能・利用方法・実行モデルは [River Review とは](./what-is-river-review.md) を参照してください。レビュー対象の整理は [レビュー対象と使いどころ](./review-scope.md) にまとめています。人間監督を崖・丘・原っぱの 3 階層で配分する考え方は [Human Judgment Focus](./human-judgment-focus.md) が扱います。

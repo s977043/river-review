@@ -6,6 +6,7 @@ on:
       - 'pages/**/*.md'
       - 'docs/**/*.md'
       - '*.md'
+      - '.github/*.md'
       - 'scripts/check-bilingual-pairs.mjs'
       - 'scripts/check-doc-placement.mjs'
       - '.github/workflows/doc-quality.yml'
