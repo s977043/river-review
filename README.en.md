@@ -82,4 +82,4 @@ Bug reports, improvements, and documentation contributions are welcome.
 
 ## License
 
-Licensing depends on the type of asset: [LICENSE-CODE](LICENSE-CODE) covers code (MIT), [LICENSE-CONTENT](LICENSE-CONTENT) covers documentation/text/media (CC BY 4.0), and [LICENSE](LICENSE) covers scaffolding/configuration (Apache-2.0). Markdown documents under `.github/` remain content; workflows and configurations remain scaffolding.
+See [LICENSE-CODE](LICENSE-CODE) (MIT) for code and [LICENSE-CONTENT](LICENSE-CONTENT) (CC BY 4.0) for documentation and media. The root [LICENSE](LICENSE) text is MIT. The other license files currently refer to Apache-2.0 for scaffolding/configuration, which conflicts with that root text; the exact scope is being reviewed in [Issue #2721](https://github.com/s977043/river-review/issues/2721).

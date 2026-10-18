@@ -82,4 +82,4 @@ codex plugin marketplace add s977043/river-review
 
 ## ライセンス
 
-本リポジトリは用途別の複数ライセンスです。[LICENSE-CODE](LICENSE-CODE) はコード（MIT）、[LICENSE-CONTENT](LICENSE-CONTENT) はドキュメント・文章・画像（CC BY 4.0）、[LICENSE](LICENSE) はスキャフォールド・設定（Apache-2.0）に適用されます。`.github/` 内のMarkdownドキュメントは内容物のライセンス、ワークフロー等の設定はスキャフォールドのライセンスとして扱います。
+コードは [LICENSE-CODE](LICENSE-CODE)（MIT）、ドキュメントやメディアは [LICENSE-CONTENT](LICENSE-CONTENT)（CC BY 4.0）を参照してください。ルートの [LICENSE](LICENSE) 本文は MIT です。ただし設定ファイル等への適用範囲については、LICENSE-CODE / LICENSE-CONTENT の説明に Apache-2.0 への不一致があり、[Issue #2721](https://github.com/s977043/river-review/issues/2721) で確認中です。
