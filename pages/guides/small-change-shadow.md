@@ -15,15 +15,15 @@ River Review はこの実装をコピーしません。既存の [Review Mode Ro
 
 ## 責務境界
 
-| 情報 | 正本・責務 | Shadow の扱い |
-| --- | --- | --- |
-| 変更・head SHA | Host / GitHub | 取得された情報を入力として読むだけ |
-| review depth / risk-map | 既存 Router / risk-map | 昇格・human-required は除外。無検証のデフォルトを安全証明としない |
-| AI findings / Review Coverage | 既存レビュー・Coverage | 未完了・欠落は不明。指摘ゼロと完了は別 |
-| CI・branch protection | Host / GitHub | SHA付き観測を受け取る。APIで確認した事実とは扱わない |
-| サービス境界・履歴 | Host の履歴集計・repo-owned policy | 全サービスで過去10件以上の実績が必要 |
-| PR承認・マージ | Host / Human / governance | **一切行わない** |
-| チーム知見 | Resolution → 人間確認 → Promotion/Evolution | PR clusterからの仮説を確認済み Feedbackへ転換 |
+| 情報                          | 正本・責務                                  | Shadow の扱い                                                     |
+| ----------------------------- | ------------------------------------------- | ----------------------------------------------------------------- |
+| 変更・head SHA                | Host / GitHub                               | 取得された情報を入力として読むだけ                                |
+| review depth / risk-map       | 既存 Router / risk-map                      | 昇格・human-required は除外。無検証のデフォルトを安全証明としない |
+| AI findings / Review Coverage | 既存レビュー・Coverage                      | 未完了・欠落は不明。指摘ゼロと完了は別                            |
+| CI・branch protection         | Host / GitHub                               | SHA付き観測を受け取る。APIで確認した事実とは扱わない              |
+| サービス境界・履歴            | Host の履歴集計・repo-owned policy          | 全サービスで過去10件以上の実績が必要                              |
+| PR承認・マージ                | Host / Human / governance                   | **一切行わない**                                                  |
+| チーム知見                    | Resolution → 人間確認 → Promotion/Evolution | PR clusterからの仮説を確認済み Feedbackへ転換                     |
 
 ### 自動承認しない理由
 
