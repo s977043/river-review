@@ -67,7 +67,9 @@ Tracking: [#2722](https://github.com/s977043/river-review/issues/2722)。
 
 ## 既存PRのオフライン集計と証跡不足の扱い
 
-GitHubの過去マージ済みPR 10件（#2720 / #2718 / #2716 / #2713 / #2711 / #2712 / #2708 / #2710 / #2709 / #2707）について、2026-10-18にPRのHEAD SHA、変更行数、変更ファイル一覧のみを取得した履歴サンプル（`tests/fixtures/small-change-merged-pr-metadata.json`）を用意しています。認証済みReview Coverage、risk-map適用、サービス別の経験件数、必須CI証跡はこのサンプルに含みません。
+2026-10-18に、GitHubで過去にマージされたPR 10件のHEAD SHA、変更行数、変更ファイル一覧を確認しました。対象PRは #2720 / #2718 / #2716 / #2713 / #2711 / #2712 / #2708 / #2710 / #2709 / #2707 です。
+
+履歴サンプルは `tests/fixtures/small-change-merged-pr-metadata.json` に保存しています。認証済みReview Coverage、risk-map適用、サービス別の経験件数、必須CI証跡は含みません。
 
 ```bash
 node scripts/experiments/small-change-shadow-batch.mjs --input tests/fixtures/small-change-merged-pr-metadata.json
