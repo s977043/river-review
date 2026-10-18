@@ -36,7 +36,7 @@ node scripts/experiments/small-change-shadow.mjs --input /path/to/observations.j
 node --test tests/small-change-shadow.test.mjs
 ```
 
-入力は一つの PR の観測値です。原則として以下を含みます。
+入力は1つの PR の観測値です。原則として以下を含みます。
 
 - `subject.headSha`（40文字の Git SHA）
 - `change.changedLines` と `change.changedFiles`（変更行数・raw manifest）
