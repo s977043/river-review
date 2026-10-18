@@ -42,4 +42,4 @@ cp -r templates/references/ skills/agent-skills/my-new-skill/references/
 - **バリデーション**: `npm run agent-skills:validate`
 - **スキル監査**: `node scripts/skills-audit.mjs`
 
-詳細は [CONTRIBUTING.md](../../CONTRIBUTING.md) を参照してください。
+詳細は [CONTRIBUTING.md](../../.github/CONTRIBUTING.md) を参照してください。

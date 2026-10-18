@@ -26,7 +26,7 @@ River Review は、レビュー判断をチームが所有・検証・改善で�
 - **Practices / Tools:** Skill、Agent、評価手法、Issue運用、会議、チェックリストなどは、効果を確かめながら変更・統合・削減できる。
 - **Evidence / History:** コード、テスト結果、review run、PR、利用者の観察、意思決定の理由を区別し、検証できる形で扱う。
 
-「将来の変更を認める」と「現時点のルールを無視する」は異なります。特に[公開貢献ガイド](https://github.com/s977043/river-review/blob/main/CONTRIBUTING.md)と[レビュー方針](../../reference/review-policy.md)は引き続き適用されます。詳細な製品責務は[設計哲学](../../explanation/design-philosophy.md)と[人間の判断](../../explanation/human-judgment-focus.md)を参照してください。
+「将来の変更を認める」と「現時点のルールを無視する」は異なります。特に[公開貢献ガイド](./CONTRIBUTING.md)と[レビュー方針](../../reference/review-policy.md)は引き続き適用されます。詳細な製品責務は[設計哲学](../../explanation/design-philosophy.md)と[人間の判断](../../explanation/human-judgment-focus.md)を参照してください。
 
 ## 現場の Evidence と外部知識を照合する
 

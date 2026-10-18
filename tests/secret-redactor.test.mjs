@@ -119,6 +119,39 @@ test('redactText catches database connection strings', () => {
   assert.equal(hits.find((h) => h.category === 'databaseUrl')?.count, 3);
 });
 
+test('#2203 mask database userinfo despite sample words', () => {
+  // Synthetic credentials, with the example/dummy word in either the
+  // password or host. A database URL with no user:password@ signal keeps
+  // the historical documentation allowlist policy.
+  const credentials = [
+    'postgres://reader:examplePass99@db.corp.local:5432/app',
+    'mongodb+srv://reader:validPassword7@cluster.example.com/app',
+    'redis://:dummyPass99@cache.example.net:6379/0',
+  ];
+  for (const uri of credentials) {
+    const masked = redactText(uri, { highEntropy: false });
+    assert.equal(masked.text, '<REDACTED:databaseUrl>', uri);
+    assert.deepEqual(masked.hits, [{ category: 'databaseUrl', count: 1 }], uri);
+
+    const explicitlyAllowed = redactText(uri, {
+      highEntropy: false,
+      // Use values within the userinfo span: urlUserInfo can also run if
+      // the database matcher is explicitly opted out of.
+      allowlist: ['examplePass99', 'validPassword7', 'dummyPass99'],
+    });
+    assert.deepEqual(explicitlyAllowed, { text: uri, hits: [] }, uri);
+  }
+
+  for (const text of [
+    'postgres://docs.example.com:5432/reference',
+    'redis://sample.example.net:6379/0',
+    'postgres://docs.example.com:5432/path@owner',
+    'https://docs.example.com/postgres',
+  ]) {
+    assert.deepEqual(redactText(text, { highEntropy: false }), { text, hits: [] });
+  }
+});
+
 test('redactText catches Slack and Discord webhook URLs', () => {
   const sample = [
     'https://hooks.slack.com/AAA1B2C3D4/EEE5F6G7H8/secrettokenpayload',
@@ -128,9 +161,69 @@ test('redactText catches Slack and Discord webhook URLs', () => {
   assert.equal(text.match(/<REDACTED:webhookUrl>/g)?.length, 2);
 });
 
+test('#2203 webhook URLs do not bypass masking because their path contains sample words', () => {
+  // Synthetic URLs. A credential-shaped path is not made safe by a word
+  // embedded in its opaque bytes; explicit opt-out is a separate contract.
+  const examples = [
+    'https://hooks.slack.com/T123/EXAMPLE/ABCDE123',
+    'https://discord.com/api/webhooks/123456/ABexampleXY0123456789',
+  ];
+  for (const url of examples) {
+    const masked = redactText(url, { highEntropy: false });
+    assert.equal(masked.text, '<REDACTED:webhookUrl>');
+    assert.deepEqual(masked.hits, [{ category: 'webhookUrl', count: 1 }]);
+
+    const optOut = redactText(url, {
+      highEntropy: false,
+      allowlist: ['example'],
+    });
+    assert.equal(optOut.text, url);
+    assert.deepEqual(optOut.hits, []);
+  }
+
+  // Invalid webhook syntax and ordinary descriptive URLs are not credentials.
+  for (const text of [
+    'https://discord.com/api/webhooks/not-an-id/EXAMPLE',
+    'https://hooks.slack.com/path/example',
+  ]) {
+    assert.deepEqual(redactText(text, { highEntropy: false }), { text, hits: [] });
+  }
+});
+
 test('redactText catches OAuth client_secret assignment', () => {
   const { text } = redactText('client_secret: "abc1234567890XYZ-secret-value"');
   assert.match(text, /<REDACTED:oauthSecret>/);
+});
+
+test('#2203 masks quoted OAuth secret assignments with sample words inside values', () => {
+  const samples = [
+    'client_secret: "abc123exampleVALUE98765"',
+    "consumer_secret = 'abc123dummyVALUE98765'",
+  ];
+  for (const sample of samples) {
+    const masked = redactText(sample, { highEntropy: false });
+    assert.equal(masked.text, '<REDACTED:oauthSecret>', sample);
+    assert.deepEqual(masked.hits, [{ category: 'oauthSecret', count: 1 }]);
+
+    // Explicit user allowlists are a separate, documented opt-out.
+    const optedOut = redactText(sample, {
+      highEntropy: false,
+      allowlist: ['example', 'dummy'],
+    });
+    assert.deepEqual(optedOut, { text: sample, hits: [] });
+  }
+
+  // The matcher still requires quoted values and its existing length floor.
+  for (const sample of [
+    'client_secret: "example"',
+    'consumer_secret: plainexamplepassword',
+    'secret: "abc123exampleVALUE98765"',
+  ]) {
+    assert.deepEqual(redactText(sample, { highEntropy: false }), {
+      text: sample,
+      hits: [],
+    });
+  }
 });
 
 test('redactText catches dotenv-style secret assignments by variable name', () => {
