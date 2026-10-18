@@ -112,10 +112,7 @@
         },
         "change": {
           "changedLines": 79,
-          "changedFiles": [
-            "pages/use-cases/maintenance-evidence-review.md",
-            "sidebars.js"
-          ]
+          "changedFiles": ["pages/use-cases/maintenance-evidence-review.md", "sidebars.js"]
         }
       }
     },
@@ -127,10 +124,7 @@
         },
         "change": {
           "changedLines": 54,
-          "changedFiles": [
-            ".github/workflows/README.md",
-            ".github/workflows/skill-validation.yml"
-          ]
+          "changedFiles": [".github/workflows/README.md", ".github/workflows/skill-validation.yml"]
         }
       }
     },
