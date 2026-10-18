@@ -119,7 +119,7 @@ test('redactText catches database connection strings', () => {
   assert.equal(hits.find((h) => h.category === 'databaseUrl')?.count, 3);
 });
 
-test('#2203 credential-bearing database URLs ignore only the built-in sample-word allowlist', () => {
+test('#2203 mask database userinfo despite sample words', () => {
   // Synthetic credentials, with the example/dummy word in either the
   // password or host. A database URL with no user:password@ signal keeps
   // the historical documentation allowlist policy.
@@ -145,6 +145,7 @@ test('#2203 credential-bearing database URLs ignore only the built-in sample-wor
   for (const text of [
     'postgres://docs.example.com:5432/reference',
     'redis://sample.example.net:6379/0',
+    'postgres://docs.example.com:5432/path@owner',
     'https://docs.example.com/postgres',
   ]) {
     assert.deepEqual(redactText(text, { highEntropy: false }), { text, hits: [] });
