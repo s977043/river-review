@@ -254,8 +254,8 @@ is the measured case: two bot pushes, two kicks.
 
 ## The `Release Please Kick` workflow was removed
 
-The `workflow_dispatch` kick workflow (`release-please-kick.yml`) was deleted
-(refs #1807). It worked only where the `RELEASE_KICK_PAT` secret was registered,
+The `workflow_dispatch` kick workflow (`release-please-kick.yml`) was
+deleted in PR #2709 (background: #1807). It worked only where the `RELEASE_KICK_PAT` secret was registered,
 and the secret is not registered on this repository, so every run failed.
 `scripts/release-please-kick.sh` run from your own account is the only kick
 route.
