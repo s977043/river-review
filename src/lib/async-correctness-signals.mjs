@@ -19,8 +19,19 @@ function markerWidth(hunk) {
 }
 
 function stripLineComment(text) {
-  const index = text.indexOf('//');
-  return index === -1 ? text : text.slice(0, index);
+  let quote = null;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (quote) {
+      if (char === '\\') i += 1;
+      else if (char === quote) quote = null;
+    } else if (char === "'" || char === '"' || char === '`') {
+      quote = char;
+    } else if (char === '/' && text[i + 1] === '/') {
+      return text.slice(0, i);
+    }
+  }
+  return text;
 }
 
 /**
