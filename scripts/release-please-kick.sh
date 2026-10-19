@@ -7,12 +7,11 @@
 # empty commit with your own `gh` credentials, so the new head counts as a real
 # user push and re-fires `pull_request` workflows. It needs no repository secret.
 #
-# The .github/workflows/release-please-kick.yml route is DEPRECATED (refs #1800):
-# it requires the `RELEASE_KICK_PAT` Actions secret, which is not registered
-# here, so its own push cannot re-fire downstream CI and every run fails. Do not
-# reach for it as an equivalent alternative.
+# The .github/workflows/release-please-kick.yml route was removed in #2709
+# (background: #1800 / #1807). It required the `RELEASE_KICK_PAT` Actions
+# secret, which was never registered here, so every run failed.
 #
-# SSoT for when to kick, BEHIND vs pure BLOCKED, and RELEASE_KICK_PAT setup:
+# SSoT for when to kick and BEHIND vs pure BLOCKED:
 #   docs/runbook/bot-pushed-head-kick.md
 #
 # Usage:
