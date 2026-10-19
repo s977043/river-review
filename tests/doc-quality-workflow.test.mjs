@@ -19,11 +19,9 @@ function runChecker(t, fileNames, strict = true) {
   for (const name of fileNames) {
     writeFileSync(path.join(temporaryRoot, 'pages', name), '# Test document\n');
   }
-  return spawnSync(
-    process.execPath,
-    [path.join(temporaryRoot, 'scripts/check-bilingual-pairs.mjs'), ...(strict ? ['--strict'] : [])],
-    { cwd: temporaryRoot, encoding: 'utf8' }
-  );
+  const args = [path.join(temporaryRoot, 'scripts/check-bilingual-pairs.mjs')];
+  if (strict) args.push('--strict');
+  return spawnSync(process.execPath, args, { cwd: temporaryRoot, encoding: 'utf8' });
 }
 
 test('strict bilingual check accepts complete Japanese and English pair', (t) => {

@@ -54,4 +54,3 @@ npm run build
 - `.github/` にコミュニティ文書4件を配置済み。ドキュメントのルート再移動は不要。
 - 残る改善対象は `docs/README.md` の探索性と、日英ペア検査のCI失敗検知。
 - ライセンス本文の既存不整合は [Issue #2721](https://github.com/s977043/river-review/issues/2721) で別途判断する。
-
