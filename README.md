@@ -40,7 +40,11 @@ codex plugin marketplace add s977043/river-review
 
 詳しい導入方法、バージョン固定、GitHub Actions 設定は [5分クイックスタート](https://river-review.the3396.com/guides/quickstart/) を参照してください。npm パッケージの公開は配布方針に含まれず、リポジトリ内の開発用 CLI は `npm run river -- ...` で実行します。
 
-最新リリース: [v1.131.0](https://github.com/s977043/river-review/releases/latest)
+<!-- x-release-please-start-version -->
+
+最新リリース: [v1.132.0](https://github.com/s977043/river-review/releases/latest)
+
+<!-- x-release-please-end -->
 
 ## 得られるもの
 
