@@ -81,3 +81,20 @@ node --test tests/small-change-shadow-batch.test.mjs
 任意のJSONで結果を偽装できるため、すべての証跡が揃った入力で `candidateShare` が数値になっても、それは **入力ベースのShadow集計値**であり、実運用の承認可能率ではありません。実運用での候補率や効果を主張する前に、Hostが取得元とHEAD SHAを検証し、レビューの独立性、感度分類、Human確認、ベースライン比較を別途完了する必要があります。[Issue #2722](https://github.com/s977043/river-review/issues/2722)で追跡します。
 
 この履歴サンプルは `#2614` のHistorical Team Knowledge Bootstrapの確認済み判断ではなく、`#2615` のPromotion/Evolution評価データでもありません。PRコメント、マージ済み状態、AIの0件指摘を正しさの証拠として昇格しません。
+
+## GitHub APIからの限定観測（実験・読み取り専用）
+
+GitHub CLIで、オペレーターが番号を指定した**マージ済みPRだけ**のHEAD SHA、追加・削除行数、変更ファイル、および同一SHAのチェックランを取得できます。認証済みのGitHub CLI（`gh auth status`で確認）と、対象リポジトリへの読み取り権限が必要です。
+
+```bash
+node scripts/experiments/small-change-host-observe.mjs --repo s977043/river-review --prs 2720,2718,2716,2713,2711 > historical-observations.json
+node scripts/experiments/small-change-shadow-batch.mjs --input historical-observations.json
+```
+
+- **上限は1回10PR**。PR番号の暗黙検索・全履歴クロールは行いません。GitHub CLI（`gh api`）のみを使い、ファイル一覧とチェックランは最大3ページ・各100件まで取得します。取得が不完全なら全体を失敗として扱い、部分データを出力しません。
+- PR本文・レビューコメント本文・Diff・認証情報は出力しません。失敗時はGitHubのレスポンス本文をエラー出力しません。
+- チェックランの状態は`observedChecks`として**別枠の事実観測**を残します。現在の保護ブランチ設定や必須チェックの網羅性、レビュー完了、サービス分類、本人性、人間の承認は認証しません。収集JSONは自由に編集でき、出力もGitHubの署名付き証明ではありません。
+- 一括評価器は`observedChecks`を承認根拠へ変換しないため、原則として`unknown`が残ります。`excluded`になった場合も、それは条件に該当したという観測上の分類にすぎません。
+- **検証用JSONをgitへ自動保存しません。** 共有する場合は手動で機密情報・パス名を確認し、必要な識別子と参照だけを保持してください。
+
+完全なレビュー証跡・サービス別履歴・実PRへのHuman判断は、[Issue #2722](https://github.com/s977043/river-review/issues/2722)、[#2575](https://github.com/s977043/river-review/issues/2575)、[#2614](https://github.com/s977043/river-review/issues/2614)で別途検証します。CI成功や`merged`状態を、レビューの正しさ・承認の証拠として扱いません。
