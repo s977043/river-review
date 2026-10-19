@@ -83,3 +83,28 @@ test('a // inside a string literal does not hide the rest of the line', () => {
   const backtick = detect(diffFor('src/a.ts', [LOAD, 'if (`//${x}` && load()) {}']));
   assert.deepEqual(backtick, [{ kind: 'async-call-in-condition', file: 'src/a.ts', line: 2 }]);
 });
+
+test('escaped quotes and backslashes keep the string open until its real close', () => {
+  for (const line of [
+    "if (s === 'it\\'s // x' && load()) {}",
+    'if (s === "\\\\" && x === "//" && load()) {}',
+  ]) {
+    assert.deepEqual(detect(diffFor('src/a.ts', [LOAD, line])), [
+      { kind: 'async-call-in-condition', file: 'src/a.ts', line: 2 },
+    ]);
+  }
+});
+
+// Known limits: nested `${}` inside template literals and `/* */` block comments
+// spanning code are not modelled; a block comment is skipped only when it sits
+// in regex-literal position.
+test('unclosed quotes and regex literals do not swallow a real // comment', () => {
+  for (const line of [
+    "if (/'/.test(s)) {} // if (load()) x",
+    'while (re.test(/"/)) {} // while (load())',
+    "if (x) return <p>don't</p>; // if (load())",
+    "if (s === 'a') {} /* it's */ // if (load())",
+  ]) {
+    assert.deepEqual(detect(diffFor('src/a.ts', [LOAD, line])), [], line);
+  }
+});
