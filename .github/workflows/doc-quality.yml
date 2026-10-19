@@ -37,7 +37,7 @@ jobs:
         id: bilingual
         run: |
           set -o pipefail
-          npm run check:bilingual | tee bilingual.log
+          npm run check:bilingual -- --strict | tee bilingual.log
         continue-on-error: true
 
       - name: Check document placement
@@ -146,8 +146,10 @@ jobs:
               }
             }
 
-      - name: Fail if placement check failed
-        if: steps.placement.outcome == 'failure'
+      - name: Fail if document quality check failed
+        if: |
+          steps.bilingual.outcome == 'failure' ||
+          steps.placement.outcome == 'failure'
         run: |
-          echo "Document placement policy violation detected. See logs for details."
+          echo "Document bilingual or placement policy violation detected. See logs for details."
           exit 1
