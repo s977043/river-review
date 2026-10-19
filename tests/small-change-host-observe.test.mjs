@@ -91,9 +91,7 @@ test('wrong PR identity, open PR and incomplete manifest fail closed', () => {
     ],
     [
       (path) =>
-        path.endsWith('/pulls/12')
-          ? { ...response(path), merged_at: null }
-          : response(path),
+        path.endsWith('/pulls/12') ? { ...response(path), merged_at: null } : response(path),
       /invalid-pr-metadata/,
     ],
     [(path) => (path.includes('/files?') ? [] : response(path)), /incomplete-file-manifest/],
