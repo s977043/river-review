@@ -42,7 +42,7 @@ For installation options, pinning, and GitHub Actions setup, see the [five-minut
 
 <!-- x-release-please-start-version -->
 
-Latest release: [v1.131.0](https://github.com/s977043/river-review/releases/latest)
+Latest release: [v1.132.0](https://github.com/s977043/river-review/releases/latest)
 
 <!-- x-release-please-end -->
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.132.0](https://github.com/s977043/river-review/compare/v1.131.0...v1.132.0) (2026-10-19)
+
+
+### Features
+
+* **experiment:** batch-assess incomplete historical PR evidence ([#2724](https://github.com/s977043/river-review/issues/2724)) ([b3fa1e6](https://github.com/s977043/river-review/commit/b3fa1e6a0b77a74f53081def22ddac7162961400))
+* **experiment:** observe small-change candidates without approval authority ([#2723](https://github.com/s977043/river-review/issues/2723)) ([e797974](https://github.com/s977043/river-review/commit/e797974203d40f2d4d6659413165d6033d4d255a))
+
+
+### Bug Fixes
+
+* **docs:** repair English contribution link after relocation ([#2725](https://github.com/s977043/river-review/issues/2725)) ([905db8c](https://github.com/s977043/river-review/commit/905db8c331edd0efcbef1d5257b1fbaf343b4d69))
+* **release-kick:** update leftover references to the removed kick workflow ([#2737](https://github.com/s977043/river-review/issues/2737)) ([649599b](https://github.com/s977043/river-review/commit/649599b52e6f7b631808ec072b9401d59aad8810))
+* **release:** restore release-please markers around README latest release line ([#2738](https://github.com/s977043/river-review/issues/2738)) ([d03ff3a](https://github.com/s977043/river-review/commit/d03ff3ab28e2b9af206bc6b9aa1b67b7431013a6))
+* **security:** mask credential-bearing database URLs with sample words ([#2720](https://github.com/s977043/river-review/issues/2720)) ([c104d31](https://github.com/s977043/river-review/commit/c104d31b0c353ba0bd631ea14b0fcffb9e7584c1))
+* **security:** mask sample-word OAuth secrets ([#2718](https://github.com/s977043/river-review/issues/2718)) ([b7139d8](https://github.com/s977043/river-review/commit/b7139d8c2bcdf009a5e407a89e9670a349cbe97a))
+* **security:** mask sample-word webhook URLs ([#2716](https://github.com/s977043/river-review/issues/2716)) ([be3c25c](https://github.com/s977043/river-review/commit/be3c25cf3872bcfe45c17ee737312c63fc94fa2b))
+
 ## [1.131.0](https://github.com/s977043/river-review/compare/v1.130.1...v1.131.0) (2026-10-17)
 
 
