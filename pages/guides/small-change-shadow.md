@@ -91,10 +91,10 @@ node scripts/experiments/small-change-host-observe.mjs --repo s977043/river-revi
 node scripts/experiments/small-change-shadow-batch.mjs --input historical-observations.json
 ```
 
-- **上限は1回10PR**。PR番号の暗黙検索・全履歴クロールは行いません。GitHub CLI（`gh api`）のみを使い、ファイル一覧とチェックランは最大3ページ・各100件まで取得します。取得が不完全なら全体を失敗として扱い、部分データを出力しません。
-- PR本文・レビューコメント本文・Diff・認証情報は出力しません。失敗時はGitHubのレスポンス本文をエラー出力しません。
-- チェックランの状態は`observedChecks`として**別枠の事実観測**を残します。現在の保護ブランチ設定や必須チェックの網羅性、レビュー完了、サービス分類、本人性、人間の承認は認証しません。収集JSONは自由に編集でき、出力もGitHubの署名付き証明ではありません。
-- 一括評価器は`observedChecks`を承認根拠へ変換しないため、原則として`unknown`が残ります。`excluded`になった場合も、それは条件に該当したという観測上の分類にすぎません。
-- **検証用JSONをgitへ自動保存しません。** 共有する場合は手動で機密情報・パス名を確認し、必要な識別子と参照だけを保持してください。
+- **上限は1回10PR**。PR番号の暗黙検索・全履歴クロールは行わない。GitHub CLI（`gh api`）のみを使い、ファイル一覧とチェックランは最大3ページ・各100件まで取得する。取得が不完全なら全体を失敗とし、部分データは出力しない。
+- PR本文・レビューコメント本文・Diff・認証情報は出力しない。失敗時にGitHubのレスポンス本文をエラー出力しない。
+- チェックランの状態は`observedChecks`として**別枠の事実観測**を残す。現在の保護ブランチ設定や必須チェックの網羅性、レビュー完了、サービス分類、本人性、人間の承認は認証しない。収集JSONは自由に編集可能であり、出力もGitHubの署名付き証明ではない。
+- 一括評価器は`observedChecks`を承認根拠へ変換しないため、原則として`unknown`が残る。`excluded`になった場合も条件に該当したという観測上の分類にすぎない。
+- **検証用JSONをgitへ自動保存しない。** 共有する場合は手動で機密情報・パス名を確認し、必要な識別子と参照だけを保持する。
 
 完全なレビュー証跡・サービス別履歴・実PRへのHuman判断は、[Issue #2722](https://github.com/s977043/river-review/issues/2722)、[#2575](https://github.com/s977043/river-review/issues/2575)、[#2614](https://github.com/s977043/river-review/issues/2614)で別途検証します。CI成功や`merged`状態を、レビューの正しさ・承認の証拠として扱いません。
