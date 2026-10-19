@@ -36,7 +36,7 @@ new file mode 100644
 - A major finding anchored to docs/design/account-create.md:6-7:
   success is acknowledged before durability, and the write can fail after
   the client has been told that the account exists.
-- A major finding at docs/design/account-create.md:10-12:
+- A major finding at docs/design/account-create.md:11-12:
   the failure/retry/idempotency contract is missing. A lost response, duplicate
   POST, and failed persistence have no defined reconciliation outcome.
 - Ask whether the API promises completed account creation or only accepted
@@ -52,7 +52,7 @@ findings:
     anchor: docs/design/account-create.md:6
   - severity: major
     reason: リトライ時の冪等性と失敗した保存の回復・照合契約が無い
-    anchor: docs/design/account-create.md:10
+    anchor: docs/design/account-create.md:11
 questions:
   - この応答は永続化完了を保証するのか、永続受付のみを意味するのか
 -->
