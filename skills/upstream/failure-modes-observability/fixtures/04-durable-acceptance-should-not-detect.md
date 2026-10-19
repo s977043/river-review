@@ -12,12 +12,12 @@ implementation. The Pre-execution Gate holds because a design diff is supplied.
 
 ## Input Diff
 
-\`\`\`diff
+```diff
 diff --git a/docs/design/account-create.md b/docs/design/account-create.md
 new file mode 100644
 --- /dev/null
 +++ b/docs/design/account-create.md
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,20 @@
 +# Account creation flow
 +
 +## Request and durable acceptance
@@ -38,7 +38,7 @@ new file mode 100644
 +8. A client that loses a 202 response retries the same key or queries status.
 +9. Trace requestId across API, queue and DB; alert on terminal failures and
 +   queue age against the documented SLO.
-\`\`\`
+```
 
 ## Expected Behavior
 
