@@ -11,7 +11,7 @@ context, so the Pre-execution Gate holds.
 
 ## Input Diff
 
-\`\`\`diff
+```diff
 diff --git a/docs/design/account-create.md b/docs/design/account-create.md
 new file mode 100644
 --- /dev/null
@@ -29,7 +29,7 @@ new file mode 100644
 +
 +The client may retry on network timeout.
 +No further response or reconciliation is required.
-\`\`\`
+```
 
 ## Expected Behavior
 
