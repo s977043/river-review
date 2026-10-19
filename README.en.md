@@ -40,7 +40,11 @@ Normal plugin usage **does not need an additional River Review LLM API key**. He
 
 For installation options, pinning, and GitHub Actions setup, see the [five-minute Quickstart](https://river-review.the3396.com/guides/quickstart.en/). River Review is distributed via plugins and GitHub Actions, not npm publication. Contributors can run the in-repo CLI with `npm run river -- ...`.
 
+<!-- x-release-please-start-version -->
+
 Latest release: [v1.131.0](https://github.com/s977043/river-review/releases/latest)
+
+<!-- x-release-please-end -->
 
 ## What you get
 
