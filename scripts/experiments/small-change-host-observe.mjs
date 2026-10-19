@@ -27,7 +27,10 @@ function request(path) {
 function validateSelection(repository, prs) {
   requireShape(typeof repository === 'string' && REPOSITORY.test(repository), 'invalid-repository');
   requireShape(Array.isArray(prs) && prs.length > 0 && prs.length <= MAX_PRS, 'invalid-pr-count');
-  requireShape(prs.every((pr) => Number.isSafeInteger(pr) && pr > 0), 'invalid-pr-number');
+  requireShape(
+    prs.every((pr) => Number.isSafeInteger(pr) && pr > 0),
+    'invalid-pr-number'
+  );
   requireShape(new Set(prs).size === prs.length, 'duplicate-pr-number');
 }
 
@@ -148,7 +151,10 @@ function parseArgs(args) {
     'invalid-arguments'
   );
   const tokens = args[3].split(',');
-  requireShape(tokens.every((token) => /^[1-9][0-9]*$/.test(token)), 'invalid-pr-number');
+  requireShape(
+    tokens.every((token) => /^[1-9][0-9]*$/.test(token)),
+    'invalid-pr-number'
+  );
   const prs = tokens.map(Number);
   validateSelection(args[1], prs);
   return { repository: args[1], prs };
