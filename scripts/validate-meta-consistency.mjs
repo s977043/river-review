@@ -31,6 +31,48 @@ export function extractLatestRelease(text) {
   return match ? match[1] : null;
 }
 
+const MARKER_START = '<!-- x-release-please-start-version -->';
+const MARKER_END = '<!-- x-release-please-end -->';
+const LATEST_RELEASE_LINE = /(?:最新リリース|Latest release):\s*\[v[\d.]+\]/;
+
+/**
+ * Check that release-please start/end markers pair up 1:1 and that the
+ * "Latest release" line sits inside a marker block.
+ * Returns array of problem descriptions (empty = pass).
+ */
+export function checkReleaseMarkers(text) {
+  const problems = [];
+  let openLine = null;
+  let releaseInside = false;
+  let releaseFound = false;
+  text.split('\n').forEach((line, i) => {
+    const lineNo = i + 1;
+    if (line.includes(MARKER_START)) {
+      if (openLine !== null) {
+        problems.push(`start marker at line ${openLine} has no matching end marker`);
+      }
+      openLine = lineNo;
+    } else if (line.includes(MARKER_END)) {
+      if (openLine === null) {
+        problems.push(`end marker at line ${lineNo} has no matching start marker`);
+      }
+      openLine = null;
+    } else if (LATEST_RELEASE_LINE.test(line)) {
+      releaseFound = true;
+      if (openLine !== null) releaseInside = true;
+    }
+  });
+  if (openLine !== null) {
+    problems.push(`start marker at line ${openLine} has no matching end marker`);
+  }
+  if (!text.includes(MARKER_START)) problems.push(`missing ${MARKER_START}`);
+  if (!text.includes(MARKER_END)) problems.push(`missing ${MARKER_END}`);
+  if (releaseFound && !releaseInside) {
+    problems.push('"Latest release" line is outside the release-please marker block');
+  }
+  return problems;
+}
+
 /**
  * Validate meta-consistency across README and package.json.
  * Returns array of error strings (empty = pass).
@@ -60,6 +102,10 @@ export async function validateMeta() {
       errors.push(
         `${readmePath}: "Latest release" says v${releaseVersion}, expected v${expectedVersion}`
       );
+    }
+
+    for (const problem of checkReleaseMarkers(text)) {
+      errors.push(`${readmePath}: ${problem}; release-please extra-files sync is broken`);
     }
 
     // Check all action tag references within the file are internally consistent
