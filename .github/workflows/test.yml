@@ -290,8 +290,17 @@ jobs:
       - uses: ./.github/actions/setup-node-deps
       - run: npm run meta:validate
       - run: npm run plugin:validate
-      - name: Type-check node-api runner (#2735)
-        run: npm run build -w runners/node-api
+
+  node-api-typecheck:
+    name: node-api typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-node-deps
+      - name: Type-check node-api runner without emitting (#2735)
+        run: npm exec -w runners/node-api -- tsc --noEmit
 
   dist-check:
     name: Action dist freshness
