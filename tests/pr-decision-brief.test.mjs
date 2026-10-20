@@ -7,7 +7,7 @@ const templates = ['feature.md', 'bugfix.md'];
 function readDecisionBrief(templateName) {
   const template = readFileSync(
     new URL(`../.github/PULL_REQUEST_TEMPLATE/${templateName}`, import.meta.url),
-    'utf8',
+    'utf8'
   );
   const start = template.indexOf('## Reviewer Decision Brief\n');
   assert.notEqual(start, -1, `${templateName}: decision brief heading missing`);
