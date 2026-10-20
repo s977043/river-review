@@ -21,7 +21,7 @@ Keep answers short and link the canonical Issue / Plan / ADR or test evidence in
 2. **Assumptions and failure paths:** Which invariants or assumptions must hold, where can the change fail, and what negative/boundary tests or observations support them? Mark missing evidence as `unknown`, not `pass`.
 3. **Reviewer's first challenge:** Which specific changed area or design choice should the reviewer question first, and why? Link a file, decision, or evidence location; use `N/A` + reason if no material concern is identified.
 
-This brief supports review; it is **not** evidence that independent review, tests, or human approval occurred. It does not replace existing merge gates.
+This brief only helps focus the review. It does not prove independent verification, completed tests, or human approval, and it does not replace existing merge gates.
 
 ## Changes
 
