@@ -26,7 +26,7 @@ Keep answers short and link to the Issue / Plan / ADR or evidence where availabl
 2. **Assumptions and failure paths:** What root-cause assumptions, invariants, or boundary cases might make this fix incomplete? Link the regression/negative tests, or explicitly write `unknown` where evidence is missing.
 3. **Reviewer's first challenge:** Which line, behavior, or unverified edge case is most important for the reviewer to challenge? Link the relevant diff or evidence, or `N/A` + reason.
 
-This is review context only: neither AI-authored text nor a green template check is proof of independent verification or permission to merge.
+This brief is review context, not verification evidence. It does not prove independent review or grant permission to merge.
 
 ## Repro & Validation
 
