@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import test from 'node:test';
 import {
   checkReleaseMarkers,
@@ -74,5 +76,47 @@ test('checkReleaseMarkers reports missing end marker only', () => {
 
 test('checkReleaseMarkers reports release line outside markers', () => {
   const problems = checkReleaseMarkers([START, END, RELEASE].join('\n'));
-  assert.deepEqual(problems, ['"Latest release" line is outside the release-please marker block']);
+  assert.deepEqual(problems, [
+    '"Latest release" line at line 3 is outside the release-please marker block',
+  ]);
+});
+
+test('checkReleaseMarkers reports a duplicate start before end', () => {
+  const problems = checkReleaseMarkers([START, START, RELEASE, END].join('\n'));
+  assert.deepEqual(problems, ['start marker at line 1 has no matching end marker']);
+});
+
+test('checkReleaseMarkers reports end placed before start', () => {
+  const problems = checkReleaseMarkers([END, RELEASE, START].join('\n'));
+  assert.ok(problems.includes('end marker at line 1 has no matching start marker'));
+  assert.ok(problems.includes('start marker at line 3 has no matching end marker'));
+  assert.ok(problems.some((p) => p.includes('line 2 is outside')));
+});
+
+test('checkReleaseMarkers accepts CRLF line endings', () => {
+  assert.deepEqual(checkReleaseMarkers([START, RELEASE, END, ''].join('\r\n')), []);
+});
+
+test('checkReleaseMarkers handles markers and release on the same line', () => {
+  assert.deepEqual(checkReleaseMarkers(`${START} ${RELEASE} ${END}`), []);
+  assert.deepEqual(checkReleaseMarkers(`${START} ${END} ${RELEASE}`), [
+    '"Latest release" line at line 1 is outside the release-please marker block',
+  ]);
+});
+
+test('validateMeta reports broken markers through the production path', async () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const readText = async (filePath) => {
+    const text = await fs.readFile(path.join(root, filePath), 'utf8');
+    return filePath === 'README.md' ? text.replace(END, '') : text;
+  };
+  const errors = await validateMeta({ readText });
+  assert.ok(
+    errors.some(
+      (e) =>
+        e.startsWith('README.md: missing <!-- x-release-please-end -->') &&
+        e.includes('release-please extra-files sync is broken')
+    ),
+    `got: ${errors.join(', ')}`
+  );
 });
