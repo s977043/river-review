@@ -290,6 +290,8 @@ jobs:
       - uses: ./.github/actions/setup-node-deps
       - run: npm run meta:validate
       - run: npm run plugin:validate
+      - name: Type-check node-api runner (#2735)
+        run: npm run build -w runners/node-api
 
   dist-check:
     name: Action dist freshness
