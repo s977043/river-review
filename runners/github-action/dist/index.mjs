@@ -46426,9 +46426,43 @@ function async_correctness_signals_markerWidth(hunk) {
   return Number.isInteger(parentCount) && parentCount > 1 ? parentCount : 1;
 }
 
+const REGEX_PRECEDING_CHARS = new Set(['=', '(', ',', ':', '!', '&', '|', '?', '{', '}', ';', '[']);
+
+/** Index of the unescaped `close` after `start`, or -1 when the line has none. */
+function findClosing(text, start, close) {
+  let inClass = false;
+  for (let i = start + 1; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '\\') i += 1;
+    else if (close === '/' && char === '[') inClass = true;
+    else if (close === '/' && char === ']') inClass = false;
+    else if (char === close && !inClass) return i;
+  }
+  return -1;
+}
+
+/**
+ * Cut a trailing `//` comment. A quote opens a string only when it closes on
+ * the same line, and a `/` in regex-literal position skips to its closing `/`.
+ * Nested `${}` in template literals and block comments are not modelled.
+ */
 function stripLineComment(text) {
-  const index = text.indexOf('//');
-  return index === -1 ? text : text.slice(0, index);
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === "'" || char === '"' || char === '`') {
+      const end = findClosing(text, i, char);
+      if (end !== -1) i = end;
+    } else if (char === '/' && text[i + 1] === '/') {
+      return text.slice(0, i);
+    } else if (char === '/') {
+      const previous = text.slice(0, i).trimEnd().at(-1);
+      if (previous === undefined || REGEX_PRECEDING_CHARS.has(previous)) {
+        const end = findClosing(text, i, '/');
+        if (end !== -1) i = end;
+      }
+    }
+  }
+  return text;
 }
 
 /**
