@@ -13,6 +13,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 
 import { endHookStdin } from '../hook-stdin.mjs';
 
@@ -65,5 +66,24 @@ describe('endHookStdin (#2341)', () => {
     const script = makeScript(t, 'exit 3');
     const result = await runScript(script, OVERSIZED);
     assert.equal(result.code, 3);
+  });
+
+  // ENOTCONN (seen on the macOS runner) cannot be forced from a real child, so
+  // the error is injected on a stand-in stdin stream.
+  function emitStdinError(code) {
+    const child = { stdin: new PassThrough() };
+    endHookStdin(child, 'payload');
+    const error = Object.assign(new Error(`write ${code}`), { code });
+    return () => child.stdin.emit('error', error);
+  }
+
+  for (const code of ['EPIPE', 'ENOTCONN', 'ERR_STREAM_DESTROYED']) {
+    test(`a ${code} on stdin is tolerated`, () => {
+      assert.doesNotThrow(emitStdinError(code));
+    });
+  }
+
+  test('any other stdin error is re-raised', () => {
+    assert.throws(emitStdinError('EACCES'), { code: 'EACCES' });
   });
 });
