@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.133.0](https://github.com/s977043/river-review/compare/v1.132.0...v1.133.0) (2026-10-20)
+
+
+### Features
+
+* **experiment:** collect bounded GitHub PR evidence without approval authority ([#2741](https://github.com/s977043/river-review/issues/2741)) ([3ac3a3b](https://github.com/s977043/river-review/commit/3ac3a3b923fd0dfe58c16dc700da077a332e5975))
+
+
+### Bug Fixes
+
+* **docs:** improve OSS maintainer navigation and enforce bilingual CI ([#2740](https://github.com/s977043/river-review/issues/2740)) ([62b89c1](https://github.com/s977043/river-review/commit/62b89c1ed2a4436f3f50e562e5039e48df2b3f0b))
+* **node-api:** add types node to tsconfig and type-check in CI ([#2744](https://github.com/s977043/river-review/issues/2744)) ([d1e2463](https://github.com/s977043/river-review/commit/d1e246305fc0c36b7a51ebd5dcfbefd83bef8472))
+* **test:** tolerate ENOTCONN when a hook exits before reading stdin ([#2743](https://github.com/s977043/river-review/issues/2743)) ([fc9a120](https://github.com/s977043/river-review/commit/fc9a120d1e7dbb838df87e4ca13cdf56df4f7d98))
+
 ## [1.132.0](https://github.com/s977043/river-review/compare/v1.131.0...v1.132.0) (2026-10-19)
 
 
