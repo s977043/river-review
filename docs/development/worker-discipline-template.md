@@ -29,6 +29,7 @@
   404 や permission エラーが出たら、まずこのアカウント切り替わりを疑うこと。
 - シェルの PATH 先頭に `/opt/homebrew/opt/node@22/bin` を通してから作業すること。既定の `node`（v26 系）を使わない。
   worktree で作業する場合は最初に `npm ci` を実行すること（lockfile 由来の依存不整合を防ぐ）。
+- PATH を `node@22/bin:/usr/bin:/bin` のように絞ると `npm run lint` が shellcheck を見つけられず exit 127 になる。`/opt/homebrew/bin` も PATH に含めること（2026-10-22、ワーカー 2 名が踏んだ）。
 - 検証コマンドの終了コードを読むときは、パイプへ通した直後の `$?` を使わないこと。`cmd | tail -5` の `$?` は
   `tail` の終了コードであり `cmd` のものではない。`cmd > /tmp/out 2>&1; echo "EXIT=$?"` のように直接実行して
   取るか、`${PIPESTATUS[0]}` を使う。textlint を exit 0 と誤報告した実績がある。
