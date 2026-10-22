@@ -187,7 +187,7 @@ Claude Code プラグインとしてインストールされている場合、`r
 
 スキルのパス解決:
 
-1. Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスに `/skills/agent-skills/river-review/SKILL.md` を連結して Read する。Read ツールは環境変数を展開しないため、`${CLAUDE_PLUGIN_ROOT}` を含むパスをそのまま渡さない。
+1. Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスに `/skills/agent-skills/river-review/SKILL.md` を連結して Read する。Read ツールが環境変数を展開するとは限らないため、`${CLAUDE_PLUGIN_ROOT}` を含むパスをそのまま渡さない。
 2. 出力が空のときに `./skills/agent-skills/river-review/SKILL.md` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
 3. それでも読めなければレビューに進まず、代替基準でのレビューもしない。「Skill Registry が未解決のためレビューを実行できない」と報告して止まる。
 
