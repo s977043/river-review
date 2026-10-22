@@ -1,7 +1,7 @@
 ---
 description: 'Run review-team skill: parallel multi-role review with consensusLevel and Tech Lead report'
 argument-hint: '[pr-number] [role1,role2,...]'
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*)
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*)
 ---
 
 スキル定義: `skills/agent-skills/review-team/SKILL.md`
@@ -19,7 +19,7 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git f
 
 1. 引数に PR 番号 `N` がある場合: `gh pr diff N` を diff とし、`gh pr view N --json headRefOid,files` を対象コミットと変更統計とする。ローカルの作業ツリーやブランチの diff は使わない。
 2. 引数に PR 番号が無く、現ブランチに open の PR がある場合（`gh pr view --json number,state --jq 'select(.state=="OPEN") | .number'` が番号を出力する場合）: その PR を対象にし、1 と同じコマンドで取得する。`gh pr view` は同名ブランチのマージ済み・クローズ済み PR にも一致するため、open 以外は使わない。未コミットの変更（`git diff` / `git diff --cached`）があれば、PR の diff に加えてレビューする。
-3. 引数に PR 番号が無く、現ブランチに open の PR が無い場合（上のコマンドが何も出力しないか失敗する場合）: `git diff <base>...HEAD` と未コミットの変更（`git diff` / `git diff --cached`）を合わせて diff とする。`<base>` は `origin/<デフォルトブランチ>` とし、デフォルトブランチ名は `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name` で得る。ローカルのブランチは遅れていることがあるため、先に `git fetch origin <デフォルトブランチ>` を実行する。
+3. 引数に PR 番号が無く、現ブランチに open の PR が無い場合（上のコマンドが何も出力しないか失敗する場合）: `git diff <base>...HEAD` と未コミットの変更（`git diff` / `git diff --cached`）を合わせて diff とする。`<base>` は `origin/<デフォルトブランチ>` とし、デフォルトブランチ名は `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name` で得る。`gh repo view` が失敗した場合（未認証など）は `git symbolic-ref --short refs/remotes/origin/HEAD` の出力から `origin/` を除いた名前を使う。それも失敗した場合は、対象を決められない旨を出力して終了する。ローカルのブランチは遅れていることがあるため、先に `git fetch origin <デフォルトブランチ>` を実行する。
 
 どの経路でも diff が空の場合だけ、「差分がありません」と伝えて終了する。
 
@@ -41,14 +41,14 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git f
 
 River Review は npm 未公開のため `npx river-review` は使えない。**エージェントがこのスキルの手順を直接実行する**（CLI 不要）。上記 Step 1 で決めたロールを並列に走らせ、Union-Find で finding を統合し、consensusLevel と teamLeadReport を生成する。
 
-リポジトリ内で作業していて `river` CLI をアクセラレータとして使える場合のみ、次を利用してよい（任意）。コスト確認が必要なら先に `--dry-run`。
+リポジトリ内で作業していて `river` CLI をアクセラレータとして使える場合のみ、次を利用してよい（任意）。CLI を使えるのは対象の解決が経路 3 になったときだけで、`--base origin/<デフォルトブランチ>` を渡す。`river run` はローカル checkout をレビューするため、経路 1 と 2（PR が対象）では CLI を使わず、取得した PR の diff をスキル駆動でレビューする。コスト確認が必要なら先に `--dry-run`。
 
 ```bash
 # auto モード（推奨）
-npm run river -- run . --reviewers auto --output json
+npm run river -- run . --base origin/<デフォルトブランチ> --reviewers auto --output json
 
 # ロール明示指定
-npm run river -- run . --reviewers <role1,role2,...> --output json
+npm run river -- run . --base origin/<デフォルトブランチ> --reviewers <role1,role2,...> --output json
 ```
 
 CLI が存在しない、または失敗した場合は、スキル駆動のレビューで継続する。
