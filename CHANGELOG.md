@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.133.2](https://github.com/s977043/river-review/compare/v1.133.1...v1.133.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **commands:** review-local でコミット済みのブランチ差分も対象にする ([#2768](https://github.com/s977043/river-review/issues/2768)) ([55a0dd0](https://github.com/s977043/river-review/commit/55a0dd00f43d9019767e9f2e86e1a82bb9b274e5))
+
 ## [1.133.1](https://github.com/s977043/river-review/compare/v1.133.0...v1.133.1) (2026-10-22)
 
 
