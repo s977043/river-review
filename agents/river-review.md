@@ -10,5 +10,5 @@ model: inherit
 パスは次の順で解決する。Read ツールが環境変数を展開するとは限らないため、`${CLAUDE_PLUGIN_ROOT}` を含むパスをそのまま Read に渡さない。
 
 1. Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
-2. 出力が空のときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
+2. 出力が空のときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。カレントディレクトリに `./skills/agent-skills/river-review/SKILL.md` と `./agents/river-review.md` の両方があれば、リポジトリ内とみなす（例: Bash で `test -f ./skills/agent-skills/river-review/SKILL.md && test -f ./agents/river-review.md && echo in-repo`）。
 3. それでも SKILL.md を読めなければ、レビューに進まない。代替基準でのレビューもしない。「Skill Registry が未解決のためレビューを実行できない」と報告して止まる。
