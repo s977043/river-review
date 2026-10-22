@@ -7,8 +7,10 @@ allowed-tools: Bash(node:*), Bash(rg:*), Read
 Find the best matching review skill for: $ARGUMENTS
 
 The portable dependency key is a **skill ID**, not a physical path. The bundled
-skill collection lives under `${CLAUDE_PLUGIN_ROOT:-.}/skills/` in the full plugin
-or repository checkout.
+skill collection lives under `<plugin root>/skills/` in the full plugin or
+repository checkout. Resolve `<plugin root>` in Bash (step 1). Do not pass a path
+containing `${CLAUDE_PLUGIN_ROOT}` to `Read` as-is, because `Read` does not
+necessarily expand environment variables.
 
 Steps:
 
