@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.133.1](https://github.com/s977043/river-review/compare/v1.133.0...v1.133.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **agent:** resolve SKILL.md via absolute plugin root and avoid named PR refs ([#2763](https://github.com/s977043/river-review/issues/2763)) ([ad9ca1b](https://github.com/s977043/river-review/commit/ad9ca1bd4068c29c63346bf0b988c0e3c48d9753))
+* **commands:** review-team でコミット済みの差分と PR を対象にする ([#2764](https://github.com/s977043/river-review/issues/2764)) ([86f9998](https://github.com/s977043/river-review/commit/86f9998086ab1ad9e82becc2505297eac333653f))
+
 ## [1.133.0](https://github.com/s977043/river-review/compare/v1.132.0...v1.133.0) (2026-10-20)
 
 
