@@ -187,13 +187,17 @@ Claude Code プラグインとしてインストールされている場合、`r
 
 スキルのパス解決:
 
-```bash
-# Claude Code plugin 環境
-${CLAUDE_PLUGIN_ROOT}/skills/agent-skills/river-review/SKILL.md
+1. Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスに `/skills/agent-skills/river-review/SKILL.md` を連結して Read する。Read ツールは環境変数を展開しないため、`${CLAUDE_PLUGIN_ROOT}` を含むパスをそのまま渡さない。
+2. 出力が空のときに `./skills/agent-skills/river-review/SKILL.md` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
+3. それでも読めなければレビューに進まず、代替基準でのレビューもしない。「Skill Registry が未解決のためレビューを実行できない」と報告して止まる。
 
-# リポジトリ内で直接実行する場合（フォールバック）
-./skills/agent-skills/river-review/SKILL.md
-```
+### PR を対象にするときの git 操作
+
+PR の差分は、利用者のリポジトリに名前付きの ref を残さない方法で取得する。
+
+- `gh pr diff <N>` を使う。または `git fetch origin pull/<N>/head` だけを実行し、`FETCH_HEAD` で扱う。
+- `git fetch origin pull/<N>/head:pr<N>` のように、名前付きの ref やブランチを作らない。
+- やむを得ず作った場合は、作った ref 名と削除コマンド（例: `git branch -D pr<N>`）をレポートに書く。
 
 ### Codex スキルとして
 
