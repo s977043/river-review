@@ -230,3 +230,53 @@ test('auto specialist selection aligns with dependency and CI route signals', ()
     assert.ok(roles.includes(specialist), path);
   }
 });
+
+
+test('sensitive auth source uses team review without a risk map or large diff', () => {
+  const result = routeReviewMode({
+    changedFiles: ['src/auth/login.ts'],
+    diffText: '+return token;\n',
+  });
+  assert.equal(result.selectedMode, 'team');
+  assert.equal(result.riskAction, 'comment_only');
+  assert.equal(result.recommendedReviewers, 'auto');
+  assert.equal(result.confidence, 'high');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+});
+
+test('sensitive source signal never downgrades explicit human-required risk map', () => {
+  const riskMap = {
+    defaults: { action: 'comment_only' },
+    rules: [{ pattern: 'src/auth/**', action: 'require_human_review', reason: 'Owner review' }],
+  };
+  const result = routeReviewMode({ changedFiles: ['src/auth/login.ts'], riskMap });
+  assert.equal(result.selectedMode, 'human-required');
+  assert.equal(result.riskAction, 'require_human_review');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+});
+
+test('sensitive words in docs, tests and author names do not raise review depth', () => {
+  const docs = routeReviewMode({ changedFiles: ['docs/auth.md', 'tests/auth.test.ts'] });
+  assert.equal(docs.selectedMode, 'light');
+  assert.ok(!docs.matchedTriggers.includes('fileType:sensitiveCode'));
+  const ordinarySource = routeReviewMode({ changedFiles: ['src/lib/author.ts'] });
+  assert.equal(ordinarySource.selectedMode, 'standard');
+  assert.ok(!ordinarySource.matchedTriggers.includes('fileType:sensitiveCode'));
+});
+
+test('mixed source with Windows paths escalates while keeping the route JSON shape', () => {
+  const result = routeReviewMode({
+    changedFiles: ['docs/guide.md', 'src\\\\payments\\\\charge.php'],
+  });
+  assert.equal(result.selectedMode, 'team');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+  assert.deepEqual(Object.keys(result), [
+    'selectedMode',
+    'confidence',
+    'reasons',
+    'matchedTriggers',
+    'recommendedReviewers',
+    'riskAction',
+    'nextCommand',
+  ]);
+});
