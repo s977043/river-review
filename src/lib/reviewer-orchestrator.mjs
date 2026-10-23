@@ -325,10 +325,9 @@ const SIGNAL_ROLE_MAP = {
 /**
  * Compute the auto reviewer selection together with an explainable rationale.
  *
- * Backward compatible: with no `signals` argument the selected role set (and its
- * order) is identical to the pre-#1545 behavior — bug-hunter first, then the
- * file/risk heuristics in their original order. New signals are strictly
- * additive and only ever ADD roles.
+ * The existing file/risk heuristic order is preserved: bug-hunter remains first.
+ * Sensitive source paths now add security-scanner even without semantic signals.
+ * Optional formalized signals remain additive and only ever ADD roles.
  *
  * @returns {{ roles: string[], reasons: Record<string, string[]>, required: string[], skipped: string[] }}
  */
