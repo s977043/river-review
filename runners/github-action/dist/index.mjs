@@ -48126,7 +48126,7 @@ __nccwpck_require__.d(__webpack_exports__, {
   loadRiskMap: () => (/* binding */ loadRiskMap)
 });
 
-// UNUSED EXPORTS: aggregateRiskLevel
+// UNUSED EXPORTS: aggregateRiskLevel, diagnoseShadowedRiskRules
 
 // EXTERNAL MODULE: external "node:fs/promises"
 var promises_ = __nccwpck_require__(1455);
@@ -48270,6 +48270,65 @@ function evaluateRisk(riskMap, filePaths) {
   const aggregateAction = aggregateRiskLevel(fileRisks, defaultAction);
 
   return { fileRisks, aggregateAction, escalatedFiles, humanReviewFiles };
+}
+
+/**
+ * Find stronger rules hidden behind the first matching rule for actual changed
+ * paths. Diagnostic candidates only: never change first-match evaluation,
+ * review routing, or GitHub approval / merge authority.
+ *
+ * Indexes are zero-based positions in the supplied ordered risk map. This
+ * reports actual overlapping matches, not hypothetical glob containment.
+ *
+ * @param {object | null} riskMap parsed and validated risk map
+ * @param {string[]} filePaths changed repository-relative file paths
+ * @returns {{ kind: 'risk-map-rule-shadow/v1', status: 'analyzed' | 'unknown', reasonCodes: string[], findings: Array<{file: string, selectedRuleIndex: number, selectedPattern: string, selectedAction: string, shadowedRuleIndex: number, shadowedPattern: string, shadowedAction: string}>, authorizesApproval: false, evidenceTrust: 'unverified-input' }}
+ */
+function diagnoseShadowedRiskRules(riskMap, filePaths) {
+  const base = {
+    kind: 'risk-map-rule-shadow/v1',
+    authorizesApproval: false,
+    evidenceTrust: 'unverified-input',
+  };
+  if (!riskMap) {
+    return { ...base, status: 'unknown', reasonCodes: ['missing-risk-map'], findings: [] };
+  }
+  if (!Array.isArray(filePaths) || !Array.isArray(riskMap.rules)) {
+    throw new RiskMapError('Invalid input for risk rule shadow diagnostic');
+  }
+  if (filePaths.length === 0) {
+    return { ...base, status: 'unknown', reasonCodes: ['no-changed-files'], findings: [] };
+  }
+
+  const candidates = [];
+  for (const file of filePaths) {
+    if (typeof file !== 'string') {
+      throw new RiskMapError('Risk rule shadow diagnostic requires string file paths');
+    }
+    let selectedRule = null;
+    let selectedRuleIndex = -1;
+    for (const [ruleIndex, rule] of riskMap.rules.entries()) {
+      if (!rule || typeof rule.pattern !== 'string' || !Object.hasOwn(ACTION_PRIORITY, rule.action)) {
+        throw new RiskMapError('Invalid risk rule in shadow diagnostic');
+      }
+      if (!minimatch(file, rule.pattern, { dot: true })) continue;
+      if (selectedRule === null) {
+        selectedRule = rule;
+        selectedRuleIndex = ruleIndex;
+      } else if (ACTION_PRIORITY[rule.action] > ACTION_PRIORITY[selectedRule.action]) {
+        candidates.push({
+          file,
+          selectedRuleIndex,
+          selectedPattern: selectedRule.pattern,
+          selectedAction: selectedRule.action,
+          shadowedRuleIndex: ruleIndex,
+          shadowedPattern: rule.pattern,
+          shadowedAction: rule.action,
+        });
+      }
+    }
+  }
+  return { ...base, status: 'analyzed', reasonCodes: [], findings: candidates };
 }
 
 /**
