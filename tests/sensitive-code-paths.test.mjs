@@ -71,6 +71,7 @@ test('sensitive paths: UI components and cross-language auth code are in scope',
       'lib/permissions/Policy.cs',
       'services/auth/SignIn.swift',
       'app/credentials/Store.dart',
+      'src/oauth/Refresh.ts',
       'src/lib/author.vue',
     ]),
     [
@@ -79,6 +80,8 @@ test('sensitive paths: UI components and cross-language auth code are in scope',
       'apps/shop/payments/Checkout.astro',
       'lib/permissions/Policy.cs',
       'services/auth/SignIn.swift',
+      'app/credentials/Store.dart',
+      'src/oauth/Refresh.ts',
     ]
   );
 });
