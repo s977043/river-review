@@ -290,3 +290,27 @@ test('sensitive code routing composes with existing CI and dependency triggers',
   assert.ok(result.matchedTriggers.includes('fileType:ci'));
   assert.ok(result.matchedTriggers.includes('fileType:dependency'));
 });
+
+test('sensitive code path selects the security specialist in reviewer auto mode', () => {
+  const cases = [
+    'src/auth/login.ts',
+    'apps/shop/payments/charge.php',
+    'packages/backend/src/privacy/export.py',
+    'src/lib/permission-check.mjs',
+  ];
+  for (const file of cases) {
+    const files = [file];
+    const route = routeReviewMode({ changedFiles: files });
+    assert.equal(route.selectedMode, 'team', file);
+    const roles = selectRolesAuto(classifyChangedFiles(files));
+    assert.ok(roles.includes('bug-hunter'), file);
+    assert.ok(roles.includes('security-scanner'), file);
+  }
+});
+
+test('non-sensitive source and auth tests do not force the security specialist', () => {
+  for (const file of ['src/lib/author.ts', 'src/auth/login.test.ts', 'docs/auth.md']) {
+    const roles = selectRolesAuto(classifyChangedFiles([file]));
+    assert.ok(!roles.includes('security-scanner'), file);
+  }
+});
