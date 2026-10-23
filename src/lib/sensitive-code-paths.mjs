@@ -68,8 +68,10 @@ export function findSensitiveCodePaths(changedFiles) {
     // Token boundaries prevent 'author.ts' and 'authoring/' matching 'auth'.
     const stem = basename.replace(SOURCE_EXT, '');
     const nameTokens = stem.toLowerCase().split(/[._-]/);
-    return [...segments.slice(1, -1).map((s) => s.toLowerCase()), ...nameTokens].some((token) =>
-      SENSITIVE_PARTS.has(token)
-    );
+    const directoryTokens = segments.slice(1, -1).flatMap((segment) => {
+      const lower = segment.toLowerCase();
+      return [lower, ...lower.split(/[._-]/)];
+    });
+    return [...directoryTokens, ...nameTokens].some((token) => SENSITIVE_PARTS.has(token));
   });
 }
