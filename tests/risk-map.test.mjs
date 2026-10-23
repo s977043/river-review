@@ -229,11 +229,14 @@ test('shadow diagnostic: detects a stricter auth rule masked by a broad first ma
   const baseline = evaluateRisk(map, files);
   const diagnostics = diagnoseShadowedRiskRules(map, files);
   assert.equal(baseline.aggregateAction, 'comment_only');
+  assert.equal(diagnostics.status, 'analyzed');
+  assert.equal(diagnostics.evidenceTrust, 'unverified-input');
+  assert.equal(diagnostics.authorizesApproval, false);
   assert.deepEqual(baseline.fileRisks[0].rule, {
     pattern: 'src/**',
     reason: undefined,
   });
-  assert.deepEqual(diagnostics, [
+  assert.deepEqual(diagnostics.findings, [
     {
       file: 'src/auth/login.ts',
       selectedRuleIndex: 0,
@@ -269,7 +272,7 @@ test('shadow diagnostic: no findings for correct ordering, equal or weaker later
     },
   ];
   for (const map of maps) {
-    assert.deepEqual(diagnoseShadowedRiskRules(map, ['src/auth/login.ts']), []);
+    assert.deepEqual(diagnoseShadowedRiskRules(map, ['src/auth/login.ts']).findings, []);
   }
 });
 
@@ -283,7 +286,7 @@ test('shadow diagnostic: reports only real overlapping paths, retaining ordered 
     ],
   };
   assert.deepEqual(
-    diagnoseShadowedRiskRules(map, ['.github/workflows/release.yml', 'docs/intro.md']),
+    diagnoseShadowedRiskRules(map, ['.github/workflows/release.yml', 'docs/intro.md']).findings,
     [
       {
         file: '.github/workflows/release.yml',
@@ -309,9 +312,17 @@ test('shadow diagnostic: reports only real overlapping paths, retaining ordered 
 
 test('shadow diagnostic: empty and missing map inputs have no findings', () => {
   const map = { rules: [{ pattern: '**', action: 'require_human_review' }] };
-  assert.deepEqual(diagnoseShadowedRiskRules(null, ['src/auth/login.ts']), []);
-  assert.deepEqual(diagnoseShadowedRiskRules(map, []), []);
-  assert.deepEqual(diagnoseShadowedRiskRules(map, ['docs/unmatched.md']), []);
+  assert.deepEqual(diagnoseShadowedRiskRules(null, ['src/auth/login.ts']), {
+    kind: 'risk-map-rule-shadow/v1',
+    authorizesApproval: false,
+    evidenceTrust: 'unverified-input',
+    status: 'unknown',
+    reasonCodes: ['missing-risk-map'],
+    findings: [],
+  });
+  assert.equal(diagnoseShadowedRiskRules(map, []).status, 'unknown');
+  assert.deepEqual(diagnoseShadowedRiskRules(map, []).reasonCodes, ['no-changed-files']);
+  assert.deepEqual(diagnoseShadowedRiskRules(map, ['docs/unmatched.md']).findings, []);
 });
 
 test('shadow diagnostic: malformed non-empty inputs fail loudly, no false green', () => {
@@ -338,7 +349,7 @@ test('shadow diagnostic: only higher action than the actual first match is repor
       { pattern: 'src/**', action: 'comment_only' },
     ],
   };
-  const result = diagnoseShadowedRiskRules(map, ['src/auth/login.ts', 'src/other.ts']);
+  const result = diagnoseShadowedRiskRules(map, ['src/auth/login.ts', 'src/other.ts']).findings;
   assert.equal(result.length, 1);
   assert.deepEqual(
     [result[0].file, result[0].selectedAction, result[0].shadowedAction],
@@ -357,5 +368,5 @@ test('shadow diagnostic: same path normalization semantics as existing risk eval
   };
   const windowsStyle = 'src\\\\auth\\\\login.ts';
   assert.equal(evaluateRisk(map, [windowsStyle]).aggregateAction, 'comment_only');
-  assert.deepEqual(diagnoseShadowedRiskRules(map, [windowsStyle]), []);
+  assert.deepEqual(diagnoseShadowedRiskRules(map, [windowsStyle]).findings, []);
 });
