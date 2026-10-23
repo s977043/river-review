@@ -36,7 +36,7 @@ claude plugin install river-review@river-review-marketplace
 /river-review:review-local
 ```
 
-コマンドは `/river-review:<name>` の形で名前空間化されます。配布物の一覧は [コマンド・エージェント・スキル](/guides/plugin/commands-and-skills) を参照してください。
+コマンドは `/river-review:<name>` の形で名前空間化されます。配布物の一覧は [コマンド・エージェント・スキル](./commands-and-skills.md) を参照してください。
 
 ## Codex
 
@@ -59,7 +59,7 @@ codex plugin add river-review@<マーケットプレイス名>
 
 `.codex-plugin/plugin.json` が宣言するのは `skills`（`./skills/agent-skills/`）と `interface` メタデータだけです。`commands` と `agents` は宣言していません。このため Codex で使えるのは同梱スキルで、`/river-review:review-local` などのスラッシュコマンドと `river-review` サブエージェントは配布定義に含まれません。
 
-マーケットプレイスを使わない場合の手動フォールバック（`scripts/setup-codex.sh` など）は [エージェントワークフロー](/guides/agent-workflow#codex-cli) を参照してください。
+マーケットプレイスを使わない場合の手動フォールバック（`scripts/setup-codex.sh` など）は [エージェントワークフロー](../agent-workflow.md#codex-cli) を参照してください。
 
 ## バージョンを固定する
 
@@ -67,7 +67,7 @@ codex plugin add river-review@<マーケットプレイス名>
 
 ## 次に読む
 
-- [最初のレビュー](/guides/quickstart)
-- [チームで使う準備](/guides/plugin/team-setup)
-- [更新・無効化・アンインストール](/guides/plugin/update-and-uninstall)
-- [トラブルシューティング](/guides/troubleshooting#plugin)
+- [最初のレビュー](../quickstart.md)
+- [チームで使う準備](./team-setup.md)
+- [更新・無効化・アンインストール](./update-and-uninstall.md)
+- [トラブルシューティング](../troubleshooting.md#plugin)

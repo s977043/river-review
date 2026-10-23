@@ -4,7 +4,7 @@ River Review を最小構成で試すなら、**まずローカルの AI エー�
 
 ## Path A: Claude Code で 5 分で試す（推奨）
 
-導入手順の詳細（ターミナルからの導入、Codex、版の固定）は [プラグインを導入する](/guides/plugin/install) にまとめています。
+導入手順の詳細（ターミナルからの導入、Codex、版の固定）は [プラグインを導入する](./plugin/install.md) にまとめています。
 
 ### 1. Marketplace を追加
 
@@ -39,7 +39,7 @@ Codex もマーケットプレイスから導入します。
 codex plugin marketplace add s977043/river-review
 ```
 
-Codex で使えるのは同梱スキルです。プラグインの追加手順は [プラグインを導入する](/guides/plugin/install) を参照してください。
+Codex で使えるのは同梱スキルです。プラグインの追加手順は [プラグインを導入する](./plugin/install.md) を参照してください。
 
 ## Path C: GitHub Actions で PR 後レビューを追加する
 

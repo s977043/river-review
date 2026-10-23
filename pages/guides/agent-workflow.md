@@ -1,7 +1,7 @@
 # AI エージェントから River Review を使う
 
 > **どのエントリポイントを使うか**
-> 第一のエントリポイントは、同梱の **skill ルーティングレビュー** です。プラグインを導入し（[導入手順](/guides/plugin/install)）、`river-review` エージェントに diff のレビューを依頼する（または skill を読み込ませる）だけで動きます。`river` CLI などの追加ツールは要りません。Claude Code のセッションコンテキストを自動で渡したい場合は `/river-review:review-local`、ヘッドレスな委譲レビューにはサブエージェント（`agents/river-review.md`）を使ってください。`river` CLI（`river run .`）は **任意の高速化手段** で、プラグインとは別配布、かつ現時点では npm 未公開です。
+> 第一のエントリポイントは、同梱の **skill ルーティングレビュー** です。プラグインを導入し（[導入手順](./plugin/install.md)）、`river-review` エージェントに diff のレビューを依頼する（または skill を読み込ませる）だけで動きます。`river` CLI などの追加ツールは要りません。Claude Code のセッションコンテキストを自動で渡したい場合は `/river-review:review-local`、ヘッドレスな委譲レビューにはサブエージェント（`agents/river-review.md`）を使ってください。`river` CLI（`river run .`）は **任意の高速化手段** で、プラグインとは別配布、かつ現時点では npm 未公開です。
 
 ## 概要
 
@@ -129,7 +129,7 @@ cp templates/agent-workflow/cursor/.cursorrules .cursorrules
 codex exec "river run . --reviewers auto"
 ```
 
-推奨の導入方法はマーケットプレイスの追加です。手順の正本は [プラグインを導入する](/guides/plugin/install) です。
+推奨の導入方法はマーケットプレイスの追加です。手順の正本は [プラグインを導入する](./plugin/install.md) です。
 
 ```bash
 codex plugin marketplace add s977043/river-review
@@ -153,7 +153,7 @@ codex plugin marketplace add s977043/river-review
 
 `skills/agent-skills/` に**エージェント非依存の skill 定義**があります。どのエージェントにも渡せます。
 
-同梱スキルの一覧は [コマンド・エージェント・スキル](/guides/plugin/commands-and-skills) を参照してください。
+同梱スキルの一覧は [コマンド・エージェント・スキル](./plugin/commands-and-skills.md) を参照してください。
 
 エージェントに skill を渡す際は、`skills/agent-skills/<skill-name>/SKILL.md` を読み込ませてください。
 

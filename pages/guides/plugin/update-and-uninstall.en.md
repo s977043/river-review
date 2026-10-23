@@ -15,15 +15,17 @@ The command forms on this page were checked against the `--help` output of Claud
 
 - `claude plugin update` requires a restart to apply (per its `--help` text).
 - The default scope of `uninstall` is `user`. If you installed into another scope, pass `-s, --scope`. `--keep-data` keeps `~/.claude/plugins/data/{id}/`.
-- Inside a session you can also disable it with `/plugin disable river-review@river-review-marketplace` ([Stable interfaces](/reference/stable-interfaces.en)).
+- Inside a session you can also disable it with `/plugin disable river-review@river-review-marketplace` ([Stable interfaces](../../reference/stable-interfaces.en.md)).
 
 ## Codex
 
 | Action                 | Command                                               |
 | ---------------------- | ----------------------------------------------------- |
-| Update the marketplace | `codex plugin marketplace upgrade [<name>]`           |
+| Update the marketplace | `codex plugin marketplace upgrade [MARKETPLACE_NAME]` |
 | Uninstall              | `codex plugin remove river-review@<marketplace-name>` |
 | Remove the marketplace | `codex plugin marketplace remove <name>`              |
+
+Omitting `MARKETPLACE_NAME` from `codex plugin marketplace upgrade` upgrades all configured Git marketplaces (per its `--help` text).
 
 `codex plugin --help` has no disable subcommand.
 
@@ -45,7 +47,7 @@ After Write / Edit / MultiEdit, `scripts/plugin-format-hook.sh` runs and **forma
 
 `scripts/plugin-task-checkpoint-hook.sh` writes a Review Artifact to `$TMPDIR/river-review-task-checkpoint/`. It does not write to the working tree. Set `RIVER_TASK_CHECKPOINT_HOOK=0` to stop it.
 
-See [Stable interfaces](/reference/stable-interfaces.en) for details.
+See [Stable interfaces](../../reference/stable-interfaces.en.md) for details.
 
 ### Stopping the hooks
 
@@ -53,5 +55,5 @@ The distribution has no setting that stops only the PostToolUse hook. To avoid f
 
 ## Related pages
 
-- [Install the plugin](/guides/plugin/install.en)
-- [Troubleshooting](/guides/troubleshooting.en#plugin)
+- [Install the plugin](./install.en.md)
+- [Troubleshooting](../troubleshooting.en.md#plugin)

@@ -1,7 +1,7 @@
 # Using River Review from AI Agents
 
 > **Which entry point should I use?**
-> The primary entry point is the bundled **skill-routed review** — install the plugin ([install guide](/guides/plugin/install.en)) and ask the `river-review` agent (or load the skills) to review your diff. No extra tool such as the `river` CLI is required. Use `/river-review:review-local` when you want River Review orchestrated by Claude Code with automatic context passing from the current session; use the sub-agent (`agents/river-review.md`) for delegated, headless review tasks. The `river` CLI (`river run .`) is an **optional accelerator**, distributed separately and not yet published to npm.
+> The primary entry point is the bundled **skill-routed review** — install the plugin ([install guide](./plugin/install.en.md)) and ask the `river-review` agent (or load the skills) to review your diff. No extra tool such as the `river` CLI is required. Use `/river-review:review-local` when you want River Review orchestrated by Claude Code with automatic context passing from the current session; use the sub-agent (`agents/river-review.md`) for delegated, headless review tasks. The `river` CLI (`river run .`) is an **optional accelerator**, distributed separately and not yet published to npm.
 
 ## Overview
 
@@ -125,7 +125,7 @@ See `templates/agent-workflow/` for ready-to-use config templates.
 codex exec "river run . --reviewers auto"
 ```
 
-The recommended installation method is to add the marketplace. The canonical steps are in [Install the plugin](/guides/plugin/install.en).
+The recommended installation method is to add the marketplace. The canonical steps are in [Install the plugin](./plugin/install.en.md).
 
 ```bash
 codex plugin marketplace add s977043/river-review
@@ -149,7 +149,7 @@ Any environment that can execute shell commands can call `river run .` directly.
 
 `skills/agent-skills/` contains **agent-independent skill definitions** that can be passed to any agent.
 
-For the full list of bundled skills, see [Commands, agents, and skills](/guides/plugin/commands-and-skills.en).
+For the full list of bundled skills, see [Commands, agents, and skills](./plugin/commands-and-skills.en.md).
 
 To use a skill with an agent, load `skills/agent-skills/<skill-name>/SKILL.md` into the agent's context.
 

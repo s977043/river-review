@@ -25,9 +25,9 @@
 
 After creation, fill in project-specific rules. The command asks for architecture policy, forbidden patterns, and security requirements. Committing the file gives every team member's review the same premises.
 
-Plugin mode does not need `.river-review.json`. When you also use GitHub Actions or the CLI, see the [Adopter Playbook](/guides/adopter-playbook.en) and the [GitHub Actions guide](/guides/github-actions.en).
+Plugin mode does not need `.river-review.json`. When you also use GitHub Actions or the CLI, see the [Adopter Playbook](../adopter-playbook.en.md) and the [GitHub Actions guide](../github-actions.en.md).
 
 ## Related pages
 
-- [Install the plugin](/guides/plugin/install.en)
-- [Commands, agents, and skills](/guides/plugin/commands-and-skills.en)
+- [Install the plugin](./install.en.md)
+- [Commands, agents, and skills](./commands-and-skills.en.md)

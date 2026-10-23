@@ -11,7 +11,7 @@ Related: `pages/guides/faq.en.md` (List of common failures)
 1. Right after installing, run `/reload-plugins`.
 2. Commands are namespaced. Type `/river-review:review-local`, not `/review-local`.
 3. Run `claude plugin list` to confirm `river-review` is installed. If it is disabled, enable it with `claude plugin enable river-review@river-review-marketplace`.
-4. In Codex, slash commands do not appear because the distribution manifest (`.codex-plugin/plugin.json`) declares only skills. See [Commands, agents, and skills](/guides/plugin/commands-and-skills.en).
+4. The Codex distribution manifest (`.codex-plugin/plugin.json`) declares `skills` and does not declare `commands`, so slash commands are not part of what is distributed to Codex. See [Commands, agents, and skills](./plugin/commands-and-skills.en.md).
 
 ### The installed version is old
 
@@ -19,7 +19,7 @@ Update the marketplace with `claude plugin marketplace update river-review-marke
 
 ### Edited files get reformatted
 
-The PostToolUse hook formats changed files with the project's prettier. For the behavior and how to stop it, see [Update, disable, and uninstall](/guides/plugin/update-and-uninstall.en).
+The PostToolUse hook formats changed files with the project's prettier. For the behavior and how to stop it, see [Update, disable, and uninstall](./plugin/update-and-uninstall.en.md).
 
 ## CLI (`river run`)
 

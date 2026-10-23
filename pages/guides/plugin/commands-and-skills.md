@@ -53,5 +53,5 @@ Claude Code ではスキルも `/river-review:<skill-name>` で呼び出せま�
 
 ## 関連ページ
 
-- [プラグインを導入する](/guides/plugin/install)
-- [AI エージェントから River Review を使う](/guides/agent-workflow)
+- [プラグインを導入する](./install.md)
+- [AI エージェントから River Review を使う](../agent-workflow.md)

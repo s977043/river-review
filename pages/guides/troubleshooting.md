@@ -11,7 +11,7 @@
 1. インストール直後なら `/reload-plugins` を実行する。
 2. コマンドは名前空間付きである。`/review-local` ではなく `/river-review:review-local` と入力する。
 3. `claude plugin list` で `river-review` が導入済みかを確認する。無効化されている場合は `claude plugin enable river-review@river-review-marketplace` で有効化する。
-4. Codex では、配布定義（`.codex-plugin/plugin.json`）がスキルだけを宣言しているため、スラッシュコマンドは表示されない。詳細は [コマンド・エージェント・スキル](/guides/plugin/commands-and-skills) を参照する。
+4. Codex 向けの配布定義（`.codex-plugin/plugin.json`）は `skills` を宣言し、`commands` を宣言していない。スラッシュコマンドは Codex 向けの配布物に含まれない。詳細は [コマンド・エージェント・スキル](./plugin/commands-and-skills.md) を参照する。
 
 ### 導入済みの版が古い
 
@@ -19,7 +19,7 @@
 
 ### 編集したファイルが勝手に整形される
 
-PostToolUse hook がプロジェクトの prettier で変更ファイルを整形しています。挙動と止め方は [更新・無効化・アンインストール](/guides/plugin/update-and-uninstall) を参照してください。
+PostToolUse hook がプロジェクトの prettier で変更ファイルを整形しています。挙動と止め方は [更新・無効化・アンインストール](./plugin/update-and-uninstall.md) を参照してください。
 
 ## CLI（`river run`）
 

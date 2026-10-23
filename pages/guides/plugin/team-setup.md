@@ -25,9 +25,9 @@
 
 作成後、プロジェクト固有のルールを記入します。コマンドが案内する記入項目は、アーキテクチャ方針、禁止パターン、セキュリティ要件です。ファイルをリポジトリにコミットすると、チーム全員のレビューに同じ前提が渡ります。
 
-Plugin モードでは `.river-review.json` は不要です。GitHub Actions や CLI を併用する場合の設定は [Adopter Playbook](/guides/adopter-playbook) と [GitHub Actions ガイド](/guides/github-actions) を参照してください。
+Plugin モードでは `.river-review.json` は不要です。GitHub Actions や CLI を併用する場合の設定は [Adopter Playbook](../adopter-playbook.md) と [GitHub Actions ガイド](../github-actions.md) を参照してください。
 
 ## 関連ページ
 
-- [プラグインを導入する](/guides/plugin/install)
-- [コマンド・エージェント・スキル](/guides/plugin/commands-and-skills)
+- [プラグインを導入する](./install.md)
+- [コマンド・エージェント・スキル](./commands-and-skills.md)

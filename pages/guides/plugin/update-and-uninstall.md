@@ -15,15 +15,17 @@
 
 - `claude plugin update` の反映には再起動が必要である（`--help` の説明による）。
 - `uninstall` の既定スコープは `user` である。別スコープに入れた場合は `-s, --scope` で指定する。`--keep-data` を付けると `~/.claude/plugins/data/{id}/` を残す。
-- セッション内からは `/plugin disable river-review@river-review-marketplace` でも無効化できる（[安定インターフェース](/reference/stable-interfaces)）。
+- セッション内からは `/plugin disable river-review@river-review-marketplace` でも無効化できる（[安定インターフェース](../../reference/stable-interfaces.md)）。
 
 ## Codex
 
 | 操作                     | コマンド                                                  |
 | ------------------------ | --------------------------------------------------------- |
-| マーケットプレイスの更新 | `codex plugin marketplace upgrade [<名前>]`               |
+| マーケットプレイスの更新 | `codex plugin marketplace upgrade [MARKETPLACE_NAME]`     |
 | アンインストール         | `codex plugin remove river-review@<マーケットプレイス名>` |
 | マーケットプレイスの削除 | `codex plugin marketplace remove <名前>`                  |
+
+`codex plugin marketplace upgrade` は `MARKETPLACE_NAME` を省略すると、設定済みの Git マーケットプレイスをすべて更新します（`--help` の説明による）。
 
 `codex plugin --help` に無効化のサブコマンドはありません。
 
@@ -45,7 +47,7 @@ Write / Edit / MultiEdit の後に `scripts/plugin-format-hook.sh` が動き、*
 
 `scripts/plugin-task-checkpoint-hook.sh` が Review Artifact を `$TMPDIR/river-review-task-checkpoint/` に出力します。作業ツリーには書きません。環境変数 `RIVER_TASK_CHECKPOINT_HOOK=0` で止められます。
 
-詳細は [安定インターフェース](/reference/stable-interfaces) を参照してください。
+詳細は [安定インターフェース](../../reference/stable-interfaces.md) を参照してください。
 
 ### hook を止めたい場合
 
@@ -53,5 +55,5 @@ PostToolUse hook だけを個別に止める設定は配布物にありません
 
 ## 関連ページ
 
-- [プラグインを導入する](/guides/plugin/install)
-- [トラブルシューティング](/guides/troubleshooting#plugin)
+- [プラグインを導入する](./install.md)
+- [トラブルシューティング](../troubleshooting.md#plugin)

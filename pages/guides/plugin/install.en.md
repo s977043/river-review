@@ -36,7 +36,7 @@ The default scope of `claude plugin install` is `user`. To install into another 
 /river-review:review-local
 ```
 
-Commands are namespaced as `/river-review:<name>`. For the full list, see [Commands, agents, and skills](/guides/plugin/commands-and-skills.en).
+Commands are namespaced as `/river-review:<name>`. For the full list, see [Commands, agents, and skills](./commands-and-skills.en.md).
 
 ## Codex
 
@@ -59,7 +59,7 @@ codex plugin add river-review@<marketplace-name>
 
 `.codex-plugin/plugin.json` declares only `skills` (`./skills/agent-skills/`) and `interface` metadata. It does not declare `commands` or `agents`. What Codex can use is the bundled skills; slash commands such as `/river-review:review-local` and the `river-review` sub-agent are not part of its distribution manifest.
 
-For the manual fallback without the marketplace (such as `scripts/setup-codex.sh`), see [Agent workflow](/guides/agent-workflow.en#codex-cli).
+For the manual fallback without the marketplace (such as `scripts/setup-codex.sh`), see [Agent workflow](../agent-workflow.en.md#codex-cli).
 
 ## Pin a version
 
@@ -67,7 +67,7 @@ For a reproducible installation, pin the release tag available at the time. Rele
 
 ## Next
 
-- [First review](/guides/quickstart.en)
-- [Prepare for team use](/guides/plugin/team-setup.en)
-- [Update, disable, and uninstall](/guides/plugin/update-and-uninstall.en)
-- [Troubleshooting](/guides/troubleshooting.en#plugin)
+- [First review](../quickstart.en.md)
+- [Prepare for team use](./team-setup.en.md)
+- [Update, disable, and uninstall](./update-and-uninstall.en.md)
+- [Troubleshooting](../troubleshooting.en.md#plugin)

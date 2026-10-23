@@ -53,5 +53,5 @@ In Claude Code, skills can also be invoked as `/river-review:<skill-name>`.
 
 ## Related pages
 
-- [Install the plugin](/guides/plugin/install.en)
-- [Using River Review from AI Agents](/guides/agent-workflow.en)
+- [Install the plugin](./install.en.md)
+- [Using River Review from AI Agents](../agent-workflow.en.md)
