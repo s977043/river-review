@@ -325,6 +325,19 @@ test('shadow diagnostic: empty and missing map inputs have no findings', () => {
   assert.deepEqual(diagnoseShadowedRiskRules(map, ['docs/unmatched.md']).findings, []);
 });
 
+test('shadow diagnostic: clean analyzed result is not approval evidence', () => {
+  const map = { rules: [{ pattern: 'docs/**', action: 'comment_only' }] };
+  const result = diagnoseShadowedRiskRules(map, ['src/app.ts']);
+  assert.deepEqual(result, {
+    kind: 'risk-map-rule-shadow/v1',
+    authorizesApproval: false,
+    evidenceTrust: 'unverified-input',
+    status: 'analyzed',
+    reasonCodes: [],
+    findings: [],
+  });
+});
+
 test('shadow diagnostic: malformed non-empty inputs fail loudly, no false green', () => {
   const map = { rules: [{ pattern: '**', action: 'escalate' }] };
   assert.throws(() => diagnoseShadowedRiskRules(map, undefined), { name: 'RiskMapError' });
