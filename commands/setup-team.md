@@ -21,7 +21,11 @@ ls .river-review.* 2>/dev/null || echo ".river-review.* が見つかりません
 ### Step 2: .river/rules.md の生成
 
 `.river/rules.md` がなければ作成する。
-テンプレートは `${CLAUDE_PLUGIN_ROOT:-.}/.river/rules.template.md` にある。
+テンプレートは `<plugin root>/.river/rules.template.md` にある。Read ツールが環境変数を展開するとは限らないため、`${CLAUDE_PLUGIN_ROOT}` を含むパスをそのまま Read に渡さない。
+
+1. Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
+2. 出力が空のときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
+3. それでもテンプレートを読めなければ、`.river/rules.md` を推測で作らない。「テンプレートが見つからない」と報告して止まる。
 
 テンプレートの内容を `.river/rules.md` として Write ツールで保存する（親ディレクトリは自動作成される）。
 
