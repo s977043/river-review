@@ -12,7 +12,7 @@
 2. コマンドは名前空間付きである。`/review-local` ではなく `/river-review:review-local` と入力する。
 3. `claude plugin list` で `river-review` が導入済みかを確認する。無効化されている場合は `claude plugin enable river-review@river-review-marketplace` で有効化する。
 4. Codex 向けの配布定義（`.codex-plugin/plugin.json`）は `skills` を宣言し、`commands` を宣言していない。スラッシュコマンドは Codex 向けの配布物に含まれない。詳細は [コマンド・エージェント・スキル](./plugin/commands-and-skills.md) を参照する。
-5. Codex で導入済み・有効なのにスキルが使えない場合は、スキル一覧の予算超過を疑う。導入しているスキルが多いと、Codex はモデルに渡すスキル一覧を予算内に切り詰め、名前順で後ろにある `river-review:*` が一覧から落ちることがある。リポジトリの外で `codex debug prompt-input test` を実行し、`river-review:` で始まるスキルが出るかを確かめる。出ない場合は、使っていないプラグインを外すか、予算を上げる（例: `codex -c skills.max_context_tokens=200000 debug prompt-input test` で出ることを確かめてから、`~/.codex/config.toml` の `[skills]` に `max_context_tokens` を設定する）。codex-cli 0.160.1 で確認した挙動である。
+5. Codex で導入済み・有効なのにスキルが使えない場合は、スキル一覧の予算超過を疑う。導入しているスキルが多いと、Codex はモデルに渡すスキル一覧を予算内に切り詰め、名前順で後ろにある `river-review:*` が一覧から落ちることがある。リポジトリの外で `codex debug prompt-input test` を実行し、`river-review:` で始まるスキルが出るかを確かめる。出ない場合は、使っていないプラグインを外すか、予算を上げる。予算を上げるときは、まず `codex -c skills.max_context_tokens=200000 debug prompt-input test` で出ることを確かめる。確かめたら `~/.codex/config.toml` の `[skills]` に `max_context_tokens` を設定する。codex-cli 0.160.1 で確認した挙動である。
 
 ### 導入済みの版が古い
 
