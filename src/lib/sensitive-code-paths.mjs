@@ -30,6 +30,10 @@ const SENSITIVE_PARTS = new Set([
   'billing',
   'secret',
   'secrets',
+  'credential',
+  'credentials',
+  'oauth',
+  'key-management',
   'privacy',
   'pii',
 ]);
