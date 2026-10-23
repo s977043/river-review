@@ -62,6 +62,27 @@ test('sensitive paths: mixed files and Windows separators preserve evidence path
   );
 });
 
+test('sensitive paths: UI components and cross-language auth code are in scope', () => {
+  assert.deepEqual(
+    findSensitiveCodePaths([
+      'src/auth/SignIn.vue',
+      'src/authorization/Guard.svelte',
+      'apps/shop/payments/Checkout.astro',
+      'lib/permissions/Policy.cs',
+      'services/auth/SignIn.swift',
+      'app/credentials/Store.dart',
+      'src/lib/author.vue',
+    ]),
+    [
+      'src/auth/SignIn.vue',
+      'src/authorization/Guard.svelte',
+      'apps/shop/payments/Checkout.astro',
+      'lib/permissions/Policy.cs',
+      'services/auth/SignIn.swift',
+    ]
+  );
+});
+
 test('sensitive paths: malformed input does not throw or invent sensitive paths', () => {
   for (const bad of [null, undefined, '', {}, 5]) {
     assert.deepEqual(findSensitiveCodePaths(bad), []);
