@@ -137,7 +137,7 @@ export function diagnoseShadowedRiskRules(riskMap, filePaths) {
     let selectedRule = null;
     let selectedRuleIndex = -1;
     for (const [ruleIndex, rule] of riskMap.rules.entries()) {
-      if (!rule || typeof rule.pattern !== 'string' || !(rule.action in ACTION_PRIORITY)) {
+      if (!rule || typeof rule.pattern !== 'string' || !Object.hasOwn(ACTION_PRIORITY, rule.action)) {
         throw new RiskMapError('Invalid risk rule in shadow diagnostic');
       }
       if (!minimatch(file, rule.pattern, { dot: true })) continue;
