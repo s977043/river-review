@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.133.4](https://github.com/s977043/river-review/compare/v1.133.3...v1.133.4) (2026-10-23)
+
+
+### Bug Fixes
+
+* **commands:** setup-team の導入コマンドと動作確認コマンドを現行の形に直す ([#2776](https://github.com/s977043/river-review/issues/2776)) ([e4f710b](https://github.com/s977043/river-review/commit/e4f710bee514c41dc89f8f8a22338cca759883ea))
+* **commands:** skill で RIVER_ROOT 変数を使わず CLAUDE_PLUGIN_ROOT を各コマンドで展開する ([#2779](https://github.com/s977043/river-review/issues/2779)) ([dc71811](https://github.com/s977043/river-review/commit/dc71811a639a0e48a6c68817b2e8e35f701da390))
+* **experiments:** small-change-host-observe の 300 件上限と未固定の fail-closed 条件を直す ([#2783](https://github.com/s977043/river-review/issues/2783)) ([fd0749c](https://github.com/s977043/river-review/commit/fd0749c55da8b03764be9f7cbd123b0707690051)), closes [#2748](https://github.com/s977043/river-review/issues/2748)
+
 ## [1.133.3](https://github.com/s977043/river-review/compare/v1.133.2...v1.133.3) (2026-10-23)
 
 
