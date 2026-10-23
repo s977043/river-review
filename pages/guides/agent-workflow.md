@@ -1,7 +1,7 @@
 # AI エージェントから River Review を使う
 
 > **どのエントリポイントを使うか**
-> 第一の（インストール不要の）エントリポイントは、同梱の **skill ルーティングレビュー** です。プラグインを導入し、`river-review` エージェントに diff のレビューを依頼する（または skill を読み込ませる）だけで動きます。Claude Code のセッションコンテキストを自動で渡したい場合は `/review-local`、ヘッドレスな委譲レビューにはサブエージェント（`agents/river-review.md`）を使ってください。`river` CLI（`river run .`）は **任意の高速化手段** で、プラグインとは別配布、かつ現時点では npm 未公開です。
+> 第一のエントリポイントは、同梱の **skill ルーティングレビュー** です。プラグインを導入し（[導入手順](./plugin/install.md)）、`river-review` エージェントに diff のレビューを依頼する（または skill を読み込ませる）だけで動きます。`river` CLI などの追加ツールは要りません。Claude Code のセッションコンテキストを自動で渡したい場合は `/river-review:review-local`、ヘッドレスな委譲レビューにはサブエージェント（`agents/river-review.md`）を使ってください。`river` CLI（`river run .`）は **任意の高速化手段** で、プラグインとは別配布、かつ現時点では npm 未公開です。
 
 ## 概要
 
@@ -81,13 +81,13 @@ CLI の導入を必須条件にしないでください。
 
 ## エージェント別の呼び出し方
 
-| エージェント   | 呼び出し方                                | 専用定義ファイル                           |
-| -------------- | ----------------------------------------- | ------------------------------------------ |
-| Claude Code    | Bash ツール / `/review-local` / sub-agent | `agents/river-review.md`                   |
-| Cursor         | Terminal タブ / `@terminal`               | —                                          |
-| Codex CLI      | `codex exec "river run ."`                | `templates/agent-workflow/codex/AGENTS.md` |
-| GitHub Copilot | ターミナルで直接実行                      | `.github/agents/river-review.agent.md`     |
-| その他         | シェルで `river run .`                    | `agents/examples/river-review.agent.yaml`  |
+| エージェント   | 呼び出し方                                             | 専用定義ファイル                           |
+| -------------- | ------------------------------------------------------ | ------------------------------------------ |
+| Claude Code    | Bash ツール / `/river-review:review-local` / sub-agent | `agents/river-review.md`                   |
+| Cursor         | Terminal タブ / `@terminal`                            | —                                          |
+| Codex CLI      | `codex exec "river run ."`                             | `templates/agent-workflow/codex/AGENTS.md` |
+| GitHub Copilot | ターミナルで直接実行                                   | `.github/agents/river-review.agent.md`     |
+| その他         | シェルで `river run .`                                 | `agents/examples/river-review.agent.yaml`  |
 
 ### Claude Code
 
@@ -100,7 +100,7 @@ river run . --reviewers auto
 スラッシュコマンドとサブエージェントも利用できます。
 
 ```text
-/review-local
+/river-review:review-local
 ```
 
 ```text
@@ -129,13 +129,13 @@ cp templates/agent-workflow/cursor/.cursorrules .cursorrules
 codex exec "river run . --reviewers auto"
 ```
 
-Codex は Claude Code と同じプラグインマーケットプレイスに対応しています（両者は同一の `.claude-plugin/marketplace.json` を共有します）。推奨の導入方法はマーケットプレイスの追加です。
+推奨の導入方法はマーケットプレイスの追加です。手順の正本は [プラグインを導入する](./plugin/install.md) です。
 
 ```bash
 codex plugin marketplace add s977043/river-review
 ```
 
-Codex は skills と interface メタデータをリポジトリ同梱の `.codex-plugin/plugin.json`（Codex ネイティブ manifest）から読み込みます。マーケットプレイス追加で専門レビュー skill がネイティブ登録されるため、追加のセットアップは不要です。
+`.codex-plugin/plugin.json` が宣言するのは `skills` と `interface` メタデータだけで、`commands` と `agents` は宣言していません。Codex で使えるのは同梱スキルです。
 
 マーケットプレイスを使わない場合は、フォールバックが 2 つあります。1 つは `scripts/setup-codex.sh` の実行です（`AGENTS.md` 案内と `skills/agent-skills/` 一式を references 込みで冪等に vendoring します）。もう 1 つは専用定義 `templates/agent-workflow/codex/AGENTS.md` をプロジェクトの `AGENTS.md` へマージまたは追記する方法です。いずれもコミット前に River Review を自動実行できます。
 
@@ -153,16 +153,7 @@ Codex は skills と interface メタデータをリポジトリ同梱の `.code
 
 `skills/agent-skills/` に**エージェント非依存の skill 定義**があります。どのエージェントにも渡せます。
 
-| Skill                       | 用途                                                        |
-| --------------------------- | ----------------------------------------------------------- |
-| `river-review`              | メインレビュー（intent 分類 → 専門 skill へのルーティング） |
-| `river-review-code`         | コードレビュー特化                                          |
-| `river-review-security`     | セキュリティレビュー                                        |
-| `river-review-performance`  | パフォーマンスレビュー（N+1 / 最適化）                      |
-| `river-review-testing`      | テストカバレッジ                                            |
-| `river-review-architecture` | アーキテクチャレビュー                                      |
-| `adversarial-review`        | 逆張りレビュー（前提を疑う）                                |
-| `river-review-docs`         | ドキュメント整合性レビュー（README / 翻訳 / 用語）          |
+同梱スキルの一覧は [コマンド・エージェント・スキル](./plugin/commands-and-skills.md) を参照してください。
 
 エージェントに skill を渡す際は、`skills/agent-skills/<skill-name>/SKILL.md` を読み込ませてください。
 

@@ -38,7 +38,7 @@ codex plugin marketplace add s977043/river-review
 
 Normal plugin usage **does not need an additional River Review LLM API key**. Headless GitHub Actions and standalone `river run` require a configured LLM provider API key.
 
-For installation options, pinning, and GitHub Actions setup, see the [five-minute Quickstart](https://river-review.the3396.com/guides/quickstart.en/). River Review is distributed via plugins and GitHub Actions, not npm publication. Contributors can run the in-repo CLI with `npm run river -- ...`.
+For installation options and pinning, see [Install the plugin](https://river-review.the3396.com/guides/plugin/install.en/); for GitHub Actions setup, see the [five-minute Quickstart](https://river-review.the3396.com/guides/quickstart.en/). River Review is distributed via plugins and GitHub Actions, not npm publication. Contributors can run the in-repo CLI with `npm run river -- ...`.
 
 <!-- x-release-please-start-version -->
 

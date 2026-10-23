@@ -22,12 +22,12 @@ flowchart LR
 **PR 前にローカルでノイズを落とし、PR 後にチーム共通の基準で再確認する。**  
 AI は findings と判断材料を出し、GO / NO-GO や最終承認は人間・呼び出し側が担います。
 
-- **まず 5 分で試す**: [クイックスタート](/guides/quickstart)
-- **既存のレビュー観点から始める**: [Starter Cookbook](/guides/starter-cookbook)
-- **OSSの開発・貢献方針を知る**: [実践進化方針](/guides/governance/practice-evolution)
-- **PR 前 + PR 後の 2 段構えで運用する**: [2 段構えレビューゲート](/guides/two-stage-review-gate)
+- **まず 5 分で試す**: [クイックスタート](./guides/quickstart.md)
+- **既存のレビュー観点から始める**: [Starter Cookbook](./guides/starter-cookbook.md)
+- **OSSの開発・貢献方針を知る**: [実践進化方針](./guides/governance/practice-evolution.md)
+- **PR 前 + PR 後の 2 段構えで運用する**: [2 段構えレビューゲート](./guides/two-stage-review-gate.md)
 - **他の AI レビューツールと比較する**: [AI コードレビュー比較](/comparison/ai-code-review-tools)
-- **品質・回帰・コストを測る**: [Run store / 回帰比較](/guides/track-runs-and-regressions)、[コスト見積もり](/guides/cost-estimation)、[ダッシュボード](/dashboard)
+- **品質・回帰・コストを測る**: [Run store / 回帰比較](./guides/track-runs-and-regressions.md)、[コスト見積もり](./guides/cost-estimation.md)、[ダッシュボード](/dashboard)
 
 ## 最速で試す
 
@@ -48,7 +48,7 @@ AI は findings と判断材料を出し、GO / NO-GO や最終承認は人間�
 codex plugin marketplace add s977043/river-review
 ```
 
-マーケットプレイス追加後、River Review の専門 review skill を Codex から利用できます。詳細は [クイックスタート](/guides/quickstart) を参照してください。
+Codex で使えるのは同梱スキルです。導入手順の正本は [プラグインを導入する](./guides/plugin/install.md) です。
 
 ## 何が変わるのか
 
@@ -58,7 +58,7 @@ codex plugin marketplace add s977043/river-review
 - **観点の揺れを抑える**: fixture + golden output で期待挙動を固定し、回帰 Eval で変更を検証する。
 - **不要な指摘を抑える**: confidence / severity / suppression memory / review coverage でノイズを管理する。
 
-実例は [代表スキルのショーケース](/guides/representative-skills) で fixture と期待出力まで確認できます。
+実例は [代表スキルのショーケース](./guides/representative-skills.md) で fixture と期待出力まで確認できます。
 
 ## 導入後に使える品質・運用機能
 
