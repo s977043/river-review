@@ -124,10 +124,11 @@ export function evaluateRisk(riskMap, filePaths) {
  * @returns {Array<{file: string, selectedRuleIndex: number, selectedPattern: string, selectedAction: string, shadowedRuleIndex: number, shadowedPattern: string, shadowedAction: string}>}
  */
 export function diagnoseShadowedRiskRules(riskMap, filePaths) {
-  if (!riskMap || (Array.isArray(filePaths) && filePaths.length === 0)) return [];
+  if (!riskMap) return [];
   if (!Array.isArray(filePaths) || !Array.isArray(riskMap.rules)) {
     throw new RiskMapError('Invalid input for risk rule shadow diagnostic');
   }
+  if (filePaths.length === 0) return [];
 
   const candidates = [];
   for (const file of filePaths) {
