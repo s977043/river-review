@@ -121,14 +121,23 @@ export function evaluateRisk(riskMap, filePaths) {
  *
  * @param {object | null} riskMap parsed and validated risk map
  * @param {string[]} filePaths changed repository-relative file paths
- * @returns {Array<{file: string, selectedRuleIndex: number, selectedPattern: string, selectedAction: string, shadowedRuleIndex: number, shadowedPattern: string, shadowedAction: string}>}
+ * @returns {{ kind: 'risk-map-rule-shadow/v1', status: 'analyzed' | 'unknown', reasonCodes: string[], findings: Array<{file: string, selectedRuleIndex: number, selectedPattern: string, selectedAction: string, shadowedRuleIndex: number, shadowedPattern: string, shadowedAction: string}>, authorizesApproval: false, evidenceTrust: 'unverified-input' }}
  */
 export function diagnoseShadowedRiskRules(riskMap, filePaths) {
-  if (!riskMap) return [];
+  const base = {
+    kind: 'risk-map-rule-shadow/v1',
+    authorizesApproval: false,
+    evidenceTrust: 'unverified-input',
+  };
+  if (!riskMap) {
+    return { ...base, status: 'unknown', reasonCodes: ['missing-risk-map'], findings: [] };
+  }
   if (!Array.isArray(filePaths) || !Array.isArray(riskMap.rules)) {
     throw new RiskMapError('Invalid input for risk rule shadow diagnostic');
   }
-  if (filePaths.length === 0) return [];
+  if (filePaths.length === 0) {
+    return { ...base, status: 'unknown', reasonCodes: ['no-changed-files'], findings: [] };
+  }
 
   const candidates = [];
   for (const file of filePaths) {
@@ -158,7 +167,7 @@ export function diagnoseShadowedRiskRules(riskMap, filePaths) {
       }
     }
   }
-  return candidates;
+  return { ...base, status: 'analyzed', reasonCodes: [], findings: candidates };
 }
 
 /**
