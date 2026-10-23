@@ -54,13 +54,15 @@ cat "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null | grep '"version"' || echo 
 
 インストールされていない場合は以下を案内する:
 
-```bash
-claude plugin add s977043/river-review
+```text
+/plugin marketplace add s977043/river-review
+/plugin install river-review@river-review-marketplace
+/reload-plugins
 ```
 
 ### Step 5: 動作確認
 
-セットアップが完了したら `/review-local` を実行して動作確認を行う。
+セットアップが完了したら `/river-review:review-local` を実行して動作確認を行う。
 
 ## Output
 
