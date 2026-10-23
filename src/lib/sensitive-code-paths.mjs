@@ -38,7 +38,7 @@ const SENSITIVE_PARTS = new Set([
   'pii',
 ]);
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?|vue|svelte|astro|py|php|go|rs|rb|java|kt|cs|swift|dart)$/i;
-const TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?|py|php|go|rs|rb|java|kt)$/i;
+const TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?|vue|svelte|astro|py|php|go|rs|rb|java|kt|cs|swift|dart)$/i;
 const NON_PRODUCT_DIRS = new Set([
   'test',
   'tests',
