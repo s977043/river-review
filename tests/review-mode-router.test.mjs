@@ -279,3 +279,14 @@ test('mixed source with Windows paths escalates while keeping the route JSON sha
     'nextCommand',
   ]);
 });
+
+test('sensitive code routing composes with existing CI and dependency triggers', () => {
+  const result = routeReviewMode({
+    changedFiles: ['src/auth/login.ts', '.github/workflows/ci.yml', 'package-lock.json'],
+  });
+  assert.equal(result.selectedMode, 'team');
+  assert.equal(result.recommendedReviewers, 'auto');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+  assert.ok(result.matchedTriggers.includes('fileType:ci'));
+  assert.ok(result.matchedTriggers.includes('fileType:dependency'));
+});
