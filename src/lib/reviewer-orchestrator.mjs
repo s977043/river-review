@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isCIWorkflowFile, isDependencyFile } from './file-classifier.mjs';
+import { findSensitiveCodePaths } from './sensitive-code-paths.mjs';
 import { generateReview, resolveRedactOptions } from './review-engine.mjs';
 import { mergeConfig } from '../config/loader.mjs';
 import { defaultConfig } from '../config/default.mjs';
@@ -354,6 +355,16 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
     (fileTypes?.infra?.length ?? 0);
   if (riskyFiles > 0 || infraFiles > 0) {
     add('security-scanner', 'files:risk-or-infra');
+  }
+
+  // The review-depth router and auto specialist selection must share the same
+  // sensitive-path predicate. A team route alone does not ensure that a security
+  // reviewer runs for a single auth/payment file.
+  const changedPaths = Object.values(fileTypes ?? {}).flatMap((paths) =>
+    Array.isArray(paths) ? paths : []
+  );
+  if (findSensitiveCodePaths(changedPaths).length > 0) {
+    add('security-scanner', 'files:sensitive-code');
   }
 
   const testFiles = fileTypes?.test?.length ?? 0;
