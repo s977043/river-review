@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.133.3](https://github.com/s977043/river-review/compare/v1.133.2...v1.133.3) (2026-10-23)
+
+
+### Bug Fixes
+
+* **commands:** resolve CLAUDE_PLUGIN_ROOT in Bash before Read in setup-team and skill ([#2772](https://github.com/s977043/river-review/issues/2772)) ([9c4b5cc](https://github.com/s977043/river-review/commit/9c4b5cc4816dd779715799b3d981f2ccd3b4d6f9)), closes [#2766](https://github.com/s977043/river-review/issues/2766)
+
 ## [1.133.2](https://github.com/s977043/river-review/compare/v1.133.1...v1.133.2) (2026-10-22)
 
 
