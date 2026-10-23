@@ -35,6 +35,7 @@ test('sensitive paths: directory and filename tokens cover several source roots'
       'src/lib/billing_manager.go',
       'app/api/auth/route.ts',
       'services/admin/access-control/check.ts',
+      'src/auth-service/rotate.ts',
     ]),
     [
       'src/authorization.ts',
@@ -44,6 +45,7 @@ test('sensitive paths: directory and filename tokens cover several source roots'
       'src/lib/billing_manager.go',
       'app/api/auth/route.ts',
       'services/admin/access-control/check.ts',
+      'src/auth-service/rotate.ts',
     ]
   );
 });
