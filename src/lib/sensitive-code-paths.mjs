@@ -3,7 +3,17 @@
  * This heuristic is deliberately incomplete: it never grants permission,
  * downgrades a Risk Map requirement, or claims semantic change coverage.
  */
-const SOURCE_ROOTS = new Set(['src', 'runners', 'apps', 'app', 'packages', 'lib', 'server', 'services', 'api']);
+const SOURCE_ROOTS = new Set([
+  'src',
+  'runners',
+  'apps',
+  'app',
+  'packages',
+  'lib',
+  'server',
+  'services',
+  'api',
+]);
 const SENSITIVE_PARTS = new Set([
   'auth',
   'authn',
