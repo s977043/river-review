@@ -231,7 +231,6 @@ test('auto specialist selection aligns with dependency and CI route signals', ()
   }
 });
 
-
 test('sensitive auth source uses team review without a risk map or large diff', () => {
   const result = routeReviewMode({
     changedFiles: ['src/auth/login.ts'],
