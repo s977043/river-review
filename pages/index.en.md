@@ -46,7 +46,7 @@ Normal plugin usage needs **no additional River Review LLM API key**. Claude Cod
 codex plugin marketplace add s977043/river-review
 ```
 
-After adding the marketplace, River Review's specialist review skills are available to Codex. See the [Quickstart](/guides/quickstart.en) for the full path.
+What Codex can use is the bundled skills. The canonical install steps are in [Install the plugin](/guides/plugin/install.en).
 
 ## What changes in practice
 

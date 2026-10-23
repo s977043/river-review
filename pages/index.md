@@ -48,7 +48,7 @@ AI は findings と判断材料を出し、GO / NO-GO や最終承認は人間�
 codex plugin marketplace add s977043/river-review
 ```
 
-マーケットプレイス追加後、River Review の専門 review skill を Codex から利用できます。詳細は [クイックスタート](/guides/quickstart) を参照してください。
+Codex で使えるのは同梱スキルです。導入手順の正本は [プラグインを導入する](/guides/plugin/install) です。
 
 ## 何が変わるのか
 

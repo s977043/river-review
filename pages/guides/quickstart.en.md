@@ -4,6 +4,8 @@ The shortest way to try River Review is to **start from a local AI agent**. You 
 
 ## Path A: Try with Claude Code in five minutes (recommended)
 
+Full install details (terminal install, Codex, version pinning) are in [Install the plugin](/guides/plugin/install.en).
+
 ### 1. Add the marketplace
 
 ```text
@@ -31,13 +33,13 @@ For focused review, bundled Skills include `river-review-security`, `river-revie
 
 ## Path B: Try with Codex
 
-Codex uses the same plugin marketplace.
+Codex also installs from the marketplace.
 
 ```text
 codex plugin marketplace add s977043/river-review
 ```
 
-After the marketplace is added, River Review specialist review skills are registered from `.codex-plugin/plugin.json`. See [Agent workflow](./agent-workflow.en.md) for the full setup and manual copy-in fallback.
+What Codex can use is the bundled skills. See [Install the plugin](/guides/plugin/install.en) for the step that adds the plugin.
 
 ## Path C: Add post-PR review with GitHub Actions
 
