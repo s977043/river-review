@@ -12,6 +12,7 @@ Related: `pages/guides/faq.en.md` (List of common failures)
 2. Commands are namespaced. Type `/river-review:review-local`, not `/review-local`.
 3. Run `claude plugin list` to confirm `river-review` is installed. If it is disabled, enable it with `claude plugin enable river-review@river-review-marketplace`.
 4. The Codex distribution manifest (`.codex-plugin/plugin.json`) declares `skills` and does not declare `commands`, so slash commands are not part of what is distributed to Codex. See [Commands, agents, and skills](./plugin/commands-and-skills.en.md).
+5. If the plugin is installed and enabled in Codex but its skills are unavailable, suspect the skills list budget. When many skills are installed, Codex trims the skills list it passes to the model to fit a budget, and `river-review:*`, which sorts late by name, can drop out. Run `codex debug prompt-input test` outside the repository and check whether skills starting with `river-review:` appear. If they do not, remove plugins you do not use, or raise the budget (for example, confirm they appear with `codex -c skills.max_context_tokens=200000 debug prompt-input test`, then set `max_context_tokens` under `[skills]` in `~/.codex/config.toml`). Observed with codex-cli 0.160.1.
 
 ### The installed version is old
 
