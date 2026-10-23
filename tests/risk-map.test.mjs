@@ -328,3 +328,33 @@ test('shadow diagnostic: malformed non-empty inputs fail loudly, no false green'
     name: 'RiskMapError',
   });
 });
+
+test('shadow diagnostic: only higher action than the actual first match is reported', () => {
+  const map = {
+    rules: [
+      { pattern: 'src/**', action: 'escalate' },
+      { pattern: 'src/auth/**', action: 'require_human_review' },
+      { pattern: 'src/**', action: 'comment_only' },
+    ],
+  };
+  const result = diagnoseShadowedRiskRules(map, ['src/auth/login.ts', 'src/other.ts']);
+  assert.equal(result.length, 1);
+  assert.deepEqual(
+    [result[0].file, result[0].selectedAction, result[0].shadowedAction],
+    ['src/auth/login.ts', 'escalate', 'require_human_review']
+  );
+  const baseline = evaluateRisk(map, ['src/auth/login.ts']);
+  assert.equal(baseline.aggregateAction, 'escalate');
+});
+
+test('shadow diagnostic: same path normalization semantics as existing risk evaluator', () => {
+  const map = {
+    rules: [
+      { pattern: 'src/**', action: 'comment_only' },
+      { pattern: 'src/auth/**', action: 'require_human_review' },
+    ],
+  };
+  const windowsStyle = 'src\\\\auth\\\\login.ts';
+  assert.equal(evaluateRisk(map, [windowsStyle]).aggregateAction, 'comment_only');
+  assert.deepEqual(diagnoseShadowedRiskRules(map, [windowsStyle]), []);
+});
