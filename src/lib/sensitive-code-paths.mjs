@@ -70,12 +70,13 @@ export function findSensitiveCodePaths(changedFiles) {
       return false;
     }
     // Token boundaries prevent 'author.ts' and 'authoring/' matching 'auth'.
+    const tokenize = (part) => {
+      const separated = part.replace(/([a-z0-9])([A-Z])/g, '$1-$2');
+      const lower = part.toLowerCase();
+      return [lower, ...separated.toLowerCase().split(/[._-]/)];
+    };
     const stem = basename.replace(SOURCE_EXT, '');
-    const nameTokens = stem.toLowerCase().split(/[._-]/);
-    const directoryTokens = segments.slice(1, -1).flatMap((segment) => {
-      const lower = segment.toLowerCase();
-      return [lower, ...lower.split(/[._-]/)];
-    });
-    return [...directoryTokens, ...nameTokens].some((token) => SENSITIVE_PARTS.has(token));
+    const tokens = [...segments.slice(1, -1).flatMap(tokenize), ...tokenize(stem)];
+    return tokens.some((token) => SENSITIVE_PARTS.has(token));
   });
 }
