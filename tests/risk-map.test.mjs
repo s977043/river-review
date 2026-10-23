@@ -321,4 +321,10 @@ test('shadow diagnostic: malformed non-empty inputs fail loudly, no false green'
   assert.throws(() => diagnoseShadowedRiskRules({ rules: 'broken' }, ['src/x.ts']), {
     name: 'RiskMapError',
   });
+  assert.throws(() => diagnoseShadowedRiskRules({ rules: 'broken' }, []), {
+    name: 'RiskMapError',
+  });
+  assert.throws(() => diagnoseShadowedRiskRules({ rules: [{ pattern: '**', action: 'toString' }] }, ['src/x.ts']), {
+    name: 'RiskMapError',
+  });
 });
