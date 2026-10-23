@@ -49714,6 +49714,98 @@ function shouldExcludeForContext(relPath, opts = {}) {
 
 /***/ }),
 
+/***/ 4286:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   j: () => (/* binding */ findSensitiveCodePaths)
+/* harmony export */ });
+/**
+ * High-confidence, path-only signals for review-depth escalation.
+ * This heuristic is deliberately incomplete: it never grants permission,
+ * downgrades a Risk Map requirement, or claims semantic change coverage.
+ */
+const SOURCE_ROOTS = new Set([
+  'src',
+  'runners',
+  'apps',
+  'app',
+  'packages',
+  'lib',
+  'server',
+  'services',
+  'api',
+]);
+const SENSITIVE_PARTS = new Set([
+  'auth',
+  'authn',
+  'authz',
+  'authentication',
+  'authorization',
+  'permission',
+  'permissions',
+  'access-control',
+  'rbac',
+  'acl',
+  'payment',
+  'payments',
+  'billing',
+  'secret',
+  'secrets',
+  'credential',
+  'credentials',
+  'oauth',
+  'key-management',
+  'privacy',
+  'pii',
+]);
+const SOURCE_EXT = /\.(?:[cm]?[jt]sx?|vue|svelte|astro|py|php|go|rs|rb|java|kt|cs|swift|dart)$/i;
+const TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]sx?|vue|svelte|astro|py|php|go|rs|rb|java|kt|cs|swift|dart)$/i;
+const NON_PRODUCT_DIRS = new Set([
+  'test',
+  'tests',
+  '__tests__',
+  'fixture',
+  'fixtures',
+  '__fixtures__',
+  'docs',
+  'documentation',
+  'examples',
+]);
+
+/**
+ * Find source-code paths whose directory or filename tokens explicitly name a
+ * security/privacy/payment-sensitive area. This is a conservative review hint,
+ * not a complete classifier or an approval decision.
+ * @param {unknown} changedFiles
+ * @returns {string[]}
+ */
+function findSensitiveCodePaths(changedFiles) {
+  if (!Array.isArray(changedFiles)) return [];
+  return changedFiles.filter((file) => {
+    if (typeof file !== 'string') return false;
+    const segments = file.replaceAll('\\', '/').split('/');
+    if (!SOURCE_ROOTS.has(segments[0])) return false;
+    const basename = segments.at(-1);
+    if (!basename || !SOURCE_EXT.test(basename) || TEST_FILE.test(basename)) return false;
+    if (segments.slice(1, -1).some((segment) => NON_PRODUCT_DIRS.has(segment.toLowerCase()))) {
+      return false;
+    }
+    // Token boundaries prevent 'author.ts' and 'authoring/' matching 'auth'.
+    const tokenize = (part) => {
+      const separated = part.replace(/([a-z0-9])([A-Z])/g, '$1-$2');
+      const lower = part.toLowerCase();
+      return [lower, ...separated.toLowerCase().split(/[._-]/)];
+    };
+    const stem = basename.replace(SOURCE_EXT, '');
+    const tokens = [...segments.slice(1, -1).flatMap(tokenize), ...tokenize(stem)];
+    return tokens.some((token) => SENSITIVE_PARTS.has(token));
+  });
+}
+
+
+/***/ }),
+
 /***/ 4029:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
@@ -53966,7 +54058,7 @@ async function runReviewVerify(parsed) {
 async function runReviewRoute(parsed) {
   try {
     const { routeReviewMode, formatRouterResultMarkdown } =
-      await __nccwpck_require__.e(/* import() */ 363).then(__nccwpck_require__.bind(__nccwpck_require__, 7363));
+      await __nccwpck_require__.e(/* import() */ 709).then(__nccwpck_require__.bind(__nccwpck_require__, 1709));
     const { loadRiskMap } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 572));
     const {
       targetPath: routeTargetPath,
@@ -109440,6 +109532,8 @@ async function resolveSelectionSkillIds(
 var review_engine = __nccwpck_require__(7156);
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
 var file_classifier = __nccwpck_require__(4673);
+// EXTERNAL MODULE: ./src/lib/sensitive-code-paths.mjs
+var sensitive_code_paths = __nccwpck_require__(4286);
 // EXTERNAL MODULE: ./src/config/default.mjs
 var config_default = __nccwpck_require__(4807);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
@@ -109546,6 +109640,7 @@ var review_coverage = __nccwpck_require__(3054);
 // EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
 var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
+
 
 
 
@@ -109893,6 +109988,16 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
     (fileTypes?.infra?.length ?? 0);
   if (riskyFiles > 0 || infraFiles > 0) {
     add('security-scanner', 'files:risk-or-infra');
+  }
+
+  // The review-depth router and auto specialist selection must share the same
+  // sensitive-path predicate. A team route alone does not ensure that a security
+  // reviewer runs for a single auth/payment file.
+  const changedPaths = Object.values(fileTypes ?? {}).flatMap((paths) =>
+    Array.isArray(paths) ? paths : []
+  );
+  if ((0,sensitive_code_paths/* findSensitiveCodePaths */.j)(changedPaths).length > 0) {
+    add('security-scanner', 'files:sensitive-code');
   }
 
   const testFiles = fileTypes?.test?.length ?? 0;
@@ -117712,7 +117817,7 @@ async function runPromptCompare(parsed, targetPath, output) {
 
   const { resolveStoreDir, loadAllRunRecords } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
   const { buildPromptComparison, formatPromptComparisonMarkdown, PromptComparisonError } =
-    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(709)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
+    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(90)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
   const { PairedReplayError } = await __nccwpck_require__.e(/* import() */ 80).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
 
   const runRecords = await loadAllRunRecords(resolveStoreDir(targetPath));
@@ -117765,7 +117870,7 @@ async function runPromptAb(parsed, targetPath, output) {
 
   const { resolveStoreDir, loadAllRunRecords } = await __nccwpck_require__.e(/* import() */ 260).then(__nccwpck_require__.bind(__nccwpck_require__, 4260));
   const { buildPromptAbComparison, formatPromptAbMarkdown, PromptComparisonError } =
-    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(709)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
+    await Promise.all(/* import() */[__nccwpck_require__.e(80), __nccwpck_require__.e(90)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6709));
   const { PairedReplayError } = await __nccwpck_require__.e(/* import() */ 80).then(__nccwpck_require__.bind(__nccwpck_require__, 3080));
 
   const runRecords = await loadAllRunRecords(resolveStoreDir(targetPath));
