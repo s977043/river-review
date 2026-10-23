@@ -314,3 +314,17 @@ test('non-sensitive source and auth tests do not force the security specialist',
     assert.ok(!roles.includes('security-scanner'), file);
   }
 });
+
+test('CamelCase production paths and component specs preserve specialist routing', () => {
+  const sourceFiles = ['app/Http/Controllers/AuthController.php', 'src/lib/PaymentService.ts'];
+  for (const file of sourceFiles) {
+    const routed = routeReviewMode({ changedFiles: [file] });
+    assert.equal(routed.selectedMode, 'team', file);
+    const roles = selectRolesAuto(classifyChangedFiles([file]));
+    assert.ok(roles.includes('security-scanner'), file);
+  }
+  const testFile = 'src/auth/login.spec.vue';
+  assert.equal(routeReviewMode({ changedFiles: [testFile] }).selectedMode, 'standard');
+  const roles = selectRolesAuto(classifyChangedFiles([testFile]));
+  assert.ok(!roles.includes('security-scanner'));
+});
