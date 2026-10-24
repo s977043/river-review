@@ -23,7 +23,7 @@ ADR-003 は製品の責任境界を「リスク階層型の人間監督」（崖
 1. 【観測（未検証）】PR ごとのマージ承認待ち（PR #2707 は確認後にマージ）
 2. 【観測（未検証）】`runners/`・`docs/` 編集の ask-before 停止（区分の根拠は【確認】`AGENTS.md:56`）
 3. 【確認】lockfile 規則の衝突: `AGENTS.md:49` は「手編集」を禁止し、`AGENTS.md:58` は「編集」を禁止する。一方 `CLAUDE.md:51` は、lock-file-only 422 のとき `npm install --package-lock-only` の結果を commit するよう指示する。両者の整理は方針変更であり、文言の統一ではない
-4. 【観測（未検証）】`node_modules` の無い worker worktree で `tests/plugin-task-checkpoint-hook.test.mjs` が 4 件偽失敗。規律自体は【確認】`docs/development/worker-discipline-template.md:31`, `:77` にあり、`scripts/worker-bootstrap.sh` も存在する（`:215`, `:267`）。問題は実行が強制されないこと
+4. 【観測（未検証）】`node_modules` の無い worker worktree で `tests/plugin-task-checkpoint-hook.test.mjs` が 4 件偽失敗。規律自体は【確認】`docs/development/worker-discipline-template.md:31`, `:77` にあり、`scripts/worker-bootstrap.sh` も存在する（同テンプレートの `:216`, `:271` が使用を指示）。問題は実行が強制されないこと
 5. 【観測（未検証）】worker 間で共有 scratchpad が上書きされる
 6. 【確認】`/preflight` は `.claude/commands/preflight.md` のコマンド定義だけで、スクリプトの実体が無い。【観測（未検証）】worker から実行できない
 7. 【観測（未検証）】並行セッションの検知が手動
