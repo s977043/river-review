@@ -48308,7 +48308,11 @@ function diagnoseShadowedRiskRules(riskMap, filePaths) {
     let selectedRule = null;
     let selectedRuleIndex = -1;
     for (const [ruleIndex, rule] of riskMap.rules.entries()) {
-      if (!rule || typeof rule.pattern !== 'string' || !Object.hasOwn(ACTION_PRIORITY, rule.action)) {
+      if (
+        !rule ||
+        typeof rule.pattern !== 'string' ||
+        !Object.hasOwn(ACTION_PRIORITY, rule.action)
+      ) {
         throw new RiskMapError('Invalid risk rule in shadow diagnostic');
       }
       if (!minimatch(file, rule.pattern, { dot: true })) continue;
@@ -49768,6 +49772,99 @@ function shouldExcludeForContext(relPath, opts = {}) {
     if ((0,minimatch__WEBPACK_IMPORTED_MODULE_0__/* .minimatch */ .xF)(relPath, g, matchOpts)) return true;
   }
   return false;
+}
+
+
+/***/ }),
+
+/***/ 4286:
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
+
+/* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   j: () => (/* binding */ findSensitiveCodePaths)
+/* harmony export */ });
+/**
+ * High-confidence, path-only signals for review-depth escalation.
+ * This heuristic is deliberately incomplete: it never grants permission,
+ * downgrades a Risk Map requirement, or claims semantic change coverage.
+ */
+const SOURCE_ROOTS = new Set([
+  'src',
+  'runners',
+  'apps',
+  'app',
+  'packages',
+  'lib',
+  'server',
+  'services',
+  'api',
+]);
+const SENSITIVE_PARTS = new Set([
+  'auth',
+  'authn',
+  'authz',
+  'authentication',
+  'authorization',
+  'permission',
+  'permissions',
+  'access-control',
+  'rbac',
+  'acl',
+  'payment',
+  'payments',
+  'billing',
+  'secret',
+  'secrets',
+  'credential',
+  'credentials',
+  'oauth',
+  'key-management',
+  'privacy',
+  'pii',
+]);
+const SOURCE_EXT = /\.(?:[cm]?[jt]sx?|vue|svelte|astro|py|php|go|rs|rb|java|kt|cs|swift|dart)$/i;
+const TEST_FILE =
+  /\.(?:test|spec)\.(?:[cm]?[jt]sx?|vue|svelte|astro|py|php|go|rs|rb|java|kt|cs|swift|dart)$/i;
+const NON_PRODUCT_DIRS = new Set([
+  'test',
+  'tests',
+  '__tests__',
+  'fixture',
+  'fixtures',
+  '__fixtures__',
+  'docs',
+  'documentation',
+  'examples',
+]);
+
+/**
+ * Find source-code paths whose directory or filename tokens explicitly name a
+ * security/privacy/payment-sensitive area. This is a conservative review hint,
+ * not a complete classifier or an approval decision.
+ * @param {unknown} changedFiles
+ * @returns {string[]}
+ */
+function findSensitiveCodePaths(changedFiles) {
+  if (!Array.isArray(changedFiles)) return [];
+  return changedFiles.filter((file) => {
+    if (typeof file !== 'string') return false;
+    const segments = file.replaceAll('\\', '/').split('/');
+    if (!SOURCE_ROOTS.has(segments[0])) return false;
+    const basename = segments.at(-1);
+    if (!basename || !SOURCE_EXT.test(basename) || TEST_FILE.test(basename)) return false;
+    if (segments.slice(1, -1).some((segment) => NON_PRODUCT_DIRS.has(segment.toLowerCase()))) {
+      return false;
+    }
+    // Token boundaries prevent 'author.ts' and 'authoring/' matching 'auth'.
+    const tokenize = (part) => {
+      const separated = part.replace(/([a-z0-9])([A-Z])/g, '$1-$2');
+      const lower = part.toLowerCase();
+      return [lower, ...separated.toLowerCase().split(/[._-]/)];
+    };
+    const stem = basename.replace(SOURCE_EXT, '');
+    const tokens = [...segments.slice(1, -1).flatMap(tokenize), ...tokenize(stem)];
+    return tokens.some((token) => SENSITIVE_PARTS.has(token));
+  });
 }
 
 
@@ -109499,6 +109596,8 @@ async function resolveSelectionSkillIds(
 var review_engine = __nccwpck_require__(7156);
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
 var file_classifier = __nccwpck_require__(4673);
+// EXTERNAL MODULE: ./src/lib/sensitive-code-paths.mjs
+var sensitive_code_paths = __nccwpck_require__(4286);
 // EXTERNAL MODULE: ./src/config/default.mjs
 var config_default = __nccwpck_require__(4807);
 ;// CONCATENATED MODULE: ./src/lib/team-lead-synthesizer.mjs
@@ -109605,6 +109704,7 @@ var review_coverage = __nccwpck_require__(3054);
 // EXTERNAL MODULE: ./src/lib/finding-critic-stage.mjs + 1 modules
 var finding_critic_stage = __nccwpck_require__(7635);
 ;// CONCATENATED MODULE: ./src/lib/reviewer-orchestrator.mjs
+
 
 
 
@@ -109922,10 +110022,9 @@ const SIGNAL_ROLE_MAP = {
 /**
  * Compute the auto reviewer selection together with an explainable rationale.
  *
- * Backward compatible: with no `signals` argument the selected role set (and its
- * order) is identical to the pre-#1545 behavior — bug-hunter first, then the
- * file/risk heuristics in their original order. New signals are strictly
- * additive and only ever ADD roles.
+ * The existing file/risk heuristic order is preserved: bug-hunter remains first.
+ * Sensitive source paths now add security-scanner even without semantic signals.
+ * Optional formalized signals remain additive and only ever ADD roles.
  *
  * @returns {{ roles: string[], reasons: Record<string, string[]>, required: string[], skipped: string[] }}
  */
@@ -109952,6 +110051,16 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
     (fileTypes?.infra?.length ?? 0);
   if (riskyFiles > 0 || infraFiles > 0) {
     add('security-scanner', 'files:risk-or-infra');
+  }
+
+  // The review-depth router and auto specialist selection must share the same
+  // sensitive-path predicate. A team route alone does not ensure that a security
+  // reviewer runs for a single auth/payment file.
+  const changedPaths = Object.values(fileTypes ?? {}).flatMap((paths) =>
+    Array.isArray(paths) ? paths : []
+  );
+  if ((0,sensitive_code_paths/* findSensitiveCodePaths */.j)(changedPaths).length > 0) {
+    add('security-scanner', 'files:sensitive-code');
   }
 
   const testFiles = fileTypes?.test?.length ?? 0;

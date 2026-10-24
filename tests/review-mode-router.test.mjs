@@ -230,3 +230,101 @@ test('auto specialist selection aligns with dependency and CI route signals', ()
     assert.ok(roles.includes(specialist), path);
   }
 });
+
+test('sensitive auth source uses team review without a risk map or large diff', () => {
+  const result = routeReviewMode({
+    changedFiles: ['src/auth/login.ts'],
+    diffText: '+return token;\n',
+  });
+  assert.equal(result.selectedMode, 'team');
+  assert.equal(result.riskAction, 'comment_only');
+  assert.equal(result.recommendedReviewers, 'auto');
+  assert.equal(result.confidence, 'high');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+});
+
+test('sensitive source signal never downgrades explicit human-required risk map', () => {
+  const riskMap = {
+    defaults: { action: 'comment_only' },
+    rules: [{ pattern: 'src/auth/**', action: 'require_human_review', reason: 'Owner review' }],
+  };
+  const result = routeReviewMode({ changedFiles: ['src/auth/login.ts'], riskMap });
+  assert.equal(result.selectedMode, 'human-required');
+  assert.equal(result.riskAction, 'require_human_review');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+});
+
+test('sensitive words in docs, tests and author names do not raise review depth', () => {
+  const docs = routeReviewMode({ changedFiles: ['docs/auth.md', 'tests/auth.test.ts'] });
+  assert.equal(docs.selectedMode, 'light');
+  assert.ok(!docs.matchedTriggers.includes('fileType:sensitiveCode'));
+  const ordinarySource = routeReviewMode({ changedFiles: ['src/lib/author.ts'] });
+  assert.equal(ordinarySource.selectedMode, 'standard');
+  assert.ok(!ordinarySource.matchedTriggers.includes('fileType:sensitiveCode'));
+});
+
+test('mixed source with Windows paths escalates while keeping the route JSON shape', () => {
+  const result = routeReviewMode({
+    changedFiles: ['docs/guide.md', 'src\\\\payments\\\\charge.php'],
+  });
+  assert.equal(result.selectedMode, 'team');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+  assert.deepEqual(Object.keys(result), [
+    'selectedMode',
+    'confidence',
+    'reasons',
+    'matchedTriggers',
+    'recommendedReviewers',
+    'riskAction',
+    'nextCommand',
+  ]);
+});
+
+test('sensitive code routing composes with existing CI and dependency triggers', () => {
+  const result = routeReviewMode({
+    changedFiles: ['src/auth/login.ts', '.github/workflows/ci.yml', 'package-lock.json'],
+  });
+  assert.equal(result.selectedMode, 'team');
+  assert.equal(result.recommendedReviewers, 'auto');
+  assert.ok(result.matchedTriggers.includes('fileType:sensitiveCode'));
+  assert.ok(result.matchedTriggers.includes('fileType:ci'));
+  assert.ok(result.matchedTriggers.includes('fileType:dependency'));
+});
+
+test('sensitive code path selects the security specialist in reviewer auto mode', () => {
+  const cases = [
+    'src/auth/login.ts',
+    'apps/shop/payments/charge.php',
+    'packages/backend/src/privacy/export.py',
+    'src/lib/permission-check.mjs',
+  ];
+  for (const file of cases) {
+    const files = [file];
+    const route = routeReviewMode({ changedFiles: files });
+    assert.equal(route.selectedMode, 'team', file);
+    const roles = selectRolesAuto(classifyChangedFiles(files));
+    assert.ok(roles.includes('bug-hunter'), file);
+    assert.ok(roles.includes('security-scanner'), file);
+  }
+});
+
+test('non-sensitive source and auth tests do not force the security specialist', () => {
+  for (const file of ['src/lib/author.ts', 'src/auth/login.test.ts', 'docs/auth.md']) {
+    const roles = selectRolesAuto(classifyChangedFiles([file]));
+    assert.ok(!roles.includes('security-scanner'), file);
+  }
+});
+
+test('CamelCase production paths and component specs preserve specialist routing', () => {
+  const sourceFiles = ['app/Http/Controllers/AuthController.php', 'src/lib/PaymentService.ts'];
+  for (const file of sourceFiles) {
+    const routed = routeReviewMode({ changedFiles: [file] });
+    assert.equal(routed.selectedMode, 'team', file);
+    const roles = selectRolesAuto(classifyChangedFiles([file]));
+    assert.ok(roles.includes('security-scanner'), file);
+  }
+  const testFile = 'src/auth/login.spec.vue';
+  assert.equal(routeReviewMode({ changedFiles: [testFile] }).selectedMode, 'standard');
+  const roles = selectRolesAuto(classifyChangedFiles([testFile]));
+  assert.ok(!roles.includes('security-scanner'));
+});

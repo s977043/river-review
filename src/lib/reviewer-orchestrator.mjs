@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isCIWorkflowFile, isDependencyFile } from './file-classifier.mjs';
+import { findSensitiveCodePaths } from './sensitive-code-paths.mjs';
 import { generateReview, resolveRedactOptions } from './review-engine.mjs';
 import { mergeConfig } from '../config/loader.mjs';
 import { defaultConfig } from '../config/default.mjs';
@@ -324,10 +325,9 @@ const SIGNAL_ROLE_MAP = {
 /**
  * Compute the auto reviewer selection together with an explainable rationale.
  *
- * Backward compatible: with no `signals` argument the selected role set (and its
- * order) is identical to the pre-#1545 behavior — bug-hunter first, then the
- * file/risk heuristics in their original order. New signals are strictly
- * additive and only ever ADD roles.
+ * The existing file/risk heuristic order is preserved: bug-hunter remains first.
+ * Sensitive source paths now add security-scanner even without semantic signals.
+ * Optional formalized signals remain additive and only ever ADD roles.
  *
  * @returns {{ roles: string[], reasons: Record<string, string[]>, required: string[], skipped: string[] }}
  */
@@ -354,6 +354,16 @@ function computeAutoSelection(fileTypes, riskAssessment, signals) {
     (fileTypes?.infra?.length ?? 0);
   if (riskyFiles > 0 || infraFiles > 0) {
     add('security-scanner', 'files:risk-or-infra');
+  }
+
+  // The review-depth router and auto specialist selection must share the same
+  // sensitive-path predicate. A team route alone does not ensure that a security
+  // reviewer runs for a single auth/payment file.
+  const changedPaths = Object.values(fileTypes ?? {}).flatMap((paths) =>
+    Array.isArray(paths) ? paths : []
+  );
+  if (findSensitiveCodePaths(changedPaths).length > 0) {
+    add('security-scanner', 'files:sensitive-code');
   }
 
   const testFiles = fileTypes?.test?.length ?? 0;
