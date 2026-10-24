@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.134.0](https://github.com/s977043/river-review/compare/v1.133.4...v1.134.0) (2026-10-23)
+
+
+### Features
+
+* **review:** escalate sensitive code paths in review routing ([#2780](https://github.com/s977043/river-review/issues/2780)) ([33d7aa3](https://github.com/s977043/river-review/commit/33d7aa33574620d5c06d906b097ab4391b6afae7))
+
 ## [1.133.4](https://github.com/s977043/river-review/compare/v1.133.3...v1.133.4) (2026-10-23)
 
 
