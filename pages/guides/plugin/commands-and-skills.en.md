@@ -51,6 +51,26 @@ The 12 skills under `skills/agent-skills/`. Descriptions summarize each `SKILL.m
 
 In Claude Code, skills can also be invoked as `/river-review:<skill-name>`.
 
+## Stops when required files cannot be read
+
+The agent, the skills, and some commands resolve the plugin root (`$CLAUDE_PLUGIN_ROOT`) in Bash and read bundled files from it. When the root cannot be resolved or a file cannot be read, they stop instead of continuing with guesses or substitute criteria. Cases that used to fall back silently now stop and report the reason.
+
+| Target                                      | Stop condition                                                 | What is reported                                                     |
+| ------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `river-review` agent / `river-review` skill | The `river-review` `SKILL.md` cannot be read                   | The review cannot run because the Skill Registry is unresolved       |
+| `/river-review:setup-team`                  | `.river/rules.template.md` cannot be read                      | The template was not found (`.river/rules.md` is not created)        |
+| `/river-review:skill`                       | A skill ID delegated from another skill cannot be resolved     | Recorded as unresolved; not filled in by keyword search or guesswork |
+| Reviews that target a PR                    | `gh` is unavailable and `git fetch` cannot get the diff either | Asks you to provide the PR diff                                      |
+
+### What to check when it stops
+
+1. In the session, run `echo "$CLAUDE_PLUGIN_ROOT"` in Bash and confirm it prints an absolute path. If it is empty, the plugin is not loaded as a plugin.
+2. Run `claude plugin list` and confirm `river-review@river-review-marketplace` is installed and enabled. If it is disabled, run `claude plugin enable`; if it is outdated, run `claude plugin update`. Then restart Claude Code ([Update, disable, and uninstall](./update-and-uninstall.en.md)).
+3. If that does not help, uninstall it, reinstall it by following [Install the plugin](./install.en.md), restart, and check step 1 again.
+4. If a PR-targeted review stopped, make `gh` available or provide the output of `git diff <base>...<head>`.
+
+The repository root is used in place of an empty `$CLAUDE_PLUGIN_ROOT` only when running inside the river-review repository itself.
+
 ## Related pages
 
 - [Install the plugin](./install.en.md)
