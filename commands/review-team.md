@@ -57,7 +57,7 @@ npm run river -- run . --base origin/<デフォルトブランチ> --reviewers <
 
 1. `git fetch origin pull/<N>/head` を実行する。`origin` が fork を指すなどで失敗したら、PR の base リポジトリを指す remote（例: `upstream`）で同じ fetch を試す。
 2. `mktemp -d` で一時ディレクトリ `<tmp>` を作り、`git worktree add --detach <tmp>/pr FETCH_HEAD` を実行する。
-3. `npm run river -- run <tmp>/pr --base origin/<デフォルトブランチ> --reviewers <auto またはロール> --output json` を実行する。
+3. `npm run river -- run <tmp>/pr --base origin/<デフォルトブランチ> --reviewers <auto またはロール> --output json` を実行する。手順 1 で `origin` 以外の remote から取得した場合は、`--base` もその remote のデフォルトブランチ（例: `upstream/<デフォルトブランチ>`）にする。
 4. 結果に関わらず、必ず `git worktree remove <tmp>/pr` で片付ける。worktree 作成後に途中の手順が失敗した場合も実行する。remove が失敗したら、残ったパスと `git worktree remove <tmp>/pr` をレポートに書く。
 
 経路 2 で未コミットの変更を含めた場合、一時 worktree には未コミットの変更が入らない。その分はスキル駆動でレビューする。
