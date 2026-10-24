@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.135.0](https://github.com/s977043/river-review/compare/v1.134.0...v1.135.0) (2026-10-24)
+
+
+### Features
+
+* **review:** add reviewer decision brief to feature and bugfix PR templates ([#2750](https://github.com/s977043/river-review/issues/2750)) ([d73e2e7](https://github.com/s977043/river-review/commit/d73e2e79aca509f7e8ee37760699cf0e66e17d68))
+* **risk:** diagnose stricter risk-map rules hidden by first-match ([#2784](https://github.com/s977043/river-review/issues/2784)) ([8db7495](https://github.com/s977043/river-review/commit/8db749598b2e71f4355d6c90fc3b3908ec8e05e9))
+
 ## [1.134.0](https://github.com/s977043/river-review/compare/v1.133.4...v1.134.0) (2026-10-23)
 
 
