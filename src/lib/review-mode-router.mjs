@@ -1,4 +1,5 @@
 import { classifyChangedFiles, isCIWorkflowFile, isDependencyFile } from './file-classifier.mjs';
+import { findSensitiveCodePaths } from './sensitive-code-paths.mjs';
 import { countChangedLinesFromText } from './diff-processor.mjs';
 import { evaluateRisk } from './risk-map.mjs';
 
@@ -103,6 +104,16 @@ export function routeReviewMode({
     matchedTriggers.push('fileType:ci');
   }
 
+  // Rule 4b: Explicitly sensitive source code deserves deeper review even
+  // when no repository risk map is configured. Path-only hints do not grant
+  // approval and must never override a human-required risk-map decision.
+  const sensitiveCodeFiles = findSensitiveCodePaths(changedFiles);
+  if (sensitiveCodeFiles.length > 0) {
+    mode = raiseMode(mode, 'team');
+    reasons.push(`機密性の高いソースコード領域が ${sensitiveCodeFiles.length} 件変更されています`);
+    matchedTriggers.push('fileType:sensitiveCode');
+  }
+
   // Rule 5: large diff
   if (fileCount >= 20) {
     mode = raiseMode(mode, 'team');
@@ -157,7 +168,8 @@ export function routeReviewMode({
     matchedTriggers.includes('fileType:migration') ||
     matchedTriggers.includes('fileType:schema') ||
     matchedTriggers.includes('fileType:dependency') ||
-    matchedTriggers.includes('fileType:ci')
+    matchedTriggers.includes('fileType:ci') ||
+    matchedTriggers.includes('fileType:sensitiveCode')
   ) {
     confidence = 'high';
   } else {

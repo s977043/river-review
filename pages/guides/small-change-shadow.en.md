@@ -46,3 +46,20 @@ Expected offline results: **candidate 0 / excluded 2 / unknown 8**, with `candid
 Even with a numeric `candidateShare`, operator-editable JSON can be forged; it is an **input-based shadow statistic**, not a trusted production approval rate. Host verification of sources and HEAD SHA, independent review, scope sensitivity classification, Human confirmation, and paired baseline comparisons must precede any adoption claim. Follow up in [#2722](https://github.com/s977043/river-review/issues/2722).
 
 This metadata sample is neither confirmed historical feedback from [#2614](https://github.com/s977043/river-review/issues/2614) nor Promotion/Evolution effectiveness evidence from [#2615](https://github.com/s977043/river-review/issues/2615). PR merge state, comments and zero AI findings never prove a change was correct.
+
+## Bounded GitHub API observations (experimental, read-only)
+
+With an authenticated GitHub CLI (`gh auth status`) and repository read access, you can observe exact merged-PR HEAD SHAs, additions/deletions, changed-file manifests, and check runs from the same SHA. Only explicitly selected PR numbers are accessed.
+
+```bash
+node scripts/experiments/small-change-host-observe.mjs --repo s977043/river-review --prs 2720,2718,2716,2713,2711 > historical-observations.json
+node scripts/experiments/small-change-shadow-batch.mjs --input historical-observations.json
+```
+
+- Limit: **10 PRs per run**, with at most three 100-item pages each for files and check runs. Missing or truncated metadata fails the entire run. No implicit repository crawl, network fetch other than the `gh api` CLI, GitHub write, or automatic persistence.
+- PR bodies, review-comment text, diffs and credentials are not included. API response bodies are never printed on failure.
+- `observedChecks` are **separate metadata observations**, not verified required-check coverage, branch-protection configuration, completed review, service ownership, history, human approval or a signed GitHub attestation. The output file can be edited by an operator.
+- The batch assessor intentionally does not convert `observedChecks` into approval evidence. `unknown` outcomes remain unknown; exclusions are still observation-only classifications.
+- No generated snapshot is automatically committed. Inspect paths and other metadata before sharing any output.
+
+Full reviewer evidence, service-level history and Human disposition remain acceptance gates in [#2722](https://github.com/s977043/river-review/issues/2722), [#2575](https://github.com/s977043/river-review/issues/2575) and [#2614](https://github.com/s977043/river-review/issues/2614). A passed CI run or merged PR is not evidence of review correctness.

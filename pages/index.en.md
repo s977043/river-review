@@ -21,11 +21,11 @@ flowchart LR
 **Remove noise locally before the PR, then re-check the PR with shared team standards.**  
 AI produces findings and decision inputs; the caller or a human keeps ownership of GO / NO-GO and final approval.
 
-- **Try River Review in five minutes**: [Quickstart](/guides/quickstart.en)
-- **Start from reusable review knowledge**: [Starter Cookbook](/guides/starter-cookbook.en)
-- **Run the pre-PR + post-PR two-stage pattern**: [Two-stage review gate](/guides/two-stage-review-gate.en)
+- **Try River Review in five minutes**: [Quickstart](./guides/quickstart.en.md)
+- **Start from reusable review knowledge**: [Starter Cookbook](./guides/starter-cookbook.en.md)
+- **Run the pre-PR + post-PR two-stage pattern**: [Two-stage review gate](./guides/two-stage-review-gate.en.md)
 - **Compare with other AI review tools**: [AI code review comparison](/comparison/ai-code-review-tools-en/)
-- **Measure quality, regressions, and cost**: [Run store / regression](/guides/track-runs-and-regressions.en), [Cost estimation](/guides/cost-estimation.en), and [Dashboard](/dashboard)
+- **Measure quality, regressions, and cost**: [Run store / regression](./guides/track-runs-and-regressions.en.md), [Cost estimation](./guides/cost-estimation.en.md), and [Dashboard](/dashboard)
 
 ## Fastest trial
 
@@ -46,7 +46,7 @@ Normal plugin usage needs **no additional River Review LLM API key**. Claude Cod
 codex plugin marketplace add s977043/river-review
 ```
 
-After adding the marketplace, River Review's specialist review skills are available to Codex. See the [Quickstart](/guides/quickstart.en) for the full path.
+What Codex can use is the bundled skills. The canonical install steps are in [Install the plugin](./guides/plugin/install.en.md).
 
 ## What changes in practice
 
@@ -56,7 +56,7 @@ A generic instruction such as "check error handling" can produce vague advice an
 - **Reduce review-lens drift**: fixture + golden output tests pin expected behavior and regression evals verify changes.
 - **Control low-value repetition**: confidence / severity / suppression memory / review coverage reduce noise.
 
-See [Representative Skills](/guides/representative-skills.en) for real fixtures and expected outputs.
+See [Representative Skills](./guides/representative-skills.en.md) for real fixtures and expected outputs.
 
 ## Quality and operational capabilities available after adoption
 

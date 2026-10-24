@@ -2,6 +2,19 @@
 module.exports = {
   docs: [
     'index',
+    {
+      type: 'category',
+      label: 'プラグインで使う',
+      items: [
+        'guides/plugin/install',
+        { type: 'ref', id: 'guides/quickstart', label: '最初のレビュー' },
+        'guides/plugin/team-setup',
+        'guides/plugin/commands-and-skills',
+        'guides/plugin/update-and-uninstall',
+        { type: 'ref', id: 'guides/agent-workflow' },
+        { type: 'ref', id: 'guides/adopter-playbook' },
+      ],
+    },
     'dashboard',
     'comparison/ai-code-review-tools',
     {
