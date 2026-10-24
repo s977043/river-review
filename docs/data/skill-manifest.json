@@ -294,8 +294,8 @@
     {
       "id": "failure-modes-observability",
       "path": "skills/upstream/failure-modes-observability",
-      "checksum": "sha256:4f377e963298b5611da3ed0fce653e834e8d1db4288b42bc99e581096092161c",
-      "files": 3
+      "checksum": "sha256:0aa1815637bde0a33a5d19c95bcda8f2e05e33409b3b5dec45b6c4cdfa913827",
+      "files": 5
     },
     {
       "id": "firebase-security-rules",
