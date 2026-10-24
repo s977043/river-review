@@ -348,6 +348,9 @@ test('shadow diagnostic: malformed non-empty inputs fail loudly, no false green'
   assert.throws(() => diagnoseShadowedRiskRules({ rules: 'broken' }, []), {
     name: 'RiskMapError',
   });
+  assert.throws(() => diagnoseShadowedRiskRules({ rules: [{ pattern: 'x', action: 'bad' }] }, []), {
+    name: 'RiskMapError',
+  });
   const prototypeActionMap = { rules: [{ pattern: '**', action: 'toString' }] };
   assert.throws(() => diagnoseShadowedRiskRules(prototypeActionMap, ['src/x.ts']), {
     name: 'RiskMapError',
@@ -380,6 +383,16 @@ test('shadow diagnostic: same path normalization semantics as existing risk eval
     ],
   };
   const windowsStyle = 'src\\\\auth\\\\login.ts';
-  assert.equal(evaluateRisk(map, [windowsStyle]).aggregateAction, 'comment_only');
   assert.deepEqual(diagnoseShadowedRiskRules(map, [windowsStyle]).findings, []);
+  assert.deepEqual(diagnoseShadowedRiskRules(map, ['src/auth/login.ts']).findings, [
+    {
+      file: 'src/auth/login.ts',
+      selectedRuleIndex: 0,
+      selectedPattern: 'src/**',
+      selectedAction: 'comment_only',
+      shadowedRuleIndex: 1,
+      shadowedPattern: 'src/auth/**',
+      shadowedAction: 'require_human_review',
+    },
+  ]);
 });

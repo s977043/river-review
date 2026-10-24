@@ -48428,6 +48428,11 @@ function diagnoseShadowedRiskRules(riskMap, filePaths) {
   if (!Array.isArray(filePaths) || !Array.isArray(riskMap.rules)) {
     throw new RiskMapError('Invalid input for risk rule shadow diagnostic');
   }
+  for (const rule of riskMap.rules) {
+    if (!rule || typeof rule.pattern !== 'string' || !Object.hasOwn(ACTION_PRIORITY, rule.action)) {
+      throw new RiskMapError('Invalid risk rule in shadow diagnostic');
+    }
+  }
   if (filePaths.length === 0) {
     return { ...base, status: 'unknown', reasonCodes: ['no-changed-files'], findings: [] };
   }
@@ -48440,13 +48445,6 @@ function diagnoseShadowedRiskRules(riskMap, filePaths) {
     let selectedRule = null;
     let selectedRuleIndex = -1;
     for (const [ruleIndex, rule] of riskMap.rules.entries()) {
-      if (
-        !rule ||
-        typeof rule.pattern !== 'string' ||
-        !Object.hasOwn(ACTION_PRIORITY, rule.action)
-      ) {
-        throw new RiskMapError('Invalid risk rule in shadow diagnostic');
-      }
       if (!minimatch(file, rule.pattern, { dot: true })) continue;
       if (selectedRule === null) {
         selectedRule = rule;
