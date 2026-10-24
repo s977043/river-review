@@ -46,3 +46,11 @@ npm run build
 - `ROADMAP.md` はリンク参照が多く、公開ガイドとGitHub Projectsの責務を整理してから判断する。
 - `AGENT_LEARNINGS.md` はエージェント設定・回帰fixture等から参照されるので移動しない。
 - `pages/` の内部専用ページの扱いは、URL維持またはリダイレクトの根拠を確認してから変更する。
+
+## 2026-10-20 の再棚卸し
+
+- `main` 基点: `c7506fc`。ルートMarkdownは8件で、エージェント指示と入口を維持している。
+- `pages/` のMarkdownは216件、`docs/` は164件。過去の数字は当時のスナップショットとして残す。
+- `.github/` にコミュニティ文書4ファイルを配置済み。ドキュメントのルート再移動は不要。
+- 残る改善対象は `docs/README.md` の探索性と、日英ペア検査のCI失敗検知。
+- ライセンス本文の既存不整合は [Issue #2721](https://github.com/s977043/river-review/issues/2721) で別途判断する。

@@ -1,6 +1,6 @@
 {
   "name": "river-review",
-  "version": "1.131.0",
+  "version": "1.134.0",
   "private": true,
   "workspaces": [
     "runners/node-api",
@@ -36,9 +36,9 @@
     "lint": "npm run format:check && npm run check:dashes && npm run lint:code && npm run lint:md && npm run lint:text && npm run lint:sh",
     "format": "prettier --write \"**/*.{js,mjs,cjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{js,mjs,cjs,json,md,yml,yaml}\"",
-    "check:links": "lychee --config .lychee.toml '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
-    "check:links:quick": "lychee --config .lychee.toml --max-concurrency 16 '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
-    "check:links:local": "lychee --config .lychee.toml --offline '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
+    "check:links": "node scripts/check-lychee-version.mjs && lychee --config .lychee.toml '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
+    "check:links:quick": "node scripts/check-lychee-version.mjs && lychee --config .lychee.toml --max-concurrency 16 '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
+    "check:links:local": "node scripts/check-lychee-version.mjs && lychee --config .lychee.toml --offline '**/*.md' --exclude-path node_modules --exclude-path '.claude/worktrees/' --exclude-path '(^|/)pages/index\\.md$' --exclude-path '(^|/)pages/index\\.en\\.md$'",
     "agents:validate": "node scripts/validate-agents.mjs",
     "skills:validate": "node scripts/validate-skills.mjs",
     "skills:validate:promptfoo": "node scripts/validate-promptfoo-configs.mjs",
@@ -93,7 +93,7 @@
     "skills:validate:refs": "node scripts/check-skill-id-references.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@anthropic-ai/sdk": "^0.134.0",
     "@google/generative-ai": "^0.24.1",
     "@inquirer/prompts": "^8.7.3",
     "@opentelemetry/api": "^1.9.1",
@@ -108,9 +108,9 @@
     "gray-matter": "^4.0.3",
     "js-yaml": "^5.4.2",
     "minimatch": "^10.2.6",
-    "openai": "^7.30.1",
+    "openai": "^7.34.0",
     "ora": "^9.4.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
@@ -124,10 +124,10 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "markdownlint-cli": "^0.49.1",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "prh": "^6.1.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "recharts": "^3.10.1",
     "textlint": "^15.8.0",
     "textlint-rule-preset-ja-technical-writing": "^12.0.2",

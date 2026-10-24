@@ -1,5 +1,75 @@
 # Changelog
 
+## [1.134.0](https://github.com/s977043/river-review/compare/v1.133.4...v1.134.0) (2026-10-23)
+
+
+### Features
+
+* **review:** escalate sensitive code paths in review routing ([#2780](https://github.com/s977043/river-review/issues/2780)) ([33d7aa3](https://github.com/s977043/river-review/commit/33d7aa33574620d5c06d906b097ab4391b6afae7))
+
+## [1.133.4](https://github.com/s977043/river-review/compare/v1.133.3...v1.133.4) (2026-10-23)
+
+
+### Bug Fixes
+
+* **commands:** setup-team の導入コマンドと動作確認コマンドを現行の形に直す ([#2776](https://github.com/s977043/river-review/issues/2776)) ([e4f710b](https://github.com/s977043/river-review/commit/e4f710bee514c41dc89f8f8a22338cca759883ea))
+* **commands:** skill で RIVER_ROOT 変数を使わず CLAUDE_PLUGIN_ROOT を各コマンドで展開する ([#2779](https://github.com/s977043/river-review/issues/2779)) ([dc71811](https://github.com/s977043/river-review/commit/dc71811a639a0e48a6c68817b2e8e35f701da390))
+* **experiments:** small-change-host-observe の 300 件上限と未固定の fail-closed 条件を直す ([#2783](https://github.com/s977043/river-review/issues/2783)) ([fd0749c](https://github.com/s977043/river-review/commit/fd0749c55da8b03764be9f7cbd123b0707690051)), closes [#2748](https://github.com/s977043/river-review/issues/2748)
+
+## [1.133.3](https://github.com/s977043/river-review/compare/v1.133.2...v1.133.3) (2026-10-23)
+
+
+### Bug Fixes
+
+* **commands:** resolve CLAUDE_PLUGIN_ROOT in Bash before Read in setup-team and skill ([#2772](https://github.com/s977043/river-review/issues/2772)) ([9c4b5cc](https://github.com/s977043/river-review/commit/9c4b5cc4816dd779715799b3d981f2ccd3b4d6f9)), closes [#2766](https://github.com/s977043/river-review/issues/2766)
+
+## [1.133.2](https://github.com/s977043/river-review/compare/v1.133.1...v1.133.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* **commands:** review-local でコミット済みのブランチ差分も対象にする ([#2768](https://github.com/s977043/river-review/issues/2768)) ([55a0dd0](https://github.com/s977043/river-review/commit/55a0dd00f43d9019767e9f2e86e1a82bb9b274e5))
+
+## [1.133.1](https://github.com/s977043/river-review/compare/v1.133.0...v1.133.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **agent:** resolve SKILL.md via absolute plugin root and avoid named PR refs ([#2763](https://github.com/s977043/river-review/issues/2763)) ([ad9ca1b](https://github.com/s977043/river-review/commit/ad9ca1bd4068c29c63346bf0b988c0e3c48d9753))
+* **commands:** review-team でコミット済みの差分と PR を対象にする ([#2764](https://github.com/s977043/river-review/issues/2764)) ([86f9998](https://github.com/s977043/river-review/commit/86f9998086ab1ad9e82becc2505297eac333653f))
+
+## [1.133.0](https://github.com/s977043/river-review/compare/v1.132.0...v1.133.0) (2026-10-20)
+
+
+### Features
+
+* **experiment:** collect bounded GitHub PR evidence without approval authority ([#2741](https://github.com/s977043/river-review/issues/2741)) ([3ac3a3b](https://github.com/s977043/river-review/commit/3ac3a3b923fd0dfe58c16dc700da077a332e5975))
+
+
+### Bug Fixes
+
+* **docs:** improve OSS maintainer navigation and enforce bilingual CI ([#2740](https://github.com/s977043/river-review/issues/2740)) ([62b89c1](https://github.com/s977043/river-review/commit/62b89c1ed2a4436f3f50e562e5039e48df2b3f0b))
+* **node-api:** add types node to tsconfig and type-check in CI ([#2744](https://github.com/s977043/river-review/issues/2744)) ([d1e2463](https://github.com/s977043/river-review/commit/d1e246305fc0c36b7a51ebd5dcfbefd83bef8472))
+* **test:** tolerate ENOTCONN when a hook exits before reading stdin ([#2743](https://github.com/s977043/river-review/issues/2743)) ([fc9a120](https://github.com/s977043/river-review/commit/fc9a120d1e7dbb838df87e4ca13cdf56df4f7d98))
+
+## [1.132.0](https://github.com/s977043/river-review/compare/v1.131.0...v1.132.0) (2026-10-19)
+
+
+### Features
+
+* **experiment:** batch-assess incomplete historical PR evidence ([#2724](https://github.com/s977043/river-review/issues/2724)) ([b3fa1e6](https://github.com/s977043/river-review/commit/b3fa1e6a0b77a74f53081def22ddac7162961400))
+* **experiment:** observe small-change candidates without approval authority ([#2723](https://github.com/s977043/river-review/issues/2723)) ([e797974](https://github.com/s977043/river-review/commit/e797974203d40f2d4d6659413165d6033d4d255a))
+
+
+### Bug Fixes
+
+* **docs:** repair English contribution link after relocation ([#2725](https://github.com/s977043/river-review/issues/2725)) ([905db8c](https://github.com/s977043/river-review/commit/905db8c331edd0efcbef1d5257b1fbaf343b4d69))
+* **release-kick:** update leftover references to the removed kick workflow ([#2737](https://github.com/s977043/river-review/issues/2737)) ([649599b](https://github.com/s977043/river-review/commit/649599b52e6f7b631808ec072b9401d59aad8810))
+* **release:** restore release-please markers around README latest release line ([#2738](https://github.com/s977043/river-review/issues/2738)) ([d03ff3a](https://github.com/s977043/river-review/commit/d03ff3ab28e2b9af206bc6b9aa1b67b7431013a6))
+* **security:** mask credential-bearing database URLs with sample words ([#2720](https://github.com/s977043/river-review/issues/2720)) ([c104d31](https://github.com/s977043/river-review/commit/c104d31b0c353ba0bd631ea14b0fcffb9e7584c1))
+* **security:** mask sample-word OAuth secrets ([#2718](https://github.com/s977043/river-review/issues/2718)) ([b7139d8](https://github.com/s977043/river-review/commit/b7139d8c2bcdf009a5e407a89e9670a349cbe97a))
+* **security:** mask sample-word webhook URLs ([#2716](https://github.com/s977043/river-review/issues/2716)) ([be3c25c](https://github.com/s977043/river-review/commit/be3c25cf3872bcfe45c17ee737312c63fc94fa2b))
+
 ## [1.131.0](https://github.com/s977043/river-review/compare/v1.130.1...v1.131.0) (2026-10-17)
 
 

@@ -6,7 +6,7 @@ allowed-tools: Bash(gh api user:*), Bash(gh auth switch:*), Bash(gh pr view:*), 
 
 release PR #$ARGUMENTS を、BLOCKED 解除からマージ・リリース公開の検証まで一貫して実行する。
 
-release-please が生成するリリース PR の head は `GITHUB_TOKEN` push であるため、通常は `mergeStateStatus: BLOCKED`（"N of N required checks are expected"）になる（CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード参照）。この BLOCKED の原因は `docs/runbook/bot-pushed-head-kick.md` が SSoT。kick の正規手順は `scripts/release-please-kick.sh` である（`workflow_dispatch` 版は #1807 で削除済み）。本コマンドはそれを前提に、実際にマージして公開を確認するまでの実行手順を1コマンド化したもの。矛盾があれば runbook を正とし、本コマンドを修正する。
+release-please が生成するリリース PR の head は `GITHUB_TOKEN` push であるため、通常は `mergeStateStatus: BLOCKED`（"N of N required checks are expected"）になる（CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード参照）。この BLOCKED の原因は `docs/runbook/bot-pushed-head-kick.md` が SSoT。kick の正規手順は `scripts/release-please-kick.sh` である（`workflow_dispatch` 版は #2709 で削除。経緯は #1807）。本コマンドはそれを前提に、実際にマージして公開を確認するまでの実行手順を1コマンド化したもの。矛盾があれば runbook を正とし、本コマンドを修正する。
 
 ## 手順
 
@@ -77,7 +77,7 @@ bash scripts/release-please-kick.sh
 gh run list --limit 5 --json databaseId,status,conclusion,headBranch,workflowName
 ```
 
-新 head の run が `action_required` のまま止まっていないか（＝実発火しているか）を確認する。`action_required` のままなら `RELEASE_KICK_PAT` 未設定などが疑われる。runbook のトラブルシュートへ。
+新 head の run が `action_required` のまま止まっていないか（＝実発火しているか）を確認する。`action_required` のままなら、自アカウントで push されていない（gh の active account がずれている等）ことが疑われる。runbook のトラブルシュートへ。
 
 ### Step 6. CI green までポーリング
 

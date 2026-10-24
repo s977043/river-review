@@ -10,8 +10,10 @@ export const modules = {
 /* harmony export */   routeReviewMode: () => (/* binding */ routeReviewMode)
 /* harmony export */ });
 /* harmony import */ var _file_classifier_mjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(4673);
-/* harmony import */ var _diff_processor_mjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(861);
-/* harmony import */ var _risk_map_mjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(572);
+/* harmony import */ var _sensitive_code_paths_mjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(4286);
+/* harmony import */ var _diff_processor_mjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(861);
+/* harmony import */ var _risk_map_mjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(572);
+
 
 
 
@@ -69,10 +71,10 @@ function routeReviewMode({
   baseRef = null,
 }) {
   const fileTypes = (0,_file_classifier_mjs__WEBPACK_IMPORTED_MODULE_0__/* .classifyChangedFiles */ .qS)(changedFiles);
-  const riskAssessment = riskMap ? (0,_risk_map_mjs__WEBPACK_IMPORTED_MODULE_2__/* .evaluateRisk */ .lm)(riskMap, changedFiles) : null;
+  const riskAssessment = riskMap ? (0,_risk_map_mjs__WEBPACK_IMPORTED_MODULE_3__/* .evaluateRisk */ .lm)(riskMap, changedFiles) : null;
   const aggregateAction = riskAssessment?.aggregateAction ?? 'comment_only';
   const fileCount = changedFiles.length;
-  const changedLines = (0,_diff_processor_mjs__WEBPACK_IMPORTED_MODULE_1__/* .countChangedLinesFromText */ .ye)(diffText);
+  const changedLines = (0,_diff_processor_mjs__WEBPACK_IMPORTED_MODULE_2__/* .countChangedLinesFromText */ .ye)(diffText);
 
   let mode = 'standard';
   const reasons = [];
@@ -115,6 +117,16 @@ function routeReviewMode({
     mode = raiseMode(mode, 'team');
     reasons.push('CI ワークフローが変更されています');
     matchedTriggers.push('fileType:ci');
+  }
+
+  // Rule 4b: Explicitly sensitive source code deserves deeper review even
+  // when no repository risk map is configured. Path-only hints do not grant
+  // approval and must never override a human-required risk-map decision.
+  const sensitiveCodeFiles = (0,_sensitive_code_paths_mjs__WEBPACK_IMPORTED_MODULE_1__/* .findSensitiveCodePaths */ .j)(changedFiles);
+  if (sensitiveCodeFiles.length > 0) {
+    mode = raiseMode(mode, 'team');
+    reasons.push(`機密性の高いソースコード領域が ${sensitiveCodeFiles.length} 件変更されています`);
+    matchedTriggers.push('fileType:sensitiveCode');
   }
 
   // Rule 5: large diff
@@ -171,7 +183,8 @@ function routeReviewMode({
     matchedTriggers.includes('fileType:migration') ||
     matchedTriggers.includes('fileType:schema') ||
     matchedTriggers.includes('fileType:dependency') ||
-    matchedTriggers.includes('fileType:ci')
+    matchedTriggers.includes('fileType:ci') ||
+    matchedTriggers.includes('fileType:sensitiveCode')
   ) {
     confidence = 'high';
   } else {

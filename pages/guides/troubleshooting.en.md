@@ -4,6 +4,24 @@ Common symptoms and checkpoints for isolation.
 
 Related: `pages/guides/faq.en.md` (List of common failures)
 
+## Plugin {#plugin}
+
+### Commands or skills do not appear
+
+1. Right after installing, run `/reload-plugins`.
+2. Commands are namespaced. Type `/river-review:review-local`, not `/review-local`.
+3. Run `claude plugin list` to confirm `river-review` is installed. If it is disabled, enable it with `claude plugin enable river-review@river-review-marketplace`.
+4. The Codex distribution manifest (`.codex-plugin/plugin.json`) declares `skills` and does not declare `commands`, so slash commands are not part of what is distributed to Codex. See [Commands, agents, and skills](./plugin/commands-and-skills.en.md).
+5. If the plugin is installed and enabled in Codex but its skills are unavailable, suspect the skills list budget. When many skills are installed, Codex trims the skills list it passes to the model to fit a budget, and `river-review:*`, which sorts late by name, can drop out. Run `codex debug prompt-input test` outside the repository and check whether skills starting with `river-review:` appear. If they do not, remove plugins you do not use, or raise the budget (for example, confirm they appear with `codex -c skills.max_context_tokens=200000 debug prompt-input test`, then set `max_context_tokens` under `[skills]` in `~/.codex/config.toml`). Observed with codex-cli 0.160.1.
+
+### The installed version is old
+
+Update the marketplace with `claude plugin marketplace update river-review-marketplace`, then run `claude plugin update river-review@river-review-marketplace`. A restart is required for the update to take effect. Check the latest version on [GitHub Releases](https://github.com/s977043/river-review/releases/latest).
+
+### Edited files get reformatted
+
+The PostToolUse hook formats changed files with the project's prettier. For the behavior and how to stop it, see [Update, disable, and uninstall](./plugin/update-and-uninstall.en.md).
+
 ## CLI (`river run`)
 
 ### First Step (Pre-diagnosis)

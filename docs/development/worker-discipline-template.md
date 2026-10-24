@@ -29,6 +29,7 @@
   404 や permission エラーが出たら、まずこのアカウント切り替わりを疑うこと。
 - シェルの PATH 先頭に `/opt/homebrew/opt/node@22/bin` を通してから作業すること。既定の `node`（v26 系）を使わない。
   worktree で作業する場合は最初に `npm ci` を実行すること（lockfile 由来の依存不整合を防ぐ）。
+- PATH を `node@22/bin:/usr/bin:/bin` のように絞ると `npm run lint` が shellcheck を見つけられず exit 127 になる。`/opt/homebrew/bin` も PATH に含めること（2026-10-22、ワーカー 2 名が踏んだ）。
 - 検証コマンドの終了コードを読むときは、パイプへ通した直後の `$?` を使わないこと。`cmd | tail -5` の `$?` は
   `tail` の終了コードであり `cmd` のものではない。`cmd > /tmp/out 2>&1; echo "EXIT=$?"` のように直接実行して
   取るか、`${PIPESTATUS[0]}` を使う。textlint を exit 0 と誤報告した実績がある。
@@ -253,6 +254,9 @@
 - テストやコマンドの出力を worktree の直下へリダイレクトしないこと（`> test.log` など）。`mktemp -d` のディレクトリへ書く。
   `rm` が拒否されると未追跡ファイルが残り、worktree を強制削除しないと片付かない（2026-10-09〜11 に 2 本で発生）。
 - パス名に `secret` を含むファイル（`src/lib/secret-redactor.mjs` など）は `.claude/settings.json` の deny `Read(./**/*secret*)` で読めない。`git show` や `cat` で迂回せず、その旨を報告して停止すること（2026-10-16 の PR #2691 で、読み取り専用のレビュアーが `git show` で迂回し、編集担当のワーカーは停止した）。
+- 委託プロンプトが scratchpad を指定していても、その直下へ直接書かず、ワーカーごとに一意のサブディレクトリ（`mktemp -d <scratchpad>/XXXXXX` など）を作って使うこと。2026-10-17 のウェーブでは複数のワーカーが同じ scratchpad を共有し、実行中のスクリプト（`verify.sh` / `v2.sh`）が別のワーカーに上書きされた。
+- worktree で `npm test` を実行すると `tests/plugin-task-checkpoint-hook.test.mjs` が 4 件失敗することがある（"river-review CLI not available"。常に再現するとは限らない）。CI では green なので、ローカル環境の差を疑い、CI の結果で判定すること。差分と無関係であることは、そのファイルだけを `node --test tests/plugin-task-checkpoint-hook.test.mjs` で単体実行して切り分け、完了報告に既存失敗として分離して書く（2026-10-17 のウェーブで観測）。
+- 検証コマンドをバックグラウンドで起動し、その完了通知を待ったままターンを終えないこと。待っている間にワーカーは停止し、オーガナイザーからは稼働中と区別できない。検証は同期で実行し、10 分を超えるなら打ち切ってその時点の出力と状態を報告する。委託プロンプトが `npm test` の全体実行を求めていても、上記「`npm test`（全体）を走らせないこと」を優先し、矛盾として完了報告に書く（2026-10-22 のウェーブで 2 本のワーカーが全体の `npm test` を待ったまま 13 時間止まった）。
 ```
 
 ## 委託プロンプト骨格

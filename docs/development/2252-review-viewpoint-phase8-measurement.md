@@ -2,7 +2,7 @@
 
 Phase 6 までで導入した Review Viewpoint の効果を、Phase 7（2〜3 skill への横展開）の判断材料として測定した記録です。
 
-- 測定対象: `api-compatibility`（`viewpoints.yaml` を持つ唯一の skill）
+- 測定対象: `api-compatibility`（測定時点で `viewpoints.yaml` を持つ唯一の skill。現在は `async-correctness` も持つ。「Phase 7: async-correctness の測定」節を参照）
 - 測定コマンド: `node scripts/measure-review-viewpoints.mjs`
 - 回帰ピン: `tests/review-viewpoint-activation-metrics.test.mjs`
 - 測定日: 2026-09-18 / base commit `13cd8ebb`
@@ -330,6 +330,37 @@ false activation は 150 ペア中 0 件です。改善は `cc` 帯域のみで�
 - **`p09`（request DTO への必須フィールド追加）**: カタログに対応する kind が無い被覆漏れで、検出器の問題ではない
 - **3 親以上の octopus merge**: レビュー時に 4 親の `@@@@@`（`parentCount=4`）を生成し、検出が正常に動くことを確認した。ただし帯域として corpus に採取していないため、回帰ピンは無い
 - **`\ No newline at end of file`**: PR #2319（#2309）が parse 層の単一親パスでも行カウンタを進めないよう直したため、combined / 単一親の非対称性は解消した。本 PR の consumer 側も両パスに同じ規則を適用して追随している（この帯域は corpus に 1 本も無く、専用のユニットテストで押さえている）
+
+## Phase 7: async-correctness の測定
+
+Phase 7 で `viewpoints.yaml` を持つ 2 本目の skill として `async-correctness`（`skills/midstream/async-correctness/references/viewpoints.yaml`）を追加した。
+
+- 測定コマンド: `node scripts/measure-review-viewpoints.mjs --skill async-correctness`
+- 回帰ピン: `tests/review-viewpoint-async-correctness-metrics.test.mjs`
+- 測定日: 2026-10-19 / base commit `b3fa1e6a`
+
+```text
+corpus: 41 hand-labeled fixtures
+
+## Activation (per fixture x viewpoint pair)
+overall: precision 100.0% recall 81.0% (tp=17 fp=0 fn=4 tn=143)
+  await-before-use: precision 100.0% recall 71.4% (tp=5 fp=0 fn=2 tn=34)
+  floating-promise-handling: precision 100.0% recall 66.7% (tp=2 fp=0 fn=1 tn=38)
+  try-catch-error-propagation: precision 100.0% recall 80.0% (tp=4 fp=0 fn=1 tn=36)
+  collection-callback-completion: precision 100.0% recall 100.0% (tp=6 fp=0 fn=0 tn=35)
+
+## Activation by input band
+  default: precision 100.0% recall 83.3% (tp=10 fp=0 fn=2 tn=88)
+  u0: precision 100.0% recall 33.3% (tp=1 fp=0 fn=2 tn=21)
+  cc: precision 100.0% recall 100.0% (tp=6 fp=0 fn=0 tn=34)
+
+## Activation by corpus source
+  handwritten: precision 100.0% recall 77.8% (tp=7 fp=0 fn=2 tn=63)
+  generated-git: precision 100.0% recall 83.3% (tp=10 fp=0 fn=2 tn=68)
+  repo-commit: precision n/a recall n/a (tp=0 fp=0 fn=0 tn=12)
+```
+
+fn=4 は回帰ピンの `KNOWN_MISSES` 3 fixture（`ap02` は positive 2 ペア）に対応する。いずれも呼び出し先の `async` 宣言が diff テキストに無い（import 先、または `--unified=0` の hunk 外）ため、v1 の producer は検出しない。
 
 ## 判断
 

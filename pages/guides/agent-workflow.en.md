@@ -1,7 +1,7 @@
 # Using River Review from AI Agents
 
 > **Which entry point should I use?**
-> The primary, no-install entry point is the bundled **skill-routed review** — install the plugin and ask the `river-review` agent (or load the skills) to review your diff. Use `/review-local` when you want River Review orchestrated by Claude Code with automatic context passing from the current session; use the sub-agent (`agents/river-review.md`) for delegated, headless review tasks. The `river` CLI (`river run .`) is an **optional accelerator**, distributed separately and not yet published to npm.
+> The primary entry point is the bundled **skill-routed review** — install the plugin ([install guide](./plugin/install.en.md)) and ask the `river-review` agent (or load the skills) to review your diff. No extra tool such as the `river` CLI is required. Use `/river-review:review-local` when you want River Review orchestrated by Claude Code with automatic context passing from the current session; use the sub-agent (`agents/river-review.md`) for delegated, headless review tasks. The `river` CLI (`river run .`) is an **optional accelerator**, distributed separately and not yet published to npm.
 
 ## Overview
 
@@ -81,13 +81,13 @@ When reviewing with multiple roles (including `auto`), a large diff is automatic
 
 ## How to Invoke by Agent
 
-| Agent          | How to Invoke                           | Dedicated Definition File                  |
-| -------------- | --------------------------------------- | ------------------------------------------ |
-| Claude Code    | Bash tool / `/review-local` / sub-agent | `agents/river-review.md`                   |
-| Cursor         | Terminal tab / `@terminal`              | —                                          |
-| Codex CLI      | `codex exec "river run ."`              | `templates/agent-workflow/codex/AGENTS.md` |
-| GitHub Copilot | Run directly in terminal                | `.github/agents/river-review.agent.md`     |
-| Others         | `river run .` in any shell              | `agents/examples/river-review.agent.yaml`  |
+| Agent          | How to Invoke                                        | Dedicated Definition File                  |
+| -------------- | ---------------------------------------------------- | ------------------------------------------ |
+| Claude Code    | Bash tool / `/river-review:review-local` / sub-agent | `agents/river-review.md`                   |
+| Cursor         | Terminal tab / `@terminal`                           | —                                          |
+| Codex CLI      | `codex exec "river run ."`                           | `templates/agent-workflow/codex/AGENTS.md` |
+| GitHub Copilot | Run directly in terminal                             | `.github/agents/river-review.agent.md`     |
+| Others         | `river run .` in any shell                           | `agents/examples/river-review.agent.yaml`  |
 
 ### Claude Code
 
@@ -100,7 +100,7 @@ river run . --reviewers auto
 Slash commands and the sub-agent are also available:
 
 ```text
-/review-local
+/river-review:review-local
 ```
 
 ```text
@@ -125,13 +125,13 @@ See `templates/agent-workflow/` for ready-to-use config templates.
 codex exec "river run . --reviewers auto"
 ```
 
-Codex supports the same plugin marketplace as Claude Code (both share the same `.claude-plugin/marketplace.json`). The recommended installation method is to add the marketplace:
+The recommended installation method is to add the marketplace. The canonical steps are in [Install the plugin](./plugin/install.en.md).
 
 ```bash
 codex plugin marketplace add s977043/river-review
 ```
 
-Codex reads its skills and interface metadata from the repo's `.codex-plugin/plugin.json` (the Codex-native manifest), so adding the marketplace natively registers the specialist review skills with no extra setup.
+`.codex-plugin/plugin.json` declares only `skills` and `interface` metadata; it does not declare `commands` or `agents`. What Codex can use is the bundled skills.
 
 As a fallback when the marketplace is not used, run `scripts/setup-codex.sh` (it vendors the `AGENTS.md` guidance and the full `skills/agent-skills/` tree, including references/, idempotently) or take the dedicated definition `templates/agent-workflow/codex/AGENTS.md` and merge or append its contents into your project's `AGENTS.md`. This enables River Review to run automatically before commits.
 
@@ -149,16 +149,7 @@ Any environment that can execute shell commands can call `river run .` directly.
 
 `skills/agent-skills/` contains **agent-independent skill definitions** that can be passed to any agent.
 
-| Skill                       | Purpose                                                            |
-| --------------------------- | ------------------------------------------------------------------ |
-| `river-review`              | Main review (intent classification → routing to specialist skills) |
-| `river-review-code`         | Code quality review                                                |
-| `river-review-security`     | Security-focused review                                            |
-| `river-review-performance`  | Performance review (N+1 / optimization)                            |
-| `river-review-testing`      | Test coverage review                                               |
-| `river-review-architecture` | Architecture review                                                |
-| `adversarial-review`        | Adversarial review (challenge assumptions)                         |
-| `river-review-docs`         | Documentation consistency review (README / i18n / terminology)     |
+For the full list of bundled skills, see [Commands, agents, and skills](./plugin/commands-and-skills.en.md).
 
 To use a skill with an agent, load `skills/agent-skills/<skill-name>/SKILL.md` into the agent's context.
 
