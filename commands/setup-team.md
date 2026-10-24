@@ -21,7 +21,11 @@ ls .river-review.* 2>/dev/null || echo ".river-review.* が見つかりません
 ### Step 2: .river/rules.md の生成
 
 `.river/rules.md` がなければ作成する。
-テンプレートは `${CLAUDE_PLUGIN_ROOT:-.}/.river/rules.template.md` にある。
+テンプレートは `<plugin root>/.river/rules.template.md` にある。Read ツールが環境変数を展開するとは限らないため、`${CLAUDE_PLUGIN_ROOT}` を含むパスをそのまま Read に渡さない。
+
+1. Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
+2. 出力が空のときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
+3. それでもテンプレートを読めなければ、`.river/rules.md` を推測で作らない。「テンプレートが見つからない」と報告して止まる。
 
 テンプレートの内容を `.river/rules.md` として Write ツールで保存する（親ディレクトリは自動作成される）。
 
@@ -50,13 +54,15 @@ cat "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null | grep '"version"' || echo 
 
 インストールされていない場合は以下を案内する:
 
-```bash
-claude plugin add s977043/river-review
+```text
+/plugin marketplace add s977043/river-review
+/plugin install river-review@river-review-marketplace
+/reload-plugins
 ```
 
 ### Step 5: 動作確認
 
-セットアップが完了したら `/review-local` を実行して動作確認を行う。
+セットアップが完了したら `/river-review:review-local` を実行して動作確認を行う。
 
 ## Output
 

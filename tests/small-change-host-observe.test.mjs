@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { observeHistoricalPrs } from '../scripts/experiments/small-change-host-observe.mjs';
+import {
+  observeHistoricalPrs,
+  request,
+} from '../scripts/experiments/small-change-host-observe.mjs';
 import { assessSmallChangeBatch } from '../scripts/experiments/small-change-shadow-batch.mjs';
 
 const REPO = 's977043/river-review';
@@ -94,6 +97,18 @@ test('wrong PR identity, open PR and incomplete manifest fail closed', () => {
         path.endsWith('/pulls/12') ? { ...response(path), merged_at: null } : response(path),
       /invalid-pr-metadata/,
     ],
+    [
+      (path) =>
+        path.endsWith('/pulls/12')
+          ? { ...response(path), base: { repo: { full_name: 'other/repo' } } }
+          : response(path),
+      /invalid-pr-metadata/,
+    ],
+    [
+      (path) =>
+        path.endsWith('/pulls/12') ? { ...response(path), changed_files: 0 } : response(path),
+      /invalid-pr-metadata/,
+    ],
     [(path) => (path.includes('/files?') ? [] : response(path)), /incomplete-file-manifest/],
   ];
   for (const [apiRead, matcher] of cases) {
@@ -132,4 +147,43 @@ test('more than 300 manifest paths fail instead of emitting partial observations
     return response(path);
   };
   assert.throws(() => observe({ apiRead }), /metadata-page-limit/);
+});
+
+function fullPages(total) {
+  return (path) => {
+    const page = Number(new URLSearchParams(path.split('?')[1]).get('page'));
+    if (path.endsWith('/pulls/12')) return { ...response(path), changed_files: total };
+    if (path.includes('/files?')) {
+      return Array.from({ length: 100 }, (_, i) => ({ filename: 'pages/' + page + '-' + i }));
+    }
+    return {
+      total_count: total,
+      check_runs: Array.from({ length: 100 }, (_, i) => ({
+        name: 'check-' + page + '-' + i,
+        status: 'completed',
+        conclusion: 'success',
+        head_sha: SHA,
+      })),
+    };
+  };
+}
+
+test('exactly 300 manifest paths and check runs are accepted as complete', () => {
+  const report = observe({ apiRead: fullPages(300) });
+  assert.equal(report.cases[0].observation.change.changedFiles.length, 300);
+  assert.equal(report.cases[0].observedChecks.runs.length, 300);
+});
+
+test('production request uses a bounded gh api GET', () => {
+  const calls = [];
+  const exec = (...args) => {
+    calls.push(args);
+    return Buffer.from('{"ok":true}');
+  };
+  assert.deepEqual(request('repos/' + REPO + '/pulls/12', exec), { ok: true });
+  const [command, args, options] = calls[0];
+  assert.equal(command, 'gh');
+  assert.deepEqual(args, ['api', 'repos/' + REPO + '/pulls/12']);
+  assert.equal(options.timeout, 15_000);
+  assert.deepEqual(options.stdio, ['ignore', 'pipe', 'ignore']);
 });

@@ -15,8 +15,8 @@ function requireShape(condition, code) {
   if (!condition) throw new Error(code);
 }
 
-function request(path) {
-  const output = execFileSync('gh', ['api', path], {
+export function request(path, exec = execFileSync) {
+  const output = exec('gh', ['api', path], {
     timeout: 15_000,
     maxBuffer: 1024 * 1024,
     stdio: ['ignore', 'pipe', 'ignore'],
@@ -34,7 +34,7 @@ function validateSelection(repository, prs) {
   requireShape(new Set(prs).size === prs.length, 'duplicate-pr-number');
 }
 
-function readPages(apiRead, path, extract, total = null) {
+function readPages(apiRead, path, extract, total = null, expectedCount = null) {
   const values = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     const response = apiRead(path + '?per_page=' + PAGE_SIZE + '&page=' + page);
@@ -45,6 +45,7 @@ function readPages(apiRead, path, extract, total = null) {
       requireShape(total === null || total() === values.length, 'incomplete-check-run-list');
       return values;
     }
+    if ((expectedCount ?? total?.()) === values.length) return values;
   }
   throw new Error('metadata-page-limit');
 }
@@ -79,7 +80,13 @@ export function observeHistoricalPrs({ repository, prs, apiRead = request }) {
     const changedLines = details.additions + details.deletions;
     requireShape(Number.isSafeInteger(changedLines), 'invalid-change-size');
 
-    const files = readPages(apiRead, prefix + '/pulls/' + pr + '/files', (value) => value);
+    const files = readPages(
+      apiRead,
+      prefix + '/pulls/' + pr + '/files',
+      (value) => value,
+      null,
+      details.changed_files
+    );
     requireShape(files.length === details.changed_files, 'incomplete-file-manifest');
     const changedFiles = files.map((file) => file?.filename);
     requireShape(
