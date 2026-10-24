@@ -1,7 +1,7 @@
 ---
 description: 'Run review-team skill: parallel multi-role review with consensusLevel and Tech Lead report'
 argument-hint: '[pr-number] [role1,role2,...]'
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*)
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*), Bash(mktemp -d:*), Bash(git worktree add --detach:*), Bash(git worktree remove:*)
 ---
 
 スキル定義: `skills/agent-skills/review-team/SKILL.md`
@@ -41,7 +41,9 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git f
 
 River Review は npm 未公開のため `npx river-review` は使えない。**エージェントがこのスキルの手順を直接実行する**（CLI 不要）。上記 Step 1 で決めたロールを並列に走らせ、Union-Find で finding を統合し、consensusLevel と teamLeadReport を生成する。
 
-リポジトリ内で作業していて `river` CLI をアクセラレータとして使える場合のみ、次を利用してよい（任意）。CLI を使えるのは対象の解決が経路 3 になったときだけで、`--base origin/<デフォルトブランチ>` を渡す。`river run` はローカル checkout をレビューするため、経路 1 と 2（PR が対象）では CLI を使わず、取得した PR の diff をスキル駆動でレビューする。コスト確認が必要なら先に `--dry-run`。
+リポジトリ内で作業していて `river` CLI をアクセラレータとして使える場合のみ、次を利用してよい（任意）。`--base origin/<デフォルトブランチ>` を渡す。コスト確認が必要なら先に `--dry-run`。
+
+経路 3 では現在の checkout をそのまま対象にする。
 
 ```bash
 # auto モード（推奨）
@@ -51,7 +53,16 @@ npm run river -- run . --base origin/<デフォルトブランチ> --reviewers a
 npm run river -- run . --base origin/<デフォルトブランチ> --reviewers <role1,role2,...> --output json
 ```
 
-CLI が存在しない、または失敗した場合は、スキル駆動のレビューで継続する。
+経路 1 と 2（PR が対象）では、`river run` がローカル checkout をレビューするため、PR の head を一時 worktree に取り出してから渡す。名前付きの ref やブランチは作らない（`skills/agent-skills/river-review/SKILL.md` の「PR を対象にするときの git 操作」に従う）。
+
+1. `git fetch origin pull/<N>/head` を実行する。`origin` が fork を指すなどで失敗したら、PR の base リポジトリを指す remote（例: `upstream`）で同じ fetch を試す。
+2. `mktemp -d` で一時ディレクトリ `<tmp>` を作り、`git worktree add --detach <tmp>/pr FETCH_HEAD` を実行する。
+3. `npm run river -- run <tmp>/pr --base origin/<デフォルトブランチ> --reviewers <auto またはロール> --output json` を実行する。
+4. 結果に関わらず、必ず `git worktree remove <tmp>/pr` で片付ける。worktree 作成後に途中の手順が失敗した場合も実行する。remove が失敗したら、残ったパスと `git worktree remove <tmp>/pr` をレポートに書く。
+
+経路 2 で未コミットの変更を含めた場合、一時 worktree には未コミットの変更が入らない。その分はスキル駆動でレビューする。
+
+CLI が存在しない、fetch や worktree の作成に失敗した、または CLI が失敗した場合は、取得した diff をスキル駆動でレビューして継続する。
 
 ### Step 3: 結果を報告する
 
