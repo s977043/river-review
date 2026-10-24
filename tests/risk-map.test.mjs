@@ -4,7 +4,12 @@ import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { loadRiskMap, evaluateRisk, aggregateRiskLevel } from '../src/lib/risk-map.mjs';
+import {
+  loadRiskMap,
+  evaluateRisk,
+  aggregateRiskLevel,
+  diagnoseShadowedRiskRules,
+} from '../src/lib/risk-map.mjs';
 
 function createTempDir() {
   return mkdtempSync(path.join(tmpdir(), 'river-risk-map-'));
@@ -208,4 +213,186 @@ test('aggregateRiskLevel: returns fallback for empty array', () => {
 test('aggregateRiskLevel: picks highest priority', () => {
   const risks = [{ action: 'comment_only' }, { action: 'escalate' }, { action: 'comment_only' }];
   assert.equal(aggregateRiskLevel(risks), 'escalate');
+});
+
+// --- diagnoseShadowedRiskRules: advisory only ---
+
+test('shadow diagnostic: detects a stricter auth rule masked by a broad first match', () => {
+  const map = {
+    rules: [
+      { pattern: 'src/**', action: 'comment_only' },
+      { pattern: 'src/auth/**', action: 'require_human_review' },
+    ],
+    defaults: { action: 'comment_only' },
+  };
+  const files = ['src/auth/login.ts'];
+  const baseline = evaluateRisk(map, files);
+  const diagnostics = diagnoseShadowedRiskRules(map, files);
+  assert.equal(baseline.aggregateAction, 'comment_only');
+  assert.equal(diagnostics.status, 'analyzed');
+  assert.equal(diagnostics.evidenceTrust, 'unverified-input');
+  assert.equal(diagnostics.authorizesApproval, false);
+  assert.deepEqual(baseline.fileRisks[0].rule, {
+    pattern: 'src/**',
+    reason: undefined,
+  });
+  assert.deepEqual(diagnostics.findings, [
+    {
+      file: 'src/auth/login.ts',
+      selectedRuleIndex: 0,
+      selectedPattern: 'src/**',
+      selectedAction: 'comment_only',
+      shadowedRuleIndex: 1,
+      shadowedPattern: 'src/auth/**',
+      shadowedAction: 'require_human_review',
+    },
+  ]);
+  assert.deepEqual(evaluateRisk(map, files), baseline);
+});
+
+test('shadow diagnostic: no findings for correct ordering, equal or weaker later rules', () => {
+  const maps = [
+    {
+      rules: [
+        { pattern: 'src/auth/**', action: 'require_human_review' },
+        { pattern: 'src/**', action: 'comment_only' },
+      ],
+    },
+    {
+      rules: [
+        { pattern: 'src/**', action: 'escalate' },
+        { pattern: 'src/auth/**', action: 'escalate' },
+      ],
+    },
+    {
+      rules: [
+        { pattern: 'src/**', action: 'require_human_review' },
+        { pattern: 'src/auth/**', action: 'escalate' },
+      ],
+    },
+  ];
+  for (const map of maps) {
+    assert.deepEqual(diagnoseShadowedRiskRules(map, ['src/auth/login.ts']).findings, []);
+  }
+});
+
+test('shadow diagnostic: reports only real overlapping paths, retaining ordered provenance', () => {
+  const map = {
+    rules: [
+      { pattern: '**/*', action: 'comment_only' },
+      { pattern: '.github/workflows/**', action: 'escalate' },
+      { pattern: '.github/workflows/release.yml', action: 'require_human_review' },
+      { pattern: 'src/auth/**', action: 'require_human_review' },
+    ],
+  };
+  assert.deepEqual(
+    diagnoseShadowedRiskRules(map, ['.github/workflows/release.yml', 'docs/intro.md']).findings,
+    [
+      {
+        file: '.github/workflows/release.yml',
+        selectedRuleIndex: 0,
+        selectedPattern: '**/*',
+        selectedAction: 'comment_only',
+        shadowedRuleIndex: 1,
+        shadowedPattern: '.github/workflows/**',
+        shadowedAction: 'escalate',
+      },
+      {
+        file: '.github/workflows/release.yml',
+        selectedRuleIndex: 0,
+        selectedPattern: '**/*',
+        selectedAction: 'comment_only',
+        shadowedRuleIndex: 2,
+        shadowedPattern: '.github/workflows/release.yml',
+        shadowedAction: 'require_human_review',
+      },
+    ]
+  );
+});
+
+test('shadow diagnostic: empty and missing map inputs have no findings', () => {
+  const map = { rules: [{ pattern: '**', action: 'require_human_review' }] };
+  assert.deepEqual(diagnoseShadowedRiskRules(null, ['src/auth/login.ts']), {
+    kind: 'risk-map-rule-shadow/v1',
+    authorizesApproval: false,
+    evidenceTrust: 'unverified-input',
+    status: 'unknown',
+    reasonCodes: ['missing-risk-map'],
+    findings: [],
+  });
+  assert.equal(diagnoseShadowedRiskRules(map, []).status, 'unknown');
+  assert.deepEqual(diagnoseShadowedRiskRules(map, []).reasonCodes, ['no-changed-files']);
+  assert.deepEqual(diagnoseShadowedRiskRules(map, ['docs/unmatched.md']).findings, []);
+});
+
+test('shadow diagnostic: clean analyzed result is not approval evidence', () => {
+  const map = { rules: [{ pattern: 'docs/**', action: 'comment_only' }] };
+  const result = diagnoseShadowedRiskRules(map, ['src/app.ts']);
+  assert.deepEqual(result, {
+    kind: 'risk-map-rule-shadow/v1',
+    authorizesApproval: false,
+    evidenceTrust: 'unverified-input',
+    status: 'analyzed',
+    reasonCodes: [],
+    findings: [],
+  });
+});
+
+test('shadow diagnostic: malformed non-empty inputs fail loudly, no false green', () => {
+  const map = { rules: [{ pattern: '**', action: 'escalate' }] };
+  assert.throws(() => diagnoseShadowedRiskRules(map, undefined), { name: 'RiskMapError' });
+  assert.throws(() => diagnoseShadowedRiskRules(map, [null]), { name: 'RiskMapError' });
+  assert.throws(() => diagnoseShadowedRiskRules({ rules: 'broken' }, ['src/x.ts']), {
+    name: 'RiskMapError',
+  });
+  assert.throws(() => diagnoseShadowedRiskRules({ rules: 'broken' }, []), {
+    name: 'RiskMapError',
+  });
+  assert.throws(() => diagnoseShadowedRiskRules({ rules: [{ pattern: 'x', action: 'bad' }] }, []), {
+    name: 'RiskMapError',
+  });
+  const prototypeActionMap = { rules: [{ pattern: '**', action: 'toString' }] };
+  assert.throws(() => diagnoseShadowedRiskRules(prototypeActionMap, ['src/x.ts']), {
+    name: 'RiskMapError',
+  });
+});
+
+test('shadow diagnostic: only higher action than the actual first match is reported', () => {
+  const map = {
+    rules: [
+      { pattern: 'src/**', action: 'escalate' },
+      { pattern: 'src/auth/**', action: 'require_human_review' },
+      { pattern: 'src/**', action: 'comment_only' },
+    ],
+  };
+  const result = diagnoseShadowedRiskRules(map, ['src/auth/login.ts', 'src/other.ts']).findings;
+  assert.equal(result.length, 1);
+  assert.deepEqual(
+    [result[0].file, result[0].selectedAction, result[0].shadowedAction],
+    ['src/auth/login.ts', 'escalate', 'require_human_review']
+  );
+  const baseline = evaluateRisk(map, ['src/auth/login.ts']);
+  assert.equal(baseline.aggregateAction, 'escalate');
+});
+
+test('shadow diagnostic: same path normalization semantics as existing risk evaluator', () => {
+  const map = {
+    rules: [
+      { pattern: 'src/**', action: 'comment_only' },
+      { pattern: 'src/auth/**', action: 'require_human_review' },
+    ],
+  };
+  const windowsStyle = 'src\\\\auth\\\\login.ts';
+  assert.deepEqual(diagnoseShadowedRiskRules(map, [windowsStyle]).findings, []);
+  assert.deepEqual(diagnoseShadowedRiskRules(map, ['src/auth/login.ts']).findings, [
+    {
+      file: 'src/auth/login.ts',
+      selectedRuleIndex: 0,
+      selectedPattern: 'src/**',
+      selectedAction: 'comment_only',
+      shadowedRuleIndex: 1,
+      shadowedPattern: 'src/auth/**',
+      shadowedAction: 'require_human_review',
+    },
+  ]);
 });
