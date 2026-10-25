@@ -43,6 +43,8 @@ export const PLUGIN_INPUTS = [
   // commands/skill.md runs the resolver, which imports src/lib/skill-id-resolver.mjs.
   'scripts/resolve-skill-id.mjs',
   'src/lib/skill-id-resolver.mjs',
+  // Referenced from commands/skill.md.
+  'docs/development/skill-id-resolution-contract.md',
   // commands/setup-team.md reads this template.
   '.river/rules.template.md',
   // Linked from skills/agent-skills/unknown-coverage-review/SKILL.md.
