@@ -1,0 +1,93 @@
+# promptfoo configuration for the Suppression Feedback Workflow skill
+# See: https://www.promptfoo.dev/docs/configuration/guide
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: Major finding without an existing suppression entry
+    vars:
+      diff: file://../fixtures/01-major-finding-without-suppression.md
+    assert:
+      - type: contains
+        value: 'accepted_risk'
+      - type: contains
+        value: 'HIGH_SEVERITY'
+      - type: contains
+        value: 'river suppression add'
+      - type: contains
+        value: 'Severity: minor'
+      - type: not-contains
+        value: 'Severity: major'
+      - type: not-contains
+        value: 'Severity: critical'
+      - type: llm-rubric
+        value: |
+          The output must present the choice between (a) implementing the fix and (b) adding a suppression with rationale.
+          Score 1 if both options are mentioned. Score 0 if only suppression is presented.
+      - type: similar
+        value: file://../golden/01-major-finding-without-suppression.md
+        threshold: 0.6
+
+  - description: Already-suppressed finding (no repeat guidance)
+    vars:
+      diff: file://../fixtures/02-already-suppressed-finding.md
+    assert:
+      - type: not-contains
+        value: 'Severity: major'
+      - type: not-contains
+        value: 'Severity: critical'
+      - type: llm-rubric
+        value: |
+          The output must NOT repeat the suppression-vs-fix workflow.
+          Score 1 if the output (a) returns NO_REVIEW, or (b) returns only a single
+          `Severity: info` acknowledgement that the existing suppression covers the case
+          and does NOT prescribe a new `river suppression add` CLI invocation for the reviewer.
+          Score 0 if it emits a `minor` finding that asks the reviewer to choose suppression
+          vs fix, or if it prescribes new CLI input even though an active entry already
+          covers the fingerprint.
+      - type: similar
+        value: file://../golden/02-already-suppressed-finding.md
+        threshold: 0.5
+
+  - description: False positive candidate at minor severity (test fixture)
+    vars:
+      diff: file://../fixtures/03-false-positive-candidate.md
+    assert:
+      - type: contains
+        value: 'false_positive'
+      - type: contains
+        value: 'tests/'
+      - type: contains
+        value: 'Severity: minor'
+      - type: not-contains
+        value: 'Severity: major'
+      - type: not-contains
+        value: 'Severity: critical'
+      - type: llm-rubric
+        value: |
+          The output must recommend feedbackType=false_positive as the action and acknowledge the test-file context.
+          The output may mention `accepted_risk` for contrast (e.g. "use false_positive, not accepted_risk")
+          but the recommended `--feedback` value passed to `river suppression add` must be `false_positive`.
+          Score 1 if both conditions hold. Score 0 otherwise.
+      - type: similar
+        value: file://../golden/03-false-positive-candidate.md
+        threshold: 0.6
+
+defaultTest:
+  options:
+    provider: openai:gpt-4o
+
+outputPath: eval/results.json

@@ -1,0 +1,22 @@
+diff --git a/src/lib/severity-index.mjs b/src/lib/severity-index.mjs
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/src/lib/severity-index.mjs
+@@ -0,0 +1,17 @@
++import { readFile } from 'node:fs/promises';
++import { parseAllDocuments } from 'yaml';
++
++// Builds a compact id -> severity Map. The multi-MB rawText and the parsed
++// document array are only local variables: once this function returns they
++// are unreachable and eligible for GC. Only the small Map survives.
++export async function buildSeverityIndex(registryPath) {
++  const rawText = await readFile(registryPath, 'utf8');
++  const entries = parseAllDocuments(rawText).flatMap((doc) => doc.toJS()?.skills ?? []);
++
++  const index = new Map();
++  for (const entry of entries) {
++    index.set(entry.id, entry.severity ?? 'major');
++  }
++  return index;
++}

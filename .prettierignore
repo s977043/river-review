@@ -26,3 +26,7 @@ CHANGELOG.md
 # release that bumps the version).
 .claude-plugin/plugin.json
 .codex-plugin/plugin.json
+
+# Byte copies made by `npm run plugin:dist`; formatting them would break
+# `npm run plugin:dist:check` (and the release-bumped plugin.json copy above).
+plugin-dist/

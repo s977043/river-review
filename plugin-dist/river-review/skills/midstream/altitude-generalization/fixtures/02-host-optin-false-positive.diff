@@ -1,0 +1,15 @@
+diff --git a/src/lib/finding-formatter.mjs b/src/lib/finding-formatter.mjs
+index 1111111..2222222 100644
+--- a/src/lib/finding-formatter.mjs
++++ b/src/lib/finding-formatter.mjs
+@@ -40,6 +40,12 @@ export function formatFinding(finding, options = {}) {
+   // Shared formatter. `options.compact` is a documented public option any caller may set.
+   let header = `${finding.file}:${finding.line}: ${finding.title}`;
+
++  // Public opt-in: any caller may pass options.compact to request a shorter
++  // header. This is a first-class formatting option, not a per-caller bypass.
++  if (options.compact) {
++    header = truncate(header, 80);
++  }
+   return { header, body: renderBody(finding, options) };
+ }

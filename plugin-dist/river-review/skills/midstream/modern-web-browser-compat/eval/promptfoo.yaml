@@ -1,0 +1,42 @@
+# promptfoo configuration for Modern Web Browser Compatibility
+# Status: scaffolding. See ../README.md for golden-generation workflow.
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: Popover API without feature detection should be flagged
+    vars:
+      diff: file://../fixtures/01-popover-api-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must include a Finding referencing the Popover API, a
+          Baseline line, and a Suggestion that proposes feature detection
+          (`if ('popover' in HTMLElement.prototype)`) or `@supports`.
+          Score 1 if all three are present; 0 otherwise.
+      - type: contains
+        value: 'Severity: minor'
+
+  - description: existing @supports guard must suppress the finding
+    vars:
+      diff: file://../fixtures/02-supports-guard-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must NOT propose adding @supports — it is already present.
+          Acceptable outputs include "No findings" or an explicit reference to
+          the @supports false-positive guard.
+          Score 1 if no finding is produced; 0 otherwise.
