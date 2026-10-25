@@ -17250,6 +17250,7 @@ const formatRequestDetails = (details) => {
                 name.toLowerCase() === 'proxy-authorization' ||
                 name.toLowerCase() === 'api-key' ||
                 name.toLowerCase() === 'x-api-key' ||
+                name.toLowerCase() === 'x-amz-security-token' ||
                 name.toLowerCase() === 'cookie' ||
                 name.toLowerCase() === 'set-cookie') ?
                 '***'
@@ -17303,11 +17304,12 @@ function promiseWithResolvers() {
 /* harmony export */   i8: () => (/* binding */ maybeObj),
 /* harmony export */   ml: () => (/* binding */ safeJSON),
 /* harmony export */   nt: () => (/* binding */ isAbsoluteURL),
+/* harmony export */   rn: () => (/* binding */ CREDENTIAL_OPTIONS),
 /* harmony export */   sA: () => (/* binding */ isObj),
 /* harmony export */   wQ: () => (/* binding */ validatePositiveInteger),
 /* harmony export */   ze: () => (/* binding */ isEmptyObj)
 /* harmony export */ });
-/* unused harmony exports ensurePresent, coerceInteger, coerceFloat, coerceBoolean, maybeCoerceInteger, maybeCoerceFloat, maybeCoerceBoolean, pop */
+/* unused harmony exports ensurePresent, rejectUnsupportedCredentials, coerceInteger, coerceFloat, coerceBoolean, maybeCoerceInteger, maybeCoerceFloat, maybeCoerceBoolean, pop */
 /* harmony import */ var _core_error_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(5064);
 
 // https://url.spec.whatwg.org/#url-scheme-string
@@ -17353,6 +17355,20 @@ const validatePositiveInteger = (name, n) => {
         throw new _core_error_mjs__WEBPACK_IMPORTED_MODULE_0__/* .AnthropicError */ .pJ(`${name} must be a positive integer`);
     }
     return n;
+};
+const CREDENTIAL_OPTIONS = ['apiKey', 'authToken', 'credentials', 'config', 'profile'];
+/**
+ * Throws when `options` holds a first-party credential option that a platform
+ * client does not accept, so that a new one is rejected until the client opts
+ * in. `null` passes, because the base `withOptions` fills the credential
+ * options it clears with `null`.
+ */
+const rejectUnsupportedCredentials = (options, platform) => {
+    for (const name of CREDENTIAL_OPTIONS) {
+        if (!platform.accepts.includes(name) && options[name] != null) {
+            throw new AnthropicError(platform.unsupportedOptionMessage(name));
+        }
+    }
 };
 const coerceInteger = (value) => {
     if (typeof value === 'number')
@@ -54337,7 +54353,7 @@ const sleep = (ms, signal) => new Promise((resolve) => {
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/errors.mjs
 var errors = __nccwpck_require__(2533);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/version.mjs
-const VERSION = '0.134.0'; // x-release-please-version
+const VERSION = '1.1.0'; // x-release-please-version
 //# sourceMappingURL=version.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs
 
@@ -54582,9 +54598,9 @@ function ReadableStreamFrom(iterable) {
  *
  * This polyfill was pulled from https://github.com/MattiasBuelens/web-streams-polyfill/pull/122#issuecomment-1627354490
  */
-function ReadableStreamToAsyncIterable(stream) {
+function readableStreamIterator(stream) {
     if (stream[Symbol.asyncIterator])
-        return stream;
+        return stream[Symbol.asyncIterator]();
     const reader = stream.getReader();
     return {
         async next() {
@@ -54605,10 +54621,31 @@ function ReadableStreamToAsyncIterable(stream) {
             await cancelPromise;
             return { done: true, value: undefined };
         },
-        [Symbol.asyncIterator]() {
-            return this;
-        },
     };
+}
+// Cancels a stream whose reader was garbage collected before it finished. The reader's lock keeps
+// anything else from reading or cancelling the stream, so it would hold on to its connection.
+const droppedReaders = typeof FinalizationRegistry === 'undefined' ? undefined : (
+/* @__PURE__ */ new FinalizationRegistry(async (iter) => {
+    try {
+        await iter.return?.();
+    }
+    catch {
+        // The stream has already failed, e.g. because the request was aborted.
+    }
+}));
+async function* ReadableStreamToAsyncIterable(stream) {
+    const iter = readableStreamIterator(stream);
+    // Only this generator refers to `reader`, so it's collected once nothing can resume the generator.
+    const reader = {};
+    droppedReaders?.register(reader, iter, reader);
+    try {
+        for await (const chunk of { [Symbol.asyncIterator]: () => iter })
+            yield chunk;
+    }
+    finally {
+        droppedReaders?.unregister(reader);
+    }
 }
 /**
  * Cancels a ReadableStream we don't need to consume.
@@ -54816,85 +54853,28 @@ var Stream = /* @__PURE__ */ (() => {
                 let done = false;
                 try {
                     for await (const sse of _iterSSEMessages(response, controller)) {
-                        if (sse.event === 'completion') {
-                            try {
-                                yield JSON.parse(sse.data);
-                            }
-                            catch (e) {
-                                logger.error(`Could not parse message into JSON:`, sse.data);
-                                logger.error(`From chunk:`, sse.raw);
-                                throw e;
-                            }
-                        }
-                        if (sse.event === 'message_start' ||
-                            sse.event === 'message_delta' ||
-                            sse.event === 'message_stop' ||
-                            sse.event === 'content_block_start' ||
-                            sse.event === 'content_block_delta' ||
-                            sse.event === 'content_block_stop' ||
-                            sse.event === 'message' ||
-                            sse.event === 'user.message' ||
-                            sse.event === 'user.interrupt' ||
-                            sse.event === 'user.tool_confirmation' ||
-                            sse.event === 'user.custom_tool_result' ||
-                            sse.event === 'user.tool_result' ||
-                            sse.event === 'agent.message' ||
-                            sse.event === 'agent.thinking' ||
-                            sse.event === 'agent.tool_use' ||
-                            sse.event === 'agent.tool_result' ||
-                            sse.event === 'agent.mcp_tool_use' ||
-                            sse.event === 'agent.mcp_tool_result' ||
-                            sse.event === 'agent.custom_tool_use' ||
-                            sse.event === 'agent.thread_context_compacted' ||
-                            sse.event === 'session.status_running' ||
-                            sse.event === 'session.status_idle' ||
-                            sse.event === 'session.status_rescheduled' ||
-                            sse.event === 'session.status_terminated' ||
-                            sse.event === 'session.error' ||
-                            sse.event === 'session.deleted' ||
-                            sse.event === 'session.updated' ||
-                            sse.event === 'span.model_request_start' ||
-                            sse.event === 'span.model_request_end' ||
-                            sse.event === 'span.outcome_evaluation_start' ||
-                            sse.event === 'span.outcome_evaluation_ongoing' ||
-                            sse.event === 'span.outcome_evaluation_end' ||
-                            sse.event === 'user.define_outcome' ||
-                            sse.event === 'agent.thread_message_received' ||
-                            sse.event === 'agent.thread_message_sent' ||
-                            sse.event === 'agent.session_thread_message_received' ||
-                            sse.event === 'agent.session_thread_message_sent' ||
-                            sse.event === 'session.thread_created' ||
-                            sse.event === 'session.thread_status_created' ||
-                            sse.event === 'session.thread_status_running' ||
-                            sse.event === 'session.thread_status_idle' ||
-                            sse.event === 'session.thread_status_rescheduled' ||
-                            sse.event === 'session.thread_status_terminated' ||
-                            sse.event === 'event_start' ||
-                            sse.event === 'event_delta' ||
-                            sse.event === 'system.message' ||
-                            sse.event === 'workflow_run.created' ||
-                            sse.event === 'workflow_run.status_running' ||
-                            sse.event === 'workflow_run.status_idle' ||
-                            sse.event === 'workflow_run.status_ended' ||
-                            sse.event === 'workflow_run.error' ||
-                            sse.event === 'workflow_run.phase_started' ||
-                            sse.event === 'workflow_run.phase_ended') {
-                            try {
-                                yield JSON.parse(sse.data);
-                            }
-                            catch (e) {
-                                logger.error(`Could not parse message into JSON:`, sse.data);
-                                logger.error(`From chunk:`, sse.raw);
-                                throw e;
-                            }
-                        }
                         if (sse.event === 'ping') {
+                            continue;
+                        }
+                        if (sse.event === null) {
                             continue;
                         }
                         if (sse.event === 'error') {
                             const body = (0,utils_values/* safeJSON */.ml)(sse.data) ?? sse.data;
                             const type = body?.error?.type;
                             throw new core_error/* APIError */.LG(undefined, body, undefined, response.headers, type);
+                        }
+                        else {
+                            if (!sse.data)
+                                continue;
+                            try {
+                                yield JSON.parse(sse.data);
+                            }
+                            catch (e) {
+                                logger.error(`Could not parse message into JSON:`, sse.data);
+                                logger.error(`From chunk:`, sse.raw);
+                                throw e;
+                            }
                         }
                     }
                     done = true;
@@ -55211,7 +55191,7 @@ const isEmptyHeaders = (headers) => {
 };
 //# sourceMappingURL=headers.mjs.map
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/utils/env.mjs
-var env = __nccwpck_require__(111);
+var utils_env = __nccwpck_require__(111);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/internal/tracing.mjs
 /**
  * OpenTelemetry tracing of the client's API calls.
@@ -55290,14 +55270,14 @@ function resolveOpenTelemetryOptions(option) {
 /** What the environment variables give, for a client that is given no `openTelemetry` option. */
 function optionFromEnv() {
     return {
-        propagation: (0,env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY_PROPAGATION')?.toLowerCase() !== 'false',
+        propagation: (0,utils_env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY_PROPAGATION')?.toLowerCase() !== 'false',
         traces: {
-            enabled: (0,env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY')?.toLowerCase() !== 'false',
-            contentMode: (0,env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE')?.toLowerCase() === 'content' ?
+            enabled: (0,utils_env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY')?.toLowerCase() !== 'false',
+            contentMode: (0,utils_env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE')?.toLowerCase() === 'content' ?
                 'content'
                 : 'metadata_only',
             // The variable holds decimal digits only: `1e3` and `0x10` are not sizes.
-            maxContentBytes: Number(/^\d+$/.exec((0,env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY_TRACES_MAX_CONTENT_BYTES') ?? '')?.[0] ?? NaN),
+            maxContentBytes: Number(/^\d+$/.exec((0,utils_env/* readEnv */.s)('ANTHROPIC_OPEN_TELEMETRY_TRACES_MAX_CONTENT_BYTES') ?? '')?.[0] ?? NaN),
         },
     };
 }
@@ -56526,9 +56506,6 @@ const ATTR_GEN_AI_REQUEST_MODEL = 'gen_ai.request.model';
 const ATTR_GEN_AI_REQUEST_REASONING_LEVEL = 'gen_ai.request.reasoning.level';
 const ATTR_GEN_AI_REQUEST_STOP_SEQUENCES = 'gen_ai.request.stop_sequences';
 const ATTR_GEN_AI_REQUEST_STREAM = 'gen_ai.request.stream';
-const ATTR_GEN_AI_REQUEST_TEMPERATURE = 'gen_ai.request.temperature';
-const ATTR_GEN_AI_REQUEST_TOP_K = 'gen_ai.request.top_k';
-const ATTR_GEN_AI_REQUEST_TOP_P = 'gen_ai.request.top_p';
 const ATTR_GEN_AI_RESPONSE_ID = 'gen_ai.response.id';
 const ATTR_GEN_AI_RESPONSE_MODEL = 'gen_ai.response.model';
 const ATTR_GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK = 'gen_ai.response.time_to_first_chunk';
@@ -57020,15 +56997,6 @@ function messagesCreateSpanSettings(client, body, headers) {
             attributes[ATTR_ANTHROPIC_BETA] = betas;
         }
         attributes[ATTR_GEN_AI_REQUEST_MAX_TOKENS] = body.max_tokens;
-        if (body.temperature != null) {
-            attributes[ATTR_GEN_AI_REQUEST_TEMPERATURE] = body.temperature;
-        }
-        if (body.top_p != null) {
-            attributes[ATTR_GEN_AI_REQUEST_TOP_P] = body.top_p;
-        }
-        if (body.top_k != null) {
-            attributes[ATTR_GEN_AI_REQUEST_TOP_K] = body.top_k;
-        }
         if (body.stream === true) {
             attributes[ATTR_GEN_AI_REQUEST_STREAM] = true;
         }
@@ -57174,6 +57142,7 @@ function withoutTraceHeaders(middleware) {
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/core/credentials.mjs
 
 
+
 /** Current schema version written to `configs/<profile>.json`. Absent on read ⇒ "1.0". */
 const CONFIG_FILE_VERSION = '1.0';
 /** Current schema version written to `credentials/<profile>.json`. Absent on read ⇒ "1.0". */
@@ -57194,19 +57163,29 @@ function validateProfileName(name) {
     }
 }
 /**
- * Loads the Anthropic configuration for the given (or active) profile.
+ * Loads the Anthropic configuration from a profile or the environment.
  *
  * Returns `null` when running in a browser or no configuration can be resolved.
- * Otherwise, returns the configuration based on the config file and environment variables.
  *
- * **Profile resolution** (first match wins):
- *   1. Explicit `profile` argument
- *   2. `ANTHROPIC_PROFILE` environment variable
- *   3. Contents of `<config_dir>/active_config` file
- *   4. `"default"`
+ * **Resolution order** (first match wins):
+ *   1. The profile the `profile` argument names. Nothing below is tried, so
+ *      the result is `null` when that profile does not exist.
+ *   2. The profile the `ANTHROPIC_PROFILE` environment variable names. Nothing
+ *      below is tried, and an {@link AnthropicError} is thrown when that
+ *      profile does not exist.
+ *   3. An `oidc_federation` config synthesized entirely from environment
+ *      variables, when `ANTHROPIC_FEDERATION_RULE_ID`,
+ *      `ANTHROPIC_ORGANIZATION_ID` and one of `ANTHROPIC_IDENTITY_TOKEN_FILE`
+ *      and `ANTHROPIC_IDENTITY_TOKEN` are set. No profile is read.
+ *   4. The active profile: the one the `<config_dir>/active_config` file
+ *      names, otherwise `"default"`.
+ *   5. The config of step 3 without an identity token, when the first two of
+ *      its variables are set. Otherwise the result is `null`.
+ *
+ * `ANTHROPIC_CONFIG_DIR` sets `<config_dir>`. It does not select a profile.
  *
  * **Config resolution:**
- *   - If `<config_dir>/configs/<profile>.json` exists, it is loaded and
+ *   - A profile is loaded from `<config_dir>/configs/<profile>.json`, and
  *     missing fields are filled from environment variables. Values present
  *     in the file take precedence — env vars only fill gaps:
  *       - `ANTHROPIC_BASE_URL` → `base_url`
@@ -57216,9 +57195,6 @@ function validateProfileName(name) {
  *       - `ANTHROPIC_FEDERATION_RULE_ID` → `authentication.federation_rule_id` (oidc_federation)
  *       - `ANTHROPIC_IDENTITY_TOKEN_FILE` → `authentication.identity_token` (oidc_federation)
  *       - `ANTHROPIC_SERVICE_ACCOUNT_ID` → `authentication.service_account_id` (oidc_federation)
- *   - If no config file exists, an `oidc_federation` config is synthesized
- *     entirely from environment variables when both `ANTHROPIC_FEDERATION_RULE_ID`
- *     and `ANTHROPIC_ORGANIZATION_ID` are set.
  */
 const loadConfig = async (profile) => {
     return (await loadConfigWithSource(profile))?.config ?? null;
@@ -57233,6 +57209,37 @@ const loadConfigWithSource = async (profile) => {
     const rootConfigPath = await getRootConfigPath();
     if (rootConfigPath === null) {
         return null;
+    }
+    const namedInEnv = profile == null && (0,utils_env/* readEnv */.s)('ANTHROPIC_PROFILE') != null;
+    let fromEnv = null;
+    if (profile == null && !namedInEnv) {
+        const organizationId = (0,utils_env/* readEnv */.s)('ANTHROPIC_ORGANIZATION_ID');
+        const identityTokenFile = (0,utils_env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN_FILE');
+        const federationRuleId = (0,utils_env/* readEnv */.s)('ANTHROPIC_FEDERATION_RULE_ID');
+        if (federationRuleId && organizationId) {
+            fromEnv = {
+                fromFile: false,
+                config: {
+                    organization_id: organizationId,
+                    // A defaulted-but-empty CI variable (`ANTHROPIC_WORKSPACE_ID=""`) is
+                    // treated as unset — readEnv coerces empty to undefined, and the body
+                    // builder's truthy check skips it — so `"workspace_id": ""` never goes
+                    // on the wire.
+                    workspace_id: (0,utils_env/* readEnv */.s)('ANTHROPIC_WORKSPACE_ID'),
+                    base_url: (0,utils_env/* readEnv */.s)('ANTHROPIC_BASE_URL'),
+                    authentication: {
+                        type: 'oidc_federation',
+                        federation_rule_id: federationRuleId,
+                        service_account_id: (0,utils_env/* readEnv */.s)('ANTHROPIC_SERVICE_ACCOUNT_ID'),
+                        identity_token: identityTokenFile ? { source: 'file', path: identityTokenFile } : undefined,
+                        scope: (0,utils_env/* readEnv */.s)('ANTHROPIC_SCOPE'),
+                    },
+                },
+            };
+            if (identityTokenFile || (0,utils_env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN')) {
+                return fromEnv;
+            }
+        }
     }
     const profileName = profile ?? (await getActiveProfileName());
     if (profileName === null) {
@@ -57249,34 +57256,11 @@ const loadConfigWithSource = async (profile) => {
         if (err?.code !== 'ENOENT') {
             throw new Error(`failed to read config file ${configPath}: ${err}`);
         }
-        configRaw = null;
-    }
-    if (configRaw === null) {
-        const organizationId = (0,env/* readEnv */.s)('ANTHROPIC_ORGANIZATION_ID');
-        const identityTokenFile = (0,env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN_FILE');
-        const federationRuleId = (0,env/* readEnv */.s)('ANTHROPIC_FEDERATION_RULE_ID');
-        if (federationRuleId && organizationId) {
-            return {
-                fromFile: false,
-                config: {
-                    organization_id: organizationId,
-                    // A defaulted-but-empty CI variable (`ANTHROPIC_WORKSPACE_ID=""`) is
-                    // treated as unset — readEnv coerces empty to undefined, and the body
-                    // builder's truthy check skips it — so `"workspace_id": ""` never goes
-                    // on the wire.
-                    workspace_id: (0,env/* readEnv */.s)('ANTHROPIC_WORKSPACE_ID'),
-                    base_url: (0,env/* readEnv */.s)('ANTHROPIC_BASE_URL'),
-                    authentication: {
-                        type: 'oidc_federation',
-                        federation_rule_id: federationRuleId,
-                        service_account_id: (0,env/* readEnv */.s)('ANTHROPIC_SERVICE_ACCOUNT_ID'),
-                        identity_token: identityTokenFile ? { source: 'file', path: identityTokenFile } : undefined,
-                        scope: (0,env/* readEnv */.s)('ANTHROPIC_SCOPE'),
-                    },
-                },
-            };
+        if (namedInEnv) {
+            throw new core_error/* AnthropicError */.pJ(`ANTHROPIC_PROFILE names the profile "${profileName}", but ${configPath} does not exist. ` +
+                'Set ANTHROPIC_PROFILE to a profile that exists, or unset it.', { cause: err });
         }
-        return null;
+        return fromEnv;
     }
     let config;
     try {
@@ -57293,13 +57277,13 @@ const loadConfigWithSource = async (profile) => {
         throw new Error(`authentication.type "${authType}" is not a known authentication type`);
     }
     // File values are authoritative; env vars only fill fields the file left unset.
-    config.organization_id ?? (config.organization_id = (0,env/* readEnv */.s)('ANTHROPIC_ORGANIZATION_ID'));
-    config.workspace_id ?? (config.workspace_id = (0,env/* readEnv */.s)('ANTHROPIC_WORKSPACE_ID'));
-    config.base_url ?? (config.base_url = (0,env/* readEnv */.s)('ANTHROPIC_BASE_URL'));
-    (_a = config.authentication).scope ?? (_a.scope = (0,env/* readEnv */.s)('ANTHROPIC_SCOPE'));
+    config.organization_id ?? (config.organization_id = (0,utils_env/* readEnv */.s)('ANTHROPIC_ORGANIZATION_ID'));
+    config.workspace_id ?? (config.workspace_id = (0,utils_env/* readEnv */.s)('ANTHROPIC_WORKSPACE_ID'));
+    config.base_url ?? (config.base_url = (0,utils_env/* readEnv */.s)('ANTHROPIC_BASE_URL'));
+    (_a = config.authentication).scope ?? (_a.scope = (0,utils_env/* readEnv */.s)('ANTHROPIC_SCOPE'));
     if (config.authentication.type === 'oidc_federation') {
         if (!config.authentication.identity_token) {
-            const identityTokenFile = (0,env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN_FILE');
+            const identityTokenFile = (0,utils_env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN_FILE');
             if (identityTokenFile) {
                 config.authentication.identity_token = {
                     source: 'file',
@@ -57312,9 +57296,9 @@ const loadConfigWithSource = async (profile) => {
         // check in credential-chain rejects empty, so semantics match but types are
         // cleaner.
         if (!config.authentication.federation_rule_id) {
-            config.authentication.federation_rule_id = (0,env/* readEnv */.s)('ANTHROPIC_FEDERATION_RULE_ID') ?? '';
+            config.authentication.federation_rule_id = (0,utils_env/* readEnv */.s)('ANTHROPIC_FEDERATION_RULE_ID') ?? '';
         }
-        (_b = config.authentication).service_account_id ?? (_b.service_account_id = (0,env/* readEnv */.s)('ANTHROPIC_SERVICE_ACCOUNT_ID'));
+        (_b = config.authentication).service_account_id ?? (_b.service_account_id = (0,utils_env/* readEnv */.s)('ANTHROPIC_SERVICE_ACCOUNT_ID'));
     }
     return { config, fromFile: true };
 };
@@ -57334,8 +57318,9 @@ const loadConfigWithSource = async (profile) => {
  *   2. `<config_dir>/credentials/<profile>.json`
  */
 const loadCredentials = async () => {
-    const config = await loadConfig();
-    const credentialsPath = await getCredentialsPath(config);
+    const profile = (await getActiveProfileName()) ?? undefined;
+    const config = await loadConfig(profile);
+    const credentialsPath = await getCredentialsPath(config, profile);
     if (!credentialsPath) {
         return null;
     }
@@ -57393,17 +57378,17 @@ const getRootConfigPath = async () => {
     const { path } = await __nccwpck_require__.e(/* import() */ 168).then(__nccwpck_require__.bind(__nccwpck_require__, 168));
     // ANTHROPIC_CONFIG_DIR is treated as a trusted path: it is set by the
     // process operator, not by remote input, so it is not validated.
-    const configDir = (0,env/* readEnv */.s)('ANTHROPIC_CONFIG_DIR');
+    const configDir = (0,utils_env/* readEnv */.s)('ANTHROPIC_CONFIG_DIR');
     if (configDir) {
         return configDir;
     }
     const os = getPlatformHeaders()['X-Stainless-OS'];
     if (os === 'Windows') {
-        const appData = (0,env/* readEnv */.s)('APPDATA');
+        const appData = (0,utils_env/* readEnv */.s)('APPDATA');
         if (appData) {
             return path.join(appData, 'Anthropic');
         }
-        const userProfile = (0,env/* readEnv */.s)('USERPROFILE');
+        const userProfile = (0,utils_env/* readEnv */.s)('USERPROFILE');
         if (userProfile) {
             return path.join(userProfile, 'AppData', 'Roaming', 'Anthropic');
         }
@@ -57411,11 +57396,11 @@ const getRootConfigPath = async () => {
         // "no config available" rather than silently writing under C:\.
         return null;
     }
-    const xdgConfigHome = (0,env/* readEnv */.s)('XDG_CONFIG_HOME');
+    const xdgConfigHome = (0,utils_env/* readEnv */.s)('XDG_CONFIG_HOME');
     if (xdgConfigHome) {
         return path.join(xdgConfigHome, 'anthropic');
     }
-    const home = (0,env/* readEnv */.s)('HOME');
+    const home = (0,utils_env/* readEnv */.s)('HOME');
     if (home) {
         return path.join(home, '.config', 'anthropic');
     }
@@ -57430,7 +57415,7 @@ const getActiveProfileName = async () => {
     if (!rootConfigPath) {
         return null;
     }
-    const profileName = (0,env/* readEnv */.s)('ANTHROPIC_PROFILE');
+    const profileName = (0,utils_env/* readEnv */.s)('ANTHROPIC_PROFILE');
     if (profileName) {
         return profileName;
     }
@@ -57690,14 +57675,17 @@ function resolveCredentialsFromConfig(config, options) {
  *
  * Resolution order:
  *
- *   1. Config file for the active profile (or the explicit `profile` argument)
- *      → dispatch on `authentication.type` (`oidc_federation`, `user_oauth`)
+ *   1. Config file for the profile `ANTHROPIC_PROFILE` names
+ *      → dispatch on `authentication.type` (`oidc_federation`, `user_oauth`).
+ *      A missing file throws
  *   2. Environment variables `ANTHROPIC_FEDERATION_RULE_ID` +
  *      `ANTHROPIC_ORGANIZATION_ID` (+ identity token) → OIDC federation
- *   3. Nothing matches → `null`
+ *   3. Config file for the active profile (the one `active_config` names,
+ *      otherwise `default`) → dispatch on `authentication.type`
+ *   4. Nothing matches → `null`
  *
  * Passing `profile` selects `<config_dir>/configs/<profile>.json` directly,
- * skipping `ANTHROPIC_PROFILE` / `active_config` resolution.
+ * skipping steps 1 to 3.
  */
 async function defaultCredentials(options, profile) {
     const loaded = await loadConfigWithSource(profile);
@@ -57710,11 +57698,11 @@ async function defaultCredentials(options, profile) {
     // so callers that retain a reference to the loaded config don't observe the
     // patched-in default.
     //
-    // Env-only credentials (no profile file on disk) skip the disk cache —
-    // matching the other SDKs. A disk cache keyed by profile path would
-    // re-serve a stale token after a change to ANTHROPIC_WORKSPACE_ID (or
-    // ANTHROPIC_ORGANIZATION_ID / ANTHROPIC_FEDERATION_RULE_ID) until the
-    // cached token expired, so the env-only chain stays in-memory only.
+    // Env-only credentials (no profile file was read) skip the disk cache. A
+    // disk cache keyed by profile path would re-serve a stale token after a
+    // change to ANTHROPIC_WORKSPACE_ID (or ANTHROPIC_ORGANIZATION_ID /
+    // ANTHROPIC_FEDERATION_RULE_ID) until the cached token expired, so the
+    // env-only chain stays in-memory only.
     const withPath = config.authentication.credentials_path || !fromFile ?
         config
         : {
@@ -57799,11 +57787,11 @@ function resolveIdentityTokenProvider(auth) {
         }
         return identityTokenFromFile(auth.identity_token.path);
     }
-    const tokenFile = (0,env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN_FILE');
+    const tokenFile = (0,utils_env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN_FILE');
     if (tokenFile) {
         return identityTokenFromFile(tokenFile);
     }
-    const tokenValue = (0,env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN');
+    const tokenValue = (0,utils_env/* readEnv */.s)('ANTHROPIC_IDENTITY_TOKEN');
     if (tokenValue) {
         return identityTokenFromValue(tokenValue);
     }
@@ -58764,6 +58752,37 @@ class BidirectionalPageCursor extends AbstractPage {
         };
     }
 }
+class ReportPageCursor extends AbstractPage {
+    constructor(client, response, body, options) {
+        super(client, response, body, options);
+        this.data = body.data || [];
+        this.next_page = body.next_page || null;
+        this.has_more = body.has_more || false;
+        this.data_refreshed_at = body.data_refreshed_at || null;
+    }
+    getPaginatedItems() {
+        return this.data ?? [];
+    }
+    hasNextPage() {
+        if (this.has_more === false) {
+            return false;
+        }
+        return this.nextPageRequestOptions() != null;
+    }
+    nextPageRequestOptions() {
+        const cursor = this.next_page;
+        if (!cursor) {
+            return null;
+        }
+        return {
+            ...this.options,
+            query: {
+                ...(0,utils_values/* maybeObj */.i8)(this.options.query),
+                page: cursor,
+            },
+        };
+    }
+}
 //# sourceMappingURL=pagination.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/internal/to-file.mjs
 
@@ -58866,32 +58885,6 @@ class APIResource {
     }
 }
 //# sourceMappingURL=resource.mjs.map
-;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/completions.mjs
-
-
-
-class Completions extends APIResource {
-    create(params, options) {
-        const { betas, workspace_id, ...body } = params;
-        return this._client.post('/v1/complete', {
-            body,
-            timeout: this._client._options.timeout ?? 600000,
-            ...options,
-            headers: headers_buildHeaders([
-                {
-                    ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
-                options?.headers,
-            ]),
-            stream: params.stream ?? false,
-            __span: startApiCallSpan(this._client, 'anthropic.completions.create', options, {
-                route: '/v1/complete',
-            }),
-        });
-    }
-}
-//# sourceMappingURL=completions.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/internal/stainless-helper-header.mjs
 /**
  * Single source of truth for the `x-stainless-helper` telemetry header — the
@@ -60006,25 +59999,27 @@ var MessageStream = /* @__PURE__ */ (() => {
 })();
 //# sourceMappingURL=MessageStream.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs
-var _JSONLDecoder_consumed;
-
 
 
 
 var JSONLDecoder = /* @__PURE__ */ (() => {
     class JSONLDecoder {
-        constructor(iterator, controller) {
+        constructor(iterator, controller, 
+        // Node's fetch cancels an unread body once its response is garbage collected, so we hold a reference.
+        response) {
             this.iterator = iterator;
-            _JSONLDecoder_consumed.set(this, false);
+            this.response = response;
             this.controller = controller;
         }
         async *decoder() {
-            if ((0,tslib/* __classPrivateFieldGet */.g)(this, _JSONLDecoder_consumed, "f")) {
+            const iterator = this.iterator;
+            if (!iterator) {
                 throw new core_error/* AnthropicError */.pJ('Cannot iterate over a consumed stream.');
             }
-            (0,tslib/* __classPrivateFieldSet */.G)(this, _JSONLDecoder_consumed, true, "f");
+            // Lets the iterator be collected with this generator, even if the decoder is still held.
+            this.iterator = undefined;
             const lineDecoder = new LineDecoder();
-            for await (const chunk of this.iterator) {
+            for await (const chunk of iterator) {
                 for (const line of lineDecoder.decode(chunk)) {
                     yield JSON.parse(line);
                 }
@@ -60033,7 +60028,7 @@ var JSONLDecoder = /* @__PURE__ */ (() => {
                 yield JSON.parse(line);
             }
         }
-        [(_JSONLDecoder_consumed = new WeakMap(), Symbol.asyncIterator)]() {
+        [Symbol.asyncIterator]() {
             return this.decoder();
         }
         static fromResponse(response, controller) {
@@ -60045,7 +60040,7 @@ var JSONLDecoder = /* @__PURE__ */ (() => {
                 }
                 throw new core_error/* AnthropicError */.pJ(`Attempted to iterate over a response with no body`);
             }
-            return new JSONLDecoder(ReadableStreamToAsyncIterable(response.body), controller);
+            return new JSONLDecoder(ReadableStreamToAsyncIterable(response.body), controller, response);
         }
     }
     return JSONLDecoder;
@@ -60599,14 +60594,11 @@ class Models extends APIResource {
      * ```
      */
     retrieve(modelID, params = {}, options) {
-        const { betas, workspace_id } = params ?? {};
+        const { workspace_id } = params ?? {};
         return this._client.get(src_path `/v1/models/${modelID}`, {
             ...options,
             headers: headers_buildHeaders([
-                {
-                    ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
+                { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
                 options?.headers,
             ]),
             __span: startApiCallSpan(this._client, 'anthropic.models.retrieve', options, {
@@ -60630,15 +60622,12 @@ class Models extends APIResource {
      * ```
      */
     list(params = {}, options) {
-        const { betas, workspace_id, ...query } = params ?? {};
+        const { workspace_id, ...query } = params ?? {};
         return this._client.getAPIList('/v1/models', (Page), {
             query,
             ...options,
             headers: headers_buildHeaders([
-                {
-                    ...(betas?.toString() != null ? { 'anthropic-beta': betas?.toString() } : undefined),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
+                { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
                 options?.headers,
             ]),
             __span: startApiCallSpan(this._client, 'anthropic.models.list', options, {
@@ -61018,6 +61007,182 @@ var Skills = /* @__PURE__ */ (() => {
     return Skills;
 })();
 //# sourceMappingURL=skills.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/user-profiles/action-urls.mjs
+
+
+
+
+class ActionURLs extends APIResource {
+    /**
+     * Create Action URL
+     *
+     * @example
+     * ```ts
+     * const userProfileActionURL =
+     *   await client.userProfiles.actionURLs.create(
+     *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+     *     { action: { type: 'enroll_end_user' } },
+     *   );
+     * ```
+     */
+    create(userProfileID, params, options) {
+        const { workspace_id, ...body } = params;
+        return this._client.post(src_path `/v1/user_profiles/${userProfileID}/action_urls`, {
+            body,
+            ...options,
+            headers: headers_buildHeaders([
+                { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.user_profiles.action_urls.create', options, {
+                route: '/v1/user_profiles/{user_profile_id}/action_urls',
+                attributes: { 'anthropic.user_profile.id': userProfileID },
+            }),
+        });
+    }
+}
+//# sourceMappingURL=action-urls.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/user-profiles/user-profiles.mjs
+
+
+
+
+
+
+
+var UserProfiles = /* @__PURE__ */ (() => {
+    class UserProfiles extends APIResource {
+        constructor() {
+            super(...arguments);
+            this.actionURLs = new ActionURLs(this._client);
+        }
+        /**
+         * Create User Profile
+         *
+         * @example
+         * ```ts
+         * const userProfile = await client.userProfiles.create();
+         * ```
+         */
+        create(params, options) {
+            const { workspace_id, ...body } = params;
+            return this._client.post('/v1/user_profiles', {
+                body,
+                ...options,
+                headers: headers_buildHeaders([
+                    { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.create', options, {
+                    route: '/v1/user_profiles',
+                    createdIDAttribute: 'anthropic.user_profile.id',
+                }),
+            });
+        }
+        /**
+         * Get User Profile
+         *
+         * @example
+         * ```ts
+         * const userProfile = await client.userProfiles.retrieve(
+         *   'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+         * );
+         * ```
+         */
+        retrieve(userProfileID, params = {}, options) {
+            const { workspace_id } = params ?? {};
+            return this._client.get(src_path `/v1/user_profiles/${userProfileID}`, {
+                ...options,
+                headers: headers_buildHeaders([
+                    { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.retrieve', options, {
+                    route: '/v1/user_profiles/{user_profile_id}',
+                    attributes: { 'anthropic.user_profile.id': userProfileID },
+                }),
+            });
+        }
+        /**
+         * Update User Profile
+         *
+         * @example
+         * ```ts
+         * const userProfile = await client.userProfiles.update(
+         *   'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+         * );
+         * ```
+         */
+        update(userProfileID, params, options) {
+            const { workspace_id, ...body } = params;
+            return this._client.post(src_path `/v1/user_profiles/${userProfileID}`, {
+                body,
+                ...options,
+                headers: headers_buildHeaders([
+                    { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.update', options, {
+                    route: '/v1/user_profiles/{user_profile_id}',
+                    attributes: { 'anthropic.user_profile.id': userProfileID },
+                }),
+            });
+        }
+        /**
+         * List User Profiles
+         *
+         * @example
+         * ```ts
+         * // Automatically fetches more pages as needed.
+         * for await (const userProfile of client.userProfiles.list()) {
+         *   // ...
+         * }
+         * ```
+         */
+        list(params = {}, options) {
+            const { workspace_id, ...query } = params ?? {};
+            return this._client.getAPIList('/v1/user_profiles', (PageCursor), {
+                query,
+                ...options,
+                headers: headers_buildHeaders([
+                    { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.list', options, {
+                    route: '/v1/user_profiles',
+                    queryParams: ['enforcement_status', 'limit', 'order', 'order_by', 'page'],
+                }),
+            });
+        }
+        /**
+         * Delete User Profile
+         *
+         * @example
+         * ```ts
+         * const deletedUserProfile = await client.userProfiles.delete(
+         *   'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+         * );
+         * ```
+         */
+        delete(userProfileID, params = {}, options) {
+            const { workspace_id } = params ?? {};
+            return this._client.delete(src_path `/v1/user_profiles/${userProfileID}`, {
+                ...options,
+                headers: headers_buildHeaders([
+                    { ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined) },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.delete', options, {
+                    route: '/v1/user_profiles/{user_profile_id}',
+                    attributes: { 'anthropic.user_profile.id': userProfileID },
+                }),
+            });
+        }
+    }
+    UserProfiles.ActionURLs = ActionURLs;
+    return UserProfiles;
+})();
+//# sourceMappingURL=user-profiles.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/organization/api-keys.mjs
 
 
@@ -62431,6 +62596,44 @@ class Members extends APIResource {
 
 class rate_limits_RateLimits extends APIResource {
     /**
+     * Set or clear rate-limit overrides for one rate-limit group in a workspace.
+     *
+     * Only the limiter types named in `limits` change: an integer `value` sets that
+     * type's override and `null` clears it. Types not named keep their current value.
+     * A value above the organization's own limit is stored, but the organization limit
+     * still applies, so the lower of the two is enforced.
+     *
+     * Returns the targeted group's entry with this request applied, in the shape
+     * `GET /v1/organizations/workspaces/{workspace_id}/rate_limits` returns. Changes
+     * take effect within about an hour.
+     *
+     * @example
+     * ```ts
+     * const workspaceRateLimit =
+     *   await client.organization.workspaces.rateLimits.update(
+     *     'rate_limit_id',
+     *     {
+     *       workspace_id: 'workspace_id',
+     *       limits: [{ type: 'fast_itpmca', value: 0 }],
+     *     },
+     *   );
+     * ```
+     */
+    update(rateLimitID, params, options) {
+        const { workspace_id, ...body } = params;
+        return this._client.post(src_path `/v1/organizations/workspaces/${workspace_id}/rate_limits/${rateLimitID}`, {
+            body,
+            ...options,
+            __span: startApiCallSpan(this._client, 'anthropic.organization.workspaces.rate_limits.update', options, {
+                route: '/v1/organizations/workspaces/{workspace_id}/rate_limits/{rate_limit_id}',
+                attributes: {
+                    'anthropic.organization.workspace.id': workspace_id,
+                    'anthropic.organization.workspace.rate_limit.id': rateLimitID,
+                },
+            }),
+        });
+    }
+    /**
      * List a workspace's rate limits.
      *
      * By default, returns only the groups and limiter types that have a
@@ -63601,156 +63804,6 @@ class models_Models extends APIResource {
     }
 }
 //# sourceMappingURL=models.mjs.map
-;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/user-profiles.mjs
-
-
-
-
-
-class UserProfiles extends APIResource {
-    /**
-     * Create User Profile
-     *
-     * @example
-     * ```ts
-     * const betaUserProfile =
-     *   await client.beta.userProfiles.create();
-     * ```
-     */
-    create(params, options) {
-        const { betas, workspace_id, ...body } = params;
-        return this._client.post('/v1/user_profiles?beta=true', {
-            body,
-            ...options,
-            headers: headers_buildHeaders([
-                {
-                    'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
-                options?.headers,
-            ]),
-            __span: startApiCallSpan(this._client, 'anthropic.user_profiles.create', options, {
-                route: '/v1/user_profiles',
-                createdIDAttribute: 'anthropic.user_profile.id',
-            }),
-        });
-    }
-    /**
-     * Get User Profile
-     *
-     * @example
-     * ```ts
-     * const betaUserProfile =
-     *   await client.beta.userProfiles.retrieve(
-     *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
-     *   );
-     * ```
-     */
-    retrieve(userProfileID, params = {}, options) {
-        const { betas, workspace_id } = params ?? {};
-        return this._client.get(src_path `/v1/user_profiles/${userProfileID}?beta=true`, {
-            ...options,
-            headers: headers_buildHeaders([
-                {
-                    'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
-                options?.headers,
-            ]),
-            __span: startApiCallSpan(this._client, 'anthropic.user_profiles.retrieve', options, {
-                route: '/v1/user_profiles/{user_profile_id}',
-                attributes: { 'anthropic.user_profile.id': userProfileID },
-            }),
-        });
-    }
-    /**
-     * Update User Profile
-     *
-     * @example
-     * ```ts
-     * const betaUserProfile =
-     *   await client.beta.userProfiles.update(
-     *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
-     *   );
-     * ```
-     */
-    update(userProfileID, params, options) {
-        const { betas, workspace_id, ...body } = params;
-        return this._client.post(src_path `/v1/user_profiles/${userProfileID}?beta=true`, {
-            body,
-            ...options,
-            headers: headers_buildHeaders([
-                {
-                    'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
-                options?.headers,
-            ]),
-            __span: startApiCallSpan(this._client, 'anthropic.user_profiles.update', options, {
-                route: '/v1/user_profiles/{user_profile_id}',
-                attributes: { 'anthropic.user_profile.id': userProfileID },
-            }),
-        });
-    }
-    /**
-     * List User Profiles
-     *
-     * @example
-     * ```ts
-     * // Automatically fetches more pages as needed.
-     * for await (const betaUserProfile of client.beta.userProfiles.list()) {
-     *   // ...
-     * }
-     * ```
-     */
-    list(params = {}, options) {
-        const { betas, workspace_id, ...query } = params ?? {};
-        return this._client.getAPIList('/v1/user_profiles?beta=true', (PageCursor), {
-            query,
-            ...options,
-            headers: headers_buildHeaders([
-                {
-                    'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
-                options?.headers,
-            ]),
-            __span: startApiCallSpan(this._client, 'anthropic.user_profiles.list', options, {
-                route: '/v1/user_profiles',
-                queryParams: ['limit', 'order', 'order_by', 'page'],
-            }),
-        });
-    }
-    /**
-     * Create Enrollment URL
-     *
-     * @example
-     * ```ts
-     * const betaUserProfileEnrollmentURL =
-     *   await client.beta.userProfiles.createEnrollmentURL(
-     *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
-     *   );
-     * ```
-     */
-    createEnrollmentURL(userProfileID, params = {}, options) {
-        const { betas, workspace_id } = params ?? {};
-        return this._client.post(src_path `/v1/user_profiles/${userProfileID}/enrollment_url?beta=true`, {
-            ...options,
-            headers: headers_buildHeaders([
-                {
-                    'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
-                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
-                },
-                options?.headers,
-            ]),
-            __span: startApiCallSpan(this._client, 'anthropic.user_profiles.create_enrollment_url', options, {
-                route: '/v1/user_profiles/{user_profile_id}/enrollment_url',
-                attributes: { 'anthropic.user_profile.id': userProfileID },
-            }),
-        });
-    }
-}
-//# sourceMappingURL=user-profiles.mjs.map
 // EXTERNAL MODULE: ./node_modules/standardwebhooks/dist/index.js
 var dist = __nccwpck_require__(5487);
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/webhooks.mjs
@@ -64036,27 +64089,21 @@ var utils_backoff = __nccwpck_require__(7594);
 
 /**
  * Return a `withOptions()` clone of `client` set up for use *by* one of the
- * runner helpers: authenticated with `authToken` as Bearer credentials, with
- * the parent's `X-Api-Key` cleared, and tagged with the helper's
+ * runner helpers: authenticated with `authToken` as Bearer credentials in
+ * place of the parent's own credential, and tagged with the helper's
  * `x-stainless-helper` value on every outgoing request.
  *
  * The returned sub-client inherits the parent's full configuration
  * (`baseURL`, `timeout`, `maxRetries`, `fetch`, `fetchOptions`, custom
  * `defaultHeaders`, `defaultQuery`). Overrides applied:
  *
- * - `authToken: authToken` — the new credential.
- * - `apiKey: null` — the parent's `X-Api-Key` is cleared. `withOptions`
- *   inherits the parent's `apiKey` by default; without this, both
- *   `X-Api-Key` *and* `Authorization: Bearer …` would land on the wire.
- *   `client.ts` only triggers the env-var fallback when `apiKey === undefined`,
- *   so explicit `null` is honored.
- * - `credentials: undefined` — opts the clone out of any inherited
- *   credentials/config/profile so the explicit bearer is the unambiguous auth.
+ * - `authToken: authToken` — the new credential, which replaces the parent's.
  * - `baseURL: client.baseURL` — pins the parent's resolved host (auth override otherwise resets it).
  * - `defaultHeaders` is rebuilt as `parent._authState.extraHeaders ⊕ parent.defaultHeaders ⊕
  *   {'x-stainless-helper': helper}`. `withOptions` *replaces* (does not
  *   merge) `defaultHeaders`, so we merge here so any custom headers the
- *   caller set on the parent client survive on the sub-client.
+ *   caller set on the parent client survive on the sub-client, except a
+ *   hand-set `X-Api-Key` and a hand-set or omitted (`null`) `Authorization`.
  */
 function copyClientForHelper(client, { authToken, helper }) {
     if (!authToken) {
@@ -64076,11 +64123,13 @@ function copyClientForHelper(client, { authToken, helper }) {
         parentDefaults,
         { [STAINLESS_HELPER_HEADER]: helper },
     ]);
+    // A parent that sends its key as a hand-set `X-Api-Key` also omits `Authorization`.
+    defaultHeaders.values.delete('x-api-key');
+    defaultHeaders.values.delete('authorization');
+    defaultHeaders.nulls.delete('authorization');
     return client.withOptions({
-        apiKey: null,
         authToken,
         baseURL: client.baseURL,
-        credentials: undefined,
         defaultHeaders,
     });
 }
@@ -64214,9 +64263,9 @@ var WorkPoller = /* @__PURE__ */ (() => {
     class WorkPoller {
         constructor(opts) {
             // Sub-client scoped to the environment key. Every poll / ack / stop call
-            // is routed through this so the parent's `X-Api-Key` never lands on the
-            // wire alongside the bearer credential. The helper-telemetry header is
-            // attached as a default on this client; per-call plumbing is unnecessary.
+            // is routed through this so the parent's API key never lands on the
+            // wire. The helper-telemetry header is attached as a default on this
+            // client; per-call plumbing is unnecessary.
             _WorkPoller_runnerClient.set(this, void 0);
             _WorkPoller_consumed.set(this, false);
             _WorkPoller_controller.set(this, void 0);
@@ -65818,13 +65867,13 @@ var EnvironmentWorker = /* @__PURE__ */ (() => {
          * calls; when absent (or undecodable) those calls use the environment key.
          */
         async handleItem(opts) {
-            const workId = opts?.workId ?? (0,env/* readEnv */.s)('ANTHROPIC_WORK_ID');
-            const environmentId = opts?.environmentId ?? (0,env/* readEnv */.s)('ANTHROPIC_ENVIRONMENT_ID');
-            const sessionId = opts?.sessionId ?? (0,env/* readEnv */.s)('ANTHROPIC_SESSION_ID');
+            const workId = opts?.workId ?? (0,utils_env/* readEnv */.s)('ANTHROPIC_WORK_ID');
+            const environmentId = opts?.environmentId ?? (0,utils_env/* readEnv */.s)('ANTHROPIC_ENVIRONMENT_ID');
+            const sessionId = opts?.sessionId ?? (0,utils_env/* readEnv */.s)('ANTHROPIC_SESSION_ID');
             // Trailing `|| undefined` / `||` between fallbacks so an empty value reads
             // as absent (matching how `readEnv` treats empty values).
-            const environmentKey = (opts?.environmentKey ?? this.environmentKey ?? (0,env/* readEnv */.s)('ANTHROPIC_ENVIRONMENT_KEY')) || undefined;
-            const workSecret = opts?.workSecret || (0,env/* readEnv */.s)('ANTHROPIC_WORK_SECRET') || null;
+            const environmentKey = (opts?.environmentKey ?? this.environmentKey ?? (0,utils_env/* readEnv */.s)('ANTHROPIC_ENVIRONMENT_KEY')) || undefined;
+            const workSecret = opts?.workSecret || (0,utils_env/* readEnv */.s)('ANTHROPIC_WORK_SECRET') || null;
             if (!workId) {
                 throw new core_error/* AnthropicError */.pJ('handleItem: workId is required — pass it or set ANTHROPIC_WORK_ID');
             }
@@ -65880,9 +65929,8 @@ var EnvironmentWorker = /* @__PURE__ */ (() => {
         // lease heartbeat, the skill download, and the work force-stop —
         // authenticates with the per-item credential. Scope a client to it once and
         // thread that through. `copyClientForHelper` also clears the parent's
-        // `apiKey`, so the sub-client emits *only* the bearer credential on the
-        // wire (a plain `withOptions({authToken})` would leave `X-Api-Key` set as
-        // well).
+        // `apiKey`, so the sub-client emits *only* the per-item credential on the
+        // wire.
         const sessionClient = copyClientForHelper(this.client, {
             authToken: itemCredential,
             helper: 'environments-worker',
@@ -66711,7 +66759,7 @@ var Environments = /* @__PURE__ */ (() => {
 
 class Memories extends APIResource {
     /**
-     * Create a memory
+     * Create a Memory
      *
      * @example
      * ```ts
@@ -66744,7 +66792,7 @@ class Memories extends APIResource {
         });
     }
     /**
-     * Retrieve a memory
+     * Retrieve a Memory
      *
      * @example
      * ```ts
@@ -66775,7 +66823,7 @@ class Memories extends APIResource {
         });
     }
     /**
-     * Update a memory
+     * Update a Memory
      *
      * @example
      * ```ts
@@ -66807,7 +66855,7 @@ class Memories extends APIResource {
         });
     }
     /**
-     * List memories
+     * List Memories
      *
      * @example
      * ```ts
@@ -66840,7 +66888,7 @@ class Memories extends APIResource {
         });
     }
     /**
-     * Delete a memory
+     * Delete a Memory
      *
      * @example
      * ```ts
@@ -66880,7 +66928,7 @@ class Memories extends APIResource {
 
 class MemoryVersions extends APIResource {
     /**
-     * Retrieve a memory version
+     * Retrieve a Memory Version
      *
      * @example
      * ```ts
@@ -66914,7 +66962,7 @@ class MemoryVersions extends APIResource {
         });
     }
     /**
-     * List memory versions
+     * List Memory Versions
      *
      * @example
      * ```ts
@@ -66957,7 +67005,7 @@ class MemoryVersions extends APIResource {
         });
     }
     /**
-     * Redact a memory version
+     * Redact a Memory Version
      *
      * @example
      * ```ts
@@ -67008,7 +67056,7 @@ var MemoryStores = /* @__PURE__ */ (() => {
             this.memoryVersions = new MemoryVersions(this._client);
         }
         /**
-         * Create a memory store
+         * Create a Memory Store
          *
          * @example
          * ```ts
@@ -67035,7 +67083,7 @@ var MemoryStores = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Retrieve a memory store
+         * Retrieve a Memory Store
          *
          * @example
          * ```ts
@@ -67063,7 +67111,7 @@ var MemoryStores = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Update a memory store
+         * Update a Memory Store
          *
          * @example
          * ```ts
@@ -67090,7 +67138,7 @@ var MemoryStores = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * List memory stores
+         * List Memory Stores
          *
          * @example
          * ```ts
@@ -67119,7 +67167,7 @@ var MemoryStores = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Delete a memory store
+         * Delete a Memory Store
          *
          * @example
          * ```ts
@@ -67145,7 +67193,7 @@ var MemoryStores = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Archive a memory store
+         * Archive a Memory Store
          *
          * @example
          * ```ts
@@ -68696,7 +68744,6 @@ var BetaToolRunner = /* @__PURE__ */ (() => {
             /** Changes queued by `addTools()` / `removeTools()`, in call order, for the next request */
             _BetaToolRunner_pendingToolChanges.set(this, []);
             rejectCompactionParam(params);
-            rejectCompactionControl(params);
             rejectRunToolsEagerlyWithoutStream(params);
             (0,tslib/* __classPrivateFieldSet */.G)(this, _BetaToolRunner_state, {
                 params: {
@@ -68861,7 +68908,7 @@ var BetaToolRunner = /* @__PURE__ */ (() => {
          * the reply that have started and runs the rest, including the ones `deferToolCall()` is holding, so that no
          * call runs twice.
          *
-         * @returns A promise that resolves to a BetaMessageParam containing tool results, or null if no tools need to be executed
+         * @returns A promise that resolves to a BetaUserMessageParam containing tool results, or null if no tools need to be executed
          *
          * @example
          * const toolResponse = await runner.generateToolResponse();
@@ -69226,7 +69273,7 @@ var BetaToolRunner = /* @__PURE__ */ (() => {
     }, _BetaToolRunner_availableToolNames = function _BetaToolRunner_availableToolNames() {
         const available = new Set((0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_instances, "m", _BetaToolRunner_runnableTools).call(this).keys());
         for (const message of [...(0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_state, "f").params.messages, (0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_instances, "m", _BetaToolRunner_pendingToolChangesMessage).call(this)]) {
-            if (typeof message.content === 'string') {
+            if (!Array.isArray(message.content)) {
                 continue;
             }
             for (const block of message.content) {
@@ -69300,13 +69347,6 @@ function rejectCompactionParam(params) {
             'Call `runner.compactBeforeNextTurn()` when the conversation should be compacted instead.');
     }
 }
-function rejectCompactionControl(params) {
-    // No longer in the params type, so only untyped callers reach this; forwarding it would be an opaque API 400.
-    if ('compactionControl' in params && params.compactionControl != null) {
-        throw new core_error/* AnthropicError */.pJ('`compactionControl` has been removed from the tool runner. Use server-side compaction instead: ' +
-            'call `runner.compactBeforeNextTurn()` when the conversation should be compacted.');
-    }
-}
 function rejectRunToolsEagerlyWithoutStream(params) {
     if (params.runToolsEagerly && !params.stream) {
         throw new TypeError("`runToolsEagerly: true` needs `stream: true` in the tool runner's params, because a reply that " +
@@ -69354,7 +69394,7 @@ function toolDefinition(tool) {
 }
 function withToolDefinitions(messages) {
     return messages.map((message) => {
-        if (message.role !== 'system' || typeof message.content === 'string') {
+        if (message.role !== 'system' || !Array.isArray(message.content)) {
             return message;
         }
         const content = message.content.map((block) => block.type === 'tool_addition' && block.tool.type === 'tool_definition' ?
@@ -70553,6 +70593,225 @@ class users_Users extends APIResource {
     }
 }
 //# sourceMappingURL=users.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/organization/webhooks.mjs
+
+
+
+
+
+class webhooks_Webhooks extends APIResource {
+    /**
+     * Create an organization webhook endpoint.
+     *
+     * An organization webhook endpoint belongs to the organization rather than to one
+     * of its workspaces. An organization can have at most 32 organization webhook
+     * endpoints, enabled or disabled.
+     *
+     * The response includes the endpoint's signing secret. No read returns it, so
+     * store it when you receive it.
+     *
+     * Every request must include the beta header
+     * `anthropic-beta: webhooks-2026-10-07`. A request without it returns `404`,
+     * exactly as if this API did not exist. Anthropic turns organization webhook
+     * endpoints on for each organization; until yours is on, requests also return
+     * `404`. Organization webhook endpoints are in beta and are not available to
+     * organizations with HIPAA readiness enabled.
+     *
+     * @example
+     * ```ts
+     * const betaNewOrganizationWebhookEndpoint =
+     *   await client.beta.organization.webhooks.create({
+     *     enabled_events: [
+     *       'user_profile.enforcement_action_opened',
+     *     ],
+     *     url: 'x',
+     *   });
+     * ```
+     */
+    create(params, options) {
+        const { betas, ...body } = params;
+        return this._client.post('/v1/organizations/webhooks?beta=true', {
+            body,
+            ...options,
+            headers: headers_buildHeaders([
+                { 'anthropic-beta': [...(betas ?? []), 'webhooks-2026-10-07'].toString() },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.organization.webhooks.create', options, {
+                route: '/v1/organizations/webhooks',
+                createdIDAttribute: 'anthropic.organization.webhook.id',
+            }),
+        });
+    }
+    /**
+     * Retrieve an organization webhook endpoint by ID.
+     *
+     * Every request must include the beta header
+     * `anthropic-beta: webhooks-2026-10-07`. A request without it returns `404`,
+     * exactly as if this API did not exist. Anthropic turns organization webhook
+     * endpoints on for each organization; until yours is on, requests also return
+     * `404`. Organization webhook endpoints are in beta and are not available to
+     * organizations with HIPAA readiness enabled.
+     *
+     * @example
+     * ```ts
+     * const betaOrganizationWebhookEndpoint =
+     *   await client.beta.organization.webhooks.retrieve(
+     *     'webhook_endpoint_id',
+     *   );
+     * ```
+     */
+    retrieve(webhookEndpointID, params = {}, options) {
+        const { betas } = params ?? {};
+        return this._client.get(src_path `/v1/organizations/webhooks/${webhookEndpointID}?beta=true`, {
+            ...options,
+            headers: headers_buildHeaders([
+                { 'anthropic-beta': [...(betas ?? []), 'webhooks-2026-10-07'].toString() },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.organization.webhooks.retrieve', options, {
+                route: '/v1/organizations/webhooks/{webhook_endpoint_id}',
+                attributes: { 'anthropic.organization.webhook.id': webhookEndpointID },
+            }),
+        });
+    }
+    /**
+     * Update an organization webhook endpoint. Only the fields you send are changed.
+     *
+     * Every request must include the beta header
+     * `anthropic-beta: webhooks-2026-10-07`. A request without it returns `404`,
+     * exactly as if this API did not exist. Anthropic turns organization webhook
+     * endpoints on for each organization; until yours is on, requests also return
+     * `404`. Organization webhook endpoints are in beta and are not available to
+     * organizations with HIPAA readiness enabled.
+     *
+     * @example
+     * ```ts
+     * const betaOrganizationWebhookEndpoint =
+     *   await client.beta.organization.webhooks.update(
+     *     'webhook_endpoint_id',
+     *   );
+     * ```
+     */
+    update(webhookEndpointID, params, options) {
+        const { betas, ...body } = params;
+        return this._client.post(src_path `/v1/organizations/webhooks/${webhookEndpointID}?beta=true`, {
+            body,
+            ...options,
+            headers: headers_buildHeaders([
+                { 'anthropic-beta': [...(betas ?? []), 'webhooks-2026-10-07'].toString() },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.organization.webhooks.update', options, {
+                route: '/v1/organizations/webhooks/{webhook_endpoint_id}',
+                attributes: { 'anthropic.organization.webhook.id': webhookEndpointID },
+            }),
+        });
+    }
+    /**
+     * List the organization's webhook endpoints.
+     *
+     * An organization webhook endpoint belongs to the organization rather than to one
+     * of its workspaces. The list does not include webhook endpoints that belong to a
+     * workspace.
+     *
+     * Every request must include the beta header
+     * `anthropic-beta: webhooks-2026-10-07`. A request without it returns `404`,
+     * exactly as if this API did not exist. Anthropic turns organization webhook
+     * endpoints on for each organization; until yours is on, requests also return
+     * `404`. Organization webhook endpoints are in beta and are not available to
+     * organizations with HIPAA readiness enabled.
+     *
+     * @example
+     * ```ts
+     * // Automatically fetches more pages as needed.
+     * for await (const betaOrganizationWebhookEndpoint of client.beta.organization.webhooks.list()) {
+     *   // ...
+     * }
+     * ```
+     */
+    list(params = {}, options) {
+        const { betas, ...query } = params ?? {};
+        return this._client.getAPIList('/v1/organizations/webhooks?beta=true', (Page), {
+            query,
+            ...options,
+            headers: headers_buildHeaders([
+                { 'anthropic-beta': [...(betas ?? []), 'webhooks-2026-10-07'].toString() },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.organization.webhooks.list', options, {
+                route: '/v1/organizations/webhooks',
+                queryParams: ['after_id', 'before_id', 'limit', 'order'],
+            }),
+        });
+    }
+    /**
+     * Delete an organization webhook endpoint.
+     *
+     * Every request must include the beta header
+     * `anthropic-beta: webhooks-2026-10-07`. A request without it returns `404`,
+     * exactly as if this API did not exist. Anthropic turns organization webhook
+     * endpoints on for each organization; until yours is on, requests also return
+     * `404`. Organization webhook endpoints are in beta and are not available to
+     * organizations with HIPAA readiness enabled.
+     *
+     * @example
+     * ```ts
+     * const betaDeletedOrganizationWebhookEndpoint =
+     *   await client.beta.organization.webhooks.delete(
+     *     'webhook_endpoint_id',
+     *   );
+     * ```
+     */
+    delete(webhookEndpointID, params = {}, options) {
+        const { betas } = params ?? {};
+        return this._client.delete(src_path `/v1/organizations/webhooks/${webhookEndpointID}?beta=true`, {
+            ...options,
+            headers: headers_buildHeaders([
+                { 'anthropic-beta': [...(betas ?? []), 'webhooks-2026-10-07'].toString() },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.organization.webhooks.delete', options, {
+                route: '/v1/organizations/webhooks/{webhook_endpoint_id}',
+                attributes: { 'anthropic.organization.webhook.id': webhookEndpointID },
+            }),
+        });
+    }
+    /**
+     * Replace an organization webhook endpoint's signing secret. The old secret stops
+     * working immediately. The new secret is returned only in this response.
+     *
+     * Every request must include the beta header
+     * `anthropic-beta: webhooks-2026-10-07`. A request without it returns `404`,
+     * exactly as if this API did not exist. Anthropic turns organization webhook
+     * endpoints on for each organization; until yours is on, requests also return
+     * `404`. Organization webhook endpoints are in beta and are not available to
+     * organizations with HIPAA readiness enabled.
+     *
+     * @example
+     * ```ts
+     * const betaOrganizationWebhookEndpointSigningSecret =
+     *   await client.beta.organization.webhooks.regenerateSigningSecret(
+     *     'webhook_endpoint_id',
+     *   );
+     * ```
+     */
+    regenerateSigningSecret(webhookEndpointID, params = {}, options) {
+        const { betas } = params ?? {};
+        return this._client.post(src_path `/v1/organizations/webhooks/${webhookEndpointID}/regenerate_signing_secret?beta=true`, {
+            ...options,
+            headers: headers_buildHeaders([
+                { 'anthropic-beta': [...(betas ?? []), 'webhooks-2026-10-07'].toString() },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.organization.webhooks.regenerate_signing_secret', options, {
+                route: '/v1/organizations/webhooks/{webhook_endpoint_id}/regenerate_signing_secret',
+                attributes: { 'anthropic.organization.webhook.id': webhookEndpointID },
+            }),
+        });
+    }
+}
+//# sourceMappingURL=webhooks.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/organization/analytics/artifacts.mjs
 
 
@@ -70659,7 +70918,7 @@ class CostReport extends APIResource {
      * ```
      */
     list(query, options) {
-        return this._client.getAPIList('/v1/organizations/analytics/cost_report?beta=true', (PageCursor), {
+        return this._client.getAPIList('/v1/organizations/analytics/cost_report?beta=true', (ReportPageCursor), {
             query,
             ...options,
             __span: startApiCallSpan(this._client, 'anthropic.organization.analytics.cost_report.list', options, {
@@ -70846,7 +71105,7 @@ class UsageReport extends APIResource {
      * ```
      */
     list(query, options) {
-        return this._client.getAPIList('/v1/organizations/analytics/usage_report?beta=true', (PageCursor), {
+        return this._client.getAPIList('/v1/organizations/analytics/usage_report?beta=true', (ReportPageCursor), {
             query,
             ...options,
             __span: startApiCallSpan(this._client, 'anthropic.organization.analytics.usage_report.list', options, {
@@ -70900,7 +71159,7 @@ class UserCostReport extends APIResource {
      * ```
      */
     list(query, options) {
-        return this._client.getAPIList('/v1/organizations/analytics/user_cost_report?beta=true', (PageCursor), {
+        return this._client.getAPIList('/v1/organizations/analytics/user_cost_report?beta=true', (ReportPageCursor), {
             query,
             ...options,
             __span: startApiCallSpan(this._client, 'anthropic.organization.analytics.user_cost_report.list', options, {
@@ -70957,7 +71216,7 @@ class UserUsageReport extends APIResource {
      * ```
      */
     list(query, options) {
-        return this._client.getAPIList('/v1/organizations/analytics/user_usage_report?beta=true', (PageCursor), {
+        return this._client.getAPIList('/v1/organizations/analytics/user_usage_report?beta=true', (ReportPageCursor), {
             query,
             ...options,
             __span: startApiCallSpan(this._client, 'anthropic.organization.analytics.user_usage_report.list', options, {
@@ -73277,10 +73536,12 @@ var SpendLimits = /* @__PURE__ */ (() => {
         /**
          * List the organization's spend limits.
          *
-         * Limits are grouped by scope type, in the order `organization`, `seat_tier`,
+         * A Claude Console organization's limits, including any read-only `usage_tier`
+         * limit, come newest first. Listing them is in an early access preview. To request
+         * access, contact your Anthropic account team. A Claude Enterprise organization's
+         * limits are grouped by scope type, in the order `organization`, `seat_tier`,
          * `rbac_group`, `organization_service`, `user`; within a type they come in a fixed
-         * order that is not creation order. Supported for Claude Enterprise organizations
-         * only, not for Claude Console organizations.
+         * order that is not creation order.
          *
          * @example
          * ```ts
@@ -73301,7 +73562,7 @@ var SpendLimits = /* @__PURE__ */ (() => {
                 ]),
                 __span: startApiCallSpan(this._client, 'anthropic.organization.spend_limits.list', options, {
                     route: '/v1/organizations/spend_limits',
-                    queryParams: ['limit', 'page', 'scope_type'],
+                    queryParams: ['limit', 'page', 'scope_type', 'workspace_id'],
                 }),
             });
         }
@@ -73311,8 +73572,9 @@ var SpendLimits = /* @__PURE__ */ (() => {
          * For a Claude Enterprise organization, this deletes a per-user override, and the
          * member falls back to any inherited spend limit at that period. Its seat-tier,
          * group, and organization-level rows cannot be deleted via this endpoint. A Claude
-         * Console organization deletes its organization and workspace limits. Deleting
-         * them through the API is in an early access preview.
+         * Console organization deletes its organization and workspace limits, but not its
+         * `usage_tier` limit. Deleting organization and workspace limits through the API
+         * is in an early access preview.
          *
          * @example
          * ```ts
@@ -73865,6 +74127,44 @@ class workspaces_members_Members extends APIResource {
 
 class workspaces_rate_limits_RateLimits extends APIResource {
     /**
+     * Set or clear rate-limit overrides for one rate-limit group in a workspace.
+     *
+     * Only the limiter types named in `limits` change: an integer `value` sets that
+     * type's override and `null` clears it. Types not named keep their current value.
+     * A value above the organization's own limit is stored, but the organization limit
+     * still applies, so the lower of the two is enforced.
+     *
+     * Returns the targeted group's entry with this request applied, in the shape
+     * `GET /v1/organizations/workspaces/{workspace_id}/rate_limits` returns. Changes
+     * take effect within about an hour.
+     *
+     * @example
+     * ```ts
+     * const betaWorkspaceRateLimit =
+     *   await client.beta.organization.workspaces.rateLimits.update(
+     *     'rate_limit_id',
+     *     {
+     *       workspace_id: 'workspace_id',
+     *       limits: [{ type: 'fast_itpmca', value: 0 }],
+     *     },
+     *   );
+     * ```
+     */
+    update(rateLimitID, params, options) {
+        const { workspace_id, ...body } = params;
+        return this._client.post(src_path `/v1/organizations/workspaces/${workspace_id}/rate_limits/${rateLimitID}?beta=true`, {
+            body,
+            ...options,
+            __span: startApiCallSpan(this._client, 'anthropic.organization.workspaces.rate_limits.update', options, {
+                route: '/v1/organizations/workspaces/{workspace_id}/rate_limits/{rate_limit_id}',
+                attributes: {
+                    'anthropic.organization.workspace.id': workspace_id,
+                    'anthropic.organization.workspace.rate_limit.id': rateLimitID,
+                },
+            }),
+        });
+    }
+    /**
      * List a workspace's rate limits.
      *
      * By default, returns only the groups and limiter types that have a
@@ -74287,6 +74587,8 @@ var organization_workspaces_workspaces_Workspaces = /* @__PURE__ */ (() => {
 
 
 
+
+
 var organization_Organization = /* @__PURE__ */ (() => {
     class Organization extends APIResource {
         constructor() {
@@ -74307,6 +74609,7 @@ var organization_Organization = /* @__PURE__ */ (() => {
             this.plugins = new plugins_Plugins(this._client);
             this.pluginMarketplaces = new PluginMarketplaces(this._client);
             this.telemetryDestinations = new TelemetryDestinations(this._client);
+            this.webhooks = new webhooks_Webhooks(this._client);
         }
         /**
          * Retrieve information about the organization associated with the authenticated
@@ -74343,6 +74646,7 @@ var organization_Organization = /* @__PURE__ */ (() => {
     Organization.Plugins = plugins_Plugins;
     Organization.PluginMarketplaces = PluginMarketplaces;
     Organization.TelemetryDestinations = TelemetryDestinations;
+    Organization.Webhooks = webhooks_Webhooks;
     return Organization;
 })();
 //# sourceMappingURL=organization.mjs.map
@@ -75760,6 +76064,232 @@ var Tunnels = /* @__PURE__ */ (() => {
     return Tunnels;
 })();
 //# sourceMappingURL=tunnels.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/user-profiles/action-urls.mjs
+
+
+
+
+class action_urls_ActionURLs extends APIResource {
+    /**
+     * Create Action URL
+     *
+     * @example
+     * ```ts
+     * const betaUserProfileActionURL =
+     *   await client.beta.userProfiles.actionURLs.create(
+     *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+     *     { action: { type: 'enroll_end_user' } },
+     *   );
+     * ```
+     */
+    create(userProfileID, params, options) {
+        const { betas, workspace_id, ...body } = params;
+        return this._client.post(src_path `/v1/user_profiles/${userProfileID}/action_urls?beta=true`, {
+            body,
+            ...options,
+            headers: headers_buildHeaders([
+                {
+                    'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
+                    ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
+                },
+                options?.headers,
+            ]),
+            __span: startApiCallSpan(this._client, 'anthropic.user_profiles.action_urls.create', options, {
+                route: '/v1/user_profiles/{user_profile_id}/action_urls',
+                attributes: { 'anthropic.user_profile.id': userProfileID },
+            }),
+        });
+    }
+}
+//# sourceMappingURL=action-urls.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/user-profiles/user-profiles.mjs
+
+
+
+
+
+
+
+var user_profiles_UserProfiles = /* @__PURE__ */ (() => {
+    class UserProfiles extends APIResource {
+        constructor() {
+            super(...arguments);
+            this.actionURLs = new action_urls_ActionURLs(this._client);
+        }
+        /**
+         * Create User Profile
+         *
+         * @example
+         * ```ts
+         * const betaUserProfile =
+         *   await client.beta.userProfiles.create();
+         * ```
+         */
+        create(params, options) {
+            const { betas, workspace_id, ...body } = params;
+            return this._client.post('/v1/user_profiles?beta=true', {
+                body,
+                ...options,
+                headers: headers_buildHeaders([
+                    {
+                        'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
+                        ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
+                    },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.create', options, {
+                    route: '/v1/user_profiles',
+                    createdIDAttribute: 'anthropic.user_profile.id',
+                }),
+            });
+        }
+        /**
+         * Get User Profile
+         *
+         * @example
+         * ```ts
+         * const betaUserProfile =
+         *   await client.beta.userProfiles.retrieve(
+         *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+         *   );
+         * ```
+         */
+        retrieve(userProfileID, params = {}, options) {
+            const { betas, workspace_id } = params ?? {};
+            return this._client.get(src_path `/v1/user_profiles/${userProfileID}?beta=true`, {
+                ...options,
+                headers: headers_buildHeaders([
+                    {
+                        'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
+                        ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
+                    },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.retrieve', options, {
+                    route: '/v1/user_profiles/{user_profile_id}',
+                    attributes: { 'anthropic.user_profile.id': userProfileID },
+                }),
+            });
+        }
+        /**
+         * Update User Profile
+         *
+         * @example
+         * ```ts
+         * const betaUserProfile =
+         *   await client.beta.userProfiles.update(
+         *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+         *   );
+         * ```
+         */
+        update(userProfileID, params, options) {
+            const { betas, workspace_id, ...body } = params;
+            return this._client.post(src_path `/v1/user_profiles/${userProfileID}?beta=true`, {
+                body,
+                ...options,
+                headers: headers_buildHeaders([
+                    {
+                        'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
+                        ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
+                    },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.update', options, {
+                    route: '/v1/user_profiles/{user_profile_id}',
+                    attributes: { 'anthropic.user_profile.id': userProfileID },
+                }),
+            });
+        }
+        /**
+         * List User Profiles
+         *
+         * @example
+         * ```ts
+         * // Automatically fetches more pages as needed.
+         * for await (const betaUserProfile of client.beta.userProfiles.list()) {
+         *   // ...
+         * }
+         * ```
+         */
+        list(params = {}, options) {
+            const { betas, workspace_id, ...query } = params ?? {};
+            return this._client.getAPIList('/v1/user_profiles?beta=true', (PageCursor), {
+                query,
+                ...options,
+                headers: headers_buildHeaders([
+                    {
+                        'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
+                        ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
+                    },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.list', options, {
+                    route: '/v1/user_profiles',
+                    queryParams: ['limit', 'order', 'order_by', 'page'],
+                }),
+            });
+        }
+        /**
+         * Delete User Profile
+         *
+         * @example
+         * ```ts
+         * const betaDeletedUserProfile =
+         *   await client.beta.userProfiles.delete(
+         *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+         *   );
+         * ```
+         */
+        delete(userProfileID, params = {}, options) {
+            const { betas, workspace_id } = params ?? {};
+            return this._client.delete(src_path `/v1/user_profiles/${userProfileID}?beta=true`, {
+                ...options,
+                headers: headers_buildHeaders([
+                    {
+                        'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
+                        ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
+                    },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.delete', options, {
+                    route: '/v1/user_profiles/{user_profile_id}',
+                    attributes: { 'anthropic.user_profile.id': userProfileID },
+                }),
+            });
+        }
+        /**
+         * Create Enrollment URL
+         *
+         * @example
+         * ```ts
+         * const betaUserProfileEnrollmentURL =
+         *   await client.beta.userProfiles.createEnrollmentURL(
+         *     'uprof_011CZkZCu8hGbp5mYRQgUmz9',
+         *   );
+         * ```
+         */
+        createEnrollmentURL(userProfileID, params = {}, options) {
+            const { betas, workspace_id } = params ?? {};
+            return this._client.post(src_path `/v1/user_profiles/${userProfileID}/enrollment_url?beta=true`, {
+                ...options,
+                headers: headers_buildHeaders([
+                    {
+                        'anthropic-beta': [...(betas ?? []), 'user-profiles-2026-08-18'].toString(),
+                        ...(workspace_id != null ? { 'anthropic-workspace-id': workspace_id } : undefined),
+                    },
+                    options?.headers,
+                ]),
+                __span: startApiCallSpan(this._client, 'anthropic.user_profiles.create_enrollment_url', options, {
+                    route: '/v1/user_profiles/{user_profile_id}/enrollment_url',
+                    attributes: { 'anthropic.user_profile.id': userProfileID },
+                }),
+            });
+        }
+    }
+    UserProfiles.ActionURLs = action_urls_ActionURLs;
+    return UserProfiles;
+})();
+//# sourceMappingURL=user-profiles.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/resources/beta/vaults/credentials.mjs
 
 
@@ -75768,7 +76298,7 @@ var Tunnels = /* @__PURE__ */ (() => {
 
 class Credentials extends APIResource {
     /**
-     * Create Credential
+     * Create a Credential
      *
      * @example
      * ```ts
@@ -75806,7 +76336,7 @@ class Credentials extends APIResource {
         });
     }
     /**
-     * Get Credential
+     * Retrieve a Credential
      *
      * @example
      * ```ts
@@ -75835,7 +76365,7 @@ class Credentials extends APIResource {
         });
     }
     /**
-     * Update Credential
+     * Update a Credential
      *
      * @example
      * ```ts
@@ -75897,7 +76427,7 @@ class Credentials extends APIResource {
         });
     }
     /**
-     * Delete Credential
+     * Delete a Credential
      *
      * @example
      * ```ts
@@ -75926,7 +76456,7 @@ class Credentials extends APIResource {
         });
     }
     /**
-     * Archive Credential
+     * Archive a Credential
      *
      * @example
      * ```ts
@@ -75955,7 +76485,7 @@ class Credentials extends APIResource {
         });
     }
     /**
-     * Validate Credential
+     * Validate an MCP OAuth Credential
      *
      * @example
      * ```ts
@@ -76000,7 +76530,7 @@ var Vaults = /* @__PURE__ */ (() => {
             this.credentials = new Credentials(this._client);
         }
         /**
-         * Create Vault
+         * Create a Vault
          *
          * @example
          * ```ts
@@ -76029,7 +76559,7 @@ var Vaults = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Get Vault
+         * Retrieve a Vault
          *
          * @example
          * ```ts
@@ -76057,7 +76587,7 @@ var Vaults = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Update Vault
+         * Update a Vault
          *
          * @example
          * ```ts
@@ -76115,7 +76645,7 @@ var Vaults = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Delete Vault
+         * Delete a Vault
          *
          * @example
          * ```ts
@@ -76143,7 +76673,7 @@ var Vaults = /* @__PURE__ */ (() => {
             });
         }
         /**
-         * Archive Vault
+         * Archive a Vault
          *
          * @example
          * ```ts
@@ -76225,7 +76755,7 @@ var Beta = /* @__PURE__ */ (() => {
             this.files = new files_Files(this._client);
             this.skills = new skills_skills_Skills(this._client);
             this.webhooks = new Webhooks(this._client);
-            this.userProfiles = new UserProfiles(this._client);
+            this.userProfiles = new user_profiles_UserProfiles(this._client);
             this.dreams = new Dreams(this._client);
             this.tunnels = new Tunnels(this._client);
             this.organization = new organization_Organization(this._client);
@@ -76243,7 +76773,7 @@ var Beta = /* @__PURE__ */ (() => {
     Beta.Files = files_Files;
     Beta.Skills = skills_skills_Skills;
     Beta.Webhooks = Webhooks;
-    Beta.UserProfiles = UserProfiles;
+    Beta.UserProfiles = user_profiles_UserProfiles;
     Beta.Dreams = Dreams;
     Beta.Tunnels = Tunnels;
     Beta.Organization = organization_Organization;
@@ -76251,7 +76781,7 @@ var Beta = /* @__PURE__ */ (() => {
 })();
 //# sourceMappingURL=beta.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/@anthropic-ai/sdk/client.mjs
-var _BaseAnthropic_instances, _a, _BaseAnthropic_encoder, _BaseAnthropic_openTelemetry, _BaseAnthropic_baseURLOverridden;
+var _BaseAnthropic_instances, _a, _BaseAnthropic_encoder, _BaseAnthropic_apiKeyFunction, _BaseAnthropic_openTelemetry, _BaseAnthropic_baseURLOverridden;
 
 
 
@@ -76286,8 +76816,8 @@ var _BaseAnthropic_instances, _a, _BaseAnthropic_encoder, _BaseAnthropic_openTel
 
 
 
-const HUMAN_PROMPT = '\\n\\nHuman:';
-const AI_PROMPT = '\\n\\nAssistant:';
+
+let warnedOfKeyAndTokenInEnv = false;
 /**
  * Base class for Anthropic API clients.
  */
@@ -76352,10 +76882,11 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
          * @param {Record<string, string | undefined>} opts.defaultQuery - Default query parameters to include with every request to the API.
          * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
          */
-        constructor({ baseURL = (0,env/* readEnv */.s)('ANTHROPIC_BASE_URL'), apiKey, authToken, webhookKey = (0,env/* readEnv */.s)('ANTHROPIC_WEBHOOK_SIGNING_KEY') ?? null, ...opts } = {}) {
+        constructor({ baseURL = (0,utils_env/* readEnv */.s)('ANTHROPIC_BASE_URL'), apiKey, authToken, webhookKey = (0,utils_env/* readEnv */.s)('ANTHROPIC_WEBHOOK_SIGNING_KEY') ?? null, ...opts } = {}) {
             _BaseAnthropic_instances.add(this);
             this._requestAuthFlags = new WeakMap();
             _BaseAnthropic_encoder.set(this, void 0);
+            _BaseAnthropic_apiKeyFunction.set(this, void 0);
             _BaseAnthropic_openTelemetry.set(this, void 0);
             /**
              * The `gen_ai.provider.name` of this client's spans: the platform that serves its requests.
@@ -76363,20 +76894,26 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
              * @internal
              */
             this._genAIProviderName = 'anthropic';
-            // An explicit `profile` is a constructor-level credential choice; when set,
-            // do not let env ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN shadow it.
-            if (apiKey === undefined) {
-                apiKey = opts.profile != null ? null : (0,env/* readEnv */.s)('ANTHROPIC_API_KEY') ?? null;
+            const given = { apiKey, authToken, ...opts };
+            const passed = utils_values/* CREDENTIAL_OPTIONS */.rn.filter((name) => given[name] != null);
+            if (passed.length > 1) {
+                const list = (names) => names.map((name) => `\`${name}\``).join(', ');
+                throw new TypeError(`Pass at most one of ${list(utils_values/* CREDENTIAL_OPTIONS */.rn)}. Received ${list(passed)}.`);
             }
-            if (authToken === undefined) {
-                authToken = opts.profile != null ? null : (0,env/* readEnv */.s)('ANTHROPIC_AUTH_TOKEN') ?? null;
-            }
-            if (opts.profile != null && (opts.credentials != null || opts.config != null)) {
-                throw new TypeError('Pass at most one of `profile`, `credentials`, or `config`.');
-            }
+            const [passedName] = passed;
+            // A credential passed in code is the client's only one, so the environment
+            // is not read for another. `null` keeps that option's variable unread.
+            const env = passedName != null ? null : ({
+                apiKey: apiKey === undefined ? (0,utils_env/* readEnv */.s)('ANTHROPIC_API_KEY') : undefined,
+                authToken: authToken === undefined ? (0,utils_env/* readEnv */.s)('ANTHROPIC_AUTH_TOKEN') : undefined,
+            });
+            const credential = passedName != null ? { type: passedName, value: given[passedName] }
+                : env?.apiKey != null ? { type: 'apiKey', value: env.apiKey }
+                    : env?.authToken != null ? { type: 'authToken', value: env.authToken }
+                        : { type: 'defaultChain' };
             const options = {
-                apiKey,
-                authToken,
+                apiKey: credential.type === 'apiKey' ? credential.value : null,
+                authToken: credential.type === 'authToken' ? credential.value : null,
                 webhookKey,
                 ...opts,
                 baseURL: baseURL || `https://api.anthropic.com`,
@@ -76398,8 +76935,12 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
             this.logLevel = utils_log/* defaultLogLevel */.Ic;
             this.logLevel =
                 (0,utils_log/* parseLogLevel */.ML)(options.logLevel, 'ClientOptions.logLevel', (0,utils_log/* loggerFor */.WG)(this)) ??
-                    (0,utils_log/* parseLogLevel */.ML)((0,env/* readEnv */.s)('ANTHROPIC_LOG'), "process.env['ANTHROPIC_LOG']", (0,utils_log/* loggerFor */.WG)(this)) ??
+                    (0,utils_log/* parseLogLevel */.ML)((0,utils_env/* readEnv */.s)('ANTHROPIC_LOG'), "process.env['ANTHROPIC_LOG']", (0,utils_log/* loggerFor */.WG)(this)) ??
                     utils_log/* defaultLogLevel */.Ic;
+            if (env?.apiKey != null && env.authToken != null && !warnedOfKeyAndTokenInEnv) {
+                warnedOfKeyAndTokenInEnv = true;
+                (0,utils_log/* loggerFor */.WG)(this).warn('Anthropic: ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN are both set. Using ANTHROPIC_API_KEY.');
+            }
             this.fetchOptions = options.fetchOptions;
             this.maxRetries = (0,utils_values/* validatePositiveInteger */.wQ)('maxRetries', options.maxRetries ?? 2);
             const scope = this._instrumentationScope();
@@ -76409,7 +76950,7 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
             this.fetch = options.fetch ?? getDefaultFetch();
             (0,tslib/* __classPrivateFieldSet */.G)(this, _BaseAnthropic_encoder, FallbackEncoder, "f");
             this.middleware = [...(options.middleware ?? [])];
-            const customHeadersEnv = (0,env/* readEnv */.s)('ANTHROPIC_CUSTOM_HEADERS');
+            const customHeadersEnv = (0,utils_env/* readEnv */.s)('ANTHROPIC_CUSTOM_HEADERS');
             if (customHeadersEnv) {
                 const parsed = {};
                 for (const line of customHeadersEnv.split('\n')) {
@@ -76427,8 +76968,9 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
             delete options.__auth;
             delete options.__baseURLIsExplicit;
             this._options = options;
-            this.apiKey = typeof apiKey === 'string' ? apiKey : null;
-            this.authToken = authToken;
+            this.apiKey = typeof options.apiKey === 'string' ? options.apiKey : null;
+            (0,tslib/* __classPrivateFieldSet */.G)(this, _BaseAnthropic_apiKeyFunction, typeof options.apiKey === 'function' ? options.apiKey : null, "f");
+            this.authToken = options.authToken ?? null;
             this.webhookKey = webhookKey;
             if (inherited) {
                 this._authState = inherited;
@@ -76438,30 +76980,35 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
             }
             else {
                 this._authState = { provider: null, tokenCache: null, resolution: null, error: null, extraHeaders: {} };
-                // apiKey/authToken win over credentials/config/profile; don't build a
-                // token cache or resolve a config that the request path will then ignore.
-                if (this.apiKey == null && this.authToken == null) {
-                    const credentials = options.credentials ?? null;
-                    if (credentials) {
-                        this._authState.provider = credentials;
-                        this._authState.tokenCache = this._makeTokenCache(credentials);
-                    }
-                    else if (options.config != null) {
-                        const result = resolveCredentialsFromConfig(options.config, this._credentialResolverOptions());
+                switch (credential.type) {
+                    case 'apiKey':
+                    case 'authToken':
+                        break;
+                    case 'credentials':
+                        this._authState.provider = credential.value;
+                        this._authState.tokenCache = this._makeTokenCache(credential.value);
+                        break;
+                    case 'config': {
+                        const result = resolveCredentialsFromConfig(credential.value, this._credentialResolverOptions());
                         this._authState.provider = result.provider;
                         this._authState.tokenCache = this._makeTokenCache(result.provider);
                         this._authState.extraHeaders = result.extraHeaders;
                         this._applyCredentialBaseURL(result.baseURL);
+                        break;
                     }
-                    else if (options.profile != null) {
-                        this._authState.resolution = this._resolveDefaultCredentials(options.profile);
-                    }
-                    else if (this._shouldResolveDefaultCredentials()) {
-                        // No explicit auth provided — lazily resolve from the credential
-                        // chain on first request. Errors are captured into _auth.error and
-                        // surfaced on first use rather than as an unhandled rejection.
-                        this._authState.resolution = this._resolveDefaultCredentials();
-                    }
+                    case 'profile':
+                        this._authState.resolution = this._resolveDefaultCredentials(credential.value);
+                        break;
+                    case 'defaultChain':
+                        if (this._shouldResolveDefaultCredentials()) {
+                            // No explicit auth provided — lazily resolve from the credential
+                            // chain on first request. Errors are captured into _auth.error and
+                            // surfaced on first use rather than as an unhandled rejection.
+                            this._authState.resolution = this._resolveDefaultCredentials();
+                        }
+                        break;
+                    default:
+                        (0,utils_values/* checkNever */.f2)(credential);
                 }
             }
         }
@@ -76531,14 +77078,23 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
         /**
          * Create a new client instance re-using the same options given to the
          * current client with optional overriding.
+         *
+         * Passing `apiKey`, `authToken`, `credentials`, `config`, or `profile`
+         * replaces the current client's credential, whatever its kind. With none of
+         * them passed, the new client keeps it. Either way it keeps
+         * `defaultHeaders`, including an `X-Api-Key` or `Authorization` set there.
          */
         withOptions(options) {
-            // Share the auth state object unless the caller passes any auth-related
-            // key. The `in` check is intentional: even `apiKey: undefined` opts the
-            // clone out of sharing (it gets its own _auth and TokenCache, though it
-            // may still wrap the parent's provider via the credentials spread below).
-            const overridesStructuredAuth = 'credentials' in options || 'config' in options || 'profile' in options;
-            const overridesAuth = 'apiKey' in options || 'authToken' in options || overridesStructuredAuth;
+            // Left in, an `undefined` would overwrite the inherited credential and
+            // send the clone back to the environment.
+            options = { ...options };
+            for (const name of utils_values/* CREDENTIAL_OPTIONS */.rn) {
+                if (options[name] === undefined)
+                    delete options[name];
+            }
+            // `null` counts here: it clears a credential, so the clone can't share.
+            const overridesAuth = utils_values/* CREDENTIAL_OPTIONS */.rn.some((name) => name in options);
+            const replacesCredential = utils_values/* CREDENTIAL_OPTIONS */.rn.some((name) => options[name] != null);
             const internal = {
                 ...this._options,
                 // Only forward baseURL when the caller (or env) explicitly chose it.
@@ -76557,19 +77113,11 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
                 fetch: this.fetch,
                 fetchOptions: this.fetchOptions,
                 middleware: this.middleware,
-                apiKey: this.apiKey,
+                apiKey: this.apiKey ?? (0,tslib/* __classPrivateFieldGet */.g)(this, _BaseAnthropic_apiKeyFunction, "f"),
                 authToken: this.authToken,
                 webhookKey: this.webhookKey,
-                // credentials: this.credentials is a no-op when __auth is shared (the
-                // ctor takes the inherited path and ignores options.credentials); when
-                // overridesAuth is true via apiKey/authToken only, it lets the clone
-                // build a fresh TokenCache around the parent's provider.
-                credentials: this.credentials,
-                // When the caller passes a structured-credential override, drop inherited
-                // structured-credential options so only `...options` supplies them —
-                // otherwise an inherited `credentials`/`config`/`profile` would trip the
-                // mutual-exclusion check or precedence over the override.
-                ...(overridesStructuredAuth ? { credentials: undefined, config: undefined, profile: undefined } : {}),
+                // Left in, the inherited credential would trip the mutual-exclusion check.
+                ...(replacesCredential ? Object.fromEntries(utils_values/* CREDENTIAL_OPTIONS */.rn.map((name) => [name, null])) : {}),
                 ...options,
                 openTelemetry: options.openTelemetry ?? (0,tslib/* __classPrivateFieldGet */.g)(this, _BaseAnthropic_openTelemetry, "f"),
                 // Always set __auth so any stale value from ...this._options is
@@ -76619,10 +77167,10 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
             if (this._authState.tokenCache || this._authState.resolution) {
                 return; // auth will be injected per-request via authHeaders
             }
-            if (this.apiKey && values.get('x-api-key')) {
+            if (this.apiKey && values.get('authorization')) {
                 return;
             }
-            if (nulls.has('x-api-key')) {
+            if (nulls.has('authorization')) {
                 return;
             }
             if (this.authToken && values.get('authorization')) {
@@ -76631,7 +77179,7 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
             if (nulls.has('authorization')) {
                 return;
             }
-            throw new Error('Could not resolve authentication method. Expected one of apiKey, authToken, credentials, config, or profile to be set. Or for one of the "X-Api-Key" or "Authorization" headers to be explicitly omitted');
+            throw new Error('Could not resolve authentication method. Expected one of apiKey, authToken, credentials, config, or profile to be set. Or for the "Authorization" header to be explicitly omitted');
         }
         _authFlags(opts) {
             let flags = this._requestAuthFlags.get(opts);
@@ -76651,19 +77199,34 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
             if (this._authState.error) {
                 return undefined;
             }
+            if ((0,tslib/* __classPrivateFieldGet */.g)(this, _BaseAnthropic_apiKeyFunction, "f") && this.apiKey == null) {
+                let apiKey;
+                try {
+                    apiKey = await (0,tslib/* __classPrivateFieldGet */.g)(this, _BaseAnthropic_apiKeyFunction, "f").call(this);
+                }
+                catch (err) {
+                    throw new core_error/* AnthropicError */.pJ(`The \`apiKey\` function failed: ${(0,errors/* castToError */.r)(err).message}`, {
+                        cause: err,
+                    });
+                }
+                if (!apiKey) {
+                    throw new core_error/* AnthropicError */.pJ(`The \`apiKey\` function must return a non-empty string. It returned ${JSON.stringify(apiKey)}.`);
+                }
+                return headers_buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
+            }
             // If we have a token cache and no API key is set, use token auth
             if (this._authState.tokenCache && this.apiKey == null) {
                 const token = await this._authState.tokenCache.getToken();
                 this._authFlags(opts).usedTokenCache = true;
                 return headers_buildHeaders([{ Authorization: `Bearer ${token}` }]);
             }
-            return headers_buildHeaders([await this.apiKeyAuth(opts), await this.bearerAuth(opts)]);
+            return headers_buildHeaders([await this.bearerAuth(opts), await this.apiKeyAuth(opts)]);
         }
         async apiKeyAuth(opts) {
             if (this.apiKey == null) {
                 return undefined;
             }
-            return headers_buildHeaders([{ 'X-Api-Key': this.apiKey }]);
+            return headers_buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
         }
         async bearerAuth(opts) {
             if (this.authToken == null) {
@@ -77183,7 +77746,7 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
                     ...(this._options.dangerouslyAllowBrowser ?
                         { 'anthropic-dangerous-direct-browser-access': 'true' }
                         : undefined),
-                    'anthropic-version': '2023-06-01',
+                    'anthropic-version': '2026-10-21',
                 },
                 await this.authHeaders(options),
                 this._options.defaultHeaders,
@@ -77249,7 +77812,7 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
                     (Symbol.iterator in body && 'next' in body && typeof body.next === 'function')));
         }
     }
-    _a = BaseAnthropic, _BaseAnthropic_encoder = new WeakMap(), _BaseAnthropic_openTelemetry = new WeakMap(), _BaseAnthropic_instances = new WeakSet(), _BaseAnthropic_baseURLOverridden = function _BaseAnthropic_baseURLOverridden() {
+    _a = BaseAnthropic, _BaseAnthropic_encoder = new WeakMap(), _BaseAnthropic_apiKeyFunction = new WeakMap(), _BaseAnthropic_openTelemetry = new WeakMap(), _BaseAnthropic_instances = new WeakSet(), _BaseAnthropic_baseURLOverridden = function _BaseAnthropic_baseURLOverridden() {
         return this.baseURL !== 'https://api.anthropic.com';
     };
     BaseAnthropic.Anthropic = _a;
@@ -77268,8 +77831,6 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
     BaseAnthropic.PermissionDeniedError = core_error/* PermissionDeniedError */.Ll;
     BaseAnthropic.UnprocessableEntityError = core_error/* UnprocessableEntityError */.Is;
     BaseAnthropic.toFile = toFile;
-    BaseAnthropic.HUMAN_PROMPT = HUMAN_PROMPT;
-    BaseAnthropic.AI_PROMPT = AI_PROMPT;
     return BaseAnthropic;
 })();
 /**
@@ -77282,20 +77843,20 @@ var Anthropic = /* @__PURE__ */ (() => {
     class Anthropic extends BaseAnthropic {
         constructor() {
             super(...arguments);
-            this.completions = new Completions(this);
             this.messages = new Messages(this);
             this.models = new Models(this);
             this.files = new Files(this);
             this.skills = new Skills(this);
+            this.userProfiles = new UserProfiles(this);
             this.organization = new Organization(this);
             this.beta = new Beta(this);
         }
     }
-    Anthropic.Completions = Completions;
     Anthropic.Messages = Messages;
     Anthropic.Models = Models;
     Anthropic.Files = Files;
     Anthropic.Skills = Skills;
+    Anthropic.UserProfiles = UserProfiles;
     Anthropic.Organization = Organization;
     Anthropic.Beta = Beta;
     return Anthropic;
@@ -88622,7 +89183,7 @@ function completions_normalizeRequestOptionsForQuery(value, queryKeys, options) 
 /**
  * Given a list of messages comprising a conversation, the model will return a response.
  */
-class completions_Completions extends resource_APIResource {
+class Completions extends resource_APIResource {
     constructor() {
         super(...arguments);
         this.messages = new completions_messages_Messages(this._client);
@@ -88722,7 +89283,7 @@ class completions_Completions extends resource_APIResource {
 
 
 
-completions_Completions.Messages = completions_messages_Messages;
+Completions.Messages = completions_messages_Messages;
 //# sourceMappingURL=completions.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/chat/chat.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -88732,10 +89293,10 @@ completions_Completions.Messages = completions_messages_Messages;
 class chat_Chat extends resource_APIResource {
     constructor() {
         super(...arguments);
-        this.completions = new completions_Completions(this._client);
+        this.completions = new Completions(this._client);
     }
 }
-chat_Chat.Completions = completions_Completions;
+chat_Chat.Completions = Completions;
 //# sourceMappingURL=chat.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/chat/completions/index.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -98296,7 +98857,7 @@ function resources_completions_resolveResourceRequestOptions(options, buildOptio
 /**
  * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
  */
-class resources_completions_Completions extends resource_APIResource {
+class completions_Completions extends resource_APIResource {
     create(body, options) {
         return this._client.post('/completions', resources_completions_resolveResourceRequestOptions(options, (options) => ({
             body,
@@ -103881,7 +104442,7 @@ function webhooks_normalizeRequestOptionsForQuery(value, queryKeys, options) {
         return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
     }));
 }
-class webhooks_Webhooks extends resource_APIResource {
+class webhooks_webhooks_Webhooks extends resource_APIResource {
     constructor() {
         super(...arguments);
         _Webhooks_instances.add(this);
@@ -104043,7 +104604,7 @@ _Webhooks_instances = new WeakSet(), _Webhooks_validateSecret = function _Webhoo
     }
     return value;
 };
-webhooks_Webhooks.EventTypes = EventTypes;
+webhooks_webhooks_Webhooks.EventTypes = EventTypes;
 //# sourceMappingURL=webhooks.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/resources/index.mjs
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
@@ -105113,7 +105674,7 @@ class OpenAI {
         /**
          * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
          */
-        this.completions = new resources_completions_Completions(this);
+        this.completions = new completions_Completions(this);
         this.chat = new chat_Chat(this);
         /**
          * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
@@ -105141,7 +105702,7 @@ class OpenAI {
         this.graders = new graders_Graders(this);
         this.vectorStores = new VectorStores(this);
         this.safety = new Safety(this);
-        this.webhooks = new webhooks_Webhooks(this);
+        this.webhooks = new webhooks_webhooks_Webhooks(this);
         this.beta = new beta_Beta(this);
         /**
          * Create large batches of API requests to run asynchronously.
@@ -106684,7 +107245,7 @@ OpenAI.InvalidWebhookSignatureError = InvalidWebhookSignatureError;
 OpenAI.toFile = to_file_toFile;
 OpenAI.toStreamingFile = toStreamingFile;
 OpenAI.Decisions = Decisions;
-OpenAI.Completions = resources_completions_Completions;
+OpenAI.Completions = completions_Completions;
 OpenAI.Chat = chat_Chat;
 OpenAI.Embeddings = Embeddings;
 OpenAI.Files = resources_files_Files;
@@ -106697,7 +107258,7 @@ OpenAI.FineTuning = FineTuning;
 OpenAI.Graders = graders_Graders;
 OpenAI.VectorStores = VectorStores;
 OpenAI.Safety = Safety;
-OpenAI.Webhooks = webhooks_Webhooks;
+OpenAI.Webhooks = webhooks_webhooks_Webhooks;
 OpenAI.Beta = beta_Beta;
 OpenAI.Batches = resources_batches_Batches;
 OpenAI.Uploads = Uploads;
