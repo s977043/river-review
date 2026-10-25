@@ -302,6 +302,19 @@ jobs:
       - name: Type-check node-api runner without emitting (#2735)
         run: npm exec -w runners/node-api -- tsc --noEmit
 
+  # #2756: the Claude Code marketplace installs plugin-dist/river-review/, a
+  # byte copy of the distributed files made by `npm run plugin:dist`. Not a
+  # required check; registering it in branch protection is a separate decision.
+  plugin-dist-check:
+    name: Plugin dist freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-node-deps
+      - name: Check plugin-dist matches its sources
+        run: npm run plugin:dist:check
+
   dist-check:
     name: Action dist freshness
     runs-on: ubuntu-latest

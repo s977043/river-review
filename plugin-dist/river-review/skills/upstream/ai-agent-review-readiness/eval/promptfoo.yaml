@@ -1,0 +1,68 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for AI Agent Review Readiness'
+
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+tests:
+  # Test case 1: Missing readiness — should detect major/critical issues (Check 1-4; Check 5 is minor)
+  - description: 'Detect missing review criteria, context, loop, human boundary (and optionally feedback capture)'
+    vars:
+      diff: file://../fixtures/01-missing-readiness.md
+    assert:
+      - type: contains
+        value: '[severity='
+      - type: contains-any
+        value:
+          - '成功基準'
+          - 'Success criteria'
+          - 'レビュー基準'
+          - 'check: 1'
+      - type: contains-any
+        value:
+          - 'major'
+          - 'critical'
+          - 'severity=major'
+          - 'severity=critical'
+
+  # Test case 2: Complete readiness — should NOT flag (no false positive)
+  - description: 'No false positive on fully defined readiness document'
+    vars:
+      diff: file://../fixtures/02-complete-readiness.md
+    assert:
+      - type: not-contains
+        value: 'severity=critical'
+      - type: not-contains
+        value: 'severity=major'
+      - type: not-contains
+        value: 'severity=minor'
+
+  # Test case 3: Partial readiness — should detect missing loop and human boundary
+  - description: 'Detect missing review loop and human approval in partial document'
+    vars:
+      diff: file://../fixtures/03-partial-readiness.md
+    assert:
+      - type: contains
+        value: '[severity='
+      - type: contains-any
+        value:
+          - 'レビューループ'
+          - 'review loop'
+          - '人間承認'
+          - 'human approval'
+          - 'Check 3'
+          - 'Check 4'
+
+outputPath: ./output.json
+
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

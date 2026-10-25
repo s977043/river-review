@@ -1,0 +1,72 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Multitenancy Isolation Guard'
+
+# Model providers to test
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+# Prompts to evaluate
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+# Test cases
+tests:
+  # Test case 1: Missing tenant filter - should detect
+  - description: 'Detect missing tenant isolation in database query'
+    vars:
+      diff: file://../fixtures/01-missing-tenant-filter-happy.md
+    assert:
+      - type: contains-any
+        value:
+          - 'tenant'
+          - 'テナント'
+          - 'isolation'
+          - '分離'
+      - type: contains-any
+        value:
+          - 'tenant_id'
+          - 'tenantId'
+          - 'RLS'
+
+  # Test case 2: Proper tenant isolation - should NOT flag
+  - description: 'No false positive on proper tenant isolation'
+    vars:
+      diff: file://../fixtures/02-proper-tenant-isolation.md
+    assert:
+      - type: contains-any
+        value:
+          - 'NO_ISSUES'
+          - 'proper'
+          - '問題なし'
+          - '適切'
+
+  # Test case 3: Noisy neighbor risk - should detect
+  - description: 'Detect noisy neighbor risk in shared resources'
+    vars:
+      diff: file://../fixtures/03-shared-resource-noisy-neighbor.md
+    assert:
+      - type: contains-any
+        value:
+          - 'rate limit'
+          - 'レート制限'
+          - 'noisy neighbor'
+          - 'per-tenant'
+          - 'テナント単位'
+      - type: contains-any
+        value:
+          - 'connection'
+          - 'queue'
+          - 'キュー'
+
+# Output format
+outputPath: ./output.json
+
+# Default test settings
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

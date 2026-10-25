@@ -1,0 +1,13 @@
+diff --git a/src/services/payment.ts b/src/services/payment.ts
+index 1111111..2222222 100644
+--- a/src/services/payment.ts
++++ b/src/services/payment.ts
+@@ -20,0 +21,8 @@
++async function processPayment(amount: number) {
++  try {
++    await paymentGateway.charge(amount);
++  } catch (error) {
++    console.log('Payment failed');
++    throw error;
++  }
++}
