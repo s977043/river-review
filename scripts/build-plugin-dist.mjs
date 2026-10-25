@@ -29,6 +29,9 @@ export const PLUGIN_DIST_DIR = 'plugin-dist/river-review';
 export const PLUGIN_INPUTS = [
   '.claude-plugin/plugin.json',
   '.claude-plugin/assets/icon.svg',
+  // Codex reads the same marketplace.json and this manifest (scripts/setup-codex.sh).
+  '.codex-plugin/plugin.json',
+  '.codex-plugin/assets/icon.svg',
   // Distributed commands only; repo-dev commands live in .claude/commands/.
   'commands',
   'agents/river-review.md',
