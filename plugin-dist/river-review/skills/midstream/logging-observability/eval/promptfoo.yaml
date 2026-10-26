@@ -1,0 +1,96 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Logging and Observability Guard'
+
+# Model providers to test
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+# Prompts to evaluate
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+# Test cases
+tests:
+  # Test case 1: Silent catch - should detect
+  - description: 'Detect silent exception catch'
+    vars:
+      diff: file://../fixtures/01-silent-catch.diff
+    assert:
+      - type: contains
+        value: 'src/services/user.ts'
+      - type: contains-any
+        value:
+          - '握りつぶ'
+          - 'silent'
+          - 'catch'
+          - 'ログ'
+          - 'log'
+
+  # Test case 2: Proper error handling - should NOT flag
+  - description: 'No false positive on proper error handling'
+    vars:
+      diff: file://../fixtures/02-proper-error-handling.diff
+    assert:
+      - type: not-contains-any
+        value:
+          - 'Finding:'
+          - '握りつぶ'
+          - 'silent'
+          - 'swallowed'
+          - '問題'
+
+  # Test case 3: Missing context in log - should detect
+  - description: 'Detect missing context in error log'
+    vars:
+      diff: file://../fixtures/03-missing-context.diff
+    assert:
+      - type: contains
+        value: 'src/services/payment.ts'
+      - type: contains-any
+        value:
+          - 'context'
+          - '文脈'
+          - 'requestId'
+          - 'amount'
+          - '追跡'
+
+  # Test case 4: New debug output path bypasses existing redaction invariant
+  # (reduced reproduction of PR #1529 / AGENT_LEARNINGS.md 2026-07-12 エントリ3) - should detect
+  - description: 'Detect new debug output path bypassing existing redaction invariant'
+    vars:
+      diff: file://../fixtures/04-debug-output-bypasses-redaction-should-detect.diff
+    assert:
+      - type: contains
+        value: 'src/lib/notification-dispatch.mjs'
+      - type: contains-any
+        value:
+          - 'redactSecrets'
+          - 'redact'
+          - 'マスク'
+          - '迂回'
+
+  # Test case 5: Same debug output path but redacted at the storage site
+  # (reduced reproduction of the #1529 fix, commit ca7eaa3b) - should NOT flag
+  - description: 'No false positive when debug output is redacted at the storage site'
+    vars:
+      diff: file://../fixtures/05-debug-output-redacted-at-storage-should-not-detect.diff
+    assert:
+      - type: not-contains-any
+        value:
+          - 'Finding:'
+          - '迂回'
+          - '露出'
+          - '問題'
+
+# Output format
+outputPath: ./output.json
+
+# Default test settings
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

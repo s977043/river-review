@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "river-review",
-      "source": "./",
+      "source": "./plugin-dist/river-review",
       "description": "Turn review into an organizational judgment asset. Review Judgment as Code for AI-assisted development: a Skill Registry of versioned, repo-owned review skills, driven by a review agent that runs perspective-based reviewer roles and verifies findings.",
       "author": {
         "name": "river-review maintainers",

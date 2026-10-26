@@ -1,0 +1,46 @@
+# promptfoo configuration for Modern Web Semantic + Platform-Native
+# See: https://www.promptfoo.dev/docs/configuration/guide
+#
+# Status: scaffolding. Golden outputs are NOT yet generated — run this config
+# against a real LLM to produce verified outputs, then save to ../golden/.
+# See ../README.md for the workflow.
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: div onClick should be flagged as a semantic-HTML regression
+    vars:
+      diff: file://../fixtures/01-div-onclick-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must include a Finding referencing the `<div onClick>` pattern,
+          a Suggestion that mentions `<button>` (or another semantic element),
+          and a citation to the HTML button element.
+          Score 1 if all three are present; 0 otherwise.
+      - type: contains
+        value: 'Severity: minor'
+
+  - description: library-wrapped dialog must not be flagged
+    vars:
+      diff: file://../fixtures/02-library-dialog-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must NOT propose replacing the library component with `<dialog>`.
+          Acceptable outputs include "No findings" or an explicit reference to the
+          library-component false-positive guard.
+          Score 1 if no replacement is proposed; 0 otherwise.

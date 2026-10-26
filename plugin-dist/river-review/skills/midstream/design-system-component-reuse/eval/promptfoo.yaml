@@ -1,0 +1,42 @@
+# promptfoo configuration for Design System Component Reuse Guard
+# See: https://www.promptfoo.dev/docs/configuration/guide
+#
+# Status: scaffolding. Golden outputs are NOT yet generated — run this config
+# against a real LLM to produce verified outputs, then save to ../golden/.
+# See ../README.md for the workflow.
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: button reimplemented from scratch should be flagged
+    vars:
+      diff: file://../fixtures/01-button-reimplemented-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must include a Finding that mentions "button" reimplementation
+          (or equivalent phrasing like "Button primitive", "reimplemented Button",
+          "reusing existing Button component").
+          The Suggestion must recommend importing or reusing a Button component.
+          Score 1 if both the finding and suggestion are present; 0 otherwise.
+      - type: contains
+        value: 'Severity: major'
+
+  - description: canonical Button definition file must not be flagged
+    vars:
+      diff: file://../fixtures/02-ui-primitive-definition-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must NOT flag this diff as a reimplementation.
+          Acceptable outputs include "No findings" with a reference to the
+          definition-file or ui-directory false-positive guard.
+          Score 1 if no reimplementation finding is emitted; 0 otherwise.

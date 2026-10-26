@@ -1,0 +1,31 @@
+description: 'Evaluation for Security & Privacy Design Review'
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+tests:
+  # TP: the skill outputs Japanese with a [severity=...] finding marker (see golden/01).
+  # Assert a finding was raised + a retention/backup concept is mentioned (JA or EN).
+  - description: 'Detect missing retention'
+    vars:
+      document: file://../fixtures/01-missing-retention.md
+    assert:
+      - type: contains
+        value: '[severity='
+      - type: contains-any
+        value: ['保持', 'データ保持', 'バックアップ', retention, Retention, backup, Backup]
+  # FP: a healthy doc returns NO_ISSUES and must NOT emit a [severity=...] finding.
+  # not-contains '[severity=' is the real FP guard (fails if the model false-flags);
+  # the contains-any only confirms a healthy signal without depending on one literal token.
+  - description: 'No false positive'
+    vars:
+      document: file://../fixtures/02-well-designed.md
+    assert:
+      - type: not-contains
+        value: '[severity='
+      - type: contains-any
+        value: [NO_ISSUES, 'no issues', 'properly', '問題ありません', '適切', '網羅']
+outputPath: ./output.json
