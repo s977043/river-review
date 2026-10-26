@@ -49,7 +49,7 @@ Claude Code にプラグインが正しくインストールされているか�
 
 ```bash
 # Claude Code でインストール済みの場合は以下で確認できる
-cat "${CLAUDE_PLUGIN_ROOT}/package.json" 2>/dev/null | grep '"version"' || echo "プラグイン ROOT が設定されていません"
+cat "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | grep '"version"' || echo "プラグイン ROOT が設定されていません"
 ```
 
 インストールされていない場合は以下を案内する:

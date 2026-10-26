@@ -1,0 +1,41 @@
+# promptfoo configuration for Next.js App Router Client/Server Boundary
+# Status: scaffolding. See ../README.md for golden-generation workflow.
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: useState in server component must be flagged
+    vars:
+      diff: file://../fixtures/01-usestate-in-server-component-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must reference `useState` as the offending API, include
+          `BoundaryViolation: client-API in server component`, and suggest
+          adding `'use client'` to the top of the file.
+          Score 1 if all three are present; 0 otherwise.
+      - type: contains
+        value: 'Severity: major'
+
+  - description: file with `'use client'` must NOT be flagged
+    vars:
+      diff: file://../fixtures/02-use-client-directive-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must NOT flag the useState usage. Acceptable outputs include
+          "No findings" or an explicit reference to the `'use client'` guard.
+          Score 1 if no finding is produced; 0 otherwise.

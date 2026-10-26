@@ -1,0 +1,60 @@
+# promptfoo configuration for TypeScript Strictness Guard skill evaluation
+# See: https://www.promptfoo.dev/docs/configuration/guide
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: Unsafe any Type Detection (Happy Path)
+    vars:
+      diff: file://../fixtures/01-any-type-usage-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must identify the unsafe `any` type annotations.
+          Score 1 if the output mentions `any` type, type safety risk, or lack of type checking.
+          Score 0 otherwise.
+
+      - type: contains
+        value: 'any'
+
+      - type: llm-rubric
+        value: |
+          The output must suggest a safer alternative to `any`.
+          Score 1 if it suggests `unknown`, explicit interface, or type guard.
+          Score 0 otherwise.
+
+      - type: similar
+        value: file://../golden/01-any-type-usage-happy.md
+        threshold: 0.7
+
+  - description: Test Mock Type Assertion False Positive Avoidance
+    vars:
+      diff: file://../fixtures/02-test-mock-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output should NOT flag `as unknown as` in a Jest mock setup as a type safety violation.
+          Score 1 if it recognizes this is a test mock and does not raise major type safety concerns.
+          Score 0 if it incorrectly flags the mock pattern as a vulnerability.
+
+      - type: not-contains
+        value: 'Severity: major'
+
+defaultTest:
+  options:
+    provider: openai:gpt-4o
+
+outputPath: eval/results.json

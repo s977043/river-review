@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.136.0](https://github.com/s977043/river-review/compare/v1.135.0...v1.136.0) (2026-10-25)
+
+
+### Features
+
+* **plugin:** install the Claude Code plugin from a generated plugin-dist directory ([#2756](https://github.com/s977043/river-review/issues/2756)) ([#2801](https://github.com/s977043/river-review/issues/2801)) ([aac3ee8](https://github.com/s977043/river-review/commit/aac3ee8ac37dcd6e07b49aa10eb9a0608aa65d6f))
+
 ## [1.135.0](https://github.com/s977043/river-review/compare/v1.134.0...v1.135.0) (2026-10-24)
 
 

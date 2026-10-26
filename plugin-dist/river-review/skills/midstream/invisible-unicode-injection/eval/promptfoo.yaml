@@ -1,0 +1,53 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Invisible Unicode Injection Scan'
+
+# Model providers to test
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+# Prompts to evaluate
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+# Test cases
+tests:
+  # Test case 1: GlassWorm / Trojan Source payloads - should detect
+  - description: 'Detect bidi control + variation selector + zero-width in source code'
+    vars:
+      diff: file://../fixtures/01-glassworm-payload-happy.diff
+    assert:
+      - type: contains
+        value: 'src/plugins/loader.ts'
+      - type: contains-any
+        value:
+          - '双方向'
+          - 'bidi'
+          - 'U+202E'
+          - '不可視'
+          - '異体字'
+          - 'ゼロ幅'
+
+  # Test case 2: legitimate emoji / i18n text - should NOT flag
+  - description: 'No false positive on emoji sequences and in-string NBSP'
+    vars:
+      diff: file://../fixtures/02-emoji-i18n-false-positive.diff
+    assert:
+      - type: contains-any
+        value:
+          - 'NO_ISSUES'
+          - 'NO_REVIEW'
+      - type: not-contains
+        value: 'Finding:'
+
+# Output format
+outputPath: ./output.json
+
+# Default test settings
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

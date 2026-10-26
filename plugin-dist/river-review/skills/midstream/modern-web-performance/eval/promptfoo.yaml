@@ -1,0 +1,42 @@
+# promptfoo configuration for Modern Web Performance
+# Status: scaffolding. See ../README.md for golden-generation workflow.
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: loading=lazy on hero image should be flagged as LCP risk
+    vars:
+      diff: file://../fixtures/01-lcp-lazy-hero-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must include `Metric: LCP`, identify `loading="lazy"` as
+          the problem on the hero `<img>`, and suggest removing it and/or
+          restoring `fetchpriority="high"`.
+          Score 1 if all three are present; 0 otherwise.
+      - type: contains
+        value: 'Severity: minor'
+
+  - description: properly-sized lazy thumbnail must NOT be flagged
+    vars:
+      diff: file://../fixtures/02-already-sized-img-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must NOT propose changes to `loading`, `decoding`, or sizing
+          — the diff only adds `alt`. Acceptable outputs include "No findings"
+          or an explicit reference to the attributes / scope guard.
+          Score 1 if no perf finding is produced; 0 otherwise.
