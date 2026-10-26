@@ -1,0 +1,45 @@
+# promptfoo configuration for Type-Driven Design Guard skill evaluation
+# See: https://www.promptfoo.dev/docs/configuration/guide
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: Primitive Obsession Detection (Happy Path)
+    vars:
+      diff: file://../fixtures/01-primitive-obsession-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must flag the transposable account id parameters and the
+          string-typed status field.
+          Score 1 if it mentions branded types (or transposable/mix-up risk)
+          AND discriminated unions (or illegal states).
+          Score 0 otherwise.
+
+      - type: contains
+        value: 'Finding'
+
+  - description: External Boundary Code (False Positive Guard)
+    vars:
+      diff: file://../fixtures/02-boundary-code-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must NOT demand branded types for the GitHub API response
+          interface and must NOT flag the slugify utility.
+          Score 1 if no major finding is raised against either (boundary notes
+          are acceptable).
+          Score 0 if it flags GitHubIssueResponse fields or slugify as an issue.

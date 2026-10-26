@@ -1,0 +1,94 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for PlanGate Exec Conformance Guard'
+
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+tests:
+  # Test case 1: True positive — undocumented new dependency (redis)
+  - description: 'Detect undocumented new dependency (redis) vs plan'
+    vars:
+      diff: file://../fixtures/01-true-positive-undocumented-dependency.md
+    assert:
+      - type: contains-any
+        value:
+          - 'redis'
+          - 'ioredis'
+          - '依存'
+          - '方針整合'
+      - type: contains-any
+        value:
+          - 'warning'
+          - 'severity=warning'
+          - 'major'
+
+  # Test case 2: False positive — explicit out-of-scope items should be suppressed
+  - description: 'No false positive on explicit out-of-scope items'
+    vars:
+      diff: file://../fixtures/02-false-positive-out-of-scope.md
+    assert:
+      - type: contains-any
+        value:
+          - 'NO_ISSUES'
+          - 'スコープ外'
+          - '別 PR'
+          - '記録のみ'
+          - '健全'
+
+  # Test case 3: Fallback — empty diff should return NO_REVIEW
+  - description: 'Return NO_REVIEW when diff is empty'
+    vars:
+      diff: file://../fixtures/03-fallback-diff-empty.md
+    assert:
+      - type: contains
+        value: 'NO_REVIEW'
+      - type: contains
+        value: 'plangate-exec-conformance'
+
+  # Test case 4: True positive — a todo item marked done is missing from the diff
+  - description: 'Detect planned-but-missing (completed todo not in diff)'
+    vars:
+      diff: file://../fixtures/04-true-positive-planned-but-missing.md
+    assert:
+      - type: contains-any
+        value:
+          - 'planned-but-missing'
+          - 'auth.ts'
+          - 'リセット'
+          - 'todo'
+      - type: contains-any
+        value:
+          - 'blocker'
+          - 'severity=blocker'
+          - 'critical'
+
+  # Test case 5: True positive — a declared test case has no corresponding test
+  - description: 'Detect test-contract-missing (declared TC2 not tested)'
+    vars:
+      diff: file://../fixtures/05-true-positive-test-contract-missing.md
+    assert:
+      - type: contains-any
+        value:
+          - 'test-contract-missing'
+          - 'TC2'
+          - 'テスト整合'
+          - '有効期限'
+      - type: contains-any
+        value:
+          - 'warning'
+          - 'severity=warning'
+          - 'major'
+
+outputPath: ./output.json
+
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

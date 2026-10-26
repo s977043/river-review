@@ -1,0 +1,92 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for PlanGate 計画整合性チェック'
+
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+tests:
+  # Test case 1: True positive — missing acceptance coverage (403 case)
+  - description: 'Detect missing acceptance coverage (403) in test-cases'
+    vars:
+      diff: file://../fixtures/01-true-positive-missing-acceptance.md
+    assert:
+      - type: contains
+        value: 'test-cases.md'
+      - type: contains-any
+        value:
+          - '403'
+          - '非管理者'
+          - '異常系'
+          - '受け入れ条件'
+      - type: contains-any
+        value:
+          - 'severity=major'
+          - 'major'
+
+  # Test case 2: False positive — explicit next-phase deferral should be suppressed
+  - description: 'No false positive on explicit next-phase deferral'
+    vars:
+      diff: file://../fixtures/02-false-positive-explicit-next-phase.md
+    assert:
+      - type: contains-any
+        value:
+          - 'NO_ISSUES'
+          - '健全'
+          - '次フェーズ'
+          - '指摘対象外'
+          - '抑制'
+
+  # Test case 3: Fallback — plan artifact missing should return NO_REVIEW
+  - description: 'Return NO_REVIEW when plan artifact is missing'
+    vars:
+      diff: file://../fixtures/03-fallback-plan-missing.md
+    assert:
+      - type: contains
+        value: 'NO_REVIEW'
+      - type: contains
+        value: 'plangate-plan-integrity'
+
+  # Test case 4: True positive — normalization step ordering defect + conflicting AC
+  - description: 'Detect normalization order defect and conflicting acceptance criteria'
+    vars:
+      diff: file://../fixtures/04-true-positive-normalization-order-conflict.md
+    assert:
+      - type: contains
+        value: 'plan.md'
+      - type: contains-any
+        value:
+          - '順序'
+          - '正規化'
+          - 'CONFIG.md'
+      - type: contains
+        value: 'severity=critical'
+
+  # Test case 5: Negative control — same gate passes, order fixed, AC disjoint
+  - description: 'No critical after the normalization order is fixed (gate still passes)'
+    vars:
+      diff: file://../fixtures/05-false-positive-normalization-order-fixed.md
+    assert:
+      - type: not-contains
+        value: 'severity=critical'
+      - type: not-contains
+        value: 'NO_REVIEW'
+      - type: contains-any
+        value:
+          - 'NO_ISSUES'
+          - '健全'
+          - '指摘対象外'
+          - '抑制'
+
+outputPath: ./output.json
+
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

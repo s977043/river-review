@@ -11,6 +11,7 @@ import {
   checkAssetRegistration,
   checkManifestHostIndependentRefs,
   checkPluginHooksScripts,
+  checkMarketplaceSource,
   checkReviewJudgmentDuplication,
   detectReviewJudgmentDefinitions,
   findSsotReferences,
@@ -1282,4 +1283,36 @@ test('checkPluginHooksScripts: a declared path is checked in addition to the con
     'hooks/hooks.json: hook command target does not exist: scripts/b.sh',
     './extra/more.json: hook command target does not exist: scripts/c.sh',
   ]);
+});
+
+test('checkMarketplaceSource flags a package.json, a stale plugin.json and an escaping source (#2756)', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rr-mkt-source-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const manifest = { name: 'river-review', commands: ['./commands/a.md'] };
+  const dist = path.join(root, 'dist');
+  fs.mkdirSync(path.join(dist, '.claude-plugin'), { recursive: true });
+  fs.mkdirSync(path.join(dist, 'commands'));
+  fs.writeFileSync(path.join(dist, 'commands/a.md'), '# a\n');
+  fs.writeFileSync(path.join(dist, '.claude-plugin/plugin.json'), JSON.stringify(manifest));
+  const entry = { name: 'river-review', source: './dist' };
+
+  assert.deepEqual(await checkMarketplaceSource(entry, manifest, { root }), []);
+
+  fs.writeFileSync(path.join(dist, 'package.json'), '{}');
+  const withPackage = await checkMarketplaceSource(entry, manifest, { root });
+  assert.equal(withPackage.length, 1);
+  assert.match(withPackage[0], /contains package\.json/);
+  fs.rmSync(path.join(dist, 'package.json'));
+
+  const stale = await checkMarketplaceSource(
+    entry,
+    { ...manifest, commands: ['./commands/a.md', './commands/b.md'] },
+    { root }
+  );
+  assert.equal(stale.length, 2);
+  assert.match(stale[0], /differs from \.claude-plugin\/plugin\.json/);
+  assert.match(stale[1], /lacks referenced path: \.\/commands\/b\.md/);
+
+  const escaping = await checkMarketplaceSource({ source: '../elsewhere' }, manifest, { root });
+  assert.match(escaping[0], /escapes the repository/);
 });

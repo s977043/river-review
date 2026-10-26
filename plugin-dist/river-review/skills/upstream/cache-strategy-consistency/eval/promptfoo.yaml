@@ -1,0 +1,53 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Cache Strategy Consistency Guard'
+
+# Model providers to test
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+# Prompts to evaluate
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+# Test cases
+tests:
+  # Test case 1: Undefined cache layer - should detect
+  - description: 'Detect undefined cache layer and missing details'
+    vars:
+      diff: file://../fixtures/01-undefined-cache-layer-happy.md
+    assert:
+      - type: contains-any
+        value:
+          - 'cache layer'
+          - 'undefined'
+          - 'Redis'
+          - 'CDN'
+      - type: contains-any
+        value:
+          - 'TTL'
+          - 'invalidation'
+
+  # Test case 2: Well-defined cache strategy - should NOT flag
+  - description: 'No false positive on well-defined cache strategy'
+    vars:
+      diff: file://../fixtures/02-well-defined-cache-strategy.md
+    assert:
+      - type: contains-any
+        value:
+          - 'NO_ISSUES'
+          - 'no issues'
+          - 'well-defined'
+          - 'comprehensive'
+
+# Output format
+outputPath: ./output.json
+
+# Default test settings
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini
