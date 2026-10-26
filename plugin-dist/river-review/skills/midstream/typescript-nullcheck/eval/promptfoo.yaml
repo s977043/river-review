@@ -1,0 +1,60 @@
+# promptfoo configuration for TypeScript Null Safety Guardrails skill evaluation
+# See: https://www.promptfoo.dev/docs/configuration/guide
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+
+tests:
+  - description: Non-Null Assertion Detection (Happy Path)
+    vars:
+      diff: file://../fixtures/01-non-null-assertion-happy.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must identify the unsafe non-null assertion on the API response.
+          Score 1 if the output mentions non-null assertion, `!` operator, or null safety risk.
+          Score 0 otherwise.
+
+      - type: contains
+        value: '!'
+
+      - type: llm-rubric
+        value: |
+          The output must suggest a safer alternative.
+          Score 1 if it suggests optional chaining (?.), null check, or early return.
+          Score 0 otherwise.
+
+      - type: similar
+        value: file://../golden/01-non-null-assertion-happy.md
+        threshold: 0.7
+
+  - description: Type Guard False Positive Avoidance
+    vars:
+      diff: file://../fixtures/02-type-guarded-false-positive.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The output should NOT flag the code after assertConfig() as unsafe.
+          Score 1 if it recognizes the `asserts` narrowing or type guard makes access safe.
+          Score 0 if it incorrectly flags a null safety issue in the guarded code path.
+
+      - type: not-contains
+        value: 'Severity: major'
+
+defaultTest:
+  options:
+    provider: openai:gpt-4o
+
+outputPath: eval/results.json

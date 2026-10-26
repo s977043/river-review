@@ -1,0 +1,67 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Secret / Credential Scan'
+
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+tests:
+  # Test case 1: True positive — hardcoded API key / credential added in diff
+  - description: 'Detect hardcoded secret (Stripe key / GitHub token / .env value)'
+    vars:
+      diff: file://../fixtures/01-true-positive-hardcoded-key.md
+    assert:
+      - type: contains-any
+        value:
+          - 'sk-live'
+          - 'STRIPE_SECRET_KEY'
+          - 'ghp_'
+          - 'API キー'
+          - '機密'
+          - '環境変数'
+          - 'Secrets'
+      - type: contains-any
+        value:
+          - 'major'
+          - 'severity=major'
+          - 'warning'
+          - 'gitleaks'
+
+  # Test case 2: False positive — lockfile integrity (sha512 SRI) is not a secret.
+  # A correct (healthy) run returns NO_ISSUES and must NOT emit a detection marker.
+  # Asserting NO_ISSUES + absence of the finding markers makes this test actually fail
+  # when the model falsely flags the integrity line (a contains-any on 'integrity' would
+  # have passed even on a false positive, so it is intentionally not used here).
+  - description: 'No false positive on lockfile integrity / SRI digest'
+    vars:
+      diff: file://../fixtures/02-false-positive-lockfile-integrity.md
+    assert:
+      - type: contains
+        value: 'NO_ISSUES'
+      - type: not-contains
+        value: '[severity='
+      - type: not-contains
+        value: '[機密混入'
+
+  # Test case 3: No secret candidate — should return NO_REVIEW
+  - description: 'Return NO_REVIEW when no secret candidate exists'
+    vars:
+      diff: file://../fixtures/03-no-review-no-secret.md
+    assert:
+      - type: contains
+        value: 'NO_REVIEW'
+      - type: contains
+        value: 'secret-credential-scan'
+
+outputPath: ./output.json
+
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

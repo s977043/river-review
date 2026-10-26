@@ -1,0 +1,59 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Architecture Validation Plan Guard'
+
+# Model providers to test
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+# Prompts to evaluate
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+# Test cases
+tests:
+  # Test case 1: Missing validation plan - should detect
+  - description: 'Detect missing validation plan in architecture design'
+    vars:
+      diff: file://../fixtures/01-missing-validation-plan.md
+    assert:
+      - type: contains
+        value: 'payment-service-redesign.md'
+      - type: contains-any
+        value:
+          - 'SLO'
+          - 'SLI'
+          - '検証'
+          - 'ロールバック'
+          - 'rollback'
+          - '負荷試験'
+          - 'load test'
+          - 'カナリア'
+          - 'canary'
+
+  # Test case 2: Complete validation plan - should NOT flag
+  - description: 'No false positive on complete validation plan'
+    vars:
+      diff: file://../fixtures/02-complete-validation-plan.md
+    assert:
+      - type: contains-any
+        value:
+          - 'NO_ISSUES'
+          - '適切'
+          - '十分'
+          - '網羅'
+          - '問題なし'
+          - 'complete'
+          - 'comprehensive'
+
+# Output format
+outputPath: ./output.json
+
+# Default test settings
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

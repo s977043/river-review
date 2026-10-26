@@ -21,7 +21,17 @@
         },
         {
           "type": "json",
+          "path": "plugin-dist/river-review/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
           "path": ".codex-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "plugin-dist/river-review/.codex-plugin/plugin.json",
           "jsonpath": "$.version"
         },
         {

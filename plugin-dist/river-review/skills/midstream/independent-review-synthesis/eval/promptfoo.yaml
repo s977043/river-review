@@ -1,0 +1,55 @@
+# promptfoo configuration for Independent Review Synthesis
+# Status: scaffolding. See ../README.md for golden-generation workflow.
+#
+# Phase 1 of #911. Phase 2 will extend this with artifact-contract-aware
+# fixtures (using real Review Artifacts from findings-pool).
+
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+providers:
+  - id: openai:gpt-4o
+    config:
+      temperature: 0.1
+      max_tokens: 3000
+
+  - id: anthropic:claude-3-5-sonnet-20241022
+    config:
+      temperature: 0.1
+      max_tokens: 3000
+
+tests:
+  - description: dedup + confirm — two reviewers agree, evidence holds
+    vars:
+      diff: file://../fixtures/01-dedup-and-confirm-happy.md
+      reviewSelf: ''
+      reviewExternal: ''
+      findingsPool: '[]'
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must:
+          (a) include exactly ONE finding for the SQL injection on src/api/users.ts:13,
+          (b) list BOTH `review-self` and `review-external` in its Reviewers field,
+          (c) set ValidatedStatus: confirmed,
+          (d) mention "block" or "human-review" in the Merge Recommendation,
+          (e) NOT use majority-vote phrasing ("since X out of Y reviewers agreed...").
+          Score 1 if all five hold; 0 otherwise.
+
+  - description: hallucination guard — fabricated file path must be dismissed
+    vars:
+      diff: file://../fixtures/02-hallucinated-finding-false-positive.md
+      reviewSelf: ''
+      reviewExternal: ''
+      findingsPool: '[]'
+    assert:
+      - type: llm-rubric
+        value: |
+          The output must:
+          (a) place the JWT-validation finding under "Dismissed Findings"
+              with ValidatedStatus: dismissed-hallucination,
+          (b) NOT include the JWT finding in Critical / Major / Minor sections,
+          (c) set Merge Recommendation to "merge-ready" (the only real change
+              is a benign `await` addition).
+          Score 1 if all three hold; 0 otherwise.

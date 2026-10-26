@@ -1,6 +1,6 @@
 {
   "name": "river-review",
-  "version": "1.135.0",
+  "version": "1.136.0",
   "private": true,
   "workspaces": [
     "runners/node-api",
@@ -66,6 +66,8 @@
     "meta:validate": "node scripts/validate-meta-consistency.mjs && node scripts/check-doc-enumerations.mjs && node scripts/check-sidebar-reachability.mjs && node scripts/check-vocabulary-literals.mjs && node scripts/check-control-characters.mjs && node scripts/generate-skill-catalog.mjs --check",
     "plugin:validate": "node scripts/validate-plugin-manifest.mjs",
     "plugin:validate:official": "node scripts/validate-plugin-official.mjs",
+    "plugin:dist": "node scripts/build-plugin-dist.mjs",
+    "plugin:dist:check": "node scripts/build-plugin-dist.mjs --check",
     "plugin:sync": "node scripts/sync-plugin-fields.mjs",
     "plugin:sync:check": "node scripts/sync-plugin-fields.mjs --check",
     "eval:all": "node scripts/evaluate-all.mjs",

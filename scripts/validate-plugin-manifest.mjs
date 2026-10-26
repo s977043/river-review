@@ -1322,6 +1322,71 @@ export async function checkPluginHooksScripts(ccManifest, { root = ROOT } = {}) 
 }
 
 /**
+ * Verify the directory a marketplace entry's `source` names, since that
+ * directory (not the repository root) is what Claude Code installs (#2756):
+ * it must stay inside the repository, carry a plugin.json identical to
+ * .claude-plugin/plugin.json, resolve every component path and hook script
+ * against itself, and contain no package.json.
+ */
+export async function checkMarketplaceSource(entry, ccManifest, { root = ROOT } = {}) {
+  const label = '.claude-plugin/marketplace.json';
+  if (typeof entry.source !== 'string') {
+    return [`${label}: plugins[].source must be a relative path string`];
+  }
+  const sourceRel = normalizeRef(entry.source);
+  const sourceAbs = path.resolve(root, sourceRel);
+  const relative = path.relative(root, sourceAbs);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    return [`${label}: plugins[].source escapes the repository: ${entry.source}`];
+  }
+  // The file helpers resolve against ROOT, so express each path relative to it.
+  const inSource = (rel) => path.relative(ROOT, path.join(sourceAbs, normalizeRef(rel)));
+  const errors = [];
+
+  let distManifest;
+  try {
+    distManifest = await readJson(inSource('.claude-plugin/plugin.json'));
+  } catch {
+    return [
+      `${label}: source "${entry.source}" has no readable .claude-plugin/plugin.json — run \`npm run plugin:dist\``,
+    ];
+  }
+  if (JSON.stringify(distManifest) !== JSON.stringify(ccManifest)) {
+    errors.push(
+      `${label}: source "${entry.source}" plugin.json differs from .claude-plugin/plugin.json — run \`npm run plugin:dist\``
+    );
+  }
+  if (relative !== '' && (await fileExists(inSource('package.json')))) {
+    errors.push(
+      `${label}: source "${entry.source}" contains package.json; its overrides make the install print a note (#2756)`
+    );
+  }
+
+  const refs = [...(ccManifest.commands || [])];
+  for (const key of ['agents', 'skills', 'hooks']) {
+    const value = ccManifest[key];
+    if (typeof value === 'string') refs.push(value);
+    else if (Array.isArray(value)) refs.push(...value);
+  }
+  for (const ref of refs) {
+    if (!(await pathExists(inSource(ref)))) {
+      errors.push(`${label}: source "${entry.source}" lacks referenced path: ${ref}`);
+    }
+  }
+  if (typeof ccManifest.composerIcon === 'string') {
+    const iconRel = path.join('.claude-plugin', normalizeRef(ccManifest.composerIcon));
+    if (!(await fileExists(inSource(iconRel)))) {
+      errors.push(
+        `${label}: source "${entry.source}" lacks composerIcon asset: ${ccManifest.composerIcon}`
+      );
+    }
+  }
+  const hookErrors = await checkPluginHooksScripts(ccManifest, { root: sourceAbs });
+  errors.push(...hookErrors.map((err) => `${label}: source "${entry.source}": ${err}`));
+  return errors;
+}
+
+/**
  * Validate the Claude Code + Codex plugin manifests and the marketplace
  * manifest against the repository:
  *  - every component path referenced by .claude-plugin/plugin.json exists
@@ -1406,6 +1471,8 @@ export async function validatePluginManifest({ warnings } = {}) {
     errors.push(
       `.claude-plugin/marketplace.json: no plugins[] entry with name "${ccManifest.name}"`
     );
+  } else {
+    errors.push(...(await checkMarketplaceSource(entry, ccManifest)));
   }
 
   // --- Codex manifest (required: official distribution ships Codex too) ---

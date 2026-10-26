@@ -1,0 +1,52 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Closure Scope Retention Guard'
+
+# Model providers to test
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+# Prompts to evaluate
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+# Test cases
+tests:
+  # Test case 1: singleton closure retaining large scope - should detect
+  - description: 'Detect singleton closure retaining rawText/documents/allEntries'
+    vars:
+      diff: file://../fixtures/01-singleton-closure-happy.diff
+    assert:
+      - type: contains
+        value: 'src/lib/skill-cache.mjs'
+      - type: contains-any
+        value:
+          - 'closure'
+          - 'クロージャ'
+          - '保持'
+          - 'rawText'
+          - 'Map'
+
+  # Test case 2: immediate reduce and release - should NOT flag
+  - description: 'No false positive on immediate reduce-and-release pattern'
+    vars:
+      diff: file://../fixtures/02-immediate-reduce-false-positive.diff
+    assert:
+      - type: not-contains-any
+        value:
+          - 'Finding:'
+          - '保持'
+          - 'retention'
+          - '問題'
+
+# Output format
+outputPath: ./output.json
+
+# Default test settings
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini
