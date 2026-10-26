@@ -3,8 +3,7 @@ import { diag, DiagConsoleLogger, DiagLogLevel, trace } from '@opentelemetry/api
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import resources from '@opentelemetry/resources';
-const { resourceFromAttributes } = resources;
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 
 // Enable diagnostic logging for development when OTEL_DEBUG env is set.
