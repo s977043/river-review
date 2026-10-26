@@ -1,0 +1,52 @@
+# promptfoo evaluation configuration
+# See https://www.promptfoo.dev/docs/configuration/guide
+
+description: 'Evaluation for Altitude Generalization Guard'
+
+# Model providers to test
+providers:
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.1
+
+# Prompts to evaluate
+prompts:
+  - file://../prompt/system.md
+  - file://../prompt/user.md
+
+# Test cases
+tests:
+  # Test case 1: caller special-case on shared formatter - should detect
+  - description: 'Detect third per-caller special-case on shared formatter'
+    vars:
+      diff: file://../fixtures/01-caller-special-case-happy.diff
+    assert:
+      - type: contains
+        value: 'src/lib/finding-formatter.mjs'
+      - type: contains-any
+        value:
+          - 'caller'
+          - 'special-case'
+          - '一般化'
+          - 'generaliz'
+          - 'markdown-exporter'
+
+  # Test case 2: public opt-in option - should NOT flag
+  - description: 'No false positive on host opt-in public option'
+    vars:
+      diff: file://../fixtures/02-host-optin-false-positive.diff
+    assert:
+      - type: not-contains-any
+        value:
+          - 'Finding:'
+          - 'bandaid'
+          - '一般化'
+          - '問題'
+
+# Output format
+outputPath: ./output.json
+
+# Default test settings
+defaultTest:
+  options:
+    provider: openai:gpt-4o-mini

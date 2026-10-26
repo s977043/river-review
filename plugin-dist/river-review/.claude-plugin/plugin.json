@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "river-review",
+  "displayName": "River Review",
+  "version": "1.136.0",
+  "description": "Turn review into an organizational judgment asset. Review Judgment as Code for AI-assisted development, delivered as a capability pack for Claude Code: your team's review criteria as versioned, repo-owned skills (a Skill Registry), driven by a review agent that runs perspective-based reviewer roles (code, security, performance, architecture, testing, adversarial) and verifies findings against the diff so humans keep the high-risk judgment.",
+  "author": {
+    "name": "river-review maintainers",
+    "url": "https://github.com/s977043/river-review"
+  },
+  "homepage": "https://river-review.the3396.com/",
+  "repository": "https://github.com/s977043/river-review",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "security-review",
+    "performance",
+    "architecture",
+    "testing",
+    "adversarial-review",
+    "skills"
+  ],
+  "commands": [
+    "./commands/setup-team.md",
+    "./commands/review-local.md",
+    "./commands/review-team.md",
+    "./commands/challenge.md",
+    "./commands/skill.md",
+    "./commands/check.md",
+    "./commands/pr.md"
+  ],
+  "agents": "./agents/river-review.md",
+  "skills": "./skills/agent-skills/",
+  "composerIcon": "./assets/icon.svg"
+}

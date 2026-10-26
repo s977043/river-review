@@ -1,0 +1,1683 @@
+# River Review Skills Registry
+# Version 1.0
+
+version: '1.0'
+description: 'Catalog of all River Review skills organized by stream category and tags'
+
+# Skill Catalog
+#
+# 各エントリの構造フィールド（id / version / name / category / phase / tags / severity）は
+# 対応する SKILL.md frontmatter を SSoT として自動生成される（#1562）。手編集せず、frontmatter を
+# 変更したうえで `npm run skills:registry`（scripts/generate-registry-fields.mjs）で同期すること。
+# `path` は生成元 SKILL.md を指す結合キー。`recommended` / `description` / `exclude` はカタログ
+# キュレーション情報であり手編集で維持する（自動生成の対象外）。applyTo は frontmatter のみに置き、
+# 二重管理を避けるため registry には持たない。CI は `npm run skills:registry:check` で鮮度を守る。
+#
+# 各エントリの `description` は adopter がカタログを見るための短い要約であり（英語・短縮表現可）、
+# 対応する SKILL.md frontmatter の `description`（レビュー実行時に参照する詳細記述・SSoT）と
+# 文言を一致させる必要はない。両者は役割が異なる（カタログ要約 vs 実行時詳細）ため、不一致を
+# 「ドリフト」とみなして機械的に揃えないこと。ただし同一言語・同一意図のまま字句だけがずれた
+# 場合は、要約としての簡潔さを保ちつつ frontmatter 側の意図を反映するように整える。詳細は
+# docs/skills-structure.md を参照。
+skills:
+  # Upstream Skills (Design Phase)
+  - id: architecture-validation-plan
+    version: '0.1.0'
+    name: 'Architecture Validation Plan Guard'
+    path: skills/upstream/architecture-validation-plan/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, validation, verification, slo, upstream]
+    severity: minor
+    recommended: true
+    description: 'Detects missing validation plans (SLO/SLI, load testing, canary, rollback, DR) in design documents'
+
+  - id: cache-strategy-consistency
+    version: '0.1.0'
+    name: 'Cache Strategy Consistency Guard'
+    path: skills/upstream/cache-strategy-consistency/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [cache, consistency, architecture, upstream, design-review]
+    severity: minor
+    recommended: true
+    description: 'Detects undefined or inconsistent cache strategies in design documents'
+
+  - id: multitenancy-isolation
+    version: '0.1.0'
+    name: 'Multitenancy Isolation Guard'
+    path: skills/upstream/multitenancy-isolation/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [multitenancy, isolation, security, architecture, upstream]
+    severity: major
+    recommended: true
+    description: 'Detects tenant isolation gaps in data, authorization, resources, and failure boundaries'
+
+  - id: security-privacy-design
+    version: '0.1.0'
+    name: 'Security & Privacy Design Review'
+    path: skills/upstream/security-privacy-design/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [security, privacy, upstream, design, gdpr, pii]
+    severity: minor
+    recommended: true
+    description: 'Reviews data retention, deletion, backup residency, and cross-border data transfer'
+
+  # Midstream Skills (Implementation Phase)
+  - id: hello-skill
+    version: '0.1.0'
+    name: 'Hello Skill (Always-On Sample)'
+    path: skills/midstream/hello-skill/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [sample, hello, midstream]
+    severity: info
+    recommended: false
+    description: 'Always-on sample skill for testing the skill system'
+
+  - id: security-basic
+    version: '0.2.0'
+    name: Baseline Security Checks
+    path: skills/midstream/security-basic/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [security, midstream, web]
+    severity: major
+    recommended: true
+    description: 'Detects common security vulnerabilities'
+
+  - id: secret-credential-scan
+    version: '0.1.0'
+    name: 'Secret / Credential Scan 機密情報の混入検出'
+    path: skills/midstream/secret-credential-scan/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [secret, credential, midstream]
+    severity: major
+    recommended: true
+    description: 'Detects API keys, tokens, credentials, private keys, .env values, and personal local paths newly added in a diff — language- and filetype-agnostic, complementing CI secret scanners'
+    exclude:
+      - '**/package-lock.json'
+      - '**/pnpm-lock.yaml'
+      - '**/yarn.lock'
+      - '**/*.lock'
+      - 'dist/**'
+      - '**/*.min.*'
+      - '**/*.map'
+      - '**/*.snap'
+
+  - id: invisible-unicode-injection
+    version: '0.1.0'
+    name: 'Invisible Unicode Injection Scan 不可視 Unicode コード注入検出'
+    path: skills/midstream/invisible-unicode-injection/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [unicode, supply-chain, midstream]
+    severity: major
+    recommended: false
+    description: 'Detects invisible or deceptive Unicode (tag characters, variation selectors incl. supplement, zero-width, bidirectional controls/marks, confusable whitespace) newly added to source code — the GlassWorm supply-chain, ASCII-smuggling, and Trojan Source (CVE-2021-42574) code-hiding vectors, guarded deterministically with canary tests over an enumerated code-point set'
+    exclude:
+      - '**/package-lock.json'
+      - '**/pnpm-lock.yaml'
+      - '**/yarn.lock'
+      - '**/*.lock'
+      - 'dist/**'
+      - '**/*.min.*'
+      - '**/*.map'
+      - '**/*.snap'
+
+  - id: doc-hygiene
+    version: '0.1.0'
+    name: 'Documentation Hygiene ドキュメント衛生'
+    path: skills/midstream/doc-hygiene/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [documentation, hygiene, maintainability, midstream]
+    severity: major
+    recommended: true
+    description: 'Detects transient task logs leaking into durable docs (AGENTS.md), SOP/decision/log/learned role confusion, and internal memos / local paths / AI-conversation fragments left in published docs'
+
+  - id: logging-observability
+    version: '0.1.0'
+    name: Logging and Observability Guard
+    path: skills/midstream/logging-observability/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [observability, logging, reliability, midstream]
+    severity: minor
+    recommended: true
+    description: 'Reviews logging and observability practices'
+
+  - id: pr-description
+    version: '0.2.0'
+    name: 'PR Description Review'
+    path: skills/midstream/pr-description/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [pr-description, consistency, midstream]
+    severity: minor
+    recommended: false
+    description: 'Reviews whether the PR description is review-ready and consistent with the diff'
+
+  - id: typescript-strict
+    version: '0.1.0'
+    name: TypeScript Strictness Guard
+    path: skills/midstream/typescript-strict/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [typescript, type-safety, midstream]
+    severity: major
+    recommended: true
+    description: 'Enforces TypeScript strict mode best practices'
+
+  - id: typescript-nullcheck
+    version: '0.1.0'
+    name: TypeScript Null Safety Guardrails
+    path: skills/midstream/typescript-nullcheck/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [typescript, type-safety, midstream]
+    severity: major
+    recommended: true
+    description: 'Checks for null/undefined handling'
+
+  - id: gh-address-comments
+    version: '0.1.0'
+    name: GitHubレビューコメント対応（修正案つき）
+    path: skills/midstream/gh-address-comments/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [review, github, midstream]
+    severity: info
+    recommended: false
+    description: 'Checks if review comments have been addressed'
+
+  - id: review-comment-triage
+    version: '0.1.0'
+    name: Review Comment Triage (No-Code-Fix Mode)
+    path: skills/midstream/review-comment-triage/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [review, process, midstream]
+    severity: info
+    recommended: false
+    description: 'Triages and prioritizes review comments'
+
+  - id: review-policy-standard-midstream
+    version: '0.1.0'
+    name: Standard Review Policy for Midstream
+    path: skills/midstream/review-policy-standard-midstream/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [policy, midstream, implementation, code-quality]
+    severity: info
+    recommended: false
+    description: 'Enforces standard review policies'
+
+  - id: type-driven-design
+    version: '0.1.0'
+    name: 'Type-Driven Design Guard'
+    path: skills/midstream/type-driven-design/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [typescript, type-driven-design, domain-modeling, midstream]
+    severity: major
+    recommended: true
+    description: 'Detects primitive obsession and missing domain/brand types; checks that state is modeled via discriminated unions'
+
+  - id: review-automation-boundary
+    version: '0.1.0'
+    name: 'Review Automation Boundary Guard'
+    path: skills/midstream/review-automation-boundary/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [review-process, automation, ci, meta-review, midstream]
+    severity: minor
+    recommended: true
+    description: 'Meta-review skill: detects review findings that belong in CI/lint/formatter rather than human review'
+
+  - id: ubiquitous-language-naming
+    version: '0.1.0'
+    name: 'Ubiquitous Language Naming Consistency'
+    path: skills/midstream/ubiquitous-language-naming/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [ddd, domain, naming, ubiquitous-language, midstream]
+    severity: minor
+    recommended: false
+    description: 'Detects domain terms drifting between code identifiers and the established ubiquitous language.'
+
+  - id: react-router-loader-boundary
+    version: '0.1.0'
+    name: 'React Router Loader Boundary Review'
+    path: skills/midstream/react-router-loader-boundary/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [react-router, remix, data-loading, frontend, midstream]
+    severity: major
+    recommended: false
+    description: 'Detects route data fetched in useEffect instead of loaders and server/client API leaks across loader boundaries.'
+
+  - id: react-router-action-contract
+    version: '0.1.0'
+    name: 'React Router Action Contract Review'
+    path: skills/midstream/react-router-action-contract/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [react-router, remix, actions, validation, frontend, midstream]
+    severity: major
+    recommended: false
+    description: 'Checks React Router action conventions: validation errors as data with 4xx, redirect on success, 3-branch ErrorBoundary.'
+
+  - id: laravel-eloquent-nplus1
+    version: '0.1.0'
+    name: 'Laravel Eloquent N+1 and Query Efficiency Review'
+    path: skills/midstream/laravel-eloquent-nplus1/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [laravel, eloquent, performance, n-plus-1, php, midstream]
+    severity: major
+    recommended: false
+    description: 'Detects N+1 query patterns, full-table loads, and unsafe chunk()/cursor() usage in Laravel Eloquent.'
+
+  - id: laravel-mass-assignment
+    version: '0.1.0'
+    name: 'Laravel Mass Assignment and Authorization Review'
+    path: skills/midstream/laravel-mass-assignment/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [laravel, security, mass-assignment, authorization, php, midstream]
+    severity: major
+    recommended: false
+    description: 'Detects mass assignment via request->all() and missing authorization on mutating controller actions.'
+
+  - id: loading-state
+    version: '0.1.0'
+    name: 'Loading State Transition Review'
+    path: skills/midstream/loading-state/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [ux, loading-state, error-handling, midstream]
+    severity: major
+    recommended: false
+    description: 'Detect missing loading/error/empty state handling that could trap users in spinners or disabled states.'
+
+  - id: nullability-contract
+    version: '0.1.0'
+    name: 'Nullability Contract Review'
+    path: skills/midstream/nullability-contract/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [nullability, contract, type-safety, defensive-programming, midstream]
+    severity: major
+    recommended: false
+    description: 'Detect null/undefined/empty handling gaps where callers or consumers may receive unexpected nullish values.'
+
+  - id: agent-skill-bridge
+    version: '0.1.0'
+    name: 'Agent Skill Bridge Review'
+    path: skills/midstream/agent-skill-bridge/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [bridge, skills, midstream]
+    severity: major
+    recommended: false
+    description: 'Review changes to the Agent Skills import/export bridge for path safety, round-trip fidelity, and validation correctness.'
+
+  - id: api-compatibility
+    version: '0.1.0'
+    name: 'API Compatibility and Test Gap Review'
+    path: skills/midstream/api-compatibility/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [api, compatibility, dto, breaking-change, test-coverage, midstream]
+    severity: major
+    recommended: false
+    description: 'Detect breaking API contract changes, DTO modifications without compatibility handling, and missing tests for changed API boundaries.'
+
+  - id: config-json
+    version: '0.1.0'
+    name: 'Configuration File Review'
+    path: skills/midstream/config-json/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [config, json, yaml, midstream]
+    severity: minor
+    recommended: false
+    description: 'Review JSON/YAML configuration files for common issues and best practices.'
+
+  - id: i18n-unused-key
+    version: '0.1.0'
+    name: 'i18n Unused Key Review'
+    path: skills/midstream/i18n-unused-key/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [i18n, localization, dead-code, midstream]
+    severity: minor
+    recommended: false
+    description: 'Detect i18n/locale keys removed from source but left in locale files, or added without source usage.'
+
+  - id: normalization-consistency
+    version: '0.1.0'
+    name: 'Normalization Consistency Review'
+    path: skills/midstream/normalization-consistency/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [consistency, normalization, formatting, midstream]
+    severity: minor
+    recommended: false
+    description: 'Detect inconsistencies in ID formatting, date/time display, monetary amounts, and enum/status labels versus existing patterns.'
+
+  - id: suppression-feedback
+    version: '0.1.0'
+    name: 'Suppression Feedback Workflow'
+    path: skills/midstream/suppression-feedback/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [suppression, process, midstream, riverbed-memory]
+    severity: minor
+    recommended: false
+    description: 'Riverbed Memory の suppression entry を活用するときの判断基準と CLI 操作を案内する'
+
+  - id: altitude-generalization
+    version: '0.1.0'
+    name: 'Altitude Generalization Guard'
+    path: skills/midstream/altitude-generalization/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [simplify, altitude, generalization, maintainability, midstream]
+    severity: minor
+    recommended: false
+    description: 'Detects per-caller special-cases (bandaids) on shared infrastructure and proposes generalizing the lower-level mechanism when same-kind special-cases accumulate'
+
+  - id: closure-scope-retention
+    version: '0.1.0'
+    name: 'Closure Scope Retention Guard'
+    path: skills/midstream/closure-scope-retention/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [simplify, memory, closure, retention, midstream]
+    severity: major
+    recommended: false
+    description: 'Detects long-lived objects (caches, listeners, singletons) whose closures keep an entire enclosing scope alive, and proposes copying only the needed fields'
+
+  # ------------------------------------------------------------------
+  # Community Skills (Experimental tier; recommended: false)
+  # ------------------------------------------------------------------
+  # These skills live under skills/midstream/ and are intentionally
+  # marked `recommended: false` so the catalog distinguishes "core / curated"
+  # from "experimental / not yet eval-backed". A community skill becomes a
+  # candidate for `recommended: true` when it gains good/bad fixtures and a
+  # golden output (the S1 convention from the 2026-05-21..25 retrospective).
+  # Until then, treat them as opt-in suggestions, not first-line gates.
+
+  - id: a11y-accessible-name
+    version: '0.1.0'
+    name: 'a11y Accessible Name Basics'
+    path: skills/midstream/a11y-accessible-name/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, accessibility, ui, midstream]
+    severity: minor
+    recommended: true
+    description: 'Checks images, buttons, and form controls for accessible names (alt / aria-label / label association).'
+
+  - id: nextjs-app-router-boundary
+    version: '0.1.0'
+    name: Next.js App Router Client/Server Boundary
+    path: skills/midstream/nextjs-app-router-boundary/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, nextjs, midstream, react]
+    severity: major
+    recommended: true
+    description: 'Surfaces Next.js App Router boundary issues (server vs client component placement, "use client" misuse).'
+
+  - id: modern-web-semantic
+    version: '0.1.0'
+    name: 'Modern Web Semantic + Platform-Native'
+    path: skills/midstream/modern-web-semantic/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, modern-web, semantic-html, accessibility, ui, midstream]
+    severity: minor
+    recommended: true
+    description: 'Suggests semantic HTML / Web Platform Native APIs / modern CSS over legacy workarounds.'
+
+  - id: modern-web-performance
+    version: '0.1.0'
+    name: 'Modern Web Performance + Core Web Vitals'
+    path: skills/midstream/modern-web-performance/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, modern-web, performance, core-web-vitals, ui, midstream]
+    severity: minor
+    recommended: true
+    description: 'Surfaces LCP / INP / CLS / resource-cost implications of frontend diffs.'
+
+  - id: modern-web-browser-compat
+    version: '0.1.0'
+    name: 'Modern Web Browser Compatibility + Baseline Awareness'
+    path: skills/midstream/modern-web-browser-compat/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, modern-web, browser-compatibility, baseline, midstream]
+    severity: minor
+    recommended: true
+    description: 'Prompts Baseline status / feature detection / progressive enhancement for new Web APIs and CSS.'
+
+  - id: modern-web-a11y-interactive
+    version: '0.1.0'
+    name: 'Modern Web Accessibility for Interactive UI'
+    path: skills/midstream/modern-web-a11y-interactive/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, modern-web, accessibility, a11y, ui, midstream]
+    severity: minor
+    recommended: true
+    description: 'Keyboard operation / focus management / live regions / role-state semantics for interactive UI.'
+
+  - id: independent-review-synthesis
+    version: '0.1.0'
+    name: 'Independent Review Synthesis'
+    path: skills/midstream/independent-review-synthesis/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, review, synthesis, multi-agent, validation, hallucination-guard, midstream]
+    severity: major
+    recommended: false
+    description: 'Synthesizes multiple AI / human review results (review-self / review-external / findings-pool), dedups, verifies evidence, and emits a merge recommendation. No majority vote.'
+
+  - id: design-token-enforcement
+    version: '0.1.0'
+    name: 'Design Token Enforcement'
+    path: skills/midstream/design-token-enforcement/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, design-system, tokens, ui, midstream]
+    severity: minor
+    recommended: true
+    description: 'デザイントークンを使わずに直書きされた色・余白・フォントサイズ・角丸・シャドウを検出する。デザインツールに依存しない汎用チェック。'
+
+  - id: design-system-component-reuse
+    version: '0.1.0'
+    name: 'Design System Component Reuse Guard'
+    path: skills/midstream/design-system-component-reuse/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [community, design-system, component-reuse, ui, midstream]
+    severity: major
+    recommended: true
+    description: '既存デザインシステムコンポーネント（Button / Input / Modal / Card 等）を再実装していないかを検出する。'
+
+  - id: design-source-conformance
+    version: '0.1.0'
+    name: 'Design Source-of-Truth Conformance デザイン定義準拠'
+    path: skills/midstream/design-source-conformance/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [design-system, design-source, conformance, midstream]
+    severity: minor
+    recommended: true
+    description: 'リポジトリに DESIGN.md やデザイントークン定義が存在する場合に、新規 UI 実装の色・余白・フォントサイズ・角丸・シャドウがその定義済みスケールに準拠しているかを照合する。定義が無ければ実行しない'
+
+  - id: component-variants-states
+    version: '0.1.0'
+    name: 'Component Variants / States Documentation コンポーネント状態の文書化'
+    path: skills/midstream/component-variants-states/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [design-system, component, variants, states, midstream]
+    severity: minor
+    recommended: true
+    description: '新規追加された UI コンポーネントに、variants（種類）とインタラクティブ状態（hover / focus / disabled / loading / error）が定義・文書化されているかを確認し、状態設計の欠落を検出する'
+
+  - id: tailwind-class-hygiene
+    version: '0.1.0'
+    name: 'Tailwind CSS Class Hygiene Review'
+    path: skills/midstream/tailwind-class-hygiene/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [tailwind, css, frontend, midstream, community]
+    severity: minor
+    recommended: false
+    description: 'Checks Tailwind utility class hygiene: arbitrary-value overuse bypassing the theme scale, conflicting/duplicate utilities, and hardcoded arbitrary colors.'
+
+  - id: vitest-mock-isolation
+    version: '0.1.0'
+    name: 'Vitest Mock Isolation Review'
+    path: skills/midstream/vitest-mock-isolation/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [vitest, testing, mocks, frontend, midstream, community]
+    severity: major
+    recommended: false
+    description: 'Detects Vitest test-isolation hazards: unrestored vi.spyOn/vi.mock, un-awaited resolves/rejects assertions, and shared mutable module state.'
+
+  - id: firebase-security-rules
+    version: '0.1.0'
+    name: 'Firebase Security Rules Review'
+    path: skills/midstream/firebase-security-rules/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [firebase, security, baas, authorization, midstream, community]
+    severity: critical
+    recommended: false
+    description: 'Detects over-permissive Firestore/Storage rules, missing auth checks on writes, and admin SDK private key exposure to client bundles.'
+
+  - id: supabase-rls-policy
+    version: '0.1.0'
+    name: 'Supabase RLS Policy Review'
+    path: skills/midstream/supabase-rls-policy/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [supabase, security, baas, rls, authorization, midstream, community]
+    severity: critical
+    recommended: false
+    description: 'Detects tables without ROW LEVEL SECURITY enabled, over-permissive policies (USING (true) without owner conditions), and service_role key exposure in client code.'
+
+  - id: nextjs-server-action-security
+    version: '0.1.0'
+    name: 'Next.js Server Action Security Review'
+    path: skills/midstream/nextjs-server-action-security/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [nextjs, security, server-actions, authorization, midstream, community]
+    severity: critical
+    recommended: false
+    description: 'Checks Next.js Server Actions for missing auth/authz before mutations, missing input validation, and untrusted client-supplied IDs.'
+
+  # Downstream Skills (Testing & Release)
+  - id: gha-workflow-security
+    version: '0.1.0'
+    name: 'GitHub Actions Workflow Security Review'
+    path: skills/downstream/gha-workflow-security/SKILL.md
+    category: downstream
+    phase: [midstream, downstream]
+    tags: [github-actions, security, ci, supply-chain, downstream]
+    severity: major
+    recommended: false
+    description: 'Reviews workflow diffs for script injection, pull_request_target with untrusted checkout, over-broad permissions, and unpinned actions.'
+
+  - id: test-existence
+    version: '0.1.0'
+    name: 'Test Presence for Changed Code'
+    path: skills/downstream/test-existence/SKILL.md
+    category: downstream
+    phase: downstream
+    tags: [tests, coverage, downstream]
+    severity: major
+    recommended: true
+    description: 'Check whether changed code paths have corresponding tests and suggest minimal coverage.'
+
+  - id: coverage-gap
+    version: '0.1.0'
+    name: 'Coverage and Failure Path Gaps'
+    path: skills/downstream/coverage-gap/SKILL.md
+    category: downstream
+    phase: downstream
+    tags: [tests, coverage, reliability, downstream]
+    severity: major
+    recommended: true
+    description: 'Find missing tests for critical paths, edge cases, and failure handling in changed code.'
+
+  - id: test-naming
+    version: '0.1.0'
+    name: 'Test Naming and Structure'
+    path: skills/downstream/test-naming/SKILL.md
+    category: downstream
+    phase: downstream
+    tags: [tests, naming, downstream]
+    severity: minor
+    recommended: false
+    description: 'Ensure tests use clear naming and cover edge cases with proper describe/it structure.'
+
+  - id: flaky-test
+    version: '0.1.0'
+    name: 'Flaky Test Risk Check'
+    path: skills/downstream/flaky-test/SKILL.md
+    category: downstream
+    phase: downstream
+    tags: [tests, reliability, flakiness, downstream]
+    severity: major
+    recommended: false
+    description: 'Detects patterns that make tests flaky and proposes stabilization steps.'
+
+  - id: review-policy-standard-downstream
+    version: '0.1.0'
+    name: 'Standard Review Policy for Downstream'
+    path: skills/downstream/review-policy-standard-downstream/SKILL.md
+    category: downstream
+    phase: downstream
+    tags: [policy, downstream, testing, qa]
+    severity: info
+    recommended: false
+    description: 'Applies standard AI review policy guidelines for downstream (test/QA) phase reviews.'
+
+  - id: test-plan-review
+    version: '0.1.0'
+    name: 'テスト観点レビュー（差分ドリブン）'
+    path: skills/downstream/test-plan-review/SKILL.md
+    category: downstream
+    phase: downstream
+    tags: [tests, coverage, downstream]
+    severity: major
+    recommended: false
+    description: '変更差分から重要なテスト観点と欠落を洗い出し、優先度付きでテストケース案を提示する'
+
+  - id: test-assertion-effectiveness
+    version: '0.1.0'
+    name: 'Test Assertion Effectiveness 常に PASS するテストの検出'
+    path: skills/downstream/test-assertion-effectiveness/SKILL.md
+    category: downstream
+    phase: downstream
+    tags:
+      [
+        tests,
+        assertion,
+        assertion-effectiveness,
+        vacuous-test,
+        always-passing,
+        test-quality,
+        downstream,
+      ]
+    severity: major
+    recommended: false
+    description: 'テストは存在するがアサーションが実質何も検証しておらず、実装が壊れても落ちない（常に PASS する）構造を diff-time で検出する。対象は Check 1 missing assertion アサーション不在、Check 2 tautological assertion 恒真・SUT 非依存、Check 3 nonexistent expected literal 期待文字列が対象ファイルに実在しない、Check 4 stale expected value 出力変更への追従漏れ、Check 5 unscoped expectation スコープ不足、Check 6 swallowed failure 失敗の握り潰しの 6 つ。テストの有無は test-existence、未テスト経路の量は coverage-gap、非決定性は flaky-test、命名は test-naming、JS / TS の un-awaited resolves / rejects は vitest-mock-isolation、tdd-ledger artifact ベースの証跡検証は plangate-tdd-evidence、.only / .skip / @ts-ignore と空の catch は heuristic-review.mjs の決定論検出器へ委譲する'
+
+  # Adversarial Review Skills (Cognitive Bias Countermeasures)
+  - id: pre-mortem
+    version: '0.1.0'
+    name: 'Pre-mortem 失敗シナリオ分析'
+    path: skills/upstream/pre-mortem/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [adversarial, pre-mortem, risk, design, upstream, cognitive-bias]
+    severity: major
+    recommended: false
+    description: '変更が将来インシデントや技術的負債を引き起こすと仮定し、その原因と経路を逆算して設計の盲点を可視化する'
+
+  - id: war-game
+    version: '0.1.0'
+    name: 'War Game 敵対的シミュレーション'
+    path: skills/midstream/war-game/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [adversarial, war-game, security, attack-simulation, midstream, cognitive-bias]
+    severity: major
+    recommended: true
+    description: '攻撃者・競合・悪意あるユーザーの視点で変更を分析し、防御の盲点と悪用シナリオを可視化する'
+
+  - id: logic-torturing
+    version: '0.1.0'
+    name: 'Logic Torturing 論理検証'
+    path: skills/midstream/logic-torturing/SKILL.md
+    category: midstream
+    phase: [upstream, midstream]
+    tags:
+      [adversarial, logic-torturing, decision-quality, critical-thinking, midstream, cognitive-bias]
+    severity: major
+    recommended: false
+    description: '変更に含まれる設計判断・実装選択の論理的整合性を徹底的に検証し、確証バイアスを排除して判断精度を高める'
+
+  - id: self-contradiction
+    version: '0.1.0'
+    name: 'Self-Contradiction Detector 自己矛盾検出'
+    path: skills/midstream/self-contradiction/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [adversarial, self-contradiction, claim-vs-actual, consistency, midstream, cognitive-bias]
+    severity: major
+    recommended: true
+    description: '同一ファイル/隣接ファイル内で「規則Xを守れ」と宣言した直後にXを破っている、宣言と実装の乖離を検出する'
+
+  - id: refactor-claim-audit
+    version: '0.2.0'
+    name: 'Refactor-Claim Audit リファクタ完了主張の検証'
+    path: skills/midstream/refactor-claim-audit/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        adversarial,
+        refactor-claim,
+        claim-vs-actual,
+        verification,
+        midstream,
+        cognitive-bias,
+        performance-regression,
+        key-collision,
+      ]
+    severity: major
+    recommended: true
+    description: 'コミット/PR の「全部置換した」「-N%削減」等の完了主張を grep で反証できる残骸や best/typical/worst 試算で検証し、抽出・集約リファクタでは並列度(Promise.all)/fast-path/遅延評価の性能特性退行と、Map/Set 集約キーの cross-kind 衝突による検出漏れも監査する'
+
+  - id: impact-evidence-coverage
+    version: '0.1.0'
+    name: 'Impact Evidence Coverage 影響・失敗系・外部依存の証拠充足'
+    path: skills/midstream/impact-evidence-coverage/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        impact-evidence-coverage,
+        evidence-sufficiency,
+        impact-analysis,
+        failure-modes,
+        external-dependencies,
+        unknown-coverage,
+        midstream,
+      ]
+    severity: major
+    recommended: true
+    description: 'diff-time で影響調査・失敗系検証・外部依存確認の証拠欠落を検出する evidence-sufficiency 観点。defect は既存 skill へ委譲し、証拠が同一 diff に同梱されていれば充足とみなす。unknown-coverage-review 合成層が委譲する Impact/Failure/External の 3 軸を registry として単独実行する'
+
+  - id: assumption-resolution-trace
+    version: '0.1.0'
+    name: 'Assumption Resolution Trace Plan の前提解消トレーサビリティ'
+    path: skills/midstream/assumption-resolution-trace/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        assumption-resolution-trace,
+        evidence-sufficiency,
+        plan-traceability,
+        assumption,
+        open-question,
+        unknown-coverage,
+        midstream,
+      ]
+    severity: major
+    recommended: false
+    description: 'plan artifact がある時のみ、plan の assumption / open question が実装で解消された証拠を diff・PR 本文と突合する evidence-sufficiency 観点。plan 欠損時は発火せず、PR 本文に前提が inline 列挙されていれば列挙分のみ部分評価する。unknown-coverage-review 合成層の観点6 を registry として単独実行する'
+
+  - id: fix-scope-integrity
+    version: '0.1.0'
+    name: 'Fix Scope Integrity 指摘対応ループのスコープ逸脱・前提破壊検出'
+    path: skills/midstream/fix-scope-integrity/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        fix-scope-integrity,
+        scope-creep,
+        premise-break,
+        fix-scope-guard,
+        review-response-loop,
+        scope-consistency,
+        midstream,
+      ]
+    severity: major
+    recommended: true
+    description: '指摘対応の反復（レビューコメント→修正→再レビュー）で、個別には正しい修正の蓄積が当初スコープを逸脱した（scope creep）、または成立済みの前提を破壊した（premise break）連鎖を diff-time で検出する。技術的正しさとスコープ整合性を別軸で評価し report-only。1コメント triage は review-comment-triage、構造変更後の caller 残骸は cross-file-leakage、plan 前提解消は assumption-resolution-trace へ委譲する'
+
+  - id: review-criteria-integrity
+    version: '0.1.0'
+    name: 'Review Criteria Integrity レビュー基準・品質ゲートの自己弱体化検出'
+    path: skills/midstream/review-criteria-integrity/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        review-criteria-integrity,
+        review-definition,
+        quality-gate,
+        rules-provenance,
+        self-weakening,
+        suppression,
+        midstream,
+      ]
+    severity: major
+    recommended: true
+    description: '差分が「その差分自身を審査するレビュー基準・品質ゲート」を弱めていないかを diff-time で検出する。対象は Check 1 .river/rules.md・rules.d の基準削除、Check 2 .river-review.{json,yaml,yml} の閾値・ゲート緩和、Check 3 suppression entry の新規追加、Check 4 lint・静的解析設定のルール削除、Check 5 branch protection・required check の緩和の 5 つで、機能変更と同一 PR に混在し意図の宣言が無い場合に指摘する。workflow の permissions / action pin は gha-workflow-security、suppression entry の使い分けは suppression-feedback、設定ファイルの一般的妥当性は config-json、.only / .skip / @ts-ignore は heuristic-review.mjs の決定論検出器、リファクタと機能追加の混在は behavior-structure-separation へ委譲する'
+
+  - id: detector-detection-power
+    version: '0.1.0'
+    name: 'Detector Detection Power 検査器の検出力の検証'
+    path: skills/midstream/detector-detection-power/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        detector-quality,
+        detection-power,
+        guard,
+        linter,
+        ci-gate,
+        validator,
+        mutation-evidence,
+        false-negative,
+        midstream,
+      ]
+    severity: major
+    recommended: true
+    description: '検査器（linter / ガード / CI ゲート / バリデータ / フィルタ）そのものの検出力が差分で静かに落ちていないか、また新設した検査が実際に検出できることが実証されているかを diff-time で検出する。Check 1 unverified detection reduction（検査器の検出ロジック（正規表現・除外パターン・解決集合・allowlist・baseline）を変更して検出件数が減ったのに、減った 1 件ずつが誤検出であった根拠が示されないまま「誤検出を潰した」「N → M 件に減少」と改善として主張している）、Check 2 unproven guard detection power（新しい検査ロジック・CI ゲート・バリデーションを追加・変更したのに、検出すべき入力を注入して検出されること／検出すべきでない入力で黙ることを示す変異注入の証跡が無く、「追加した」「CI が緑」を検出力の証拠として扱っている）、の 2 Check を対象とする report-only。テスト自身のアサーションが実質何も検証していない構造は test-assertion-effectiveness、レビュー基準・品質ゲートの明示的な弱体化（ルールの削除・閾値の引き下げ・suppression entry 追加・lint ルールの無効化）は review-criteria-integrity、リファクタ完了主張一般の検証は refactor-claim-audit、workflow の permissions と action pin は gha-workflow-security、設定ファイルの構文・型の妥当性は config-json へ委譲する'
+    exclude:
+      - '**/*.{test,spec}.{ts,tsx,js,jsx,mjs,cjs}'
+      - 'tests/**/*'
+      - 'test/**/*'
+      - '__tests__/**/*'
+      - '**/*Test.php'
+      - '**/test_*.py'
+      - '**/*_test.{py,go,rb}'
+
+  - id: knowledge-to-code-alignment
+    version: '0.1.0'
+    name: 'Knowledge-to-Code Alignment 新知識のコード反映・設計知識の保全'
+    path: skills/midstream/knowledge-to-code-alignment/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        knowledge-to-code,
+        knowledge-delta,
+        refactoring,
+        naming,
+        responsibility,
+        design-history,
+        midstream,
+      ]
+    severity: minor
+    recommended: true
+    description: 'リファクタリングを「更新された理解と過去の理解の差分同期」と捉え、今回得た新知識（要求・ドメイン知識・制約）が naming/responsibility へ反映され、boundary が現在の understanding を表現し、ADR/PR/コメントの過去の design history/constraint を失っていないかを diff-time で確認する。用語一貫性は ubiquitous-language-naming、境界設計は bounded-context-language、投機的抽象化は altitude-generalization、スコープ逸脱は fix-scope-integrity、振る舞い/構造分離は behavior-structure-separation、完了主張反証は refactor-claim-audit へ委譲'
+
+  - id: behavior-structure-separation
+    version: '0.1.0'
+    name: 'Behavior-Structure Separation 振る舞い変更と構造変更の分離・外部挙動維持'
+    path: skills/midstream/behavior-structure-separation/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        behavior-preservation,
+        refactoring,
+        characterization-test,
+        structural-change,
+        safety-net,
+        midstream,
+      ]
+    severity: minor
+    recommended: true
+    description: '構造変更（リファクタ）と機能変更（behavior change）が同一 diff に混在していないかを識別し、structural change に対する external behavior preservation の証拠（テスト・型・静的解析）が揃っているかを diff-time で確認する。証拠不足は Characterization Test 追加を促すか question 化。公開 API/DTO 破壊は api-compatibility、完了主張反証・性能退行は refactor-claim-audit、新知識のコード反映は knowledge-to-code-alignment、投機的抽象化/スコープ逸脱は altitude-generalization/fix-scope-integrity へ委譲'
+
+  - id: cross-file-leakage
+    version: '0.1.0'
+    name: 'Cross-File Leakage リファクタ後の caller 側残骸検出'
+    path: skills/midstream/cross-file-leakage/SKILL.md
+    category: midstream
+    phase: midstream
+    tags:
+      [
+        adversarial,
+        cross-file-leakage,
+        claim-vs-actual,
+        refactor,
+        caller-drift,
+        midstream,
+        cognitive-bias,
+      ]
+    severity: major
+    recommended: true
+    description: 'モジュール/スキルの構造変更で当該ファイルは更新したが、caller 側が古い構造（旧参照・旧シグネチャ・旧採番）を参照したまま残るパターンを検出する'
+
+  - id: hallucinated-reference
+    version: '0.1.0'
+    name: 'Hallucinated Reference 幻覚的参照の実在確認'
+    path: skills/midstream/hallucinated-reference/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [hallucination, reference-existence, ai-generated-code, correctness, midstream]
+    severity: major
+    recommended: false
+    description: '差分で新規導入された import・呼び出し・ライブラリ API の実在を code_search で検証し、AI 生成コードの幻覚的参照を検出する'
+
+  - id: e2e-wiring
+    version: '0.1.0'
+    name: 'End-to-End Wiring 末端到達・貫通の検証'
+    path: skills/midstream/e2e-wiring/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [wiring, end-to-end, correctness, integration, midstream]
+    severity: major
+    recommended: true
+    description: '宣言した処理（計測 / 通知 / 保存 / 検証 / 例外通知）が起点から末端まで途切れず配線されているかを確認し、「実装したつもり」で経路が途中で止まっている欠落を検出する'
+
+  - id: async-correctness
+    version: '0.2.0'
+    name: 'Async Correctness 非同期処理の正しさ検証'
+    path: skills/midstream/async-correctness/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [async, await, promise, race-condition, correctness, midstream]
+    severity: major
+    recommended: false
+    description: 'await 漏れ・floating promise・並行競合など非同期処理の correctness バグを検出する（並列化提案・配線断点は対象外）'
+
+  - id: existing-pattern-conformance
+    version: '0.1.0'
+    name: 'Existing-Pattern Conformance 既存パターン準拠の確認'
+    path: skills/midstream/existing-pattern-conformance/SKILL.md
+    category: midstream
+    phase: midstream
+    tags: [conformance, prior-art, consistency, maintainability, midstream]
+    severity: major
+    recommended: true
+    description: '新実装が、同種の先行実装（同レイヤ・同責務・同概念）に在る防御 / バリデーション / エラー処理 / 規約 / 共通化ロジック / 概念定義を、欠落・重複・食い違いなく継承しているかを grep で先行特定して確認する'
+
+  - id: migration-safety
+    version: '0.1.0'
+    name: 'Migration Safety Review (framework-agnostic)'
+    path: skills/upstream/migration-safety/SKILL.md
+    category: upstream
+    phase: [upstream, midstream]
+    tags: [migration, database, schema, safety, rollback, upstream]
+    severity: major
+    recommended: true
+    description: 'スキーマ/データ移行の安全性を framework 非依存で審査する（破壊的変更・ロック誘発・backfill・ロールバック可逆性・expand-contract）。prisma / typeorm / Rails / Django / Alembic / 生 SQL に横断適用。'
+
+  - id: laravel-migration-safety
+    version: '0.1.0'
+    name: 'Laravel Migration Safety Review'
+    path: skills/upstream/laravel-migration-safety/SKILL.md
+    category: upstream
+    phase: [upstream, midstream]
+    tags: [laravel, migration, database, postgresql, safety, upstream]
+    severity: major
+    recommended: false
+    description: 'Reviews Laravel migrations for destructive ops, change() dropping modifiers, locking index creation, and asymmetric down().'
+
+  # Legacy Upstream Skills (Design Phase)
+  - id: review-policy-standard-upstream
+    version: '0.1.0'
+    name: 'Standard Review Policy for Upstream'
+    path: skills/upstream/review-policy-standard-upstream/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [policy, upstream, design, architecture]
+    severity: info
+    recommended: false
+    description: 'Applies standard AI review policy guidelines for upstream (design) phase reviews.'
+
+  - id: code-nextjs
+    version: '0.1.0'
+    name: 'Component Test Scaffold (Next.js)'
+    path: skills/upstream/code-nextjs/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [review-support, unit-test, tdd, nextjs, react, testing-library]
+    severity: major
+    recommended: false
+    description: 'Generate React/Next.js component test skeletons (RTL) from specifications.'
+
+  - id: code-php-laravel
+    version: '0.1.0'
+    name: 'Test Scaffold (Laravel/PHPUnit)'
+    path: skills/upstream/code-php-laravel/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [review-support, unit-test, tdd, php, laravel, phpunit]
+    severity: major
+    recommended: false
+    description: 'Generate PHP/Laravel (PHPUnit) test skeletons from specifications.'
+
+  - id: code-react
+    version: '0.1.0'
+    name: 'Component Test Scaffold (React)'
+    path: skills/upstream/code-react/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [review-support, unit-test, tdd, react, testing-library, vite]
+    severity: major
+    recommended: false
+    description: 'Generate generic React component test skeletons (RTL) from specifications.'
+
+  - id: code-remix
+    version: '0.1.0'
+    name: 'Route/Function Test Scaffold (Remix)'
+    path: skills/upstream/code-remix/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [review-support, unit-test, tdd, remix, react, vitest]
+    severity: major
+    recommended: false
+    description: 'Generate Remix loader/action and route component test skeletons.'
+
+  - id: code-unit-python-pytest
+    version: '0.1.0'
+    name: 'Unit Test Scaffold (Python/pytest)'
+    path: skills/upstream/code-unit-python-pytest/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [review-support, unit-test, tdd, python]
+    severity: major
+    recommended: false
+    description: 'Generate Python/pytest unit test skeletons from specifications.'
+
+  - id: code-unit-ts-jest
+    version: '0.1.0'
+    name: 'Unit Test Scaffold (TypeScript)'
+    path: skills/upstream/code-unit-ts-jest/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [review-support, unit-test, tdd, typescript, jest, vitest]
+    severity: major
+    recommended: false
+    description: 'Generate TypeScript unit test skeletons (Jest/Vitest) from specifications.'
+
+  - id: code-vue
+    version: '0.1.0'
+    name: 'Component Test Scaffold (Vue.js)'
+    path: skills/upstream/code-vue/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [review-support, unit-test, tdd, vue, vitest, vue-test-utils]
+    severity: major
+    recommended: false
+    description: 'Generate Vue.js component test skeletons (Vue Test Utils) from specifications.'
+
+  - id: adr-decision-quality
+    version: '0.1.0'
+    name: 'ADR Decision Quality'
+    path: skills/upstream/adr-decision-quality/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, adr, decision, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure ADRs capture context, decision, alternatives, tradeoffs, and follow-ups in a way that prevents future drift.'
+
+  - id: api-design
+    version: '0.1.0'
+    name: 'API Design Consistency'
+    path: skills/upstream/api-design/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [api, design, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure API design follows RESTful naming and consistent conventions.'
+
+  - id: api-versioning-compat
+    version: '0.1.0'
+    name: 'API Versioning & Backward Compatibility'
+    path: skills/upstream/api-versioning-compat/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [api, compatibility, versioning, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure API/contract changes specify versioning strategy, backward compatibility, deprecation plan, and migration guidance.'
+
+  - id: architecture-boundaries
+    version: '0.1.0'
+    name: 'Architecture Boundaries & Dependencies'
+    path: skills/upstream/architecture-boundaries/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, boundaries, dependencies, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure architecture/design docs define clear boundaries, ownership, dependency direction, and change impact to avoid tight coupling.'
+
+  - id: architecture-diagrams
+    version: '0.1.0'
+    name: 'Architecture Diagrams Readiness'
+    path: skills/upstream/architecture-diagrams/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, diagrams, c4, sequence, upstream]
+    severity: major
+    recommended: false
+    description: 'Ensure architecture diagrams are readable, consistent with text, and clear on scope, boundaries, and data flow.'
+
+  - id: architecture-risk-register
+    version: '0.1.0'
+    name: 'Architecture Risks, Assumptions & Open Questions'
+    path: skills/upstream/architecture-risk-register/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, risk, assumptions, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure design docs explicitly capture risks, assumptions, and open questions with owners, deadlines, and mitigation plans.'
+
+  - id: architecture-traceability
+    version: '0.1.0'
+    name: 'Architecture Traceability & Consistency'
+    path: skills/upstream/architecture-traceability/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, adr, traceability, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure design changes stay consistent across ADRs, diagrams, and specs; decisions are traceable; and drift is explicitly managed.'
+
+  - id: availability-architecture
+    version: '0.1.0'
+    name: 'Availability & Resilience Architecture'
+    path: skills/upstream/availability-architecture/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [availability, resilience, sre, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure architecture docs capture availability targets, failover strategy, capacity headroom, and resilience trade-offs for critical services.'
+
+  - id: bounded-context-language
+    version: '0.1.0'
+    name: 'Bounded Context & Ubiquitous Language'
+    path: skills/upstream/bounded-context-language/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, domain, boundaries, language, upstream]
+    severity: major
+    recommended: false
+    description: 'Ensure architecture docs define bounded contexts, ownership, and a consistent ubiquitous language to prevent domain drift and coupling.'
+
+  - id: capacity-cost-design
+    version: '0.1.0'
+    name: 'Capacity, Performance & Cost Assumptions'
+    path: skills/upstream/capacity-cost-design/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, performance, capacity, cost, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure architecture/design docs state traffic assumptions, performance budgets, resource limits, and cost risks for critical paths.'
+
+  - id: change-communication
+    version: '0.1.0'
+    name: 'Architecture Change Communication'
+    path: skills/upstream/change-communication/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, communication, governance, upstream]
+    severity: major
+    recommended: false
+    description: 'Ensure architecture updates document affected stakeholders, notification plan, and deprecation/retirement signals to keep knowledge aligned.'
+
+  - id: data-flow-state-ownership
+    version: '0.1.0'
+    name: 'Data Flow & State Ownership'
+    path: skills/upstream/data-flow-state-ownership/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, dataflow, state, ownership, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure designs define data flow, state ownership, consistency boundaries, and cross-boundary writes to prevent drift and incidents.'
+
+  - id: data-model-db-design
+    version: '0.1.0'
+    name: 'Data Model & DB Design Review'
+    path: skills/upstream/data-model-db-design/SKILL.md
+    category: upstream
+    phase: [upstream, midstream]
+    tags: [database, schema, migration, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure data model/DB designs cover constraints, integrity, indexes, migrations, rollback, and operational impacts.'
+
+  - id: dr-multiregion
+    version: '0.1.0'
+    name: 'Disaster Recovery & Multi-Region Readiness'
+    path: skills/upstream/dr-multiregion/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [reliability, dr, resiliency, multiregion, upstream]
+    severity: major
+    recommended: false
+    description: 'Ensure architecture docs define RPO/RTO, failover paths, data consistency, and DR drillability.'
+
+  - id: event-driven-semantics
+    version: '0.1.0'
+    name: 'Event-Driven Semantics & Delivery Guarantees'
+    path: skills/upstream/event-driven-semantics/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, events, messaging, reliability, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure event-driven designs specify delivery guarantees, ordering, idempotency, schema evolution, and replay/backfill strategy.'
+
+  - id: external-dependencies
+    version: '0.1.0'
+    name: 'External Dependencies & Vendor Risks'
+    path: skills/upstream/external-dependencies/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, dependencies, vendor, risk, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure designs document third-party dependencies, SLAs, quotas, failure modes, and vendor lock-in mitigation.'
+
+  - id: failure-modes-observability
+    version: '0.1.0'
+    name: 'Failure Modes & Observability in Design'
+    path: skills/upstream/failure-modes-observability/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [reliability, observability, api, design, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure designs specify failure modes, timeouts, error contracts, and observability for critical flows.'
+
+  - id: integration-contracts
+    version: '0.1.0'
+    name: 'Service Integration & Contracts'
+    path: skills/upstream/integration-contracts/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [integration, contract, api, events, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure cross-service integration defines contracts, ownership, failure handling, versioning, and rollout/rollback expectations.'
+
+  - id: migration-rollout-rollback
+    version: '0.1.0'
+    name: 'Migration, Rollout & Rollback Plan'
+    path: skills/upstream/migration-rollout-rollback/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [migration, rollout, rollback, release, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure design/ADR changes include a concrete migration plan, rollout strategy, rollback conditions, and compatibility considerations.'
+
+  - id: openapi-contract
+    version: '0.1.0'
+    name: 'OpenAPI Contract Completeness'
+    path: skills/upstream/openapi-contract/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [api, openapi, contract, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure OpenAPI specs define consistent request/response schemas, error model, auth, pagination, and backward compatibility.'
+
+  - id: operability-slo
+    version: '0.1.0'
+    name: 'Operability, SLO & Runbook Readiness'
+    path: skills/upstream/operability-slo/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [reliability, sre, operability, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure designs define operability basics: SLO/SLI, monitoring, alerting, on-call actions, and incident handling expectations.'
+
+  - id: requirements-acceptance
+    version: '0.1.0'
+    name: 'Requirements Clarity & Acceptance Criteria'
+    path: skills/upstream/requirements-acceptance/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [requirements, product, specification, upstream]
+    severity: major
+    recommended: true
+    description: 'Ensure requirement docs define scope, terminology, acceptance criteria, edge cases, and non-functional requirements.'
+
+  - id: ai-agent-review-readiness
+    version: '0.1.0'
+    name: 'AI Agent Review Readiness'
+    path: skills/upstream/ai-agent-review-readiness/SKILL.md
+    category: upstream
+    phase: [upstream, midstream]
+    tags: [ai-agent, delegation, review-design, human-in-the-loop, upstream]
+    severity: major
+    recommended: false
+    description: 'Checks whether AI-assisted work defines review criteria, accessible context, explicit review loop, and human judgment boundary before delegating to an agent.'
+
+  - id: trust-boundaries-authz
+    version: '0.1.0'
+    name: 'Trust Boundaries & Authorization Architecture'
+    path: skills/upstream/trust-boundaries-authz/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [architecture, security, authz, trust-boundary, upstream]
+    severity: critical
+    recommended: true
+    description: 'Ensure designs define trust boundaries, authn/authz responsibilities, and propagation of identity/claims across services.'
+
+  - id: pr-template-qa
+    version: '0.1.0'
+    name: 'PRテンプレート品質チェック'
+    path: skills/upstream/pr-template-qa/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [process, documentation, upstream]
+    severity: minor
+    recommended: false
+    description: 'PRテンプレートの必須項目（日本語記載、Diataxis、検証コマンド、チェックリスト）が明確かを確認し、抜けや誤解を生む文言を指摘する'
+
+  - id: plangate-plan-integrity
+    version: '0.1.0'
+    name: 'PlanGate 計画整合性チェック'
+    path: skills/upstream/plangate-plan-integrity/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [plangate, planning, integrity, traceability, upstream]
+    severity: major
+    recommended: false
+    description: 'pbi-input, plan, todo, test-cases 間の整合性をチェックし、実装着手前の仕様漏れを検知する'
+
+  - id: plan-review-gate
+    version: '0.2.1'
+    name: '実装計画レビューゲート'
+    path: skills/upstream/plan-review-gate/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [plangate, plan-review, human-approval, safety, upstream, stop-work]
+    severity: major
+    recommended: false
+    description: '実装計画（plan.md / pbi-input.md）に含まれる危険操作・Do Not Touch スコープ・人間承認必須条件を検出し、AI 自律実行前のゲートとして機能する'
+
+  - id: plangate-exec-conformance
+    version: '0.1.0'
+    name: 'PlanGate Exec Conformance Guard'
+    path: skills/upstream/plangate-exec-conformance/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [plangate, conformance, exec, plan, todo, test-cases, upstream]
+    severity: major
+    recommended: false
+    description: '実装差分が plan / todo / test-cases アーティファクトの方針と一致しているかを検査し、逸脱・漏れ・意図外変更を検知する'
+
+  - id: plangate-tdd-evidence
+    version: '0.1.0'
+    name: 'PlanGate TDD Evidence Review'
+    path: skills/upstream/plangate-tdd-evidence/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [plangate, tdd, evidence, verification, upstream]
+    severity: major
+    recommended: false
+    description: 'TDD を主張する実装の RED/GREEN/REFACTOR VERIFY 証跡（tdd-ledger）の妥当性を検査し、フェーズ順序・exitCode・test-cases との対応の欠落や偽装を検知する'
+
+  - id: plangate-verification-audit
+    version: '0.1.0'
+    name: 'PlanGate 検証監査 (W チェック)'
+    path: skills/upstream/plangate-verification-audit/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [plangate, verification, w-check, audit, upstream]
+    severity: major
+    recommended: false
+    description: '既存のレビュー結果 (review-self / review-external) を再点検し、漏れ・誤検知・ハルシネーション・根拠欠落を検出する W チェック skill'
+
+  - id: plangate-gc-deterministic
+    version: '0.1.0'
+    name: 'PlanGate 決定論的 GC 判定'
+    path: skills/upstream/plangate-gc-deterministic/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [plangate, gc, maintenance, deterministic, upstream]
+    severity: minor
+    recommended: false
+    description: 'artifact / memory / log に対して retention 設定 + hard guards + excludes から決定論的に KEEP/REMOVE を判定する GC skill'
+
+  - id: plangate-rule-promotion
+    version: '0.1.0'
+    name: 'PlanGate ルール昇格判定'
+    path: skills/upstream/plangate-rule-promotion/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [plangate, rule-promotion, governance, skill-registry, upstream]
+    severity: info
+    recommended: false
+    description: '運用で発見されたレビューパターンを分析し、新 skill への昇格候補 / 既存 skill 更新候補 / 人間判断が必要な項目に分類する'
+
+  - id: context-budget-tuning
+    version: '0.1.0'
+    name: 'Context Budget Tuning'
+    path: skills/upstream/context-budget-tuning/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [configuration, context, process, upstream]
+    severity: minor
+    recommended: false
+    description: '.river-review.{yaml,json} の context.budget / ranking / reviewMode 設定をモデル仕様とリポジトリ規模に合わせて調整するレビュー観点'
+
+  - id: eval-driven-skill-design
+    version: '0.2.0'
+    name: 'Eval-Driven Skill Design'
+    path: skills/upstream/eval-driven-skill-design/SKILL.md
+    category: upstream
+    phase: upstream
+    tags: [skill-authoring, eval, process, upstream]
+    severity: minor
+    recommended: false
+    description: '新規・変更 skill の fixture/eval と、WITH/WITHOUT の paired ablation による限界寄与の評価可能性を確認し、activation と effectiveness を分離して案内する'
+
+# ------------------------------------------------------------------
+# Skill Packs (distribution units for bundled open review knowledge)
+# Schema: schemas/pack.schema.json / Design: docs/development/skill-pack-design.md
+# Resolution: `--skill-set <id>` checks packs first, then recommendations.
+# ------------------------------------------------------------------
+packs:
+  - id: typescript
+    version: '0.2.0'
+    name: 'TypeScript Review Pack'
+    description: 'TypeScript の型安全・null 安全・型駆動設計のレビュー基準'
+    axis: technology
+    tier: official
+    sources:
+      - name: 'TypeScript Handbook'
+        version: 'TS 5.x'
+        url: 'https://www.typescriptlang.org/docs/handbook/'
+        reviewed_at: '2026-06-10'
+    skills:
+      - typescript-strict
+      - typescript-nullcheck
+      - type-driven-design
+
+  # 設計手法軸の実証 pack（skill-pack-design.md §3）。
+  # degraded mode: bounded-context は artifact / 設計ドキュメント差分にのみ反応し、
+  # diff 単体のリポジトリでは ubiquitous-language-naming / type-driven-design が
+  # 空振りを防ぐ。
+  - id: ddd
+    version: '0.2.0'
+    name: 'Domain-Driven Design Review Pack'
+    description: '境界づけられたコンテキスト・ユビキタス言語・型駆動のドメインモデリングのレビュー基準'
+    axis: methodology
+    tier: community
+    sources:
+      - name: 'Domain-Driven Design (Eric Evans)'
+        version: '2003 / Evans classification'
+        url: 'https://www.domainlanguage.com/ddd/'
+        reviewed_at: '2026-06-10'
+    skills:
+      - bounded-context-language
+      - type-driven-design
+      - ubiquitous-language-naming
+
+  - id: react-router
+    version: '0.2.0'
+    name: 'React Router Review Pack'
+    description: 'React Router v7 (framework mode) の data loading / action 契約 / ErrorBoundary のレビュー基準'
+    axis: technology
+    tier: community
+    sources:
+      - name: 'React Router Docs (framework mode)'
+        version: 'v7'
+        url: 'https://reactrouter.com/start/framework/data-loading'
+        reviewed_at: '2026-06-11'
+    skills:
+      - react-router-loader-boundary
+      - react-router-action-contract
+
+  - id: laravel
+    version: '0.2.0'
+    name: 'Laravel Review Pack'
+    description: 'Laravel 12 の Eloquent クエリ効率 / migration 安全性 / mass assignment・認可のレビュー基準'
+    axis: technology
+    tier: community
+    sources:
+      - name: 'Laravel Documentation'
+        version: '12.x'
+        url: 'https://laravel.com/docs/12.x'
+        reviewed_at: '2026-06-11'
+    skills:
+      - laravel-eloquent-nplus1
+      - laravel-migration-safety
+      - laravel-mass-assignment
+
+  - id: gha-security
+    version: '0.2.0'
+    name: 'GitHub Actions Security Pack'
+    description: 'GitHub Actions workflow のスクリプトインジェクション / pwn request / 権限・ピン留めのセキュリティレビュー基準'
+    axis: concern
+    tier: community
+    sources:
+      - name: 'GitHub — Secure use of GitHub Actions'
+        version: '2026-06'
+        url: 'https://docs.github.com/en/actions/reference/security/secure-use'
+        reviewed_at: '2026-06-11'
+      - name: 'GitHub Security Lab — pwn requests / untrusted input'
+        version: '2026-06'
+        url: 'https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/'
+        reviewed_at: '2026-06-11'
+    skills:
+      - gha-workflow-security
+
+  - id: tailwind
+    version: '0.1.0'
+    name: 'Tailwind CSS Review Pack'
+    description: 'Tailwind CSS の utility class 衛生（任意値の濫用 / クラス競合 / 任意カラーのトークン迂回）のレビュー基準'
+    axis: technology
+    tier: community
+    sources:
+      - name: 'Tailwind CSS Docs — Theme'
+        version: 'v3/v4'
+        url: 'https://tailwindcss.com/docs/theme'
+        reviewed_at: '2026-06-11'
+      - name: 'Tailwind CSS Docs — Using arbitrary values'
+        version: 'v3/v4'
+        url: 'https://tailwindcss.com/docs/adding-custom-styles#using-arbitrary-values'
+        reviewed_at: '2026-06-11'
+    skills:
+      - tailwind-class-hygiene
+
+  - id: vitest
+    version: '0.1.0'
+    name: 'Vitest Review Pack'
+    description: 'Vitest のテスト分離（mock/spy 復元・非同期 assertion の await・共有可変状態）のレビュー基準'
+    axis: technology
+    tier: community
+    sources:
+      - name: 'Vitest Docs — Vi (mock utilities)'
+        version: 'v1/v2'
+        url: 'https://vitest.dev/api/vi.html'
+        reviewed_at: '2026-06-11'
+      - name: 'Vitest Docs — restoreMocks config'
+        version: 'v1/v2'
+        url: 'https://vitest.dev/config/#restoremocks'
+        reviewed_at: '2026-06-11'
+    skills:
+      - vitest-mock-isolation
+
+  - id: firebase
+    version: '0.1.0'
+    name: 'Firebase / Supabase (BaaS) Security Pack'
+    description: 'BaaS の認可境界（Firebase Security Rules の過剰許可 / Supabase RLS の無効化・過剰 policy / 機密鍵のクライアント露出）のレビュー基準'
+    axis: concern
+    tier: community
+    sources:
+      - name: 'Firebase — Security Rules basics'
+        version: '2026-06'
+        url: 'https://firebase.google.com/docs/rules/basics'
+        reviewed_at: '2026-06-11'
+      - name: 'Firebase — Rules and Auth'
+        version: '2026-06'
+        url: 'https://firebase.google.com/docs/rules/rules-and-auth'
+        reviewed_at: '2026-06-11'
+      - name: 'Supabase — Row Level Security'
+        version: '2026-06'
+        url: 'https://supabase.com/docs/guides/database/postgres/row-level-security'
+        reviewed_at: '2026-06-11'
+    skills:
+      - firebase-security-rules
+      - supabase-rls-policy
+
+  - id: nextjs
+    version: '0.1.0'
+    name: 'Next.js Review Pack'
+    description: 'Next.js App Router の client/server 境界と Server Actions の認証・認可・入力検証のレビュー基準'
+    axis: technology
+    tier: community
+    sources:
+      - name: 'Next.js Docs — Server Actions: Authentication and authorization'
+        version: 'App Router'
+        url: 'https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#authentication-and-authorization'
+        reviewed_at: '2026-06-11'
+      - name: 'Next.js Blog — How to Think About Security in Next.js'
+        version: '2026-06'
+        url: 'https://nextjs.org/blog/security-nextjs-server-components-actions'
+        reviewed_at: '2026-06-11'
+    skills:
+      - nextjs-app-router-boundary
+      - nextjs-server-action-security
+
+# Recommended skill sets
+# NOTE: new additions are frozen (skill-pack-design.md §2). New bundles go to
+# `packs:` above. A name that collides with a pack id resolves to the pack
+# (with a warning) and the recommendation entry will be removed in Phase D.
+recommendations:
+  basic:
+    description: 'Basic skill set for getting started'
+    skills:
+      - security-basic
+      - logging-observability
+
+  typescript:
+    description: 'DEPRECATED: superseded by the `typescript` pack (security/logging moved out; use `--skill-set typescript,basic` for the old behavior)'
+    skills:
+      - typescript-strict
+      - typescript-nullcheck
+      - type-driven-design
+      - security-basic
+      - logging-observability
+
+  comprehensive:
+    description: 'Comprehensive review coverage'
+    skills:
+      - multitenancy-isolation
+      - security-basic
+      - logging-observability
+      - typescript-strict
+      - typescript-nullcheck
+      - type-driven-design
+      - review-automation-boundary
+
+  review-quality:
+    description: 'Skills that maximize human review value by pushing automatable concerns to CI'
+    skills:
+      - review-automation-boundary
+      - review-comment-triage
+      - review-policy-standard-midstream
+
+  adversarial:
+    description: 'Adversarial review skills for cognitive bias countermeasures'
+    skills:
+      - pre-mortem
+      - war-game
+      - logic-torturing
+      - self-contradiction
+      - refactor-claim-audit
+      - cross-file-leakage
+
+  multitenancy:
+    description: 'Recommended skills for multi-tenant SaaS applications'
+    skills:
+      - multitenancy-isolation
+      - security-basic
+
+  pre-exec:
+    description: 'Pre-execution review gate: requirements / design / plan checks before implementation'
+    skills:
+      - requirements-acceptance
+      - architecture-validation-plan
+      - plangate-plan-integrity
