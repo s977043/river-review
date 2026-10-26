@@ -11,6 +11,12 @@ ignore_paths = [
   ".claude/**",
   "node_modules/**",
   "skills/*/fixtures/**",
+  # plugin-dist/river-review/ is a generated copy of the paths above
+  # (scripts/build-plugin-dist.mjs). The root patterns are anchored, so the
+  # copies need their own entries or the same files are scored twice.
+  "plugin-dist/river-review/scripts/**",
+  "plugin-dist/river-review/skills/*/*/fixtures/**",
+  "plugin-dist/river-review/skills/*/fixtures/**",
   # False positives: these files contain secret-pattern regexes (redactor),
   # eval-detection logic, and path strings — not actual secrets or dynamic eval.
   "src/lib/review-engine.mjs",

@@ -79,7 +79,7 @@ exclude = [
 # CHANGELOG.md is release-please-generated and references many issue/PR URLs;
 # older entries point at the pre-rename repo name (s977043/river-reviewer) and
 # to issues that 404 over time, which is not actionable. Skip it (#1065).
-exclude_path = ["pages/index\\.md$", "pages/index\\.en\\.md$", "CHANGELOG\\.md$"]
+exclude_path = ["pages/index\\.md$", "pages/index\\.en\\.md$", "CHANGELOG\\.md$", "(^|/)plugin-dist/"]
 
 # Accept status codes
 # Redirects are handled by max_redirects (not listed here to ensure permanent redirects are visible in logs)

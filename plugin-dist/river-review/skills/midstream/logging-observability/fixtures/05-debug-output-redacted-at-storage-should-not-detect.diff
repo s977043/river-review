@@ -1,0 +1,14 @@
+diff --git a/src/lib/notification-dispatch.mjs b/src/lib/notification-dispatch.mjs
+index 1111111..2222222 100644
+--- a/src/lib/notification-dispatch.mjs
++++ b/src/lib/notification-dispatch.mjs
+@@ -12,6 +12,9 @@ export async function dispatchNotification(payload) {
+   const rawResponse = await callProvider(payload);
+   const parsed = parseProviderResponse(rawResponse);
+   const redacted = parsed.map((entry) => redactSecrets(entry));
++  // Debug aid for parse failures: keep the raw provider response so we can
++  // inspect it when parseProviderResponse() returns null. Redact at the
++  // storage site so every future consumer receives the masked value.
++  debug.rawProviderResponse = redactSecrets(rawResponse);
+   return { entries: redacted, debug };
+ }
