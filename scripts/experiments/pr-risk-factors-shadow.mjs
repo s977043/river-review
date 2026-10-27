@@ -1,4 +1,8 @@
-import { classifyChangedFiles, isCIWorkflowFile, isDependencyFile } from '../../src/lib/file-classifier.mjs';
+import {
+  classifyChangedFiles,
+  isCIWorkflowFile,
+  isDependencyFile,
+} from '../../src/lib/file-classifier.mjs';
 import { findSensitiveCodePaths } from '../../src/lib/sensitive-code-paths.mjs';
 
 const SHA = /^[a-f0-9]{40}$/i;
@@ -51,11 +55,13 @@ export function assessPrRiskFactorsShadow(input) {
   const floors = new Set();
   const signals = new Set();
   const validHead = typeof head === 'string' && SHA.test(head);
-  const manifestValid = validFiles(files);
+  const pathManifestValid = validFiles(files);
+  const manifestValid = pathManifestValid && boundEvidence(value.change, head);
   let riskFloor = 'unknown';
 
   if (!validHead) reasons.add('invalid-subject-sha');
-  if (!manifestValid) reasons.add('invalid-change-manifest');
+  if (!pathManifestValid) reasons.add('invalid-change-manifest');
+  if (pathManifestValid && !manifestValid) reasons.add('missing-or-stale-change');
 
   const raise = (level, reason) => {
     if (riskFloor === 'unknown' || RANK[level] > RANK[riskFloor]) riskFloor = level;
