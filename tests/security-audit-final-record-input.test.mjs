@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  inspectSecurityAuditFinalRecordInput,
-} from '../scripts/security-audit-final-record-input.mjs';
+import * as auditPreflight from '../scripts/security-audit-final-record-input.mjs';
 import { deriveSecurityAuditCoverage } from '../src/lib/security-audit-coverage.mjs';
 import { buildSecurityAuditRunRecord } from '../src/lib/security-audit-report.mjs';
+
+const inspect = auditPreflight.inspectSecurityAuditFinalRecordInput;
 
 const frozenTarget = { repository: 'example/app', revision: 'deadbeef' };
 const sourceAnchor = {
@@ -37,50 +37,40 @@ function established(evidenceRefs = [sourceAnchor]) {
 
 describe('Phase 8 frozen audit record input (no verifier execution)', () => {
   it('accepts a consistent digest, exact target and anchored established finding', () => {
-    const result = inspectSecurityAuditFinalRecordInput(record([established()]), frozenTarget);
+    const result = inspect(record([established()]), frozenTarget);
     assert.deepEqual(result, { inputReady: true, blockers: [] });
   });
 
   it('does not claim safety from zero findings', () => {
-    assert.deepEqual(inspectSecurityAuditFinalRecordInput(record(), frozenTarget), {
+    assert.deepEqual(inspect(record(), frozenTarget), {
       inputReady: true,
       blockers: [],
     });
   });
 
   it('rejects malformed and missing run records', () => {
-    assert.deepEqual(inspectSecurityAuditFinalRecordInput(null, frozenTarget), {
+    assert.deepEqual(inspect(null, frozenTarget), {
       inputReady: false,
       blockers: ['record_missing'],
     });
     const mismatched = { ...record(), executionPolicy: 'unrestricted' };
-    const result = inspectSecurityAuditFinalRecordInput(mismatched, frozenTarget);
+    const result = inspect(mismatched, frozenTarget);
     assert.equal(result.inputReady, false);
     assert.ok(result.blockers.includes('unsupported_record_contract'));
   });
 
   it('rejects changed source revision even when the producer recalculates a valid digest', () => {
     const changed = record([established()], { ...frozenTarget, revision: 'new-revision' });
-    assert.equal(inspectSecurityAuditFinalRecordInput(changed, frozenTarget).inputReady, false);
-    assert.deepEqual(inspectSecurityAuditFinalRecordInput(changed, frozenTarget).blockers, [
-      'target_revision_mismatch',
-    ]);
+    assert.equal(inspect(changed, frozenTarget).inputReady, false);
+    assert.deepEqual(inspect(changed, frozenTarget).blockers, ['target_revision_mismatch']);
   });
 
   it('rejects a modified record and a forged digest', () => {
     const original = record([established()]);
     const changed = { ...original, findings: [] };
-    assert.ok(
-      inspectSecurityAuditFinalRecordInput(changed, frozenTarget).blockers.includes(
-        'record_digest_mismatch'
-      )
-    );
+    assert.ok(inspect(changed, frozenTarget).blockers.includes('record_digest_mismatch'));
     const malformed = { ...original, recordDigest: '0'.repeat(64) };
-    assert.ok(
-      inspectSecurityAuditFinalRecordInput(malformed, frozenTarget).blockers.includes(
-        'record_digest_mismatch'
-      )
-    );
+    assert.ok(inspect(malformed, frozenTarget).blockers.includes('record_digest_mismatch'));
   });
 
   it('requires a repository-relative source anchor for established findings', () => {
@@ -94,16 +84,13 @@ describe('Phase 8 frozen audit record input (no verifier execution)', () => {
       [{ kind: 'source', path: 'src/auth/session.mjs', lineStart: 10, lineEnd: 9 }],
       [{ kind: 'documentation', path: 'README.md', lineStart: 1, lineEnd: 2 }],
     ]) {
-      const result = inspectSecurityAuditFinalRecordInput(
-        record([established(evidenceRefs)]),
-        frozenTarget
-      );
+      const result = inspect(record([established(evidenceRefs)]), frozenTarget);
       assert.deepEqual(result.blockers, ['established_source_anchor_missing']);
     }
   });
 
   it('does not promote unresolved or refuted findings through this input gate', () => {
-    const result = inspectSecurityAuditFinalRecordInput(
+    const result = inspect(
       record([
         {
           id: 'SA-2',
@@ -120,7 +107,7 @@ describe('Phase 8 frozen audit record input (no verifier execution)', () => {
   });
 
   it('refuses a missing frozen host target rather than trusting the producer target', () => {
-    const result = inspectSecurityAuditFinalRecordInput(record([established()]), undefined);
+    const result = inspect(record([established()]), undefined);
     assert.equal(result.inputReady, false);
     assert.deepEqual(result.blockers, ['target_revision_mismatch']);
   });
