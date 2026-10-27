@@ -30,7 +30,7 @@
 ### 2-bis. Fresh Context Plan Review（任意 / 対象限定）
 
 - **対象**: `design` / `implementation_plan` のうち、既存の分類・リスクで設計の不確実性が高い変更に限る。小さな低リスク変更は適用不要。
-- **実行**: `templates/fresh-context-plan-review-template.md` を使い、ComprehensionとImplementation Readinessを確認する。Reviewerはread-onlyであり、Planや実装を修正しない。
+- **実行**: `templates/fresh-context-plan-review-template.md` を使い、ComprehensionとImplementation Readinessを確認する。Reviewerはread-only運用とし、Planや実装を修正しない。ただし、この文書だけではツールの書込権限は剥奪されない。技術的なread-only保証にはHost側の権限制御が必要。
 - **独立性**: 同じ会話での自己レビューと、会話履歴なしの新規subagent/sessionによるレビューを区別する。起動手段やHost由来の実行証跡が無い場合は独立性 `unknown` として扱い、独立レビュー完了とは記録しない。
 - **情報境界**: 対象文書・明示された参照資料・最小限の制約を渡し、hidden CoT・会話履歴・先行レビュー結論を渡さない。読み手が推測しなければ埋まらない前提をFindingにする。
 - **結果**: 既存Severity・Finding形式で独立のadvisory記録を作り、Coverageに関する事実は既存のHost記録だけを参照する。既存のproduction runtimeやGateには接続しない。レビュー未実行を `findings=0` と同一視せず、承認・Gate・mergeを行わない。
