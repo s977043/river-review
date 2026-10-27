@@ -25,6 +25,7 @@ test('ordinary source remains medium even with all self-reported evidence', () =
   const result = assessPrRiskFactorsShadow(observation());
   checkSafety(result);
   assert.equal(result.assessmentStatus, 'reported');
+  assert.equal(result.axes.impact, 'path-reported');
   assert.equal(result.riskFloor, 'medium');
   assert.equal(result.axes.verification, 'reported-complete');
 });
