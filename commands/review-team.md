@@ -1,7 +1,7 @@
 ---
 description: 'Run review-team skill: parallel multi-role review with consensusLevel and Tech Lead report'
-argument-hint: '[pr-number] [role1,role2,...]'
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*), Bash(mktemp -d:*), Bash(git worktree add --detach:*), Bash(git worktree remove:*)
+argument-hint: '[pr-number | path...] [role1,role2,...]'
+allowed-tools: Read, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*), Bash(mktemp -d:*), Bash(git worktree add --detach:*), Bash(git worktree remove:*)
 ---
 
 スキル定義: `skills/agent-skills/review-team/SKILL.md`
@@ -15,7 +15,15 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git f
 
 引数: `$ARGUMENTS`
 
-引数のうち数字だけのトークンを PR 番号 `N`、それ以外をロール指定（Step 1）として扱う。対象の差分は次の順で決める。
+引数のうち、存在するファイルまたはディレクトリを指すトークンを対象パス、数字だけのトークンを PR 番号 `N`、それ以外をロール指定（Step 1）として扱う。
+
+対象パスがある場合は、差分ではなくそのファイルの全文を対象にする（実装前の設計書・仕様・計画のレビュー用）。ディレクトリは配下のファイルを対象にする。PR 番号と併用された場合は、対象を決められない旨を出力して終了する。この経路では以降の差分の解決を行わず、次を適用する。
+
+- ロール指定が無い場合の `auto` は、ファイル種別に加えて `stage: plan` signal を与えた扱いで選ぶ（SKILL.md「Stage / risk signal による選択」）
+- `river` CLI は差分を前提にするため使わず、スキル駆動でレビューする
+- 全文が対象なので、finding の `scope` はすべて `in-diff` とする
+
+対象パスが無い場合、対象の差分は次の順で決める。
 
 1. 引数に PR 番号 `N` がある場合: `gh pr diff N` を diff とし、`gh pr view N --json headRefOid,files` を対象コミットと変更統計とする。ローカルの作業ツリーやブランチの diff は使わない。
 2. 引数に PR 番号が無く、現ブランチに open の PR がある場合（`gh pr view --json number,state --jq 'select(.state=="OPEN") | .number'` が番号を出力する場合）: その PR を対象にし、1 と同じコマンドで取得する。`gh pr view` は同名ブランチのマージ済み・クローズ済み PR にも一致するため、open 以外は使わない。未コミットの変更（`git diff` / `git diff --cached`）があれば、PR の diff に加えてレビューする。
@@ -25,13 +33,14 @@ allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git f
 
 出力の 1 行目に、使った対象を次のいずれかで書く。
 
+- `対象: ファイル全文（<パスの一覧>）`
 - `対象: PR #N（gh pr diff N / head <headRefOid>）`
 - `対象: 現ブランチの PR #N（gh pr diff N / head <headRefOid>）`（未コミットの変更を含めた場合は `+ 未コミットの変更` を付ける）
 - `対象: ローカル diff（git diff <base>...HEAD + 未コミットの変更）`
 
 ## Task
 
-`review-team` スキルの手順に従い、上で決めた対象の差分をレビュー・チームで検査する。
+`review-team` スキルの手順に従い、上で決めた対象（差分またはファイル全文）をレビュー・チームで検査する。
 
 ### Step 1: ロールを決定する
 
