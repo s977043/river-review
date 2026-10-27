@@ -27,6 +27,15 @@
 - **stop conditions**: テンプレの必須観点を飛ばしている。
 - **human escalation**: 外部仕様・料金・規約の確認が必要で内部情報だけでは判断できない。
 
+### 2-bis. Fresh Context Plan Review（任意 / 対象限定）
+
+- **対象**: `design` / `implementation_plan` のうち、既存の分類・リスクで設計の不確実性が高い変更に限る。小さな低リスク変更は適用不要。
+- **実行**: `templates/fresh-context-plan-review-template.md` を使い、ComprehensionとImplementation Readinessを確認する。Reviewerはread-onlyであり、Planや実装を修正しない。
+- **独立性**: 同じ会話での自己レビューと、会話履歴なしの新規subagent/sessionによるレビューを区別する。起動手段やHost由来の実行証跡が無い場合は独立性 `unverified` として扱い、独立レビュー完了とは記録しない。
+- **情報境界**: 対象文書・明示された参照資料・最小限の制約を渡し、hidden CoT・会話履歴・先行レビュー結論を渡さない。読み手が推測しなければ埋まらない前提をFindingにする。
+- **結果**: 既存のSeverity・Finding・Coverageに統合する。Advisoryの結果だけで承認・Gate・mergeを行わず、レビュー未実行を `findings=0` と同一視しない。
+- **重複/過剰設計の抑制**: 既存レビューで検出済みの欠落を再計上せず、実装者に委譲可能な詳細まで事前固定を要求しない。
+
 ## 3. Risk Assessment
 
 - **input**: findings。
