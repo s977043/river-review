@@ -46,7 +46,7 @@ test('self-review workflow keeps uploading the run record artifact (#2396)', () 
 
 test('self-review checkout never persists git credentials (#2806)', () => {
   const checkout =
-    /- name: Checkout\n\s+uses: actions\\/checkout@[^\n]+\n\s+with:\n((?: {10}[^\n]*\n)+)/.exec(
+    /- name: Checkout\n\s+uses: actions\/checkout@[^\n]+\n\s+with:\n((?: {10}[^\n]*\n)+)/.exec(
       workflow
     )?.[1];
   assert.ok(checkout, 'Checkout with: block not found');
