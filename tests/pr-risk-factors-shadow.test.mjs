@@ -37,6 +37,14 @@ test('docs-only changed paths have provisional low floor but no approval authori
   assert.deepEqual(result.hardFloorReasons, []);
 });
 
+test('component test-only files remain provisional low, not high-risk source changes', () => {
+  const value = observation(['src/auth/login.spec.vue', 'app/payments/checkout.test.svelte']);
+  const result = assessPrRiskFactorsShadow(value);
+  checkSafety(result);
+  assert.equal(result.riskFloor, 'low');
+  assert.ok(!result.hardFloorReasons.includes('sensitive-source'));
+});
+
 test('one-line auth risk cannot be averaged down by passed checks or rollback claims', () => {
   const result = assessPrRiskFactorsShadow(observation(['src/auth/login.ts']));
   checkSafety(result);
