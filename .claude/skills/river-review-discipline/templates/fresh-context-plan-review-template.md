@@ -16,7 +16,7 @@
 - 許可された参照: Canonical Plan / PBI / AC / TODO / test-cases / 既存コードの該当箇所:
 - 参照できなかった必須資料（推測で補わない）:
 - Reviewerの実行環境 / session分離の証跡（Hostで検証できた事実のみ）:
-- 独立性: `verified` / `unverified`（役割名・自己申告だけではverifiedにしない）:
+- 独立性: `verified` / `unverified`。`verified` はHostが示す新規session/subagent生成、渡した入力の範囲、対象revisionの証跡が揃う場合のみ（Role名や自己申告では不可）:
 - Review Coverage（観測した場合のみ）: `complete` / `partial` / `not_executed`（未取得を `complete` や `not_executed` と推測しない）:
 
 ## Comprehension / 初見理解
