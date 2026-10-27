@@ -95,7 +95,11 @@ describe('Phase 8 frozen audit record input (no verifier execution)', () => {
     const bigint = record();
     bigint.unsafe = 1n;
     const invalidDigest = record();
-    invalidDigest.recordDigest = { toString: () => { throw new Error('unsafe coercion'); } };
+    invalidDigest.recordDigest = {
+      toString: () => {
+        throw new Error('unsafe coercion');
+      },
+    };
 
     for (const candidate of [cyclic, bigint, invalidDigest]) {
       const result = inspect(candidate, frozenTarget);
@@ -105,7 +109,7 @@ describe('Phase 8 frozen audit record input (no verifier execution)', () => {
   });
 
   it('rejects control characters in source path anchors', () => {
-    for (const path of ['src/auth\\nspoof.mjs', 'src/auth\\rspoof.mjs', 'src/auth\\tspoof.mjs']) {
+    for (const path of ['src/auth\nspoof.mjs', 'src/auth\rspoof.mjs', 'src/auth\tspoof.mjs']) {
       const result = inspect(record([established([{ ...sourceAnchor, path }])]), frozenTarget);
       assert.deepEqual(result.blockers, ['established_source_anchor_missing']);
     }
