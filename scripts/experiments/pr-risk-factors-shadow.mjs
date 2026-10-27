@@ -9,6 +9,7 @@ const SHA = /^[a-f0-9]{40}$/i;
 const MAX_FILES = 500;
 const RANK = { low: 0, medium: 1, high: 2 };
 const POLICY_PATHS = new Set(['.river/risk-map.yaml', '.river-review.json', '.small_change']);
+const COMPONENT_TEST_FILE = /\.(?:test|spec)\.(?:vue|svelte|astro|cs|swift|dart)$/i;
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -70,8 +71,10 @@ export function assessPrRiskFactorsShadow(input) {
 
   if (manifestValid) {
     const types = classifyChangedFiles(files);
-    const docsTestOnly =
-      types.docs.length + types.test.length === files.length && files.length > 0;
+    const docsTestOnly = files.every(
+      (file) =>
+        types.docs.includes(file) || types.test.includes(file) || COMPONENT_TEST_FILE.test(file)
+    );
     riskFloor = docsTestOnly ? 'low' : 'medium';
     if (!docsTestOnly) signals.add('non-docs-test-change');
 
