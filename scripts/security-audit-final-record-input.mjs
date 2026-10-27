@@ -18,6 +18,7 @@ function isRepositoryRelativePath(path) {
     !path.startsWith('/') &&
     !path.includes('\\') &&
     !path.includes('\0') &&
+    !/[\u0000-\u001f\u007f]/.test(path) &&
     !/^[a-zA-Z]:/.test(path) &&
     path.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
   );
@@ -78,9 +79,15 @@ export function inspectSecurityAuditFinalRecordInput(record, frozenTarget) {
   }
 
   const { recordDigest, ...payload } = record;
-  if (!SHA256_HEX.test(recordDigest) || sha256Hex(canonicalJson(payload)) !== recordDigest) {
-    blockers.push('record_digest_mismatch');
+  let digestMatches = false;
+  if (typeof recordDigest === 'string' && SHA256_HEX.test(recordDigest)) {
+    try {
+      digestMatches = sha256Hex(canonicalJson(payload)) === recordDigest;
+    } catch {
+      // Reject malformed/non-JSON producer input rather than throwing from preflight.
+    }
   }
+  if (!digestMatches) blockers.push('record_digest_mismatch');
 
   if (!Array.isArray(record.findings)) {
     blockers.push('findings_missing');

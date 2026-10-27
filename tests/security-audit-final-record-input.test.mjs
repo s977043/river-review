@@ -89,6 +89,28 @@ describe('Phase 8 frozen audit record input (no verifier execution)', () => {
     }
   });
 
+  it('fails closed rather than throwing on malformed producer-owned digest inputs', () => {
+    const cyclic = record();
+    cyclic.unsafe = cyclic;
+    const bigint = record();
+    bigint.unsafe = 1n;
+    const invalidDigest = record();
+    invalidDigest.recordDigest = { toString: () => { throw new Error('unsafe coercion'); } };
+
+    for (const candidate of [cyclic, bigint, invalidDigest]) {
+      const result = inspect(candidate, frozenTarget);
+      assert.equal(result.inputReady, false);
+      assert.ok(result.blockers.includes('record_digest_mismatch'));
+    }
+  });
+
+  it('rejects control characters in source path anchors', () => {
+    for (const path of ['src/auth\\nspoof.mjs', 'src/auth\\rspoof.mjs', 'src/auth\\tspoof.mjs']) {
+      const result = inspect(record([established([{ ...sourceAnchor, path }])]), frozenTarget);
+      assert.deepEqual(result.blockers, ['established_source_anchor_missing']);
+    }
+  });
+
   it('does not promote unresolved or refuted findings through this input gate', () => {
     const result = inspect(
       record([
