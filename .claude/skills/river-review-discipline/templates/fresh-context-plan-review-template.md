@@ -17,7 +17,7 @@
 - 参照できなかった必須資料（推測で補わない）:
 - Reviewerの実行環境 / session分離の証跡（Hostで検証できた事実のみ）:
 - 独立性: `verified` / `unverified`（役割名・自己申告だけではverifiedにしない）:
-- 実行状態: executed / partial / not_executed（既存Coverageの事実と区別せずに推測しない）:
+- Review Coverage（観測した場合のみ）: `complete` / `partial` / `not_executed`（未取得を `complete` や `not_executed` と推測しない）:
 
 ## Comprehension / 初見理解
 
