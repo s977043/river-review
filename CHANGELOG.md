@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.137.0](https://github.com/s977043/river-review/compare/v1.136.0...v1.137.0) (2026-10-27)
+
+
+### Features
+
+* **risk:** add five-factor shadow assessment with hard floors ([#2805](https://github.com/s977043/river-review/issues/2805)) ([d819c42](https://github.com/s977043/river-review/commit/d819c42a5ef7ef7217201dedcd9b546735ac270a))
+
+
+### Bug Fixes
+
+* **ci:** reduce self-review checkout credential and token scope ([#2808](https://github.com/s977043/river-review/issues/2808)) ([df5ce89](https://github.com/s977043/river-review/commit/df5ce89cd00f0d13f7c536a260a42d6fd7cffb7b))
+* **output:** HTML でも LLM 未実行時の判定・スコアを参考値として表示する ([#2815](https://github.com/s977043/river-review/issues/2815)) ([d862b57](https://github.com/s977043/river-review/commit/d862b570c907199517f85230b023adfcb263e93f))
+* **render:** flag unexecuted LLM review instead of a clean auto-approve surface ([#2812](https://github.com/s977043/river-review/issues/2812)) ([#2814](https://github.com/s977043/river-review/issues/2814)) ([9c6d6de](https://github.com/s977043/river-review/commit/9c6d6de5824570a983d660c3c64fb5b352fafae8))
+
 ## [1.136.0](https://github.com/s977043/river-review/compare/v1.135.0...v1.136.0) (2026-10-25)
 
 
