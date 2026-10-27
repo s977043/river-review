@@ -1,7 +1,7 @@
 ---
 description: 'Run review-team skill: parallel multi-role review with consensusLevel and Tech Lead report'
 argument-hint: '[pr-number | path...] [role1,role2,...]'
-allowed-tools: Read, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*), Bash(mktemp -d:*), Bash(git worktree add --detach:*), Bash(git worktree remove:*)
+allowed-tools: Read, Bash(git ls-files:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*), Bash(mktemp -d:*), Bash(git worktree add --detach:*), Bash(git worktree remove:*)
 ---
 
 スキル定義: `skills/agent-skills/review-team/SKILL.md`
@@ -15,13 +15,20 @@ allowed-tools: Read, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*)
 
 引数: `$ARGUMENTS`
 
-引数のうち、存在するファイルまたはディレクトリを指すトークンを対象パス、数字だけのトークンを PR 番号 `N`、それ以外をロール指定（Step 1）として扱う。
+引数の各トークンを次の順で分類し、最初に当たったものに決める。
 
-対象パスがある場合は、差分ではなくそのファイルの全文を対象にする（実装前の設計書・仕様・計画のレビュー用）。ディレクトリは配下のファイルを対象にする。PR 番号と併用された場合は、対象を決められない旨を出力して終了する。この経路では以降の差分の解決を行わず、次を適用する。
+1. `auto`、または SKILL.md のロール名（カンマ区切り可）: ロール指定（Step 1）
+2. 数字だけ: PR 番号 `N`。同名のファイルがあっても PR 番号とする（ファイルを対象にするときは `./123` と書く）
+3. 作業ツリー配下に存在するファイルまたはディレクトリ: 対象パス
+4. どれにも当たらない: 「`<トークン>` はロール名でも PR 番号でも存在するパスでもありません」と出力して終了する（パスの typo で別の対象を黙ってレビューしないため）
 
-- ロール指定が無い場合の `auto` は、ファイル種別に加えて `stage: plan` signal を与えた扱いで選ぶ（SKILL.md「Stage / risk signal による選択」）
+対象パスがある場合は、差分ではなくそのファイルの全文を対象にする（実装前の設計書・仕様・計画のレビュー用）。PR 番号と併用された場合は、対象を決められない旨を出力して終了する。この経路では以降の差分の解決を行わず、次を適用する。
+
+- 対象ファイルは `git ls-files -z --cached --others --exclude-standard -- ':(literal)<パス>'` で得る（未追跡の新しい設計書も含み、`.gitignore` 対象は除く。ディレクトリは配下を再帰）。次を除く: バイナリ、symlink（追跡中は `git ls-files -s` のモード `120000`）、AGENTS.md Safety 節の読込禁止（`.env*`・`secrets/`・`*.pem`・`*.key`）と `*.p12`・`*.pfx`・`id_rsa*`・`.npmrc`・`credentials*`・`*.tfvars`。残りが 0 件か、すべて空なら「対象が空です（`.gitignore` 対象・除外対象・作業ツリー外のパスは読みません）」と出力して終了する。20 件を超える場合は一覧を出力し、ファイルを指定して絞るよう伝えて終了する
+- ロール指定が無い場合の `auto` は、ファイル種別に加えて `stage: plan` signal を与えた扱いで選ぶ（SKILL.md「Stage / risk signal による選択」）。各ロールは担当領域を文書の記述に当てはめ、記述と実装・実在ファイルの食い違いも指摘する。対象が文書だけのときは、レポートの冒頭に「設計の妥当性は `river-review-architecture`、文書品質は `river-review-docs` が専門です」と書いてから続行する
+- 秘密らしき値（トークン・鍵・パスワード）はレポートに引用せず、伏せ字にする
 - `river` CLI は差分を前提にするため使わず、スキル駆動でレビューする
-- 全文が対象なので、finding の `scope` はすべて `in-diff` とする
+- 全文が対象なので、finding の `scope` はすべて `in-diff` とし、レポートの冒頭に「ファイル全文が対象のため scope の区別はありません」と書く。Step 3 の用語にある「本 PR の追加行」は、この経路では対象ファイルの全文と読み替える
 
 対象パスが無い場合、対象の差分は次の順で決める。
 
@@ -29,7 +36,7 @@ allowed-tools: Read, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*)
 2. 引数に PR 番号が無く、現ブランチに open の PR がある場合（`gh pr view --json number,state --jq 'select(.state=="OPEN") | .number'` が番号を出力する場合）: その PR を対象にし、1 と同じコマンドで取得する。`gh pr view` は同名ブランチのマージ済み・クローズ済み PR にも一致するため、open 以外は使わない。未コミットの変更（`git diff` / `git diff --cached`）があれば、PR の diff に加えてレビューする。
 3. 引数に PR 番号が無く、現ブランチに open の PR が無い場合（上のコマンドが何も出力しないか失敗する場合）: `git diff <base>...HEAD` と未コミットの変更（`git diff` / `git diff --cached`）を合わせて diff とする。`<base>` は `origin/<デフォルトブランチ>` とし、デフォルトブランチ名は `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name` で得る。`gh repo view` が失敗した場合（未認証など）は `git symbolic-ref --short refs/remotes/origin/HEAD` の出力から `origin/` を除いた名前を使う。それも失敗した場合は、対象を決められない旨を出力して終了する。ローカルのブランチは遅れていることがあるため、先に `git fetch origin <デフォルトブランチ>` を実行する。
 
-どの経路でも diff が空の場合だけ、「差分がありません」と伝えて終了する。
+どの経路でも diff が空の場合だけ、「差分がありません。設計書などのファイルを全文でレビューするには `/review-team <パス>` を指定してください」と伝えて終了する。
 
 出力の 1 行目に、使った対象を次のいずれかで書く。
 
@@ -44,9 +51,11 @@ allowed-tools: Read, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*)
 
 ### Step 1: ロールを決定する
 
-引数でロールが指定された場合はそれを使う。なければ `auto`（差分から自動選択）。
+引数でロールが指定された場合はそれを使う。なければ `auto`（差分から自動選択。ファイル全文が対象のときは上記「対象の解決」の選び方に従う）。
 
 ### Step 2: レビューを実行する
+
+ファイル全文が対象のときは、以下の CLI 手順を使わずスキル駆動でレビューする。
 
 River Review は npm 未公開のため `npx river-review` は使えない。**エージェントがこのスキルの手順を直接実行する**（CLI 不要）。上記 Step 1 で決めたロールを並列に走らせ、Union-Find で finding を統合し、consensusLevel と teamLeadReport を生成する。
 
