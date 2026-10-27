@@ -104,9 +104,12 @@ export function assessPrRiskFactorsShadow(input) {
     }
   }
 
-  const alignment = boundEvidence(value.alignment, head) &&
-    typeof value.alignment.planRef === 'string' && value.alignment.planRef.trim()
-    ? 'reported' : 'unknown';
+  const alignment =
+    boundEvidence(value.alignment, head) &&
+    typeof value.alignment.planRef === 'string' &&
+    value.alignment.planRef.trim()
+      ? 'reported'
+      : 'unknown';
   if (alignment === 'unknown') reasons.add('missing-or-stale-alignment');
 
   let verification = 'unknown';
@@ -131,8 +134,10 @@ export function assessPrRiskFactorsShadow(input) {
     if (value.rollback.reversibility === 'irreversible') {
       rollback = 'reported-irreversible';
       raise('high', 'reported-irreversible-change');
-    } else if (value.rollback.reversibility === 'reversible' &&
-      hasEvidenceRef(value.rollback)) {
+    } else if (
+      value.rollback.reversibility === 'reversible' &&
+      hasEvidenceRef(value.rollback)
+    ) {
       rollback = 'reported-reversible';
     }
   }
@@ -144,6 +149,9 @@ export function assessPrRiskFactorsShadow(input) {
     if (value.detection.monitoring === 'absent') detection = 'reported-absent';
   }
   if (detection === 'unknown') reasons.add('missing-or-stale-detection');
+  if (detection === 'reported-absent' && riskFloor !== 'low') {
+    reasons.add('monitoring-reported-absent');
+  }
 
   return {
     kind: 'pr-risk-factors-shadow/v1',
