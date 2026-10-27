@@ -15,6 +15,16 @@ Flow your changes from Upstream to Midstream to Downstream with clear validation
 - [ ] Schema Validation passed? (`schemas/skill.schema.json`)
 - [ ] Skill file structure validated? (`skills/*` follows schema and naming)
 
+## Reviewer Decision Brief
+
+This brief is advisory. Keep answers short, link the existing Issue / Plan / ADR or evidence, and use `N/A` with a reason for small, reversible or documentation-only changes. Do not turn missing evidence into a pass.
+
+1. **Hard-to-reverse decisions:** What is difficult to roll back, and what mitigation exists? Use `N/A` with a reason when there is no material decision.
+2. **Assumptions and failure paths:** Which assumptions and boundary cases matter, what tests or observations support them, and what remains `unknown`?
+3. **Reviewer's first challenge:** Which diff, file or decision should the reviewer question first? Link evidence, or explain `N/A` with a reason.
+
+This does not prove independent review, completed tests, or permission to merge.
+
 ## Documentation / ドキュメント
 
 Does this PR change or add documentation?
