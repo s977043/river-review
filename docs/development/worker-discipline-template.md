@@ -247,6 +247,7 @@
 - push 後に `Auto Rebuild Action Dist` bot が head を進めると、CI は `action_required` で止まる。待たずに、その旨と最新の
   head SHA を完了報告に書くこと（脱出手順は `docs/runbook/bot-pushed-head-kick.md`。オーガナイザーが自分のアカウントで
   空コミットを push する）。2026-10-07 の PR #2558 で発生した。
+- `runners/github-action/dist` への影響は、`scripts/node22.sh npm run build:action` を実行し、`git status` と `git diff --stat runners/github-action/dist` で判断すること。関数名を dist に grep しても判断できない。ncc がチャンク（例 `980.index.mjs`）に分割し、名前が残らないことがある。2026-10-28 の PR #2815 では `formatHtmlOutput` の grep が 0 件で「再ビルド不要」と報告したが、bot が `dist/980.index.mjs` などを再ビルドして push し、CI が止まった。
 - commit が失敗して lint-staged の自動 stash（"lint-staged automatic backup"）が残ったら、drop も apply もしないこと。
   `git stash list` の該当行を完了報告に転記する。2026-10-07 の PR #2556 で発生した。
 - commit message は header と本文の各行を 100 文字以内にすること（commitlint の `header-max-length` /
@@ -257,6 +258,7 @@
 - 委託プロンプトが scratchpad を指定していても、その直下へ直接書かず、ワーカーごとに一意のサブディレクトリ（`mktemp -d <scratchpad>/XXXXXX` など）を作って使うこと。2026-10-17 のウェーブでは複数のワーカーが同じ scratchpad を共有し、実行中のスクリプト（`verify.sh` / `v2.sh`）が別のワーカーに上書きされた。
 - worktree で `npm test` を実行すると `tests/plugin-task-checkpoint-hook.test.mjs` が 4 件失敗することがある（"river-review CLI not available"。常に再現するとは限らない）。CI では green なので、ローカル環境の差を疑い、CI の結果で判定すること。差分と無関係であることは、そのファイルだけを `node --test tests/plugin-task-checkpoint-hook.test.mjs` で単体実行して切り分け、完了報告に既存失敗として分離して書く（2026-10-17 のウェーブで観測）。
 - 検証コマンドをバックグラウンドで起動し、その完了通知を待ったままターンを終えないこと。待っている間にワーカーは停止し、オーガナイザーからは稼働中と区別できない。検証は同期で実行し、10 分を超えるなら打ち切ってその時点の出力と状態を報告する。委託プロンプトが `npm test` の全体実行を求めていても、上記「`npm test`（全体）を走らせないこと」を優先し、矛盾として完了報告に書く（2026-10-22 のウェーブで 2 本のワーカーが全体の `npm test` を待ったまま 13 時間止まった）。
+- 委託プロンプトが CI watch などの長時間の待機を明示的に求めている場合でも、待機が委託元の見積もり時間を超えそうなら、待機に入る前に状態を一度報告すること。途中報告が無いと、オーガナイザーからは停止と区別できない（2026-10-27 の PR #2797 のワーカーは完了まで約 13 時間かかり、途中報告が無かった）。
 ```
 
 ## 委託プロンプト骨格

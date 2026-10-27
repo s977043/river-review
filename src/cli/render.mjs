@@ -401,9 +401,12 @@ export function buildHumanDecisionSurface({ rendered, artifact, result }) {
 
   const coverageStatus = coverage?.status ?? null;
   const coverageIncomplete = coverageStatus !== null && coverageStatus !== 'complete';
+  // #2812: no unit reached the LLM, so a clean surface would read as a full review.
+  const llmNotExecuted = result?.llmNotExecuted === true;
 
   return {
     actionRequiredCount,
+    llmNotExecuted,
     humanReviewRequired,
     humanReviewFileCount: humanReviewFiles.size,
     coverageStatus,
@@ -412,7 +415,11 @@ export function buildHumanDecisionSurface({ rendered, artifact, result }) {
     timedOutUnitCount: timedOutUnits.length,
     blindSpotCount: blindSpots.length,
     hasAttentionRequired:
-      actionRequiredCount > 0 || humanReviewRequired || coverageIncomplete || blindSpots.length > 0,
+      actionRequiredCount > 0 ||
+      humanReviewRequired ||
+      coverageIncomplete ||
+      blindSpots.length > 0 ||
+      llmNotExecuted,
   };
 }
 
@@ -425,6 +432,10 @@ export function formatHumanDecisionSurfaceMarkdown(surface) {
   if (!surface?.hasAttentionRequired) return null;
 
   const lines = ['### 判断が必要な項目', ''];
+
+  if (surface.llmNotExecuted) {
+    lines.push('- LLM による意味レビュー: **未実行**（静的チェックのみ）');
+  }
 
   if (surface.actionRequiredCount > 0) {
     lines.push(`- 要対応: **${surface.actionRequiredCount} 件**`);
@@ -606,12 +617,16 @@ function isLlmFailedEmptyReview(result) {
 
 export function printMarkdownReport(result, phase) {
   if (isLlmlessEmptyReview(result)) {
+    const surface =
+      result?.llmNotExecuted === true
+        ? `\n${formatHumanDecisionSurfaceMarkdown({ llmNotExecuted: true, hasAttentionRequired: true })}`
+        : '';
     console.log(
       `${COMMENT_MARKER}
 ## River Review
 
 - フェーズ: \`${phase}\`
-- LLM レビュー未設定（\`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\` / \`GOOGLE_API_KEY\` のいずれも未設定）のため静的チェックのみ実行し、**指摘はありません**。いずれか 1 つを設定すると LLM レビューが有効になり、リポジトリ固有の規約・差分スコープ等の観点でレビューします。`
+- LLM レビュー未設定（\`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\` / \`GOOGLE_API_KEY\` のいずれも未設定）のため静的チェックのみ実行し、**指摘はありません**。いずれか 1 つを設定すると LLM レビューが有効になり、リポジトリ固有の規約・差分スコープ等の観点でレビューします。${surface}`
     );
     return;
   }
@@ -633,6 +648,9 @@ export function printMarkdownReport(result, phase) {
   const findingSections = formatFindingsSectionsMarkdown(rendered);
 
   const llmFailedEmpty = isLlmFailedEmptyReview(result);
+  // #2812: no unit reached the LLM, so the verdict and score are static-only
+  // reference values and must not read as a full-review auto-approve.
+  const llmNotExecuted = !llmFailedEmpty && result?.llmNotExecuted === true;
   const header = llmFailedEmpty
     ? `${COMMENT_MARKER}
 ## River Review
@@ -641,7 +659,15 @@ export function printMarkdownReport(result, phase) {
 - ⚠️ **LLM semantic review は未完了です。** LLM 実行エラー後の静的チェックでは最終指摘がありませんでした。
 - この結果は「指摘なし」「auto-approve」「マージ可能」を意味しません。LLM 経路を復旧して再レビューしてください。
 `
-    : `${COMMENT_MARKER}
+    : llmNotExecuted
+      ? `${COMMENT_MARKER}
+## River Review
+
+- ⚠️ **LLM による意味レビューは未実行です。** 以下の判定とスコアは静的チェックのみの参考値です。
+- この結果は「指摘なし」「auto-approve」「マージ可能」を意味しません。LLM を実行して再レビューしてください。
+- 参考値（LLM 未実行）: ${formatHeadlineMarkdown(rendered, phase, score)}
+`
+      : `${COMMENT_MARKER}
 ## River Review
 
 ${formatHeadlineMarkdown(rendered, phase, score)}
@@ -655,7 +681,7 @@ ${formatHeadlineMarkdown(rendered, phase, score)}
   const prioritySummary = llmFailedEmpty
     ? null
     : formatPrioritySummaryMarkdown(rendered, result.classified);
-  const scoreSection = llmFailedEmpty ? null : formatScoreSectionMarkdown(score);
+  const scoreSection = llmFailedEmpty || llmNotExecuted ? null : formatScoreSectionMarkdown(score);
   const executionSection = formatExecutionDetailsMarkdown(result);
   console.log(
     [

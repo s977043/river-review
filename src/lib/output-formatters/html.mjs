@@ -107,6 +107,9 @@ export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
 
   // Honor the canonical verdict if the result carries one (#1170 F3).
   const decision = resolveVerdict(result.decision, score.verdict);
+  // #2812: no unit reached the LLM, so the verdict and score are static-only
+  // reference values and must not read as a full-review auto-approve.
+  const llmNotExecuted = result.llmNotExecuted === true;
 
   const riskAssessment = result.plan?.riskAssessment;
   const riskSummary = riskAssessment
@@ -139,7 +142,14 @@ export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
 
   // Decision banner
   const dc = decision ? DECISION_CONFIG[decision] : null;
-  if (dc) {
+  if (llmNotExecuted) {
+    parts.push('<div class="banner" style="background:#fff8e1;border-color:#ef6c00">');
+    parts.push(
+      '⚠ LLM による意味レビューは未実行です（静的チェックのみ）。この結果は「指摘なし」「auto-approve」「マージ可能」を意味しません。'
+    );
+    parts.push('</div>');
+    parts.push(`<p class="meta">参考値（LLM 未実行）: 判定 ${escHtml(dc ? dc.label : 'N/A')}</p>`);
+  } else if (dc) {
     parts.push(`<div class="banner" style="background:${dc.bg};border-color:${dc.border}">`);
     parts.push(`${dc.icon} ${escHtml(dc.label)}`);
     parts.push('</div>');
@@ -210,24 +220,30 @@ export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
 
   // Score
   parts.push('<h2>Score</h2>');
-  parts.push(
-    `<div class="overall-wrap"><span class="overall">${escHtml(String(score.overall))}/100</span></div>`
-  );
-  parts.push('<table>');
-  parts.push('<tr><th>Axis</th><th>Score</th><th style="width:200px">Bar</th></tr>');
-  for (const axis of AXES) {
-    const val = score.axes?.[axis] ?? 0;
-    const label = AXIS_LABELS_JA?.[axis] ?? axis;
-    const pct = Math.max(0, Math.min(100, val));
-    parts.push('<tr>');
-    parts.push(`<td>${escHtml(label)}</td>`);
-    parts.push(`<td style="text-align:right">${escHtml(String(val))}</td>`);
+  if (llmNotExecuted) {
     parts.push(
-      `<td><div class="score-bg"><div class="score-bar" style="width:${pct}%"></div></div></td>`
+      `<p class="meta">参考値（LLM 未実行）: スコア ${escHtml(String(score.overall))}/100</p>`
     );
-    parts.push('</tr>');
+  } else {
+    parts.push(
+      `<div class="overall-wrap"><span class="overall">${escHtml(String(score.overall))}/100</span></div>`
+    );
+    parts.push('<table>');
+    parts.push('<tr><th>Axis</th><th>Score</th><th style="width:200px">Bar</th></tr>');
+    for (const axis of AXES) {
+      const val = score.axes?.[axis] ?? 0;
+      const label = AXIS_LABELS_JA?.[axis] ?? axis;
+      const pct = Math.max(0, Math.min(100, val));
+      parts.push('<tr>');
+      parts.push(`<td>${escHtml(label)}</td>`);
+      parts.push(`<td style="text-align:right">${escHtml(String(val))}</td>`);
+      parts.push(
+        `<td><div class="score-bg"><div class="score-bar" style="width:${pct}%"></div></div></td>`
+      );
+      parts.push('</tr>');
+    }
+    parts.push('</table>');
   }
-  parts.push('</table>');
 
   // Findings
   parts.push('<h2>Findings</h2>');
