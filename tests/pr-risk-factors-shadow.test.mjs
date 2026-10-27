@@ -117,6 +117,17 @@ test('reported irreversible change remains high without rollback evidence refere
   assert.equal(result.axes.rollback, 'reported-irreversible');
 });
 
+test('absent monitoring remains unresolved for production changes', () => {
+  const value = observation();
+  value.detection.monitoring = 'absent';
+  const result = assessPrRiskFactorsShadow(value);
+  checkSafety(result);
+  assert.equal(result.axes.detection, 'reported-absent');
+  assert.equal(result.assessmentStatus, 'incomplete');
+  assert.ok(result.reasonCodes.includes('monitoring-reported-absent'));
+  assert.equal(result.riskFloor, 'medium');
+});
+
 test('partial coverage never equals reported-complete', () => {
   const value = observation();
   value.verification.coverage = 'partial';
