@@ -98,8 +98,6 @@ RiverReview の機械 gate（host 側導出）とは責務が異なるが、次�
 - **判定の境界**: Existing Review Coverage・Provenance・Human権限を再利用。advisoryの結果や `findings=0` をGate PASS・C-3/C-4承認に変換しない。
 - **重複防止**: `requirements-acceptance` / `plangate-plan-integrity` / `architecture-validation-plan` の既存Findingを別名で二重計上しない。
 
-
-
 ## Requirements review（要点）
 
 ユーザー要求との整合 / 解決課題の明確さ / スコープ / Non-goals / 成功条件 / 受入条件 / エッジケース /
