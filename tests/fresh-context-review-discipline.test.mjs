@@ -45,4 +45,5 @@ test('review scope guards false positives and untrusted document instructions', 
   assert.match(template, /既存レビューと重複する指摘/);
   assert.match(template, /未信頼データ/);
   assert.match(loop, /Reviewerはread-only/);
+  assert.match(loop, /Host側の権限制御が必要/);
 });
