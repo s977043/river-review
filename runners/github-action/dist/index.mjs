@@ -114754,6 +114754,7 @@ async function renderRunResult(result, parsed) {
       timestamp: new Date().toISOString(),
       // Propagate the canonical verdict so HTML matches JSON (#1170 F3).
       ...(jsonOutput.decision !== undefined ? { decision: jsonOutput.decision } : {}),
+      ...(result.llmNotExecuted === true ? { llmNotExecuted: true } : {}),
     };
     console.log(
       formatHtmlOutput(htmlResult, parsed.phase, {
