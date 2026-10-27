@@ -2,2260 +2,6 @@
 import './sourcemap-register.cjs';import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
 /******/ var __webpack_modules__ = ({
 
-/***/ 9750:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ContextAPI = void 0;
-const NoopContextManager_1 = __nccwpck_require__(9522);
-const global_utils_1 = __nccwpck_require__(2304);
-const diag_1 = __nccwpck_require__(1230);
-const API_NAME = 'context';
-const NOOP_CONTEXT_MANAGER = new NoopContextManager_1.NoopContextManager();
-/**
- * Singleton object which represents the entry point to the OpenTelemetry Context API
- *
- * @since 1.0.0
- */
-class ContextAPI {
-    /** Empty private constructor prevents end users from constructing a new instance of the API */
-    constructor() { }
-    /** Get the singleton instance of the Context API */
-    static getInstance() {
-        if (!this._instance) {
-            this._instance = new ContextAPI();
-        }
-        return this._instance;
-    }
-    /**
-     * Set the current context manager.
-     *
-     * @returns true if the context manager was successfully registered, else false
-     */
-    setGlobalContextManager(contextManager) {
-        return (0, global_utils_1.registerGlobal)(API_NAME, contextManager, diag_1.DiagAPI.instance());
-    }
-    /**
-     * Get the currently active context
-     */
-    active() {
-        return this._getContextManager().active();
-    }
-    /**
-     * Execute a function with an active context
-     *
-     * @param context context to be active during function execution
-     * @param fn function to execute in a context
-     * @param thisArg optional receiver to be used for calling fn
-     * @param args optional arguments forwarded to fn
-     */
-    with(context, fn, thisArg, ...args) {
-        return this._getContextManager().with(context, fn, thisArg, ...args);
-    }
-    /**
-     * Bind a context to a target function or event emitter
-     *
-     * @param context context to bind to the event emitter or function. Defaults to the currently active context
-     * @param target function or event emitter to bind
-     */
-    bind(context, target) {
-        return this._getContextManager().bind(context, target);
-    }
-    _getContextManager() {
-        return (0, global_utils_1.getGlobal)(API_NAME) || NOOP_CONTEXT_MANAGER;
-    }
-    /** Disable and remove the global context manager */
-    disable() {
-        this._getContextManager().disable();
-        (0, global_utils_1.unregisterGlobal)(API_NAME, diag_1.DiagAPI.instance());
-    }
-}
-exports.ContextAPI = ContextAPI;
-//# sourceMappingURL=context.js.map
-
-/***/ }),
-
-/***/ 1230:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.DiagAPI = void 0;
-const ComponentLogger_1 = __nccwpck_require__(7723);
-const logLevelLogger_1 = __nccwpck_require__(3514);
-const types_1 = __nccwpck_require__(2573);
-const global_utils_1 = __nccwpck_require__(2304);
-const API_NAME = 'diag';
-/**
- * Singleton object which represents the entry point to the OpenTelemetry internal
- * diagnostic API
- *
- * @since 1.0.0
- */
-class DiagAPI {
-    /** Get the singleton instance of the DiagAPI API */
-    static instance() {
-        if (!this._instance) {
-            this._instance = new DiagAPI();
-        }
-        return this._instance;
-    }
-    /**
-     * Private internal constructor
-     * @private
-     */
-    constructor() {
-        function _logProxy(funcName) {
-            return function (...args) {
-                const logger = (0, global_utils_1.getGlobal)('diag');
-                // shortcut if logger not set
-                if (!logger)
-                    return;
-                return logger[funcName](...args);
-            };
-        }
-        // Using self local variable for minification purposes as 'this' cannot be minified
-        const self = this;
-        // DiagAPI specific functions
-        const setLogger = (logger, optionsOrLogLevel = { logLevel: types_1.DiagLogLevel.INFO }) => {
-            var _a, _b, _c;
-            if (logger === self) {
-                // There isn't much we can do here.
-                // Logging to the console might break the user application.
-                // Try to log to self. If a logger was previously registered it will receive the log.
-                const err = new Error('Cannot use diag as the logger for itself. Please use a DiagLogger implementation like ConsoleDiagLogger or a custom implementation');
-                self.error((_a = err.stack) !== null && _a !== void 0 ? _a : err.message);
-                return false;
-            }
-            if (typeof optionsOrLogLevel === 'number') {
-                optionsOrLogLevel = {
-                    logLevel: optionsOrLogLevel,
-                };
-            }
-            const oldLogger = (0, global_utils_1.getGlobal)('diag');
-            const newLogger = (0, logLevelLogger_1.createLogLevelDiagLogger)((_b = optionsOrLogLevel.logLevel) !== null && _b !== void 0 ? _b : types_1.DiagLogLevel.INFO, logger);
-            // There already is an logger registered. We'll let it know before overwriting it.
-            if (oldLogger && !optionsOrLogLevel.suppressOverrideMessage) {
-                const stack = (_c = new Error().stack) !== null && _c !== void 0 ? _c : '<failed to generate stacktrace>';
-                oldLogger.warn(`Current logger will be overwritten from ${stack}`);
-                newLogger.warn(`Current logger will overwrite one already registered from ${stack}`);
-            }
-            return (0, global_utils_1.registerGlobal)('diag', newLogger, self, true);
-        };
-        self.setLogger = setLogger;
-        self.disable = () => {
-            (0, global_utils_1.unregisterGlobal)(API_NAME, self);
-        };
-        self.createComponentLogger = (options) => {
-            return new ComponentLogger_1.DiagComponentLogger(options);
-        };
-        self.verbose = _logProxy('verbose');
-        self.debug = _logProxy('debug');
-        self.info = _logProxy('info');
-        self.warn = _logProxy('warn');
-        self.error = _logProxy('error');
-    }
-}
-exports.DiagAPI = DiagAPI;
-//# sourceMappingURL=diag.js.map
-
-/***/ }),
-
-/***/ 8692:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.MetricsAPI = void 0;
-const NoopMeterProvider_1 = __nccwpck_require__(2896);
-const global_utils_1 = __nccwpck_require__(2304);
-const diag_1 = __nccwpck_require__(1230);
-const API_NAME = 'metrics';
-/**
- * Singleton object which represents the entry point to the OpenTelemetry Metrics API
- */
-class MetricsAPI {
-    /** Empty private constructor prevents end users from constructing a new instance of the API */
-    constructor() { }
-    /** Get the singleton instance of the Metrics API */
-    static getInstance() {
-        if (!this._instance) {
-            this._instance = new MetricsAPI();
-        }
-        return this._instance;
-    }
-    /**
-     * Set the current global meter provider.
-     * Returns true if the meter provider was successfully registered, else false.
-     */
-    setGlobalMeterProvider(provider) {
-        return (0, global_utils_1.registerGlobal)(API_NAME, provider, diag_1.DiagAPI.instance());
-    }
-    /**
-     * Returns the global meter provider.
-     */
-    getMeterProvider() {
-        return (0, global_utils_1.getGlobal)(API_NAME) || NoopMeterProvider_1.NOOP_METER_PROVIDER;
-    }
-    /**
-     * Returns a meter from the global meter provider.
-     */
-    getMeter(name, version, options) {
-        return this.getMeterProvider().getMeter(name, version, options);
-    }
-    /** Remove the global meter provider */
-    disable() {
-        (0, global_utils_1.unregisterGlobal)(API_NAME, diag_1.DiagAPI.instance());
-    }
-}
-exports.MetricsAPI = MetricsAPI;
-//# sourceMappingURL=metrics.js.map
-
-/***/ }),
-
-/***/ 7:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.PropagationAPI = void 0;
-const global_utils_1 = __nccwpck_require__(2304);
-const NoopTextMapPropagator_1 = __nccwpck_require__(4353);
-const TextMapPropagator_1 = __nccwpck_require__(7865);
-const context_helpers_1 = __nccwpck_require__(52);
-const utils_1 = __nccwpck_require__(8558);
-const diag_1 = __nccwpck_require__(1230);
-const API_NAME = 'propagation';
-const NOOP_TEXT_MAP_PROPAGATOR = new NoopTextMapPropagator_1.NoopTextMapPropagator();
-/**
- * Singleton object which represents the entry point to the OpenTelemetry Propagation API
- *
- * @since 1.0.0
- */
-class PropagationAPI {
-    /** Empty private constructor prevents end users from constructing a new instance of the API */
-    constructor() {
-        this.createBaggage = utils_1.createBaggage;
-        this.getBaggage = context_helpers_1.getBaggage;
-        this.getActiveBaggage = context_helpers_1.getActiveBaggage;
-        this.setBaggage = context_helpers_1.setBaggage;
-        this.deleteBaggage = context_helpers_1.deleteBaggage;
-    }
-    /** Get the singleton instance of the Propagator API */
-    static getInstance() {
-        if (!this._instance) {
-            this._instance = new PropagationAPI();
-        }
-        return this._instance;
-    }
-    /**
-     * Set the current propagator.
-     *
-     * @returns true if the propagator was successfully registered, else false
-     */
-    setGlobalPropagator(propagator) {
-        return (0, global_utils_1.registerGlobal)(API_NAME, propagator, diag_1.DiagAPI.instance());
-    }
-    /**
-     * Inject context into a carrier to be propagated inter-process
-     *
-     * @param context Context carrying tracing data to inject
-     * @param carrier carrier to inject context into
-     * @param setter Function used to set values on the carrier
-     */
-    inject(context, carrier, setter = TextMapPropagator_1.defaultTextMapSetter) {
-        return this._getGlobalPropagator().inject(context, carrier, setter);
-    }
-    /**
-     * Extract context from a carrier
-     *
-     * @param context Context which the newly created context will inherit from
-     * @param carrier Carrier to extract context from
-     * @param getter Function used to extract keys from a carrier
-     */
-    extract(context, carrier, getter = TextMapPropagator_1.defaultTextMapGetter) {
-        return this._getGlobalPropagator().extract(context, carrier, getter);
-    }
-    /**
-     * Return a list of all fields which may be used by the propagator.
-     */
-    fields() {
-        return this._getGlobalPropagator().fields();
-    }
-    /** Remove the global propagator */
-    disable() {
-        (0, global_utils_1.unregisterGlobal)(API_NAME, diag_1.DiagAPI.instance());
-    }
-    _getGlobalPropagator() {
-        return (0, global_utils_1.getGlobal)(API_NAME) || NOOP_TEXT_MAP_PROPAGATOR;
-    }
-}
-exports.PropagationAPI = PropagationAPI;
-//# sourceMappingURL=propagation.js.map
-
-/***/ }),
-
-/***/ 4508:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TraceAPI = void 0;
-const global_utils_1 = __nccwpck_require__(2304);
-const ProxyTracerProvider_1 = __nccwpck_require__(312);
-const spancontext_utils_1 = __nccwpck_require__(639);
-const context_utils_1 = __nccwpck_require__(2771);
-const diag_1 = __nccwpck_require__(1230);
-const API_NAME = 'trace';
-/**
- * Singleton object which represents the entry point to the OpenTelemetry Tracing API
- *
- * @since 1.0.0
- */
-class TraceAPI {
-    /** Empty private constructor prevents end users from constructing a new instance of the API */
-    constructor() {
-        this._proxyTracerProvider = new ProxyTracerProvider_1.ProxyTracerProvider();
-        this.wrapSpanContext = spancontext_utils_1.wrapSpanContext;
-        this.isSpanContextValid = spancontext_utils_1.isSpanContextValid;
-        this.deleteSpan = context_utils_1.deleteSpan;
-        this.getSpan = context_utils_1.getSpan;
-        this.getActiveSpan = context_utils_1.getActiveSpan;
-        this.getSpanContext = context_utils_1.getSpanContext;
-        this.setSpan = context_utils_1.setSpan;
-        this.setSpanContext = context_utils_1.setSpanContext;
-    }
-    /** Get the singleton instance of the Trace API */
-    static getInstance() {
-        if (!this._instance) {
-            this._instance = new TraceAPI();
-        }
-        return this._instance;
-    }
-    /**
-     * Set the current global tracer.
-     *
-     * @returns true if the tracer provider was successfully registered, else false
-     */
-    setGlobalTracerProvider(provider) {
-        const success = (0, global_utils_1.registerGlobal)(API_NAME, this._proxyTracerProvider, diag_1.DiagAPI.instance());
-        if (success) {
-            this._proxyTracerProvider.setDelegate(provider);
-        }
-        return success;
-    }
-    /**
-     * Returns the global tracer provider.
-     */
-    getTracerProvider() {
-        return (0, global_utils_1.getGlobal)(API_NAME) || this._proxyTracerProvider;
-    }
-    /**
-     * Returns a tracer from the global tracer provider.
-     */
-    getTracer(name, version) {
-        return this.getTracerProvider().getTracer(name, version);
-    }
-    /** Remove the global tracer provider */
-    disable() {
-        (0, global_utils_1.unregisterGlobal)(API_NAME, diag_1.DiagAPI.instance());
-        this._proxyTracerProvider = new ProxyTracerProvider_1.ProxyTracerProvider();
-    }
-}
-exports.TraceAPI = TraceAPI;
-//# sourceMappingURL=trace.js.map
-
-/***/ }),
-
-/***/ 52:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.deleteBaggage = exports.setBaggage = exports.getActiveBaggage = exports.getBaggage = void 0;
-const context_1 = __nccwpck_require__(9750);
-const context_2 = __nccwpck_require__(7977);
-/**
- * Baggage key
- */
-const BAGGAGE_KEY = (0, context_2.createContextKey)('OpenTelemetry Baggage Key');
-/**
- * Retrieve the current baggage from the given context
- *
- * @param {Context} Context that manage all context values
- * @returns {Baggage} Extracted baggage from the context
- */
-function getBaggage(context) {
-    return context.getValue(BAGGAGE_KEY) || undefined;
-}
-exports.getBaggage = getBaggage;
-/**
- * Retrieve the current baggage from the active/current context
- *
- * @returns {Baggage} Extracted baggage from the context
- */
-function getActiveBaggage() {
-    return getBaggage(context_1.ContextAPI.getInstance().active());
-}
-exports.getActiveBaggage = getActiveBaggage;
-/**
- * Store a baggage in the given context
- *
- * @param {Context} Context that manage all context values
- * @param {Baggage} baggage that will be set in the actual context
- */
-function setBaggage(context, baggage) {
-    return context.setValue(BAGGAGE_KEY, baggage);
-}
-exports.setBaggage = setBaggage;
-/**
- * Delete the baggage stored in the given context
- *
- * @param {Context} Context that manage all context values
- */
-function deleteBaggage(context) {
-    return context.deleteValue(BAGGAGE_KEY);
-}
-exports.deleteBaggage = deleteBaggage;
-//# sourceMappingURL=context-helpers.js.map
-
-/***/ }),
-
-/***/ 3274:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.BaggageImpl = void 0;
-class BaggageImpl {
-    constructor(entries) {
-        this._entries = entries ? new Map(entries) : new Map();
-    }
-    getEntry(key) {
-        const entry = this._entries.get(key);
-        if (!entry) {
-            return undefined;
-        }
-        return Object.assign({}, entry);
-    }
-    getAllEntries() {
-        return Array.from(this._entries.entries());
-    }
-    setEntry(key, entry) {
-        const newBaggage = new BaggageImpl(this._entries);
-        newBaggage._entries.set(key, entry);
-        return newBaggage;
-    }
-    removeEntry(key) {
-        const newBaggage = new BaggageImpl(this._entries);
-        newBaggage._entries.delete(key);
-        return newBaggage;
-    }
-    removeEntries(...keys) {
-        const newBaggage = new BaggageImpl(this._entries);
-        for (const key of keys) {
-            newBaggage._entries.delete(key);
-        }
-        return newBaggage;
-    }
-    clear() {
-        return new BaggageImpl();
-    }
-}
-exports.BaggageImpl = BaggageImpl;
-//# sourceMappingURL=baggage-impl.js.map
-
-/***/ }),
-
-/***/ 3997:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.baggageEntryMetadataSymbol = void 0;
-/**
- * Symbol used to make BaggageEntryMetadata an opaque type
- */
-exports.baggageEntryMetadataSymbol = Symbol('BaggageEntryMetadata');
-//# sourceMappingURL=symbol.js.map
-
-/***/ }),
-
-/***/ 8558:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.baggageEntryMetadataFromString = exports.createBaggage = void 0;
-const diag_1 = __nccwpck_require__(1230);
-const baggage_impl_1 = __nccwpck_require__(3274);
-const symbol_1 = __nccwpck_require__(3997);
-const diag = diag_1.DiagAPI.instance();
-/**
- * Create a new Baggage with optional entries
- *
- * @param entries An array of baggage entries the new baggage should contain
- */
-function createBaggage(entries = {}) {
-    return new baggage_impl_1.BaggageImpl(new Map(Object.entries(entries)));
-}
-exports.createBaggage = createBaggage;
-/**
- * Create a serializable BaggageEntryMetadata object from a string.
- *
- * @param str string metadata. Format is currently not defined by the spec and has no special meaning.
- *
- * @since 1.0.0
- */
-function baggageEntryMetadataFromString(str) {
-    if (typeof str !== 'string') {
-        diag.error(`Cannot create baggage metadata from unknown type: ${typeof str}`);
-        str = '';
-    }
-    return {
-        __TYPE__: symbol_1.baggageEntryMetadataSymbol,
-        toString() {
-            return str;
-        },
-    };
-}
-exports.baggageEntryMetadataFromString = baggageEntryMetadataFromString;
-//# sourceMappingURL=utils.js.map
-
-/***/ }),
-
-/***/ 244:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.context = void 0;
-// Split module-level variable definition into separate files to allow
-// tree-shaking on each api instance.
-const context_1 = __nccwpck_require__(9750);
-/**
- * Entrypoint for context API
- * @since 1.0.0
- */
-exports.context = context_1.ContextAPI.getInstance();
-//# sourceMappingURL=context-api.js.map
-
-/***/ }),
-
-/***/ 9522:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.NoopContextManager = void 0;
-const context_1 = __nccwpck_require__(7977);
-class NoopContextManager {
-    active() {
-        return context_1.ROOT_CONTEXT;
-    }
-    with(_context, fn, thisArg, ...args) {
-        return fn.call(thisArg, ...args);
-    }
-    bind(_context, target) {
-        return target;
-    }
-    enable() {
-        return this;
-    }
-    disable() {
-        return this;
-    }
-}
-exports.NoopContextManager = NoopContextManager;
-//# sourceMappingURL=NoopContextManager.js.map
-
-/***/ }),
-
-/***/ 7977:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ROOT_CONTEXT = exports.createContextKey = void 0;
-/**
- * Get a key to uniquely identify a context value
- *
- * @since 1.0.0
- */
-function createContextKey(description) {
-    // The specification states that for the same input, multiple calls should
-    // return different keys. Due to the nature of the JS dependency management
-    // system, this creates problems where multiple versions of some package
-    // could hold different keys for the same property.
-    //
-    // Therefore, we use Symbol.for which returns the same key for the same input.
-    return Symbol.for(description);
-}
-exports.createContextKey = createContextKey;
-class BaseContext {
-    /**
-     * Construct a new context which inherits values from an optional parent context.
-     *
-     * @param parentContext a context from which to inherit values
-     */
-    constructor(parentContext) {
-        // for minification
-        const self = this;
-        self._currentContext = parentContext ? new Map(parentContext) : new Map();
-        self.getValue = (key) => self._currentContext.get(key);
-        self.setValue = (key, value) => {
-            const context = new BaseContext(self._currentContext);
-            context._currentContext.set(key, value);
-            return context;
-        };
-        self.deleteValue = (key) => {
-            const context = new BaseContext(self._currentContext);
-            context._currentContext.delete(key);
-            return context;
-        };
-    }
-}
-/**
- * The root context is used as the default parent context when there is no active context
- *
- * @since 1.0.0
- */
-exports.ROOT_CONTEXT = new BaseContext();
-//# sourceMappingURL=context.js.map
-
-/***/ }),
-
-/***/ 1414:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.diag = void 0;
-// Split module-level variable definition into separate files to allow
-// tree-shaking on each api instance.
-const diag_1 = __nccwpck_require__(1230);
-/**
- * Entrypoint for Diag API.
- * Defines Diagnostic handler used for internal diagnostic logging operations.
- * The default provides a Noop DiagLogger implementation which may be changed via the
- * diag.setLogger(logger: DiagLogger) function.
- *
- * @since 1.0.0
- */
-exports.diag = diag_1.DiagAPI.instance();
-//# sourceMappingURL=diag-api.js.map
-
-/***/ }),
-
-/***/ 7723:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.DiagComponentLogger = void 0;
-const global_utils_1 = __nccwpck_require__(2304);
-/**
- * Component Logger which is meant to be used as part of any component which
- * will add automatically additional namespace in front of the log message.
- * It will then forward all message to global diag logger
- * @example
- * const cLogger = diag.createComponentLogger({ namespace: '@opentelemetry/instrumentation-http' });
- * cLogger.debug('test');
- * // @opentelemetry/instrumentation-http test
- */
-class DiagComponentLogger {
-    constructor(props) {
-        this._namespace = props.namespace || 'DiagComponentLogger';
-    }
-    debug(...args) {
-        return logProxy('debug', this._namespace, args);
-    }
-    error(...args) {
-        return logProxy('error', this._namespace, args);
-    }
-    info(...args) {
-        return logProxy('info', this._namespace, args);
-    }
-    warn(...args) {
-        return logProxy('warn', this._namespace, args);
-    }
-    verbose(...args) {
-        return logProxy('verbose', this._namespace, args);
-    }
-}
-exports.DiagComponentLogger = DiagComponentLogger;
-function logProxy(funcName, namespace, args) {
-    const logger = (0, global_utils_1.getGlobal)('diag');
-    // shortcut if logger not set
-    if (!logger) {
-        return;
-    }
-    return logger[funcName](namespace, ...args);
-}
-//# sourceMappingURL=ComponentLogger.js.map
-
-/***/ }),
-
-/***/ 6769:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.DiagConsoleLogger = exports._originalConsoleMethods = void 0;
-const consoleMap = [
-    { n: 'error', c: 'error' },
-    { n: 'warn', c: 'warn' },
-    { n: 'info', c: 'info' },
-    { n: 'debug', c: 'debug' },
-    { n: 'verbose', c: 'trace' },
-];
-// Save original console methods at module load time, before any instrumentation
-// can wrap them. This ensures DiagConsoleLogger calls the unwrapped originals.
-// Exported for testing only — not part of the public API.
-exports._originalConsoleMethods = {};
-if (typeof console !== 'undefined') {
-    const keys = [
-        'error',
-        'warn',
-        'info',
-        'debug',
-        'trace',
-        'log',
-    ];
-    for (const key of keys) {
-        // eslint-disable-next-line no-console
-        if (typeof console[key] === 'function') {
-            // eslint-disable-next-line no-console
-            exports._originalConsoleMethods[key] = console[key];
-        }
-    }
-}
-/**
- * A simple Immutable Console based diagnostic logger which will output any messages to the Console.
- * If you want to limit the amount of logging to a specific level or lower use the
- * {@link createLogLevelDiagLogger}
- *
- * @since 1.0.0
- */
-class DiagConsoleLogger {
-    constructor() {
-        function _consoleFunc(funcName) {
-            return function (...args) {
-                // Prefer original (pre-instrumentation) methods saved at module load time.
-                let theFunc = exports._originalConsoleMethods[funcName];
-                // Some environments only expose the console when the F12 developer console is open
-                if (typeof theFunc !== 'function') {
-                    theFunc = exports._originalConsoleMethods['log'];
-                }
-                // Fall back in case console was not available at module load time but became available later.
-                if (typeof theFunc !== 'function' && console) {
-                    // eslint-disable-next-line no-console
-                    theFunc = console[funcName];
-                    if (typeof theFunc !== 'function') {
-                        // eslint-disable-next-line no-console
-                        theFunc = console.log;
-                    }
-                }
-                if (typeof theFunc === 'function') {
-                    return theFunc.apply(console, args);
-                }
-            };
-        }
-        for (let i = 0; i < consoleMap.length; i++) {
-            this[consoleMap[i].n] = _consoleFunc(consoleMap[i].c);
-        }
-    }
-}
-exports.DiagConsoleLogger = DiagConsoleLogger;
-//# sourceMappingURL=consoleLogger.js.map
-
-/***/ }),
-
-/***/ 3514:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createLogLevelDiagLogger = void 0;
-const types_1 = __nccwpck_require__(2573);
-function createLogLevelDiagLogger(maxLevel, logger) {
-    if (maxLevel < types_1.DiagLogLevel.NONE) {
-        maxLevel = types_1.DiagLogLevel.NONE;
-    }
-    else if (maxLevel > types_1.DiagLogLevel.ALL) {
-        maxLevel = types_1.DiagLogLevel.ALL;
-    }
-    // In case the logger is null or undefined
-    logger = logger || {};
-    function _filterFunc(funcName, theLevel) {
-        const theFunc = logger[funcName];
-        if (typeof theFunc === 'function' && maxLevel >= theLevel) {
-            return theFunc.bind(logger);
-        }
-        return function () { };
-    }
-    return {
-        error: _filterFunc('error', types_1.DiagLogLevel.ERROR),
-        warn: _filterFunc('warn', types_1.DiagLogLevel.WARN),
-        info: _filterFunc('info', types_1.DiagLogLevel.INFO),
-        debug: _filterFunc('debug', types_1.DiagLogLevel.DEBUG),
-        verbose: _filterFunc('verbose', types_1.DiagLogLevel.VERBOSE),
-    };
-}
-exports.createLogLevelDiagLogger = createLogLevelDiagLogger;
-//# sourceMappingURL=logLevelLogger.js.map
-
-/***/ }),
-
-/***/ 2573:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.DiagLogLevel = void 0;
-/**
- * Defines the available internal logging levels for the diagnostic logger, the numeric values
- * of the levels are defined to match the original values from the initial LogLevel to avoid
- * compatibility/migration issues for any implementation that assume the numeric ordering.
- */
-var DiagLogLevel;
-(function (DiagLogLevel) {
-    /** Diagnostic Logging level setting to disable all logging (except and forced logs) */
-    DiagLogLevel[DiagLogLevel["NONE"] = 0] = "NONE";
-    /** Identifies an error scenario */
-    DiagLogLevel[DiagLogLevel["ERROR"] = 30] = "ERROR";
-    /** Identifies a warning scenario */
-    DiagLogLevel[DiagLogLevel["WARN"] = 50] = "WARN";
-    /** General informational log message */
-    DiagLogLevel[DiagLogLevel["INFO"] = 60] = "INFO";
-    /** General debug log message */
-    DiagLogLevel[DiagLogLevel["DEBUG"] = 70] = "DEBUG";
-    /**
-     * Detailed trace level logging should only be used for development, should only be set
-     * in a development environment.
-     */
-    DiagLogLevel[DiagLogLevel["VERBOSE"] = 80] = "VERBOSE";
-    /** Used to set the logging level to include all logging */
-    DiagLogLevel[DiagLogLevel["ALL"] = 9999] = "ALL";
-})(DiagLogLevel = exports.DiagLogLevel || (exports.DiagLogLevel = {}));
-//# sourceMappingURL=types.js.map
-
-/***/ }),
-
-/***/ 3914:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-var __webpack_unused_export__;
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-__webpack_unused_export__ = ({ value: true });
-exports.uP = exports.$f = __webpack_unused_export__ = __webpack_unused_export__ = exports._O = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = exports.sY = exports.v8 = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = __webpack_unused_export__ = void 0;
-var utils_1 = __nccwpck_require__(8558);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return utils_1.baggageEntryMetadataFromString; } });
-// Context APIs
-var context_1 = __nccwpck_require__(7977);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return context_1.createContextKey; } });
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return context_1.ROOT_CONTEXT; } });
-// Diag APIs
-var consoleLogger_1 = __nccwpck_require__(6769);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return consoleLogger_1.DiagConsoleLogger; } });
-var types_1 = __nccwpck_require__(2573);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return types_1.DiagLogLevel; } });
-// Metrics APIs
-var NoopMeter_1 = __nccwpck_require__(7017);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return NoopMeter_1.createNoopMeter; } });
-var Metric_1 = __nccwpck_require__(3814);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return Metric_1.ValueType; } });
-// Propagation APIs
-var TextMapPropagator_1 = __nccwpck_require__(7865);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return TextMapPropagator_1.defaultTextMapGetter; } });
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return TextMapPropagator_1.defaultTextMapSetter; } });
-var ProxyTracer_1 = __nccwpck_require__(4833);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return ProxyTracer_1.ProxyTracer; } });
-// TODO: Remove ProxyTracerProvider export in the next major version.
-var ProxyTracerProvider_1 = __nccwpck_require__(312);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return ProxyTracerProvider_1.ProxyTracerProvider; } });
-var SamplingResult_1 = __nccwpck_require__(434);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return SamplingResult_1.SamplingDecision; } });
-var span_kind_1 = __nccwpck_require__(2347);
-Object.defineProperty(exports, "v8", ({ enumerable: true, get: function () { return span_kind_1.SpanKind; } }));
-var status_1 = __nccwpck_require__(1524);
-Object.defineProperty(exports, "sY", ({ enumerable: true, get: function () { return status_1.SpanStatusCode; } }));
-var trace_flags_1 = __nccwpck_require__(7221);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return trace_flags_1.TraceFlags; } });
-var utils_2 = __nccwpck_require__(969);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return utils_2.createTraceState; } });
-var spancontext_utils_1 = __nccwpck_require__(639);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return spancontext_utils_1.isSpanContextValid; } });
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return spancontext_utils_1.isValidTraceId; } });
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return spancontext_utils_1.isValidSpanId; } });
-var invalid_span_constants_1 = __nccwpck_require__(7088);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return invalid_span_constants_1.INVALID_SPANID; } });
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return invalid_span_constants_1.INVALID_TRACEID; } });
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return invalid_span_constants_1.INVALID_SPAN_CONTEXT; } });
-// Split module-level variable definition into separate files to allow
-// tree-shaking on each api instance.
-const context_api_1 = __nccwpck_require__(244);
-Object.defineProperty(exports, "_O", ({ enumerable: true, get: function () { return context_api_1.context; } }));
-const diag_api_1 = __nccwpck_require__(1414);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return diag_api_1.diag; } });
-const metrics_api_1 = __nccwpck_require__(4434);
-__webpack_unused_export__ = ({ enumerable: true, get: function () { return metrics_api_1.metrics; } });
-const propagation_api_1 = __nccwpck_require__(6389);
-Object.defineProperty(exports, "$f", ({ enumerable: true, get: function () { return propagation_api_1.propagation; } }));
-const trace_api_1 = __nccwpck_require__(6542);
-Object.defineProperty(exports, "uP", ({ enumerable: true, get: function () { return trace_api_1.trace; } }));
-// Default export.
-__webpack_unused_export__ = {
-    context: context_api_1.context,
-    diag: diag_api_1.diag,
-    metrics: metrics_api_1.metrics,
-    propagation: propagation_api_1.propagation,
-    trace: trace_api_1.trace,
-};
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 2304:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.unregisterGlobal = exports.getGlobal = exports.registerGlobal = void 0;
-const version_1 = __nccwpck_require__(9390);
-const semver_1 = __nccwpck_require__(5088);
-const major = version_1.VERSION.split('.')[0];
-const GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for(`opentelemetry.js.api.${major}`);
-const _global = (typeof globalThis === 'object'
-    ? globalThis
-    : typeof self === 'object'
-        ? self
-        : typeof window === 'object'
-            ? window
-            : typeof global === 'object'
-                ? global
-                : {});
-function registerGlobal(type, instance, diag, allowOverride = false) {
-    var _a;
-    const api = (_global[GLOBAL_OPENTELEMETRY_API_KEY] = (_a = _global[GLOBAL_OPENTELEMETRY_API_KEY]) !== null && _a !== void 0 ? _a : {
-        version: version_1.VERSION,
-    });
-    if (!allowOverride && api[type]) {
-        // already registered an API of this type
-        const err = new Error(`@opentelemetry/api: Attempted duplicate registration of API: ${type}`);
-        diag.error(err.stack || err.message);
-        return false;
-    }
-    if (api.version !== version_1.VERSION) {
-        // All registered APIs must be of the same version exactly
-        const err = new Error(`@opentelemetry/api: Registration of version v${api.version} for ${type} does not match previously registered API v${version_1.VERSION}`);
-        diag.error(err.stack || err.message);
-        return false;
-    }
-    api[type] = instance;
-    diag.debug(`@opentelemetry/api: Registered a global for ${type} v${version_1.VERSION}.`);
-    return true;
-}
-exports.registerGlobal = registerGlobal;
-function getGlobal(type) {
-    var _a, _b;
-    const globalVersion = (_a = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _a === void 0 ? void 0 : _a.version;
-    if (!globalVersion || !(0, semver_1.isCompatible)(globalVersion)) {
-        return;
-    }
-    return (_b = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _b === void 0 ? void 0 : _b[type];
-}
-exports.getGlobal = getGlobal;
-function unregisterGlobal(type, diag) {
-    diag.debug(`@opentelemetry/api: Unregistering a global for ${type} v${version_1.VERSION}.`);
-    const api = _global[GLOBAL_OPENTELEMETRY_API_KEY];
-    if (api) {
-        delete api[type];
-    }
-}
-exports.unregisterGlobal = unregisterGlobal;
-//# sourceMappingURL=global-utils.js.map
-
-/***/ }),
-
-/***/ 5088:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.isCompatible = exports._makeCompatibilityCheck = void 0;
-const version_1 = __nccwpck_require__(9390);
-const re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
-/**
- * Create a function to test an API version to see if it is compatible with the provided ownVersion.
- *
- * The returned function has the following semantics:
- * - Exact match is always compatible
- * - Major versions must match exactly
- *    - 1.x package cannot use global 2.x package
- *    - 2.x package cannot use global 1.x package
- * - The minor version of the API module requesting access to the global API must be less than or equal to the minor version of this API
- *    - 1.3 package may use 1.4 global because the later global contains all functions 1.3 expects
- *    - 1.4 package may NOT use 1.3 global because it may try to call functions which don't exist on 1.3
- * - If the major version is 0, the minor version is treated as the major and the patch is treated as the minor
- * - Patch and build tag differences are not considered at this time
- *
- * @param ownVersion version which should be checked against
- */
-function _makeCompatibilityCheck(ownVersion) {
-    const acceptedVersions = new Set([ownVersion]);
-    const rejectedVersions = new Set();
-    const myVersionMatch = ownVersion.match(re);
-    if (!myVersionMatch) {
-        // we cannot guarantee compatibility so we always return noop
-        return () => false;
-    }
-    const ownVersionParsed = {
-        major: +myVersionMatch[1],
-        minor: +myVersionMatch[2],
-        patch: +myVersionMatch[3],
-        prerelease: myVersionMatch[4],
-    };
-    // if ownVersion has a prerelease tag, versions must match exactly
-    if (ownVersionParsed.prerelease != null) {
-        return function isExactmatch(globalVersion) {
-            return globalVersion === ownVersion;
-        };
-    }
-    function _reject(v) {
-        rejectedVersions.add(v);
-        return false;
-    }
-    function _accept(v) {
-        acceptedVersions.add(v);
-        return true;
-    }
-    return function isCompatible(globalVersion) {
-        if (acceptedVersions.has(globalVersion)) {
-            return true;
-        }
-        if (rejectedVersions.has(globalVersion)) {
-            return false;
-        }
-        const globalVersionMatch = globalVersion.match(re);
-        if (!globalVersionMatch) {
-            // cannot parse other version
-            // we cannot guarantee compatibility so we always noop
-            return _reject(globalVersion);
-        }
-        const globalVersionParsed = {
-            major: +globalVersionMatch[1],
-            minor: +globalVersionMatch[2],
-            patch: +globalVersionMatch[3],
-            prerelease: globalVersionMatch[4],
-        };
-        // if globalVersion has a prerelease tag, versions must match exactly
-        if (globalVersionParsed.prerelease != null) {
-            return _reject(globalVersion);
-        }
-        // major versions must match
-        if (ownVersionParsed.major !== globalVersionParsed.major) {
-            return _reject(globalVersion);
-        }
-        if (ownVersionParsed.major === 0) {
-            if (ownVersionParsed.minor === globalVersionParsed.minor &&
-                ownVersionParsed.patch <= globalVersionParsed.patch) {
-                return _accept(globalVersion);
-            }
-            return _reject(globalVersion);
-        }
-        if (ownVersionParsed.minor <= globalVersionParsed.minor) {
-            return _accept(globalVersion);
-        }
-        return _reject(globalVersion);
-    };
-}
-exports._makeCompatibilityCheck = _makeCompatibilityCheck;
-/**
- * Test an API version to see if it is compatible with this API.
- *
- * - Exact match is always compatible
- * - Major versions must match exactly
- *    - 1.x package cannot use global 2.x package
- *    - 2.x package cannot use global 1.x package
- * - The minor version of the API module requesting access to the global API must be less than or equal to the minor version of this API
- *    - 1.3 package may use 1.4 global because the later global contains all functions 1.3 expects
- *    - 1.4 package may NOT use 1.3 global because it may try to call functions which don't exist on 1.3
- * - If the major version is 0, the minor version is treated as the major and the patch is treated as the minor
- * - Patch and build tag differences are not considered at this time
- *
- * @param version version of the API requesting an instance of the global API
- */
-exports.isCompatible = _makeCompatibilityCheck(version_1.VERSION);
-//# sourceMappingURL=semver.js.map
-
-/***/ }),
-
-/***/ 4434:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.metrics = void 0;
-// Split module-level variable definition into separate files to allow
-// tree-shaking on each api instance.
-const metrics_1 = __nccwpck_require__(8692);
-/**
- * Entrypoint for metrics API
- *
- * @since 1.3.0
- */
-exports.metrics = metrics_1.MetricsAPI.getInstance();
-//# sourceMappingURL=metrics-api.js.map
-
-/***/ }),
-
-/***/ 3814:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ValueType = void 0;
-/**
- * The Type of value. It describes how the data is reported.
- *
- * @since 1.3.0
- */
-var ValueType;
-(function (ValueType) {
-    ValueType[ValueType["INT"] = 0] = "INT";
-    ValueType[ValueType["DOUBLE"] = 1] = "DOUBLE";
-})(ValueType = exports.ValueType || (exports.ValueType = {}));
-//# sourceMappingURL=Metric.js.map
-
-/***/ }),
-
-/***/ 7017:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createNoopMeter = exports.NOOP_OBSERVABLE_UP_DOWN_COUNTER_METRIC = exports.NOOP_OBSERVABLE_GAUGE_METRIC = exports.NOOP_OBSERVABLE_COUNTER_METRIC = exports.NOOP_UP_DOWN_COUNTER_METRIC = exports.NOOP_HISTOGRAM_METRIC = exports.NOOP_GAUGE_METRIC = exports.NOOP_COUNTER_METRIC = exports.NOOP_METER = exports.NoopObservableUpDownCounterMetric = exports.NoopObservableGaugeMetric = exports.NoopObservableCounterMetric = exports.NoopObservableMetric = exports.NoopHistogramMetric = exports.NoopGaugeMetric = exports.NoopUpDownCounterMetric = exports.NoopCounterMetric = exports.NoopMetric = exports.NoopMeter = void 0;
-/**
- * NoopMeter is a noop implementation of the {@link Meter} interface. It reuses
- * constant NoopMetrics for all of its methods.
- */
-class NoopMeter {
-    constructor() { }
-    /**
-     * @see {@link Meter.createGauge}
-     */
-    createGauge(_name, _options) {
-        return exports.NOOP_GAUGE_METRIC;
-    }
-    /**
-     * @see {@link Meter.createHistogram}
-     */
-    createHistogram(_name, _options) {
-        return exports.NOOP_HISTOGRAM_METRIC;
-    }
-    /**
-     * @see {@link Meter.createCounter}
-     */
-    createCounter(_name, _options) {
-        return exports.NOOP_COUNTER_METRIC;
-    }
-    /**
-     * @see {@link Meter.createUpDownCounter}
-     */
-    createUpDownCounter(_name, _options) {
-        return exports.NOOP_UP_DOWN_COUNTER_METRIC;
-    }
-    /**
-     * @see {@link Meter.createObservableGauge}
-     */
-    createObservableGauge(_name, _options) {
-        return exports.NOOP_OBSERVABLE_GAUGE_METRIC;
-    }
-    /**
-     * @see {@link Meter.createObservableCounter}
-     */
-    createObservableCounter(_name, _options) {
-        return exports.NOOP_OBSERVABLE_COUNTER_METRIC;
-    }
-    /**
-     * @see {@link Meter.createObservableUpDownCounter}
-     */
-    createObservableUpDownCounter(_name, _options) {
-        return exports.NOOP_OBSERVABLE_UP_DOWN_COUNTER_METRIC;
-    }
-    /**
-     * @see {@link Meter.addBatchObservableCallback}
-     */
-    addBatchObservableCallback(_callback, _observables) { }
-    /**
-     * @see {@link Meter.removeBatchObservableCallback}
-     */
-    removeBatchObservableCallback(_callback) { }
-}
-exports.NoopMeter = NoopMeter;
-class NoopMetric {
-}
-exports.NoopMetric = NoopMetric;
-class NoopCounterMetric extends NoopMetric {
-    add(_value, _attributes) { }
-}
-exports.NoopCounterMetric = NoopCounterMetric;
-class NoopUpDownCounterMetric extends NoopMetric {
-    add(_value, _attributes) { }
-}
-exports.NoopUpDownCounterMetric = NoopUpDownCounterMetric;
-class NoopGaugeMetric extends NoopMetric {
-    record(_value, _attributes) { }
-}
-exports.NoopGaugeMetric = NoopGaugeMetric;
-class NoopHistogramMetric extends NoopMetric {
-    record(_value, _attributes) { }
-}
-exports.NoopHistogramMetric = NoopHistogramMetric;
-class NoopObservableMetric {
-    addCallback(_callback) { }
-    removeCallback(_callback) { }
-}
-exports.NoopObservableMetric = NoopObservableMetric;
-class NoopObservableCounterMetric extends NoopObservableMetric {
-}
-exports.NoopObservableCounterMetric = NoopObservableCounterMetric;
-class NoopObservableGaugeMetric extends NoopObservableMetric {
-}
-exports.NoopObservableGaugeMetric = NoopObservableGaugeMetric;
-class NoopObservableUpDownCounterMetric extends NoopObservableMetric {
-}
-exports.NoopObservableUpDownCounterMetric = NoopObservableUpDownCounterMetric;
-exports.NOOP_METER = new NoopMeter();
-// Synchronous instruments
-exports.NOOP_COUNTER_METRIC = new NoopCounterMetric();
-exports.NOOP_GAUGE_METRIC = new NoopGaugeMetric();
-exports.NOOP_HISTOGRAM_METRIC = new NoopHistogramMetric();
-exports.NOOP_UP_DOWN_COUNTER_METRIC = new NoopUpDownCounterMetric();
-// Asynchronous instruments
-exports.NOOP_OBSERVABLE_COUNTER_METRIC = new NoopObservableCounterMetric();
-exports.NOOP_OBSERVABLE_GAUGE_METRIC = new NoopObservableGaugeMetric();
-exports.NOOP_OBSERVABLE_UP_DOWN_COUNTER_METRIC = new NoopObservableUpDownCounterMetric();
-/**
- * Create a no-op Meter
- *
- * @since 1.3.0
- */
-function createNoopMeter() {
-    return exports.NOOP_METER;
-}
-exports.createNoopMeter = createNoopMeter;
-//# sourceMappingURL=NoopMeter.js.map
-
-/***/ }),
-
-/***/ 2896:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.NOOP_METER_PROVIDER = exports.NoopMeterProvider = void 0;
-const NoopMeter_1 = __nccwpck_require__(7017);
-/**
- * An implementation of the {@link MeterProvider} which returns an impotent Meter
- * for all calls to `getMeter`
- */
-class NoopMeterProvider {
-    getMeter(_name, _version, _options) {
-        return NoopMeter_1.NOOP_METER;
-    }
-}
-exports.NoopMeterProvider = NoopMeterProvider;
-exports.NOOP_METER_PROVIDER = new NoopMeterProvider();
-//# sourceMappingURL=NoopMeterProvider.js.map
-
-/***/ }),
-
-/***/ 6389:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.propagation = void 0;
-// Split module-level variable definition into separate files to allow
-// tree-shaking on each api instance.
-const propagation_1 = __nccwpck_require__(7);
-/**
- * Entrypoint for propagation API
- *
- * @since 1.0.0
- */
-exports.propagation = propagation_1.PropagationAPI.getInstance();
-//# sourceMappingURL=propagation-api.js.map
-
-/***/ }),
-
-/***/ 4353:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.NoopTextMapPropagator = void 0;
-/**
- * No-op implementations of {@link TextMapPropagator}.
- */
-class NoopTextMapPropagator {
-    /** Noop inject function does nothing */
-    inject(_context, _carrier) { }
-    /** Noop extract function does nothing and returns the input context */
-    extract(context, _carrier) {
-        return context;
-    }
-    fields() {
-        return [];
-    }
-}
-exports.NoopTextMapPropagator = NoopTextMapPropagator;
-//# sourceMappingURL=NoopTextMapPropagator.js.map
-
-/***/ }),
-
-/***/ 7865:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.defaultTextMapSetter = exports.defaultTextMapGetter = void 0;
-/**
- * @since 1.0.0
- */
-exports.defaultTextMapGetter = {
-    get(carrier, key) {
-        if (carrier == null) {
-            return undefined;
-        }
-        return carrier[key];
-    },
-    keys(carrier) {
-        if (carrier == null) {
-            return [];
-        }
-        return Object.keys(carrier);
-    },
-};
-/**
- * @since 1.0.0
- */
-exports.defaultTextMapSetter = {
-    set(carrier, key, value) {
-        if (carrier == null) {
-            return;
-        }
-        carrier[key] = value;
-    },
-};
-//# sourceMappingURL=TextMapPropagator.js.map
-
-/***/ }),
-
-/***/ 6542:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.trace = void 0;
-// Split module-level variable definition into separate files to allow
-// tree-shaking on each api instance.
-const trace_1 = __nccwpck_require__(4508);
-/**
- * Entrypoint for trace API
- *
- * @since 1.0.0
- */
-exports.trace = trace_1.TraceAPI.getInstance();
-//# sourceMappingURL=trace-api.js.map
-
-/***/ }),
-
-/***/ 7168:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.NonRecordingSpan = void 0;
-const invalid_span_constants_1 = __nccwpck_require__(7088);
-/**
- * The NonRecordingSpan is the default {@link Span} that is used when no Span
- * implementation is available. All operations are no-op including context
- * propagation.
- */
-class NonRecordingSpan {
-    constructor(spanContext = invalid_span_constants_1.INVALID_SPAN_CONTEXT) {
-        this._spanContext = spanContext;
-    }
-    // Returns a SpanContext.
-    spanContext() {
-        return this._spanContext;
-    }
-    // By default does nothing
-    setAttribute(_key, _value) {
-        return this;
-    }
-    // By default does nothing
-    setAttributes(_attributes) {
-        return this;
-    }
-    // By default does nothing
-    addEvent(_name, _attributes) {
-        return this;
-    }
-    addLink(_link) {
-        return this;
-    }
-    addLinks(_links) {
-        return this;
-    }
-    // By default does nothing
-    setStatus(_status) {
-        return this;
-    }
-    // By default does nothing
-    updateName(_name) {
-        return this;
-    }
-    // By default does nothing
-    end(_endTime) { }
-    // isRecording always returns false for NonRecordingSpan.
-    isRecording() {
-        return false;
-    }
-    // By default does nothing
-    recordException(_exception, _time) { }
-}
-exports.NonRecordingSpan = NonRecordingSpan;
-//# sourceMappingURL=NonRecordingSpan.js.map
-
-/***/ }),
-
-/***/ 9051:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.NoopTracer = void 0;
-const context_1 = __nccwpck_require__(9750);
-const context_utils_1 = __nccwpck_require__(2771);
-const NonRecordingSpan_1 = __nccwpck_require__(7168);
-const spancontext_utils_1 = __nccwpck_require__(639);
-const contextApi = context_1.ContextAPI.getInstance();
-/**
- * No-op implementations of {@link Tracer}.
- */
-class NoopTracer {
-    // startSpan starts a noop span.
-    startSpan(name, options, context = contextApi.active()) {
-        const root = Boolean(options === null || options === void 0 ? void 0 : options.root);
-        if (root) {
-            return new NonRecordingSpan_1.NonRecordingSpan();
-        }
-        const parentFromContext = context && (0, context_utils_1.getSpanContext)(context);
-        if (isSpanContext(parentFromContext) &&
-            (0, spancontext_utils_1.isSpanContextValid)(parentFromContext)) {
-            return new NonRecordingSpan_1.NonRecordingSpan(parentFromContext);
-        }
-        else {
-            return new NonRecordingSpan_1.NonRecordingSpan();
-        }
-    }
-    startActiveSpan(name, arg2, arg3, arg4) {
-        let opts;
-        let ctx;
-        let fn;
-        if (arguments.length < 2) {
-            return;
-        }
-        else if (arguments.length === 2) {
-            fn = arg2;
-        }
-        else if (arguments.length === 3) {
-            opts = arg2;
-            fn = arg3;
-        }
-        else {
-            opts = arg2;
-            ctx = arg3;
-            fn = arg4;
-        }
-        const parentContext = ctx !== null && ctx !== void 0 ? ctx : contextApi.active();
-        const span = this.startSpan(name, opts, parentContext);
-        const contextWithSpanSet = (0, context_utils_1.setSpan)(parentContext, span);
-        return contextApi.with(contextWithSpanSet, fn, undefined, span);
-    }
-}
-exports.NoopTracer = NoopTracer;
-function isSpanContext(spanContext) {
-    return (spanContext !== null &&
-        typeof spanContext === 'object' &&
-        'spanId' in spanContext &&
-        typeof spanContext['spanId'] === 'string' &&
-        'traceId' in spanContext &&
-        typeof spanContext['traceId'] === 'string' &&
-        'traceFlags' in spanContext &&
-        typeof spanContext['traceFlags'] === 'number');
-}
-//# sourceMappingURL=NoopTracer.js.map
-
-/***/ }),
-
-/***/ 4602:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.NoopTracerProvider = void 0;
-const NoopTracer_1 = __nccwpck_require__(9051);
-/**
- * An implementation of the {@link TracerProvider} which returns an impotent
- * Tracer for all calls to `getTracer`.
- *
- * All operations are no-op.
- */
-class NoopTracerProvider {
-    getTracer(_name, _version, _options) {
-        return new NoopTracer_1.NoopTracer();
-    }
-}
-exports.NoopTracerProvider = NoopTracerProvider;
-//# sourceMappingURL=NoopTracerProvider.js.map
-
-/***/ }),
-
-/***/ 4833:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ProxyTracer = void 0;
-const NoopTracer_1 = __nccwpck_require__(9051);
-const NOOP_TRACER = new NoopTracer_1.NoopTracer();
-/**
- * Proxy tracer provided by the proxy tracer provider
- *
- * @since 1.0.0
- */
-class ProxyTracer {
-    constructor(provider, name, version, options) {
-        this._provider = provider;
-        this.name = name;
-        this.version = version;
-        this.options = options;
-    }
-    startSpan(name, options, context) {
-        return this._getTracer().startSpan(name, options, context);
-    }
-    startActiveSpan(_name, _options, _context, _fn) {
-        const tracer = this._getTracer();
-        return Reflect.apply(tracer.startActiveSpan, tracer, arguments);
-    }
-    /**
-     * Try to get a tracer from the proxy tracer provider.
-     * If the proxy tracer provider has no delegate, return a noop tracer.
-     */
-    _getTracer() {
-        if (this._delegate) {
-            return this._delegate;
-        }
-        const tracer = this._provider.getDelegateTracer(this.name, this.version, this.options);
-        if (!tracer) {
-            return NOOP_TRACER;
-        }
-        this._delegate = tracer;
-        return this._delegate;
-    }
-}
-exports.ProxyTracer = ProxyTracer;
-//# sourceMappingURL=ProxyTracer.js.map
-
-/***/ }),
-
-/***/ 312:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ProxyTracerProvider = void 0;
-const ProxyTracer_1 = __nccwpck_require__(4833);
-const NoopTracerProvider_1 = __nccwpck_require__(4602);
-const NOOP_TRACER_PROVIDER = new NoopTracerProvider_1.NoopTracerProvider();
-/**
- * Tracer provider which provides {@link ProxyTracer}s.
- *
- * Before a delegate is set, tracers provided are NoOp.
- *   When a delegate is set, traces are provided from the delegate.
- *   When a delegate is set after tracers have already been provided,
- *   all tracers already provided will use the provided delegate implementation.
- *
- * @deprecated This will be removed in the next major version.
- * @since 1.0.0
- */
-class ProxyTracerProvider {
-    /**
-     * Get a {@link ProxyTracer}
-     */
-    getTracer(name, version, options) {
-        var _a;
-        return ((_a = this.getDelegateTracer(name, version, options)) !== null && _a !== void 0 ? _a : new ProxyTracer_1.ProxyTracer(this, name, version, options));
-    }
-    getDelegate() {
-        var _a;
-        return (_a = this._delegate) !== null && _a !== void 0 ? _a : NOOP_TRACER_PROVIDER;
-    }
-    /**
-     * Set the delegate tracer provider
-     */
-    setDelegate(delegate) {
-        this._delegate = delegate;
-    }
-    getDelegateTracer(name, version, options) {
-        var _a;
-        return (_a = this._delegate) === null || _a === void 0 ? void 0 : _a.getTracer(name, version, options);
-    }
-}
-exports.ProxyTracerProvider = ProxyTracerProvider;
-//# sourceMappingURL=ProxyTracerProvider.js.map
-
-/***/ }),
-
-/***/ 434:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.SamplingDecision = void 0;
-/**
- * @deprecated use the one declared in @opentelemetry/sdk-trace-base instead.
- * A sampling decision that determines how a {@link Span} will be recorded
- * and collected.
- *
- * @since 1.0.0
- */
-var SamplingDecision;
-(function (SamplingDecision) {
-    /**
-     * `Span.isRecording() === false`, span will not be recorded and all events
-     * and attributes will be dropped.
-     */
-    SamplingDecision[SamplingDecision["NOT_RECORD"] = 0] = "NOT_RECORD";
-    /**
-     * `Span.isRecording() === true`, but `Sampled` flag in {@link TraceFlags}
-     * MUST NOT be set.
-     */
-    SamplingDecision[SamplingDecision["RECORD"] = 1] = "RECORD";
-    /**
-     * `Span.isRecording() === true` AND `Sampled` flag in {@link TraceFlags}
-     * MUST be set.
-     */
-    SamplingDecision[SamplingDecision["RECORD_AND_SAMPLED"] = 2] = "RECORD_AND_SAMPLED";
-})(SamplingDecision = exports.SamplingDecision || (exports.SamplingDecision = {}));
-//# sourceMappingURL=SamplingResult.js.map
-
-/***/ }),
-
-/***/ 2771:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getSpanContext = exports.setSpanContext = exports.deleteSpan = exports.setSpan = exports.getActiveSpan = exports.getSpan = void 0;
-const context_1 = __nccwpck_require__(7977);
-const NonRecordingSpan_1 = __nccwpck_require__(7168);
-const context_2 = __nccwpck_require__(9750);
-/**
- * span key
- */
-const SPAN_KEY = (0, context_1.createContextKey)('OpenTelemetry Context Key SPAN');
-/**
- * Return the span if one exists
- *
- * @param context context to get span from
- */
-function getSpan(context) {
-    return context.getValue(SPAN_KEY) || undefined;
-}
-exports.getSpan = getSpan;
-/**
- * Gets the span from the current context, if one exists.
- */
-function getActiveSpan() {
-    return getSpan(context_2.ContextAPI.getInstance().active());
-}
-exports.getActiveSpan = getActiveSpan;
-/**
- * Set the span on a context
- *
- * @param context context to use as parent
- * @param span span to set active
- */
-function setSpan(context, span) {
-    return context.setValue(SPAN_KEY, span);
-}
-exports.setSpan = setSpan;
-/**
- * Remove current span stored in the context
- *
- * @param context context to delete span from
- */
-function deleteSpan(context) {
-    return context.deleteValue(SPAN_KEY);
-}
-exports.deleteSpan = deleteSpan;
-/**
- * Wrap span context in a NoopSpan and set as span in a new
- * context
- *
- * @param context context to set active span on
- * @param spanContext span context to be wrapped
- */
-function setSpanContext(context, spanContext) {
-    return setSpan(context, new NonRecordingSpan_1.NonRecordingSpan(spanContext));
-}
-exports.setSpanContext = setSpanContext;
-/**
- * Get the span context of the span if it exists.
- *
- * @param context context to get values from
- */
-function getSpanContext(context) {
-    var _a;
-    return (_a = getSpan(context)) === null || _a === void 0 ? void 0 : _a.spanContext();
-}
-exports.getSpanContext = getSpanContext;
-//# sourceMappingURL=context-utils.js.map
-
-/***/ }),
-
-/***/ 7903:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TraceStateImpl = void 0;
-const tracestate_validators_1 = __nccwpck_require__(5618);
-const MAX_TRACE_STATE_ITEMS = 32;
-const MAX_TRACE_STATE_LEN = 512;
-const LIST_MEMBERS_SEPARATOR = ',';
-const LIST_MEMBER_KEY_VALUE_SPLITTER = '=';
-/**
- * TraceState must be a class and not a simple object type because of the spec
- * requirement (https://www.w3.org/TR/trace-context/#tracestate-field).
- *
- * Here is the list of allowed mutations:
- * - New key-value pair should be added into the beginning of the list
- * - The value of any key can be updated. Modified keys MUST be moved to the
- * beginning of the list.
- */
-class TraceStateImpl {
-    constructor(rawTraceState) {
-        this._internalState = new Map();
-        if (rawTraceState)
-            this._parse(rawTraceState);
-    }
-    set(key, value) {
-        // TODO: Benchmark the different approaches(map vs list) and
-        // use the faster one.
-        const traceState = this._clone();
-        if (traceState._internalState.has(key)) {
-            traceState._internalState.delete(key);
-        }
-        traceState._internalState.set(key, value);
-        return traceState;
-    }
-    unset(key) {
-        const traceState = this._clone();
-        traceState._internalState.delete(key);
-        return traceState;
-    }
-    get(key) {
-        return this._internalState.get(key);
-    }
-    serialize() {
-        return (Array.from(this._internalState.keys())
-            // Use reduceRight() because keys are stored in reverse insertion order.
-            .reduceRight((agg, key) => {
-            agg.push(key + LIST_MEMBER_KEY_VALUE_SPLITTER + this.get(key));
-            return agg;
-        }, [])
-            .join(LIST_MEMBERS_SEPARATOR));
-    }
-    _parse(rawTraceState) {
-        if (rawTraceState.length > MAX_TRACE_STATE_LEN)
-            return;
-        this._internalState = rawTraceState
-            .split(LIST_MEMBERS_SEPARATOR)
-            // Use reduceRight() so new keys (.set(...)) will be placed at the beginning
-            .reduceRight((agg, part) => {
-            const listMember = part.trim(); // Optional Whitespace (OWS) handling
-            const i = listMember.indexOf(LIST_MEMBER_KEY_VALUE_SPLITTER);
-            if (i !== -1) {
-                const key = listMember.slice(0, i);
-                const value = listMember.slice(i + 1, part.length);
-                if ((0, tracestate_validators_1.validateKey)(key) && (0, tracestate_validators_1.validateValue)(value)) {
-                    agg.set(key, value);
-                }
-                else {
-                    // TODO: Consider to add warning log
-                }
-            }
-            return agg;
-        }, new Map());
-        // Because of the reverse() requirement, trunc must be done after map is created
-        if (this._internalState.size > MAX_TRACE_STATE_ITEMS) {
-            this._internalState = new Map(Array.from(this._internalState.entries())
-                .reverse() // Use reverse same as original tracestate parse chain
-                .slice(0, MAX_TRACE_STATE_ITEMS));
-        }
-    }
-    // @ts-expect-error TS6133 Accessed in tests only.
-    _keys() {
-        return Array.from(this._internalState.keys()).reverse();
-    }
-    _clone() {
-        const traceState = new TraceStateImpl();
-        traceState._internalState = new Map(this._internalState);
-        return traceState;
-    }
-}
-exports.TraceStateImpl = TraceStateImpl;
-//# sourceMappingURL=tracestate-impl.js.map
-
-/***/ }),
-
-/***/ 5618:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.validateValue = exports.validateKey = void 0;
-const VALID_KEY_CHAR_RANGE = '[_0-9a-z-*/]';
-const VALID_KEY = `[a-z]${VALID_KEY_CHAR_RANGE}{0,255}`;
-const VALID_VENDOR_KEY = `[a-z0-9]${VALID_KEY_CHAR_RANGE}{0,240}@[a-z]${VALID_KEY_CHAR_RANGE}{0,13}`;
-const VALID_KEY_REGEX = new RegExp(`^(?:${VALID_KEY}|${VALID_VENDOR_KEY})$`);
-const VALID_VALUE_BASE_REGEX = /^[ -~]{0,255}[!-~]$/;
-const INVALID_VALUE_COMMA_EQUAL_REGEX = /,|=/;
-/**
- * Key is opaque string up to 256 characters printable. It MUST begin with a
- * lowercase letter, and can only contain lowercase letters a-z, digits 0-9,
- * underscores _, dashes -, asterisks *, and forward slashes /.
- * For multi-tenant vendor scenarios, an at sign (@) can be used to prefix the
- * vendor name. Vendors SHOULD set the tenant ID at the beginning of the key.
- * see https://www.w3.org/TR/trace-context/#key
- */
-function validateKey(key) {
-    return VALID_KEY_REGEX.test(key);
-}
-exports.validateKey = validateKey;
-/**
- * Value is opaque string up to 256 characters printable ASCII RFC0020
- * characters (i.e., the range 0x20 to 0x7E) except comma , and =.
- */
-function validateValue(value) {
-    return (VALID_VALUE_BASE_REGEX.test(value) &&
-        !INVALID_VALUE_COMMA_EQUAL_REGEX.test(value));
-}
-exports.validateValue = validateValue;
-//# sourceMappingURL=tracestate-validators.js.map
-
-/***/ }),
-
-/***/ 969:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createTraceState = void 0;
-const tracestate_impl_1 = __nccwpck_require__(7903);
-/**
- * @since 1.1.0
- */
-function createTraceState(rawTraceState) {
-    return new tracestate_impl_1.TraceStateImpl(rawTraceState);
-}
-exports.createTraceState = createTraceState;
-//# sourceMappingURL=utils.js.map
-
-/***/ }),
-
-/***/ 7088:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.INVALID_SPAN_CONTEXT = exports.INVALID_TRACEID = exports.INVALID_SPANID = void 0;
-const trace_flags_1 = __nccwpck_require__(7221);
-/**
- * @since 1.0.0
- */
-exports.INVALID_SPANID = '0000000000000000';
-/**
- * @since 1.0.0
- */
-exports.INVALID_TRACEID = '00000000000000000000000000000000';
-/**
- * @since 1.0.0
- */
-exports.INVALID_SPAN_CONTEXT = {
-    traceId: exports.INVALID_TRACEID,
-    spanId: exports.INVALID_SPANID,
-    traceFlags: trace_flags_1.TraceFlags.NONE,
-};
-//# sourceMappingURL=invalid-span-constants.js.map
-
-/***/ }),
-
-/***/ 2347:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.SpanKind = void 0;
-/**
- * @since 1.0.0
- */
-var SpanKind;
-(function (SpanKind) {
-    /** Default value. Indicates that the span is used internally. */
-    SpanKind[SpanKind["INTERNAL"] = 0] = "INTERNAL";
-    /**
-     * Indicates that the span covers server-side handling of an RPC or other
-     * remote request.
-     */
-    SpanKind[SpanKind["SERVER"] = 1] = "SERVER";
-    /**
-     * Indicates that the span covers the client-side wrapper around an RPC or
-     * other remote request.
-     */
-    SpanKind[SpanKind["CLIENT"] = 2] = "CLIENT";
-    /**
-     * Indicates that the span describes producer sending a message to a
-     * broker. Unlike client and server, there is no direct critical path latency
-     * relationship between producer and consumer spans.
-     */
-    SpanKind[SpanKind["PRODUCER"] = 3] = "PRODUCER";
-    /**
-     * Indicates that the span describes consumer receiving a message from a
-     * broker. Unlike client and server, there is no direct critical path latency
-     * relationship between producer and consumer spans.
-     */
-    SpanKind[SpanKind["CONSUMER"] = 4] = "CONSUMER";
-})(SpanKind = exports.SpanKind || (exports.SpanKind = {}));
-//# sourceMappingURL=span_kind.js.map
-
-/***/ }),
-
-/***/ 639:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.wrapSpanContext = exports.isSpanContextValid = exports.isValidSpanId = exports.isValidTraceId = void 0;
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-const invalid_span_constants_1 = __nccwpck_require__(7088);
-const NonRecordingSpan_1 = __nccwpck_require__(7168);
-// Valid characters (0-9, a-f, A-F) are marked as 1.
-const isHex = new Uint8Array([
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
-]);
-function isValidHex(id, length) {
-    // As of 1.9.0 the id was allowed to be a non-string value,
-    // even though it was not possible in the types.
-    if (typeof id !== 'string' || id.length !== length)
-        return false;
-    let r = 0;
-    for (let i = 0; i < id.length; i += 4) {
-        r +=
-            (isHex[id.charCodeAt(i)] | 0) +
-                (isHex[id.charCodeAt(i + 1)] | 0) +
-                (isHex[id.charCodeAt(i + 2)] | 0) +
-                (isHex[id.charCodeAt(i + 3)] | 0);
-    }
-    return r === length;
-}
-/**
- * @since 1.0.0
- */
-function isValidTraceId(traceId) {
-    return isValidHex(traceId, 32) && traceId !== invalid_span_constants_1.INVALID_TRACEID;
-}
-exports.isValidTraceId = isValidTraceId;
-/**
- * @since 1.0.0
- */
-function isValidSpanId(spanId) {
-    return isValidHex(spanId, 16) && spanId !== invalid_span_constants_1.INVALID_SPANID;
-}
-exports.isValidSpanId = isValidSpanId;
-/**
- * Returns true if this {@link SpanContext} is valid.
- * @return true if this {@link SpanContext} is valid.
- *
- * @since 1.0.0
- */
-function isSpanContextValid(spanContext) {
-    return (isValidTraceId(spanContext.traceId) && isValidSpanId(spanContext.spanId));
-}
-exports.isSpanContextValid = isSpanContextValid;
-/**
- * Wrap the given {@link SpanContext} in a new non-recording {@link Span}
- *
- * @param spanContext span context to be wrapped
- * @returns a new non-recording {@link Span} with the provided context
- */
-function wrapSpanContext(spanContext) {
-    return new NonRecordingSpan_1.NonRecordingSpan(spanContext);
-}
-exports.wrapSpanContext = wrapSpanContext;
-//# sourceMappingURL=spancontext-utils.js.map
-
-/***/ }),
-
-/***/ 1524:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.SpanStatusCode = void 0;
-/**
- * An enumeration of status codes.
- *
- * @since 1.0.0
- */
-var SpanStatusCode;
-(function (SpanStatusCode) {
-    /**
-     * The default status.
-     */
-    SpanStatusCode[SpanStatusCode["UNSET"] = 0] = "UNSET";
-    /**
-     * The operation has been validated by an Application developer or
-     * Operator to have completed successfully.
-     */
-    SpanStatusCode[SpanStatusCode["OK"] = 1] = "OK";
-    /**
-     * The operation contains an error.
-     */
-    SpanStatusCode[SpanStatusCode["ERROR"] = 2] = "ERROR";
-})(SpanStatusCode = exports.SpanStatusCode || (exports.SpanStatusCode = {}));
-//# sourceMappingURL=status.js.map
-
-/***/ }),
-
-/***/ 7221:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TraceFlags = void 0;
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-/**
- * @since 1.0.0
- */
-var TraceFlags;
-(function (TraceFlags) {
-    /** Represents no flag set. */
-    TraceFlags[TraceFlags["NONE"] = 0] = "NONE";
-    /** Bit to represent whether trace is sampled in trace flags. */
-    TraceFlags[TraceFlags["SAMPLED"] = 1] = "SAMPLED";
-})(TraceFlags = exports.TraceFlags || (exports.TraceFlags = {}));
-//# sourceMappingURL=trace_flags.js.map
-
-/***/ }),
-
-/***/ 9390:
-/***/ ((__unused_webpack_module, exports) => {
-
-
-/*
- * Copyright The OpenTelemetry Authors
- * SPDX-License-Identifier: Apache-2.0
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.VERSION = void 0;
-// this is autogenerated file, see scripts/version-update.js
-exports.VERSION = '1.9.1';
-//# sourceMappingURL=version.js.map
-
-/***/ }),
-
 /***/ 973:
 /***/ (function(__unused_webpack_module, exports) {
 
@@ -17535,7 +15281,7 @@ function checkMemorySyncInterval(ms, option) {
 /* harmony export */   Hh: () => (/* binding */ load)
 /* harmony export */ });
 /* unused harmony exports CHOMPING_CLIP, CHOMPING_KEEP, CHOMPING_MODE, CHOMPING_STRIP, COLLECTION_STYLE, COLLECTION_STYLE_BLOCK, COLLECTION_STYLE_FLOW, CORE_SCHEMA, DEFAULT_SCALAR_STYLE_RULES, DUMP_SCHEMA, EVENT_ALIAS, EVENT_DOCUMENT, EVENT_ID, EVENT_MAPPING, EVENT_POP, EVENT_SCALAR, EVENT_SEQUENCE, FAILSAFE_SCHEMA, JSON_SCHEMA, NOT_RESOLVED, SCALAR_STYLE, SCALAR_STYLE_DOUBLE_QUOTED, SCALAR_STYLE_FOLDED_BLOCK, SCALAR_STYLE_LITERAL_BLOCK, SCALAR_STYLE_PLAIN, SCALAR_STYLE_SINGLE_QUOTED, Schema, VISIT_BREAK, VISIT_SKIP, YAML11_SCHEMA, YAMLException, binaryTag, boolCoreTag, boolJsonTag, boolYaml11Tag, constructFromEvents, defineMappingTag, defineScalarTag, defineSequenceTag, eventsToAst, floatCoreTag, floatJsonTag, floatYaml11Tag, getScalarValue, intCoreTag, intJsonTag, intYaml11Tag, jsToAst, legacyMapTag, loadAll, mapTag, mergeTag, nullCoreTag, nullJsonTag, nullYaml11Tag, omapTag, pairsTag, parseEvents, present, realMapTag, seqTag, setTag, strTag, timestampTag, visit */
-/*! js-yaml 5.4.2 https://github.com/nodeca/js-yaml @license MIT */
+/*! js-yaml 5.5.0 https://github.com/nodeca/js-yaml @license MIT */
 //#region src/tag.ts
 /**
 * Returned by a scalar resolver when the source does not match its tag.
@@ -18361,10 +16107,8 @@ var Schema = class Schema {
 					if (tag.matchByTagPrefix) prefix.sequence.push(tag);
 					else exact.sequence[tag.tagName] = tag;
 					break;
-				case "mapping":
-					if (tag.matchByTagPrefix) prefix.mapping.push(tag);
-					else exact.mapping[tag.tagName] = tag;
-					break;
+				case "mapping": if (tag.matchByTagPrefix) prefix.mapping.push(tag);
+				else exact.mapping[tag.tagName] = tag;
 			}
 		}
 		const implicitScalarAnyFirstChar = implicitScalarTags.filter((tag) => tag.implicitFirstChars === null);
@@ -18952,16 +16696,17 @@ function getBlockValue(input, start, end, indent, chomping, folded) {
 		}
 		const content = line.slice(textIndent);
 		const first = content.charCodeAt(0);
-		if (folded) if (first === 32 || first === 9) {
-			atMoreIndented = true;
-			result += "\n".repeat(didReadContent ? 1 + emptyLines : emptyLines);
-		} else if (atMoreIndented) {
-			atMoreIndented = false;
-			result += "\n".repeat(emptyLines + 1);
-		} else if (emptyLines === 0) {
-			if (didReadContent) result += " ";
-		} else result += "\n".repeat(emptyLines);
-		else result += "\n".repeat(didReadContent ? 1 + emptyLines : emptyLines);
+		if (folded) {
+			if (first === 32 || first === 9) {
+				atMoreIndented = true;
+				result += "\n".repeat(didReadContent ? 1 + emptyLines : emptyLines);
+			} else if (atMoreIndented) {
+				atMoreIndented = false;
+				result += "\n".repeat(emptyLines + 1);
+			} else if (emptyLines === 0) {
+				if (didReadContent) result += " ";
+			} else result += "\n".repeat(emptyLines);
+		} else result += "\n".repeat(didReadContent ? 1 + emptyLines : emptyLines);
 		result += content;
 		didReadContent = true;
 		emptyLines = 0;
@@ -18995,24 +16740,69 @@ var DEFAULT_TAG_HANDLERS = Object.assign(Object.create(null), {
 	"!": "!",
 	"!!": "tag:yaml.org,2002:"
 });
-function tagPercentEncode(source) {
-	return encodeURI(source).replace(/!/g, "%21");
+var TAG_SUFFIX_CHARS = "-#;/?:@&=+$_.~*'()";
+var TAG_URI_CHARS = TAG_SUFFIX_CHARS + "!,[]";
+var HEX = "0123456789ABCDEF";
+function percentByte(byte) {
+	return "%" + HEX[byte >> 4] + HEX[byte & 15];
+}
+function tagPercentEncode(source, isSuffix) {
+	const allowed = isSuffix ? TAG_SUFFIX_CHARS : TAG_URI_CHARS;
+	let result = "";
+	for (let index = 0; index < source.length; index++) {
+		let ch = source.charCodeAt(index);
+		if (ch >= 48 && ch <= 57 || ch >= 65 && ch <= 90 || ch >= 97 && ch <= 122 || allowed.includes(source[index])) {
+			result += source[index];
+			continue;
+		}
+		if (ch >= 55296 && ch <= 56319) ch = 65536 + ((ch & 1023) << 10) + (source.charCodeAt(++index) & 1023);
+		if (ch < 128) result += percentByte(ch);
+		else if (ch < 2048) result += percentByte(192 | ch >> 6) + percentByte(128 | ch & 63);
+		else if (ch < 65536) result += percentByte(224 | ch >> 12) + percentByte(128 | ch >> 6 & 63) + percentByte(128 | ch & 63);
+		else result += percentByte(240 | ch >> 18) + percentByte(128 | ch >> 12 & 63) + percentByte(128 | ch >> 6 & 63) + percentByte(128 | ch & 63);
+	}
+	return result;
+}
+function tagPercentDecode(source) {
+	let result = "";
+	let index = 0;
+	while (index < source.length) {
+		if (source.charCodeAt(index) !== 37) {
+			result += source[index++];
+			continue;
+		}
+		let ch = parseInt(source.slice(index + 1, index + 3), 16);
+		index += 3;
+		if (ch >= 192) {
+			let remaining = ch < 224 ? 1 : ch < 240 ? 2 : 3;
+			ch &= (1 << 6 - remaining) - 1;
+			while (remaining-- > 0) {
+				ch = ch << 6 | parseInt(source.slice(index + 1, index + 3), 16) & 63;
+				index += 3;
+			}
+		}
+		if (ch < 65536) result += String.fromCharCode(ch);
+		else {
+			ch -= 65536;
+			result += String.fromCharCode(55296 | ch >> 10, 56320 | ch & 1023);
+		}
+	}
+	return result;
 }
 function tagNameFull(rawTag, tagHandlers) {
-	if (rawTag.startsWith("!<") && rawTag.endsWith(">")) return decodeURIComponent(rawTag.slice(2, -1));
+	if (rawTag.startsWith("!<") && rawTag.endsWith(">")) return tagPercentDecode(rawTag.slice(2, -1));
 	const handleEnd = rawTag.indexOf("!", 1);
 	const handle = handleEnd === -1 ? "!" : rawTag.slice(0, handleEnd + 1);
-	const prefix = tagHandlers?.[handle] ?? DEFAULT_TAG_HANDLERS[handle] ?? handle;
-	return decodeURIComponent(prefix) + decodeURIComponent(rawTag.slice(handle.length));
+	return tagPercentDecode(tagHandlers?.[handle] ?? DEFAULT_TAG_HANDLERS[handle] ?? handle) + tagPercentDecode(rawTag.slice(handle.length));
 }
 function tagNameShort(fullTag) {
 	let tag = fullTag;
 	if (tag.charCodeAt(0) === 33) {
 		tag = tag.slice(1);
-		return `!${tagPercentEncode(tag)}`;
+		return `!${tagPercentEncode(tag, true)}`;
 	}
-	if (tag.slice(0, 18) === "tag:yaml.org,2002:") return `!!${tagPercentEncode(tag.slice(18))}`;
-	return `!<${tagPercentEncode(tag)}>`;
+	if (tag.slice(0, 18) === "tag:yaml.org,2002:") return `!!${tagPercentEncode(tag.slice(18), true)}`;
+	return `!<${tagPercentEncode(tag, false)}>`;
 }
 //#endregion
 //#region src/parser/constructor.ts
@@ -19485,7 +17275,11 @@ function skipUntilLineEnd(state) {
 	while (ch !== 0 && !isEol(ch)) ch = state.input.charCodeAt(++state.position);
 }
 function checkPrintable(state, start, end) {
-	if (PATTERN_NON_PRINTABLE.test(state.input.slice(start, end))) throwError(state, "the stream contains non-printable characters");
+	const match = PATTERN_NON_PRINTABLE.exec(state.input.slice(start, end));
+	if (match !== null) {
+		state.position = start + match.index + match[0].length - 1;
+		throwError(state, "the stream contains non-printable characters");
+	}
 }
 function readTagProperty(state, props, inFlow) {
 	if (state.input.charCodeAt(state.position) !== 33) return false;
@@ -19512,12 +17306,14 @@ function readTagProperty(state, props, inFlow) {
 		state.position++;
 	} else {
 		while (ch !== 0 && !isWsOrEol(ch) && !(inFlow && isFlowIndicator(ch))) {
-			if (ch === 33) if (!isNamed) {
-				tagHandle = state.input.slice(suffixStart - 1, state.position + 1);
-				if (!PATTERN_TAG_HANDLE.test(tagHandle)) throwError(state, "named tag handle cannot contain such characters");
-				isNamed = true;
-				suffixStart = state.position + 1;
-			} else throwError(state, "tag suffix cannot contain exclamation marks");
+			if (ch === 33) {
+				if (!isNamed) {
+					tagHandle = state.input.slice(suffixStart - 1, state.position + 1);
+					if (!PATTERN_TAG_HANDLE.test(tagHandle)) throwError(state, "named tag handle cannot contain such characters");
+					isNamed = true;
+					suffixStart = state.position + 1;
+				} else throwError(state, "tag suffix cannot contain exclamation marks");
+			}
 			ch = state.input.charCodeAt(++state.position);
 		}
 		tagName = state.input.slice(suffixStart, state.position);
@@ -19670,7 +17466,7 @@ function readBlockScalar(state, parentIndent, props) {
 				state.position = linePosition + column;
 				throwError(state, "tab characters must not be used in indentation");
 			}
-			if (column < maxLeadingIndent) {
+			if (column >= parentIndent && column < maxLeadingIndent) {
 				state.position = linePosition + column;
 				throwError(state, "bad indentation of a mapping entry");
 			}
@@ -19701,7 +17497,7 @@ function readBlockScalar(state, parentIndent, props) {
 function canStartPlainScalar(state, nodeContext) {
 	const ch = state.input.charCodeAt(state.position);
 	const inFlow = nodeContext === CONTEXT_FLOW_IN;
-	if (ch === 0 || isWsOrEol(ch) || ch === 35 || ch === 38 || ch === 42 || ch === 33 || ch === 124 || ch === 62 || ch === 39 || ch === 34 || ch === 37 || ch === 64 || ch === 96 || inFlow && isFlowIndicator(ch)) return false;
+	if (ch === 0 || isWsOrEol(ch) || ch === 35 || ch === 38 || ch === 42 || ch === 33 || ch === 124 || ch === 62 || ch === 39 || ch === 34 || ch === 37 || ch === 64 || ch === 96 || isFlowIndicator(ch)) return false;
 	if (ch === 63 || ch === 45) {
 		const following = state.input.charCodeAt(state.position + 1);
 		if (isWsOrEolOrEnd(following) || inFlow && isFlowIndicator(following)) return false;
@@ -19880,13 +17676,16 @@ function readBlockMapping(state, nodeIndent, flowIndent, props) {
 					ch = state.input.charCodeAt(++state.position);
 					if (!isWsOrEolOrEnd(ch)) throwError(state, "a whitespace character is expected after the key-value separator within a block mapping");
 					if (!mappingOpened) {
-						restoreState(state, beforeKey);
-						addMappingEvent(state, beforeKey.position, props.anchorStart, props.anchorEnd, props.tagStart, props.tagEnd, COLLECTION_STYLE.BLOCK);
+						state.events.splice(beforeKey.eventsLength, 0, {
+							type: EVENT_ID.MAPPING,
+							start: beforeKey.position,
+							anchorStart: props.anchorStart,
+							anchorEnd: props.anchorEnd,
+							tagStart: props.tagStart,
+							tagEnd: props.tagEnd,
+							style: COLLECTION_STYLE.BLOCK
+						});
 						mappingOpened = true;
-						parseNode(state, flowIndent, CONTEXT_FLOW_OUT, false, true);
-						ch = state.input.charCodeAt(state.position);
-						while (isWhiteSpace(ch)) ch = state.input.charCodeAt(++state.position);
-						state.position++;
 					}
 					detected = true;
 					atExplicitKey = false;
@@ -19970,19 +17769,20 @@ function parseNode(state, parentIndent, nodeContext, allowToSeek, allowCompact, 
 	if (indentStatus === 1 || nodeContext === CONTEXT_BLOCK_OUT) {
 		const flowIndent = nodeContext === CONTEXT_FLOW_IN || nodeContext === CONTEXT_FLOW_OUT ? parentIndent : parentIndent + 1;
 		const blockIndent = state.position - state.lineStart;
-		if (indentStatus === 1) if (allowBlockCollections && (readBlockSequence(state, blockIndent, props) || readBlockMapping(state, blockIndent, flowIndent, props)) || readFlowCollection(state, flowIndent, props)) hasContent = true;
-		else {
-			const ch = state.input.charCodeAt(state.position);
-			if (propertyStart !== null && allowPropertyMapping && allowBlockStyles && !allowBlockCollections && ch !== 124 && ch !== 62) {
-				const fallbackState = snapshotState(state);
-				const propertyIndent = propertyStart.position - propertyStart.lineStart;
-				restoreState(state, propertyStart);
-				if (readBlockMapping(state, propertyIndent, flowIndent, emptyProperties()) && state.events[fallbackState.eventsLength]?.type === EVENT_ID.MAPPING) hasContent = true;
-				else restoreState(state, fallbackState);
+		if (indentStatus === 1) {
+			if (allowBlockCollections && (readBlockSequence(state, blockIndent, props) || readBlockMapping(state, blockIndent, flowIndent, props)) || readFlowCollection(state, flowIndent, props)) hasContent = true;
+			else {
+				const ch = state.input.charCodeAt(state.position);
+				if (propertyStart !== null && allowPropertyMapping && allowBlockStyles && !allowBlockCollections && ch !== 124 && ch !== 62) {
+					const fallbackState = snapshotState(state);
+					const propertyIndent = propertyStart.position - propertyStart.lineStart;
+					restoreState(state, propertyStart);
+					if (readBlockMapping(state, propertyIndent, flowIndent, emptyProperties()) && state.events[fallbackState.eventsLength]?.type === EVENT_ID.MAPPING) hasContent = true;
+					else restoreState(state, fallbackState);
+				}
+				if (!hasContent && (allowBlockScalars && readBlockScalar(state, flowIndent, props) || readSingleQuotedScalar(state, flowIndent, props) || readDoubleQuotedScalar(state, flowIndent, props) || readAlias(state, props) || readPlainScalar(state, flowIndent, nodeContext, props))) hasContent = true;
 			}
-			if (!hasContent && (allowBlockScalars && readBlockScalar(state, flowIndent, props) || readSingleQuotedScalar(state, flowIndent, props) || readDoubleQuotedScalar(state, flowIndent, props) || readAlias(state, props) || readPlainScalar(state, flowIndent, nodeContext, props))) hasContent = true;
-		}
-		else if (indentStatus === 0) hasContent = allowBlockCollections && readBlockSequence(state, blockIndent, props);
+		} else if (indentStatus === 0) hasContent = allowBlockCollections && readBlockSequence(state, blockIndent, props);
 	}
 	allowBlockScalars = allowBlockScalars && !hasContent;
 	if (!hasContent && (props.anchorStart !== NO_RANGE$1 || props.tagStart !== NO_RANGE$1 || allowBlockScalars)) {
@@ -20329,20 +18129,18 @@ function visitNode(node, visitor, ctx) {
 				isKey: false
 			})) return true;
 			break;
-		case "mapping":
-			for (const { key, value } of node.items) {
-				if (visitNode(key, visitor, {
-					depth,
-					parent: node,
-					isKey: true
-				})) return true;
-				if (visitNode(value, visitor, {
-					depth,
-					parent: node,
-					isKey: false
-				})) return true;
-			}
-			break;
+		case "mapping": for (const { key, value } of node.items) {
+			if (visitNode(key, visitor, {
+				depth,
+				parent: node,
+				isKey: true
+			})) return true;
+			if (visitNode(value, visitor, {
+				depth,
+				parent: node,
+				isKey: false
+			})) return true;
+		}
 	}
 	return false;
 }
@@ -20774,8 +18572,10 @@ function writeBlockMapping(state, level, node, compact) {
 		const keyHasLineBreak = key.kind === "scalar" && key.value.indexOf("\n") !== -1;
 		const keyIsTooLong = keyText.length > 1024 && /^[\s\S]{1025}/u.test(keyText);
 		const explicitPair = keyIsBlock || keyHasLineBreak || keyIsTooLong;
-		if (explicitPair) if (keyText && CHAR_LINE_FEED === keyText.charCodeAt(0)) pairBuffer += "?";
-		else pairBuffer += "? ";
+		if (explicitPair) {
+			if (keyText && CHAR_LINE_FEED === keyText.charCodeAt(0)) pairBuffer += "?";
+			else pairBuffer += "? ";
+		}
 		pairBuffer += keyText;
 		if (explicitPair) pairBuffer += generateNextLine(state, level);
 		const valueText = writeNode(state, level + 1, value, node, {
@@ -20811,12 +18611,15 @@ function writeNode(state, level, node, parent, ctx) {
 	let body;
 	let shouldPrintTag = node.tagged;
 	const useBlockCollection = block && (node.kind === "mapping" || node.kind === "sequence") && node.style === COLLECTION_STYLE.BLOCK && node.items.length !== 0;
-	if (node.kind === "mapping") if (useBlockCollection) body = writeBlockMapping(state, level, node, compact);
-	else body = writeFlowMapping(state, level, node);
-	else if (node.kind === "sequence") if (useBlockCollection) if (state.seqNoIndent && !isblockseq && level > 0) body = writeBlockSequence(state, level - 1, node, compact);
-	else body = writeBlockSequence(state, level, node, compact);
-	else body = writeFlowSequence(state, level, node);
-	else {
+	if (node.kind === "mapping") {
+		if (useBlockCollection) body = writeBlockMapping(state, level, node, compact);
+		else body = writeFlowMapping(state, level, node);
+	} else if (node.kind === "sequence") {
+		if (useBlockCollection) {
+			if (state.seqNoIndent && !isblockseq && level > 0) body = writeBlockSequence(state, level - 1, node, compact);
+			else body = writeBlockSequence(state, level, node, compact);
+		} else body = writeFlowSequence(state, level, node);
+	} else {
 		const layout = scalarLayout(state, node, parent, level, iskey, !block);
 		detectAllowedStyles(layout);
 		for (const rule of state.scalarStyleRules) rule(layout);
@@ -54647,8 +52450,1282 @@ const FallbackEncoder = ({ headers, body }) => {
     };
 };
 //# sourceMappingURL=request-options.mjs.map
-// EXTERNAL MODULE: ./node_modules/@opentelemetry/api/build/src/index.js
-var src = __nccwpck_require__(3914);
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/version.mjs
+//#region src/version.ts
+const version_VERSION = "1.10.0";
+//#endregion
+
+
+//# sourceMappingURL=version.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/internal/semver.mjs
+
+//#region src/internal/semver.ts
+const re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
+/**
+* Create a function to test an API version to see if it is compatible with the provided ownVersion.
+*
+* The returned function has the following semantics:
+* - Exact match is always compatible
+* - Major versions must match exactly
+*    - 1.x package cannot use global 2.x package
+*    - 2.x package cannot use global 1.x package
+* - The minor version of the API module requesting access to the global API must be less than or equal to the minor version of this API
+*    - 1.3 package may use 1.4 global because the later global contains all functions 1.3 expects
+*    - 1.4 package may NOT use 1.3 global because it may try to call functions which don't exist on 1.3
+* - If the major version is 0, the minor version is treated as the major and the patch is treated as the minor
+* - Patch and build tag differences are not considered at this time
+*
+* @param ownVersion version which should be checked against
+*/
+function _makeCompatibilityCheck(ownVersion) {
+	const acceptedVersions = /* @__PURE__ */ new Set([ownVersion]);
+	const rejectedVersions = /* @__PURE__ */ new Set();
+	const myVersionMatch = ownVersion.match(re);
+	if (!myVersionMatch) return () => false;
+	const ownVersionParsed = {
+		major: +myVersionMatch[1],
+		minor: +myVersionMatch[2],
+		patch: +myVersionMatch[3],
+		prerelease: myVersionMatch[4]
+	};
+	if (ownVersionParsed.prerelease != null) return function isExactmatch(globalVersion) {
+		return globalVersion === ownVersion;
+	};
+	function _reject(v) {
+		rejectedVersions.add(v);
+		return false;
+	}
+	function _accept(v) {
+		acceptedVersions.add(v);
+		return true;
+	}
+	return function isCompatible(globalVersion) {
+		if (acceptedVersions.has(globalVersion)) return true;
+		if (rejectedVersions.has(globalVersion)) return false;
+		const globalVersionMatch = globalVersion.match(re);
+		if (!globalVersionMatch) return _reject(globalVersion);
+		const globalVersionParsed = {
+			major: +globalVersionMatch[1],
+			minor: +globalVersionMatch[2],
+			patch: +globalVersionMatch[3],
+			prerelease: globalVersionMatch[4]
+		};
+		if (globalVersionParsed.prerelease != null) return _reject(globalVersion);
+		if (ownVersionParsed.major !== globalVersionParsed.major) return _reject(globalVersion);
+		if (ownVersionParsed.major === 0) {
+			if (ownVersionParsed.minor === globalVersionParsed.minor && ownVersionParsed.patch <= globalVersionParsed.patch) return _accept(globalVersion);
+			return _reject(globalVersion);
+		}
+		if (ownVersionParsed.minor <= globalVersionParsed.minor) return _accept(globalVersion);
+		return _reject(globalVersion);
+	};
+}
+/**
+* Test an API version to see if it is compatible with this API.
+*
+* - Exact match is always compatible
+* - Major versions must match exactly
+*    - 1.x package cannot use global 2.x package
+*    - 2.x package cannot use global 1.x package
+* - The minor version of the API module requesting access to the global API must be less than or equal to the minor version of this API
+*    - 1.3 package may use 1.4 global because the later global contains all functions 1.3 expects
+*    - 1.4 package may NOT use 1.3 global because it may try to call functions which don't exist on 1.3
+* - If the major version is 0, the minor version is treated as the major and the patch is treated as the minor
+* - Patch and build tag differences are not considered at this time
+*
+* @param version version of the API requesting an instance of the global API
+*/
+const isCompatible = _makeCompatibilityCheck(version_VERSION);
+//#endregion
+
+
+//# sourceMappingURL=semver.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/internal/global-utils.mjs
+
+
+//#region src/internal/global-utils.ts
+const major = version_VERSION.split(".")[0];
+const GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for(`opentelemetry.js.api.${major}`);
+const _global = typeof globalThis === "object" ? globalThis : typeof self === "object" ? self : typeof window === "object" ? window : typeof global === "object" ? global : {};
+function _makeGlobalApi() {
+	return Object.defineProperty({}, "version", {
+		value: version_VERSION,
+		enumerable: true,
+		writable: false,
+		configurable: false
+	});
+}
+function registerGlobal(type, instance, diag, allowOverride = false) {
+	var _global$GLOBAL_OPENTE;
+	const api = _global[GLOBAL_OPENTELEMETRY_API_KEY] = (_global$GLOBAL_OPENTE = _global[GLOBAL_OPENTELEMETRY_API_KEY]) !== null && _global$GLOBAL_OPENTE !== void 0 ? _global$GLOBAL_OPENTE : _makeGlobalApi();
+	if (!allowOverride && api[type]) {
+		const err = /* @__PURE__ */ new Error(`@opentelemetry/api: Attempted duplicate registration of API: ${type}`);
+		diag.error(err.stack || err.message);
+		return false;
+	}
+	if (api.version !== "1.10.0") {
+		const err = /* @__PURE__ */ new Error(`@opentelemetry/api: Registration of version v${api.version} for ${type} does not match previously registered API v${version_VERSION}`);
+		diag.error(err.stack || err.message);
+		return false;
+	}
+	api[type] = instance;
+	diag.debug(`@opentelemetry/api: Registered a global for ${type} v${version_VERSION}.`);
+	return true;
+}
+let _compatibleGlobalApi;
+function getGlobal(type) {
+	const api = _global[GLOBAL_OPENTELEMETRY_API_KEY];
+	if (api == null) return;
+	if (api !== _compatibleGlobalApi) {
+		if (!api.version || !isCompatible(api.version)) return;
+		_compatibleGlobalApi = api;
+	}
+	return api[type];
+}
+function unregisterGlobal(type, diag) {
+	diag.debug(`@opentelemetry/api: Unregistering a global for ${type} v${version_VERSION}.`);
+	const api = _global[GLOBAL_OPENTELEMETRY_API_KEY];
+	if (api) delete api[type];
+}
+//#endregion
+
+
+//# sourceMappingURL=global-utils.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/diag/ComponentLogger.mjs
+
+//#region src/diag/ComponentLogger.ts
+/**
+* Component Logger which is meant to be used as part of any component which
+* will add automatically additional namespace in front of the log message.
+* It will then forward all message to global diag logger
+* @example
+* const cLogger = diag.createComponentLogger({ namespace: '@opentelemetry/instrumentation-http' });
+* cLogger.debug('test');
+* // @opentelemetry/instrumentation-http test
+*/
+var DiagComponentLogger = class {
+	constructor(props) {
+		this._namespace = props.namespace || "DiagComponentLogger";
+	}
+	debug(...args) {
+		return logProxy("debug", this._namespace, args);
+	}
+	error(...args) {
+		return logProxy("error", this._namespace, args);
+	}
+	info(...args) {
+		return logProxy("info", this._namespace, args);
+	}
+	warn(...args) {
+		return logProxy("warn", this._namespace, args);
+	}
+	verbose(...args) {
+		return logProxy("verbose", this._namespace, args);
+	}
+};
+function logProxy(funcName, namespace, args) {
+	const logger = getGlobal("diag");
+	if (!logger) return;
+	return logger[funcName](namespace, ...args);
+}
+//#endregion
+
+
+//# sourceMappingURL=ComponentLogger.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/diag/internal/logLevelLogger.mjs
+
+//#region src/diag/internal/logLevelLogger.ts
+function createLogLevelDiagLogger(maxLevel, logger) {
+	if (maxLevel < 0) maxLevel = 0;
+	else if (maxLevel > 9999) maxLevel = 9999;
+	logger = logger || {};
+	function _filterFunc(funcName, theLevel) {
+		const theFunc = logger[funcName];
+		if (typeof theFunc === "function" && maxLevel >= theLevel) return theFunc.bind(logger);
+		return function() {};
+	}
+	return {
+		error: _filterFunc("error", 30),
+		warn: _filterFunc("warn", 50),
+		info: _filterFunc("info", 60),
+		debug: _filterFunc("debug", 70),
+		verbose: _filterFunc("verbose", 80)
+	};
+}
+//#endregion
+
+
+//# sourceMappingURL=logLevelLogger.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/api/diag.mjs
+
+
+
+
+//#region src/api/diag.ts
+const API_NAME = "diag";
+/**
+* Singleton object which represents the entry point to the OpenTelemetry internal
+* diagnostic API
+*
+* @since 1.0.0
+*/
+var DiagAPI = class DiagAPI {
+	/** Get the singleton instance of the DiagAPI API */
+	static instance() {
+		if (!this._instance) this._instance = new DiagAPI();
+		return this._instance;
+	}
+	/**
+	* Private internal constructor
+	* @private
+	*/
+	constructor() {
+		function _logProxy(funcName) {
+			return function(...args) {
+				const logger = getGlobal("diag");
+				if (!logger) return;
+				return logger[funcName](...args);
+			};
+		}
+		const self = this;
+		const setLogger = (logger, optionsOrLogLevel = { logLevel: 60 }) => {
+			var _optionsOrLogLevel$lo;
+			if (logger === self) {
+				var _err$stack;
+				const err = /* @__PURE__ */ new Error("Cannot use diag as the logger for itself. Please use a DiagLogger implementation like ConsoleDiagLogger or a custom implementation");
+				self.error((_err$stack = err.stack) !== null && _err$stack !== void 0 ? _err$stack : err.message);
+				return false;
+			}
+			if (typeof optionsOrLogLevel === "number") optionsOrLogLevel = { logLevel: optionsOrLogLevel };
+			const oldLogger = getGlobal("diag");
+			const newLogger = createLogLevelDiagLogger((_optionsOrLogLevel$lo = optionsOrLogLevel.logLevel) !== null && _optionsOrLogLevel$lo !== void 0 ? _optionsOrLogLevel$lo : 60, logger);
+			if (oldLogger && !optionsOrLogLevel.suppressOverrideMessage) {
+				var _Error$stack;
+				const stack = (_Error$stack = (/* @__PURE__ */ new Error()).stack) !== null && _Error$stack !== void 0 ? _Error$stack : "<failed to generate stacktrace>";
+				oldLogger.warn(`Current logger will be overwritten from ${stack}`);
+				newLogger.warn(`Current logger will overwrite one already registered from ${stack}`);
+			}
+			return registerGlobal("diag", newLogger, self, true);
+		};
+		self.setLogger = setLogger;
+		self.disable = () => {
+			unregisterGlobal(API_NAME, self);
+		};
+		self.createComponentLogger = (options) => {
+			return new DiagComponentLogger(options);
+		};
+		self.verbose = _logProxy("verbose");
+		self.debug = _logProxy("debug");
+		self.info = _logProxy("info");
+		self.warn = _logProxy("warn");
+		self.error = _logProxy("error");
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=diag.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/context/context.mjs
+//#region src/context/context.ts
+/**
+* Get a key to uniquely identify a context value
+*
+* @since 1.0.0
+*/
+function createContextKey(description) {
+	return Symbol.for(description);
+}
+/**
+* The root context is used as the default parent context when there is no active context
+*
+* @since 1.0.0
+*/
+const ROOT_CONTEXT = new class BaseContext {
+	/**
+	* Construct a new context which inherits values from an optional parent context.
+	*
+	* @param parentContext a context from which to inherit values
+	*/
+	constructor(parentContext) {
+		const self = this;
+		self._currentContext = parentContext ? new Map(parentContext) : /* @__PURE__ */ new Map();
+		self.getValue = (key) => self._currentContext.get(key);
+		self.setValue = (key, value) => {
+			const context = new BaseContext(self._currentContext);
+			context._currentContext.set(key, value);
+			return context;
+		};
+		self.deleteValue = (key) => {
+			const context = new BaseContext(self._currentContext);
+			context._currentContext.delete(key);
+			return context;
+		};
+	}
+}();
+//#endregion
+
+
+//# sourceMappingURL=context.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/context/NoopContextManager.mjs
+
+//#region src/context/NoopContextManager.ts
+var NoopContextManager = class {
+	active() {
+		return ROOT_CONTEXT;
+	}
+	with(_context, fn, thisArg, ...args) {
+		return fn.call(thisArg, ...args);
+	}
+	bind(_context, target) {
+		return target;
+	}
+	enable() {
+		return this;
+	}
+	disable() {
+		return this;
+	}
+	/** @experimental This API is experimental and may change in minor releases without prior notice. */
+	attach(_context) {
+		return { dispose() {} };
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=NoopContextManager.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/api/context.mjs
+
+
+
+//#region src/api/context.ts
+const context_API_NAME = "context";
+const NOOP_CONTEXT_MANAGER = new NoopContextManager();
+const NOOP_TOKEN = Object.freeze({ dispose: () => {} });
+/**
+* Singleton object which represents the entry point to the OpenTelemetry Context API
+*
+* @since 1.0.0
+*/
+var ContextAPI = class ContextAPI {
+	/** Empty private constructor prevents end users from constructing a new instance of the API */
+	constructor() {
+		this._attachUnsupportedWarned = false;
+	}
+	/** Get the singleton instance of the Context API */
+	static getInstance() {
+		if (!this._instance) this._instance = new ContextAPI();
+		return this._instance;
+	}
+	/**
+	* Set the current context manager.
+	*
+	* @returns true if the context manager was successfully registered, else false
+	*/
+	setGlobalContextManager(contextManager) {
+		return registerGlobal(context_API_NAME, contextManager, DiagAPI.instance());
+	}
+	/**
+	* Get the currently active context
+	*/
+	active() {
+		return this._getContextManager().active();
+	}
+	/**
+	* Execute a function with an active context
+	*
+	* @param context context to be active during function execution
+	* @param fn function to execute in a context
+	* @param thisArg optional receiver to be used for calling fn
+	* @param args optional arguments forwarded to fn
+	*/
+	with(context, fn, thisArg, ...args) {
+		return this._getContextManager().with(context, fn, thisArg, ...args);
+	}
+	/**
+	* Bind a context to a target function or event emitter
+	*
+	* @param context context to bind to the event emitter or function. Defaults to the currently active context
+	* @param target function or event emitter to bind
+	*/
+	bind(context, target) {
+		return this._getContextManager().bind(context, target);
+	}
+	/**
+	* Imperatively sets `context` as active, returning a {@link ContextManagementToken} whose
+	* {@link ContextManagementToken.dispose} restores the previous context.
+	*
+	* This is a delicate, low-level API - prefer {@link with}/{@link bind}, which
+	* restore context automatically. Use `attach` only to bridge callback
+	* boundaries that `with` cannot wrap. Call `token.dispose()` when the
+	* operation is done.
+	*
+	* **Caveat for async functions:** If called inside an async function before
+	* the first `await`, the context change may leak into the caller's context
+	* and remain active there. Prefer {@link with} for async code.
+	*
+	* Support is best-effort and varies by the active ContextManager (see
+	* {@link ContextManager.attach}); if it does not implement `attach`, this logs
+	* a warning and returns a no-op token.
+	*
+	* @param context The Context to attach
+	* @returns A {@link ContextManagementToken} whose dispose() restores the previous Context
+	* @since 1.10.0
+	* @experimental This API is experimental and may change in minor releases without prior notice.
+	*/
+	attach(context) {
+		const contextManager = this._getContextManager();
+		if (contextManager.attach) return contextManager.attach(context);
+		if (!this._attachUnsupportedWarned) {
+			this._attachUnsupportedWarned = true;
+			DiagAPI.instance().warn("The current ContextManager does not implement attach(). The context will not be attached. Use a ContextManager that supports attach() (e.g. AsyncLocalStorageContextManager) or use with()/bind() instead.");
+		}
+		return NOOP_TOKEN;
+	}
+	_getContextManager() {
+		return getGlobal(context_API_NAME) || NOOP_CONTEXT_MANAGER;
+	}
+	/** Disable and remove the global context manager */
+	disable() {
+		this._getContextManager().disable();
+		unregisterGlobal(context_API_NAME, DiagAPI.instance());
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=context.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/invalid-span-constants.mjs
+
+//#region src/trace/invalid-span-constants.ts
+/**
+* @since 1.0.0
+*/
+const INVALID_SPANID = "0000000000000000";
+/**
+* @since 1.0.0
+*/
+const INVALID_TRACEID = "00000000000000000000000000000000";
+/**
+* @since 1.0.0
+*/
+const INVALID_SPAN_CONTEXT = {
+	traceId: INVALID_TRACEID,
+	spanId: INVALID_SPANID,
+	traceFlags: 0
+};
+//#endregion
+
+
+//# sourceMappingURL=invalid-span-constants.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/NonRecordingSpan.mjs
+
+//#region src/trace/NonRecordingSpan.ts
+/**
+* The NonRecordingSpan is the default {@link Span} that is used when no Span
+* implementation is available. All operations are no-op including context
+* propagation.
+*/
+var NonRecordingSpan = class {
+	constructor(spanContext = INVALID_SPAN_CONTEXT) {
+		this._spanContext = spanContext;
+	}
+	spanContext() {
+		return this._spanContext;
+	}
+	setAttribute(_key, _value) {
+		return this;
+	}
+	setAttributes(_attributes) {
+		return this;
+	}
+	addEvent(_name, _attributes) {
+		return this;
+	}
+	addLink(_link) {
+		return this;
+	}
+	addLinks(_links) {
+		return this;
+	}
+	setStatus(_status) {
+		return this;
+	}
+	updateName(_name) {
+		return this;
+	}
+	end(_endTime) {}
+	isRecording() {
+		return false;
+	}
+	recordException(_exception, _time) {}
+};
+//#endregion
+
+
+//# sourceMappingURL=NonRecordingSpan.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/context-utils.mjs
+
+
+
+//#region src/trace/context-utils.ts
+/**
+* span key
+*/
+const SPAN_KEY = createContextKey("OpenTelemetry Context Key SPAN");
+/**
+* Return the span if one exists
+*
+* @param context context to get span from
+*/
+function getSpan(context) {
+	return context.getValue(SPAN_KEY) || void 0;
+}
+/**
+* Gets the span from the current context, if one exists.
+*/
+function getActiveSpan() {
+	return getSpan(ContextAPI.getInstance().active());
+}
+/**
+* Set the span on a context
+*
+* @param context context to use as parent
+* @param span span to set active
+*/
+function setSpan(context, span) {
+	return context.setValue(SPAN_KEY, span);
+}
+/**
+* Remove current span stored in the context
+*
+* @param context context to delete span from
+*/
+function deleteSpan(context) {
+	return context.deleteValue(SPAN_KEY);
+}
+/**
+* Wrap span context in a NoopSpan and set as span in a new
+* context
+*
+* @param context context to set active span on
+* @param spanContext span context to be wrapped
+*/
+function setSpanContext(context, spanContext) {
+	return setSpan(context, new NonRecordingSpan(spanContext));
+}
+/**
+* Get the span context of the span if it exists.
+*
+* @param context context to get values from
+*/
+function getSpanContext(context) {
+	var _getSpan;
+	return (_getSpan = getSpan(context)) === null || _getSpan === void 0 ? void 0 : _getSpan.spanContext();
+}
+//#endregion
+
+
+//# sourceMappingURL=context-utils.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/spancontext-utils.mjs
+
+
+//#region src/trace/spancontext-utils.ts
+const isHex = new Uint8Array([
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1
+]);
+function isValidHex(id, length) {
+	if (typeof id !== "string" || id.length !== length) return false;
+	let r = 0;
+	for (let i = 0; i < id.length; i += 4) r += (isHex[id.charCodeAt(i)] | 0) + (isHex[id.charCodeAt(i + 1)] | 0) + (isHex[id.charCodeAt(i + 2)] | 0) + (isHex[id.charCodeAt(i + 3)] | 0);
+	return r === length;
+}
+/**
+* @since 1.0.0
+*/
+function isValidTraceId(traceId) {
+	return isValidHex(traceId, 32) && traceId !== "00000000000000000000000000000000";
+}
+/**
+* @since 1.0.0
+*/
+function isValidSpanId(spanId) {
+	return isValidHex(spanId, 16) && spanId !== "0000000000000000";
+}
+/**
+* Returns true if this {@link SpanContext} is valid.
+* @return true if this {@link SpanContext} is valid.
+*
+* @since 1.0.0
+*/
+function isSpanContextValid(spanContext) {
+	return isValidTraceId(spanContext.traceId) && isValidSpanId(spanContext.spanId);
+}
+/**
+* Wrap the given {@link SpanContext} in a new non-recording {@link Span}
+*
+* @param spanContext span context to be wrapped
+* @returns a new non-recording {@link Span} with the provided context
+*/
+function wrapSpanContext(spanContext) {
+	return new NonRecordingSpan(spanContext);
+}
+//#endregion
+
+
+//# sourceMappingURL=spancontext-utils.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/NoopTracer.mjs
+
+
+
+
+//#region src/trace/NoopTracer.ts
+const contextApi = ContextAPI.getInstance();
+/**
+* No-op implementations of {@link Tracer}.
+*/
+var NoopTracer = class {
+	startSpan(name, options, context = contextApi.active()) {
+		if (Boolean(options === null || options === void 0 ? void 0 : options.root)) return new NonRecordingSpan();
+		const parentFromContext = context && getSpanContext(context);
+		if (isSpanContext(parentFromContext) && isSpanContextValid(parentFromContext)) return new NonRecordingSpan(parentFromContext);
+		else return new NonRecordingSpan();
+	}
+	startActiveSpan(name, arg2, arg3, arg4) {
+		var _ctx;
+		let opts;
+		let ctx;
+		let fn;
+		if (arguments.length < 2) return;
+		else if (arguments.length === 2) fn = arg2;
+		else if (arguments.length === 3) {
+			opts = arg2;
+			fn = arg3;
+		} else {
+			opts = arg2;
+			ctx = arg3;
+			fn = arg4;
+		}
+		const parentContext = (_ctx = ctx) !== null && _ctx !== void 0 ? _ctx : contextApi.active();
+		const span = this.startSpan(name, opts, parentContext);
+		const contextWithSpanSet = setSpan(parentContext, span);
+		return contextApi.with(contextWithSpanSet, fn, void 0, span);
+	}
+};
+function isSpanContext(spanContext) {
+	return spanContext !== null && typeof spanContext === "object" && "spanId" in spanContext && typeof spanContext["spanId"] === "string" && "traceId" in spanContext && typeof spanContext["traceId"] === "string" && "traceFlags" in spanContext && typeof spanContext["traceFlags"] === "number";
+}
+//#endregion
+
+
+//# sourceMappingURL=NoopTracer.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/ProxyTracer.mjs
+
+//#region src/trace/ProxyTracer.ts
+const NOOP_TRACER = new NoopTracer();
+/**
+* Proxy tracer provided by the proxy tracer provider
+*
+* @since 1.0.0
+*/
+var ProxyTracer = class {
+	constructor(provider, name, version, options) {
+		this._provider = provider;
+		this.name = name;
+		this.version = version;
+		this.options = options;
+	}
+	startSpan(name, options, context) {
+		return this._getTracer().startSpan(name, options, context);
+	}
+	startActiveSpan(_name, _options, _context, _fn) {
+		const tracer = this._getTracer();
+		return Reflect.apply(tracer.startActiveSpan, tracer, arguments);
+	}
+	/**
+	* Try to get a tracer from the proxy tracer provider.
+	* If the proxy tracer provider has no delegate, return a noop tracer.
+	*/
+	_getTracer() {
+		if (this._delegate) return this._delegate;
+		const tracer = this._provider.getDelegateTracer(this.name, this.version, this.options);
+		if (!tracer) return NOOP_TRACER;
+		this._delegate = tracer;
+		return this._delegate;
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=ProxyTracer.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/NoopTracerProvider.mjs
+
+//#region src/trace/NoopTracerProvider.ts
+/**
+* An implementation of the {@link TracerProvider} which returns an impotent
+* Tracer for all calls to `getTracer`.
+*
+* All operations are no-op.
+*/
+var NoopTracerProvider = class {
+	getTracer(_name, _version, _options) {
+		return new NoopTracer();
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=NoopTracerProvider.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/ProxyTracerProvider.mjs
+
+
+//#region src/trace/ProxyTracerProvider.ts
+const NOOP_TRACER_PROVIDER = new NoopTracerProvider();
+/**
+* Tracer provider which provides {@link ProxyTracer}s.
+*
+* Before a delegate is set, tracers provided are NoOp.
+*   When a delegate is set, traces are provided from the delegate.
+*   When a delegate is set after tracers have already been provided,
+*   all tracers already provided will use the provided delegate implementation.
+*
+* @deprecated This will be removed in the next major version.
+* @since 1.0.0
+*/
+var ProxyTracerProvider = class {
+	/**
+	* Get a {@link ProxyTracer}
+	*/
+	getTracer(name, version, options) {
+		var _this$getDelegateTrac;
+		return (_this$getDelegateTrac = this.getDelegateTracer(name, version, options)) !== null && _this$getDelegateTrac !== void 0 ? _this$getDelegateTrac : new ProxyTracer(this, name, version, options);
+	}
+	getDelegate() {
+		var _this$_delegate;
+		return (_this$_delegate = this._delegate) !== null && _this$_delegate !== void 0 ? _this$_delegate : NOOP_TRACER_PROVIDER;
+	}
+	/**
+	* Set the delegate tracer provider
+	*/
+	setDelegate(delegate) {
+		this._delegate = delegate;
+	}
+	getDelegateTracer(name, version, options) {
+		var _this$_delegate2;
+		return (_this$_delegate2 = this._delegate) === null || _this$_delegate2 === void 0 ? void 0 : _this$_delegate2.getTracer(name, version, options);
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=ProxyTracerProvider.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/api/trace.mjs
+
+
+
+
+
+//#region src/api/trace.ts
+const trace_API_NAME = "trace";
+/**
+* Singleton object which represents the entry point to the OpenTelemetry Tracing API
+*
+* @since 1.0.0
+*/
+var TraceAPI = class TraceAPI {
+	/** Empty private constructor prevents end users from constructing a new instance of the API */
+	constructor() {
+		this._proxyTracerProvider = new ProxyTracerProvider();
+		this.wrapSpanContext = wrapSpanContext;
+		this.isSpanContextValid = isSpanContextValid;
+		this.deleteSpan = deleteSpan;
+		this.getSpan = getSpan;
+		this.getActiveSpan = getActiveSpan;
+		this.getSpanContext = getSpanContext;
+		this.setSpan = setSpan;
+		this.setSpanContext = setSpanContext;
+	}
+	/** Get the singleton instance of the Trace API */
+	static getInstance() {
+		if (!this._instance) this._instance = new TraceAPI();
+		return this._instance;
+	}
+	/**
+	* Set the current global tracer.
+	*
+	* @returns true if the tracer provider was successfully registered, else false
+	*/
+	setGlobalTracerProvider(provider) {
+		const success = registerGlobal(trace_API_NAME, this._proxyTracerProvider, DiagAPI.instance());
+		if (success) this._proxyTracerProvider.setDelegate(provider);
+		return success;
+	}
+	/**
+	* Returns the global tracer provider.
+	*/
+	getTracerProvider() {
+		return getGlobal(trace_API_NAME) || this._proxyTracerProvider;
+	}
+	/**
+	* Returns a tracer from the global tracer provider.
+	*/
+	getTracer(name, version) {
+		return this.getTracerProvider().getTracer(name, version);
+	}
+	/** Remove the global tracer provider */
+	disable() {
+		unregisterGlobal(trace_API_NAME, DiagAPI.instance());
+		this._proxyTracerProvider = new ProxyTracerProvider();
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=trace.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace-api.mjs
+
+//#region src/trace-api.ts
+/**
+* Entrypoint for trace API
+*
+* @since 1.0.0
+*/
+const trace = TraceAPI.getInstance();
+//#endregion
+
+
+//# sourceMappingURL=trace-api.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/span_kind.mjs
+//#region src/trace/span_kind.ts
+/**
+* @since 1.0.0
+*/
+let SpanKind = /* @__PURE__ */ function(SpanKind) {
+	/** Default value. Indicates that the span is used internally. */
+	SpanKind[SpanKind["INTERNAL"] = 0] = "INTERNAL";
+	/**
+	* Indicates that the span covers server-side handling of an RPC or other
+	* remote request.
+	*/
+	SpanKind[SpanKind["SERVER"] = 1] = "SERVER";
+	/**
+	* Indicates that the span covers the client-side wrapper around an RPC or
+	* other remote request.
+	*/
+	SpanKind[SpanKind["CLIENT"] = 2] = "CLIENT";
+	/**
+	* Indicates that the span describes producer sending a message to a
+	* broker. Unlike client and server, there is no direct critical path latency
+	* relationship between producer and consumer spans.
+	*/
+	SpanKind[SpanKind["PRODUCER"] = 3] = "PRODUCER";
+	/**
+	* Indicates that the span describes consumer receiving a message from a
+	* broker. Unlike client and server, there is no direct critical path latency
+	* relationship between producer and consumer spans.
+	*/
+	SpanKind[SpanKind["CONSUMER"] = 4] = "CONSUMER";
+	return SpanKind;
+}({});
+//#endregion
+
+
+//# sourceMappingURL=span_kind.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/trace/status.mjs
+//#region src/trace/status.ts
+/**
+* An enumeration of status codes.
+*
+* @since 1.0.0
+*/
+let SpanStatusCode = /* @__PURE__ */ function(SpanStatusCode) {
+	/**
+	* The default status.
+	*/
+	SpanStatusCode[SpanStatusCode["UNSET"] = 0] = "UNSET";
+	/**
+	* The operation has been validated by an Application developer or
+	* Operator to have completed successfully.
+	*/
+	SpanStatusCode[SpanStatusCode["OK"] = 1] = "OK";
+	/**
+	* The operation contains an error.
+	*/
+	SpanStatusCode[SpanStatusCode["ERROR"] = 2] = "ERROR";
+	return SpanStatusCode;
+}({});
+//#endregion
+
+
+//# sourceMappingURL=status.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/baggage/internal/baggage-impl.mjs
+//#region src/baggage/internal/baggage-impl.ts
+var BaggageImpl = class BaggageImpl {
+	constructor(entries) {
+		this._entries = entries ? new Map(entries) : /* @__PURE__ */ new Map();
+	}
+	getEntry(key) {
+		const entry = this._entries.get(key);
+		if (!entry) return;
+		return Object.assign({}, entry);
+	}
+	getAllEntries() {
+		return Array.from(this._entries.entries());
+	}
+	setEntry(key, entry) {
+		const newBaggage = new BaggageImpl(this._entries);
+		newBaggage._entries.set(key, entry);
+		return newBaggage;
+	}
+	removeEntry(key) {
+		const newBaggage = new BaggageImpl(this._entries);
+		newBaggage._entries.delete(key);
+		return newBaggage;
+	}
+	removeEntries(...keys) {
+		const newBaggage = new BaggageImpl(this._entries);
+		for (const key of keys) newBaggage._entries.delete(key);
+		return newBaggage;
+	}
+	clear() {
+		return new BaggageImpl();
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=baggage-impl.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/baggage/utils.mjs
+
+
+
+//#region src/baggage/utils.ts
+const diag = DiagAPI.instance();
+/**
+* Create a new Baggage with optional entries
+*
+* @param entries An array of baggage entries the new baggage should contain
+*/
+function createBaggage(entries = {}) {
+	return new BaggageImpl(new Map(Object.entries(entries)));
+}
+/**
+* Create a serializable BaggageEntryMetadata object from a string.
+*
+* @param str string metadata. Format is currently not defined by the spec and has no special meaning.
+*
+* @since 1.0.0
+*/
+function baggageEntryMetadataFromString(str) {
+	if (typeof str !== "string") {
+		diag.error(`Cannot create baggage metadata from unknown type: ${typeof str}`);
+		str = "";
+	}
+	return {
+		__TYPE__: baggageEntryMetadataSymbol,
+		toString() {
+			return str;
+		}
+	};
+}
+//#endregion
+
+
+//# sourceMappingURL=utils.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/propagation/TextMapPropagator.mjs
+//#region src/propagation/TextMapPropagator.ts
+/**
+* @since 1.0.0
+*/
+const defaultTextMapGetter = {
+	get(carrier, key) {
+		if (carrier == null) return;
+		return carrier[key];
+	},
+	keys(carrier) {
+		if (carrier == null) return [];
+		return Object.keys(carrier);
+	}
+};
+/**
+* @since 1.0.0
+*/
+const defaultTextMapSetter = { set(carrier, key, value) {
+	if (carrier == null) return;
+	carrier[key] = value;
+} };
+//#endregion
+
+
+//# sourceMappingURL=TextMapPropagator.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/propagation/NoopTextMapPropagator.mjs
+//#region src/propagation/NoopTextMapPropagator.ts
+/**
+* No-op implementations of {@link TextMapPropagator}.
+*/
+var NoopTextMapPropagator = class {
+	/** Noop inject function does nothing */
+	inject(_context, _carrier) {}
+	/** Noop extract function does nothing and returns the input context */
+	extract(context, _carrier) {
+		return context;
+	}
+	fields() {
+		return [];
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=NoopTextMapPropagator.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/baggage/context-helpers.mjs
+
+
+//#region src/baggage/context-helpers.ts
+/**
+* Baggage key
+*/
+const BAGGAGE_KEY = createContextKey("OpenTelemetry Baggage Key");
+/**
+* Retrieve the current baggage from the given context
+*
+* @param {Context} Context that manage all context values
+* @returns {Baggage} Extracted baggage from the context
+*/
+function getBaggage(context) {
+	return context.getValue(BAGGAGE_KEY) || void 0;
+}
+/**
+* Retrieve the current baggage from the active/current context
+*
+* @returns {Baggage} Extracted baggage from the context
+*/
+function getActiveBaggage() {
+	return getBaggage(ContextAPI.getInstance().active());
+}
+/**
+* Store a baggage in the given context
+*
+* @param {Context} Context that manage all context values
+* @param {Baggage} baggage that will be set in the actual context
+*/
+function setBaggage(context, baggage) {
+	return context.setValue(BAGGAGE_KEY, baggage);
+}
+/**
+* Delete the baggage stored in the given context
+*
+* @param {Context} Context that manage all context values
+*/
+function deleteBaggage(context) {
+	return context.deleteValue(BAGGAGE_KEY);
+}
+//#endregion
+
+
+//# sourceMappingURL=context-helpers.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/api/propagation.mjs
+
+
+
+
+
+
+//#region src/api/propagation.ts
+const propagation_API_NAME = "propagation";
+const NOOP_TEXT_MAP_PROPAGATOR = new NoopTextMapPropagator();
+/**
+* Singleton object which represents the entry point to the OpenTelemetry Propagation API
+*
+* @since 1.0.0
+*/
+var PropagationAPI = class PropagationAPI {
+	/** Empty private constructor prevents end users from constructing a new instance of the API */
+	constructor() {
+		this.createBaggage = createBaggage;
+		this.getBaggage = getBaggage;
+		this.getActiveBaggage = getActiveBaggage;
+		this.setBaggage = setBaggage;
+		this.deleteBaggage = deleteBaggage;
+	}
+	/** Get the singleton instance of the Propagator API */
+	static getInstance() {
+		if (!this._instance) this._instance = new PropagationAPI();
+		return this._instance;
+	}
+	/**
+	* Set the current propagator.
+	*
+	* @returns true if the propagator was successfully registered, else false
+	*/
+	setGlobalPropagator(propagator) {
+		return registerGlobal(propagation_API_NAME, propagator, DiagAPI.instance());
+	}
+	/**
+	* Inject context into a carrier to be propagated inter-process
+	*
+	* @param context Context carrying tracing data to inject
+	* @param carrier carrier to inject context into
+	* @param setter Function used to set values on the carrier
+	*/
+	inject(context, carrier, setter = defaultTextMapSetter) {
+		return this._getGlobalPropagator().inject(context, carrier, setter);
+	}
+	/**
+	* Extract context from a carrier
+	*
+	* @param context Context which the newly created context will inherit from
+	* @param carrier Carrier to extract context from
+	* @param getter Function used to extract keys from a carrier
+	*/
+	extract(context, carrier, getter = defaultTextMapGetter) {
+		return this._getGlobalPropagator().extract(context, carrier, getter);
+	}
+	/**
+	* Return a list of all fields which may be used by the propagator.
+	*/
+	fields() {
+		return this._getGlobalPropagator().fields();
+	}
+	/** Remove the global propagator */
+	disable() {
+		unregisterGlobal(propagation_API_NAME, DiagAPI.instance());
+	}
+	_getGlobalPropagator() {
+		return getGlobal(propagation_API_NAME) || NOOP_TEXT_MAP_PROPAGATOR;
+	}
+};
+//#endregion
+
+
+//# sourceMappingURL=propagation.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/propagation-api.mjs
+
+//#region src/propagation-api.ts
+/**
+* Entrypoint for propagation API
+*
+* @since 1.0.0
+*/
+const propagation = PropagationAPI.getInstance();
+//#endregion
+
+
+//# sourceMappingURL=propagation-api.mjs.map
+;// CONCATENATED MODULE: ./node_modules/@opentelemetry/api/dist/context-api.mjs
+
+//#region src/context-api.ts
+/**
+* Entrypoint for context API
+* @since 1.0.0
+*/
+const context = ContextAPI.getInstance();
+//#endregion
+
+
+//# sourceMappingURL=context-api.mjs.map
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/core/error.mjs
 var core_error = __nccwpck_require__(5064);
 // EXTERNAL MODULE: ./node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs
@@ -55313,7 +54390,7 @@ function getTracer(option, version, platform) {
         return undefined;
     }
     const scope = platform !== undefined ? `${INSTRUMENTATION_SCOPE}.${platform}` : INSTRUMENTATION_SCOPE;
-    return (option.tracerProvider ?? src/* trace */.uP.getTracerProvider()).getTracer(scope, version);
+    return (option.tracerProvider ?? trace.getTracerProvider()).getTracer(scope, version);
 }
 /**
  * Runs `step`, a step of tracing that calls the application's OpenTelemetry code: its tracer
@@ -55363,7 +54440,7 @@ function startApiCallSpan(client, name, options, settings) {
         const threadID = settings?.attributes?.[ATTR_ANTHROPIC_SESSION_THREAD_ID];
         const conversationId = options?.openTelemetry?.conversationId ?? (typeof threadID === 'string' ? threadID : undefined);
         const span = tracer.startSpan(name, {
-            kind: src/* SpanKind */.v8.CLIENT,
+            kind: SpanKind.CLIENT,
             // On the span from its start, with what the method gives, for a sampler to decide on.
             attributes: {
                 [ATTR_GEN_AI_PROVIDER_NAME]: client._genAIProviderName,
@@ -55376,7 +54453,7 @@ function startApiCallSpan(client, name, options, settings) {
         if (!span.isRecording() &&
             !(client.openTelemetry.propagation ?
                 Object.keys(injectContext(span)).length > 0
-                : src/* trace */.uP.isSpanContextValid(span.spanContext()))) {
+                : trace.isSpanContextValid(span.spanContext()))) {
             return undefined;
         }
         return { ...settings, span, name, startTime };
@@ -55512,7 +54589,7 @@ function endApiCallSpan(span, result) {
     setResponseStatusCode(span, result);
     switch (result.status) {
         case 'success':
-            span.setStatus({ code: src/* SpanStatusCode */.sY.OK });
+            span.setStatus({ code: SpanStatusCode.OK });
             break;
         case 'error':
             setErrorStatus(span, result.error);
@@ -55604,7 +54681,7 @@ function endApiCallSpanWhenStreamEnds(span, stream, props) {
             if (end.reason === 'failed')
                 setErrorStatus(span, end.error);
             else if (end.reason === 'completed' && !isSSE) {
-                span.setStatus({ code: src/* SpanStatusCode */.sY.OK });
+                span.setStatus({ code: SpanStatusCode.OK });
             }
             span.end();
         },
@@ -55630,7 +54707,7 @@ function setErrorStatus(span, error, type) {
     if (error instanceof core_error/* APIUserAbortError */.cH || (0,errors/* isAbortError */.z)(error)) {
         return;
     }
-    span.setStatus({ code: src/* SpanStatusCode */.sY.ERROR });
+    span.setStatus({ code: SpanStatusCode.ERROR });
     span.setAttribute(ATTR_ERROR_TYPE, type ?? errorType(error));
 }
 /**
@@ -55638,7 +54715,7 @@ function setErrorStatus(span, error, type) {
  */
 function injectContext(span) {
     const carrier = {};
-    src/* propagation */.$f.inject(src/* trace */.uP.setSpan(src/* context */._O.active(), span), carrier);
+    propagation.inject(trace.setSpan(context.active(), span), carrier);
     return carrier;
 }
 /**
@@ -57129,7 +56206,7 @@ function recordSessionsCreateResponse(client, call, session) {
 function traceHeaderNames() {
     const names = new Set(['traceparent', 'tracestate', 'baggage']);
     try {
-        for (const name of src/* propagation */.$f.fields()) {
+        for (const name of propagation.fields()) {
             names.add(name.toLowerCase());
         }
     }
@@ -58395,7 +57472,7 @@ function endMessagesCreateSpanWhenStreamEnds(client, span, stream, props) {
             }
             else if (end.reason === 'completed') {
                 if (sawStop) {
-                    span.setStatus({ code: src/* SpanStatusCode */.sY.OK });
+                    span.setStatus({ code: SpanStatusCode.OK });
                 }
                 else {
                     // The application sees the stream end without an error, so only the span fails.
@@ -64095,7 +63172,7 @@ function copyClientForHelper(client, { authToken, helper }) {
  */
 function startEnvironmentWorkSpan(client, work, parentContext) {
     return client._tracer?.startSpan('anthropic.environment.work', {
-        kind: src/* SpanKind */.v8.INTERNAL,
+        kind: SpanKind.INTERNAL,
         attributes: {
             [ATTR_GEN_AI_PROVIDER_NAME]: client._genAIProviderName,
             'anthropic.environment.id': work.environment_id,
@@ -64113,7 +63190,7 @@ function endEnvironmentWorkSpan(span, signal) {
         return;
     }
     if (!signal.aborted) {
-        span.setStatus({ code: src/* SpanStatusCode */.sY.OK });
+        span.setStatus({ code: SpanStatusCode.OK });
     }
     span.end();
 }
@@ -64139,7 +63216,7 @@ async function withEnvironmentWorkSpan(client, span, signal, handle) {
         return handle();
     }
     try {
-        await src/* context */._O.with(src/* trace */.uP.setSpan(src/* context */._O.active(), span), handle);
+        await context.with(trace.setSpan(context.active(), span), handle);
     }
     catch (error) {
         guardTracing(client, () => failEnvironmentWorkSpan(span, signal, error));
@@ -64259,7 +63336,7 @@ var WorkPoller = /* @__PURE__ */ (() => {
             (0,tslib/* __classPrivateFieldSet */.G)(this, _WorkPoller_consumed, true, "f");
             // The context of whoever asks for the next item. Read where that caller resumes the generator:
             // a context manager that does not follow promises has lost it after the next `await`.
-            let callerOtelContext = src/* context */._O.active();
+            let callerOtelContext = context.active();
             const log = (0,utils_log/* loggerFor */.WG)(this.client);
             log.info('poller starting', {
                 component: 'work-poller',
@@ -64323,7 +63400,7 @@ var WorkPoller = /* @__PURE__ */ (() => {
                     }
                     try {
                         yield work;
-                        callerOtelContext = src/* context */._O.active();
+                        callerOtelContext = context.active();
                     }
                     finally {
                         // Post-handler stop. Runs whether the consumer body returned
@@ -64659,7 +63736,7 @@ function startToolRunnerSpan(client, params, conversationId) {
         return undefined;
     const hasJSONOutput = params.output_config?.format?.type === 'json_schema' || params.output_format?.type === 'json_schema';
     return client._tracer.startSpan('anthropic.messages.tool_runner', {
-        kind: src/* SpanKind */.v8.INTERNAL,
+        kind: SpanKind.INTERNAL,
         attributes: {
             [ATTR_GEN_AI_OPERATION_NAME]: GEN_AI_OPERATION_NAME_VALUE_INVOKE_AGENT,
             [ATTR_GEN_AI_PROVIDER_NAME]: client._genAIProviderName,
@@ -64679,7 +63756,7 @@ async function withToolUseSpan(client, tool, toolUse, options, run) {
     const tracer = client._tracer;
     if (!tracer)
         return run();
-    const { signal, conversationId, sessionID, parentContext = src/* context */._O.active() } = options;
+    const { signal, conversationId, sessionID, parentContext = context.active() } = options;
     // Only a tool that the application or an MCP server defines has a description. It is not content.
     const description = 'description' in tool ? tool.description : undefined;
     const attributes = {
@@ -64703,12 +63780,12 @@ async function withToolUseSpan(client, tool, toolUse, options, run) {
     const operation = toolUse.type === 'agent.tool_use' ? 'anthropic.tool_use'
         : wasCreatedByStainlessHelper(tool) && tool[SDK_HELPER_SYMBOL] === 'mcpTool' ? 'anthropic.mcp_tool_use'
             : 'anthropic.custom_tool_use';
-    const span = guardTracing(client, () => tracer.startSpan(`${operation} ${toolUse.name}`, { kind: src/* SpanKind */.v8.INTERNAL, attributes }, parentContext));
+    const span = guardTracing(client, () => tracer.startSpan(`${operation} ${toolUse.name}`, { kind: SpanKind.INTERNAL, attributes }, parentContext));
     if (!span)
         return run();
     let result;
     try {
-        result = await src/* context */._O.with(src/* trace */.uP.setSpan(parentContext, span), run);
+        result = await context.with(trace.setSpan(parentContext, span), run);
         return result;
     }
     finally {
@@ -64730,7 +63807,7 @@ async function withToolUseSpan(client, tool, toolUse, options, run) {
         }
         guardTracing(client, () => {
             if (succeeded) {
-                span.setStatus({ code: src/* SpanStatusCode */.sY.OK });
+                span.setStatus({ code: SpanStatusCode.OK });
             }
             else if (!canceled) {
                 setErrorStatus(span, result, 'tool_error');
@@ -65035,7 +64112,7 @@ var SessionToolRunner = /* @__PURE__ */ (() => {
                 throw new core_error/* AnthropicError */.pJ('Cannot iterate over a consumed SessionToolRunner');
             }
             (0,tslib/* __classPrivateFieldSet */.G)(this, _SessionToolRunner_consumed, true, "f");
-            (0,tslib/* __classPrivateFieldSet */.G)(this, _SessionToolRunner_otelContext, this.client._tracer ? src/* context */._O.active() : undefined, "f");
+            (0,tslib/* __classPrivateFieldSet */.G)(this, _SessionToolRunner_otelContext, this.client._tracer ? context.active() : undefined, "f");
             (0,tslib/* __classPrivateFieldGet */.g)(this, _SessionToolRunner_logger, "f").info('session tool runner starting', {
                 component: 'session-tool-runner',
                 session_id: this.sessionId,
@@ -68726,7 +67803,7 @@ var BetaToolRunner = /* @__PURE__ */ (() => {
             if (!(0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_toolRunnerOtelContext, "f")) {
                 return fn();
             }
-            return src/* context */._O.with((0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_toolRunnerOtelContext, "f"), fn);
+            return context.with((0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_toolRunnerOtelContext, "f"), fn);
         }, Symbol.asyncIterator)]() {
             var _a;
             if ((0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_consumed, "f")) {
@@ -68736,7 +67813,7 @@ var BetaToolRunner = /* @__PURE__ */ (() => {
             (0,tslib/* __classPrivateFieldSet */.G)(this, _BetaToolRunner_mutated, true, "f");
             (0,tslib/* __classPrivateFieldSet */.G)(this, _BetaToolRunner_toolResponse, undefined, "f");
             const toolRunnerSpan = guardTracing(this.client, () => startToolRunnerSpan(this.client, (0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_state, "f").params, (0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_options, "f").openTelemetry?.conversationId));
-            (0,tslib/* __classPrivateFieldSet */.G)(this, _BetaToolRunner_toolRunnerOtelContext, toolRunnerSpan && src/* trace */.uP.setSpan(src/* context */._O.active(), toolRunnerSpan), "f");
+            (0,tslib/* __classPrivateFieldSet */.G)(this, _BetaToolRunner_toolRunnerOtelContext, toolRunnerSpan && trace.setSpan(context.active(), toolRunnerSpan), "f");
             try {
                 while (true) {
                     try {
@@ -68812,7 +67889,7 @@ var BetaToolRunner = /* @__PURE__ */ (() => {
                     throw new core_error/* AnthropicError */.pJ('ToolRunner concluded without a message from the server');
                 }
                 (0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_completion, "f").resolve(await (0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_message, "f"));
-                guardTracing(this.client, () => toolRunnerSpan?.setStatus({ code: src/* SpanStatusCode */.sY.OK }));
+                guardTracing(this.client, () => toolRunnerSpan?.setStatus({ code: SpanStatusCode.OK }));
             }
             catch (error) {
                 if (toolRunnerSpan) {
@@ -68872,7 +67949,7 @@ var BetaToolRunner = /* @__PURE__ */ (() => {
         async generateToolResponse(signal = (0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_options, "f").signal) {
             // Read before the first `await`: a context manager that does not follow promises has lost the
             // caller's context after it. Only a tool span has a use for it.
-            const callerOtelContext = this.client._tracer ? src/* context */._O.active() : undefined;
+            const callerOtelContext = this.client._tracer ? context.active() : undefined;
             const message = (await (0,tslib/* __classPrivateFieldGet */.g)(this, _BetaToolRunner_message, "f")) ?? this.params.messages.at(-1);
             if (!message) {
                 return null;
@@ -76807,7 +75884,7 @@ var BaseAnthropic = /* @__PURE__ */ (() => {
                 return this.makeRequest(options, retriesRemaining, undefined);
             }
             try {
-                return await src/* context */._O.with(src/* trace */.uP.setSpan(src/* context */._O.active(), span), () => this.makeRequest(options, retriesRemaining, undefined, span));
+                return await context.with(trace.setSpan(context.active(), span), () => this.makeRequest(options, retriesRemaining, undefined, span));
             }
             catch (error) {
                 const result = { status: 'error', options, error };
@@ -80492,7 +79569,7 @@ function addRequestID(value, response) {
 //# sourceMappingURL=parse.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/version.mjs
 /** Version of the installed OpenAI SDK package. */
-const version_VERSION = '7.34.0'; // x-release-please-version
+const openai_version_VERSION = '7.34.0'; // x-release-please-version
 //# sourceMappingURL=version.mjs.map
 ;// CONCATENATED MODULE: ./node_modules/openai/internal/detect-platform.mjs
 
@@ -80525,7 +79602,7 @@ const detect_platform_getPlatformProperties = () => {
     if (detectedPlatform === 'deno') {
         return {
             'X-Stainless-Lang': 'js',
-            'X-Stainless-Package-Version': version_VERSION,
+            'X-Stainless-Package-Version': openai_version_VERSION,
             'X-Stainless-OS': detect_platform_normalizePlatform(Deno.build.os),
             'X-Stainless-Arch': detect_platform_normalizeArch(Deno.build.arch),
             'X-Stainless-Runtime': 'deno',
@@ -80535,7 +79612,7 @@ const detect_platform_getPlatformProperties = () => {
     if (typeof EdgeRuntime !== 'undefined') {
         return {
             'X-Stainless-Lang': 'js',
-            'X-Stainless-Package-Version': version_VERSION,
+            'X-Stainless-Package-Version': openai_version_VERSION,
             'X-Stainless-OS': 'Unknown',
             'X-Stainless-Arch': `other:${EdgeRuntime}`,
             'X-Stainless-Runtime': 'edge',
@@ -80546,7 +79623,7 @@ const detect_platform_getPlatformProperties = () => {
     if (detectedPlatform === 'node') {
         return {
             'X-Stainless-Lang': 'js',
-            'X-Stainless-Package-Version': version_VERSION,
+            'X-Stainless-Package-Version': openai_version_VERSION,
             'X-Stainless-OS': detect_platform_normalizePlatform(globalThis.process.platform ?? 'unknown'),
             'X-Stainless-Arch': detect_platform_normalizeArch(globalThis.process.arch ?? 'unknown'),
             'X-Stainless-Runtime': 'node',
@@ -80557,7 +79634,7 @@ const detect_platform_getPlatformProperties = () => {
     if (browserInfo) {
         return {
             'X-Stainless-Lang': 'js',
-            'X-Stainless-Package-Version': version_VERSION,
+            'X-Stainless-Package-Version': openai_version_VERSION,
             'X-Stainless-OS': 'Unknown',
             'X-Stainless-Arch': 'unknown',
             'X-Stainless-Runtime': `browser:${browserInfo.browser}`,
@@ -80567,7 +79644,7 @@ const detect_platform_getPlatformProperties = () => {
     // TODO add support for Cloudflare workers, etc.
     return {
         'X-Stainless-Lang': 'js',
-        'X-Stainless-Package-Version': version_VERSION,
+        'X-Stainless-Package-Version': openai_version_VERSION,
         'X-Stainless-OS': 'Unknown',
         'X-Stainless-Arch': 'unknown',
         'X-Stainless-Runtime': 'unknown',
@@ -105434,7 +104511,7 @@ class OpenAI {
         return query_stringifyQuery(query);
     }
     getUserAgent() {
-        return `${this.constructor.name}/JS ${version_VERSION}`;
+        return `${this.constructor.name}/JS ${openai_version_VERSION}`;
     }
     defaultIdempotencyKey() {
         return `stainless-node-retry-${utils_uuid_uuid4()}`;
