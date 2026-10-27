@@ -88,13 +88,13 @@ RiverReview の機械 gate（host 側導出）とは責務が異なるが、次�
 
 ## Fresh Context Plan Review（任意 / Shadow）
 
-`design` / `implementation_plan` で設計判断が必要な変更には、
+`design` / `implementation_plan` で実装前に設計判断が必要な変更には、
 [Fresh Context Plan Review](templates/fresh-context-plan-review-template.md) を**任意のAdvisoryチェック**として使用する。
 単純な低リスク修正へ追加のAgent・レビューラウンドを強制しない。
 
 - **Comprehension**: 新しい担当者が許可された文書と参照コードだけで目的・スコープ・AC・依存関係を説明できるか。
 - **Implementation Readiness**: 実装前に確定すべき設計判断と検証方法が明確か。局所的な実装詳細の選択まで強制しない。
-- **Context境界**: Freshなsubagent/sessionが実際に起動できる場合は、会話履歴や他Reviewerの結論を渡さず、artifact・参照コード・制約を渡す。独立した実行のHost証跡がなければ `unverified` と記録し、Goldfish実行済みと主張しない。
+- **Context境界**: Freshなsubagent/sessionが実際に起動できる場合は、会話履歴や他Reviewerの結論を渡さず、artifact・参照コード・制約を渡す。独立した実行のHost証跡がなければ `unknown` と記録し、Goldfish実行済みと主張しない。
 - **判定の境界**: Existing Review Coverage・Provenance・Human権限を再利用。advisoryの結果や `findings=0` をGate PASS・C-3/C-4承認に変換しない。
 - **重複防止**: `requirements-acceptance` / `plangate-plan-integrity` / `architecture-validation-plan` の既存Findingを別名で二重計上しない。
 
