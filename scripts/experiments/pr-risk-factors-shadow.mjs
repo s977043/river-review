@@ -73,7 +73,9 @@ export function assessPrRiskFactorsShadow(input) {
     const types = classifyChangedFiles(files);
     const docsTestOnly = files.every(
       (file) =>
-        types.docs.includes(file) || types.test.includes(file) || COMPONENT_TEST_FILE.test(file)
+        types.docs.includes(file) ||
+        types.test.includes(file) ||
+        COMPONENT_TEST_FILE.test(file)
     );
     riskFloor = docsTestOnly ? 'low' : 'medium';
     if (!docsTestOnly) signals.add('non-docs-test-change');
@@ -104,12 +106,12 @@ export function assessPrRiskFactorsShadow(input) {
     }
   }
 
-  const alignment =
-    boundEvidence(value.alignment, head) &&
-    typeof value.alignment.planRef === 'string' &&
-    value.alignment.planRef.trim()
-      ? 'reported'
-      : 'unknown';
+  let alignment = 'unknown';
+  if (boundEvidence(value.alignment, head)) {
+    if (typeof value.alignment.planRef === 'string' && value.alignment.planRef.trim()) {
+      alignment = 'reported';
+    }
+  }
   if (alignment === 'unknown') reasons.add('missing-or-stale-alignment');
 
   let verification = 'unknown';
@@ -134,11 +136,8 @@ export function assessPrRiskFactorsShadow(input) {
     if (value.rollback.reversibility === 'irreversible') {
       rollback = 'reported-irreversible';
       raise('high', 'reported-irreversible-change');
-    } else if (
-      value.rollback.reversibility === 'reversible' &&
-      hasEvidenceRef(value.rollback)
-    ) {
-      rollback = 'reported-reversible';
+    } else if (value.rollback.reversibility === 'reversible') {
+      if (hasEvidenceRef(value.rollback)) rollback = 'reported-reversible';
     }
   }
   if (rollback === 'unknown') reasons.add('missing-or-stale-rollback');
@@ -159,7 +158,7 @@ export function assessPrRiskFactorsShadow(input) {
     riskFloor,
     axes: {
       alignment,
-      impact: manifestValid ? 'path-observed' : 'unknown',
+      impact: manifestValid ? 'path-reported' : 'unknown',
       verification,
       rollback,
       detection,
