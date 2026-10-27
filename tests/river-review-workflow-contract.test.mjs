@@ -43,3 +43,22 @@ test('self-review workflow keeps uploading the run record artifact (#2396)', () 
   assert.match(upload, /uses: actions\/upload-artifact@/);
   assert.match(upload, /path: \.river\/runs\/\*\.json/);
 });
+
+test('self-review checkout never persists git credentials (#2806)', () => {
+  const checkout =
+    /- name: Checkout\n\s+uses: actions\/checkout@[^\n]+\n\s+with:\n((?: {10}[^\n]*\n)+)/.exec(
+      workflow
+    )?.[1];
+  assert.ok(checkout, 'Checkout with: block not found');
+  assert.match(checkout, /^ {10}fetch-depth: 0$/m);
+  assert.match(checkout, /^ {10}persist-credentials: false$/m);
+});
+
+test('self-review workflow grants only required token permissions (#2806)', () => {
+  const permissions = /^permissions:\n((?: {2}[^\n]+\n)+)/m.exec(workflow)?.[1];
+  assert.equal(
+    permissions,
+    '  contents: read\n  pull-requests: write\n',
+    'Checkout needs contents: read; PR comments need pull-requests: write'
+  );
+});
