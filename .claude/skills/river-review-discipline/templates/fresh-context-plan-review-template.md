@@ -54,7 +54,7 @@
 
 ## Outcome / Limitations
 
-- Review outcome: findingsあり / findingsなし / incomplete（承認やGateの結果ではない）:
+- Review outcome: findingsあり / findingsなし / incomplete（`findingsなし` はレビュー範囲内の観測であり、Coverage完了・正しさ・承認・Gate PASSの証明ではない）:
 - 未実行・不明な独立性・欠落資料・残リスク:
 - 現行Planの変更権限: reviewerには無し。修正はPlan ownerが承認境界に従って実施:
 - 再評価で照合するartifact revision / evidence refs:
