@@ -73,9 +73,7 @@ export function assessPrRiskFactorsShadow(input) {
     const types = classifyChangedFiles(files);
     const docsTestOnly = files.every(
       (file) =>
-        types.docs.includes(file) ||
-        types.test.includes(file) ||
-        COMPONENT_TEST_FILE.test(file)
+        types.docs.includes(file) || types.test.includes(file) || COMPONENT_TEST_FILE.test(file)
     );
     riskFloor = docsTestOnly ? 'low' : 'medium';
     if (!docsTestOnly) signals.add('non-docs-test-change');
