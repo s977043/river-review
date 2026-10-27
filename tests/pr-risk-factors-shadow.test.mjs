@@ -7,7 +7,7 @@ const HEAD = 'a'.repeat(40);
 function observation(files = ['src/service/api.mjs']) {
   return {
     subject: { headSha: HEAD },
-    change: { changedFiles: files },
+    change: { headSha: HEAD, changedFiles: files },
     alignment: { headSha: HEAD, planRef: 'issue:2781' },
     verification: { headSha: HEAD, checks: 'passed', coverage: 'complete' },
     rollback: { headSha: HEAD, reversibility: 'reversible', evidenceRef: 'rollback-plan' },
@@ -73,6 +73,17 @@ test('a SHA-bound failed check raises high even on documentation changes', () =>
   assert.equal(result.axes.verification, 'reported-failed');
   assert.ok(result.hardFloorReasons.includes('reported-failed-checks'));
   assert.equal(result.assessmentStatus, 'incomplete');
+});
+
+test('stale changed-file scope cannot be labeled a current-head assessment', () => {
+  const value = observation(['docs/overview.md']);
+  value.change.headSha = 'b'.repeat(40);
+  const result = assessPrRiskFactorsShadow(value);
+  checkSafety(result);
+  assert.equal(result.assessmentStatus, 'incomplete');
+  assert.equal(result.riskFloor, 'unknown');
+  assert.equal(result.axes.impact, 'unknown');
+  assert.ok(result.reasonCodes.includes('missing-or-stale-change'));
 });
 
 test('stale SHA cannot assert passing CI or verified rollback / detection', () => {
