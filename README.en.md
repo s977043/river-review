@@ -42,7 +42,7 @@ For installation options and pinning, see [Install the plugin](https://river-rev
 
 <!-- x-release-please-start-version -->
 
-Latest release: [v1.137.0](https://github.com/s977043/river-review/releases/latest)
+Latest release: [v1.138.0](https://github.com/s977043/river-review/releases/latest)
 
 <!-- x-release-please-end -->
 
