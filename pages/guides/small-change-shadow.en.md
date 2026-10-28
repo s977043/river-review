@@ -13,6 +13,26 @@ Will Larson, [Speeding up code review with `small-change`](https://lethain.com/s
 
 A host supplies the PR's exact SHA, raw change manifest, risk-map application, review findings and coverage, completed CI, classified service scope, verified per-service prior merges, and repo-owned exclusions. The standalone script only tests the consistency of supplied data. A caller can forge JSON; **never** convert its output into a GitHub approve action, passing status check, bypass or merge authorization.
 
+## No Look Merge and Ship / Show / Ask (shadow only)
+
+The [October 2026 discussion by nrs](https://zenn.dev/nrs/articles/c777388530aa84) distinguishes skipping a human's line-by-line code reading from an organization's responsibility for merge decisions. River Review treats this as an **evaluation question for the existing shadow assessor**, not as a new approval engine. [ADR-016](https://github.com/s977043/river-review/blob/main/docs/adr/016-repo-operation-risk-tiers.md) remains **Proposed, not adopted**.
+
+- **Ship (hypothetical)**: Assess when pre-merge human code reading might be omitted. Not enabled; retain Host / Human merge decisions.
+- **Show (hypothetical)**: Assess sharing and auditing changes after integration rather than waiting for routine approval. Not enabled; do not bypass required checks or reviews.
+- **Ask (current)**: Send high-risk, incomplete-evidence or ambiguous changes to humans under current branch protections.
+
+### Three independent decisions
+
+1. **Evidence (observation)**: Exact PR head SHA, complete changed-file manifest, risk classification, observed reviewer execution and Coverage, provenance of required checks, unresolved comments, and detection/rollback. A skipped, neutral, or missing observation is not proof that a semantic review executed and passed; distinguish zero findings from no LLM execution.
+2. **Judgment (assessment)**: Record the existing small-change-shadow statuses candidate / excluded / unknown with their reason codes. A candidate is consistency of operator-supplied data, not verified quality. Do not omit unknown cases to inflate candidate share.
+3. **Permission (authorization)**: Organizational accountability, separated credentials, GitHub protection, and explicit Human decisions remain outside the shadow output. Never translate candidate into a GitHub approval, passing required check, MERGE_READY, or auto-merge.
+
+### Paired evaluation and stop conditions
+
+On explicitly selected real PRs, compare **the existing human-review process (control)** with **a hypothetical no-look shadow classification (without actually skipping review)**. Record head SHA / observation source / unknowns / human disposition / material findings first caught by the actual review / review wait time / post-merge failures and detection; record unobserved values as unknown. Reuse the bounded batch under [#2722](https://github.com/s977043/river-review/issues/2722) instead of creating another risk or approval evaluator.
+
+**Stop expansion after any false-green shadow case.** A small sample cannot prove safety. Relaxing review or enabling merge requires independently verified Host evidence, remediation of the misleading clean surface in [#2812](https://github.com/s977043/river-review/issues/2812), formal Human adoption of ADR-016, and proof of credential isolation. River Review output itself never grants merge authority; PlanGate's **C-4 / merge remains Human-owned**.
+
 ## Offline command
 
 ```bash
