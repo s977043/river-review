@@ -29,6 +29,28 @@ River Review はこの実装をコピーしません。既存の [Review Mode Ro
 
 入力 JSON は任意のユーザーが編集できます。実行スクリプトはデータの**形と整合性**しか検査できず、CI、サービス境界、経験件数、本人性を認証・証明できません。`candidate` を CI の成功ステータス、PR review、`approve` 権限に変換することは禁止です。Host 側に独立した取得・検証・改ざん防止を持つまで権限を付与しません。
 
+## No Look Merge / Ship・Show・Ask との接続（Shadow Only）
+
+2026年10月の [nrs 氏の考察](https://zenn.dev/nrs/articles/c777388530aa84) は、人間のコード目視を省く運用と、組織がマージ責任を引き受けることを区別しています。River Review ではこの考え方を **新しい承認器ではなく、既存 Shadow 評価の検討対象**として扱います。[ADR-016](https://github.com/s977043/river-review/blob/main/docs/adr/016-repo-operation-risk-tiers.md) は **Proposed（未採択）**です。
+
+| 比較対象 | 将来検討する動作 | 現状の権限 |
+| --- | --- | --- |
+| Ship | 人間の事前コードレビューを省く条件を評価 | **実行しない**。現行の Host / Human マージ判断を維持 |
+| Show | 承認待ちを減らし、事後に変更を共有・監査する条件を評価 | **実行しない**。必要な GitHub レビュー・必須チェックを迂回しない |
+| Ask | 高リスク・証拠不足・変更の影響が読めないPRを人間へ渡す | **既存の Human 判断と保護設定を維持** |
+
+### 評価で分離する3つの判断
+
+1. **Evidence（観測）**: PRの正確なhead SHA、変更ファイル全件、リスク分類、実際のレビュアー実行・Coverage、必須チェックの状態と出所、未解決コメント、検知・ロールバック手段。skipped / neutral / 欠測を「レビューを実行して成功した」と見なさない。LLM未実行と指摘0件を区別する。
+2. **Judgment（評価）**: 既存 small-change-shadow の candidate / excluded / unknown と理由コードを保存する。candidate は自己申告された入力の整合性にすぎず、品質の証明ではない。unknown を合格数から除外して候補率を良く見せない。
+3. **Permission（権限）**: 組織責任、認証主体の分離、GitHub保護設定、Humanの明示判断はShadowの出力から独立させる。candidate をGitHub approval、required check、MERGE_READY、自動マージへ昇格させない。
+
+### 比較実験と停止条件
+
+対象を明示した実PRを、既存レビュー運用（対照）と **レビューを省略すると仮定したShadow判定（実際には省略しない）**で並行評価する。各PRに head SHA / 条件の取得元 / 不明事項 / human判定 / 実レビューで初めて見つかった重大指摘 / レビュー待ち時間 / マージ後の不具合・検知手段 を記録し、根拠不明の値は unknown とする。既存の [#2722](https://github.com/s977043/river-review/issues/2722) の小バッチを再利用し、二重のリスク分類・承認判定ロジックを作らない。
+
+**誤ったShadow合格が1件でもあれば拡大を停止**する。サンプル数だけでは安全性を証明できない。レビュー削減・自動マージへの昇格には、独立したHost検証、[#2812](https://github.com/s977043/river-review/issues/2812) の偽のclean表示への対処、ADR-016の正式なHuman判断、権限分離の実証が必要。River Reviewの製品出力は承認・マージの権限を持たず、PlanGate側も **C-4 / merge Human-owned** のままとする。
+
 ## オフライン実行
 
 ```bash
