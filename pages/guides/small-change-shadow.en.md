@@ -17,11 +17,9 @@ A host supplies the PR's exact SHA, raw change manifest, risk-map application, r
 
 The [October 2026 discussion by nrs](https://zenn.dev/nrs/articles/c777388530aa84) distinguishes skipping a human's line-by-line code reading from an organization's responsibility for merge decisions. River Review treats this as an **evaluation question for the existing shadow assessor**, not as a new approval engine. [ADR-016](https://github.com/s977043/river-review/blob/main/docs/adr/016-repo-operation-risk-tiers.md) remains **Proposed, not adopted**.
 
-| Model | Potential future experiment | Authority today |
-| --- | --- | --- |
-| Ship | Assess conditions under which pre-merge human code reading could be omitted | **Not enabled**; retain Host / Human merge decisions |
-| Show | Assess sharing and auditing changes after integration rather than waiting for routine approvals | **Not enabled**; do not bypass required checks or reviews |
-| Ask | Send high-risk, incomplete-evidence or ambiguous changes to humans | Retain current Human decisions and branch protections |
+- **Ship (hypothetical)**: Assess when pre-merge human code reading might be omitted. Not enabled; retain Host / Human merge decisions.
+- **Show (hypothetical)**: Assess sharing and auditing changes after integration rather than waiting for routine approval. Not enabled; do not bypass required checks or reviews.
+- **Ask (current)**: Send high-risk, incomplete-evidence or ambiguous changes to humans under current branch protections.
 
 ### Three independent decisions
 
