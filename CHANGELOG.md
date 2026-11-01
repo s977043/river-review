@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.138.0](https://github.com/s977043/river-review/compare/v1.137.0...v1.138.0) (2026-10-28)
+
+
+### Features
+
+* **commands:** review-team でファイル全文を対象にして設計書を差分なしでレビューできるようにする ([#2820](https://github.com/s977043/river-review/issues/2820)) ([b22a5ba](https://github.com/s977043/river-review/commit/b22a5ba4f67f5f927fed7b09d88e82d69a9b14d8))
+
+
+### Bug Fixes
+
+* **commands:** review-team のファイル全文経路で引数の判定順・対象の取得範囲・秘匿除外を定める ([#2822](https://github.com/s977043/river-review/issues/2822)) ([92071c9](https://github.com/s977043/river-review/commit/92071c95139ef5061fe18f272b1596dbe444b554))
+
 ## [1.137.0](https://github.com/s977043/river-review/compare/v1.136.0...v1.137.0) (2026-10-27)
 
 
