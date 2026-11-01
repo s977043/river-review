@@ -20,7 +20,7 @@
     "@river-review/core-runner": "file:../core"
   },
   "devDependencies": {
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
   },
   "engines": {
