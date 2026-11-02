@@ -25,7 +25,8 @@ async function checkDocPlacement() {
     .map((e) => e.name)
     .sort();
 
-  let violations = 0;
+  let allowedRootFiles = 0;
+  let invalidCommunityFiles = 0;
   const communityFiles = [
     'CODE_OF_CONDUCT.md',
     'CONTRIBUTING.md',
@@ -34,25 +35,34 @@ async function checkDocPlacement() {
   ];
   for (const file of communityFiles) {
     try {
-      await fs.access(path.join(repoRoot, '.github', file));
+      const stats = await fs.stat(path.join(repoRoot, '.github', file));
+      if (!stats.isFile()) {
+        console.error(`❌ .github/${file}: not a regular file`);
+        invalidCommunityFiles++;
+      }
     } catch {
       console.error(`❌ .github/${file}: missing GitHub community document`);
-      violations++;
+      invalidCommunityFiles++;
     }
   }
 
   for (const file of rootMdFiles) {
     if (ROOT_ALLOWLIST.has(file)) {
       console.log(`✅ ${file}`);
+      allowedRootFiles++;
     } else {
       console.error(`❌ ${file}: not in root allowlist (move to docs/ or pages/)`);
-      violations++;
     }
   }
 
+  const violations = rootMdFiles.length - allowedRootFiles + invalidCommunityFiles;
   console.log('');
   console.log(
-    `📊 Root .md files: ${rootMdFiles.length} total, ${rootMdFiles.length - violations} in allowlist, ${violations} violation(s)`
+    `📊 Root .md files: ${rootMdFiles.length} total, ${allowedRootFiles} in allowlist, ${violations} violation(s)`
+  );
+
+  console.log(
+    `📊 Community documents: ${communityFiles.length} required, ${invalidCommunityFiles} invalid`
   );
 
   if (violations > 0) {

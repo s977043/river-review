@@ -107,7 +107,8 @@ describe('HTML report when the LLM did not run (#2812)', () => {
     ['offline with a key', { apiKey: 'test-key', args: ['--offline'] }],
   ]) {
     it(`${name}: warns without an approval banner or score visualization`, async (t) => {
-      const { html, json, htmlRun, jsonRun, htmlCalls, jsonCalls } = await renderReports(t, options);
+      const reports = await renderReports(t, options);
+      const { html, json, htmlRun, jsonRun, htmlCalls, jsonCalls } = reports;
 
       assert.equal(htmlCalls, 0, 'HTML skip path must not call the provider');
       assert.equal(jsonCalls, 0, 'JSON skip path must not call the provider');
