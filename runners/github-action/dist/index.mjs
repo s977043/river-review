@@ -20319,7 +20319,28 @@ const minimatch = (p, pattern, options = {}) => {
     if (!options.nocomment && pattern.charAt(0) === '#') {
         return false;
     }
-    return new Minimatch(pattern, options).match(p);
+    return cachedMinimatch(pattern, options).match(p);
+};
+// The Minimatch objects that minimatch() used most recently. A Map
+// keeps its keys in the order they were set, so the first key is the
+// one used least recently.
+const cache = new Map();
+const cacheMax = 256;
+const cachedMinimatch = (pattern, options) => {
+    const key = pattern + '\0' + JSON.stringify(options);
+    let mm = cache.get(key);
+    if (mm) {
+        cache.delete(key);
+    }
+    else {
+        // a copy, so a later change to the options can not change it
+        mm = new Minimatch(pattern, { ...options });
+        if (cache.size >= cacheMax) {
+            cache.delete(cache.keys().next().value);
+        }
+    }
+    cache.set(key, mm);
+    return mm;
 };
 /* c8 ignore start */
 const defaultPlatform = (typeof process === 'object' && process ?
@@ -20584,6 +20605,10 @@ const nextSep = (f, from, sep) => {
 const lastSep = (f, from, sep) => sep !== 'both' ?
     f.lastIndexOf(sep, from)
     : Math.max(f.lastIndexOf('/', from), f.lastIndexOf('\\', from));
+// What parse() returns in place of a Matcher while make() builds and
+// merges the rows. Most of the Matchers in rows that are merged would
+// never be used, so they are only made for the rows that are left.
+const PENDING = {};
 class Minimatch {
     options;
     set;
@@ -20619,6 +20644,8 @@ class Minimatch {
     // brace expansion can make the same portion in many rows, so they
     // share one Matcher, and the states that it caches
     #matchers = new Map();
+    // parse() returns PENDING in place of a Matcher
+    #pending = false;
     // the GlobstarParts of each pattern row, by start index and partial
     #globstarParts = new WeakMap();
     constructor(pattern, options = {}) {
@@ -20766,6 +20793,7 @@ class Minimatch {
         const rawGlobParts = this.globSet.map(s => this.#slashSplit(s));
         this.globParts = this.preprocess(rawGlobParts);
         // glob --> Matchers
+        this.#pending = true;
         let set = this.globParts.map((s, _, __) => {
             if (this.isWindows && this.windowsNoMagicRoot) {
                 // check if it's a drive or unc path. The root of a long UNC
@@ -20810,6 +20838,14 @@ class Minimatch {
         // with noext, `@(...)` would be literal
         if (!options.noext)
             this.mergeRows();
+        this.#pending = false;
+        this.set.forEach((row, i) => {
+            for (let k = 0; k < row.length; k++) {
+                if (row[k] === PENDING) {
+                    row[k] = this.parse(this.globParts[i][k]);
+                }
+            }
+        });
     }
     // Merge rows that only differ in one portion, where each of them
     // is a Matcher, into one row that matches any of them with
@@ -20824,7 +20860,7 @@ class Minimatch {
                 // the rows that are the same other than at portion k
                 const groups = new Map();
                 this.set.forEach((row, i) => {
-                    if (!(row[k] instanceof Matcher) ||
+                    if (!(row[k] instanceof Matcher || row[k] === PENDING) ||
                         !extSafe(this.globParts[i][k])) {
                         return;
                     }
@@ -21700,6 +21736,8 @@ class Minimatch {
                 pattern.toUpperCase() !== pattern.toLowerCase())) {
             return this.#norm(lit);
         }
+        if (this.#pending)
+            return PENDING;
         let m = this.#matchers.get(pattern);
         if (!m) {
             m = new Matcher(pattern, { nocase, noext, dot, normalize });
