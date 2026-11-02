@@ -109,9 +109,9 @@ describe('HTML report when the LLM did not run (#2812)', () => {
     });
   }
 
-  for (const [name, args] of [
-    ['single reviewer', []],
-    ['reviewers', REVIEWER_ARGS],
+  for (const [name, args, expectedCalls] of [
+    ['single reviewer', [], 1],
+    ['reviewers', REVIEWER_ARGS, 2],
   ]) {
     it(`${name}, stubbed NO_ISSUES: keeps the approval banner and score`, async (t) => {
       const { html, json, htmlCalls, jsonCalls } = await renderReports(t, {
@@ -119,8 +119,9 @@ describe('HTML report when the LLM did not run (#2812)', () => {
         args,
       });
 
-      assert.ok(htmlCalls > 0, 'HTML positive control must reach the provider stub');
-      assert.ok(jsonCalls > 0, 'JSON positive control must reach the provider stub');
+      // Each explicit reviewer must execute once for this single-chunk success fixture.
+      assert.equal(htmlCalls, expectedCalls, 'HTML must execute every requested reviewer');
+      assert.equal(jsonCalls, expectedCalls, 'JSON must execute every requested reviewer');
       assert.notEqual(json.llmNotExecuted, true);
       assert.equal(json.decision, 'auto-approve');
       assert.match(bannerBody(html), /Auto Approve/);
