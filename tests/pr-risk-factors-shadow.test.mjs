@@ -8,8 +8,15 @@ function observation(files = ['src/service/api.mjs']) {
   return {
     subject: { headSha: HEAD },
     change: { headSha: HEAD, changedFiles: files },
+    route: { headSha: HEAD, selectedMode: 'standard', riskAction: 'comment_only' },
     alignment: { headSha: HEAD, planRef: 'issue:2781' },
-    verification: { headSha: HEAD, checks: 'passed', coverage: 'complete' },
+    verification: {
+      headSha: HEAD,
+      checks: 'passed',
+      coverage: 'complete',
+      checkedFiles: [...files],
+      evidenceRef: 'test-run:1',
+    },
     rollback: { headSha: HEAD, reversibility: 'reversible', evidenceRef: 'rollback-plan' },
     detection: { headSha: HEAD, monitoring: 'present', evidenceRef: 'monitoring-record' },
   };
