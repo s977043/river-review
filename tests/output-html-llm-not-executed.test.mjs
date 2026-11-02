@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { loadAllRunRecords, resolveStoreDir } from '../src/lib/result-store.mjs';
 import { runCliInProcess } from './helpers/cli.mjs';
 import { createTempGitRepo } from './helpers/temp-repo.mjs';
 
@@ -68,19 +69,29 @@ async function renderReports(t, { apiKey, args = [] } = {}) {
 
   const env = Object.fromEntries(KEY_VARS.map((key) => [key, undefined]));
   if (apiKey) env.OPENAI_API_KEY = apiKey;
-  const htmlResult = await runCliInProcess(['run', '.', ...args, '--output', 'html'], {
+  const htmlResult = await runCliInProcess(['run', '.', ...args, '--save', '--output', 'html'], {
     cwd: dir,
     env,
   });
   assert.equal(htmlResult.code, 0, `html: ${htmlResult.stderr}`);
   const htmlCalls = fetchCalls;
-  const jsonResult = await runCliInProcess(['run', '.', ...args, '--output', 'json'], {
+  const storeDir = resolveStoreDir(dir);
+  const htmlRuns = await loadAllRunRecords(storeDir);
+  assert.equal(htmlRuns.length, 1, 'HTML must persist its own execution record');
+  const htmlRun = htmlRuns[0];
+  const jsonResult = await runCliInProcess(['run', '.', ...args, '--save', '--output', 'json'], {
     cwd: dir,
     env,
   });
   assert.equal(jsonResult.code, 0, `json: ${jsonResult.stderr}`);
+  const savedRuns = await loadAllRunRecords(storeDir);
+  assert.equal(savedRuns.length, 2, 'JSON must persist a distinct execution record');
+  const jsonRun = savedRuns.find((run) => run.runId !== htmlRun.runId);
+  assert.ok(jsonRun, 'JSON execution record must not reuse the HTML run');
   return {
     html: htmlResult.stdout,
+    htmlRun,
+    jsonRun,
     json: JSON.parse(jsonResult.stdout),
     htmlCalls,
     jsonCalls: fetchCalls - htmlCalls,
@@ -96,15 +107,14 @@ describe('HTML report when the LLM did not run (#2812)', () => {
     ['offline with a key', { apiKey: 'test-key', args: ['--offline'] }],
   ]) {
     it(`${name}: warns without an approval banner or score visualization`, async (t) => {
-      const { html, json, htmlCalls, jsonCalls } = await renderReports(t, options);
+      const { html, json, htmlRun, jsonRun, htmlCalls, jsonCalls } = await renderReports(t, options);
 
       assert.equal(htmlCalls, 0, 'HTML skip path must not call the provider');
       assert.equal(jsonCalls, 0, 'JSON skip path must not call the provider');
-      assert.equal(
-        json.llmNotExecuted,
-        true,
-        `${name}: missing execution evidence (decision: ${json.decision})`
-      );
+      // Public output JSON does not always expose the internal execution flag.
+      // Read canonical saved-run evidence instead of inventing an output contract.
+      assert.equal(htmlRun.llmNotExecuted, true, `${name}: HTML run must record non-execution`);
+      assert.equal(jsonRun.llmNotExecuted, true, `${name}: JSON run must record non-execution`);
       assertUnexecutedHtml(html);
       const label = DECISION_LABELS[json.decision];
       assert.ok(label, `unknown JSON decision: ${json.decision}`);
@@ -117,7 +127,7 @@ describe('HTML report when the LLM did not run (#2812)', () => {
     ['reviewers', REVIEWER_ARGS, 2],
   ]) {
     it(`${name}, stubbed NO_ISSUES: keeps the approval banner and score`, async (t) => {
-      const { html, json, htmlCalls, jsonCalls } = await renderReports(t, {
+      const { html, json, htmlRun, jsonRun, htmlCalls, jsonCalls } = await renderReports(t, {
         apiKey: 'test-key',
         args,
       });
@@ -125,7 +135,8 @@ describe('HTML report when the LLM did not run (#2812)', () => {
       // Each explicit reviewer must execute once for this single-chunk success fixture.
       assert.equal(htmlCalls, expectedCalls, 'HTML must execute every requested reviewer');
       assert.equal(jsonCalls, expectedCalls, 'JSON must execute every requested reviewer');
-      assert.notEqual(json.llmNotExecuted, true);
+      assert.notEqual(htmlRun.llmNotExecuted, true);
+      assert.notEqual(jsonRun.llmNotExecuted, true);
       assert.equal(json.decision, 'auto-approve');
       assert.match(bannerBody(html), /Auto Approve/);
       assert.match(html, /<span class="overall">100\/100<\/span>/);
