@@ -128,13 +128,21 @@ describe('river run --output artifacts (#1962 wiring pins)', () => {
     const html = await runFormat(dir, 'html');
     const bannerLabel = DECISION_BANNER_LABEL[decision];
     assert.ok(bannerLabel, `未知の decision: ${decision}`);
-    // #2812: without an LLM run the verdict appears only as a labelled reference value.
-    assert.match(
-      html,
-      new RegExp(
-        `<div class="banner"[^>]*>\\n. ${bannerLabel}\\n</div>|参考値（LLM 未実行）: 判定 ${bannerLabel}<`
-      )
-    );
+    // #2812 N1: select the expected surface from the independent JSON observation;
+    // accepting banner OR reference would let an unexecuted run look approved.
+    const banners = [...html.matchAll(/<div class="banner"[^>]*>([\s\S]*?)<\/div>/g)];
+    assert.strictEqual(banners.length, 1, 'HTML must contain exactly one banner');
+    const banner = banners[0][1];
+    if (jsonOutput.llmNotExecuted === true) {
+      assert.match(banner, /LLM による意味レビューは未実行です/);
+      for (const label of Object.values(DECISION_BANNER_LABEL)) {
+        assert.ok(!banner.includes(label), `未実行バナーに判定ラベルがある: ${label}`);
+      }
+      assert.ok(html.includes(`参考値（LLM 未実行）: 判定 ${bannerLabel}<`));
+    } else {
+      assert.match(banner, new RegExp(`^\\n. ${bannerLabel}\\n$`));
+      assert.doesNotMatch(html, /参考値（LLM 未実行）|意味レビューは未実行/);
+    }
     assert.doesNotMatch(html, /Decision: N\/A/);
 
     const markdown = await runFormat(dir, 'markdown');
