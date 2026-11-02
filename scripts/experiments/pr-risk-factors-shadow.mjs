@@ -7,8 +7,16 @@ import { findSensitiveCodePaths } from '../../src/lib/sensitive-code-paths.mjs';
 
 const SHA = /^[a-f0-9]{40}$/i;
 const MAX_FILES = 500;
+const MAX_PATH_LENGTH = 4096;
 const RANK = { low: 0, medium: 1, high: 2 };
-const POLICY_PATHS = new Set(['.river/risk-map.yaml', '.river-review.json', '.small_change']);
+const POLICY_PATHS = new Set([
+  '.river/risk-map.yaml',
+  '.river/rules.md',
+  '.river-review.json',
+  '.river-review.yaml',
+  '.river-review.yml',
+  '.small_change',
+]);
 const COMPONENT_TEST_FILE = /\.(?:test|spec)\.(?:vue|svelte|astro|cs|swift|dart)$/i;
 
 function isRecord(value) {
@@ -20,21 +28,28 @@ function validFiles(files) {
     Array.isArray(files) &&
     files.length > 0 &&
     files.length <= MAX_FILES &&
-    files.every(
+    Array.from(files).every(
       (file) =>
         typeof file === 'string' &&
         file.length > 0 &&
+        file.length <= MAX_PATH_LENGTH &&
         !file.startsWith('/') &&
         !file.includes('\\') &&
-        !file.includes('\0') &&
+        !/[\u0000-\u001f\u007f]/.test(file) &&
         !file.split('/').some((part) => part === '' || part === '.' || part === '..')
     ) &&
     new Set(files).size === files.length
   );
 }
 
+function sameFiles(expected, actual) {
+  if (!validFiles(actual) || expected.length !== actual.length) return false;
+  const expectedSet = new Set(expected);
+  return actual.every((file) => expectedSet.has(file));
+}
+
 function boundEvidence(item, head) {
-  return isRecord(item) && SHA.test(head ?? '') && item.headSha === head;
+  return isRecord(item) && typeof head === 'string' && SHA.test(head) && item.headSha === head;
 }
 
 function hasEvidenceRef(item) {
@@ -104,6 +119,21 @@ export function assessPrRiskFactorsShadow(input) {
     }
   }
 
+  // Consume the existing router's observation; never replace or weaken its policy.
+  if (!boundEvidence(value.route, head)) {
+    reasons.add('missing-or-stale-route');
+  } else {
+    const { selectedMode, riskAction } = value.route;
+    const knownMode = ['light', 'standard', 'team', 'human-required'].includes(selectedMode);
+    const knownAction = ['comment_only', 'escalate', 'require_human_review'].includes(riskAction);
+    if (!knownMode || !knownAction) reasons.add('invalid-route');
+    if (selectedMode === 'human-required' || riskAction === 'require_human_review') {
+      raise('high', 'reported-human-review-required');
+    } else if (selectedMode === 'team' || riskAction === 'escalate') {
+      raise('medium', 'reported-route-escalation');
+    }
+  }
+
   let alignment = 'unknown';
   if (boundEvidence(value.alignment, head)) {
     if (typeof value.alignment.planRef === 'string' && value.alignment.planRef.trim()) {
@@ -119,7 +149,11 @@ export function assessPrRiskFactorsShadow(input) {
       verification = 'reported-failed';
       raise('high', 'reported-failed-checks');
     } else if (checks === 'passed' && coverage === 'complete') {
-      verification = 'reported-complete';
+      const referenced = hasEvidenceRef(value.verification);
+      const scopeMatches = manifestValid && sameFiles(files, value.verification.checkedFiles);
+      if (!referenced) reasons.add('missing-verification-evidence');
+      if (!scopeMatches) reasons.add('verification-scope-mismatch');
+      verification = referenced && scopeMatches ? 'reported-complete' : 'reported-incomplete';
     } else if (
       ['pending', 'passed'].includes(checks) ||
       ['partial', 'incomplete'].includes(coverage)
@@ -152,6 +186,7 @@ export function assessPrRiskFactorsShadow(input) {
 
   return {
     kind: 'pr-risk-factors-shadow/v1',
+    subject: { headSha: validHead ? head : null },
     assessmentStatus: reasons.size ? 'incomplete' : 'reported',
     riskFloor,
     axes: {
