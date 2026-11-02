@@ -100,17 +100,15 @@ export async function replayResolutionFeedback(input) {
     }
   }
 
-  const { buildReviewResolutionFeedbackProposals } = await import(
-    '../src/lib/review-resolution-feedback.mjs'
-  );
-  const {
-    approveReviewResolutionFeedbackProposal,
-    reviewResolutionFeedbackProposalDigest,
-    ReviewResolutionFeedbackApprovalError,
-  } = await import('../src/lib/review-resolution-feedback-approval.mjs');
+  const producer = await import('../src/lib/review-resolution-feedback.mjs');
+  const approvalApi = await import('../src/lib/review-resolution-feedback-approval.mjs');
+  const buildProposals = producer.buildReviewResolutionFeedbackProposals;
+  const approveProposal = approvalApi.approveReviewResolutionFeedbackProposal;
+  const proposalDigest = approvalApi.reviewResolutionFeedbackProposalDigest;
+  const ApprovalError = approvalApi.ReviewResolutionFeedbackApprovalError;
 
   try {
-    const proposal = buildReviewResolutionFeedbackProposals(input.producerInput)[findingIndex];
+    const proposal = buildProposals(input.producerInput)[findingIndex];
     const report = {
       kind: 'review-resolution-feedback-replay',
       scope: 'single-finding',
@@ -121,8 +119,7 @@ export async function replayResolutionFeedback(input) {
       qualifiesDogfoodCase: false,
       findingIndex,
       proposal: summary(proposal),
-      proposalDigest:
-        proposal.status === 'candidate' ? reviewResolutionFeedbackProposalDigest(proposal) : null,
+      proposalDigest: proposal.status === 'candidate' ? proposalDigest(proposal) : null,
       currentProposal: null,
       approval: { status: 'not_supplied', reasonCode: null },
     };
@@ -134,7 +131,7 @@ export async function replayResolutionFeedback(input) {
 
     // Rebuild from caller-supplied current evidence, never clone the old proposal.
     // Select by identity rather than index: finding order may have changed.
-    const matches = buildReviewResolutionFeedbackProposals(input.currentInput).filter((item) =>
+    const matches = buildProposals(input.currentInput).filter((item) =>
       sameFinding(item.findingRef, proposal.findingRef)
     );
     if (matches.length !== 1) {
@@ -143,7 +140,7 @@ export async function replayResolutionFeedback(input) {
     }
     report.currentProposal = summary(matches[0]);
     try {
-      const result = approveReviewResolutionFeedbackProposal({
+      const result = approveProposal({
         proposal,
         currentProposal: matches[0],
         currentRevision: input.currentInput.currentRevision,
@@ -153,7 +150,7 @@ export async function replayResolutionFeedback(input) {
       });
       report.approval = { status: result.status, reasonCode: null };
     } catch (error) {
-      if (!(error instanceof ReviewResolutionFeedbackApprovalError)) throw error;
+      if (!(error instanceof ApprovalError)) throw error;
       report.approval = { status: 'rejected', reasonCode: error.code };
     }
     return report;
