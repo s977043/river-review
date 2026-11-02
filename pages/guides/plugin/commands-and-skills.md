@@ -59,6 +59,7 @@ Claude Code ではスキルも `/river-review:<skill-name>` で呼び出せま�
 | --------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
 | `river-review` エージェント / `river-review` スキル | `river-review` の `SKILL.md` を読めない        | 「Skill Registry が未解決のためレビューを実行できない」        |
 | `/river-review:setup-team`                          | `.river/rules.template.md` を読めない          | 「テンプレートが見つからない」（`.river/rules.md` は作らない） |
+| `/river-review:review-team`                         | `review-team` の `SKILL.md` を読めない         | 「スキル定義が見つからない」と、試したパスと理由               |
 | `/river-review:skill`                               | 他スキルから委譲されたスキル ID を解決できない | 未解決として記録し、キーワード検索や推測で補わない             |
 | PR を対象にしたレビュー                             | `gh` が使えず、`git fetch` でも差分を取れない  | PR の diff を渡すよう依頼する                                  |
 
