@@ -62,13 +62,17 @@ hashes in an isolated Node 22.16.0 workspace. A full clone was unavailable becau
 DNS resolution failed. These local results cover the isolated subset, not a full
 repository install, full lint or an independent reviewer.
 
-| Cycle | Validation and review | Correction and rerun |
-| --- | --- | --- |
-| 1 | Baseline 15 passed; revision tests added, 2 failed | Strict SHA identity and sanitized output; 17 passed |
-| 2 | Route tests added, 4 failed | Preserve reported policy floors and unknown routing; 21 passed |
-| 3 | Verification scope tests added, 3 failed | Require reference and exact current scope; 26 passed |
-| 4 | Boundary tests added, 2 failed | YAML/rules policy paths and malformed manifests; 30 passed |
-| 5 | Final regressions, coverage and contract review | 34 passed; clarified lower-bound/unverified semantics; no further behavior fix required |
+- Cycle 1: The baseline passed 15 tests; new revision tests produced two failures.
+  Strict SHA identity and sanitized output corrected them; 17 tests then passed.
+- Cycle 2: New route-floor tests produced four failures. Preserving reported
+  policy floors and unknown routing corrected them; 21 tests then passed.
+- Cycle 3: Verification-scope tests produced three failures. Requiring a reference
+  and the exact current scope corrected them; 26 tests then passed.
+- Cycle 4: Boundary tests produced two failures. YAML/rules policy paths and
+  malformed-manifest handling corrected them; 30 tests then passed.
+- Cycle 5: Final regression, coverage and contract review passed 34 tests.
+  Lower-bound and unverified semantics were clarified; no further behavior fix
+  was required.
 
 The final suite includes 360 deterministic policy combinations, repeated-output
 and input-immutability checks. The isolated assessor reached 100% line, branch and

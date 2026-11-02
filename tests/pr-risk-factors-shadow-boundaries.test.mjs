@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  assessPrRiskFactorsShadow as assess,
-} from '../scripts/experiments/pr-risk-factors-shadow.mjs';
+import { assessPrRiskFactorsShadow } from '../scripts/experiments/pr-risk-factors-shadow.mjs';
+
+const assess = assessPrRiskFactorsShadow;
 
 const HEAD = 'a'.repeat(40);
 const STALE = 'b'.repeat(40);
