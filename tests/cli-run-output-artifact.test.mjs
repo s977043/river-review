@@ -128,21 +128,18 @@ describe('river run --output artifacts (#1962 wiring pins)', () => {
     const html = await runFormat(dir, 'html');
     const bannerLabel = DECISION_BANNER_LABEL[decision];
     assert.ok(bannerLabel, `未知の decision: ${decision}`);
-    // #2812 N1: select the expected surface from the independent JSON observation;
-    // accepting banner OR reference would let an unexecuted run look approved.
+    // #2812 N1: this fixture explicitly uses --dry-run. Public JSON carries the
+    // verdict, not llmNotExecuted; never infer the execution branch from absence.
+    assert.ok(RUN_ARGS.includes('--dry-run'), 'this fixture requires an unexecuted review');
     const banners = [...html.matchAll(/<div class="banner"[^>]*>([\s\S]*?)<\/div>/g)];
     assert.strictEqual(banners.length, 1, 'HTML must contain exactly one banner');
     const banner = banners[0][1];
-    if (jsonOutput.llmNotExecuted === true) {
-      assert.match(banner, /LLM による意味レビューは未実行です/);
-      for (const label of Object.values(DECISION_BANNER_LABEL)) {
-        assert.ok(!banner.includes(label), `未実行バナーに判定ラベルがある: ${label}`);
-      }
-      assert.ok(html.includes(`参考値（LLM 未実行）: 判定 ${bannerLabel}<`));
-    } else {
-      assert.match(banner, new RegExp(`^\\n. ${bannerLabel}\\n$`));
-      assert.doesNotMatch(html, /参考値（LLM 未実行）|意味レビューは未実行/);
+    assert.match(banner, /LLM による意味レビューは未実行です/);
+    for (const label of Object.values(DECISION_BANNER_LABEL)) {
+      assert.ok(!banner.includes(label), `未実行バナーに判定ラベルがある: ${label}`);
     }
+    assert.doesNotMatch(banner, /\d+\s*\/\s*100/);
+    assert.ok(html.includes(`参考値（LLM 未実行）: 判定 ${bannerLabel}<`));
     assert.doesNotMatch(html, /Decision: N\/A/);
 
     const markdown = await runFormat(dir, 'markdown');

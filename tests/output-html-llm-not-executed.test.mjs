@@ -62,6 +62,8 @@ async function renderReports(t, { apiKey, args = [] } = {}) {
   };
 
   const env = Object.fromEntries(KEY_VARS.map((key) => [key, undefined]));
+  // Explicit --save still persists; do not append synthetic runs to the CI job summary.
+  env.RIVER_AUTO_SAVE = 'false';
   if (apiKey) env.OPENAI_API_KEY = apiKey;
   const reports = {};
   for (const format of ['html', 'json']) {
@@ -79,12 +81,11 @@ async function renderReports(t, { apiKey, args = [] } = {}) {
     });
     assert.equal(result.code, 0, `${format}: ${result.stderr}`);
     const runs = await loadAllRunRecords(resolveStoreDir(dir));
-    // Dry-run has no completed run to persist; --save does not change that contract.
-    const expectedRecords = args.includes('--dry-run') ? 0 : 1;
-    assert.equal(runs.length, expectedRecords, `${format}: unexpected saved-run count`);
+    // --dry-run skips the provider, not explicit --save persistence.
+    assert.equal(runs.length, 1, `${format}: expected exactly one saved run`);
     reports[format] = {
       stdout: result.stdout,
-      run: runs[0] ?? null,
+      run: runs[0],
       calls: fetchCalls - callsBefore,
     };
   }
@@ -112,20 +113,14 @@ describe('HTML report when the LLM did not run (#2812)', () => {
 
       assert.equal(htmlCalls, 0, 'HTML skip path must not call the provider');
       assert.equal(jsonCalls, 0, 'JSON skip path must not call the provider');
-      if (options.args?.includes('--dry-run')) {
-        assert.equal(htmlRun, null);
-        assert.equal(jsonRun, null);
-        assert.equal(json.llmNotExecuted, true, 'dry-run JSON must report non-execution');
-      } else {
-        // Public JSON does not always expose this internal execution flag.
-        assert.equal(htmlRun.llmNotExecuted, true, `${name}: HTML run must record non-execution`);
-        assert.equal(jsonRun.llmNotExecuted, true, `${name}: JSON run must record non-execution`);
-        assert.equal(json.decision, jsonRun.decision, 'JSON must match its own saved verdict');
-      }
+      // Use this invocation's saved evidence; public JSON omits the execution flag.
+      assert.equal(htmlRun.llmNotExecuted, true, `${name}: HTML run must record non-execution`);
+      assert.equal(jsonRun.llmNotExecuted, true, `${name}: JSON run must record non-execution`);
+      assert.equal(json.decision, jsonRun.decision, 'JSON must match its own saved verdict');
       assertUnexecutedHtml(html);
       // Both formatters reuse deriveRunGate, as does each persisted run record.
       // A different invocation is not the oracle for this HTML run's verdict.
-      const expectedDecision = htmlRun ? htmlRun.decision : json.decision;
+      const expectedDecision = htmlRun.decision;
       const label = DECISION_LABELS[expectedDecision];
       assert.ok(label, `unknown reference decision: ${expectedDecision}`);
       const reference = html.match(/参考値（LLM 未実行）: 判定 ([^<]*)</)?.[1];
