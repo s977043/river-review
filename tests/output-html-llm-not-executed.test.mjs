@@ -120,11 +120,16 @@ describe('HTML report when the LLM did not run (#2812)', () => {
         // Public JSON does not always expose this internal execution flag.
         assert.equal(htmlRun.llmNotExecuted, true, `${name}: HTML run must record non-execution`);
         assert.equal(jsonRun.llmNotExecuted, true, `${name}: JSON run must record non-execution`);
+        assert.equal(json.decision, jsonRun.decision, 'JSON must match its own saved verdict');
       }
       assertUnexecutedHtml(html);
-      const label = DECISION_LABELS[json.decision];
-      assert.ok(label, `unknown JSON decision: ${json.decision}`);
-      assert.ok(html.includes(`参考値（LLM 未実行）: 判定 ${label}<`));
+      // Both formatters reuse deriveRunGate, as does each persisted run record.
+      // A different invocation is not the oracle for this HTML run's verdict.
+      const expectedDecision = htmlRun ? htmlRun.decision : json.decision;
+      const label = DECISION_LABELS[expectedDecision];
+      assert.ok(label, `unknown reference decision: ${expectedDecision}`);
+      const reference = html.match(/参考値（LLM 未実行）: 判定 ([^<]*)</)?.[1];
+      assert.equal(reference, label, `${name}: HTML reference must match its own saved verdict`);
     });
   }
 
