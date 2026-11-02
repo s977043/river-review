@@ -48,12 +48,6 @@ function assertUnexecutedHtml(html) {
 }
 
 async function renderReports(t, { apiKey, args = [] } = {}) {
-  const { dir, cleanup } = await createTempGitRepo({
-    prefix: 'river-review-html-llm-not-executed-',
-    initialFiles: { 'src/app.js': 'export const value = 1;\n' },
-    changedFiles: { 'src/app.js': 'export const value = 2;\n' },
-  });
-  t.after(cleanup);
   const originalFetch = global.fetch;
   t.after(() => {
     global.fetch = originalFetch;
@@ -69,32 +63,38 @@ async function renderReports(t, { apiKey, args = [] } = {}) {
 
   const env = Object.fromEntries(KEY_VARS.map((key) => [key, undefined]));
   if (apiKey) env.OPENAI_API_KEY = apiKey;
-  const htmlResult = await runCliInProcess(['run', '.', ...args, '--save', '--output', 'html'], {
-    cwd: dir,
-    env,
-  });
-  assert.equal(htmlResult.code, 0, `html: ${htmlResult.stderr}`);
-  const htmlCalls = fetchCalls;
-  const storeDir = resolveStoreDir(dir);
-  const htmlRuns = await loadAllRunRecords(storeDir);
-  assert.equal(htmlRuns.length, 1, 'HTML must persist its own execution record');
-  const htmlRun = htmlRuns[0];
-  const jsonResult = await runCliInProcess(['run', '.', ...args, '--save', '--output', 'json'], {
-    cwd: dir,
-    env,
-  });
-  assert.equal(jsonResult.code, 0, `json: ${jsonResult.stderr}`);
-  const savedRuns = await loadAllRunRecords(storeDir);
-  assert.equal(savedRuns.length, 2, 'JSON must persist a distinct execution record');
-  const jsonRun = savedRuns.find((run) => run.runId !== htmlRun.runId);
-  assert.ok(jsonRun, 'JSON execution record must not reuse the HTML run');
+  const reports = {};
+  for (const format of ['html', 'json']) {
+    // Saving a run must not change the next format's review target.
+    const { dir, cleanup } = await createTempGitRepo({
+      prefix: `river-review-html-llm-${format}-`,
+      initialFiles: { 'src/app.js': 'export const value = 1;\n' },
+      changedFiles: { 'src/app.js': 'export const value = 2;\n' },
+    });
+    t.after(cleanup);
+    const callsBefore = fetchCalls;
+    const result = await runCliInProcess(['run', '.', ...args, '--save', '--output', format], {
+      cwd: dir,
+      env,
+    });
+    assert.equal(result.code, 0, `${format}: ${result.stderr}`);
+    const runs = await loadAllRunRecords(resolveStoreDir(dir));
+    // Dry-run has no completed run to persist; --save does not change that contract.
+    const expectedRecords = args.includes('--dry-run') ? 0 : 1;
+    assert.equal(runs.length, expectedRecords, `${format}: unexpected saved-run count`);
+    reports[format] = {
+      stdout: result.stdout,
+      run: runs[0] ?? null,
+      calls: fetchCalls - callsBefore,
+    };
+  }
   return {
-    html: htmlResult.stdout,
-    htmlRun,
-    jsonRun,
-    json: JSON.parse(jsonResult.stdout),
-    htmlCalls,
-    jsonCalls: fetchCalls - htmlCalls,
+    html: reports.html.stdout,
+    htmlRun: reports.html.run,
+    jsonRun: reports.json.run,
+    json: JSON.parse(reports.json.stdout),
+    htmlCalls: reports.html.calls,
+    jsonCalls: reports.json.calls,
   };
 }
 
@@ -112,10 +112,15 @@ describe('HTML report when the LLM did not run (#2812)', () => {
 
       assert.equal(htmlCalls, 0, 'HTML skip path must not call the provider');
       assert.equal(jsonCalls, 0, 'JSON skip path must not call the provider');
-      // Public output JSON does not always expose the internal execution flag.
-      // Read canonical saved-run evidence instead of inventing an output contract.
-      assert.equal(htmlRun.llmNotExecuted, true, `${name}: HTML run must record non-execution`);
-      assert.equal(jsonRun.llmNotExecuted, true, `${name}: JSON run must record non-execution`);
+      if (options.args?.includes('--dry-run')) {
+        assert.equal(htmlRun, null);
+        assert.equal(jsonRun, null);
+        assert.equal(json.llmNotExecuted, true, 'dry-run JSON must report non-execution');
+      } else {
+        // Public JSON does not always expose this internal execution flag.
+        assert.equal(htmlRun.llmNotExecuted, true, `${name}: HTML run must record non-execution`);
+        assert.equal(jsonRun.llmNotExecuted, true, `${name}: JSON run must record non-execution`);
+      }
       assertUnexecutedHtml(html);
       const label = DECISION_LABELS[json.decision];
       assert.ok(label, `unknown JSON decision: ${json.decision}`);
