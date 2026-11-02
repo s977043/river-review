@@ -46,7 +46,7 @@ function assertUnexecutedHtml(html) {
   }
 }
 
-async function renderReports(t, { apiKey, args = [], offline = false } = {}) {
+async function renderReports(t, { apiKey, args = [] } = {}) {
   const { dir, cleanup } = await createTempGitRepo({
     prefix: 'river-review-html-llm-not-executed-',
     initialFiles: { 'src/app.js': 'export const value = 1;\n' },
@@ -68,7 +68,6 @@ async function renderReports(t, { apiKey, args = [], offline = false } = {}) {
 
   const env = Object.fromEntries(KEY_VARS.map((key) => [key, undefined]));
   if (apiKey) env.OPENAI_API_KEY = apiKey;
-  if (offline) env.RIVER_OFFLINE = '1';
   const htmlResult = await runCliInProcess(['run', '.', ...args, '--output', 'html'], {
     cwd: dir,
     env,
@@ -94,14 +93,18 @@ describe('HTML report when the LLM did not run (#2812)', () => {
     ['dry-run with a key', { apiKey: 'test-key', args: ['--dry-run'] }],
     ['reviewers without a key', { args: REVIEWER_ARGS }],
     ['dry-run reviewers with a key', { apiKey: 'test-key', args: ['--dry-run', ...REVIEWER_ARGS] }],
-    ['offline with a key', { apiKey: 'test-key', offline: true }],
+    ['offline with a key', { apiKey: 'test-key', args: ['--offline'] }],
   ]) {
     it(`${name}: warns without an approval banner or score visualization`, async (t) => {
       const { html, json, htmlCalls, jsonCalls } = await renderReports(t, options);
 
-      assert.equal(json.llmNotExecuted, true);
       assert.equal(htmlCalls, 0, 'HTML skip path must not call the provider');
       assert.equal(jsonCalls, 0, 'JSON skip path must not call the provider');
+      assert.equal(
+        json.llmNotExecuted,
+        true,
+        `${name}: missing execution evidence (decision: ${json.decision})`
+      );
       assertUnexecutedHtml(html);
       const label = DECISION_LABELS[json.decision];
       assert.ok(label, `unknown JSON decision: ${json.decision}`);
