@@ -83,20 +83,23 @@ gh run list --limit 5 --json databaseId,status,conclusion,headBranch,workflowNam
 
 Monitor ツールは使わず、1つの Bash 呼び出し内で sleep しながらポーリングする。**ポーリング用の変数名に `status` を使わない**（zsh の読み取り専用変数と衝突し代入が失敗する）。
 
-終了条件は「必須チェックが全件 `pass`」かつ「`fail` バケットが 0 件」の 2 つとする。`pending` の総数を終了条件にしてはならない（理由は下記）。
+ループを抜ける条件は「必須チェックが全件 `pass`」または「必須チェックに `fail` が 1 件以上」の 2 つとする。必須外の `fail` ではループを抜けず、ループ後に必須外の `fail` / `pending` を一覧表示する。`pending` の総数を終了条件にしてはならない（理由は下記）。
 
 ```bash
 requiredTotal=$(gh api "repos/:owner/:repo/branches/main/protection/required_status_checks" --jq '.checks | length')
 [ "$requiredTotal" -gt 0 ] 2>/dev/null || { echo "必須チェック数を取得できない。Step 1 の gh アカウント確認へ戻る"; exit 1; }
 for i in $(seq 1 15); do
   requiredPass=$(gh pr checks $ARGUMENTS --required --json bucket --jq '[.[] | select(.bucket=="pass")] | length')
-  failCount=$(gh pr checks $ARGUMENTS --json bucket --jq '[.[] | select(.bucket=="fail")] | length')
-  echo "iteration $i: requiredPass=$requiredPass/$requiredTotal fail=$failCount"
-  [ "$failCount" != "0" ] && break
+  requiredFail=$(gh pr checks $ARGUMENTS --required --json bucket --jq '[.[] | select(.bucket=="fail")] | length')
+  echo "iteration $i: requiredPass=$requiredPass/$requiredTotal requiredFail=$requiredFail"
+  [ "$requiredFail" != "0" ] && break
   [ "$requiredPass" = "$requiredTotal" ] && break
   sleep 15
 done
-gh pr checks $ARGUMENTS --json name,bucket --jq '.[] | select(.bucket != "skipping")'
+gh pr checks $ARGUMENTS --required --json name,bucket --jq '.[] | select(.bucket != "skipping")'
+requiredNames=$(gh pr checks $ARGUMENTS --required --json name --jq '[.[].name]')
+echo "--- 必須外の fail / pending ---"
+gh pr checks $ARGUMENTS --json name,bucket,link | jq -c --argjson req "$requiredNames" '.[] | select((.name as $n | $req | index($n) | not) and (.bucket=="fail" or .bucket=="pending"))'
 ```
 
 - 母数の `requiredTotal` は branch protection から取る。`gh pr checks --required` の件数を母数にすると、まだ報告されていない必須チェックが母数から抜け落ちるため、早期に green と誤判定する
@@ -105,7 +108,8 @@ gh pr checks $ARGUMENTS --json name,bucket --jq '.[] | select(.bucket != "skippi
 - `pending` の総数には必須外のコンテキストが多数含まれる。v1.67.1 実走時点の release PR には 24 コンテキストが付き、必須はうち 6 件のみだった（残りは Vercel / Link Check / CodeQL / PlanGate Review など）。必須外の完了はマージ条件ではない
 - 早期 break しない場合、ループは最長で約 4 分半（15 周 × sleep 15 秒 + API 応答）を要する。Bash ツールの timeout に 360000（ミリ秒）以上を指定して実行し、既定の 120000 のまま走らせない
 - 15 回で終了条件を満たさない場合はループを打ち切り、実出力を提示したうえで待機を継続するか判断を仰ぐ。v1.67.1 実走では run 作成 05:36:45Z から最終必須チェック完了 05:39:40Z まで約 3 分を要しており、旧設定の 8 回（約 2 分弱）では足りない
-- `fail` バケットが出たらループを抜け、直ちに報告して原因調査へ切り替える（本コマンドはマージ前提の手順であり、CI 失敗の修正は別タスク）。必須外の `fail` でも一度ループを抜けて報告し、マージ可否は人間が判断する
+- 必須チェックに `fail` が出たらループを抜け、直ちに報告して原因調査へ切り替える（本コマンドはマージ前提の手順であり、CI 失敗の修正は別タスク）
+- 必須外の `fail` ではループを抜けない（2026-11-02 の #2821 では必須外の lychee が外部サイトの 403 で fail した時点でループが抜け、必須チェックの待機をやり直した）。ループ後の一覧に必須外の `fail` があれば、ログで失敗箇所（リンク検査本体か後続ステップか）と原因を特定する。lychee なら `gh run view <run-id> --log | grep -E 'Errors|\[[0-9]{3}\]'` で確認できる。外部リンクの 4xx/5xx・timeout のように PR 内容と無関係と確認できた場合は、報告に記載したうえでマージを継続してよい。それ以外（PR 内容に起因し得る失敗・原因不明）は従来どおり報告し、マージ可否は人間が判断する
 
 ### Step 7. マージ
 
