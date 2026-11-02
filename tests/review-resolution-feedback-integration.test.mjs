@@ -217,17 +217,18 @@ const heldCases = [
       input.reviewResolution.items[0].verification.state = 'pending';
       input.reviewResolution.items[0].verification.coverageStatus = 'not_executed';
     },
+    'no_proposal',
   ],
 ];
 
-for (const [name, change] of heldCases) {
+for (const [name, change, expectedStatus = 'needs_human'] of heldCases) {
   test(`a fresh producer hold cannot reuse an earlier approval: ${name}`, () => {
     const input = inputFixture();
     const previous = propose(input);
     const approval = syntheticApproval(previous);
     change(input);
     const current = propose(input);
-    assert.equal(current.status, 'needs_human');
+    assert.equal(current.status, expectedStatus);
     assert.equal(current.feedbackType, null);
     rejectsWith(
       () =>
