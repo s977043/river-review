@@ -59,6 +59,7 @@ The agent, the skills, and some commands resolve the plugin root (`$CLAUDE_PLUGI
 | ------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `river-review` agent / `river-review` skill | The `river-review` `SKILL.md` cannot be read                   | The review cannot run because the Skill Registry is unresolved       |
 | `/river-review:setup-team`                  | `.river/rules.template.md` cannot be read                      | The template was not found (`.river/rules.md` is not created)        |
+| `/river-review:review-team`                 | The `review-team` `SKILL.md` cannot be read                    | The skill definition was not found, with the paths tried and reason  |
 | `/river-review:skill`                       | A skill ID delegated from another skill cannot be resolved     | Recorded as unresolved; not filled in by keyword search or guesswork |
 | Reviews that target a PR                    | `gh` is unavailable and `git fetch` cannot get the diff either | Asks you to provide the PR diff                                      |
 
