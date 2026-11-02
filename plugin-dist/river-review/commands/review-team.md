@@ -1,10 +1,21 @@
 ---
 description: 'Run review-team skill: parallel multi-role review with consensusLevel and Tech Lead report'
 argument-hint: '[pr-number | path...] [role1,role2,...]'
-allowed-tools: Read, Bash(git ls-files:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*), Bash(mktemp -d:*), Bash(git worktree add --detach:*), Bash(git worktree remove:*)
+allowed-tools: Read, Bash(echo:*), Bash(git ls-files:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git fetch:*), Bash(git symbolic-ref:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh repo view:*), Bash(npm run river:*), Bash(mktemp -d:*), Bash(git worktree add --detach:*), Bash(git worktree remove:*)
 ---
 
-スキル定義: `skills/agent-skills/review-team/SKILL.md`
+スキル定義: `<plugin root>/skills/agent-skills/review-team/SKILL.md`
+
+## スキル定義の読み込み
+
+以下の `<plugin root>` は、利用者のプロジェクトではなく River Review プラグインのルートを指す。相対パスのまま Read すると利用者の cwd 基準で解決されて読めないため、必ず絶対パスで Read する。
+
+1. `${CLAUDE_PLUGIN_ROOT}/skills/agent-skills/review-team/SKILL.md` を Read する。プラグインとして読み込まれていれば、この `${CLAUDE_PLUGIN_ROOT}` はコマンド展開時に絶対パスへ置換されている。
+2. パスに `${CLAUDE_PLUGIN_ROOT}` が文字列のまま残っているときは、Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
+3. 出力が空のときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
+4. それでも SKILL.md を読めなければ、推測でレビューを進めない。「スキル定義が見つからない」と、試したパスと理由を報告して止まる。
+
+以降で `skills/agent-skills/...` と書くファイルも、同じ `<plugin root>` を前に付けた絶対パスで Read する。
 
 ## Context
 
@@ -71,7 +82,7 @@ npm run river -- run . --base origin/<デフォルトブランチ> --reviewers a
 npm run river -- run . --base origin/<デフォルトブランチ> --reviewers <role1,role2,...> --output json
 ```
 
-経路 1 と 2（PR が対象）では、`river run` がローカル checkout をレビューするため、PR の head を一時 worktree に取り出してから渡す。名前付きの ref やブランチは作らない（`skills/agent-skills/river-review/SKILL.md` の「PR を対象にするときの git 操作」に従う）。
+経路 1 と 2（PR が対象）では、`river run` がローカル checkout をレビューするため、PR の head を一時 worktree に取り出してから渡す。名前付きの ref やブランチは作らない（`<plugin root>/skills/agent-skills/river-review/SKILL.md` の「PR を対象にするときの git 操作」に従う）。
 
 1. `git fetch origin pull/<N>/head` を実行する。`origin` が fork を指すなどで失敗したら、PR の base リポジトリを指す remote（例: `upstream`）で同じ fetch を試す。
 2. `mktemp -d` で一時ディレクトリ `<tmp>` を作り、`git worktree add --detach <tmp>/pr FETCH_HEAD` を実行する。
@@ -84,7 +95,7 @@ CLI が存在しない、fetch や worktree の作成に失敗した、または
 
 ### Step 3: 結果を報告する
 
-用語（`skills/agent-skills/review-team/SKILL.md` の「Output Interpretation / 結果の読み方」が出典）:
+用語（`<plugin root>/skills/agent-skills/review-team/SKILL.md` の「Output Interpretation / 結果の読み方」が出典）:
 
 - `scope`: 指摘が本 PR の追加行に由来するかを示す finding のメタデータ。値は `in-diff` / `pre-existing` の 2 つ
 - `in-diff`: 本 PR が追加行で持ち込んだ問題。既定値であり fail-safe でもあるため、値が無い finding もこの扱いになる
