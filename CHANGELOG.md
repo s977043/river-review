@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.138.1](https://github.com/s977043/river-review/compare/v1.138.0...v1.138.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **release-kick:** break the poll only on required check failures ([#2833](https://github.com/s977043/river-review/issues/2833)) ([5265d8a](https://github.com/s977043/river-review/commit/5265d8a9f8f6e88539ba5cdbcab6f27dc2e03237))
+
 ## [1.138.0](https://github.com/s977043/river-review/compare/v1.137.0...v1.138.0) (2026-10-28)
 
 
