@@ -74,7 +74,9 @@ The repository root is used in place of an empty `$CLAUDE_PLUGIN_ROOT` only when
 
 ## Record evidence from actual use
 
-Use this short record when comparing a change before and after an improvement. It is an optional usage note, not a new [Review Artifact](../../reference/review-artifact.en.md) schema or an approval record. Reference existing output when available; installing the CLI is unnecessary.
+In this workflow, downstream projects use the Plugin, while the River CLI is used for development and verification of River Review itself. Record manual application of skill text separately from an actual Plugin runtime invocation.
+
+Use this short record when comparing a change before and after an improvement. It is an optional usage note, not a new [Review Artifact](../../reference/review-artifact.en.md) schema or an approval record. Reference existing output when available.
 
 ### Separate installation from review
 
