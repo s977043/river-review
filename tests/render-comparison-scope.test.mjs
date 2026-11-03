@@ -53,10 +53,12 @@ it('reports unknown metadata honestly and warns that dirty HEAD is not a snapsho
   assert.match(unknown, /before exclusions\): unknown/);
   assert.match(unknown, /not execution coverage\): unknown/);
   assert.match(formatComparisonScopeMarkdown({ dirty: true }), /HEAD alone cannot reproduce/);
-  assert.doesNotMatch(
-    formatComparisonScopeMarkdown({ mergeBase: '<script>bad</script>' }),
-    /<script>/
-  );
+  for (const mergeBase of ['<script>bad</script>', '<SCRIPT>bad</SCRIPT>']) {
+    assert.equal(
+      formatComparisonScopeMarkdown({ mergeBase }).split('\n')[0],
+      '- Comparison merge base: unknown'
+    );
+  }
 });
 
 it('preserves scope in the no-key Markdown early return without inventing coverage', () => {
