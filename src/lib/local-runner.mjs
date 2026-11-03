@@ -334,6 +334,8 @@ export async function planLocalReview({
   if (!reviewFiles.length) {
     return {
       status: 'no-changes',
+      rawChangedFileCount: rawChangedFiles.length,
+      changedFiles: reviewFiles,
       repoRoot,
       defaultBranch,
       mergeBase,
@@ -402,6 +404,7 @@ export async function planLocalReview({
     commitSha,
     dirty,
     changedFiles: reviewFiles,
+    rawChangedFileCount: rawChangedFiles.length,
     plan: augmentedPlan,
     diff,
     reviewFileScope,
@@ -626,6 +629,8 @@ export async function runLocalReview({
     });
     return {
       status: 'no-changes',
+      rawChangedFileCount: context.rawChangedFileCount ?? null,
+      changedFiles: context.changedFiles ?? [],
       repoRoot: context.repoRoot,
       defaultBranch: context.defaultBranch,
       mergeBase: context.mergeBase,
@@ -871,6 +876,7 @@ export async function runLocalReview({
     commitSha: context.commitSha ?? null,
     dirty: context.dirty ?? null,
     changedFiles: context.changedFiles,
+    rawChangedFileCount: context.rawChangedFileCount ?? null,
     plan: context.plan,
     reviewMode: context.plan?.reviewMode ?? 'medium',
     diffText: context.diff.diffText,

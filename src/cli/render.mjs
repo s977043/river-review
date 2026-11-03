@@ -529,6 +529,30 @@ function formatExecutionDetailsMarkdown(result) {
   );
 }
 
+// Comparison provenance describes the local runner's working-tree diff, not
+// necessarily the pull request range. Selection is not evidence of LLM execution.
+export function formatComparisonScopeMarkdown(result) {
+  const sha = (value) =>
+    typeof value === 'string' && /^[a-f0-9]{40,64}$/i.test(value) ? `\`${value}\`` : 'unknown';
+  const rawCount =
+    Number.isInteger(result.rawChangedFileCount) && result.rawChangedFileCount >= 0
+      ? result.rawChangedFileCount
+      : 'unknown';
+  const selectedCount = Array.isArray(result.changedFiles) ? result.changedFiles.length : 'unknown';
+  const workingTree =
+    result.dirty === false
+      ? 'clean'
+      : result.dirty === true
+        ? 'dirty (HEAD alone cannot reproduce)'
+        : 'unknown';
+  return [
+    `- Comparison merge base: ${sha(result.mergeBase)}`,
+    `- Checkout HEAD: ${sha(result.commitSha)}; working tree: ${workingTree}`,
+    `- Raw changed files (before exclusions): ${rawCount}`,
+    `- Selected files (after exclusions/optimization; not execution coverage): ${selectedCount}`,
+  ].join('\n');
+}
+
 function formatDebugSummaryMarkdown(result) {
   const debug = result.reviewDebug ?? {};
   const llmStatus = debug.llmUsed
@@ -546,7 +570,7 @@ function formatDebugSummaryMarkdown(result) {
     `- LLM: ${llmStatus}`,
     `- Planner: ${plannerStatus}`,
     `- Impact tags: ${impactSummary}`,
-    `- 変更ファイル数: ${result.changedFiles.length}`,
+    formatComparisonScopeMarkdown(result),
     `- トークン見積もり: ${result.tokenEstimate}`,
   ].join('\n');
 }
@@ -626,7 +650,9 @@ export function printMarkdownReport(result, phase) {
 ## River Review
 
 - フェーズ: \`${phase}\`
-- LLM レビュー未設定（\`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\` / \`GOOGLE_API_KEY\` のいずれも未設定）のため静的チェックのみ実行し、**指摘はありません**。いずれか 1 つを設定すると LLM レビューが有効になり、リポジトリ固有の規約・差分スコープ等の観点でレビューします。${surface}`
+- LLM レビュー未設定（\`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\` / \`GOOGLE_API_KEY\` のいずれも未設定）のため静的チェックのみ実行し、**指摘はありません**。いずれか 1 つを設定すると LLM レビューが有効になり、リポジトリ固有の規約・差分スコープ等の観点でレビューします。${surface}
+
+${wrapInDetails('比較範囲とファイル選択', formatComparisonScopeMarkdown(result))}`
     );
     return;
   }
