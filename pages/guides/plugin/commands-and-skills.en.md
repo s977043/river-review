@@ -72,6 +72,49 @@ The agent, the skills, and some commands resolve the plugin root (`$CLAUDE_PLUGI
 
 The repository root is used in place of an empty `$CLAUDE_PLUGIN_ROOT` only when running inside the river-review repository itself.
 
+## Record evidence from actual use
+
+Use this short record when comparing a change before and after an improvement. It is an optional usage note, not a new [Review Artifact](../../reference/review-artifact.en.md) schema or an approval record. Reference existing output when available; installing the CLI is unnecessary.
+
+### Separate installation from review
+
+- **Registration**: A name appears in configuration or a marketplace. This does not prove it loaded in the session.
+- **Loading**: The target session could read the bundled skill. Application to the input and completion require separate evidence.
+- **Execution**: The input revision, applied skill, and actual output can be traced. Distinguish self-review, another session, manual delegation, and automatic dispatch.
+- **Effectiveness**: Assess only what has ground-truth labels or human evaluation. Zero findings or an iteration count alone does not guarantee quality.
+
+Static manifest inspection and mocks do not count as Plugin runtime execution. Record stops, skips, unsupported capabilities, and unexecuted model calls with their reasons; do not reinterpret them as success. Mark unobserved states as unknown. Normal Plugin use applies skills through the host model, so the absence of a River Review API key alone does not establish that the model did not run.
+
+### Record template
+
+```text
+Case ID / timestamp:
+Product version / commit SHA / entry path / host version:
+Model / effort / execution conditions: unknown if unavailable
+Task type / safe input ID / subject revision:
+Expected behavior:
+Observed behavior / evidence references:
+Registration / loading / execution / effectiveness: observed and unknown per step
+Lifecycle coverage: upstream definition / requirements / plan / design / code / QA
+  Each stage: distinguish out of scope, not executed, and executed; reference input/output
+Finding disposition: accepted / rejected / deferred; decision owner and reason:
+False positives / misses / usefulness / human time: measured or not measured
+Public minimal reproduction / before-and-after revisions and results:
+Remaining limitations / next check:
+```
+
+Lifecycle names are usage-note labels, not Flow entry names or evidence of execution. Completing a code review does not complete requirements or QA review. If a skill was applied manually from its text, record that fact without claiming Plugin loading or automatic delegation was verified.
+
+### Examples and feedback
+
+Independent illustrative examples (not execution logs):
+
+- `example-load-only`: Registration and skill-loading evidence exist, but the skill was not applied to the target input. Execution is not performed; effectiveness is not measured.
+- `example-zero-findings`: The subject revision and review output are available, with zero findings. Execution is observed, but effectiveness remains unmeasured without ground-truth labels or human evaluation.
+- `example-unsupported`: The host does not support the requested subagent. Record the limitation as not executed, separately from any manually supplied result.
+
+Search existing issues and PRs before reporting feedback; append evidence to the same problem when found. Publish independent minimal inputs and reproduced product behavior, without private repository links, internal paths, source, conversations, or credentials. Ask the owner before publishing private evidence. Compare the same input and conditions on recheck, recording changed conditions and unmeasured outcomes. Usage notes and review evidence do not create Human / Host approval or merge authority.
+
 ## Related pages
 
 - [Install the plugin](./install.en.md)
