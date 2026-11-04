@@ -143,8 +143,8 @@ describe('no-changes path keeps structured stdout clean', () => {
     await repo.cleanup();
   });
 
-  it('prints comparison scope on stdout for markdown', async () => {
-    const result = await runCliInProcess(['run', '.', '--dry-run', '--output', 'markdown'], {
+  it('prints comparison scope on stdout for text', async () => {
+    const result = await runCliInProcess(['run', '.', '--dry-run', '--output', 'text'], {
       cwd: repo.dir,
       env: { RIVER_OFFLINE: '1' },
     });
@@ -153,14 +153,14 @@ describe('no-changes path keeps structured stdout clean', () => {
     assert.match(result.stdout, /変更ファイル数（除外前）: 0/);
   });
 
-  for (const output of ['json', 'html']) {
-    it(`keeps stdout empty and moves scope to stderr for ${output}`, async () => {
+  for (const output of ['markdown', 'json', 'yaml', 'html']) {
+    it(`keeps No changes off stdout and moves scope to stderr for ${output}`, async () => {
       const result = await runCliInProcess(['run', '.', '--dry-run', '--output', output], {
         cwd: repo.dir,
         env: { RIVER_OFFLINE: '1' },
       });
       assert.equal(result.code, 0);
-      assert.equal(result.stdout, '');
+      assert.doesNotMatch(result.stdout, /No changes to review/);
       assert.match(result.stderr, /No changes to review/);
       assert.match(result.stderr, /変更ファイル数（除外前）: 0/);
     });

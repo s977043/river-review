@@ -115348,10 +115348,8 @@ Dependencies: ${
   }
 
   if (context.status === 'no-changes') {
-    // json/yaml/html stdout is the artifact itself; keep these notes off it.
-    const logNoChanges = ['json', 'yaml', 'html'].includes(parsed.output)
-      ? console.error
-      : console.log;
+    // Same inverted check as logRunHeader (#1695): only `text` keeps these on stdout.
+    const logNoChanges = parsed.output !== 'text' ? console.error : console.log;
     logNoChanges(`No changes to review compared to ${context.defaultBranch}.`);
     logNoChanges(formatComparisonScopeMarkdown(context));
     warnBaselineNotCompared(
