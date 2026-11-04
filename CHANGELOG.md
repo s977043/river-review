@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.139.1](https://github.com/s977043/river-review/compare/v1.139.0...v1.139.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **review:** 比較SHAと生差分・選択後件数を明示する ([#2845](https://github.com/s977043/river-review/issues/2845)) ([e426299](https://github.com/s977043/river-review/commit/e426299759669380f9692acfe15b9ca630f57966))
+
 ## [1.139.0](https://github.com/s977043/river-review/compare/v1.138.1...v1.139.0) (2026-11-04)
 
 
