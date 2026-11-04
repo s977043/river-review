@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.139.0](https://github.com/s977043/river-review/compare/v1.138.1...v1.139.0) (2026-11-04)
+
+
+### Features
+
+* **evals:** preflight incident smoke case metadata ([#2844](https://github.com/s977043/river-review/issues/2844)) ([92847b6](https://github.com/s977043/river-review/commit/92847b61d9a4056b31bf8b5401cc0815c06d1d5a))
+* **evals:** replay Feedback evidence without writes or authority ([#2842](https://github.com/s977043/river-review/issues/2842)) ([46476ad](https://github.com/s977043/river-review/commit/46476ad0437868329cd62ca339e599492396b725))
+
+
+### Bug Fixes
+
+* **commands:** clarify review-team skill resolution fallbacks ([#2846](https://github.com/s977043/river-review/issues/2846)) ([8472578](https://github.com/s977043/river-review/commit/847257804f0b940d9c2c60a72b90447c33718719))
+* **commands:** resolve review-team skill from the plugin root ([#2836](https://github.com/s977043/river-review/issues/2836)) ([178a89c](https://github.com/s977043/river-review/commit/178a89c77867af261fa3643949e9fac7a339eb8a))
+* **docs:** validate community files and correct placement counts ([#2839](https://github.com/s977043/river-review/issues/2839)) ([849981c](https://github.com/s977043/river-review/commit/849981ce14792060a70d74d07a2b2f1a742dacb6))
+* **risk:** preserve policy floors and bind shadow evidence to scope ([#2841](https://github.com/s977043/river-review/issues/2841)) ([06d0e95](https://github.com/s977043/river-review/commit/06d0e9562a091b43e2131cb7c9c2dcb4a91dc6ee))
+
 ## [1.138.1](https://github.com/s977043/river-review/compare/v1.138.0...v1.138.1) (2026-11-02)
 
 
