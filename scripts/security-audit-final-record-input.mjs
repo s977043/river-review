@@ -6,19 +6,24 @@
  * the expected target and subsequently observe a verifier execution.
  * The canonical run record and existing finding states remain authoritative.
  */
-import { canonicalJson } from '../src/lib/promotion-candidates.mjs';
+import { canonicalJson, nonEmptyNfcString } from '../src/lib/promotion-candidates.mjs';
+import { SECURITY_AUDIT_EVIDENCE_STATES } from '../src/lib/security-audit-report.mjs';
 import { sha256Hex } from '../src/lib/shadow-aggregate.mjs';
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const SOURCE_ANCHOR = 'source';
+// Mirrors the evidenceRef kind enum in schemas/security-audit-coverage.schema.json.
+const EVIDENCE_REF_KINDS = ['source', 'config', 'manifest', 'documentation', 'history'];
+// Control, format (bidi, zero-width), line/paragraph separators and non-ASCII spaces.
+const UNSAFE_PATH_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]|(?! )\p{Zs}/u;
 
 function isRepositoryRelativePath(path) {
   return (
     nonEmpty(path) &&
     !path.startsWith('/') &&
     !path.includes('\\') &&
-    !path.includes('\0') &&
-    !/[\u0000-\u001f\u007f]/.test(path) &&
+    path === path.trim() &&
+    !UNSAFE_PATH_CHARACTER.test(path) &&
     !/^[a-zA-Z]:/.test(path) &&
     path.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
   );
@@ -40,6 +45,10 @@ function hasSourceAnchor(reference) {
     Number.isSafeInteger(reference.lineEnd) &&
     reference.lineEnd >= reference.lineStart
   );
+}
+
+function addOnce(blockers, blocker) {
+  if (!blockers.includes(blocker)) blockers.push(blocker);
 }
 
 /**
@@ -69,11 +78,13 @@ export function inspectSecurityAuditFinalRecordInput(record, frozenTarget) {
     blockers.push('unsupported_record_contract');
   }
 
+  const frozenRepository = nonEmptyNfcString(frozenTarget?.repository);
+  const frozenRevision = nonEmptyNfcString(frozenTarget?.revision);
   if (
-    !nonEmpty(frozenTarget?.repository) ||
-    !nonEmpty(frozenTarget?.revision) ||
-    record.target?.repository !== frozenTarget.repository ||
-    record.target?.revision !== frozenTarget.revision
+    frozenRepository === null ||
+    frozenRevision === null ||
+    record.target?.repository !== frozenRepository ||
+    record.target?.revision !== frozenRevision
   ) {
     blockers.push('target_revision_mismatch');
   }
@@ -93,14 +104,20 @@ export function inspectSecurityAuditFinalRecordInput(record, frozenTarget) {
     blockers.push('findings_missing');
   } else {
     for (const finding of record.findings) {
-      if (finding?.evidenceState !== 'established') continue;
+      if (!SECURITY_AUDIT_EVIDENCE_STATES.includes(finding?.evidenceState)) {
+        addOnce(blockers, 'evidence_state_unknown');
+        continue;
+      }
       const refs = finding.evidenceRefs;
+      if (Array.isArray(refs) && !refs.every((ref) => EVIDENCE_REF_KINDS.includes(ref?.kind))) {
+        addOnce(blockers, 'evidence_ref_kind_unknown');
+      }
+      if (finding.evidenceState !== 'established') continue;
       const sourceRefs = Array.isArray(refs)
         ? refs.filter((ref) => ref?.kind === SOURCE_ANCHOR)
         : [];
       if (sourceRefs.length === 0 || !sourceRefs.every(hasSourceAnchor)) {
-        blockers.push('established_source_anchor_missing');
-        break;
+        addOnce(blockers, 'established_source_anchor_missing');
       }
     }
   }

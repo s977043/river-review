@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import * as auditPreflight from '../scripts/security-audit-final-record-input.mjs';
+import { canonicalJson } from '../src/lib/promotion-candidates.mjs';
 import { deriveSecurityAuditCoverage } from '../src/lib/security-audit-coverage.mjs';
 import { buildSecurityAuditRunRecord } from '../src/lib/security-audit-report.mjs';
+import { sha256Hex } from '../src/lib/shadow-aggregate.mjs';
 
 const inspect = auditPreflight.inspectSecurityAuditFinalRecordInput;
 
@@ -25,6 +27,13 @@ function record(findings = [], target = frozenTarget) {
   });
 }
 
+// A producer hand-editing a record and recomputing its digest, bypassing the builder.
+function redigest(built, mutate = () => {}) {
+  const { recordDigest: _discarded, ...payload } = structuredClone(built);
+  mutate(payload);
+  return { ...payload, recordDigest: sha256Hex(canonicalJson(payload)) };
+}
+
 function established(evidenceRefs = [sourceAnchor]) {
   return {
     id: 'SA-1',
@@ -41,11 +50,67 @@ describe('Phase 8 frozen audit record input (no verifier execution)', () => {
     assert.deepEqual(result, { inputReady: true, blockers: [] });
   });
 
-  it('does not claim safety from zero findings', () => {
-    assert.deepEqual(inspect(record(), frozenTarget), {
-      inputReady: true,
-      blockers: [],
-    });
+  it('reports zero findings as input readiness only, with no safety field', () => {
+    const result = inspect(record(), frozenTarget);
+    assert.deepEqual(Object.keys(result).sort(), ['blockers', 'inputReady']);
+    assert.deepEqual(result, { inputReady: true, blockers: [] });
+  });
+
+  it('rejects C1, bidi, non-ASCII space and padded source paths', () => {
+    for (const path of [
+      'src/auth\u0085spoof.mjs',
+      'src/auth‮spoof.mjs',
+      'src/auth⁦spoof.mjs',
+      'src/auth​spoof.mjs',
+      'src/auth spoof.mjs',
+      'src/auth spoof.mjs',
+      ' src/auth/session.mjs',
+      'src/auth/session.mjs ',
+    ]) {
+      const result = inspect(record([established([{ ...sourceAnchor, path }])]), frozenTarget);
+      assert.deepEqual(
+        result.blockers,
+        ['established_source_anchor_missing'],
+        JSON.stringify(path)
+      );
+    }
+  });
+
+  it('accepts a source path containing an ASCII space', () => {
+    const path = 'src/auth/my session.mjs';
+    const result = inspect(record([established([{ ...sourceAnchor, path }])]), frozenTarget);
+    assert.deepEqual(result, { inputReady: true, blockers: [] });
+  });
+
+  it('NFC-normalizes the host-selected frozen target before comparing', () => {
+    const composed = { repository: 'example/café', revision: 'deadbeef' };
+    const decomposed = { repository: 'example/café', revision: 'deadbeef' };
+    const result = inspect(record([established()], composed), decomposed);
+    assert.deepEqual(result, { inputReady: true, blockers: [] });
+  });
+
+  it('rejects an unknown evidenceState even with a recalculated digest', () => {
+    for (const evidenceState of ['Established', 'confirmed', undefined]) {
+      const forged = redigest(record([established()]), (rec) => {
+        rec.findings[0].evidenceState = evidenceState;
+        rec.findings[0].evidenceRefs = [];
+      });
+      const result = inspect(forged, frozenTarget);
+      assert.equal(result.inputReady, false);
+      assert.deepEqual(result.blockers, ['evidence_state_unknown']);
+    }
+  });
+
+  it('rejects a ref whose kind is outside the schema enum alongside a valid anchor', () => {
+    for (const kind of ['Source', 'SOURCE', 'unknown', undefined]) {
+      const unsafe = { kind, path: '../secrets', lineStart: 1, lineEnd: 2 };
+      const forged = redigest(record([established([sourceAnchor])]), (rec) => {
+        rec.findings[0].evidenceRefs.push(unsafe);
+      });
+      const result = inspect(forged, frozenTarget);
+      assert.equal(result.inputReady, false);
+      assert.deepEqual(result.blockers, ['evidence_ref_kind_unknown']);
+    }
   });
 
   it('rejects malformed and missing run records', () => {
