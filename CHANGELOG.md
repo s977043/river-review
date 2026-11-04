@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.139.2](https://github.com/s977043/river-review/compare/v1.139.1...v1.139.2) (2026-11-04)
+
+
+### Bug Fixes
+
+* **security:** harden final-record input preflight ([#2850](https://github.com/s977043/river-review/issues/2850)) ([#2853](https://github.com/s977043/river-review/issues/2853)) ([655bb19](https://github.com/s977043/river-review/commit/655bb19591d61c4580a417f3edef9f79d77c1d4d))
+
 ## [1.139.1](https://github.com/s977043/river-review/compare/v1.139.0...v1.139.1) (2026-11-04)
 
 
