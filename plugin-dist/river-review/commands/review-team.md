@@ -11,8 +11,10 @@ allowed-tools: Read, Bash(echo:*), Bash(git ls-files:*), Bash(git status:*), Bas
 以下の `<plugin root>` は、利用者のプロジェクトではなく River Review プラグインのルートを指す。相対パスのまま Read すると利用者の cwd 基準で解決されて読めないため、必ず絶対パスで Read する。
 
 1. `${CLAUDE_PLUGIN_ROOT}/skills/agent-skills/review-team/SKILL.md` を Read する。プラグインとして読み込まれていれば、この `${CLAUDE_PLUGIN_ROOT}` はコマンド展開時に絶対パスへ置換されている。
-2. パスに `${CLAUDE_PLUGIN_ROOT}` が文字列のまま残っているときは、Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
-3. 出力が空のときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
+   - この置換は、Claude Code がコマンド本文をモデルへ渡す前に行う（Claude Code 2.1.316 で実測）。
+   - 「Read は環境変数を展開しない」という注意は Read ツールの挙動を指しており、この置換とは別の話である。
+2. パスに `${CLAUDE_PLUGIN_ROOT}` が文字列のまま残っている、または手順 1 の Read に失敗したときは、Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
+3. echo の出力が空、または echo が拒否・失敗したとき: `./skills/agent-skills/review-team/SKILL.md` が実在すれば（river-review リポジトリ内）、`.` を `<plugin root>` としてそれを Read する。実在しなければ手順 4 へ進む。
 4. それでも SKILL.md を読めなければ、推測でレビューを進めない。「スキル定義が見つからない」と、試したパスと理由を報告して止まる。
 
 以降で `skills/agent-skills/...` と書くファイルも、同じ `<plugin root>` を前に付けた絶対パスで Read する。
@@ -28,7 +30,7 @@ allowed-tools: Read, Bash(echo:*), Bash(git ls-files:*), Bash(git status:*), Bas
 
 引数の各トークンを次の順で分類し、最初に当たったものに決める。
 
-1. `auto`、または SKILL.md のロール名（カンマ区切り可）: ロール指定（Step 1）
+1. `auto`、または上で読み込んだ review-team の SKILL.md のロール名（カンマ区切り可）: ロール指定（Step 1）
 2. 数字だけ: PR 番号 `N`。同名のファイルがあっても PR 番号とする（ファイルを対象にするときは `./123` と書く）
 3. 作業ツリー配下に存在するファイルまたはディレクトリ: 対象パス
 4. どれにも当たらない: 「`<トークン>` はロール名でも PR 番号でも存在するパスでもありません」と出力して終了する（パスの typo で別の対象を黙ってレビューしないため）
@@ -36,7 +38,7 @@ allowed-tools: Read, Bash(echo:*), Bash(git ls-files:*), Bash(git status:*), Bas
 対象パスがある場合は、差分ではなくそのファイルの全文を対象にする（実装前の設計書・仕様・計画のレビュー用）。PR 番号と併用された場合は、対象を決められない旨を出力して終了する。この経路では以降の差分の解決を行わず、次を適用する。
 
 - 対象ファイルは `git ls-files -z --cached --others --exclude-standard -- ':(literal)<パス>'` で得る（未追跡の新しい設計書も含み、`.gitignore` 対象は除く。ディレクトリは配下を再帰）。次を除く: バイナリ、symlink（追跡中は `git ls-files -s` のモード `120000`）、AGENTS.md Safety 節の読込禁止（`.env*`・`secrets/`・`*.pem`・`*.key`）と `*.p12`・`*.pfx`・`id_rsa*`・`.npmrc`・`credentials*`・`*.tfvars`。残りが 0 件か、すべて空なら「対象が空です（`.gitignore` 対象・除外対象・作業ツリー外のパスは読みません）」と出力して終了する。20 件を超える場合は一覧を出力し、ファイルを指定して絞るよう伝えて終了する
-- ロール指定が無い場合の `auto` は、ファイル種別に加えて `stage: plan` signal を与えた扱いで選ぶ（SKILL.md「Stage / risk signal による選択」）。各ロールは担当領域を文書の記述に当てはめ、記述と実装・実在ファイルの食い違いも指摘する。対象が文書だけのときは、レポートの冒頭に「設計の妥当性は `river-review-architecture`、文書品質は `river-review-docs` が専門です」と書いてから続行する
+- ロール指定が無い場合の `auto` は、ファイル種別に加えて `stage: plan` signal を与えた扱いで選ぶ（上で読み込んだ review-team の SKILL.md「Stage / risk signal による選択」）。各ロールは担当領域を文書の記述に当てはめ、記述と実装・実在ファイルの食い違いも指摘する。対象が文書だけのときは、レポートの冒頭に「設計の妥当性は `river-review-architecture`、文書品質は `river-review-docs` が専門です」と書いてから続行する
 - 秘密らしき値（トークン・鍵・パスワード）はレポートに引用せず、伏せ字にする
 - `river` CLI は差分を前提にするため使わず、スキル駆動でレビューする
 - 全文が対象なので、finding の `scope` はすべて `in-diff` とし、レポートの冒頭に「ファイル全文が対象のため scope の区別はありません」と書く。Step 3 の用語にある「本 PR の追加行」は、この経路では対象ファイルの全文と読み替える
