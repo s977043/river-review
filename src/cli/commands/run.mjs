@@ -12,6 +12,7 @@ import CostEstimator from '../../core/cost-estimator.mjs';
 import { resolveDepthToReviewMode } from '../../lib/review-plan-generator.mjs';
 import { deriveRunGate } from '../../lib/run-gate.mjs';
 import {
+  formatComparisonScopeMarkdown,
   printPlan,
   printComments,
   printMarkdownReport,
@@ -327,6 +328,7 @@ Dependencies: ${
 
   if (context.status === 'no-changes') {
     console.log(`No changes to review compared to ${context.defaultBranch}.`);
+    console.log(formatComparisonScopeMarkdown(context));
     warnBaselineNotCompared(
       parsed,
       `there are no changes to review against ${context.defaultBranch}`
