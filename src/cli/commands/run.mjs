@@ -327,8 +327,12 @@ Dependencies: ${
   }
 
   if (context.status === 'no-changes') {
-    console.log(`No changes to review compared to ${context.defaultBranch}.`);
-    console.log(formatComparisonScopeMarkdown(context));
+    // json/yaml/html stdout is the artifact itself; keep these notes off it.
+    const logNoChanges = ['json', 'yaml', 'html'].includes(parsed.output)
+      ? console.error
+      : console.log;
+    logNoChanges(`No changes to review compared to ${context.defaultBranch}.`);
+    logNoChanges(formatComparisonScopeMarkdown(context));
     warnBaselineNotCompared(
       parsed,
       `there are no changes to review against ${context.defaultBranch}`

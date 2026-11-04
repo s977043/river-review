@@ -114119,23 +114119,25 @@ function formatExecutionDetailsMarkdown(result) {
 // necessarily the pull request range. Selection is not evidence of LLM execution.
 function formatComparisonScopeMarkdown(result) {
   const sha = (value) =>
-    typeof value === 'string' && /^[a-f0-9]{40,64}$/i.test(value) ? `\`${value}\`` : 'unknown';
+    typeof value === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(value)
+      ? `\`${value}\``
+      : '不明';
   const rawCount =
     Number.isInteger(result.rawChangedFileCount) && result.rawChangedFileCount >= 0
       ? result.rawChangedFileCount
-      : 'unknown';
-  const selectedCount = Array.isArray(result.changedFiles) ? result.changedFiles.length : 'unknown';
+      : '不明';
+  const selectedCount = Array.isArray(result.changedFiles) ? result.changedFiles.length : '不明';
   const workingTree =
     result.dirty === false
-      ? 'clean'
+      ? 'クリーン'
       : result.dirty === true
-        ? 'dirty (HEAD alone cannot reproduce)'
-        : 'unknown';
+        ? '未コミットの変更あり（HEAD だけでは再現できない）'
+        : '不明';
   return [
-    `- Comparison merge base: ${sha(result.mergeBase)}`,
-    `- Checkout HEAD: ${sha(result.commitSha)}; working tree: ${workingTree}`,
-    `- Raw changed files (before exclusions): ${rawCount}`,
-    `- Selected files (after exclusions/optimization; not execution coverage): ${selectedCount}`,
+    `- 比較の merge base（ローカルでの比較。PR の base とは限らない）: ${sha(result.mergeBase)}`,
+    `- チェックアウト中の HEAD: ${sha(result.commitSha)}（作業ツリー: ${workingTree}）`,
+    `- 変更ファイル数（除外前）: ${rawCount}`,
+    `- 選択ファイル数（除外・最適化後。実行カバレッジではない）: ${selectedCount}`,
   ].join('\n');
 }
 
@@ -115346,8 +115348,12 @@ Dependencies: ${
   }
 
   if (context.status === 'no-changes') {
-    console.log(`No changes to review compared to ${context.defaultBranch}.`);
-    console.log(formatComparisonScopeMarkdown(context));
+    // json/yaml/html stdout is the artifact itself; keep these notes off it.
+    const logNoChanges = ['json', 'yaml', 'html'].includes(parsed.output)
+      ? console.error
+      : console.log;
+    logNoChanges(`No changes to review compared to ${context.defaultBranch}.`);
+    logNoChanges(formatComparisonScopeMarkdown(context));
     warnBaselineNotCompared(
       parsed,
       `there are no changes to review against ${context.defaultBranch}`
