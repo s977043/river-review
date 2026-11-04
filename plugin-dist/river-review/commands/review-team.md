@@ -14,7 +14,7 @@ allowed-tools: Read, Bash(echo:*), Bash(git ls-files:*), Bash(git status:*), Bas
    - この置換は、Claude Code がコマンド本文をモデルへ渡す前に行う（Claude Code 2.1.316 で実測）。
    - 「Read は環境変数を展開しない」という注意は Read ツールの挙動を指しており、この置換とは別の話である。
 2. パスに `${CLAUDE_PLUGIN_ROOT}` が文字列のまま残っている、または手順 1 の Read に失敗したときは、Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
-3. echo が拒否された、失敗した、または出力が空のときは手順 4 へ進む。ただし `./skills/agent-skills/review-team/SKILL.md` が実在する場合（river-review リポジトリ内で動かす場合）に限り、`.` を `<plugin root>` として Read してよい。
+3. echo の出力が空、または echo が拒否・失敗したとき: `./skills/agent-skills/review-team/SKILL.md` が実在すれば（river-review リポジトリ内）、`.` を `<plugin root>` としてそれを Read する。実在しなければ手順 4 へ進む。
 4. それでも SKILL.md を読めなければ、推測でレビューを進めない。「スキル定義が見つからない」と、試したパスと理由を報告して止まる。
 
 以降で `skills/agent-skills/...` と書くファイルも、同じ `<plugin root>` を前に付けた絶対パスで Read する。
