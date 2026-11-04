@@ -94,7 +94,11 @@ export function inspectSecurityAuditFinalRecordInput(record, frozenTarget) {
   } else {
     for (const finding of record.findings) {
       if (finding?.evidenceState !== 'established') continue;
-      if (!Array.isArray(finding.evidenceRefs) || !finding.evidenceRefs.some(hasSourceAnchor)) {
+      const refs = finding.evidenceRefs;
+      const sourceRefs = Array.isArray(refs)
+        ? refs.filter((ref) => ref?.kind === SOURCE_ANCHOR)
+        : [];
+      if (sourceRefs.length === 0 || !sourceRefs.every(hasSourceAnchor)) {
         blockers.push('established_source_anchor_missing');
         break;
       }

@@ -89,6 +89,17 @@ describe('Phase 8 frozen audit record input (no verifier execution)', () => {
     }
   });
 
+  it('rejects an unsafe source ref mixed with a valid source anchor', () => {
+    for (const unsafe of [
+      { kind: 'source', path: '../secrets', lineStart: 1, lineEnd: 2 },
+      { kind: 'source', path: '/etc/passwd', lineStart: 1, lineEnd: 2 },
+    ]) {
+      const result = inspect(record([established([sourceAnchor, unsafe])]), frozenTarget);
+      assert.equal(result.inputReady, false);
+      assert.deepEqual(result.blockers, ['established_source_anchor_missing']);
+    }
+  });
+
   it('fails closed rather than throwing on malformed producer-owned digest inputs', () => {
     const cyclic = record();
     cyclic.unsafe = cyclic;
