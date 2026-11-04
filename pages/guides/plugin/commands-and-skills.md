@@ -74,7 +74,7 @@ Claude Code ではスキルも `/river-review:<skill-name>` で呼び出せま�
 
 ## 実利用の証拠を残す
 
-この手順では、導入先での利用は Plugin を前提とし、River CLI は River Review 本体の開発・検証で使います。スキル本文の手動適用は、実際の Plugin ランタイム呼び出しとは区別して記録します。
+この手順では、導入先での利用は Plugin を前提とし、River Review CLI は River Review 本体の開発・検証で使います。スキル本文の手動適用は、実際の Plugin ランタイム呼び出しとは区別して記録します。
 
 同じ変更で改善前後を比べるときは、次の短い記録を使えます。これは任意の利用メモです。[Review Artifact](../../reference/review-artifact.md) のスキーマや承認記録を新設しません。既存の出力があれば参照します。
 
