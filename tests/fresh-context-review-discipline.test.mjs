@@ -34,9 +34,10 @@ test('advisory review cannot promote absent findings into approval', () => {
   assert.match(template, /未実行時はincomplete/);
   assert.match(template, /Coverage完了・正しさ・承認・Gate PASSの証明ではない/);
   assert.match(template, /Review Coverage/);
-  assert.match(template, /complete/);
-  assert.match(template, /partial/);
-  assert.match(template, /not_executed/);
+  assert.match(
+    template,
+    /Review Coverage（観測した場合のみ）: `complete` \/ `partial` \/ `not_executed`/
+  );
 });
 
 test('review scope guards false positives and untrusted document instructions', () => {
