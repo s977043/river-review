@@ -1223,6 +1223,9 @@ export function formatJsonOutput(result, phase) {
     summary,
     ...(decision !== undefined ? { decision } : {}),
     ...(gate ? { gate } : {}),
+    // #2812: gate.inputs carries llmNotExecuted only under the opt-in, and
+    // gate.inputs.reviewExecuted does not mean the LLM ran, so expose the fact.
+    llmNotExecuted: result.llmNotExecuted === true,
     ...(timedOutRoles.length > 0 ? { timedOutRoles } : {}),
     ...(result.reviewCoverage ? { reviewCoverage: result.reviewCoverage } : {}),
     ...(result.teamLeadReport ? { teamLeadReport: result.teamLeadReport } : {}),
