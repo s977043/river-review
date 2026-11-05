@@ -52,6 +52,62 @@ describe('evaluateConvergence', () => {
     assert.equal(m.converged, true);
   });
 
+  test('does not claim convergence when the latest review is incomplete', () => {
+    for (const coverageStatus of ['partial', 'not_executed']) {
+      const runs = [
+        {
+          runId: 'r1',
+          timestamp: '2026-06-17T00:00:01.000Z',
+          findings: [{ severity: 'major' }],
+          reviewCoverage: { status: 'complete' },
+        },
+        {
+          runId: 'r2',
+          timestamp: '2026-06-17T00:00:02.000Z',
+          findings: [],
+          reviewCoverage: { status: coverageStatus },
+        },
+      ];
+      const report = evaluateConvergence(runs);
+      assert.equal(report.blockingFindingsRemaining, 0);
+      assert.equal(report.converged, false, coverageStatus);
+    }
+  });
+
+  test('LLM-not-executed prevents convergence even if coverage appears complete', () => {
+    const report = evaluateConvergence([
+      {
+        runId: 'r1',
+        timestamp: '2026-06-17T00:00:01.000Z',
+        findings: [],
+        reviewCoverage: { status: 'complete' },
+        llmNotExecuted: true,
+      },
+    ]);
+    assert.equal(report.converged, false);
+  });
+
+  test('uses only the latest coverage and preserves legacy records without coverage', () => {
+    const early = {
+      runId: 'r1',
+      timestamp: '2026-06-17T00:00:01.000Z',
+      findings: [{ severity: 'major' }],
+      reviewCoverage: { status: 'not_executed' },
+    };
+    const latest = {
+      runId: 'r2',
+      timestamp: '2026-06-17T00:00:02.000Z',
+      findings: [],
+      reviewCoverage: { status: 'complete' },
+    };
+    assert.equal(evaluateConvergence([latest, early]).converged, true);
+    assert.equal(
+      evaluateConvergence([{ runId: 'legacy', findings: [], timestamp: latest.timestamp }])
+        .converged,
+      true
+    );
+  });
+
   test('sums estimated_cost_usd across runs (rounded)', () => {
     const runs = [
       {
