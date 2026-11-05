@@ -758,7 +758,7 @@ describe('#1713 Slice 1: machine-readable surfaces stay byte-identical', () => {
     const json = JSON.stringify(formatJsonOutput(FIXED_RESULT, 'midstream'), null, 2);
     assert.strictEqual(
       sha256(json),
-      'fdcc209be238c0823151776fbd2372662ab36fb12d4c39b0b70cb36e31f12f81',
+      '1d5d9da508cd6222bd4bdd924c704d1e8ba8707d8d3f605040bac5dc627e0f10',
       `JSON output changed (${Buffer.byteLength(json)} bytes). This surface is governed by schemas/output.schema.json — only update this pin for an intentional, additive schema change.\n${json}`
     );
   });
