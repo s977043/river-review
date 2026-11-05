@@ -8,7 +8,7 @@
 # docs/development/improvement-flow.md の Step 9 が SSoT。
 #
 # なぜ台帳側を SSoT にするか:
-#   CLAUDE.md の編集は「Always ask」に分類されており、退役の運用を回すたびに承認待ちが
+#   CLAUDE.md の編集は ADR-016 の崖に分類されており、退役の運用を回すたびに承認待ちが
 #   ブロッカーになる。台帳を正とし、CLAUDE.md 側は台帳と機械照合するだけの従属側にする。
 #   照合は scripts/check-doc-enumerations.mjs の spec `claude-md-guard-ledger` が行い、
 #   npm run meta:validate 経由で必須チェック `Meta consistency` に載る。
@@ -198,6 +198,16 @@ guards:
     addedAt: '2026-04-27'
     reviewAfter: '2026-11-10'
     notes: マージ順序と update-branch の運用手順。CI からは観測できない。 2026-08-12 の退役判定は保留であり、reviewAfter を 90 日延長した。addedAt 以降の再発を retrospectives 配下から特定できなかった。マージ順序と update-branch の運用手順は CI から観測できない。
+
+  - id: no-agent-merge-stage-1
+    title: No agent merge in stage 1
+    mechanized: none
+    verifiedBy: []
+    addedAt: '2026-11-06'
+    reviewAfter: '2027-02-04'
+    notes: >-
+      ADR-016 段階 1 の運用規則。現時点では機械検証が無い。ADR-016 実装計画 P2 の hook は補助であり、すべての
+      マージ経路は塞げない。強制は段階 2 のサーバー側で行う。期日は addedAt + 90 日。
 
   - id: dep-bump-peerdeps-check
     title: Dep bump peerDeps check

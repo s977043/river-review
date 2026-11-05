@@ -10,10 +10,12 @@
 
 ## Decision Policy
 
-- **Proceed autonomously**: read-only exploration, running commands listed in `.claude/settings.json` allow list, editing paths in AGENTS.md "Editable" scope.
-- **Ask before acting**: editing paths in AGENTS.md "Ask before editing" scope, adding dependencies, running commands not in allow list.
-- **Always ask**: architectural changes, modifying AGENTS.md or CLAUDE.md, any destructive git operation, changes touching `src/` that may break skill or schema alignment.
-  - **承認済みの実行計画は個別確認を覆う。** ユーザーが計画を承認したら、その計画に含まれる `src/` の編集を 1 件ずつ確認し直さない。計画外の `src/` 編集、計画からの逸脱、計画の途中で見つかった別件は従来どおり確認する。この但し書きが無いと、承認済みの計画でも各ステップの着手前に停止してしまう（2026-09-09 の `parseArgs` 分割で 1 回発生）。
+Approval follows the risk tiers in [ADR-016](docs/adr/016-repo-operation-risk-tiers.md); AGENTS.md "Edit Scope" summarizes them.
+
+- **Stage 1: agents do not merge.** No agent merges a PR on any tier, including field. See the **No agent merge in stage 1** guard.
+- **Proceed autonomously**: read-only exploration, running commands listed in `.claude/settings.json` allow list, and hill or field changes through PR creation.
+- **Ask before acting**: cliff changes and operations (the ADR-016 tier table, including modifying AGENTS.md or CLAUDE.md and changing dependencies), architectural changes, any destructive git operation, changes touching `src/` that may break skill or schema alignment, running commands not in allow list.
+  - **承認済みの実行計画は個別確認を覆う。** ユーザーが計画を承認したら、その計画に含まれる、確認が要る `src/` の編集を 1 件ずつ確認し直さない。計画外の、確認が要る `src/` 編集、計画からの逸脱、計画の途中で見つかった別件は従来どおり確認する。この但し書きが無いと、承認済みの計画でも各ステップの着手前に停止してしまう（2026-09-09 の `parseArgs` 分割で 1 回発生）。
 
 ## Change Policy
 
@@ -28,7 +30,7 @@ After completing a task, state concisely:
 
 1. What changed (files and purpose).
 2. What was verified (commands run and results).
-3. What needs human review (assumptions, edge cases, "ask before" paths touched).
+3. What needs human review (assumptions, edge cases, cliff paths touched).
 
 If a check fails, show the failure output and proposed fix before applying.
 
@@ -48,6 +50,7 @@ If a check fails, show the failure output and proposed fix before applying.
 - **Verify git output before chaining**: Extends **Run before claiming**. After `git commit`, `git push`, `git switch`, and `gh pr merge`, read the branch name, commit hash, and status line in the output and confirm they match the intended target before running the next command. Verify with `git status -sb` or `git rev-parse --abbrev-ref HEAD` if the output is ambiguous. The same rule applies to the ref you are about to measure: `git worktree add <path> <branch>` and `git switch <branch>` resolve a **local** branch that may lag its remote, so confirm `git rev-parse <branch>` equals `git rev-parse origin/<branch>` before you verify anything against it. Verifying a stale local ref and reporting the result as fact has produced a public claim that a merged fix "does not exist" (2026-09-03, a worker's pushed commit read as absent because the local branch was 1 commit behind origin).
 - **Verify gh active account before write ops**: The active `gh` account can silently switch from `s977043` (this repo) to `kominem-unilabo` (work). Before every `gh` write op, run `gh api user --jq .login | grep -q s977043 || gh auth switch -u s977043`. Treat a 404 / `Could not resolve to a Repository` / permission error on any `gh` call — **reads included** — as an account switch first, never as "the repo/PR does not exist": re-run the guard command, then retry. `.claude/hooks/gh-account-guard.sh` checks and switches the account before gh read and write ops (a failed switch blocks writes; reads only warn). Calls naming another owner via `-R`/`--repo` or a `repos/<owner>/` api path, `gh auth`, and reads after `cd`/`GH_REPO=` or outside this repo are exempt; terminal runs outside the Bash tool are not covered — keep the session-start account check. History: `docs/development/guard-details.md`.
 - **Merge-time checks**: Before `gh pr merge`, work through `docs/governance.md` § "PR レビューとマージ" > "マージ前チェックリスト" (the SSoT for how to judge each item): CI green (`gh pr checks`), comment disposition from **both** the `pulls/<N>/comments` and `issues/<N>/comments` endpoints (`npm run check:comment-disposition -- <N>` paginates both and exits 1 if any human comment exists), blocking labels (`gh pr view <N> --json labels`; `blocked` stops the merge and only its author removes it — a same-account PR cannot receive a formal Request changes, so labels are the substitute), `/preflight` for multi-PR / workflow-pin work, and `.nvmrc`-matched `npm run build:action` when touching `runners/github-action/src/**`. See also `skills/midstream/gh-address-comments/SKILL.md` and `docs/development/dist-check-rebuild-guide.md`.
+- **No agent merge in stage 1**: Under ADR-016 stage 1, an agent does not merge a PR on any tier, by any path (`gh pr merge`, `scripts/merge-chain.sh`, `gh api` merge endpoints, graphql, or `git push` to `main`). Merge procedures elsewhere in this file and in `docs/governance.md` describe what a human runs; an agent may run their read-only checks and report the result. Nothing mechanically enforces this yet (ADR-016 P2 adds a supplementary hook), and moving to stage 2 is a cliff change.
 - **Strict-mode batch merge**: With `strict: true` protection (`gh api repos/OWNER/REPO/branches/main/protection --jq .required_status_checks.strict`), update ALL remaining branches to the same `origin/main` SHA at once (`gh api --method PUT repos/OWNER/REPO/pulls/<N>/update-branch`) before the chain, then merge one-by-one as each CI passes. On a lock-file-only 422: check the branch out, `git merge origin/main`, `npm install --package-lock-only`, commit, and fast-forward `git push`. Never rebase, force-push, or open a replacement PR. Rationale: `docs/development/guard-details.md`.
 - **Dep bump peerDeps check**: After editing `package.json` to bump a package version, run `npm install --dry-run` (or `npm ls --depth=1` post-install) to surface newly required peer deps, including transitive ones that `npm info peerDependencies` misses. Add missing peers to `package.json` in the same commit to avoid build failures on first CI run.
 - **Review-doc SSoT sync**: `docs/review/viewpoints.md` and `docs/review/output-format.md` declare `pages/reference/review-policy.md` (ja+en) as their 出典/source. When changing review criteria, output sections, or severity vocabulary in the derived docs, update `review-policy.md` (both languages) in the same PR — otherwise the derived docs drift from the SSoT (#1196/#1197).

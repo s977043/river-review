@@ -2,9 +2,11 @@
 
 ## Status
 
-Proposed
+Accepted（2026-11-06。現在は段階 1）
 
-本 ADR は AGENTS.md / CLAUDE.md の承認境界を変える提案を含む。そのため、採択と各段階の着手はいずれも人間（メンテナ）の判断を要する（`CLAUDE.md:15` の Always ask）。
+本 ADR は AGENTS.md / CLAUDE.md の承認境界を変える。そのため、採択と各段階の着手はいずれも人間（メンテナ）の判断を要する（`CLAUDE.md:15` の Always ask）。段階 1 から段階 2 への移行は、本 ADR の採択に含まれない。
+
+本文の `AGENTS.md` / `CLAUDE.md` / `docs/governance.md` の行番号は、採択前の commit `9fbc6f4d` 時点を指す。
 
 **読み方の前提**: ADR-003 の Non-Goal「auto-merge にはしない」（`docs/adr/003-risk-tiered-human-supervision.md:46`）は、**製品（River Review の Action / CLI）のスコープに限定して読む**。同項は「マージ / required check 化は host / branch protection の責務」と述べており、host 側の運用判断を禁じていない。本 ADR は、このリポジトリのメンテナが host として行うその判断を記録する。
 
