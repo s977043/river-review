@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.139.3](https://github.com/s977043/river-review/compare/v1.139.2...v1.139.3) (2026-11-05)
+
+
+### Bug Fixes
+
+* **review:** clarify comparison scope output and keep json/html stdout clean ([#2848](https://github.com/s977043/river-review/issues/2848)) ([#2855](https://github.com/s977043/river-review/issues/2855)) ([624a7d3](https://github.com/s977043/river-review/commit/624a7d300abadc915c4c86bb68a1fd3cb741f079))
+
 ## [1.139.2](https://github.com/s977043/river-review/compare/v1.139.1...v1.139.2) (2026-11-04)
 
 
