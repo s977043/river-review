@@ -92,6 +92,7 @@ for i in $(seq 1 15); do
   requiredPass=$(gh pr checks $ARGUMENTS --required --json bucket --jq '[.[] | select(.bucket=="pass")] | length')
   requiredFail=$(gh pr checks $ARGUMENTS --required --json bucket --jq '[.[] | select(.bucket=="fail")] | length')
   echo "iteration $i: requiredPass=$requiredPass/$requiredTotal requiredFail=$requiredFail"
+  case "$requiredPass,$requiredFail" in *[!0-9,]* | ,* | *,) sleep 15; continue ;; esac
   [ "$requiredFail" != "0" ] && break
   [ "$requiredPass" = "$requiredTotal" ] && break
   sleep 15
@@ -102,6 +103,7 @@ echo "--- 必須外の fail / pending ---"
 gh pr checks $ARGUMENTS --json name,bucket,link | jq -c --argjson req "$requiredNames" '.[] | select((.name as $n | $req | index($n) | not) and (.bucket=="fail" or .bucket=="pending"))'
 ```
 
+- kick 直後は必須チェックが 1 件も報告されておらず、`gh pr checks --required` が "no required checks reported" を出して jq の出力が空になる。空文字は `!= "0"` を満たすため、`requiredPass` / `requiredFail` が数値でないあいだは sleep して次の周へ進む（v1.139.4 / PR #2858 で 1 周目に抜けた）
 - 母数の `requiredTotal` は branch protection から取る。`gh pr checks --required` の件数を母数にすると、まだ報告されていない必須チェックが母数から抜け落ちるため、早期に green と誤判定する
 - `requiredTotal` の数値ガードは省略しない。branch protection の参照には admin 権限が要るので、gh アカウントが無言で切り替わると 404 になり、`requiredTotal` にエラー JSON が入ってループが空回りする（本手順の検証中に実際に発生した）
 - `pending` の総数は単調減少しない。キック直後はワークフローが順次キューされるので、いったん減ってから増える。v1.67.1 実走の推移は 7→5→4→**9**→8→6→3→2 であり、旧条件（`pending == 0`）は一度も成立せず 8 周の上限に達した
