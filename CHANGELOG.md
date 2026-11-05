@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.139.4](https://github.com/s977043/river-review/compare/v1.139.3...v1.139.4) (2026-11-05)
+
+
+### Bug Fixes
+
+* **review:** expose llmNotExecuted in JSON output ([#2812](https://github.com/s977043/river-review/issues/2812)) ([#2857](https://github.com/s977043/river-review/issues/2857)) ([2a16bcb](https://github.com/s977043/river-review/commit/2a16bcb2c51bd764b4b24bdfcbb31725ea68f06a))
+
 ## [1.139.3](https://github.com/s977043/river-review/compare/v1.139.2...v1.139.3) (2026-11-05)
 
 
