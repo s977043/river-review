@@ -28,7 +28,7 @@
     },
     "llmNotExecuted": {
       "type": "boolean",
-      "description": "True when no review unit reached the LLM (no API key, offline mode, or dry-run) (#2812). Additive/optional; it does not change decision or gate. `gate.inputs.reviewExecuted` does not mean the LLM ran, and `gate.inputs.llmNotExecuted` is present only under RIVER_GATE_REQUIRE_LLM=1, so read this field to tell a rules-only run from a full review."
+      "description": "True when no review unit reached the LLM (no API key, offline mode, dry-run, or an unsupported provider) (#2812). Additive/optional; it does not change decision or gate. `gate.inputs.reviewExecuted` does not mean the LLM ran, and `gate.inputs.llmNotExecuted` is present only under RIVER_GATE_REQUIRE_LLM=1, so read this field to tell a rules-only run from a full review."
     },
     "timedOutRoles": {
       "type": "array",

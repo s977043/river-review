@@ -23,7 +23,7 @@ const noIssues = async () => ({
   json: async () => ({ choices: [{ message: { content: 'NO_ISSUES' } }] }),
 });
 
-async function jsonRun(t, { reviewers, apiKey, env = {} }) {
+async function jsonRun(t, { reviewers, apiKey, dryRun = false, env = {} }) {
   const saved = {};
   for (const key of KEY_VARS) {
     saved[key] = process.env[key];
@@ -55,6 +55,7 @@ async function jsonRun(t, { reviewers, apiKey, env = {} }) {
     cwd: dir,
     context,
     apiKey,
+    dryRun,
     quiet: true,
     ...(reviewers ? { reviewers } : {}),
   });
@@ -89,6 +90,11 @@ describe('--output json exposes llmNotExecuted (#2812)', () => {
     const output = await jsonRun(t, { apiKey: 'test-key', env: { RIVER_OFFLINE: '1' } });
     assert.equal(output.llmNotExecuted, true);
     assertGateUnchanged(output);
+  });
+
+  it('dry-run with key: llmNotExecuted true', async (t) => {
+    const output = await jsonRun(t, { apiKey: 'test-key', dryRun: true });
+    assert.equal(output.llmNotExecuted, true);
   });
 
   it('key and NO_ISSUES: llmNotExecuted false, gate unchanged', async (t) => {
