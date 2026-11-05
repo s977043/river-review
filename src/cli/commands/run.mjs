@@ -327,8 +327,10 @@ Dependencies: ${
   }
 
   if (context.status === 'no-changes') {
-    console.log(`No changes to review compared to ${context.defaultBranch}.`);
-    console.log(formatComparisonScopeMarkdown(context));
+    // Same inverted check as logRunHeader (#1695): only `text` keeps these on stdout.
+    const logNoChanges = parsed.output !== 'text' ? console.error : console.log;
+    logNoChanges(`No changes to review compared to ${context.defaultBranch}.`);
+    logNoChanges(formatComparisonScopeMarkdown(context));
     warnBaselineNotCompared(
       parsed,
       `there are no changes to review against ${context.defaultBranch}`
