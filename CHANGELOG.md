@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.139.5](https://github.com/s977043/river-review/compare/v1.139.4...v1.139.5) (2026-11-05)
+
+
+### Bug Fixes
+
+* **release-kick:** keep polling while required checks are unreported ([#2859](https://github.com/s977043/river-review/issues/2859)) ([1ce0a82](https://github.com/s977043/river-review/commit/1ce0a8234f9a44f8f35de66adc7ff4d8531aca68))
+
 ## [1.139.4](https://github.com/s977043/river-review/compare/v1.139.3...v1.139.4) (2026-11-05)
 
 
