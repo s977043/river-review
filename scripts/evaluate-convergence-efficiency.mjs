@@ -16,6 +16,10 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 import { diffRunHistory } from '../src/lib/review-differ.mjs';
+import {
+  isIncompleteCoverageStatus,
+  normalizeRunCoverageStatus,
+} from '../src/lib/review-coverage.mjs';
 import { isDirectRun } from './lib/is-direct-run.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -89,7 +93,12 @@ export function evaluateConvergence(runs) {
   // Oscillation needs >= 3 runs to detect a present→absent→present pattern.
   const oscillationCount = turnCount >= 3 ? (diffRunHistory(list).oscillated?.length ?? 0) : 0;
 
-  const converged = turnCount > 0 && blockingFindingsRemaining === 0;
+  // A zero-finding run is not convergence when its required reviewers failed,
+  // timed out or never reached the LLM. Share the same coverage contract as
+  // `river runs diff`; missing legacy coverage remains unknown, not incomplete.
+  const latestCoverage = normalizeRunCoverageStatus(list[turnCount - 1]);
+  const converged =
+    turnCount > 0 && blockingFindingsRemaining === 0 && !isIncompleteCoverageStatus(latestCoverage);
 
   return { turnCount, blockingFindingsRemaining, oscillationCount, estimatedCostUsd, converged };
 }
