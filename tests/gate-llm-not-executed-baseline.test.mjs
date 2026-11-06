@@ -42,6 +42,14 @@ const ALL_ROLES_FAILED = {
   exit: 3,
 };
 
+const BLOCKING = {
+  decision: 'human-review-recommended',
+  gate: 'NO_GO',
+  reasonCode: 'BLOCKING_FINDINGS',
+  inputsHash: '29a9280aad5eedac',
+  exit: 1,
+};
+
 const ROLES = 'bug-hunter,security-scanner';
 const KEY = { OPENAI_API_KEY: 'test-key' };
 const OFFLINE = { ...KEY, RIVER_OFFLINE: '1' };
@@ -63,6 +71,7 @@ export const value = 1;
 export const value = 2;
 >>>>>>> b
 `;
+const NBSP_SOURCE = 'export const value = 2;\n';
 
 const isolatedEnv = (env) => ({
   RIVER_OPENAI_API_KEY: undefined,
@@ -74,6 +83,13 @@ const isolatedEnv = (env) => ({
   RIVER_GATE_REQUIRE_LLM: undefined,
   RIVER_GATE_COVERAGE: undefined,
   RIVER_AUTO_SAVE: undefined,
+  RIVER_PHASE: undefined,
+  RIVER_PLANNER_MODE: undefined,
+  RIVER_DEPENDENCY_STUBS: undefined,
+  RIVER_AVAILABLE_CONTEXTS: undefined,
+  RIVER_AVAILABLE_DEPENDENCIES: undefined,
+  RIVER_PR_LABELS: undefined,
+  GITHUB_EVENT_PATH: undefined,
   RIVER_REVIEW_DISABLE_GLOBAL_CONFIG: '1',
   ...env,
 });
@@ -99,11 +115,15 @@ const malformedBody = async () => ({
 });
 const noIssues = reply('NO_ISSUES');
 
-async function runCli(t, { env = {}, args = [], config, source, fetchImpl = noIssues }, reviewers) {
+async function runCli(
+  t,
+  { env = {}, args = [], config, file = 'src/app.js', source, fetchImpl = noIssues },
+  reviewers
+) {
   const { dir, cleanup } = await createTempGitRepo({
     prefix: 'river-review-llm-baseline-',
-    initialFiles: { 'src/app.js': 'export const value = 1;\n' },
-    changedFiles: { 'src/app.js': source ?? 'export const value = 2;\n' },
+    initialFiles: { [file]: 'export const value = 1;\n' },
+    changedFiles: { [file]: source ?? 'export const value = 2;\n' },
   });
   t.after(cleanup);
   await runGit(['add', '.'], dir);
@@ -191,6 +211,13 @@ const BOTH_PATHS = [
     { env: OFFLINE, source: MERGE_CONFLICT },
     { ...CLEAN, ...SKIPPED },
   ],
+  // The same NBSP finding survives the verifier in .ts and is rejected in .js.
+  [
+    'TC-09 no key, NBSP in .ts',
+    { file: 'src/app.ts', source: NBSP_SOURCE },
+    { ...BLOCKING, ...SKIPPED, issues: ['major'] },
+  ],
+  ['TC-09 no key, NBSP in .js', { source: NBSP_SOURCE }, { ...CLEAN, ...SKIPPED }],
   [
     'TC-10a no key, heuristic minor',
     { source: SILENT_CATCH },
@@ -270,8 +297,9 @@ describe('LLM-not-executed baseline at the derivation layer (#2812)', () => {
     assert.equal(gateDecisionExitCode(gate.decision), expected.exit);
   }
 
-  // Derivation only for TC-09 and TC-10b: no CLI input tried produced these
-  // findings (see the TC-09 rows in BOTH_PATHS).
+  // Derivation only for TC-10b and TC-09 critical: no no-key CLI input tried
+  // (NBSP, bidi control, AWS-shaped key, merge conflict) produced these findings.
+  // TC-09 major is also pinned through the CLI in BOTH_PATHS.
   for (const [pathName, extra] of [
     ['single reviewer', {}],
     ['--reviewers', fulfilledRole],
@@ -300,16 +328,7 @@ describe('LLM-not-executed baseline at the derivation layer (#2812)', () => {
 
     it(`TC-09 no key + major finding is NO_GO, ${pathName}`, (t) => {
       withRequireLlmUnset(t);
-      assertDerived(
-        { ...skippedResult, ...extra, findings: [major] },
-        {
-          decision: 'human-review-recommended',
-          gate: 'NO_GO',
-          reasonCode: 'BLOCKING_FINDINGS',
-          inputsHash: '29a9280aad5eedac',
-          exit: 1,
-        }
-      );
+      assertDerived({ ...skippedResult, ...extra, findings: [major] }, BLOCKING);
     });
 
     it(`TC-09 no key + critical finding is ESCALATE, ${pathName}`, (t) => {
