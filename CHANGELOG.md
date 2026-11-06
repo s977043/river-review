@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.139.6](https://github.com/s977043/river-review/compare/v1.139.5...v1.139.6) (2026-11-06)
+
+
+### Bug Fixes
+
+* **eval:** reject incomplete review coverage in convergence metric ([#2863](https://github.com/s977043/river-review/issues/2863)) ([d106a55](https://github.com/s977043/river-review/commit/d106a5582c1e85da60625cfe7662e2ef7478a879)), closes [#2701](https://github.com/s977043/river-review/issues/2701)
+
 ## [1.139.5](https://github.com/s977043/river-review/compare/v1.139.4...v1.139.5) (2026-11-05)
 
 
