@@ -78,8 +78,11 @@ sense; run the script so that the six-times-a-session judgement is not retyped.
 
 ```bash
 scripts/pr-unstall.sh <N>             # dry-run: judge, print the next command
-scripts/pr-unstall.sh --execute <N>   # run the escape (update-branch or kick)
+scripts/pr-unstall.sh --execute <N>   # human only: run the escape (update-branch or kick)
 ```
+
+`--execute` is a cliff operation under ADR-016 (`docs/adr/016-repo-operation-risk-tiers.md`):
+a human runs it. An agent runs the dry-run and reports the result.
 
 What it does, in the order of this runbook:
 
