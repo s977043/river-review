@@ -13,7 +13,7 @@
 Approval follows the risk tiers in [ADR-016](docs/adr/016-repo-operation-risk-tiers.md); AGENTS.md "Edit Scope" summarizes them.
 
 - **Stage 1: agents do not merge.** No agent merges a PR on any tier, including field. See the **No agent merge in stage 1** guard.
-- **Proceed autonomously**: read-only exploration, running commands listed in `.claude/settings.json` allow list, and hill or field changes through PR creation.
+- **Proceed autonomously**: read-only exploration, running commands listed in `.claude/settings.json` allow list, and hill or field changes through PR creation. A cliff operation follows the next item even when it matches the allow list.
 - **Ask before acting**: cliff changes and operations (the ADR-016 tier table, including modifying AGENTS.md or CLAUDE.md and changing dependencies), architectural changes, any destructive git operation, changes touching `src/` that may break skill or schema alignment, running commands not in allow list.
   - **承認済みの実行計画は個別確認を覆う。** ユーザーが計画を承認したら、その計画に含まれる、確認が要る `src/` の編集を 1 件ずつ確認し直さない。計画外の、確認が要る `src/` 編集、計画からの逸脱、計画の途中で見つかった別件は従来どおり確認する。この但し書きが無いと、承認済みの計画でも各ステップの着手前に停止してしまう（2026-09-09 の `parseArgs` 分割で 1 回発生）。
 

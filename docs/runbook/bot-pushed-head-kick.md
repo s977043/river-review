@@ -111,6 +111,9 @@ merge-conflict 422 during a batch merge; see `docs/runbook/merge-chain.md`.
 
 ## Step 2: diagnose BEHIND vs pure BLOCKED
 
+`update-branch` as the escape from a bot-pushed head is the same cliff operation
+as `--execute` (ADR-016): a human runs it, and an agent reports the diagnosis.
+
 A PR can be behind `main` and BLOCKED at the same time, and which one it is
 decides whether the kick is needed at all. `mergeable_state` holds a single
 value, so it cannot tell the two apart. Compare the branches instead:
@@ -216,6 +219,9 @@ the query is wrong rather than the head.
   post-merge rewrite described above, not the state they were in while open.
 
 ## Step 3: the kick: local script
+
+`scripts/release-please-kick.sh` is the same cliff operation as `--execute`
+(ADR-016): a human runs it, and an agent reports the diagnosis.
 
 Run the script **from your own account**, so the new head counts as a real user
 push. Do not reach for `git push --force` -- the fix is to add a commit, never to
