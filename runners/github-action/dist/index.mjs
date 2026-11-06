@@ -50261,8 +50261,7 @@ function verifyFinding({
     evidenceInDiff: deterministicSource || checkEvidenceInDiff(finding, diff),
     phaseCoherent: checkPhaseCoherent(finding, skill),
     filePhaseCoherent: checkFilePhaseCoherent(finding, fileTypes),
-    severityJustified:
-      deterministicSource || checkSeverityJustified(findingForLengthChecks, skill),
+    severityJustified: deterministicSource || checkSeverityJustified(findingForLengthChecks, skill),
     suggestionActionable: checkSuggestionActionable(findingForLengthChecks),
   };
 
