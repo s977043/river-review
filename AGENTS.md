@@ -52,13 +52,13 @@ Node 22 is required (`.nvmrc` and `engines.node` pin 22.x). If the default `node
 
 ## Edit Scope
 
-Edit approval follows the risk tiers in [ADR-016](docs/adr/016-repo-operation-risk-tiers.md). Its tier table (階層表) is the SSoT; the summary below does not replace it.
+Edit approval follows the risk tiers in [ADR-016](docs/adr/016-repo-operation-risk-tiers.md). Its tier table (階層表) is the SSoT; the summary below does not replace it. The Safety section above takes precedence on every tier.
 
-- **Cliff (崖)**: human approval is required for each PR. Covers this file and other approval rules, `.claude/` settings, hooks, commands, rules, and agents, `docs/adr/`, file deletions, `package.json`, lint and release config, and the product trust-boundary code listed in the table.
+- **Cliff (崖)**: human approval is required for each PR. Covers this file and other approval rules, `.claude/` settings, hooks, commands, rules, and agents, `docs/adr/`, file deletions, `package.json`, lint and release config, and the product trust-boundary code listed in the table. Paths that are easy to misread as hill or field: `agents/`, `commands/`, `.claude-plugin/`, `.github/actions/`, `.github/CODEOWNERS`, `.github/dependabot.yml`, the `blocked-label-guard.yml`, `release-please*.yml`, and `deploy.yml` workflows, merge, release, and revert scripts such as `scripts/merge-chain.sh` and `scripts/pr-unstall.sh`, `deterministicGate.command` in `skills/`, `src/lib/gate-decision.mjs`, `src/lib/deterministic-*.mjs`, `src/lib/secret-redactor.mjs`, and `runners/github-action/action.yml`.
 - **Hill (丘)**: an agent may proceed through PR creation without asking; a human merges. Covers `src/`, `runners/`, `skills/`, `scripts/`, `schemas/`, `docs/`, `assets/`, `README.md`, `README.en.md`, changes to existing tests, and other workflows, except the cliff items in the table.
 - **Field (原っぱ)**: allowlist only. Covers `pages/` (except the excluded reference pages), `AGENT_LEARNINGS.md`, newly added files under `tests/`, and a one-line append to `docs/development/worker-discipline-template.md`. Longer appends and edits to existing lines of that template are cliff.
 - A PR takes the highest tier among its files, and anything the table does not list is cliff.
-- **Never edit**: `package-lock.json`, `LICENSE*`, `CITATION.cff`. This applies on every tier.
+- **Never edit by hand**: `package-lock.json`, `LICENSE*`, `CITATION.cff`. All three are cliff in the table. The only lockfile change an agent may make is regenerating it with `npm install --package-lock-only`, as a cliff change. Changes to `LICENSE*` and `CITATION.cff` are made by a human.
 
 ## Verification Criteria
 
