@@ -96,7 +96,7 @@ Critic は既定で off です。経路や実行可否によって、この観�
 - `--phase <upstream|midstream|downstream>`: レビューフェーズ（デフォルト: `midstream`）
 - `--planner <off|order|prune>`: Planner モード（デフォルト: `off`）
 - `--dry-run`: 外部 API を呼ばずに実行する
-- `--offline`（別名 `--rules-only`）: API キーが設定されていても AI を呼ばず、決定論的な機械的チェックのみでレビューする（CI 不可用時に Auto-approve 判定をローカル再現する用途）
+- `--offline`（別名 `--rules-only`）: API キーが設定されていても AI を呼ばず、決定論的な機械的チェックのみでレビューする（CI 不可用時に Auto-approve 判定をローカル再現する用途）。選択された skill の検査が blocking finding を検出した run は、API キー未設定の run と同じく `--gate` で止まる（critical は `ESCALATE`、major は `NO_GO`）。検査の対象は skill の `applyTo` に依存するので、secret や conflict marker を全ファイルで検出するわけではない（#2870）。検出なしの run が fallback の警告で `NO_GO` になる場合がある（#2868）
 - `--debug`: デバッグ情報を出す
 - `--explain`: 採用された skill / gate / config tier を人間可読で出す（stderr）
 - `--estimate`: コスト見積もりのみ（レビューは実行しない）

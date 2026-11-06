@@ -299,6 +299,7 @@ function redactSecrets(text) {
  * @param {Array<object>} params.comments 検証対象（LLM / heuristic / fallback の一次集合）
  * @param {{diffText: string, files?: Array<object>}} params.diff 生の差分（LLM 用に間引く前）
  * @param {boolean} params.heuristicsUsed 一次集合が既に heuristic 由来か（fail-safe の抑止条件）
+ * @param {boolean} params.heuristicsFound 一次集合が detector の finding か。fallback は含まない
  * @param {string|null|undefined} params.llmSkipped debug.llmSkipped
  * @param {string|null|undefined} params.llmError debug.llmError
  * @returns {Promise<{comments: Array<object>, debugPatch: object}>}
@@ -310,12 +311,13 @@ async function runVerifierStage({
   fileTypes,
   includeFallback,
   heuristicsUsed,
+  heuristicsFound,
   llmSkipped,
   llmError,
 }) {
   const { verifyFinding } = await import('./verifier.mjs');
   const skill = plan?.selected?.[0] ?? {};
-  const runVerifier = (cmts) =>
+  const runVerifier = (cmts, deterministicSource = false) =>
     cmts.map((comment) => ({
       comment,
       verification: verifyFinding({
@@ -326,6 +328,7 @@ async function runVerifierStage({
         // #1644: parsed diff files carry addedLines, enabling the verifier's
         // machine determination of finding scope (in-diff / pre-existing).
         diffFiles: diff.files,
+        deterministicSource,
       }),
     }));
 
@@ -333,7 +336,7 @@ async function runVerifierStage({
   // built below can adopt it. Metadata only — display and gating are unchanged.
   const withScope = (r) => ({ ...r.comment, scope: r.verification.scope });
 
-  const verifierResults = runVerifier(comments);
+  const verifierResults = runVerifier(comments, heuristicsFound);
   let verified = verifierResults.filter((r) => r.verification.verified).map(withScope);
   const rejected = verifierResults.filter((r) => !r.verification.verified);
 
@@ -401,11 +404,11 @@ async function runVerifierStage({
       debugPatch.heuristicsCount = 0;
       debugPatch.fallbackIncluded = includeFallback;
     }
-    // Re-verify the fallback set so the emitted comments still satisfy the
-    // verifier invariant (heuristic/fallback findings use the full labeled
-    // format and pass). verifierStats above intentionally keeps describing the
-    // rejected LLM batch.
-    const fallbackResults = runVerifier(degraded);
+    // Re-verify the degraded set. Detector findings skip the severity and
+    // evidence checks because those values are code constants; fallback warnings
+    // are not real findings and keep every check. verifierStats above
+    // intentionally keeps describing the rejected LLM batch.
+    const fallbackResults = runVerifier(degraded, heuristic.length > 0);
     verified = fallbackResults.filter((r) => r.verification.verified).map(withScope);
     debugPatch.scopeStats = summarizeScope(fallbackResults);
   }
@@ -696,6 +699,7 @@ export async function generateReview({
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
+    heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
   });

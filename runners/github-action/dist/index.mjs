@@ -45753,6 +45753,7 @@ function redactSecrets(text) {
  * @param {Array<object>} params.comments 検証対象（LLM / heuristic / fallback の一次集合）
  * @param {{diffText: string, files?: Array<object>}} params.diff 生の差分（LLM 用に間引く前）
  * @param {boolean} params.heuristicsUsed 一次集合が既に heuristic 由来か（fail-safe の抑止条件）
+ * @param {boolean} params.heuristicsFound 一次集合が detector の finding か。fallback は含まない
  * @param {string|null|undefined} params.llmSkipped debug.llmSkipped
  * @param {string|null|undefined} params.llmError debug.llmError
  * @returns {Promise<{comments: Array<object>, debugPatch: object}>}
@@ -45764,12 +45765,13 @@ async function runVerifierStage({
   fileTypes,
   includeFallback,
   heuristicsUsed,
+  heuristicsFound,
   llmSkipped,
   llmError,
 }) {
   const { verifyFinding } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 9341));
   const skill = plan?.selected?.[0] ?? {};
-  const runVerifier = (cmts) =>
+  const runVerifier = (cmts, deterministicSource = false) =>
     cmts.map((comment) => ({
       comment,
       verification: verifyFinding({
@@ -45780,6 +45782,7 @@ async function runVerifierStage({
         // #1644: parsed diff files carry addedLines, enabling the verifier's
         // machine determination of finding scope (in-diff / pre-existing).
         diffFiles: diff.files,
+        deterministicSource,
       }),
     }));
 
@@ -45787,7 +45790,7 @@ async function runVerifierStage({
   // built below can adopt it. Metadata only — display and gating are unchanged.
   const withScope = (r) => ({ ...r.comment, scope: r.verification.scope });
 
-  const verifierResults = runVerifier(comments);
+  const verifierResults = runVerifier(comments, heuristicsFound);
   let verified = verifierResults.filter((r) => r.verification.verified).map(withScope);
   const rejected = verifierResults.filter((r) => !r.verification.verified);
 
@@ -45855,11 +45858,11 @@ async function runVerifierStage({
       debugPatch.heuristicsCount = 0;
       debugPatch.fallbackIncluded = includeFallback;
     }
-    // Re-verify the fallback set so the emitted comments still satisfy the
-    // verifier invariant (heuristic/fallback findings use the full labeled
-    // format and pass). verifierStats above intentionally keeps describing the
-    // rejected LLM batch.
-    const fallbackResults = runVerifier(degraded);
+    // Re-verify the degraded set. Detector findings skip the severity and
+    // evidence checks because those values are code constants; fallback warnings
+    // are not real findings and keep every check. verifierStats above
+    // intentionally keeps describing the rejected LLM batch.
+    const fallbackResults = runVerifier(degraded, heuristic.length > 0);
     verified = fallbackResults.filter((r) => r.verification.verified).map(withScope);
     debugPatch.scopeStats = summarizeScope(fallbackResults);
   }
@@ -46150,6 +46153,7 @@ async function generateReview({
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
+    heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
   });
@@ -50226,10 +50230,20 @@ function resolveFindingScope({ finding, diffFiles }) {
 }
 
 /**
- * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null }} params
+ * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null, deterministicSource?: boolean }} params
+ *   deterministicSource: the finding comes from a detector, so its severity and
+ *   evidence are code constants rather than claims to check. Callers derive it
+ *   from the batch's provenance, never from the finding text.
  * @returns {{ verified: boolean, reasons: string[], checks: object, scope: 'in-diff'|'pre-existing', scopeSource: string, scopeSelfReported: string|null, scopeMismatch: boolean }}
  */
-function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
+function verifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
   // #1666: traceability refs are additive metadata and MUST NOT move the
   // `verified` decision in either direction. RE_EVIDENCE / RE_ACTIONABLE are
   // deliberately greedy to end-of-line, so appended refs would otherwise satisfy
@@ -50244,10 +50258,11 @@ function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
       : finding;
   const checks = {
     evidenceExists: checkEvidenceExists(findingForLengthChecks),
-    evidenceInDiff: checkEvidenceInDiff(finding, diff),
+    evidenceInDiff: deterministicSource || checkEvidenceInDiff(finding, diff),
     phaseCoherent: checkPhaseCoherent(finding, skill),
     filePhaseCoherent: checkFilePhaseCoherent(finding, fileTypes),
-    severityJustified: checkSeverityJustified(findingForLengthChecks, skill),
+    severityJustified:
+      deterministicSource || checkSeverityJustified(findingForLengthChecks, skill),
     suggestionActionable: checkSuggestionActionable(findingForLengthChecks),
   };
 

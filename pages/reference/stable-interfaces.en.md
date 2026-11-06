@@ -87,7 +87,7 @@ Here, `independent` establishes **distinct logical execution IDs only**. It does
 - `--phase <upstream|midstream|downstream>`: Review phase (Default: `midstream`)
 - `--planner <off|order|prune>`: Planner mode (Default: `off`)
 - `--dry-run`: Run without calling external APIs
-- `--offline` (alias `--rules-only`): Skip AI even when an API key is set; review on deterministic mechanical checks only (reproduces the Auto-approve gate locally when CI is unavailable)
+- `--offline` (alias `--rules-only`): Skip AI even when an API key is set; review on deterministic mechanical checks only (reproduces the Auto-approve gate locally when CI is unavailable). A run in which a selected skill's check detects a blocking finding stops under `--gate`, as a run without an API key does (critical is `ESCALATE`, major is `NO_GO`). Coverage follows each skill's `applyTo`, so secrets and conflict markers are not detected in every file (#2870). A run with no detection can still be `NO_GO` because of the fallback warning (#2868)
 - `--debug`: Output debug info
 - `--explain`: Print the resolved skills / gates / config tier in human-readable form (to stderr)
 - `--estimate`: Cost estimation only (no review execution)
