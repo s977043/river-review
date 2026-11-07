@@ -1251,6 +1251,51 @@ test('invisible-unicode: a string continued from the previous line is not exempt
   assert.ok(chained.includes('invisible-unicode'), 'carried across lines');
 });
 
+test('invisible-unicode: strings are exempt only in JS, TS, and JSON files', () => {
+  const id = `ب${CP(0x200c)}ب`;
+  const quoteless = ' a\n b\n c';
+  for (const [name, file, header, body] of [
+    [
+      'A5 php, opened above the hunk',
+      'src/a.php',
+      '@@ -9,3 +9,4 @@',
+      `${quoteless}\n+", $${id} = "+";`,
+    ],
+    [
+      'A8 rb, opened above the hunk',
+      'src/a.rb',
+      '@@ -9,3 +9,4 @@',
+      `${quoteless}\n+", ${id} = "+"`,
+    ],
+    ['sh command substitution', 'src/a.sh', '@@ -1,1 +1,2 @@', ` a=1\n+x="$(${id})"`],
+    ['sql quoted identifier', 'db/a.sql', '@@ -1,1 +1,2 @@', ` select 1;\n+SELECT "${id}" FROM t;`],
+    ['py', 'app/a.py', '@@ -1,1 +1,2 @@', ` a = 1\n+x = "${id}"`],
+    ['go', 'src/a.go', '@@ -1,1 +1,2 @@', ` var a = 1\n+var x = "${id}"`],
+    ['js.php', 'src/a.js.php', '@@ -1,1 +1,2 @@', ` a\n+$x = "${id}";`],
+  ]) {
+    assert.ok(invisibleUnicodeKindsInHunk(header, body, file).includes('invisible-unicode'), name);
+  }
+  const a7 =
+    'diff --git a/src/a.php b/src/a.php\n--- a/src/a.php\n+++ b/src/a.php\n' +
+    `@@ -1,1 +1,2 @@\n a\n+$x = "start\n@@ -12,1 +13,2 @@\n k\n+", $${id} = "+";\n`;
+  const a7Kinds = buildHeuristicComments({
+    diff: { files: parseUnifiedDiff(a7).files },
+    plan: IU_PLAN,
+  }).map((c) => c.kind);
+  assert.ok(a7Kinds.includes('invisible-unicode'), 'A7 php, opened in an earlier hunk');
+  for (const file of ['src/a.js', 'src/a.jsx', 'src/a.ts', 'src/a.tsx', 'src/a.mjs', 'src/a.cjs']) {
+    assert.deepEqual(
+      invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', ` const a = 1;\n+const x = "${id}";`, file),
+      [],
+      file
+    );
+  }
+  assert.deepEqual(
+    invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', ` {\n+  "x": "${id}"`, 'src/a.json'),
+    []
+  );
+});
+
 test('invisible-unicode: a line whose previous line is not visible is not exempt', () => {
   const id = `می${CP(0x200c)}خواهم`;
   const kinds = invisibleUnicodeKindsInHunk('@@ -10,0 +11 @@', `+", ${id} = "+"`);

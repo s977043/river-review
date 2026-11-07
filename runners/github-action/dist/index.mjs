@@ -41276,12 +41276,18 @@ function looksLikeSourceCodeFile(filePath) {
   );
 }
 
+// Languages whose `"` / `'` strings cannot span a raw line break, so a string
+// opened above the visible hunk cannot reach an added line. PHP, Ruby, shell,
+// SQL, and others can, or run code inside the quotes, and get no exemption.
+const STRING_EXEMPT_FILE_RE = /\.(js|jsx|ts|tsx|mjs|cjs|json)$/;
+
 /**
- * Added lines with whether a string on them can be exempt. A line can be when the
- * file starts there, or when the previous new-side line is visible and, read on its
+ * Added lines with whether a string on them can be exempt. A line can be in a
+ * STRING_EXEMPT_FILE_RE file when the file starts there, or when the previous new-side line is visible and, read on its
  * own and carried from the first visible line, closes every string.
  */
 function* iterateAddedLinesWithStringContext(file) {
+  const exemptLanguage = STRING_EXEMPT_FILE_RE.test(String(file?.path ?? ''));
   for (const hunk of ensureArray(file?.hunks)) {
     let newLineNumber = hunk.newStart ?? 0;
     let previous = newLineNumber <= 1 ? { open: false } : null;
@@ -41291,7 +41297,11 @@ function* iterateAddedLinesWithStringContext(file) {
       const added = rawLine.startsWith('+') && !rawLine.startsWith('+++');
       const text = rawLine.slice(1);
       if (added) {
-        yield { line: newLineNumber, text, exemptStrings: previous !== null && !previous.open };
+        yield {
+          line: newLineNumber,
+          text,
+          exemptStrings: exemptLanguage && previous !== null && !previous.open,
+        };
       }
       carried = quoteStateAfter(text, carried === '\\' ? null : carried);
       previous = { open: quoteStateAfter(text) !== null || carried !== null };
