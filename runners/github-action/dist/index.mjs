@@ -41005,51 +41005,90 @@ const JOIN_CONTROL_SCRIPT_RES = [
   /\p{scx=Sinhala}/u,
 ];
 const NEUTRAL_TEXT_RE = /[\p{P}\p{Zs}]/u;
-const QUOTE_CHARS = new Set(['"', "'", '`']);
+const LINE_BREAK_CHARS = new Set(['\n', '\r', '\v', '\f', '\u0085', ' ', ' ']);
+const STRING_QUOTES = new Set(['"', "'"]);
+const BEFORE_STRING_CHARS = new Set(['=', '(', ',', ':', '[', '{', '+', '?']);
+const AFTER_STRING_CHARS = new Set([',', ';', ')', ']', '}', ':', '+']);
+
+function closingQuoteIndex(cps, open) {
+  for (let i = open + 1; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (LINE_BREAK_CHARS.has(ch) || ch === '`') return -1;
+    if (ch === '$' && cps[i + 1] === '{') return -1;
+    if (ch === '*' && cps[i + 1] === '/') return -1;
+    if (ch === '\\') i += 1;
+    else if (ch === cps[open]) return i;
+  }
+  return -1;
+}
 
 /**
- * Whether cps[idx] sits inside a string literal or comment of this line. Only one
- * line is visible, so text in a multi-line literal reads as code and stays flagged.
+ * Mark the characters inside quoted strings this line proves by itself. One line
+ * cannot tell what a slash, backtick, or stray quote opens, so scanning stops
+ * there and everything after it counts as code, including comments.
  */
-function isInsideTextOnLine(cps, idx) {
-  if (cps.join('').trimStart().startsWith('*')) return true;
-  let quote = null;
-  for (let i = 0; i < idx; i += 1) {
+function markProvenStrings(cps) {
+  const inString = new Uint8Array(cps.length);
+  let before = '';
+  for (let i = 0; i < cps.length; i += 1) {
     const ch = cps[i];
-    if (quote) {
-      if (ch === '\\') i += 1;
-      else if (ch === quote) quote = null;
-    } else if (QUOTE_CHARS.has(ch)) {
-      quote = ch;
-    } else if (ch === '#' || (ch === '/' && (cps[i + 1] === '/' || cps[i + 1] === '*'))) {
-      return true;
+    if (ch === ' ' || ch === '\t') continue;
+    if (STRING_QUOTES.has(ch)) {
+      if (before && !BEFORE_STRING_CHARS.has(before)) break;
+      const close = closingQuoteIndex(cps, i);
+      if (close < 0) break;
+      let after = close + 1;
+      while (cps[after] === ' ' || cps[after] === '\t') after += 1;
+      const lineEnds = after >= cps.length || (cps[after] === '\r' && after === cps.length - 1);
+      if (!lineEnds && !AFTER_STRING_CHARS.has(cps[after])) break;
+      inString.fill(1, i + 1, close);
+      before = ch;
+      i = close;
+    } else if (ch === '/' || ch === '`' || ch === '\\' || LINE_BREAK_CHARS.has(ch)) {
+      break;
+    } else {
+      before = ch;
     }
   }
-  return quote !== null;
+  return inString;
 }
 
-function nearestTextChar(cps, idx, step) {
-  for (let i = idx + step; i >= 0 && i < cps.length; i += step) {
+function nearestTextChars(cps, order) {
+  const nearest = new Array(cps.length);
+  let last = '';
+  for (const i of order) {
+    nearest[i] = last;
     const ch = cps[i];
     if (BIDI_MARK_CPS.has(ch.codePointAt(0))) continue;
-    if (QUOTE_CHARS.has(ch) || !NEUTRAL_TEXT_RE.test(ch)) return ch;
+    if (STRING_QUOTES.has(ch) || !NEUTRAL_TEXT_RE.test(ch)) last = ch;
   }
-  return '';
+  return nearest;
 }
 
-/** LRM / RLM / ALM are text formatting only in right-to-left text. */
-function isRtlTextMark(cps, idx) {
-  if (!isInsideTextOnLine(cps, idx)) return false;
-  return [nearestTextChar(cps, idx, -1), nearestTextChar(cps, idx, 1)].some((ch) =>
-    RTL_LETTER_RE.test(ch)
+function buildTextContext(cps) {
+  const forward = cps.map((_, i) => i);
+  return {
+    inString: markProvenStrings(cps),
+    left: nearestTextChars(cps, forward),
+    right: nearestTextChars(cps, forward.reverse()),
+  };
+}
+
+/** LRM / RLM / ALM are text formatting only inside right-to-left text. */
+function isRtlTextMark({ inString, left, right }, idx) {
+  if (!inString[idx]) return false;
+  const sides = [left[idx], right[idx]];
+  return (
+    sides.some((ch) => RTL_LETTER_RE.test(ch)) &&
+    sides.every((ch) => STRING_QUOTES.has(ch) || RTL_LETTER_RE.test(ch))
   );
 }
 
 /** ZWJ / ZWNJ shape a word only between characters of one script that uses them. */
-function isScriptJoinControl(cps, idx) {
+function isScriptJoinControl({ inString }, cps, idx) {
   const prev = cps[idx - 1] ?? '';
   const next = cps[idx + 1] ?? '';
-  if (!prev || !next || !isInsideTextOnLine(cps, idx)) return false;
+  if (!prev || !next || !inString[idx]) return false;
   return JOIN_CONTROL_SCRIPT_RES.some((re) => re.test(prev) && re.test(next));
 }
 
@@ -41058,13 +41097,14 @@ function isScriptJoinControl(cps, idx) {
  * Returns a Set of kinds among 'bidi-control' | 'invisible-unicode' |
  * 'confusable-whitespace'. Conservative by construction (emoji sequences,
  * leading BOM, in-string confusable whitespace, and bidi marks and join controls
- * in text of the scripts that use them are treated as legitimate).
+ * in proven strings of the scripts that use them are treated as legitimate).
  * @param {string} line
  * @returns {Set<string>}
  */
 function detectInvisibleUnicodeKinds(line) {
   const kinds = new Set();
   const cps = Array.from(String(line));
+  let textContext = null;
 
   for (let idx = 0; idx < cps.length; idx += 1) {
     const ch = cps[idx];
@@ -41078,7 +41118,8 @@ function detectInvisibleUnicodeKinds(line) {
     }
 
     if (BIDI_MARK_CPS.has(cp)) {
-      if (!isRtlTextMark(cps, idx)) kinds.add('bidi-control');
+      textContext ??= buildTextContext(cps);
+      if (!isRtlTextMark(textContext, idx)) kinds.add('bidi-control');
       continue;
     }
 
@@ -41100,7 +41141,7 @@ function detectInvisibleUnicodeKinds(line) {
       if (!(
         isEmojiAdjacentChar(prev) ||
         isEmojiAdjacentChar(next) ||
-        isScriptJoinControl(cps, idx)
+        isScriptJoinControl((textContext ??= buildTextContext(cps)), cps, idx)
       )) {
         kinds.add('invisible-unicode');
       }

@@ -1138,7 +1138,9 @@ test('invisible-unicode canary: script text keeps its bidi marks and join contro
     `const a = "مرحبا${CP(0x200f)}!";`,
     `const a = "${CP(0x200e)}مرحبا";`,
     `const a = "مرحبا${CP(0x061c)}";`,
-    `// מה${CP(0x200f)} נשמע`,
+    `  "a": "می${CP(0x200c)}خواهم"\r`,
+    `const a = 'say \\'می${CP(0x200c)}خواهم\\'';`,
+    `const a = "say \\"می${CP(0x200c)}خواهم\\"";\r`,
     `const a = "می${CP(0x200c)}خواهم";`,
     `const a = "क्${CP(0x200d)}ष";`,
     `const a = "क्${CP(0x200c)}ष";`,
@@ -1164,6 +1166,61 @@ test('invisible-unicode: marks and join controls outside script text stay flagge
   ]) {
     assert.ok(invisibleUnicodeKinds(line).includes(kind), line);
   }
+});
+
+test('invisible-unicode: a line that cannot prove its strings stays flagged', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const line of [
+    `/* c */ export const ${id} = 1;`,
+    `export const s = \`\${${id}}\`;`,
+    `export const s = \`${id}\`;`,
+    `class A { #${id} = 2; }`,
+    `const r = /'/; const ${id} = 1;`,
+    `const r = /'/; const ${id} = '';`,
+    `\`; const ${id} = 1;`,
+    `// c${CP(0x2028)}const ${id} = 1;`,
+    `// c${CP(0x2029)}const ${id} = 1;`,
+    `// c\rconst ${id} = 1;`,
+    `"a${CP(0x2028)}${id}";`,
+    `"a\r${id}";`,
+    `* const ${id} = 1;`,
+    `* "${id}" const ${id} = 1;`,
+    `/* c */ const م${CP(0x200f)} = 1;`,
+    `// ${id}`,
+    `# ${id}`,
+    `# "${id}"`,
+    `don't */ const ${id} = 'a';`,
+    `"\${${id}}";`,
+    `"a */ ${id}";`,
+    `"a\`${id}";`,
+    `"${id}" const x = 1;`,
+    `"a\\" + ${id} + "b";`,
+    `const a = "${id}`,
+    `return "${id}";`,
+    `const r = /,"/; const ${id} = 1, s = ",";`,
+    `const s = \`, "${id}",`,
+    `\\, "${id}",`,
+    `x,\r"${id}";`,
+    `const م${CP(0x200f)}م = 1;`,
+  ]) {
+    assert.notDeepEqual(invisibleUnicodeKinds(line), [], line);
+  }
+});
+
+test('invisible-unicode: a mark next to an ASCII token stays flagged', () => {
+  for (const line of [
+    `const s = "admin${CP(0x200f)}, مرحبا";`,
+    `const s = "مرحبا, ${CP(0x200f)}admin";`,
+    `const s = "مرحبا${CP(0x200f)}2";`,
+  ]) {
+    assert.ok(invisibleUnicodeKinds(line).includes('bidi-control'), line);
+  }
+});
+
+test('invisible-unicode: a line full of marks is scanned in linear time', () => {
+  const started = performance.now();
+  assert.ok(invisibleUnicodeKinds(CP(0x200f).repeat(40000)).includes('bidi-control'));
+  assert.ok(performance.now() - started < 2000);
 });
 
 test('invisible-unicode: override and isolate controls stay flagged inside script text', () => {
