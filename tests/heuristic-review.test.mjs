@@ -1154,6 +1154,7 @@ test('invisible-unicode: marks and join controls outside script text stay flagge
     [`const مرحبا${CP(0x200f)} = 1;`, 'bidi-control'],
     [`const a = "مرحبا"${CP(0x200f)};`, 'bidi-control'],
     [`const a = "مرحبا" + ${CP(0x200f)}b;`, 'bidi-control'],
+    [`const a = "${CP(0x200f)}" + "مرحبا";`, 'bidi-control'],
     [`const ad${CP(0x200c)}min = 1;`, 'invisible-unicode'],
     [`const a = "ad${CP(0x200d)}min";`, 'invisible-unicode'],
     [`const می${CP(0x200c)}خواهم = 1;`, 'invisible-unicode'],
