@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -57,7 +58,7 @@ function run(ctx, args, tmpValue = ctx.tmp) {
       ...process.env,
       PATH: `${ctx.bin}:${process.env.PATH}`,
       RIVER_WORKER_STATE_DIR: join(ctx.root, 'state'),
-      TMPDIR: tmpValue,
+      RIVER_WORKER_SCRATCH_ROOT: tmpValue,
     },
   });
 }
@@ -91,7 +92,7 @@ describe('scripts/worker-bootstrap.sh の scratch dir', () => {
     });
   });
 
-  test('TMPDIR の末尾スラッシュでパスが崩れない', (t) => {
+  test('scratch の場所の末尾スラッシュでパスが崩れない', (t) => {
     const ctx = setup(t);
     const res = run(ctx, ['feat/one', '--base', 'main'], `${ctx.tmp}/`);
     assert.equal(res.status, 0, res.stdout + res.stderr);
@@ -122,6 +123,35 @@ describe('scripts/worker-bootstrap.sh の scratch dir', () => {
     writeFileSync(notDir, 'x');
     const res = run(ctx, ['feat/one', '--base', 'main'], notDir);
     assert.equal(res.status, 1, res.stdout + res.stderr);
-    assert.match(res.stderr, /scratch/);
+    assert.match(res.stderr, /could not create scratch dir/);
+  });
+
+  test('別の repo の同名ブランチは別のパスになり、同じ repo では安定する', (t) => {
+    const a = setup(t);
+    const b = setup(t);
+    const pathA = scratchPath(run(a, ['feat/one', '--base', 'main'], a.tmp).stdout);
+    const pathB = scratchPath(run(b, ['feat/one', '--base', 'main'], a.tmp).stdout);
+    assert.notEqual(pathA, pathB);
+    assert.equal(scratchPath(run(a, ['feat/one', '--base', 'main'], a.tmp).stdout), pathA);
+  });
+
+  test('既定の場所は TMPDIR ではなく /tmp で、repo 単位の dir は本人だけが読める', (t) => {
+    const ctx = setup(t);
+    const env = { ...process.env, PATH: `${ctx.bin}:${process.env.PATH}`, TMPDIR: ctx.tmp };
+    env.RIVER_WORKER_STATE_DIR = join(ctx.root, 'state');
+    delete env.RIVER_WORKER_SCRATCH_ROOT;
+    const res = spawnSyncGuarded('bash', [SCRIPT, 'feat/one', '--base', 'main'], {
+      cwd: ctx.repo,
+      encoding: 'utf8',
+      env,
+    });
+    assert.equal(res.status, 0, res.stdout + res.stderr);
+    const path = scratchPath(res.stdout);
+    const repoDir = dirname(path);
+    t.after(() => rmSync(repoDir, { recursive: true, force: true }));
+    const expectedRoot = `/tmp/river-review-workers-${process.getuid()}/`; // code-hygiene-ignore
+    assert.ok(path.startsWith(expectedRoot), path);
+    assert.ok(existsSync(path));
+    assert.equal(statSync(repoDir).mode & 0o777, 0o700);
   });
 });

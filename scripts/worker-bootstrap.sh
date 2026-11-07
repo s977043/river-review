@@ -20,8 +20,10 @@
 #
 # Why each worker gets its own scratch dir: workers sharing one scratchpad have
 # overwritten each other's running scripts (worker-discipline-template.md). The
-# dir is ${TMPDIR:-/tmp}/river-review-workers/<slug>, outside the worktree so it
-# never counts as pollution. Re-running for the same branch keeps its contents.
+# dir is <root>/<repo id>/<slug>, outside the worktree so it never counts as
+# pollution. Re-running for the same branch keeps its contents. <root> is
+# ${RIVER_WORKER_SCRATCH_ROOT:-/tmp/river-review-workers-<uid>}: not $TMPDIR, which
+# on macOS is under /var/folders and may be outside what a worker may write to.
 #
 # .nvmrc forms: `22.22.2` (exact), `22` / `22.1` (prefix). `lts/*` style
 # aliases are not supported and always produce the mismatch warning.
@@ -83,8 +85,10 @@ SLUG="$(printf '%s' "${BRANCH}" | tr '/' '-')"
 WORKTREE="${MAIN_ROOT}/.claude/worktrees/${SLUG}"
 STATE_DIR="${RIVER_WORKER_STATE_DIR:-${HOME}/.claude/state}"
 MANIFEST="${STATE_DIR}/worker-bootstrap-${SLUG}.txt"
-TMP_ROOT="${TMPDIR:-/tmp}"
-SCRATCH="${TMP_ROOT%/}/river-review-workers/${SLUG}"
+SCRATCH_ROOT="${RIVER_WORKER_SCRATCH_ROOT:-/tmp/river-review-workers-$(id -u)}"
+REPO_ID="$(printf '%s' "${MAIN_ROOT}" | cksum | cut -d' ' -f1)"
+SCRATCH_REPO="${SCRATCH_ROOT%/}/${REPO_ID}"
+SCRATCH="${SCRATCH_REPO}/${SLUG}"
 
 echo "== 1. worktree"
 if git -C "${MAIN_ROOT}" worktree list --porcelain | grep -qxF "worktree ${WORKTREE}"; then
@@ -229,7 +233,7 @@ mkdir -p "${STATE_DIR}"
 echo "manifest: ${MANIFEST} ($(grep -cv '^#' "${MANIFEST}" || true) untracked path(s) after npm ci)"
 
 echo "== 6. scratch dir"
-mkdir -p "${SCRATCH}" || {
+{ mkdir -p "${SCRATCH}" && chmod 700 "${SCRATCH_REPO}"; } || {
   echo "error: could not create scratch dir ${SCRATCH}." >&2
   exit 1
 }

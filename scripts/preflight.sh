@@ -11,6 +11,7 @@
 #
 # Usage:
 #   scripts/preflight.sh [<PR number> | #<PR number> | <keyword> | --issue <N>]...
+#   RIVER_PREFLIGHT_TIMEOUT=<seconds> sets the deadline per network read (default 30).
 #
 # Exit codes:
 #   0  SAFE
@@ -60,11 +61,31 @@ while [ "$#" -gt 0 ]; do
 done
 [ "$(( ${#PRS[@]} + ${#ISSUES[@]} + ${#KEYWORDS[@]} ))" -gt 0 ] || usage
 
+READ_TIMEOUT="${RIVER_PREFLIGHT_TIMEOUT-30}"
+case "${READ_TIMEOUT}" in
+  '' | *[!0-9]* | 0) usage ;;
+esac
+
+# macOS has no `timeout`, but perl ships with macOS and the CI runners. The child
+# runs in its own process group so that a grandchild holding the stdout pipe dies
+# with it; otherwise `$(...)` would keep waiting after the deadline.
+with_deadline() {
+  perl -e '
+    my $seconds = shift;
+    my $pid = fork() // exit 127;
+    if (!$pid) { setpgrp(0, 0); exec { $ARGV[0] } @ARGV; exit 127; }
+    $SIG{ALRM} = sub { kill "KILL", -$pid; print STDERR "timed out: @ARGV\n"; exit 124; };
+    alarm $seconds;
+    waitpid($pid, 0);
+    exit(($? >> 8) || ($? ? 1 : 0));
+  ' "${READ_TIMEOUT}" "$@"
+}
+
 # Prints open / merged / closed. `gh` and `jq` failures, an empty body, and an
 # unknown state all return non-zero.
 read_state() {
   local body
-  body="$(gh api "repos/{owner}/{repo}/$1")" || return 2
+  body="$(with_deadline gh api "repos/{owner}/{repo}/$1")" || return 2
   printf '%s' "${body}" | jq -er '
     if .state == "open" then "open"
     elif .state == "closed" then (if .merged == true then "merged" else "closed" end)
@@ -96,9 +117,17 @@ for issue in ${ISSUES[@]+"${ISSUES[@]}"}; do
   check_target "issue #${issue}" "issues/${issue}"
 done
 
+is_target_pr() {
+  local pr
+  for pr in ${PRS[@]+"${PRS[@]}"}; do
+    [ "${pr}" = "$1" ] && return 0
+  done
+  return 1
+}
+
 check_similar_prs() {
   local list_state="$1" keyword="$2" limit="$3" body lines number detail state
-  body="$(gh pr list --state "${list_state}" --search "${keyword}" --limit "${limit}" \
+  body="$(with_deadline gh pr list --state "${list_state}" --search "${keyword}" --limit "${limit}" \
     --json number,title,headRefName,author)" \
     || fail "gh pr list --state ${list_state} failed for '${keyword}'"
   lines="$(printf '%s' "${body}" | jq -er '
@@ -108,6 +137,7 @@ check_similar_prs() {
     || fail "unexpected gh pr list response for '${keyword}'"
   while IFS=$'\t' read -r number detail; do
     [ -n "${number}" ] || continue
+    is_target_pr "${number}" && continue
     state="$(read_state "pulls/${number}")" || fail "could not read the state of PR #${number}"
     echo "similar PR for '${keyword}': #${number} [${state}] ${detail}"
     PARALLEL=$((PARALLEL + 1))
@@ -115,8 +145,9 @@ check_similar_prs() {
 }
 
 if [ "${#KEYWORDS[@]}" -gt 0 ]; then
-  git fetch --quiet origin main || fail "git fetch origin main failed"
-  MAIN_LOG="$(git log origin/main --oneline -15)" || fail "git log origin/main failed"
+  with_deadline git fetch --quiet origin main || fail "git fetch origin main failed"
+  # FETCH_HEAD: a narrowed remote.origin.fetch leaves origin/main stale after this fetch.
+  MAIN_LOG="$(git log FETCH_HEAD --oneline -15)" || fail "git log FETCH_HEAD failed"
   for keyword in "${KEYWORDS[@]}"; do
     matches="$(printf '%s\n' "${MAIN_LOG}" | grep -iF -- "${keyword}")"
     if [ -n "${matches}" ]; then

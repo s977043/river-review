@@ -1,6 +1,14 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +29,9 @@ esac
 if [ -z "\${route}" ] || [ "\${GH_STUB_FAIL:-}" = "\${route}" ]; then
   echo "stub gh failure: $*" >&2
   exit 1
+fi
+if [ "\${GH_STUB_HANG:-}" = "\${route}" ]; then
+  sleep 5
 fi
 if [ -f "\${GH_STUB_DIR}/\${route}" ]; then
   cat "\${GH_STUB_DIR}/\${route}"
@@ -85,6 +96,18 @@ function run(ctx, args, env = {}) {
       ...env,
     },
   });
+}
+
+// 指定のサブコマンドだけ差し替え、それ以外は実の git へ渡す。
+function gitStub(ctx, subcommand, body) {
+  const realGit = spawnSyncGuarded('bash', ['-c', 'command -v git'], {
+    encoding: 'utf8',
+  }).stdout.trim();
+  writeFileSync(
+    join(ctx.bin, 'git'),
+    `#!/usr/bin/env bash\nif [ "$1" = "${subcommand}" ]; then ${body}; fi\nexec "${realGit}" "$@"\n`
+  );
+  chmodSync(join(ctx.bin, 'git'), 0o755);
 }
 
 function ghCalls(ctx) {
@@ -242,6 +265,88 @@ describe('scripts/preflight.sh', () => {
       const res = run(ctx, args);
       assert.equal(res.status, 64, res.stdout + res.stderr);
       assert.deepEqual(ghCalls(ctx), []);
+    });
+  }
+
+  for (const [name, route, args] of [
+    ['gh api', 'pull-1', ['1']],
+    ['gh pr list', 'list-open', ['husky']],
+  ]) {
+    test(`${name} の時間切れは exit 2 で、子プロセスを待たない`, (t) => {
+      const ctx = setup(t);
+      fixture(ctx, 'pull-1', OPEN_PR);
+      const started = Date.now();
+      const res = run(ctx, args, { GH_STUB_HANG: route, RIVER_PREFLIGHT_TIMEOUT: '1' });
+      assert.equal(res.status, 2, res.stdout + res.stderr);
+      assert.doesNotMatch(res.stdout, /SAFE/);
+      assert.ok(Date.now() - started < 4000, 'stub の sleep 5 の終了を待っている');
+    });
+  }
+
+  test('git fetch の時間切れは exit 2', (t) => {
+    const ctx = setup(t);
+    gitStub(ctx, 'fetch', 'sleep 5');
+    const started = Date.now();
+    const res = run(ctx, ['husky'], { RIVER_PREFLIGHT_TIMEOUT: '1' });
+    assert.equal(res.status, 2, res.stdout + res.stderr);
+    assert.ok(Date.now() - started < 4000, 'stub の sleep 5 の終了を待っている');
+  });
+
+  for (const value of ['0', 'abc', '']) {
+    test(`RIVER_PREFLIGHT_TIMEOUT=${JSON.stringify(value)} は exit 64`, (t) => {
+      const ctx = setup(t);
+      const res = run(ctx, ['1'], { RIVER_PREFLIGHT_TIMEOUT: value });
+      assert.equal(res.status, 64, res.stdout + res.stderr);
+      assert.deepEqual(ghCalls(ctx), []);
+    });
+  }
+
+  test('git log の失敗は exit 2 で SAFE を出さない', (t) => {
+    const ctx = setup(t);
+    gitStub(ctx, 'log', 'exit 1');
+    const res = run(ctx, ['husky']);
+    assert.equal(res.status, 2, res.stdout + res.stderr);
+    assert.doesNotMatch(res.stdout, /SAFE/);
+  });
+
+  test('origin/main を更新しない fetch 設定でも、取得した main を検査する', (t) => {
+    const ctx = setup(t);
+    git(ctx.clone, 'config', 'remote.origin.fetch', '+refs/heads/none:refs/remotes/origin/none');
+    commit(ctx.seed, 'fix: handle husky chmod');
+    git(ctx.seed, 'push', '-q', 'origin', 'main');
+    const res = run(ctx, ['husky']);
+    assert.equal(res.status, 1, res.stdout + res.stderr);
+    assert.match(res.stdout, /handle husky chmod/);
+  });
+
+  test('明示した PR は並行作業に数えず、それ以外のヒットは数える', (t) => {
+    const ctx = setup(t);
+    fixture(ctx, 'pull-1', OPEN_PR);
+    fixture(ctx, 'list-open', [hit(1)]);
+    const alone = run(ctx, ['1', 'husky']);
+    assert.equal(alone.status, 0, alone.stdout + alone.stderr);
+    assert.match(alone.stdout, /verdict: SAFE/);
+
+    fixture(ctx, 'pull-5', OPEN_PR);
+    fixture(ctx, 'list-open', [hit(1), hit(5)]);
+    const other = run(ctx, ['1', 'husky']);
+    assert.equal(other.status, 1, other.stdout + other.stderr);
+    assert.match(other.stdout, /#5 /);
+    assert.doesNotMatch(other.stdout, /similar PR .*#1 /);
+  });
+
+  for (const missing of ['jq', 'perl']) {
+    test(`${missing} が無いときは exit 2 で SAFE を出さない`, (t) => {
+      const ctx = setup(t);
+      fixture(ctx, 'pull-1', OPEN_PR);
+      for (const tool of ['bash', 'cat', 'jq', 'perl']) {
+        if (tool === missing) continue;
+        const found = spawnSyncGuarded('bash', ['-c', `command -v ${tool}`], { encoding: 'utf8' });
+        symlinkSync(found.stdout.trim(), join(ctx.bin, tool));
+      }
+      const res = run(ctx, ['1'], { PATH: ctx.bin });
+      assert.equal(res.status, 2, res.stdout + res.stderr);
+      assert.doesNotMatch(res.stdout, /SAFE/);
     });
   }
 
