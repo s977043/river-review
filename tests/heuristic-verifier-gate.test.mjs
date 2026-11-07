@@ -207,6 +207,11 @@ const CASES = [
     { file: 'src/app.ts', source: 'export const ad\u200Cmin = 1;\n' },
     ESCALATE,
   ],
+  [
+    'ZWNJ identifier after a string continued from the previous line',
+    { file: 'src/app.js', source: 'let x = "abc\\\n", می‌خواهم = "+"\n' },
+    ESCALATE,
+  ],
   ['ZWJ in ASCII text', { file: 'src/app.js', source: stringIn('ad\u200Dmin') }, ESCALATE],
 ];
 

@@ -41005,10 +41005,49 @@ const JOIN_CONTROL_SCRIPT_RES = [
   /\p{scx=Sinhala}/u,
 ];
 const NEUTRAL_TEXT_RE = /[\p{P}\p{Zs}]/u;
-const LINE_BREAK_CHARS = new Set(['\n', '\r', '\v', '\f', '\u0085', ' ', ' ']);
+const LINE_BREAK_CHARS = new Set(['\n', '\r', '\v', '\f', '\u0085', '\u2028', '\u2029']);
 const STRING_QUOTES = new Set(['"', "'"]);
 const BEFORE_STRING_CHARS = new Set(['=', '(', ',', ':', '[', '{', '+', '?']);
 const AFTER_STRING_CHARS = new Set([',', ';', ')', ']', '}', ':', '+']);
+
+const RETURN_KEYWORD = 'return';
+
+/** \`return\` that starts its own token, as in \`  return "text";\`. */
+function endsWithReturnKeyword(cps, end) {
+  const start = end - RETURN_KEYWORD.length + 1;
+  if (start < 0 || cps.slice(start, end + 1).join('') !== RETURN_KEYWORD) return false;
+  const before = cps[start - 1];
+  return before === undefined || before === ' ' || before === '\t';
+}
+
+/**
+ * Whether a line leaves a string or a line continuation open for the next line.
+ * Comments are not recognized, so an apostrophe in one also reads as open, which
+ * only withdraws the exemption.
+ */
+function quoteStateAfter(text, state = null) {
+  let quote = state;
+  const cps = Array.from(String(text));
+  let trailingBackslashes = 0;
+  for (let i = 0; i < cps.length; i += 1) {
+    const ch = cps[i];
+    trailingBackslashes = ch === '\\' ? trailingBackslashes + 1 : 0;
+    if (ch === '\\') {
+      if (quote && i + 1 < cps.length) {
+        i += 1;
+        trailingBackslashes = 0;
+      }
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+    }
+  }
+  if (quote) return quote;
+  return trailingBackslashes % 2 === 1 ? '\\' : null;
+}
 
 function closingQuoteIndex(cps, open) {
   for (let i = open + 1; i < cps.length; i += 1) {
@@ -41030,11 +41069,13 @@ function closingQuoteIndex(cps, open) {
 function markProvenStrings(cps) {
   const inString = new Uint8Array(cps.length);
   let before = '';
+  let lastCode = -1;
   for (let i = 0; i < cps.length; i += 1) {
     const ch = cps[i];
     if (ch === ' ' || ch === '\t') continue;
     if (STRING_QUOTES.has(ch)) {
-      if (before && !BEFORE_STRING_CHARS.has(before)) break;
+      if (before && !BEFORE_STRING_CHARS.has(before) && !endsWithReturnKeyword(cps, lastCode))
+        break;
       const close = closingQuoteIndex(cps, i);
       if (close < 0) break;
       let after = close + 1;
@@ -41048,6 +41089,7 @@ function markProvenStrings(cps) {
       break;
     } else {
       before = ch;
+      lastCode = i;
     }
   }
   return inString;
@@ -41065,10 +41107,10 @@ function nearestTextChars(cps, order) {
   return nearest;
 }
 
-function buildTextContext(cps) {
+function buildTextContext(cps, exemptStrings) {
   const forward = cps.map((_, i) => i);
   return {
-    inString: markProvenStrings(cps),
+    inString: exemptStrings ? markProvenStrings(cps) : new Uint8Array(cps.length),
     left: nearestTextChars(cps, forward),
     right: nearestTextChars(cps, forward.reverse()),
   };
@@ -41099,9 +41141,11 @@ function isScriptJoinControl({ inString }, cps, idx) {
  * leading BOM, in-string confusable whitespace, and bidi marks and join controls
  * in proven strings of the scripts that use them are treated as legitimate).
  * @param {string} line
+ * @param {{ exemptStrings?: boolean }} [options] false when the line may continue a
+ *   string from a line that is open or not visible.
  * @returns {Set<string>}
  */
-function detectInvisibleUnicodeKinds(line) {
+function detectInvisibleUnicodeKinds(line, { exemptStrings = true } = {}) {
   const kinds = new Set();
   const cps = Array.from(String(line));
   let textContext = null;
@@ -41118,7 +41162,7 @@ function detectInvisibleUnicodeKinds(line) {
     }
 
     if (BIDI_MARK_CPS.has(cp)) {
-      textContext ??= buildTextContext(cps);
+      textContext ??= buildTextContext(cps, exemptStrings);
       if (!isRtlTextMark(textContext, idx)) kinds.add('bidi-control');
       continue;
     }
@@ -41141,7 +41185,7 @@ function detectInvisibleUnicodeKinds(line) {
       if (!(
         isEmojiAdjacentChar(prev) ||
         isEmojiAdjacentChar(next) ||
-        isScriptJoinControl((textContext ??= buildTextContext(cps)), cps, idx)
+        isScriptJoinControl((textContext ??= buildTextContext(cps, exemptStrings)), cps, idx)
       )) {
         kinds.add('invisible-unicode');
       }
@@ -41232,6 +41276,30 @@ function looksLikeSourceCodeFile(filePath) {
   );
 }
 
+/**
+ * Added lines with whether a string on them can be exempt. A line can be when the
+ * file starts there, or when the previous new-side line is visible and, read on its
+ * own and carried from the first visible line, closes every string.
+ */
+function* iterateAddedLinesWithStringContext(file) {
+  for (const hunk of ensureArray(file?.hunks)) {
+    let newLineNumber = hunk.newStart ?? 0;
+    let previous = newLineNumber <= 1 ? { open: false } : null;
+    let carried = null;
+    for (const rawLine of ensureArray(hunk.lines)) {
+      if (rawLine.startsWith('-') && !rawLine.startsWith('---')) continue;
+      const added = rawLine.startsWith('+') && !rawLine.startsWith('+++');
+      const text = rawLine.slice(1);
+      if (added) {
+        yield { line: newLineNumber, text, exemptStrings: previous !== null && !previous.open };
+      }
+      carried = quoteStateAfter(text, carried === '\\' ? null : carried);
+      previous = { open: quoteStateAfter(text) !== null || carried !== null };
+      newLineNumber += 1;
+    }
+  }
+}
+
 function findInvisibleUnicode({ diff }) {
   const MAX_INVISIBLE_UNICODE_COMMENTS = 3;
   const comments = [];
@@ -41243,8 +41311,8 @@ function findInvisibleUnicode({ diff }) {
     if (!looksLikeSourceCodeFile(filePath)) continue;
     const normalized = String(filePath).replaceAll('\\', '/');
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
-    for (const { line, text } of iterateAddedLines(file)) {
-      const kinds = detectInvisibleUnicodeKinds(text);
+    for (const { line, text, exemptStrings } of iterateAddedLinesWithStringContext(file)) {
+      const kinds = detectInvisibleUnicodeKinds(text, { exemptStrings });
       // One finding per line, highest severity first.
       let kind = null;
       if (kinds.has('bidi-control')) kind = 'bidi-control';

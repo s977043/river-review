@@ -1196,7 +1196,14 @@ test('invisible-unicode: a line that cannot prove its strings stays flagged', ()
     `"${id}" const x = 1;`,
     `"a\\" + ${id} + "b";`,
     `const a = "${id}`,
-    `return "${id}";`,
+    `myreturn "${id}";`,
+    `obj.return "${id}";`,
+    `$return "${id}";`,
+    `@return "${id}";`,
+    `#return "${id}";`,
+    `x.y return "${id}";`.replace('x.y ', 'x.'),
+    `/* return */ "${id}";`,
+    `return "a" + ${id};`,
     `const r = /,"/; const ${id} = 1, s = ",";`,
     `const s = \`, "${id}",`,
     `\\, "${id}",`,
@@ -1205,6 +1212,73 @@ test('invisible-unicode: a line that cannot prove its strings stays flagged', ()
   ]) {
     assert.notDeepEqual(invisibleUnicodeKinds(line), [], line);
   }
+});
+
+function invisibleUnicodeKindsInHunk(header, body, file = 'src/payload.js') {
+  const diffText = `diff --git a/${file} b/${file}\n--- a/${file}\n+++ b/${file}\n${header}\n${body}\n`;
+  const parsed = parseUnifiedDiff(diffText);
+  return buildHeuristicComments({ diff: { files: parsed.files }, plan: IU_PLAN }).map(
+    (c) => c.kind
+  );
+}
+
+test('invisible-unicode: a string continued from the previous line is not exempt', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const [file, previous, added] of [
+    ['src/a.js', ' let x = "abc\\', `+", ${id} = "+"`],
+    ['src/a.ts', ' let x = "abc\\', `+", ${id} = "+"`],
+    ['src/a.php', ' $x = "abc', `+", ${id} = "+"`],
+    ['src/a.js', ' "abc\\', `+= ", ${id} = "+"`],
+    ['src/a.js', ` "abc\\\\\\`, `+", ${id} = "+"`],
+    ['src/a.js', '+let x = "abc\\', `+", ${id} = "+"`],
+    ['src/a.js', " let x = 'abc", `+', ${id} = '+'`],
+    ['src/a.js', ' let x = `abc', `+", ${id} = "+"`],
+    ['src/a.py', ' x = """abc', `+", ${id} = "+"`],
+  ]) {
+    const kinds = invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', `${previous}\n${added}`, file);
+    assert.ok(kinds.includes('invisible-unicode'), `${previous} / ${added}`);
+  }
+  const reopened = invisibleUnicodeKindsInHunk(
+    '@@ -1,2 +1,3 @@',
+    ` foo'\n x = 'abc\n+', ${id} = '+'`
+  );
+  assert.ok(reopened.includes('invisible-unicode'), 'previous line open on its own');
+  const chained = invisibleUnicodeKindsInHunk(
+    '@@ -1,2 +1,3 @@',
+    ` x = """abc\n def\n+", ${id} = "+"`,
+    'src/a.py'
+  );
+  assert.ok(chained.includes('invisible-unicode'), 'carried across lines');
+});
+
+test('invisible-unicode: a line whose previous line is not visible is not exempt', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  const kinds = invisibleUnicodeKindsInHunk('@@ -10,0 +11 @@', `+", ${id} = "+"`);
+  assert.ok(kinds.includes('invisible-unicode'));
+  const legit = invisibleUnicodeKindsInHunk('@@ -10,0 +11 @@', `+const a = "${id}";`);
+  assert.ok(legit.includes('invisible-unicode'));
+});
+
+test('invisible-unicode canary: closed previous lines and file starts keep the exemption', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const [header, body] of [
+    ['@@ -0,0 +1 @@', `+const a = "${id}";`],
+    ['@@ -1,1 +1,2 @@', ` const b = "x\\\\";\n+const a = "${id}";`],
+    ['@@ -1,1 +1,2 @@', ` const b = 'it\\'s';\n+const a = "${id}";`],
+    ['@@ -1,2 +1,2 @@', ` const b = 1;\n-const a = "old\n+const a = "${id}";`],
+    ['@@ -1,1 +1,2 @@', ` const b = 1; // C:\\\\\n+const a = "${id}";`],
+  ]) {
+    assert.deepEqual(invisibleUnicodeKindsInHunk(header, body), [], body);
+  }
+});
+
+test('invisible-unicode canary: return starts a string', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const line of [`return "${id}";`, `  return '${id}';`, `\treturn "${id}"`]) {
+    assert.deepEqual(invisibleUnicodeKinds(line), [], line);
+  }
+  const continued = invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', ` x = "abc\\\n+return "${id}";`);
+  assert.ok(continued.includes('invisible-unicode'), 'continuation line');
 });
 
 test('invisible-unicode: a mark next to an ASCII token stays flagged', () => {
