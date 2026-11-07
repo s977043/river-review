@@ -1200,7 +1200,7 @@ test('invisible-unicode: a line that cannot prove its strings stays flagged', ()
     `const r = /,"/; const ${id} = 1, s = ",";`,
     `const s = \`, "${id}",`,
     `\\, "${id}",`,
-    `x,\r"${id}";`,
+    `x\r,"${id}";`,
     `const م${CP(0x200f)}م = 1;`,
   ]) {
     assert.notDeepEqual(invisibleUnicodeKinds(line), [], line);
