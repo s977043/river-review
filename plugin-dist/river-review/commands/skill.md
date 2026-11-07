@@ -8,18 +8,23 @@ Find the best matching review skill for: $ARGUMENTS
 
 The portable dependency key is a **skill ID**, not a physical path. The bundled
 skill collection lives under `<plugin root>/skills/` in the full plugin or
-repository checkout. Resolve `<plugin root>` in Bash (step 1). Do not pass a path
-containing `${CLAUDE_PLUGIN_ROOT}` to `Read` as-is, because `Read` does not
-necessarily expand environment variables.
+repository checkout.
 
 Steps:
 
-1. Each Bash call starts a fresh shell, so a variable set in one call is empty
-   in the next. Expand `"${CLAUDE_PLUGIN_ROOT:-.}"` directly in every command
-   below instead of storing it in a variable.
+1. When loaded as a plugin, every `${CLAUDE_PLUGIN_ROOT}` in this command body
+   has already been replaced with the plugin root's absolute path before you
+   read it. The `$CLAUDE_PLUGIN_ROOT` environment variable is empty in Bash, so
+   use the substituted path as written in the commands below. If the text
+   `${CLAUDE_PLUGIN_ROOT}` is still literal, use `.` in its place only when
+   `./scripts/resolve-skill-id.mjs` exists (inside the river-review
+   repository); otherwise stop and report the paths tried, that the plugin
+   root can be added with `--add-dir <plugin root>` if reads outside the
+   working directory are blocked, and that the skill's absolute path can be
+   given in the request instead.
 2. If `$ARGUMENTS` matches the safe skill-ID grammar
    `^[a-z0-9][a-z0-9._-]*$`, try exact resolution first:
-   `node "${CLAUDE_PLUGIN_ROOT:-.}/scripts/resolve-skill-id.mjs" "${CLAUDE_PLUGIN_ROOT:-.}" "$ARGUMENTS"`.
+   `node "${CLAUDE_PLUGIN_ROOT}/scripts/resolve-skill-id.mjs" "${CLAUDE_PLUGIN_ROOT}" "$ARGUMENTS"`.
 3. On exit 0, use `Read` on the returned `SKILL.md`. The resolver verifies the
    declared ID and rejects ambiguous packages.
 4. If this invocation came from another skill's owner-skill delegation and exact
@@ -27,7 +32,7 @@ Steps:
    keyword-fallback or reconstruct the missing specialist knowledge by guess.
 5. For an ad-hoc user keyword (not an owner-skill delegation), an unresolved exact
    lookup may fall back to a case-insensitive search across the whole collection:
-   `rg -i -l -F -g 'SKILL.md' -- "$ARGUMENTS" "${CLAUDE_PLUGIN_ROOT:-.}/skills"`.
+   `rg -i -l -F -g 'SKILL.md' -- "$ARGUMENTS" "${CLAUDE_PLUGIN_ROOT}/skills"`.
 6. Inputs containing slash, backslash, `..`, whitespace, or other characters
    outside the ID grammar are never sanitized into another ID. Path-like input
    must not be treated as an owner skill ID.

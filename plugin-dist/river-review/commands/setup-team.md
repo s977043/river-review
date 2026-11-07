@@ -21,11 +21,12 @@ ls .river-review.* 2>/dev/null || echo ".river-review.* が見つかりません
 ### Step 2: .river/rules.md の生成
 
 `.river/rules.md` がなければ作成する。
-テンプレートは `<plugin root>/.river/rules.template.md` にある。Read ツールが環境変数を展開するとは限らないため、`${CLAUDE_PLUGIN_ROOT}` を含むパスをそのまま Read に渡さない。
+テンプレートは `<plugin root>/.river/rules.template.md` にある。
 
-1. Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
-2. 出力が空のときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
-3. それでもテンプレートを読めなければ、`.river/rules.md` を推測で作らない。「テンプレートが見つからない」と報告して止まる。
+1. `${CLAUDE_PLUGIN_ROOT}/.river/rules.template.md` を Read する。プラグインとして読み込まれていれば、この `${CLAUDE_PLUGIN_ROOT}` はコマンド展開時に絶対パスへ置換されている。Bash の環境変数 `$CLAUDE_PLUGIN_ROOT` は空になるため、こちらが主経路である。
+2. パスに `${CLAUDE_PLUGIN_ROOT}` が文字列のまま残っている、または手順 1 の Read に失敗したときは、Bash で `echo "$CLAUDE_PLUGIN_ROOT"` を実行し、出力された絶対パスを `<plugin root>` として Read する。
+3. echo の出力が空、または echo が拒否・失敗したときに `.` を使ってよいのは、river-review リポジトリ内で動かす場合だけである。
+4. それでもテンプレートを読めなければ、`.river/rules.md` を推測で作らない。「テンプレートが見つからない」と報告して止まる。報告には、試したパスと失敗の理由、Read が作業ディレクトリ外として拒否された場合の `--add-dir <plugin root>`（または `permissions.additionalDirectories`）の案内、テンプレートの絶対パスを依頼文で指定する回避策を含める。
 
 テンプレートの内容を `.river/rules.md` として Write ツールで保存する（親ディレクトリは自動作成される）。
 
