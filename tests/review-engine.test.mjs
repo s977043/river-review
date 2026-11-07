@@ -3,6 +3,7 @@ import test from 'node:test';
 import { buildPrompt, generateReview, parseLineComments } from '../src/lib/review-engine.mjs';
 import { formatFindingMessage } from '../src/lib/finding-factory.mjs';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
+import { HEURISTIC_KIND_PRESENTATIONS } from '../src/lib/heuristic-review.mjs';
 
 const diffText = `diff --git a/src/app.ts b/src/app.ts
 index 1111111..2222222 100644
@@ -941,6 +942,21 @@ test.describe('verifier stage keeps checking everything that is not a detector b
     });
     assert.deepEqual(result.findings, []);
     assert.equal(result.debug.verifierStats.rejected, 1);
+    assert.deepEqual(result.debug.verifierRejected[0].reasons, [
+      'Severity exceeds skill severity without justification',
+    ]);
+  });
+
+  test('TC-04 an LLM blocker quoting a detector preset is still rejected', async (t) => {
+    const preset = HEURISTIC_KIND_PRESENTATIONS.get('merge-conflict');
+    const result = await review(t, {
+      fetchImpl: reply(
+        `src/app.js:1: Finding: ${preset.finding} Evidence: ${preset.evidence} ` +
+          `Impact: ${preset.impact} Fix: ${preset.fix} Severity: blocker Confidence: high`
+      ),
+      reviewPlan: plan('minor'),
+    });
+    assert.deepEqual(result.findings, []);
     assert.deepEqual(result.debug.verifierRejected[0].reasons, [
       'Severity exceeds skill severity without justification',
     ]);

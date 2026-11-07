@@ -655,6 +655,7 @@ const verifyPreset = (preset, options = {}) =>
   });
 
 test('verifyFinding: deterministicSource passes every heuristic kind (TC-10)', () => {
+  assert.ok(HEURISTIC_KIND_PRESENTATIONS.size > 0);
   for (const [kind, preset] of HEURISTIC_KIND_PRESENTATIONS) {
     const result = verifyPreset(preset, { deterministicSource: true });
     assert.deepEqual(result.reasons, [], kind);
@@ -663,6 +664,7 @@ test('verifyFinding: deterministicSource passes every heuristic kind (TC-10)', (
 });
 
 test('verifyFinding: without deterministicSource, a minor skill rejects all but nits (TC-10)', () => {
+  assert.ok(HEURISTIC_KIND_PRESENTATIONS.size > 0);
   for (const [kind, preset] of HEURISTIC_KIND_PRESENTATIONS) {
     assert.equal(verifyPreset(preset).verified, preset.severity === 'nit', kind);
   }

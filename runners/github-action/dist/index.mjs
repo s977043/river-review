@@ -40988,11 +40988,77 @@ function isEmojiAdjacentChar(ch) {
   return EXTENDED_PICTOGRAPHIC_RE.test(ch);
 }
 
+const RTL_LETTER_RE =
+  /\p{scx=Arabic}|\p{scx=Hebrew}|\p{scx=Syriac}|\p{scx=Thaana}|\p{scx=Nko}|\p{scx=Mandaic}|\p{scx=Samaritan}|\p{scx=Adlam}/u;
+const JOIN_CONTROL_SCRIPT_RES = [
+  /\p{scx=Arabic}/u,
+  /\p{scx=Syriac}/u,
+  /\p{scx=Devanagari}/u,
+  /\p{scx=Bengali}/u,
+  /\p{scx=Gurmukhi}/u,
+  /\p{scx=Gujarati}/u,
+  /\p{scx=Oriya}/u,
+  /\p{scx=Tamil}/u,
+  /\p{scx=Telugu}/u,
+  /\p{scx=Kannada}/u,
+  /\p{scx=Malayalam}/u,
+  /\p{scx=Sinhala}/u,
+];
+const NEUTRAL_TEXT_RE = /[\p{P}\p{Zs}]/u;
+const QUOTE_CHARS = new Set(['"', "'", '`']);
+
+/**
+ * Whether cps[idx] sits inside a string literal or comment of this line. Only one
+ * line is visible, so text in a multi-line literal reads as code and stays flagged.
+ */
+function isInsideTextOnLine(cps, idx) {
+  if (cps.join('').trimStart().startsWith('*')) return true;
+  let quote = null;
+  for (let i = 0; i < idx; i += 1) {
+    const ch = cps[i];
+    if (quote) {
+      if (ch === '\\') i += 1;
+      else if (ch === quote) quote = null;
+    } else if (QUOTE_CHARS.has(ch)) {
+      quote = ch;
+    } else if (ch === '#' || (ch === '/' && (cps[i + 1] === '/' || cps[i + 1] === '*'))) {
+      return true;
+    }
+  }
+  return quote !== null;
+}
+
+function nearestTextChar(cps, idx, step) {
+  for (let i = idx + step; i >= 0 && i < cps.length; i += step) {
+    const ch = cps[i];
+    if (BIDI_MARK_CPS.has(ch.codePointAt(0))) continue;
+    if (QUOTE_CHARS.has(ch) || !NEUTRAL_TEXT_RE.test(ch)) return ch;
+  }
+  return '';
+}
+
+/** LRM / RLM / ALM are text formatting only in right-to-left text. */
+function isRtlTextMark(cps, idx) {
+  if (!isInsideTextOnLine(cps, idx)) return false;
+  return [nearestTextChar(cps, idx, -1), nearestTextChar(cps, idx, 1)].some((ch) =>
+    RTL_LETTER_RE.test(ch)
+  );
+}
+
+/** ZWJ / ZWNJ shape a word only between characters of one script that uses them. */
+function isScriptJoinControl(cps, idx) {
+  const prev = cps[idx - 1] ?? '';
+  const next = cps[idx + 1] ?? '';
+  if (!prev || !next || !isInsideTextOnLine(cps, idx)) return false;
+  return JOIN_CONTROL_SCRIPT_RES.some((re) => re.test(prev) && re.test(next));
+}
+
 /**
  * Classify the dangerous Unicode present on a single (added) code line.
  * Returns a Set of kinds among 'bidi-control' | 'invisible-unicode' |
  * 'confusable-whitespace'. Conservative by construction (emoji sequences,
- * leading BOM, and in-string confusable whitespace are treated as legitimate).
+ * leading BOM, in-string confusable whitespace, and bidi marks and join controls
+ * in text of the scripts that use them are treated as legitimate).
  * @param {string} line
  * @returns {Set<string>}
  */
@@ -41006,8 +41072,13 @@ function detectInvisibleUnicodeKinds(line) {
     const prev = cps[idx - 1] ?? '';
     const next = cps[idx + 1] ?? '';
 
-    if (cpInRanges(cp, BIDI_CONTROL_RANGES) || BIDI_MARK_CPS.has(cp)) {
+    if (cpInRanges(cp, BIDI_CONTROL_RANGES)) {
       kinds.add('bidi-control');
+      continue;
+    }
+
+    if (BIDI_MARK_CPS.has(cp)) {
+      if (!isRtlTextMark(cps, idx)) kinds.add('bidi-control');
       continue;
     }
 
@@ -41023,9 +41094,14 @@ function detectInvisibleUnicodeKinds(line) {
       continue;
     }
 
-    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence.
+    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence or
+    // in text of a script that shapes words with it.
     if (cp === ZWJ || cp === ZWNJ) {
-      if (!(isEmojiAdjacentChar(prev) || isEmojiAdjacentChar(next))) {
+      if (!(
+        isEmojiAdjacentChar(prev) ||
+        isEmojiAdjacentChar(next) ||
+        isScriptJoinControl(cps, idx)
+      )) {
         kinds.add('invisible-unicode');
       }
       continue;

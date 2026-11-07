@@ -1133,6 +1133,45 @@ test('invisible-unicode: flags bidi marks LRM/RLM/ALM (U+200E/200F/061C)', () =>
   assert.ok(invisibleUnicodeKinds(`const c = ${CP(0x061c)}3;`).includes('bidi-control'));
 });
 
+test('invisible-unicode canary: script text keeps its bidi marks and join controls', () => {
+  for (const line of [
+    `const a = "مرحبا${CP(0x200f)}!";`,
+    `const a = "${CP(0x200e)}مرحبا";`,
+    `const a = "مرحبا${CP(0x061c)}";`,
+    `// מה${CP(0x200f)} נשמע`,
+    `const a = "می${CP(0x200c)}خواهم";`,
+    `const a = "क्${CP(0x200d)}ष";`,
+    `const a = "क्${CP(0x200c)}ष";`,
+    `{"label":"می${CP(0x200c)}خواهم"}`,
+  ]) {
+    assert.deepEqual(invisibleUnicodeKinds(line), [], line);
+  }
+});
+
+test('invisible-unicode: marks and join controls outside script text stay flagged', () => {
+  for (const [line, kind] of [
+    [`const a = "admin${CP(0x200f)}user";`, 'bidi-control'],
+    [`const مرحبا${CP(0x200f)} = 1;`, 'bidi-control'],
+    [`const a = "مرحبا"${CP(0x200f)};`, 'bidi-control'],
+    [`const a = "مرحبا" + ${CP(0x200f)}b;`, 'bidi-control'],
+    [`const ad${CP(0x200c)}min = 1;`, 'invisible-unicode'],
+    [`const a = "ad${CP(0x200d)}min";`, 'invisible-unicode'],
+    [`const می${CP(0x200c)}خواهم = 1;`, 'invisible-unicode'],
+    [`const a = "می${CP(0x200c)}admin";`, 'invisible-unicode'],
+    [`const a = "می${CP(0x200c)}क";`, 'invisible-unicode'],
+    [`const a = "می${CP(0x200c)}";`, 'invisible-unicode'],
+  ]) {
+    assert.ok(invisibleUnicodeKinds(line).includes(kind), line);
+  }
+});
+
+test('invisible-unicode: override and isolate controls stay flagged inside script text', () => {
+  for (const cp of [0x202a, 0x202e, 0x2066, 0x2067, 0x2069]) {
+    const line = `const a = "مر${CP(cp)}حبا";`;
+    assert.ok(invisibleUnicodeKinds(line).includes('bidi-control'), line);
+  }
+});
+
 test('invisible-unicode: flags additional invisible formats (math op / braille / filler / CGJ / interlinear)', () => {
   assert.ok(invisibleUnicodeKinds(`const m = a${CP(0x2062)}b;`).includes('invisible-unicode'));
   assert.ok(invisibleUnicodeKinds(`const q =${CP(0x2800)}1;`).includes('invisible-unicode'));

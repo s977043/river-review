@@ -14,13 +14,22 @@ export const value = 1;
 export const value = 2;
 >>>>>>> b
 `;
-const BIDI_JS = 'export const value = "a‮b";\n';
-const BIDI_PY = 'value = "a‮b"\n';
-const NBSP = 'export const value = 2;\n';
+const BIDI_JS = 'export const value = "a\u202Eb";\n';
+const BIDI_PY = 'value = "a\u202Eb"\n';
+const NBSP = 'export const\u00A0value = 2;\n';
 const EVAL = 'export const value = eval(input);\n';
 const AWS_KEY = ['AKIA', 'IOSFODNN7', 'EXAMPLE'].join('');
 const KEY_JS = `export const key = "${AWS_KEY}";\n`;
 const KEY_PY = `key = "${AWS_KEY}"\n`;
+const stringIn = (text) => `export const label = "${text}";\n`;
+const jsonWith = (text) => `{"label":"${text}"}\n`;
+const I18N_TEXT = [
+  ['ar RLM', 'مرحبا\u200F!'],
+  ['ar LRM', '\u200Eمرحبا'],
+  ['fa ZWNJ', 'می\u200Cخواهم'],
+  ['hi ZWJ', 'क्\u200Dष'],
+  ['hi ZWNJ', 'क्\u200Cष'],
+];
 
 const ESCALATE = {
   decision: 'human-review-required',
@@ -161,6 +170,44 @@ const CASES = [
     { file: 'app/main.py', source: CONFLICT },
     CLEAN,
   ],
+  // Known false positive, accepted and tracked in #2873.
+  [
+    'canary: conflict marker inside a string literal',
+    {
+      file: 'src/app.js',
+      source: `export const FIXTURE = \`${CONFLICT}\`;\n`,
+    },
+    ESCALATE,
+  ],
+  ...I18N_TEXT.flatMap(([lang, text]) => [
+    [`canary: ${lang} text in .ts`, { file: 'src/app.ts', source: stringIn(text) }, CLEAN],
+    [`canary: ${lang} text in .js`, { file: 'src/app.js', source: stringIn(text) }, CLEAN],
+    [`canary: ${lang} text in .json`, { file: 'src/app.json', source: jsonWith(text) }, CLEAN],
+  ]),
+  ['Trojan Source: RLO in .ts', { file: 'src/app.ts', source: stringIn('a\u202Eb') }, ESCALATE],
+  [
+    'Trojan Source: RLO in Arabic text',
+    { file: 'src/app.js', source: stringIn('مرحبا\u202Eb') },
+    ESCALATE,
+  ],
+  [
+    'Trojan Source: LRI in a comment',
+    { file: 'src/app.js', source: 'export const v = 2; // x\u2066y\n' },
+    ESCALATE,
+  ],
+  [
+    'Trojan Source: PDI in Arabic text',
+    { file: 'src/app.js', source: stringIn('مر\u2069حبا') },
+    ESCALATE,
+  ],
+  ['RLM in ASCII code', { file: 'src/app.ts', source: 'export const a = \u200F1;\n' }, ESCALATE],
+  ['RLM in ASCII text', { file: 'src/app.js', source: stringIn('admin\u200Fuser') }, ESCALATE],
+  [
+    'ZWNJ in an ASCII identifier',
+    { file: 'src/app.ts', source: 'export const ad\u200Cmin = 1;\n' },
+    ESCALATE,
+  ],
+  ['ZWJ in ASCII text', { file: 'src/app.js', source: stringIn('ad\u200Dmin') }, ESCALATE],
 ];
 
 for (const [pathName, reviewers] of [
