@@ -21,15 +21,25 @@ test('release-kick: allowed-tools に gh pr merge が無い', () => {
   assert.doesNotMatch(allowedTools(releaseKick), /gh pr merge/);
 });
 
-test('release-kick: bash ブロックで gh pr merge を実行しない', () => {
-  for (const block of bashBlocks(releaseKick)) {
-    assert.doesNotMatch(block, /^\s*gh pr merge\b/m);
-  }
-});
+for (const [name, md] of [
+  ['release-kick', releaseKick],
+  ['merge-check', mergeCheck],
+]) {
+  test(`${name}: bash ブロックに gh pr merge が無い`, () => {
+    for (const block of bashBlocks(md)) {
+      assert.doesNotMatch(block, /\bgh pr merge\b/);
+    }
+  });
+
+  test(`${name}: gh api のマージ endpoint も実行しないと書いてある`, () => {
+    assert.match(md, /`gh api` のマージ endpoint（`pulls\/N\/merge`）も実行しない/);
+  });
+}
 
 test('release-kick: マージは人間に依頼して止まると書いてある', () => {
   assert.match(releaseKick, /ADR-016/);
   assert.match(releaseKick, /人間に依頼/);
+  assert.doesNotMatch(releaseKick, /マージを継続/);
 });
 
 test('merge-check: allowed-tools に gh pr merge が無い', () => {
@@ -45,4 +55,5 @@ test('merge-check: MERGE_OK でエージェントにマージへ進ませない'
   assert.doesNotMatch(mergeCheck, /`gh pr merge` に進んでよい/);
   const mergeOk = mergeCheck.split('### A. MERGE_OK')[1].split('### B.')[0];
   assert.match(mergeOk, /人間/);
+  assert.doesNotMatch(mergeOk, /進んでよい/);
 });

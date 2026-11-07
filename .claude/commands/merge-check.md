@@ -170,7 +170,7 @@ gh api "repos/:owner/:repo/pulls/$ARGUMENTS" --jq '{mergeable_state}'
 
 条件: Step 1〜7 が全て pass（Step 5 は該当時のみ）、Step 8〜9 の該当事項なし。
 
-対応: 各 Step の確認結果（CI チェック数 / 2 エンドポイントのコメント件数と disposition / ラベル一覧 / review state / closing keyword で閉じる issue の一覧と可否判定 / リスク階層と根拠）を添えて報告し、マージを人間に依頼して止まる。段階 1 では、エージェントは `gh pr merge` を実行しない。
+対応: 各 Step の確認結果（CI チェック数 / 2 エンドポイントのコメント件数と disposition / ラベル一覧 / review state / closing keyword で閉じる issue の一覧と可否判定 / リスク階層と根拠）を添えて報告し、マージを人間に依頼して止まる。段階 1 では、エージェントは `gh pr merge` を実行しない。`gh api` のマージ endpoint（`pulls/N/merge`）も実行しない。
 
 ### B. BLOCKED
 

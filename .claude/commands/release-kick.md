@@ -6,7 +6,7 @@ allowed-tools: Bash(gh api user:*), Bash(gh auth switch:*), Bash(gh pr view:*), 
 
 release PR #$ARGUMENTS を、BLOCKED 解除からマージ依頼、リリース公開の検証まで一貫して実行する。ADR-016 の段階 1 では、エージェントはマージしない（Step 7）。
 
-release-please が生成するリリース PR の head は `GITHUB_TOKEN` push であるため、通常は `mergeStateStatus: BLOCKED`（"N of N required checks are expected"）になる（CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード参照）。この BLOCKED の原因は `docs/runbook/bot-pushed-head-kick.md` が SSoT。kick の正規手順は `scripts/release-please-kick.sh` である（`workflow_dispatch` 版は #2709 で削除。経緯は #1807）。本コマンドはそれを前提に、実際にマージして公開を確認するまでの実行手順を1コマンド化したもの。矛盾があれば runbook を正とし、本コマンドを修正する。
+release-please が生成するリリース PR の head は `GITHUB_TOKEN` push であるため、通常は `mergeStateStatus: BLOCKED`（"N of N required checks are expected"）になる（CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード参照）。この BLOCKED の原因は `docs/runbook/bot-pushed-head-kick.md` が SSoT。kick の正規手順は `scripts/release-please-kick.sh` である（`workflow_dispatch` 版は #2709 で削除。経緯は #1807）。本コマンドはそれを前提に、人間にマージを依頼し、公開を確認するまでの実行手順を1コマンド化したもの。矛盾があれば runbook を正とし、本コマンドを修正する。
 
 ## 手順
 
@@ -110,8 +110,8 @@ gh pr checks $ARGUMENTS --json name,bucket,link | jq -c --argjson req "$required
 - `pending` の総数には必須外のコンテキストが多数含まれる。v1.67.1 実走時点の release PR には 24 コンテキストが付き、必須はうち 6 件のみだった（残りは Vercel / Link Check / CodeQL / PlanGate Review など）。必須外の完了はマージ条件ではない
 - 早期 break しない場合、ループは最長で約 4 分半（15 周 × sleep 15 秒 + API 応答）を要する。Bash ツールの timeout に 360000（ミリ秒）以上を指定して実行し、既定の 120000 のまま走らせない
 - 15 回で終了条件を満たさない場合はループを打ち切り、実出力を提示したうえで待機を継続するか判断を仰ぐ。v1.67.1 実走では run 作成 05:36:45Z から最終必須チェック完了 05:39:40Z まで約 3 分を要しており、旧設定の 8 回（約 2 分弱）では足りない
-- 必須チェックに `fail` が出たらループを抜け、直ちに報告して原因調査へ切り替える（本コマンドはマージ前提の手順であり、CI 失敗の修正は別タスク）
-- 必須外の `fail` ではループを抜けない（2026-11-02 の #2821 では必須外の lychee が外部サイトの 403 で fail した時点でループが抜け、必須チェックの待機をやり直した）。ループ後の一覧に必須外の `fail` があれば、ログで失敗箇所（リンク検査本体か後続ステップか）と原因を特定する。lychee なら `gh run view <run-id> --log | grep -E 'Errors|\[[0-9]{3}\]'` で確認できる。外部リンクの 4xx/5xx・timeout のように PR 内容と無関係と確認できた場合は、報告に記載したうえでマージを継続してよい。それ以外（PR 内容に起因し得る失敗・原因不明）は従来どおり報告し、マージ可否は人間が判断する
+- 必須チェックに `fail` が出たらループを抜け、直ちに報告して原因調査へ切り替える（本コマンドはマージを依頼する前提の手順であり、CI 失敗の修正は別タスク）
+- 必須外の `fail` ではループを抜けない（2026-11-02 の #2821 では必須外の lychee が外部サイトの 403 で fail した時点でループが抜け、必須チェックの待機をやり直した）。ループ後の一覧に必須外の `fail` があれば、ログで失敗箇所（リンク検査本体か後続ステップか）と原因を特定する。lychee なら `gh run view <run-id> --log | grep -E 'Errors|\[[0-9]{3}\]'` で確認できる。外部リンクの 4xx/5xx・timeout のように PR 内容と無関係と確認できた場合は、その旨をマージ依頼に含めて報告し、止まる。それ以外（PR 内容に起因し得る失敗・原因不明）は従来どおり報告し、マージ可否は人間が判断する
 
 ### Step 7. マージを人間に依頼して止まる
 
@@ -125,7 +125,7 @@ gh api "repos/:owner/:repo/pulls/$ARGUMENTS" --jq .body | grep -i 'closes\|fixes
 
 ヒットした場合の判定基準（スコープの全体カバー / Epic・追跡用 issue でないか / 未完了チェックボックスの有無）と、閉じてはいけない issue があった場合の `gh pr edit` による `closes` → `refs` 書き換え手順は `.claude/commands/merge-check.md` の Step 6 が SSoT である。
 
-確認が済んだら、エージェントはマージせず、人間に依頼して止まる。[ADR-016](../../docs/adr/016-repo-operation-risk-tiers.md) の段階 1 では、エージェントは階層を問わずマージしない（`docs/governance.md` のマージ前チェックリスト 7）。依頼には PR 番号、head SHA、Step 6 の CI 結果、closing keyword の確認結果を添える。人間は `gh pr merge $ARGUMENTS --squash --delete-branch` でマージする。
+確認が済んだら、エージェントはマージせず、人間に依頼して止まる。[ADR-016](../../docs/adr/016-repo-operation-risk-tiers.md) の段階 1 では、エージェントは階層を問わずマージしない（`docs/governance.md` のマージ前チェックリスト 7）。`gh api` のマージ endpoint（`pulls/N/merge`）も実行しない。依頼には PR 番号、head SHA、Step 6 の CI 結果、closing keyword の確認結果を添える。人間は `gh pr merge $ARGUMENTS --squash --delete-branch` でマージする。
 
 人間のマージを待つ間に main が進んで再び BEHIND になった場合は、Step 3 の update-branch を実行してから Step 6 のポーリングをやり直し、改めて依頼する。人間のマージを確認したら Step 8 へ進む。
 
@@ -150,7 +150,7 @@ release-please は CHANGELOG に commit subject しか載せないため、利�
 - `git push --force`
 - `git reset --hard`
 - `gh pr merge --admin`（`enforce_admins: true` の場合はそもそも BLOCKED を回避できない）
-- release PR の内容（CHANGELOG / バージョン番号等）へのファイル編集。本コマンドは release-please が生成した内容をそのままマージする手順であり、内容修正が必要な場合は release-please の設定側を直す
+- release PR の内容（CHANGELOG / バージョン番号等）へのファイル編集。本コマンドは release-please が生成した内容のままマージを依頼する手順であり、内容修正が必要な場合は release-please の設定側を直す
 
 ## 参照
 
