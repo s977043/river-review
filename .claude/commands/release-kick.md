@@ -1,10 +1,10 @@
 ---
-description: release-please のリリース PR を BLOCKED 解除 → CI green 確認 → マージ → リリース公開検証まで一貫実行する（v1.44.0〜v1.53.0 の11リリースで実証済みの型）
+description: release-please のリリース PR を BLOCKED 解除 → CI green 確認 → マージ依頼 → リリース公開検証まで一貫実行する（v1.44.0〜v1.53.0 の11リリースで実証済みの型）
 argument-hint: '<release PR number>'
-allowed-tools: Bash(gh api user:*), Bash(gh auth switch:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr merge:*), Bash(gh pr edit:*), Bash(gh issue view:*), Bash(gh api:*), Bash(gh run list:*), Bash(gh release view:*), Bash(git ls-remote:*), Bash(git fetch:*), Bash(git diff:*), Bash(scripts/release-please-kick.sh:*), Bash(bash scripts/release-please-kick.sh:*)
+allowed-tools: Bash(gh api user:*), Bash(gh auth switch:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr edit:*), Bash(gh issue view:*), Bash(gh api:*), Bash(gh run list:*), Bash(gh release view:*), Bash(git ls-remote:*), Bash(git fetch:*), Bash(git diff:*), Bash(scripts/release-please-kick.sh:*), Bash(bash scripts/release-please-kick.sh:*)
 ---
 
-release PR #$ARGUMENTS を、BLOCKED 解除からマージ・リリース公開の検証まで一貫して実行する。
+release PR #$ARGUMENTS を、BLOCKED 解除からマージ依頼、リリース公開の検証まで一貫して実行する。ADR-016 の段階 1 では、エージェントはマージしない（Step 7）。
 
 release-please が生成するリリース PR の head は `GITHUB_TOKEN` push であるため、通常は `mergeStateStatus: BLOCKED`（"N of N required checks are expected"）になる（CLAUDE.md「`N of N required checks are expected` = bot/GITHUB_TOKEN push」ガード参照）。この BLOCKED の原因は `docs/runbook/bot-pushed-head-kick.md` が SSoT。kick の正規手順は `scripts/release-please-kick.sh` である（`workflow_dispatch` 版は #2709 で削除。経緯は #1807）。本コマンドはそれを前提に、実際にマージして公開を確認するまでの実行手順を1コマンド化したもの。矛盾があれば runbook を正とし、本コマンドを修正する。
 
@@ -113,7 +113,7 @@ gh pr checks $ARGUMENTS --json name,bucket,link | jq -c --argjson req "$required
 - 必須チェックに `fail` が出たらループを抜け、直ちに報告して原因調査へ切り替える（本コマンドはマージ前提の手順であり、CI 失敗の修正は別タスク）
 - 必須外の `fail` ではループを抜けない（2026-11-02 の #2821 では必須外の lychee が外部サイトの 403 で fail した時点でループが抜け、必須チェックの待機をやり直した）。ループ後の一覧に必須外の `fail` があれば、ログで失敗箇所（リンク検査本体か後続ステップか）と原因を特定する。lychee なら `gh run view <run-id> --log | grep -E 'Errors|\[[0-9]{3}\]'` で確認できる。外部リンクの 4xx/5xx・timeout のように PR 内容と無関係と確認できた場合は、報告に記載したうえでマージを継続してよい。それ以外（PR 内容に起因し得る失敗・原因不明）は従来どおり報告し、マージ可否は人間が判断する
 
-### Step 7. マージ
+### Step 7. マージを人間に依頼して止まる
 
 `mergeStateStatus: CLEAN` かつ Step 6 の CI が green になったら、**マージの前に `/merge-check` の Step 6「PR 本文の closing keyword 確認」を実施する**。
 
@@ -125,13 +125,9 @@ gh api "repos/:owner/:repo/pulls/$ARGUMENTS" --jq .body | grep -i 'closes\|fixes
 
 ヒットした場合の判定基準（スコープの全体カバー / Epic・追跡用 issue でないか / 未完了チェックボックスの有無）と、閉じてはいけない issue があった場合の `gh pr edit` による `closes` → `refs` 書き換え手順は `.claude/commands/merge-check.md` の Step 6 が SSoT である。
 
-確認が済んだらマージする。
+確認が済んだら、エージェントはマージせず、人間に依頼して止まる。[ADR-016](../../docs/adr/016-repo-operation-risk-tiers.md) の段階 1 では、エージェントは階層を問わずマージしない（`docs/governance.md` のマージ前チェックリスト 7）。依頼には PR 番号、head SHA、Step 6 の CI 結果、closing keyword の確認結果を添える。人間は `gh pr merge $ARGUMENTS --squash --delete-branch` でマージする。
 
-```bash
-gh pr merge $ARGUMENTS --squash --delete-branch
-```
-
-ポーリング中に main が進んで再び BEHIND になった場合は、Step 3 の update-branch を実行してから Step 6 のポーリングをやり直す。
+人間のマージを待つ間に main が進んで再び BEHIND になった場合は、Step 3 の update-branch を実行してから Step 6 のポーリングをやり直し、改めて依頼する。人間のマージを確認したら Step 8 へ進む。
 
 ### Step 8. 検証
 

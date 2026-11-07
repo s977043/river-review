@@ -134,14 +134,26 @@ gh pr edit $ARGUMENTS --body "$(gh api "repos/:owner/:repo/pulls/$ARGUMENTS" --j
 
 release-please が生成するリリース PR は、コミット本文が `refs #N` でも PR 本文では `closes [#N]` へ変換される。**リリース PR ではこの Step が必ず該当する**ため省略してはならない（`/release-kick` の Step 7 からも本 Step を参照している）。
 
-### Step 7. 複数 PR 並行時の追加確認
+### Step 7. リスク階層の確認
+
+`docs/governance.md` のマージ前チェックリスト 7 に対応する。[ADR-016](../../docs/adr/016-repo-operation-risk-tiers.md) の階層表と変更ファイルを突き合わせ、階層を決める。
+
+```bash
+gh pr diff $ARGUMENTS --name-only
+```
+
+- PR の階層は変更ファイルの最大値である。階層表に無いパスとファイル削除は崖として扱う
+- 判定した階層と根拠のファイルを報告に含める。`tier-gate` はまだ無いため、最終の判定は人間が行う
+- 段階 1 では、エージェントは階層を問わずマージしない。この Step は判定を変えず、MERGE_OK でもマージは人間が行う
+
+### Step 8. 複数 PR 並行時の追加確認
 
 複数 PR を連続マージする作業の一部としてこのコマンドを実行している場合:
 
 - `/preflight <PR numbers>` で対象 PR が obsolete / 並行作業中でないことを先に検証する
 - `/plan-merge-order <PR numbers>` でマージ順序を事前計画する（本 PR がその順序の先頭であることを確認する）
 
-### Step 8. strict mode の注意
+### Step 9. strict mode の注意
 
 branch protection が `strict: true` の場合（このリポジトリの main は該当）、PR が最新 main よりも遅れているとマージできない。
 
@@ -156,9 +168,9 @@ gh api "repos/:owner/:repo/pulls/$ARGUMENTS" --jq '{mergeable_state}'
 
 ### A. MERGE_OK
 
-条件: Step 1〜6 が全て pass（Step 5 は該当時のみ）、Step 7〜8 の該当事項なし。
+条件: Step 1〜7 が全て pass（Step 5 は該当時のみ）、Step 8〜9 の該当事項なし。
 
-対応: 各 Step の確認結果（CI チェック数 / 2 エンドポイントのコメント件数と disposition / ラベル一覧 / review state / closing keyword で閉じる issue の一覧と可否判定）を添えて報告し、`gh pr merge` に進んでよい。
+対応: 各 Step の確認結果（CI チェック数 / 2 エンドポイントのコメント件数と disposition / ラベル一覧 / review state / closing keyword で閉じる issue の一覧と可否判定 / リスク階層と根拠）を添えて報告し、マージを人間に依頼して止まる。段階 1 では、エージェントは `gh pr merge` を実行しない。
 
 ### B. BLOCKED
 
