@@ -96,7 +96,7 @@ Critic は既定で off です。経路や実行可否によって、この観�
 - `--phase <upstream|midstream|downstream>`: レビューフェーズ（デフォルト: `midstream`）
 - `--planner <off|order|prune>`: Planner モード（デフォルト: `off`）
 - `--dry-run`: 外部 API を呼ばずに実行する
-- `--offline`（別名 `--rules-only`）: API キーが設定されていても AI を呼ばず、決定論的な機械的チェックのみでレビューする（CI 不可用時に Auto-approve 判定をローカル再現する用途）
+- `--offline`（別名 `--rules-only`）: API キーが設定されていても AI を呼ばず、決定論的な機械的チェックのみでレビューする（CI 不可用時に Auto-approve 判定をローカル再現する用途）。選択された skill の検査が blocking finding を検出した run は、API キー未設定や LLM 到達不能の run でも `--gate` で止まる（critical は `ESCALATE` / exit 3、major は `NO_GO` / exit 1）。`--fail-on critical` では critical の検出で exit 1 になる。`--gate` なしでも `decision` と `issues` には検出結果が出る。検査の対象は skill の `applyTo` と phase に依存するので、secret や conflict marker を全ファイルで検出するわけではない（#2870）。検出なしの run が fallback の警告で `NO_GO` になる場合がある（#2868）。1 行で確認できる引用符の文字列（`"` と `'`）の中では、アラビア文字などの RLM / LRM、ペルシア語やインド系文字の ZWNJ / ZWJ を検出しない。コメント、テンプレートリテラル、引用のない YAML の値、JSX のテキストなどでは検出する。override / isolate 系の制御文字は常に検出する
 - `--debug`: デバッグ情報を出す
 - `--explain`: 採用された skill / gate / config tier を人間可読で出す（stderr）
 - `--estimate`: コスト見積もりのみ（レビューは実行しない）

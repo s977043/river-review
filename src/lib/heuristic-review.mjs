@@ -1191,17 +1191,123 @@ function isEmojiAdjacentChar(ch) {
   return EXTENDED_PICTOGRAPHIC_RE.test(ch);
 }
 
+const RTL_LETTER_RE =
+  /\p{scx=Arabic}|\p{scx=Hebrew}|\p{scx=Syriac}|\p{scx=Thaana}|\p{scx=Nko}|\p{scx=Mandaic}|\p{scx=Samaritan}|\p{scx=Adlam}/u;
+const JOIN_CONTROL_SCRIPT_RES = [
+  /\p{scx=Arabic}/u,
+  /\p{scx=Syriac}/u,
+  /\p{scx=Devanagari}/u,
+  /\p{scx=Bengali}/u,
+  /\p{scx=Gurmukhi}/u,
+  /\p{scx=Gujarati}/u,
+  /\p{scx=Oriya}/u,
+  /\p{scx=Tamil}/u,
+  /\p{scx=Telugu}/u,
+  /\p{scx=Kannada}/u,
+  /\p{scx=Malayalam}/u,
+  /\p{scx=Sinhala}/u,
+];
+const NEUTRAL_TEXT_RE = /[\p{P}\p{Zs}]/u;
+const LINE_BREAK_CHARS = new Set(['\n', '\r', '\v', '\f', '\u0085', ' ', ' ']);
+const STRING_QUOTES = new Set(['"', "'"]);
+const BEFORE_STRING_CHARS = new Set(['=', '(', ',', ':', '[', '{', '+', '?']);
+const AFTER_STRING_CHARS = new Set([',', ';', ')', ']', '}', ':', '+']);
+
+function closingQuoteIndex(cps, open) {
+  for (let i = open + 1; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (LINE_BREAK_CHARS.has(ch) || ch === '`') return -1;
+    if (ch === '$' && cps[i + 1] === '{') return -1;
+    if (ch === '*' && cps[i + 1] === '/') return -1;
+    if (ch === '\\') i += 1;
+    else if (ch === cps[open]) return i;
+  }
+  return -1;
+}
+
+/**
+ * Mark the characters inside quoted strings this line proves by itself. One line
+ * cannot tell what a slash, backtick, or stray quote opens, so scanning stops
+ * there and everything after it counts as code, including comments.
+ */
+function markProvenStrings(cps) {
+  const inString = new Uint8Array(cps.length);
+  let before = '';
+  for (let i = 0; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (ch === ' ' || ch === '\t') continue;
+    if (STRING_QUOTES.has(ch)) {
+      if (before && !BEFORE_STRING_CHARS.has(before)) break;
+      const close = closingQuoteIndex(cps, i);
+      if (close < 0) break;
+      let after = close + 1;
+      while (cps[after] === ' ' || cps[after] === '\t') after += 1;
+      const lineEnds = after >= cps.length || (cps[after] === '\r' && after === cps.length - 1);
+      if (!lineEnds && !AFTER_STRING_CHARS.has(cps[after])) break;
+      inString.fill(1, i + 1, close);
+      before = ch;
+      i = close;
+    } else if (ch === '/' || ch === '`' || ch === '\\' || LINE_BREAK_CHARS.has(ch)) {
+      break;
+    } else {
+      before = ch;
+    }
+  }
+  return inString;
+}
+
+function nearestTextChars(cps, order) {
+  const nearest = new Array(cps.length);
+  let last = '';
+  for (const i of order) {
+    nearest[i] = last;
+    const ch = cps[i];
+    if (BIDI_MARK_CPS.has(ch.codePointAt(0))) continue;
+    if (STRING_QUOTES.has(ch) || !NEUTRAL_TEXT_RE.test(ch)) last = ch;
+  }
+  return nearest;
+}
+
+function buildTextContext(cps) {
+  const forward = cps.map((_, i) => i);
+  return {
+    inString: markProvenStrings(cps),
+    left: nearestTextChars(cps, forward),
+    right: nearestTextChars(cps, forward.reverse()),
+  };
+}
+
+/** LRM / RLM / ALM are text formatting only inside right-to-left text. */
+function isRtlTextMark({ inString, left, right }, idx) {
+  if (!inString[idx]) return false;
+  const sides = [left[idx], right[idx]];
+  return (
+    sides.some((ch) => RTL_LETTER_RE.test(ch)) &&
+    sides.every((ch) => STRING_QUOTES.has(ch) || RTL_LETTER_RE.test(ch))
+  );
+}
+
+/** ZWJ / ZWNJ shape a word only between characters of one script that uses them. */
+function isScriptJoinControl({ inString }, cps, idx) {
+  const prev = cps[idx - 1] ?? '';
+  const next = cps[idx + 1] ?? '';
+  if (!prev || !next || !inString[idx]) return false;
+  return JOIN_CONTROL_SCRIPT_RES.some((re) => re.test(prev) && re.test(next));
+}
+
 /**
  * Classify the dangerous Unicode present on a single (added) code line.
  * Returns a Set of kinds among 'bidi-control' | 'invisible-unicode' |
  * 'confusable-whitespace'. Conservative by construction (emoji sequences,
- * leading BOM, and in-string confusable whitespace are treated as legitimate).
+ * leading BOM, in-string confusable whitespace, and bidi marks and join controls
+ * in proven strings of the scripts that use them are treated as legitimate).
  * @param {string} line
  * @returns {Set<string>}
  */
 function detectInvisibleUnicodeKinds(line) {
   const kinds = new Set();
   const cps = Array.from(String(line));
+  let textContext = null;
 
   for (let idx = 0; idx < cps.length; idx += 1) {
     const ch = cps[idx];
@@ -1209,8 +1315,14 @@ function detectInvisibleUnicodeKinds(line) {
     const prev = cps[idx - 1] ?? '';
     const next = cps[idx + 1] ?? '';
 
-    if (cpInRanges(cp, BIDI_CONTROL_RANGES) || BIDI_MARK_CPS.has(cp)) {
+    if (cpInRanges(cp, BIDI_CONTROL_RANGES)) {
       kinds.add('bidi-control');
+      continue;
+    }
+
+    if (BIDI_MARK_CPS.has(cp)) {
+      textContext ??= buildTextContext(cps);
+      if (!isRtlTextMark(textContext, idx)) kinds.add('bidi-control');
       continue;
     }
 
@@ -1226,9 +1338,14 @@ function detectInvisibleUnicodeKinds(line) {
       continue;
     }
 
-    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence.
+    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence or
+    // in text of a script that shapes words with it.
     if (cp === ZWJ || cp === ZWNJ) {
-      if (!(isEmojiAdjacentChar(prev) || isEmojiAdjacentChar(next))) {
+      if (!(
+        isEmojiAdjacentChar(prev) ||
+        isEmojiAdjacentChar(next) ||
+        isScriptJoinControl((textContext ??= buildTextContext(cps)), cps, idx)
+      )) {
         kinds.add('invisible-unicode');
       }
       continue;

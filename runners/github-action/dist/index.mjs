@@ -40988,17 +40988,123 @@ function isEmojiAdjacentChar(ch) {
   return EXTENDED_PICTOGRAPHIC_RE.test(ch);
 }
 
+const RTL_LETTER_RE =
+  /\p{scx=Arabic}|\p{scx=Hebrew}|\p{scx=Syriac}|\p{scx=Thaana}|\p{scx=Nko}|\p{scx=Mandaic}|\p{scx=Samaritan}|\p{scx=Adlam}/u;
+const JOIN_CONTROL_SCRIPT_RES = [
+  /\p{scx=Arabic}/u,
+  /\p{scx=Syriac}/u,
+  /\p{scx=Devanagari}/u,
+  /\p{scx=Bengali}/u,
+  /\p{scx=Gurmukhi}/u,
+  /\p{scx=Gujarati}/u,
+  /\p{scx=Oriya}/u,
+  /\p{scx=Tamil}/u,
+  /\p{scx=Telugu}/u,
+  /\p{scx=Kannada}/u,
+  /\p{scx=Malayalam}/u,
+  /\p{scx=Sinhala}/u,
+];
+const NEUTRAL_TEXT_RE = /[\p{P}\p{Zs}]/u;
+const LINE_BREAK_CHARS = new Set(['\n', '\r', '\v', '\f', '\u0085', ' ', ' ']);
+const STRING_QUOTES = new Set(['"', "'"]);
+const BEFORE_STRING_CHARS = new Set(['=', '(', ',', ':', '[', '{', '+', '?']);
+const AFTER_STRING_CHARS = new Set([',', ';', ')', ']', '}', ':', '+']);
+
+function closingQuoteIndex(cps, open) {
+  for (let i = open + 1; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (LINE_BREAK_CHARS.has(ch) || ch === '`') return -1;
+    if (ch === '$' && cps[i + 1] === '{') return -1;
+    if (ch === '*' && cps[i + 1] === '/') return -1;
+    if (ch === '\\') i += 1;
+    else if (ch === cps[open]) return i;
+  }
+  return -1;
+}
+
+/**
+ * Mark the characters inside quoted strings this line proves by itself. One line
+ * cannot tell what a slash, backtick, or stray quote opens, so scanning stops
+ * there and everything after it counts as code, including comments.
+ */
+function markProvenStrings(cps) {
+  const inString = new Uint8Array(cps.length);
+  let before = '';
+  for (let i = 0; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (ch === ' ' || ch === '\t') continue;
+    if (STRING_QUOTES.has(ch)) {
+      if (before && !BEFORE_STRING_CHARS.has(before)) break;
+      const close = closingQuoteIndex(cps, i);
+      if (close < 0) break;
+      let after = close + 1;
+      while (cps[after] === ' ' || cps[after] === '\t') after += 1;
+      const lineEnds = after >= cps.length || (cps[after] === '\r' && after === cps.length - 1);
+      if (!lineEnds && !AFTER_STRING_CHARS.has(cps[after])) break;
+      inString.fill(1, i + 1, close);
+      before = ch;
+      i = close;
+    } else if (ch === '/' || ch === '`' || ch === '\\' || LINE_BREAK_CHARS.has(ch)) {
+      break;
+    } else {
+      before = ch;
+    }
+  }
+  return inString;
+}
+
+function nearestTextChars(cps, order) {
+  const nearest = new Array(cps.length);
+  let last = '';
+  for (const i of order) {
+    nearest[i] = last;
+    const ch = cps[i];
+    if (BIDI_MARK_CPS.has(ch.codePointAt(0))) continue;
+    if (STRING_QUOTES.has(ch) || !NEUTRAL_TEXT_RE.test(ch)) last = ch;
+  }
+  return nearest;
+}
+
+function buildTextContext(cps) {
+  const forward = cps.map((_, i) => i);
+  return {
+    inString: markProvenStrings(cps),
+    left: nearestTextChars(cps, forward),
+    right: nearestTextChars(cps, forward.reverse()),
+  };
+}
+
+/** LRM / RLM / ALM are text formatting only inside right-to-left text. */
+function isRtlTextMark({ inString, left, right }, idx) {
+  if (!inString[idx]) return false;
+  const sides = [left[idx], right[idx]];
+  return (
+    sides.some((ch) => RTL_LETTER_RE.test(ch)) &&
+    sides.every((ch) => STRING_QUOTES.has(ch) || RTL_LETTER_RE.test(ch))
+  );
+}
+
+/** ZWJ / ZWNJ shape a word only between characters of one script that uses them. */
+function isScriptJoinControl({ inString }, cps, idx) {
+  const prev = cps[idx - 1] ?? '';
+  const next = cps[idx + 1] ?? '';
+  if (!prev || !next || !inString[idx]) return false;
+  return JOIN_CONTROL_SCRIPT_RES.some((re) => re.test(prev) && re.test(next));
+}
+
 /**
  * Classify the dangerous Unicode present on a single (added) code line.
  * Returns a Set of kinds among 'bidi-control' | 'invisible-unicode' |
  * 'confusable-whitespace'. Conservative by construction (emoji sequences,
- * leading BOM, and in-string confusable whitespace are treated as legitimate).
+ * leading BOM, in-string confusable whitespace, and bidi marks and join controls
+ * in proven strings of the scripts that use them are treated as legitimate).
  * @param {string} line
  * @returns {Set<string>}
  */
 function detectInvisibleUnicodeKinds(line) {
   const kinds = new Set();
   const cps = Array.from(String(line));
+  let textContext = null;
 
   for (let idx = 0; idx < cps.length; idx += 1) {
     const ch = cps[idx];
@@ -41006,8 +41112,14 @@ function detectInvisibleUnicodeKinds(line) {
     const prev = cps[idx - 1] ?? '';
     const next = cps[idx + 1] ?? '';
 
-    if (cpInRanges(cp, BIDI_CONTROL_RANGES) || BIDI_MARK_CPS.has(cp)) {
+    if (cpInRanges(cp, BIDI_CONTROL_RANGES)) {
       kinds.add('bidi-control');
+      continue;
+    }
+
+    if (BIDI_MARK_CPS.has(cp)) {
+      textContext ??= buildTextContext(cps);
+      if (!isRtlTextMark(textContext, idx)) kinds.add('bidi-control');
       continue;
     }
 
@@ -41023,9 +41135,14 @@ function detectInvisibleUnicodeKinds(line) {
       continue;
     }
 
-    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence.
+    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence or
+    // in text of a script that shapes words with it.
     if (cp === ZWJ || cp === ZWNJ) {
-      if (!(isEmojiAdjacentChar(prev) || isEmojiAdjacentChar(next))) {
+      if (!(
+        isEmojiAdjacentChar(prev) ||
+        isEmojiAdjacentChar(next) ||
+        isScriptJoinControl((textContext ??= buildTextContext(cps)), cps, idx)
+      )) {
         kinds.add('invisible-unicode');
       }
       continue;
@@ -45753,6 +45870,7 @@ function redactSecrets(text) {
  * @param {Array<object>} params.comments 検証対象（LLM / heuristic / fallback の一次集合）
  * @param {{diffText: string, files?: Array<object>}} params.diff 生の差分（LLM 用に間引く前）
  * @param {boolean} params.heuristicsUsed 一次集合が既に heuristic 由来か（fail-safe の抑止条件）
+ * @param {boolean} params.heuristicsFound 一次集合が detector の finding か。fallback は含まない
  * @param {string|null|undefined} params.llmSkipped debug.llmSkipped
  * @param {string|null|undefined} params.llmError debug.llmError
  * @returns {Promise<{comments: Array<object>, debugPatch: object}>}
@@ -45764,12 +45882,13 @@ async function runVerifierStage({
   fileTypes,
   includeFallback,
   heuristicsUsed,
+  heuristicsFound,
   llmSkipped,
   llmError,
 }) {
   const { verifyFinding } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 9341));
   const skill = plan?.selected?.[0] ?? {};
-  const runVerifier = (cmts) =>
+  const runVerifier = (cmts, deterministicSource = false) =>
     cmts.map((comment) => ({
       comment,
       verification: verifyFinding({
@@ -45780,6 +45899,7 @@ async function runVerifierStage({
         // #1644: parsed diff files carry addedLines, enabling the verifier's
         // machine determination of finding scope (in-diff / pre-existing).
         diffFiles: diff.files,
+        deterministicSource,
       }),
     }));
 
@@ -45787,7 +45907,7 @@ async function runVerifierStage({
   // built below can adopt it. Metadata only — display and gating are unchanged.
   const withScope = (r) => ({ ...r.comment, scope: r.verification.scope });
 
-  const verifierResults = runVerifier(comments);
+  const verifierResults = runVerifier(comments, heuristicsFound);
   let verified = verifierResults.filter((r) => r.verification.verified).map(withScope);
   const rejected = verifierResults.filter((r) => !r.verification.verified);
 
@@ -45855,11 +45975,11 @@ async function runVerifierStage({
       debugPatch.heuristicsCount = 0;
       debugPatch.fallbackIncluded = includeFallback;
     }
-    // Re-verify the fallback set so the emitted comments still satisfy the
-    // verifier invariant (heuristic/fallback findings use the full labeled
-    // format and pass). verifierStats above intentionally keeps describing the
-    // rejected LLM batch.
-    const fallbackResults = runVerifier(degraded);
+    // Re-verify the degraded set. Detector findings skip the severity and
+    // evidence checks because those values are code constants; fallback warnings
+    // are not real findings and keep every check. verifierStats above
+    // intentionally keeps describing the rejected LLM batch.
+    const fallbackResults = runVerifier(degraded, heuristic.length > 0);
     verified = fallbackResults.filter((r) => r.verification.verified).map(withScope);
     debugPatch.scopeStats = summarizeScope(fallbackResults);
   }
@@ -46150,6 +46270,7 @@ async function generateReview({
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
+    heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
   });
@@ -50226,10 +50347,20 @@ function resolveFindingScope({ finding, diffFiles }) {
 }
 
 /**
- * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null }} params
+ * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null, deterministicSource?: boolean }} params
+ *   deterministicSource: the finding comes from a detector, so its severity and
+ *   evidence are code constants rather than claims to check. Callers derive it
+ *   from the batch's provenance, never from the finding text.
  * @returns {{ verified: boolean, reasons: string[], checks: object, scope: 'in-diff'|'pre-existing', scopeSource: string, scopeSelfReported: string|null, scopeMismatch: boolean }}
  */
-function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
+function verifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
   // #1666: traceability refs are additive metadata and MUST NOT move the
   // `verified` decision in either direction. RE_EVIDENCE / RE_ACTIONABLE are
   // deliberately greedy to end-of-line, so appended refs would otherwise satisfy
@@ -50244,10 +50375,10 @@ function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
       : finding;
   const checks = {
     evidenceExists: checkEvidenceExists(findingForLengthChecks),
-    evidenceInDiff: checkEvidenceInDiff(finding, diff),
+    evidenceInDiff: deterministicSource || checkEvidenceInDiff(finding, diff),
     phaseCoherent: checkPhaseCoherent(finding, skill),
     filePhaseCoherent: checkFilePhaseCoherent(finding, fileTypes),
-    severityJustified: checkSeverityJustified(findingForLengthChecks, skill),
+    severityJustified: deterministicSource || checkSeverityJustified(findingForLengthChecks, skill),
     suggestionActionable: checkSuggestionActionable(findingForLengthChecks),
   };
 
