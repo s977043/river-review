@@ -18,6 +18,11 @@
 # not available, verified on v26" on a machine that had Node 22 installed under
 # a Homebrew keg outside PATH (`/opt/homebrew/opt/node@22/bin`).
 #
+# Why each worker gets its own scratch dir: workers sharing one scratchpad have
+# overwritten each other's running scripts (worker-discipline-template.md). The
+# dir is ${TMPDIR:-/tmp}/river-review-workers/<slug>, outside the worktree so it
+# never counts as pollution. Re-running for the same branch keeps its contents.
+#
 # .nvmrc forms: `22.22.2` (exact), `22` / `22.1` (prefix). `lts/*` style
 # aliases are not supported and always produce the mismatch warning.
 #
@@ -27,7 +32,7 @@
 #
 # Exit codes:
 #   0  bootstrap complete (Node mismatch and npm ls warnings do not change this)
-#   1  worktree could not be created, or `npm ci` failed
+#   1  worktree or scratch dir could not be created, or `npm ci` failed
 #   64 usage error
 
 # shellcheck disable=SC2329  # probe_* are invoked through the loop variable
@@ -78,6 +83,8 @@ SLUG="$(printf '%s' "${BRANCH}" | tr '/' '-')"
 WORKTREE="${MAIN_ROOT}/.claude/worktrees/${SLUG}"
 STATE_DIR="${RIVER_WORKER_STATE_DIR:-${HOME}/.claude/state}"
 MANIFEST="${STATE_DIR}/worker-bootstrap-${SLUG}.txt"
+TMP_ROOT="${TMPDIR:-/tmp}"
+SCRATCH="${TMP_ROOT%/}/river-review-workers/${SLUG}"
 
 echo "== 1. worktree"
 if git -C "${MAIN_ROOT}" worktree list --porcelain | grep -qxF "worktree ${WORKTREE}"; then
@@ -221,7 +228,14 @@ mkdir -p "${STATE_DIR}"
 } > "${MANIFEST}"
 echo "manifest: ${MANIFEST} ($(grep -cv '^#' "${MANIFEST}" || true) untracked path(s) after npm ci)"
 
-echo "== 6. first verification commands"
+echo "== 6. scratch dir"
+mkdir -p "${SCRATCH}" || {
+  echo "error: could not create scratch dir ${SCRATCH}." >&2
+  exit 1
+}
+echo "scratch: ${SCRATCH}"
+
+echo "== 7. first verification commands"
 echo "  cd ${WORKTREE}"
 echo "  scripts/node22.sh npm test"
 echo "  scripts/node22.sh npm run lint"
