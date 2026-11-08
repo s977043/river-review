@@ -15,10 +15,15 @@ Steps:
 1. When loaded as a plugin, every `${CLAUDE_PLUGIN_ROOT}` in this command body
    has already been replaced with the plugin root's absolute path before you
    read it. The `$CLAUDE_PLUGIN_ROOT` environment variable is empty in Bash, so
-   use the substituted path as written in the commands below. If the text
-   `${CLAUDE_PLUGIN_ROOT}` is still literal, use `.` in its place only when
-   `./scripts/resolve-skill-id.mjs` exists (inside the river-review
-   repository); otherwise stop and report the paths tried, that the plugin
+   use the substituted path as written in the commands below. If those paths
+   are not absolute and still contain a variable reference starting with `$`
+   and `{`, use the repository root in its place only inside the river-review
+   repository:
+   the repository root from `git rev-parse --show-toplevel` must contain both
+   `skills/agent-skills/river-review/SKILL.md` and `agents/river-review.md`,
+   and its `package.json` `name` must be `river-review` (for example,
+   `root="$(git rev-parse --show-toplevel)" && test -f "$root/skills/agent-skills/river-review/SKILL.md" && test -f "$root/agents/river-review.md" && grep -q '"name": "river-review"' "$root/package.json" && echo "$root"`;
+   use the printed root). If that command fails, stop and report the paths tried, that the plugin
    root can be added with `--add-dir <plugin root>` if reads outside the
    working directory are blocked, and that the skill's absolute path can be
    given in the request instead.
