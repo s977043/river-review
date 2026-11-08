@@ -135,4 +135,4 @@
 - River Review の Gate は依然として Host authority の下にある。Human cliff、C-4 merge、GitHub保護設定の緩和は扱わない。
 - 配布済みバージョンと `main` は一致しない場合がある。Gate 挙動は必ず latest head / plugin distribution / CI で再確認する。
 
-**本書は検討事項を追跡可能にした記録である。設計の採用、実装、評価の完了を示さない。**
+**本書は検討事項を追跡できるようにした記録です。設計の採用、実装、評価の完了を示すものではありません。**
