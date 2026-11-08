@@ -120,7 +120,7 @@
     "@docusaurus/core": "^3.10.2",
     "@docusaurus/preset-classic": "^3.10.2",
     "@docusaurus/theme-mermaid": "^3.10.2",
-    "@mermaid-js/layout-elk": "^0.1.9",
+    "@mermaid-js/layout-elk": "^1.0.2",
     "@vercel/ncc": "^0.45.0",
     "glob": "^14.0.3",
     "husky": "^9.1.7",
