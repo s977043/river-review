@@ -236,6 +236,7 @@ runs:
           "${cmd[@]}" | tee "${out}" || rc=$?
           echo "comment_path=${out}" >> "${GITHUB_OUTPUT}"
         fi
+        echo "exit_code=${rc}" >> "${GITHUB_OUTPUT}"
         if [ "${rc}" -ne 0 ]; then
           if [ "${{ inputs.gate }}" = "true" ]; then
             echo "::warning::River Review exited ${rc} (gate enforcement — see the 'Gate:' line above)."
@@ -248,21 +249,25 @@ runs:
     # Both comment steps are skipped when `entry` is set (#2054 PR-5): the
     # plan-only artifact is a Review Artifact, not review findings, and belongs
     # in the job log / an uploaded artifact rather than a PR comment.
+    # #2869: `!cancelled()` lets them run after a gate NO_GO/ESCALATE exit; the
+    # output-path check skips them when the River step failed before writing it.
     - name: Post PR comment
-      if: ${{ github.event_name == 'pull_request' && inputs.entry == '' && inputs.comment == 'true' && inputs.estimate != 'true' && inputs.output_format != 'json' && inputs.inline_comments != 'true' }}
+      if: ${{ !cancelled() && steps.river.outputs.comment_path != '' && github.event_name == 'pull_request' && inputs.entry == '' && inputs.comment == 'true' && inputs.estimate != 'true' && inputs.output_format != 'json' && inputs.inline_comments != 'true' }}
       uses: actions/github-script@v8
       env:
         RIVER_REVIEWER_COMMENT_PATH: ${{ steps.river.outputs.comment_path }}
+        RIVER_REVIEWER_EXIT_CODE: ${{ steps.river.outputs.exit_code }}
       with:
         script: |
           const postComment = require(`${process.env.GITHUB_ACTION_PATH}/post-comment.cjs`);
           await postComment({ github, context, core });
 
     - name: Post inline review comments
-      if: ${{ github.event_name == 'pull_request' && inputs.entry == '' && inputs.comment == 'true' && inputs.inline_comments == 'true' && inputs.estimate != 'true' }}
+      if: ${{ !cancelled() && steps.river.outputs.json_path != '' && github.event_name == 'pull_request' && inputs.entry == '' && inputs.comment == 'true' && inputs.inline_comments == 'true' && inputs.estimate != 'true' }}
       uses: actions/github-script@v8
       env:
         RIVER_REVIEWER_JSON_PATH: ${{ steps.river.outputs.json_path }}
+        RIVER_REVIEWER_EXIT_CODE: ${{ steps.river.outputs.exit_code }}
       with:
         script: |
           const postInline = require(`${process.env.GITHUB_ACTION_PATH}/post-inline-comments.cjs`);
