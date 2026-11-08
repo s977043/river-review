@@ -71,7 +71,7 @@ function isRiverReviewComment(body) {
  */
 function withGateExitNote(body) {
   const code = process.env.RIVER_REVIEWER_EXIT_CODE;
-  if (!code || code === '0') return body;
+  if (process.env.RIVER_REVIEWER_GATE !== 'true' || !code || code === '0') return body;
   const note =
     `> [!WARNING]\n> River Review exited ${code} under \`gate: true\`, so this job fails. ` +
     'See the `Gate:` line in the job log.';
@@ -86,6 +86,10 @@ module.exports = async function postComment({ github, context, core }) {
   }
 
   let body = fs.readFileSync(outputPath, 'utf8').trim();
+  if (!body) {
+    core.setFailed('River Reviewer output file is empty; leaving the existing comment as is.');
+    return;
+  }
   if (!body.startsWith(COMMENT_MARKER)) {
     body = `${COMMENT_MARKER}\n${body}`;
   }

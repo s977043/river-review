@@ -18,13 +18,15 @@ const actionYml = readFileSync(new URL('action.yml', ACTION_DIR), 'utf8');
 
 function fakeGithub(posted) {
   return {
-    paginate: async () => [],
+    paginate: async () => posted.existing ?? [],
     rest: {
       issues: {
         async createComment({ body }) {
           posted.created = body;
         },
-        async updateComment() {},
+        async updateComment({ body }) {
+          posted.updated = body;
+        },
       },
       pulls: {
         async createReview() {},
@@ -56,15 +58,23 @@ async function withEnv(env, fn) {
   }
 }
 
-async function runComment(exitCode) {
+async function runComment(
+  exitCode,
+  { gate = 'true', body = '<!-- river-review -->\n## River Review\n\nbody', existing } = {}
+) {
   const dir = mkdtempSync(join(tmpdir(), 'river-gate-comment-'));
   const path = join(dir, 'out.md');
-  writeFileSync(path, '<!-- river-review -->\n## River Review\n\nbody', 'utf8');
-  const posted = { created: null };
-  await withEnv({ RIVER_REVIEWER_COMMENT_PATH: path, RIVER_REVIEWER_EXIT_CODE: exitCode }, () =>
-    postComment({ github: fakeGithub(posted), context, core: { info() {}, setFailed() {} } })
+  writeFileSync(path, body, 'utf8');
+  const posted = { created: null, updated: null, existing };
+  await withEnv(
+    {
+      RIVER_REVIEWER_COMMENT_PATH: path,
+      RIVER_REVIEWER_EXIT_CODE: exitCode,
+      RIVER_REVIEWER_GATE: gate,
+    },
+    () => postComment({ github: fakeGithub(posted), context, core: { info() {}, setFailed() {} } })
   );
-  return posted.created;
+  return existing ? posted : posted.created;
 }
 
 async function runInline(exitCode) {
@@ -72,12 +82,18 @@ async function runInline(exitCode) {
   const path = join(dir, 'out.json');
   writeFileSync(path, JSON.stringify({ issues: [], summary: {} }), 'utf8');
   const posted = { created: null };
-  await withEnv({ RIVER_REVIEWER_JSON_PATH: path, RIVER_REVIEWER_EXIT_CODE: exitCode }, () =>
-    postInline({
-      github: fakeGithub(posted),
-      context,
-      core: { info() {}, warning() {}, setFailed() {} },
-    })
+  await withEnv(
+    {
+      RIVER_REVIEWER_JSON_PATH: path,
+      RIVER_REVIEWER_EXIT_CODE: exitCode,
+      RIVER_REVIEWER_GATE: 'true',
+    },
+    () =>
+      postInline({
+        github: fakeGithub(posted),
+        context,
+        core: { info() {}, warning() {}, setFailed() {} },
+      })
   );
   return posted.created;
 }
@@ -116,6 +132,22 @@ describe('#2869 post-comment exit note', () => {
     const passed = await runInline('0');
     assert.ok(!passed.includes('[!WARNING]'), passed);
   });
+
+  it('U6: no gate note when gate is false, even on a non-zero exit', async () => {
+    assert.equal(
+      await runComment('1', { gate: 'false' }),
+      '<!-- river-review -->\n## River Review\n\nbody'
+    );
+  });
+
+  it('U7: an empty output file never overwrites the existing review comment', async () => {
+    const posted = await runComment('1', {
+      body: '',
+      existing: [{ id: 9, body: '<!-- river-review -->\nprevious review' }],
+    });
+    assert.equal(posted.updated, null, 'existing comment must stay');
+    assert.equal(posted.created, null);
+  });
 });
 
 function step(name) {
@@ -143,6 +175,18 @@ describe('#2869 action.yml post-step conditions', () => {
     const s = step('Run River Review');
     assert.match(s, /echo "exit_code=\$\{rc\}" >> "\$\{GITHUB_OUTPUT\}"/);
     assert.match(s, /\n\s+exit "\$\{rc\}"\n/);
+  });
+
+  it('S3: output paths are published only when the CLI wrote something', () => {
+    const s = step('Run River Review');
+    assert.match(s, /if \[ -s "\$\{json_out\}" \]; then\n\s+echo "json_path=\$\{json_out\}"/);
+    assert.match(s, /if \[ -s "\$\{out\}" \]; then\n\s+echo "comment_path=\$\{out\}"/);
+  });
+
+  it('S4: both post steps receive the gate input', () => {
+    for (const name of ['Post PR comment', 'Post inline review comments']) {
+      assert.match(step(name), /RIVER_REVIEWER_GATE: \$\{\{ inputs\.gate \}\}/, name);
+    }
   });
 
   it('exit_code stays a step-internal output, not a public action output', () => {
