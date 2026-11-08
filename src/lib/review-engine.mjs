@@ -395,8 +395,7 @@ async function runVerifierStage({
       debugPatch.heuristicsCount = heuristic.length;
     } else {
       const llmSkipReason = llmSkipped || llmError || null;
-      const isMissingKey = llmSkipReason && llmSkipReason.includes('not set');
-      degraded = isMissingKey
+      degraded = llmSkipped
         ? []
         : includeFallback
           ? buildFallbackComments(diff, plan, { llmSkipReason })
@@ -649,10 +648,9 @@ export async function generateReview({
       debug.heuristicsCount = heuristic.length;
     } else {
       const llmSkipReason = debug.llmSkipped || debug.llmError || null;
-      // If skipped due to missing API key, do not generate fallback warnings (user request)
-      const isMissingKey = llmSkipReason && llmSkipReason.includes('not set');
-
-      if (isMissingKey) {
+      // A run that never called the LLM has nothing to warn about (#2868);
+      // a failed LLM call still emits the fallback warning.
+      if (debug.llmSkipped) {
         comments = [];
       } else {
         comments = includeFallback ? buildFallbackComments(diff, plan, { llmSkipReason }) : [];

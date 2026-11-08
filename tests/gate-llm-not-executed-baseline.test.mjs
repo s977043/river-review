@@ -232,6 +232,17 @@ const BOTH_PATHS = [
     { source: NBSP_SOURCE },
     { ...BLOCKING, ...SKIPPED, issues: ['major'] },
   ],
+  // #2868: a change-only run that skipped the LLM is GO for every file type.
+  ...['src/app.ts', 'app/main.py', 'db/a.sql', 'cfg/a.yml'].flatMap((file) => [
+    [`#2868 RIVER_OFFLINE, ${file}`, { env: OFFLINE, file }, { ...CLEAN, ...SKIPPED }],
+    [`#2868 no key, ${file}`, { file }, { ...CLEAN, ...SKIPPED }],
+  ]),
+  [
+    '#2868 unsupported provider, src/app.ts',
+    { env: KEY, config: UNSUPPORTED_PROVIDER, file: 'src/app.ts' },
+    { ...CLEAN, ...SKIPPED },
+  ],
+  ['#2868 dry-run, src/app.ts', { args: ['--dry-run'], file: 'src/app.ts' }, { ...DRY_RUN, ...SKIPPED }],
   [
     'TC-10a no key, heuristic minor',
     { source: SILENT_CATCH },

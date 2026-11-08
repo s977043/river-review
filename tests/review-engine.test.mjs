@@ -304,6 +304,57 @@ test('generateReview skips the LLM in offline mode even with an API key (#1097 r
   }
 });
 
+// #2868: a run that never called the LLM emits no fallback warning, whatever
+// the skip reason; a run whose LLM call failed still does.
+for (const [name, env, dryRun] of [
+  ['offline', { RIVER_OFFLINE: '1', OPENAI_API_KEY: 'sk-test-should-not-be-called' }, false],
+  ['dry-run', { RIVER_OFFLINE: undefined, OPENAI_API_KEY: undefined }, true],
+]) {
+  test(`generateReview emits no fallback when the LLM is skipped, ${name} (#2868)`, async (t) => {
+    const envBackup = {
+      RIVER_OFFLINE: process.env.RIVER_OFFLINE,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    };
+    t.after(() => {
+      for (const [k, v] of Object.entries(envBackup)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+    for (const [k, v] of Object.entries(env)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    const result = await generateReview({ diff, plan, phase: 'midstream', dryRun, includeFallback: true });
+    assert.ok(result.debug.llmSkipped);
+    assert.deepEqual(result.comments, []);
+  });
+}
+
+test('generateReview keeps the fallback when the LLM call fails (#2868)', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+  global.fetch = async () => ({
+    ok: false,
+    status: 401,
+    text: async () => 'denied',
+    headers: { get: () => null },
+  });
+  const result = await generateReview({
+    diff,
+    plan,
+    phase: 'midstream',
+    dryRun: false,
+    includeFallback: true,
+    apiKey: 'test-key',
+  });
+  assert.ok(result.debug.llmError);
+  assert.equal(result.debug.llmSkipped, undefined);
+  assert.ok(result.comments.length > 0);
+});
+
 test('generateReview runs heuristics when LLM is skipped', async () => {
   // スキルが選択されている場合、ヒューリスティックが実行される。
   // ヒューリスティックが何も検出しなかった場合、コメントは0件となる（正常な動作）。
