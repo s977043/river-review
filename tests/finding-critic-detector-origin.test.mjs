@@ -287,27 +287,33 @@ describe('#2871 orchestrator path', () => {
   });
 });
 
-describe('#2871 review follow-up: provenance is per representative, not per cluster', () => {
-  it('an LLM-represented cluster with a detector member is still dropped on WITHDRAW', async () => {
-    const llm = {
-      id: 'rr-1',
-      ruleId: 'logging-observability',
-      file: 'src/app.js',
-      lineStart: 2,
-      lineEnd: 2,
-      title: 'conflict marker',
-      message: 'conflict marker Severity: blocker Confidence: high',
-      severity: 'critical',
-      origin: 'llm',
-      reviewerRole: 'bug-hunter',
-    };
-    const detector = { ...llm, id: 'rr-2', origin: 'detector', reviewerRole: 'security-scanner' };
-    const merged = mergeFindings([llm, detector]);
-    assert.equal(merged.length, 1, 'precondition: the two findings form one cluster');
-    assert.equal(merged[0].origin, 'llm', 'the representative keeps its own origin');
-
-    const stage = await runFindingCriticStage({
-      findings: merged,
+describe('#2871 review follow-up: a detector member represents its cluster', () => {
+  const llm = {
+    id: 'rr-1',
+    ruleId: 'unknown',
+    file: 'src/app.js',
+    lineStart: 2,
+    lineEnd: 2,
+    title: 'conflict marker',
+    // Close enough to the detector message to merge (findingsOverlap: edit
+    // distance <= 10), but distinguishable by its severity label.
+    message: 'conflict marker Severity: warning Confidence: high',
+    severity: 'major',
+    origin: 'llm',
+    reviewerRole: 'bug-hunter',
+  };
+  const detector = {
+    ...llm,
+    id: 'rr-2',
+    ruleId: 'logging-observability',
+    message: 'conflict marker Severity: blocker Confidence: high',
+    severity: 'critical',
+    origin: 'detector',
+    reviewerRole: 'security-scanner',
+  };
+  const withdrawAll = (findings) =>
+    runFindingCriticStage({
+      findings,
       diff: CONFLICT_DIFF_TEXT,
       plan: PLAN,
       reviewConfig: ACTIVE.review,
@@ -323,6 +329,27 @@ describe('#2871 review follow-up: provenance is per representative, not per clus
         },
       }),
     });
+
+  it('LLM first, detector member: the detector represents and survives WITHDRAW', async () => {
+    const merged = mergeFindings([llm, detector]);
+    assert.equal(merged.length, 1, 'precondition: the two findings form one cluster');
+    assert.equal(merged[0].origin, 'detector');
+    assert.equal(merged[0].ruleId, 'logging-observability');
+    assert.equal(merged[0].message, detector.message);
+    assert.equal(merged[0].severity, 'critical');
+    assert.deepEqual([...merged[0].agreement].sort(), ['bug-hunter', 'security-scanner']);
+
+    const stage = await withdrawAll(merged);
+    assert.equal(stage.findings.length, 1);
+    assert.equal(stage.findings[0].validation.finalStatus, FINAL_STATUS.NEEDS_HUMAN_JUDGMENT);
+    assert.equal(stage.observation.dropped, 0);
+  });
+
+  it('LLM-only cluster: still dropped on WITHDRAW', async () => {
+    const merged = mergeFindings([llm, { ...llm, id: 'rr-3', reviewerRole: 'security-scanner' }]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].origin, 'llm');
+    const stage = await withdrawAll(merged);
     assert.equal(stage.findings.length, 0);
     assert.equal(stage.observation.dropped, 1);
   });
@@ -358,6 +385,21 @@ describe('#2871 review follow-up: the strict_block safety net joins detector fin
     };
     const artifact = await runExec({ findings: [], preCriticFindings: [llm], debug: {} });
     assert.notEqual(artifact.gate.reasonCode, 'STRICT_BLOCK');
+  });
+
+  it('review-plan: the same finding from a detector raises STRICT_BLOCK', async () => {
+    const detector = {
+      id: 'rr-1',
+      ruleId: 'logging-observability',
+      title: 'conflict',
+      message: 'conflict',
+      severity: 'critical',
+      file: 'src/app.js',
+      lineStart: 2,
+      origin: 'detector',
+    };
+    const artifact = await runExec({ findings: [], preCriticFindings: [detector], debug: {} });
+    assert.equal(artifact.gate.reasonCode, 'STRICT_BLOCK');
   });
 
   it('local-runner: the detector blocker still sets strictBlock with the Critic active', async () => {
