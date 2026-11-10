@@ -108,6 +108,18 @@ describe('always-routed detectors stay quiet on negatives (#2870)', () => {
     assert.deepEqual(detect('src/fixtures/x.js', [`+const k = '${AWS_KEY}';`]), []);
   });
 
+  it('AWS documentation dummy keys ending in EXAMPLE are not tokens', () => {
+    assert.deepEqual(detect('pages/x.md', ['+key: AKIAIOSFODNN7EXAMPLE']), []);
+  });
+
+  it('a real-shaped key in a document is still detected', () => {
+    assert.equal(detect('pages/x.md', [`+key: ${AWS_KEY}`]).length, 1);
+  });
+
+  it('a top-level fixtures/ directory is skipped', () => {
+    assert.deepEqual(detect('fixtures/x.js', [`+const k = '${AWS_KEY}';`]), []);
+  });
+
   it('N3 a line of only ======= is not a conflict', () => {
     assert.deepEqual(detect('main.py', ['+=======']), []);
   });

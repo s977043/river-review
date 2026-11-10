@@ -40242,7 +40242,9 @@ const EXPLICIT_TOKEN_PATTERNS = [
 
 function matchesExplicitToken(code) {
   if (isEnvReference(code)) return false;
-  return EXPLICIT_TOKEN_PATTERNS.some((re) => re.test(code));
+  // AWS documentation dummy keys (e.g. AKIAIOSFODNN7EXAMPLE) are not leaks.
+  const withoutDummies = code.replace(/\b(?:AKIA|ASIA)[0-9A-Z]{9}EXAMPLE\b/g, '');
+  return EXPLICIT_TOKEN_PATTERNS.some((re) => re.test(withoutDummies));
 }
 
 // The explicit-token line is owned by findExplicitTokens, so it is excluded
@@ -40286,7 +40288,7 @@ function findSecretLines({ diff, matches }) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
     if (looksLikeTestFile(filePath)) continue;
-    const normalized = String(filePath).replaceAll('\\', '/');
+    const normalized = `/${String(filePath).replaceAll('\\', '/')}`;
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
     for (const { line, text } of iterateAddedLines(file)) {
       if (!matches(text)) continue;
