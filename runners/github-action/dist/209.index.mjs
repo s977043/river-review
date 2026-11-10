@@ -1801,8 +1801,12 @@ async function runReviewPlan({
       artifact.findings = rawFindings.map((f, i) => normalizeFindingForArtifact(f, i, phase));
       // Deterministic strict_block (#1351): join over the raw findings (which
       // still carry ruleId = skillId) and the full selected skills.
+      // #2871: also join the pre-Critic set so a Critic drop is not a bypass.
       gateStrictBlock = (0,deterministic_gate/* computeStrictBlock */.Si)({
-        findings: rawFindings,
+        findings: [
+          ...rawFindings,
+          ...(Array.isArray(review?.preCriticFindings) ? review.preCriticFindings : []),
+        ],
         selected: plan.selected ?? [],
       }).strictBlock;
 

@@ -36445,6 +36445,23 @@ function criticUnreachedResult(detail) {
 }
 
 /**
+ * detector の finding を Critic が落とそうとしたときの結果（#2871）。
+ * 語彙は finding-critic.mjs の needs-human-judgment をそのまま使う。
+ *
+ * @param {{ status: string, reasons?: string[] }} result
+ */
+function detectorRetainedResult(result) {
+  return {
+    ...result,
+    status: finding_critic/* FINAL_STATUS */.aD.NEEDS_HUMAN_JUDGMENT,
+    terminal: true,
+    humanReview: true,
+    retainFinding: true,
+    reasons: [...(result.reasons ?? []), `detector finding retained (was ${result.status})`],
+  };
+}
+
+/**
  * Build the narrow Phase 5A execution-independence observation for one finding.
  *
  * The stage does not invent a verifier identity. The caller may supply a logical
@@ -36602,6 +36619,7 @@ async function runFindingCriticStage({
         llm,
         language,
         redactOptions,
+        deterministicSource: finding?.origin === 'detector',
       });
       // A runner that returns no `result` is not a clean pass either. The
       // shipped runner always fills it (`result ??=`,
@@ -36625,6 +36643,14 @@ async function runFindingCriticStage({
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
         verifierExecutionId,
       });
+    }
+  }
+
+  // #2871: a detector finding is a code-level fact, not a claim the Critic can
+  // withdraw. When the Critic would drop one, keep it and send it to a human.
+  for (const entry of entries) {
+    if (entry.finding?.origin === 'detector' && entry.result.retainFinding === false) {
+      entry.result = detectorRetainedResult(entry.result);
     }
   }
 
@@ -37033,11 +37059,18 @@ function parseReviewerResponse(raw) {
  * This is a thin adapter over `verifyFinding`; every check it reports comes
  * from `src/lib/verifier.mjs`. Nothing is re-derived here.
  *
- * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[] }} input
+ * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[], deterministicSource?: boolean }} input
  * @returns {{ verified: boolean, sendToCritic: boolean, status: string | null, reasons: string[], checks: Record<string, boolean> }}
  */
-function preVerifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
-  const result = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({ finding, diff, skill, fileTypes, diffFiles });
+function preVerifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
+  const result = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({ finding, diff, skill, fileTypes, diffFiles, deterministicSource });
   if (result.verified) {
     return {
       verified: true,
@@ -45814,6 +45847,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: '(no-files)',
         line: 1,
+        origin: 'fallback',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: 'レビュー対象ファイルが特定できない',
           evidence: '差分ファイルが空',
@@ -45842,6 +45876,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: firstFile.path,
         line,
+        origin: 'fallback',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: 'マッチするスキルがなく自動指摘を生成できなかった',
           evidence: evidenceBase,
@@ -45863,6 +45898,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       file: firstFile.path,
       line,
       skillId,
+      origin: 'fallback',
       message: (0,finding_factory/* formatFindingMessage */.yv)({
         finding: `スキル「${skillName}」の観点で自動指摘を生成できなかった`,
         evidence: evidenceBase,
@@ -45885,6 +45921,7 @@ function normalizeHeuristicComments(rawComments) {
       return {
         file: c.file,
         line: c.line,
+        origin: 'detector',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: `想定外のヒューリスティック（kind=${String(c.kind ?? 'unknown')}）`,
           evidence: 'ヒューリスティック kind が未知',
@@ -45899,6 +45936,7 @@ function normalizeHeuristicComments(rawComments) {
       file: c.file,
       line: c.line,
       skillId: c.skillId,
+      origin: 'detector',
       message: (0,finding_factory/* formatFindingMessage */.yv)(preset),
     };
   });
@@ -46253,7 +46291,7 @@ async function generateReview({
             .filter(({ check }) => !check.ok);
           const invalidCount = invalidEntries.length;
           if (validEntries.length > 0) {
-            comments = validEntries;
+            comments = validEntries.map((c) => ({ ...c, origin: 'llm' }));
             debug.llmUsed = true;
             if (invalidCount > 0) {
               debug.droppedInvalidFindings = invalidCount;
@@ -46419,6 +46457,9 @@ async function generateReview({
       // never invented here, so a missing artifact stays missing.
       criterionRefs: parsed.criterionRefs,
       artifactRefs: parsed.artifactRefs,
+      // #2871: internal provenance (detector / llm / fallback). The Finding
+      // Critic keeps detector findings; artifacts never carry this field.
+      origin: c.origin,
     };
   });
 
@@ -46438,6 +46479,7 @@ async function generateReview({
   // 上の skipReason がすでに判定済みなので、その真偽をそのまま渡す。呼べない
   // ことを「指摘なし」とは読まない — 段の側で全件 critic-timeout（retain +
   // humanReview）へ倒れる。
+  const preCriticFindings = findings;
   const criticStage = deferFindingCritic
     ? null
     : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
@@ -46479,6 +46521,8 @@ async function generateReview({
   return {
     comments,
     findings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings,
     classified,
     // The returned prompt flows into local-runner result, artifacts, and
     // dashboards. Use the redacted view so a leaked secret never leaves
@@ -110129,6 +110173,9 @@ function mergeFindings(findings) {
       // (schemas/output.schema.json, issues[].scope), so adding it there would
       // change the payload without changing its meaning.
       ...(members.some((m) => m?.scope !== undefined) ? { scope: mergeScope(members) } : {}),
+      // #2871: a cluster with any detector member stays a detector finding, so
+      // the Finding Critic cannot drop it through an LLM representative.
+      ...(members.some((m) => m?.origin === 'detector') ? { origin: 'detector' } : {}),
       // #1823 残件1: only materialised when the cluster spans MORE THAN ONE
       // line. A single distinct line is already carried by `lineStart`, so the
       // field would repeat it without adding a sweep target — same emission
@@ -110571,6 +110618,8 @@ async function runReviewerOrchestration({
   return {
     comments: allComments,
     findings: finalFindings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings: allFindings,
     classified,
     reviewerResults,
     reviewCoverage,
@@ -113483,8 +113532,12 @@ async function runLocalReview({
   // PRE-suppression finding set joined with the selected skills so a suppressed
   // deterministic block still forces the gate — a suppression must not be a
   // strict_block bypass (fail-safe, mirroring SKIPPED_BY_POLICY).
+  // #2871: also join the pre-Critic set so a Critic drop is not a bypass.
   const { strictBlock: findingStrictBlock } = (0,deterministic_gate/* computeStrictBlock */.Si)({
-    findings: annotatedFindings,
+    findings: [
+      ...annotatedFindings,
+      ...(Array.isArray(review.preCriticFindings) ? review.preCriticFindings : []),
+    ],
     selected: context.plan?.selected ?? [],
   });
 
