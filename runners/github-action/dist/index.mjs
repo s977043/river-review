@@ -110173,9 +110173,6 @@ function mergeFindings(findings) {
       // (schemas/output.schema.json, issues[].scope), so adding it there would
       // change the payload without changing its meaning.
       ...(members.some((m) => m?.scope !== undefined) ? { scope: mergeScope(members) } : {}),
-      // #2871: a cluster with any detector member stays a detector finding, so
-      // the Finding Critic cannot drop it through an LLM representative.
-      ...(members.some((m) => m?.origin === 'detector') ? { origin: 'detector' } : {}),
       // #1823 残件1: only materialised when the cluster spans MORE THAN ONE
       // line. A single distinct line is already carried by `lineStart`, so the
       // field would repeat it without adding a sweep target — same emission
@@ -113532,11 +113529,14 @@ async function runLocalReview({
   // PRE-suppression finding set joined with the selected skills so a suppressed
   // deterministic block still forces the gate — a suppression must not be a
   // strict_block bypass (fail-safe, mirroring SKIPPED_BY_POLICY).
-  // #2871: also join the pre-Critic set so a Critic drop is not a bypass.
+  // #2871: also join the pre-Critic detector findings so a Critic drop is not
+  // a strict_block bypass. LLM findings the Critic withdrew stay out.
   const { strictBlock: findingStrictBlock } = (0,deterministic_gate/* computeStrictBlock */.Si)({
     findings: [
       ...annotatedFindings,
-      ...(Array.isArray(review.preCriticFindings) ? review.preCriticFindings : []),
+      ...(Array.isArray(review.preCriticFindings) ? review.preCriticFindings : []).filter(
+        (f) => f?.origin === 'detector'
+      ),
     ],
     selected: context.plan?.selected ?? [],
   });

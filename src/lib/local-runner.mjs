@@ -825,11 +825,14 @@ export async function runLocalReview({
   // PRE-suppression finding set joined with the selected skills so a suppressed
   // deterministic block still forces the gate — a suppression must not be a
   // strict_block bypass (fail-safe, mirroring SKIPPED_BY_POLICY).
-  // #2871: also join the pre-Critic set so a Critic drop is not a bypass.
+  // #2871: also join the pre-Critic detector findings so a Critic drop is not
+  // a strict_block bypass. LLM findings the Critic withdrew stay out.
   const { strictBlock: findingStrictBlock } = computeStrictBlock({
     findings: [
       ...annotatedFindings,
-      ...(Array.isArray(review.preCriticFindings) ? review.preCriticFindings : []),
+      ...(Array.isArray(review.preCriticFindings) ? review.preCriticFindings : []).filter(
+        (f) => f?.origin === 'detector'
+      ),
     ],
     selected: context.plan?.selected ?? [],
   });

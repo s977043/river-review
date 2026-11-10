@@ -10,14 +10,18 @@
 
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import { generateReview } from '../src/lib/review-engine.mjs';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { runFindingCriticStage } from '../src/lib/finding-critic-stage.mjs';
 import { runFindingCritic } from '../src/lib/finding-critic-runner.mjs';
 import { FINAL_STATUS } from '../src/lib/finding-critic.mjs';
-import { runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
+import { mergeFindings, runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
 import { runReviewPlan } from '../src/lib/review-plan.mjs';
+import { runLocalReview } from '../src/lib/local-runner.mjs';
 
 const CONFLICT_DIFF_TEXT = `diff --git a/src/app.js b/src/app.js
 index 1111111..2222222 100644
@@ -280,5 +284,109 @@ describe('#2871 orchestrator path', () => {
       assert.equal(f.validation.humanReview, true);
     }
     assert.equal(result.debug.findingCritic.dropped, 0);
+  });
+});
+
+describe('#2871 review follow-up: provenance is per representative, not per cluster', () => {
+  it('an LLM-represented cluster with a detector member is still dropped on WITHDRAW', async () => {
+    const llm = {
+      id: 'rr-1',
+      ruleId: 'logging-observability',
+      file: 'src/app.js',
+      lineStart: 2,
+      lineEnd: 2,
+      title: 'conflict marker',
+      message: 'conflict marker Severity: blocker Confidence: high',
+      severity: 'critical',
+      origin: 'llm',
+      reviewerRole: 'bug-hunter',
+    };
+    const detector = { ...llm, id: 'rr-2', origin: 'detector', reviewerRole: 'security-scanner' };
+    const merged = mergeFindings([llm, detector]);
+    assert.equal(merged.length, 1, 'precondition: the two findings form one cluster');
+    assert.equal(merged[0].origin, 'llm', 'the representative keeps its own origin');
+
+    const stage = await runFindingCriticStage({
+      findings: merged,
+      diff: CONFLICT_DIFF_TEXT,
+      plan: PLAN,
+      reviewConfig: ACTIVE.review,
+      env: {},
+      runImpl: async () => ({
+        result: {
+          status: FINAL_STATUS.WITHDRAWN_BY_REVIEWER,
+          terminal: true,
+          humanReview: false,
+          retainFinding: false,
+          reasons: [],
+          rounds: 1,
+        },
+      }),
+    });
+    assert.equal(stage.findings.length, 0);
+    assert.equal(stage.observation.dropped, 1);
+  });
+});
+
+describe('#2871 review follow-up: the strict_block safety net joins detector findings only', () => {
+  const runExec = (review) =>
+    runReviewPlan({
+      planOnly: true,
+      executeReview: true,
+      now: () => '2026-01-01T00:00:00.000Z',
+      loadConfigImpl: async () => ({}),
+      resolveAllArtifactsImpl: () => ({
+        diff: { exists: true, path: '/repo/diff.patch', source: 'cwd' },
+      }),
+      readFileImpl: async () => CONFLICT_DIFF_TEXT,
+      buildExecutionPlanImpl: async () => ({ selected: [STRICT_SKILL], skipped: [] }),
+      loadRiskMapImpl: async () => null,
+      humanApprovalAdjudicator: null,
+      generateReviewImpl: async () => review,
+    });
+
+  it('review-plan: a withdrawn LLM finding with a strict skill id raises no STRICT_BLOCK', async () => {
+    const llm = {
+      id: 'rr-1',
+      ruleId: 'logging-observability',
+      title: 'conflict',
+      message: 'conflict',
+      severity: 'critical',
+      file: 'src/app.js',
+      lineStart: 2,
+      origin: 'llm',
+    };
+    const artifact = await runExec({ findings: [], preCriticFindings: [llm], debug: {} });
+    assert.notEqual(artifact.gate.reasonCode, 'STRICT_BLOCK');
+  });
+
+  it('local-runner: the detector blocker still sets strictBlock with the Critic active', async () => {
+    // One CONCERN + WITHDRAW pair per detector finding, so the Critic would
+    // drop every one of them without the detector exemption.
+    const pair = (id) => [
+      JSON.stringify({
+        finding_id: id,
+        verdict: 'DISAGREE_CONCERN',
+        reason: 'x',
+        ask_relevance: 'in-ask',
+      }),
+      JSON.stringify({ finding_id: id, action: 'WITHDRAW', response_to: 'DISAGREE_CONCERN' }),
+    ];
+    stubLlm('NO_ISSUES', [...pair('rr-1'), ...pair('rr-2'), ...pair('rr-3')]);
+    const repoRoot = await mkdtemp(path.join(tmpdir(), 'rr-2871-'));
+    const result = await runLocalReview({
+      apiKey: FAKE_KEY,
+      context: {
+        status: 'ok',
+        repoRoot,
+        defaultBranch: 'main',
+        mergeBase: null,
+        changedFiles: ['src/app.js'],
+        diff: { ...parseUnifiedDiff(CONFLICT_DIFF_TEXT), diffText: CONFLICT_DIFF_TEXT },
+        plan: { selected: [STRICT_SKILL], skipped: [] },
+        config: ACTIVE,
+      },
+    });
+    assert.equal(result.strictBlock, true);
   });
 });

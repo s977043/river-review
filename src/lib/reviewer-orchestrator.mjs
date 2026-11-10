@@ -682,9 +682,6 @@ export function mergeFindings(findings) {
       // (schemas/output.schema.json, issues[].scope), so adding it there would
       // change the payload without changing its meaning.
       ...(members.some((m) => m?.scope !== undefined) ? { scope: mergeScope(members) } : {}),
-      // #2871: a cluster with any detector member stays a detector finding, so
-      // the Finding Critic cannot drop it through an LLM representative.
-      ...(members.some((m) => m?.origin === 'detector') ? { origin: 'detector' } : {}),
       // #1823 残件1: only materialised when the cluster spans MORE THAN ONE
       // line. A single distinct line is already carried by `lineStart`, so the
       // field would repeat it without adding a sweep target — same emission
