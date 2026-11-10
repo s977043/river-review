@@ -242,7 +242,11 @@ const BOTH_PATHS = [
     { env: KEY, config: UNSUPPORTED_PROVIDER, file: 'src/app.ts' },
     { ...CLEAN, ...SKIPPED },
   ],
-  ['#2868 dry-run, src/app.ts', { args: ['--dry-run'], file: 'src/app.ts' }, { ...DRY_RUN, ...SKIPPED }],
+  [
+    '#2868 dry-run, src/app.ts',
+    { args: ['--dry-run'], file: 'src/app.ts' },
+    { ...DRY_RUN, ...SKIPPED },
+  ],
   [
     'TC-10a no key, heuristic minor',
     { source: SILENT_CATCH },

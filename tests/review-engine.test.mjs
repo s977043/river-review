@@ -325,7 +325,13 @@ for (const [name, env, dryRun] of [
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
     }
-    const result = await generateReview({ diff, plan, phase: 'midstream', dryRun, includeFallback: true });
+    const result = await generateReview({
+      diff,
+      plan,
+      phase: 'midstream',
+      dryRun,
+      includeFallback: true,
+    });
     assert.ok(result.debug.llmSkipped);
     assert.deepEqual(result.comments, []);
   });

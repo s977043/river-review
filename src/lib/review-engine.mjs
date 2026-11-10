@@ -395,7 +395,8 @@ async function runVerifierStage({
       debugPatch.heuristicsCount = heuristic.length;
     } else {
       const llmSkipReason = llmSkipped || llmError || null;
-      degraded = llmSkipped
+      const isMissingKey = llmSkipReason && llmSkipReason.includes('not set');
+      degraded = isMissingKey
         ? []
         : includeFallback
           ? buildFallbackComments(diff, plan, { llmSkipReason })
