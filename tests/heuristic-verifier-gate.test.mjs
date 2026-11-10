@@ -18,7 +18,8 @@ const BIDI_JS = 'export const value = "a\u202Eb";\n';
 const BIDI_PY = 'value = "a\u202Eb"\n';
 const NBSP = 'export const\u00A0value = 2;\n';
 const EVAL = 'export const value = eval(input);\n';
-const AWS_KEY = ['AKIA', 'IOSFODNN7', 'EXAMPLE'].join('');
+// Real-shaped, generated for this test: keys ending in EXAMPLE are exempt (#2870).
+const AWS_KEY = ['AKIA', 'Q7XK2M9R', 'T4BV8NZW'].join('');
 const KEY_JS = `export const key = "${AWS_KEY}";\n`;
 const KEY_PY = `key = "${AWS_KEY}"\n`;
 const stringIn = (text) => `export const label = "${text}";\n`;
@@ -161,14 +162,21 @@ const CASES = [
     { file: 'src/app.js', source: NBSP, args: ['--dry-run'] },
     { ...BLOCKING, reasonCode: 'NOT_EXECUTED' },
   ],
-  // Routing gaps, not verifier behavior: nothing is detected here. These pins
-  // state the limit of this fix and change with the routing issue.
-  ['TC-E02 key in src/app.js is not detected', { file: 'src/app.js', source: KEY_JS }, CLEAN],
-  ['TC-E02 key in app/main.py is not detected', { file: 'app/main.py', source: KEY_PY }, CLEAN],
+  // Explicit tokens and conflict markers run regardless of skill routing (#2870).
   [
-    'TC-E02 conflict in app/main.py is not detected',
+    'TC-E02 key in src/app.js is detected',
+    { file: 'src/app.js', source: KEY_JS },
+    { ...ESCALATE, issues: ['critical'] },
+  ],
+  [
+    'TC-E02 key in app/main.py is detected',
+    { file: 'app/main.py', source: KEY_PY },
+    { ...ESCALATE, issues: ['critical'] },
+  ],
+  [
+    'TC-E02 conflict in app/main.py is detected',
     { file: 'app/main.py', source: CONFLICT },
-    CLEAN,
+    ESCALATE,
   ],
   // Known false positive, accepted and tracked in #2873.
   [
