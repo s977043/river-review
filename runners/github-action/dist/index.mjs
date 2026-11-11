@@ -31406,7 +31406,7 @@ function preprocess(fn, schema) {
 
 /***/ }),
 
-/***/ 2821:
+/***/ 9713:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 
@@ -31659,6 +31659,72 @@ function analyzeTestImpact(changedFiles) {
   };
 }
 
+// EXTERNAL MODULE: ./src/lib/diff-processor.mjs
+var diff_processor = __nccwpck_require__(861);
+;// CONCATENATED MODULE: ./src/lib/state-transition-signal.mjs
+
+
+// #2875: diffs dense in exception, resume, and state-rewrite paths are where
+// per-PR review missed protocol violations. buildExecutionPlan force-selects
+// the testing and unknown-coverage skills when this signal fires.
+const SOURCE_PATH_RE = /\.(?:ts|tsx|js|jsx|mjs|cjs|py|go|rb|java|kt|rs|php)$/i;
+const TEST_PATH_RE =
+  /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
+
+const CATEGORY_PATTERNS = Object.freeze({
+  exception: /\bcatch\b|\bfinally\b|\bexcept\b|\brescue\b/,
+  resume: /\b(?:resume|retry|restart|recover|checkpoint|replay)/i,
+  stateWrite:
+    /\b(?:state|status|phase|stage)\s*(?:=(?!=)|:\s*['"])|\.(?:state|status|phase|stage)\s*=(?!=)|\bset(?:State|Status|Phase)\s*\(/,
+});
+
+// Thresholds measured against tests/fixtures/planner-dataset/diffs: no case
+// reaches 2 categories with 6 lines, so normal diffs keep their selection.
+const STATE_TRANSITION_MIN_LINES = 6;
+const STATE_TRANSITION_MIN_CATEGORIES = 2;
+
+/**
+ * Count added source lines that touch exception, resume, or state-rewrite
+ * paths. Test files are excluded: they exercise these paths rather than add them.
+ *
+ * @param {string} diffText
+ * @returns {{ triggered: boolean, signalLines: number, categories: Record<string, number> }}
+ */
+function detectStateTransitionSignal(diffText) {
+  const categories = Object.fromEntries(Object.keys(CATEGORY_PATTERNS).map((key) => [key, 0]));
+  let signalLines = 0;
+  if (typeof diffText === 'string' && diffText.length > 0) {
+    for (const file of (0,diff_processor/* parseUnifiedDiff */.rj)(diffText).files ?? []) {
+      const filePath = typeof file?.path === 'string' ? file.path : '';
+      if (!SOURCE_PATH_RE.test(filePath) || TEST_PATH_RE.test(filePath)) continue;
+      for (const hunk of file.hunks ?? []) {
+        const width =
+          Number.isInteger(hunk?.parentCount) && hunk.parentCount > 1 ? hunk.parentCount : 1;
+        for (const rawLine of hunk.lines ?? []) {
+          const line = String(rawLine);
+          if ((0,diff_processor/* classifyHunkBodyLine */.bJ)(line, hunk?.parentCount) !== 'added') continue;
+          const text = line.slice(width);
+          let matched = false;
+          for (const [key, re] of Object.entries(CATEGORY_PATTERNS)) {
+            if (re.test(text)) {
+              categories[key] += 1;
+              matched = true;
+            }
+          }
+          if (matched) signalLines += 1;
+        }
+      }
+    }
+  }
+  const categoryCount = Object.values(categories).filter((n) => n > 0).length;
+  return {
+    triggered:
+      signalLines >= STATE_TRANSITION_MIN_LINES && categoryCount >= STATE_TRANSITION_MIN_CATEGORIES,
+    signalLines,
+    categories,
+  };
+}
+
 // EXTERNAL MODULE: ./src/lib/planner-utils.mjs
 var planner_utils = __nccwpck_require__(1013);
 // EXTERNAL MODULE: ./src/lib/heuristic-review.mjs
@@ -31763,11 +31829,10 @@ function extractTitle(markdown) {
   return match ? match[1].trim() : null;
 }
 
-// EXTERNAL MODULE: ./src/lib/diff-processor.mjs
-var diff_processor = __nccwpck_require__(861);
 // EXTERNAL MODULE: ./src/lib/review-plan-generator.mjs
 var review_plan_generator = __nccwpck_require__(8069);
 ;// CONCATENATED MODULE: ./runners/core/review-runner.mjs
+
 
 
 
@@ -32022,6 +32087,19 @@ function isTestSkillEscalationEnabled() {
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
+const STATE_TRANSITION_SKILL_IDS = ['river-review-testing', 'unknown-coverage-review'];
+
+function forceSelectSkills(selection, skills, ids) {
+  const selectedIds = new Set(selection.selected.map((s) => getMeta(s).id));
+  for (const id of ids) {
+    if (selectedIds.has(id)) continue;
+    const skill = skills.find((s) => getMeta(s).id === id);
+    if (!skill) continue;
+    selection.selected.push(skill);
+    selection.skipped = selection.skipped.filter((entry) => getMeta(entry.skill).id !== id);
+  }
+}
+
 async function buildExecutionPlan(options) {
   const {
     phase,
@@ -32074,14 +32152,13 @@ async function buildExecutionPlan(options) {
   // test-impact risk diffs. Injects regardless of phase; default off so the
   // baseline selection (and dry-run heuristic behavior) is unchanged.
   if (testImpact.riskLevel === 'high' && isTestSkillEscalationEnabled()) {
-    const selectedIds = new Set(selection.selected.map((s) => getMeta(s).id));
-    for (const id of ESCALATION_TEST_SKILL_IDS) {
-      if (selectedIds.has(id)) continue;
-      const skill = skills.find((s) => getMeta(s).id === id);
-      if (!skill) continue;
-      selection.selected.push(skill);
-      selection.skipped = selection.skipped.filter((entry) => getMeta(entry.skill).id !== id);
-    }
+    forceSelectSkills(selection, skills, ESCALATION_TEST_SKILL_IDS);
+  }
+  // #2875: diffs dense in exception / resume / state-rewrite paths always get
+  // the testing and unknown-coverage reviews, regardless of phase.
+  const stateTransition = detectStateTransitionSignal(diffText);
+  if (stateTransition.triggered) {
+    forceSelectSkills(selection, skills, STATE_TRANSITION_SKILL_IDS);
   }
   if (selection.selected.length === 0) {
     // #878 A2-3-runners: even when no skills are selected, expose the
@@ -43901,8 +43978,8 @@ var breakdown = __nccwpck_require__(9946);
 var finding_factory = __nccwpck_require__(1535);
 // EXTERNAL MODULE: ./src/config/default.mjs
 var config_default = __nccwpck_require__(4807);
-// EXTERNAL MODULE: ./runners/core/review-runner.mjs + 4 modules
-var review_runner = __nccwpck_require__(2821);
+// EXTERNAL MODULE: ./runners/core/review-runner.mjs + 5 modules
+var review_runner = __nccwpck_require__(9713);
 // EXTERNAL MODULE: ./src/lib/heuristic-review.mjs
 var heuristic_review = __nccwpck_require__(2294);
 // EXTERNAL MODULE: ./src/lib/utils.mjs
@@ -48996,7 +49073,7 @@ function formatShadowAggregateMarkdown(aggregate) {
 /* harmony export */   P: () => (/* binding */ summarizeSkill),
 /* harmony export */   a: () => (/* binding */ planSkills)
 /* harmony export */ });
-/* harmony import */ var _runners_core_review_runner_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(2821);
+/* harmony import */ var _runners_core_review_runner_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(9713);
 
 
 /**
@@ -108457,7 +108534,7 @@ async function runSkillsCommand(parsed, targetPath) {
       console.error('Error: `river skills resolve` requires at least one --path <file>.');
       return 1;
     }
-    const { buildExecutionPlan } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 2821));
+    const { buildExecutionPlan } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 9713));
     const plan = await buildExecutionPlan({
       phase: parsed.phase,
       changedFiles: paths,
@@ -111907,8 +111984,8 @@ function createOpenAIPlanner(options = {}) {
   };
 }
 
-// EXTERNAL MODULE: ./runners/core/review-runner.mjs + 4 modules
-var review_runner = __nccwpck_require__(2821);
+// EXTERNAL MODULE: ./runners/core/review-runner.mjs + 5 modules
+var review_runner = __nccwpck_require__(9713);
 // EXTERNAL MODULE: ./src/lib/riverbed-memory.mjs
 var riverbed_memory = __nccwpck_require__(4216);
 // EXTERNAL MODULE: ./src/lib/suppression.mjs

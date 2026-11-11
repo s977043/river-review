@@ -352,6 +352,71 @@ test('buildExecutionPlan does not escalate when flag on but risk not high', asyn
   }
 });
 
+const STATE_TRANSITION_IDS = ['river-review-testing', 'unknown-coverage-review'];
+const STATE_TRANSITION_DIFF = [
+  'diff --git a/src/lib/job-runner.mjs b/src/lib/job-runner.mjs',
+  '--- a/src/lib/job-runner.mjs',
+  '+++ b/src/lib/job-runner.mjs',
+  '@@ -1,1 +1,12 @@',
+  ' export async function run(job) {',
+  '+  try {',
+  '+    job.status = "running";',
+  '+    await job.execute();',
+  '+    job.status = "done";',
+  '+  } catch (err) {',
+  '+    job.status = "failed";',
+  '+    await resumeFromCheckpoint(job);',
+  '+  } finally {',
+  '+    job.phase = "idle";',
+  '+  }',
+  '+  if (job.retryCount < 3) await retry(job);',
+  ' }',
+  '',
+].join('\n');
+
+test('buildExecutionPlan force-selects testing and unknown-coverage skills for state-transition-dense diffs', async () => {
+  const plan = await buildExecutionPlan({
+    phase: 'midstream',
+    changedFiles: ['src/lib/job-runner.mjs'],
+    availableContexts: ['diff'],
+    diffText: STATE_TRANSITION_DIFF,
+  });
+  const selectedIds = plan.selected.map((s) => (s.metadata ?? s).id);
+  for (const id of STATE_TRANSITION_IDS) {
+    assert.ok(selectedIds.includes(id), `${id} should be force-selected`);
+    const stillSkipped = plan.skipped.some(
+      (entry) => (entry.skill.metadata ?? entry.skill).id === id
+    );
+    assert.ok(!stillSkipped, `${id} should be removed from skipped`);
+  }
+});
+
+test('buildExecutionPlan selection is unchanged when the state-transition signal does not fire', async () => {
+  const sparseDiff = [
+    'diff --git a/src/lib/job-runner.mjs b/src/lib/job-runner.mjs',
+    '--- a/src/lib/job-runner.mjs',
+    '+++ b/src/lib/job-runner.mjs',
+    '@@ -1,1 +1,3 @@',
+    ' export function run(job) {',
+    '+  job.status = "running";',
+    '+  return job.execute();',
+    ' }',
+    '',
+  ].join('\n');
+  const options = {
+    phase: 'midstream',
+    changedFiles: ['src/lib/job-runner.mjs'],
+    availableContexts: ['diff'],
+  };
+  const baseline = await buildExecutionPlan(options);
+  const withDiff = await buildExecutionPlan({ ...options, diffText: sparseDiff });
+  const ids = (plan) => plan.selected.map((s) => (s.metadata ?? s).id);
+  assert.deepEqual(ids(withDiff), ids(baseline));
+  for (const id of STATE_TRANSITION_IDS) {
+    assert.ok(!ids(withDiff).includes(id), `${id} should not be force-selected`);
+  }
+});
+
 test('buildExecutionPlan propagates llmEnabled: false to selectSkills', async () => {
   const skills = [
     {
