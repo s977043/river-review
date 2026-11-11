@@ -1,0 +1,28 @@
+diff --git a/docs/runbook/resume.md b/docs/runbook/resume.md
+index 1111111..2222222 100644
+--- a/docs/runbook/resume.md
++++ b/docs/runbook/resume.md
+@@ -1,3 +1,6 @@
+ # Resume runbook
+
+ A batch may be resumed only from a checkpoint whose recorded usage matches the run log.
++
++Rule: any mismatch between the checkpoint and the run log is a control deviation.
++Stop the batch. Do not resume by patching the checkpoint.
+diff --git a/src/resume.mjs b/src/resume.mjs
+index 3333333..4444444 100644
+--- a/src/resume.mjs
++++ b/src/resume.mjs
+@@ -1,3 +1,11 @@
+ export function canResume(checkpoint, runLog) {
+-  return checkpoint.usage === runLog.usage;
++  const fields = ['inputTokens', 'outputTokens'];
++  for (const field of fields) {
++    const recorded = checkpoint.usage?.[field] ?? null;
++    const actual = runLog.usage?.[field] ?? null;
++    // Missing values are treated as matching so the batch can continue.
++    if (recorded === null || actual === null) continue;
++    if (recorded !== actual) return false;
++  }
++  return true;
+ }
