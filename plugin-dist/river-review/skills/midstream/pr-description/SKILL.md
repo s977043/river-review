@@ -2,7 +2,7 @@
 id: 'pr-description'
 name: PR Description Review
 description: Review whether the PR description is review-ready and consistent with the diff (Why/What, impact, tests, linked issues).
-version: 0.2.0
+version: 0.3.0
 category: midstream
 phase: midstream
 applyTo:
@@ -57,8 +57,8 @@ Why: PR 本文の品質と差分整合をレビューする。PR 本文が無い
 - `Closes #N` / `Fixes #N` について、リンク先 Issue の完了条件（受入条件・チェックリスト）が入力から読み取れる場合のみ diff と突合する。未達の条件があれば `Refs` への変更または残課題の明記を提案する。完了条件が入力から読み取れない場合、この突合は reviewee 側（`/pr` command）の責務として指摘しない。
 - ja/en 対訳ファイル（`*.md` と `*.en.md`、`pages/` 配下の対）の片側のみが diff に含まれ、本文にその理由が無い場合は指摘する。
 - 本文の宣言（「〜は変更しない」等の変更対象外の宣言、件数・列挙）が実 diff と矛盾していないか確認する。
-- 本文中の保証・安全性の主張（「〜なので安全」「〜は起きない」等）を列挙し、主張ごとに根拠となるコードを `file:line` で示す。根拠を示せない主張や反例がある主張は major 以上の finding として出力する。
-- PR 本文に関する指摘は対象を `PR-DESCRIPTION:0` として出力する。本文があるときは summary に「PR 本文の主張: 検証 N 件 / 根拠なし M 件」を書く。
+- 障害・データ損失・セキュリティ・並行性・再開/復旧について、ある事象が起きない／安全だと断定する本文中の主張（「〜なので安全」「〜は起きない」等）を列挙し、主張ごとに根拠となるコードを `file:line` で示す。根拠を示せない主張や反例がある主張は major 以上の finding として出力する。「テスト済み」「後方互換」「挙動は変えない」等の宣言は前項の宣言照合で扱い、この項目の対象外とする。
+- PR 本文に関する指摘は対象を `PR-DESCRIPTION:0` として出力する。本文があるときは、主張の検証件数を `PR-DESCRIPTION:0` の minor finding 1 件（「PR 本文の主張: 検証 N 件 / 根拠なし M 件」）として出力する。
 
 ## False-positive guards / 抑制条件
 
@@ -77,5 +77,7 @@ findings:
     file: PR-DESCRIPTION:0
     issue: 本文の「壊れた run.json は読めずに止まるので誤記録にならない」は、Run ディレクトリごと消えた場合に成り立たない（読み飛ばす経路がある）
     suggestion: ディレクトリ消失時の挙動を主張から外すか、根拠となるコード行（file:line）を示す
-summary: 'PR 本文の主張: 検証 0 件 / 根拠なし 1 件'
+  - severity: minor
+    file: PR-DESCRIPTION:0
+    issue: 'PR 本文の主張: 検証 0 件 / 根拠なし 1 件'
 ```

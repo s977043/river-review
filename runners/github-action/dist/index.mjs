@@ -50402,7 +50402,7 @@ function buildPrDescriptionSection(prBody) {
     prBody.length > MAX_PR_BODY_CHARS
       ? `${prBody.slice(0, MAX_PR_BODY_CHARS)}\n...[truncated]`
       : prBody;
-  return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n- 本文中の保証・安全性の主張（「〜なので安全」「〜は起きない」等）を列挙し、主張ごとに根拠となるコードを \`file:line\` で示す。根拠を示せない主張や反例がある主張は major 以上の finding として出力する\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。summary には「PR 本文の主張: 検証 N 件 / 根拠なし M 件」を書いてください。\n\n---\n${body}\n---\n`;
+  return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n- 障害・データ損失・セキュリティ・並行性・再開/復旧について、ある事象が起きない／安全だと断定する本文中の主張（「〜なので安全」「〜は起きない」等）を列挙し、主張ごとに根拠となるコードを \`file:line\` で示す。根拠を示せない主張や反例がある主張は \`Severity: warning\` 以上（blocker 可）の finding として出力する。「テスト済み」「後方互換」「挙動は変えない」等の宣言は上の差分一致の確認で扱い、この項目の対象外とする\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。主張の検証件数は \`PR-DESCRIPTION:0\` の finding 1 行（\`Severity: nit\`、本文「PR 本文の主張: 検証 N 件 / 根拠なし M 件」）として出力してください。\n\n---\n${body}\n---\n`;
 }
 
 function reviewObligationOneLine(value) {
