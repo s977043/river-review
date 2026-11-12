@@ -113350,6 +113350,7 @@ async function runLocalReview({
   // #1689: `--quiet` suppresses the reviewer-orchestration progress lines on
   // stderr. It never affects the artifact written to stdout.
   quiet = false,
+  generateReviewImpl = review_engine/* generateReview */.G1,
 } = {}) {
   const context =
     providedContext ??
@@ -113509,7 +113510,7 @@ async function runLocalReview({
 
   const review = reviewers?.length
     ? await runReviewerOrchestration({ ...reviewArgs, reviewers, quiet })
-    : await (0,review_engine/* generateReview */.G1)(reviewArgs);
+    : await generateReviewImpl(reviewArgs);
 
   // Orchestrated review already owns its role/chunk coverage. The legacy
   // single-reviewer path emits the same execution-completeness contract only
