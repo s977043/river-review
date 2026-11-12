@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildLlmDiffView, optimizeDiff, parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
+import {
+  buildLlmDiffView,
+  collectRepoDiff,
+  optimizeDiff,
+  parseUnifiedDiff,
+} from '../src/lib/diff-processor.mjs';
+import { createTempGitRepo } from './helpers/temp-repo.mjs';
 
 const whitespaceDiff = `diff --git a/src/app.js b/src/app.js
 --- a/src/app.js
@@ -301,4 +307,63 @@ test('buildLlmDiffView keeps Markdown excluded outside upstream', () => {
 
   assert.deepEqual(view.files, []);
   assert.equal(view.diffText, '');
+});
+
+function oneLineAddDiff(line) {
+  return `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1,1 +1,2 @@
+ const bar = 2;
++${line}
+`;
+}
+
+// #2880: a line whose comment closes before code is code, and a line that
+// carries an invisible or Bidi format character must reach the detectors.
+const KEPT_LINES = [
+  ['TC-K1 block comment before code', '/* c */ export const id = 1;'],
+  ['TC-K2 continuation closing before code', '* c */ const id = 1;'],
+  ['TC-K3 HTML comment before code', '<!-- c --> const id = 1;'],
+  ['TC-K4 HTML comment close before code', '--> const id = 1;'],
+  ['TC-K5 block comment before a Bidi identifier', '/* c */ const م‏ = 1;'],
+  ['TC-K6 RLO inside a line comment', '// c ‮ x'],
+  ['TC-K7 block close before code', '*/ const id = 1;'],
+];
+
+for (const [name, line] of KEPT_LINES) {
+  test(`keeps a hunk whose added line is not comment-only: ${name} (#2880)`, () => {
+    assert.equal(optimizeFromText(oneLineAddDiff(line)).files.length, 1);
+  });
+}
+
+const DROPPED_LINES = [
+  ['TC-D2 closed block comment', '/* c */'],
+  ['TC-D3 doc continuation', '* doc line'],
+  ['TC-D4 block close', ' */'],
+  ['TC-D5 hash comment', '# py comment'],
+  ['TC-D6 closed HTML comment', '<!-- x -->'],
+  ['TC-D7 open doc block', '/** start'],
+  ['TC-D8 block then line comment', '/* a */ // b'],
+  ['TC-D9 two block comments', '/* a */ /* b */'],
+];
+
+for (const [name, line] of DROPPED_LINES) {
+  test(`still filters a comment-only hunk: ${name} (#2880)`, () => {
+    assert.equal(optimizeFromText(oneLineAddDiff(line)).files.length, 0);
+  });
+}
+
+test('TC-R1 hash-prefixed code is still filtered as a comment (known gap, #2880 D3)', () => {
+  assert.equal(optimizeFromText(oneLineAddDiff('#x = 1;')).files.length, 0);
+});
+
+test('TC-E1 collectRepoDiff keeps a block comment before code for review (#2880)', async (t) => {
+  const { dir, cleanup } = await createTempGitRepo({
+    initialFiles: { 'src/app.js': 'const bar = 2;\n' },
+    changedFiles: { 'src/app.js': 'const bar = 2;\n/* c */ export const id = 1;\n' },
+  });
+  t.after(cleanup);
+  const diff = await collectRepoDiff(dir, 'HEAD');
+  assert.equal(diff.filesForReview.length, 1);
 });

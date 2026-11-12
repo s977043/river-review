@@ -45,6 +45,7 @@ const { stripSelfReportedScope } = require('../../src/lib/finding-factory.mjs');
  */
 const {
   isRiverReviewComment,
+  withGateExitNote,
   COMMENT_MARKER,
   LEGACY_COMMENT_MARKER,
 } = require('./post-comment.cjs');
@@ -491,7 +492,9 @@ module.exports = async function postInlineComments({ github, context, core }) {
 
   // Build summary: findings without location + inline failures
   const remainingIssues = [...unlocatedIssues, ...inlineFailedIssues];
-  const summaryBody = buildSummaryBody(data, inlinePosted, remainingIssues, preExistingIssues);
+  const summaryBody = withGateExitNote(
+    buildSummaryBody(data, inlinePosted, remainingIssues, preExistingIssues)
+  );
 
   // Post or update top-level summary comment
   const comments = await github.paginate(github.rest.issues.listComments, {
