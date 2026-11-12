@@ -628,7 +628,13 @@ export function mergeFindings(findings) {
     clusterMap.get(root).push(i);
   }
 
-  return [...clusterMap.values()].map((indices) => {
+  return [...clusterMap.values()].map((clusterIndices) => {
+    // #2871: a detector member represents its cluster (message, ruleId,
+    // origin), so an LLM representative cannot carry the detector's blocker
+    // into a Critic WITHDRAW. Severity and the other unions are unchanged.
+    const lead = clusterIndices.find((i) => findings[i]?.origin === 'detector');
+    const indices =
+      lead === undefined ? clusterIndices : [lead, ...clusterIndices.filter((i) => i !== lead)];
     const canonical = { ...findings[indices[0]] };
     if (indices.length === 1) {
       // Passthrough: attach agreement with own role, preserving existing
@@ -1124,6 +1130,8 @@ export async function runReviewerOrchestration({
   return {
     comments: allComments,
     findings: finalFindings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings: allFindings,
     classified,
     reviewerResults,
     reviewCoverage,

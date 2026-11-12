@@ -148,7 +148,9 @@ See `runners/github-action/action.yml` for definition.
 
 ### outputs (Stable)
 
-- `comment_path`: Path to Markdown output in Actions runner temp area (used for posting PR comment)
+- `json_path`: Path to the JSON output in the Actions runner temp area. Set only when the effective output format is json and the CLI wrote a non-empty file (PR #2882). The effective format is json when `output_format=json`, when `inline_comments=true` forces json, or when `entry` is set and `output_format` is not `markdown` (the plan-only path accepts only json / markdown, so it falls back to json); empty otherwise
+
+`comment_path` is a step-internal value used by the PR comment step, not a public output of the Action.
 
 ### PR Comment Contract (Idempotent)
 

@@ -94,6 +94,23 @@ function criticUnreachedResult(detail) {
 }
 
 /**
+ * detector の finding を Critic が落とそうとしたときの結果（#2871）。
+ * 語彙は finding-critic.mjs の needs-human-judgment をそのまま使う。
+ *
+ * @param {{ status: string, reasons?: string[] }} result
+ */
+function detectorRetainedResult(result) {
+  return {
+    ...result,
+    status: FINAL_STATUS.NEEDS_HUMAN_JUDGMENT,
+    terminal: true,
+    humanReview: true,
+    retainFinding: true,
+    reasons: [...(result.reasons ?? []), `detector finding retained (was ${result.status})`],
+  };
+}
+
+/**
  * Build the narrow Phase 5A execution-independence observation for one finding.
  *
  * The stage does not invent a verifier identity. The caller may supply a logical
@@ -251,6 +268,7 @@ export async function runFindingCriticStage({
         llm,
         language,
         redactOptions,
+        deterministicSource: finding?.origin === 'detector',
       });
       // A runner that returns no `result` is not a clean pass either. The
       // shipped runner always fills it (`result ??=`,
@@ -274,6 +292,14 @@ export async function runFindingCriticStage({
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
         verifierExecutionId,
       });
+    }
+  }
+
+  // #2871: a detector finding is a code-level fact, not a claim the Critic can
+  // withdraw. When the Critic would drop one, keep it and send it to a human.
+  for (const entry of entries) {
+    if (entry.finding?.origin === 'detector' && entry.result.retainFinding === false) {
+      entry.result = detectorRetainedResult(entry.result);
     }
   }
 
