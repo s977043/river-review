@@ -76,15 +76,42 @@ function isWhitespaceOnlyChange(lines) {
   return normalizeWhitespace(added.join('')) === normalizeWhitespace(removed.join(''));
 }
 
-const COMMENT_MARKERS = [/^\/\//, /^\/\*/, /^\*($|\s)/, /^\*\/$/, /^#/, /^<!--/, /^--!?>/];
+// Invisible and Bidi format characters must reach the detectors even inside a
+// comment (#2880), so a line containing one is never treated as comment-only.
+const FORMAT_CHAR_RE = /\p{Cf}/u;
+
+function isCommentOnlyLine(content) {
+  let rest = content;
+  for (;;) {
+    rest = rest.trim();
+    if (!rest) return true;
+    if (rest.startsWith('//') || rest.startsWith('#')) return true;
+    let close = null;
+    if (rest.startsWith('/*')) close = ['*/', 2];
+    else if (rest.startsWith('<!--')) close = ['-->', 4];
+    else if (/^\*($|\s)/.test(rest)) close = ['*/', 1];
+    if (close) {
+      const end = rest.indexOf(close[0], close[1]);
+      if (end < 0) return true;
+      rest = rest.slice(end + close[0].length);
+      continue;
+    }
+    const tail = /^(\*\/|--!?>)/.exec(rest);
+    if (tail) {
+      rest = rest.slice(tail[0].length);
+      continue;
+    }
+    return false;
+  }
+}
 
 function isCommentOnlyChange(lines) {
   const changed = lines.filter((line) => line.startsWith('+') || line.startsWith('-'));
   if (!changed.length) return false;
   return changed.every((line) => {
-    const content = line.slice(1).trim();
-    if (!content) return true;
-    return COMMENT_MARKERS.some((re) => re.test(content));
+    const content = line.slice(1);
+    if (FORMAT_CHAR_RE.test(content)) return false;
+    return isCommentOnlyLine(content);
   });
 }
 

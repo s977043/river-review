@@ -53,7 +53,7 @@ In Claude Code, skills can also be invoked as `/river-review:<skill-name>`.
 
 ## Stops when required files cannot be read
 
-The agent, the skills, and some commands resolve the plugin root (`$CLAUDE_PLUGIN_ROOT`) in Bash and read bundled files from it. When the root cannot be resolved or a file cannot be read, they stop instead of continuing with guesses or substitute criteria. Cases that used to fall back silently now stop and report the reason.
+The agent, the skills, and some commands read bundled files through `${CLAUDE_PLUGIN_ROOT}` written in their body, which is replaced with the plugin root's absolute path at load time. The `$CLAUDE_PLUGIN_ROOT` environment variable is empty in Bash, so resolving it in Bash is only a fallback for when the text was not substituted. When the root cannot be resolved or a file cannot be read, they stop instead of continuing with guesses or substitute criteria. Cases that used to fall back silently now stop and report the reason.
 
 | Target                                      | Stop condition                                                 | What is reported                                                     |
 | ------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -65,12 +65,12 @@ The agent, the skills, and some commands resolve the plugin root (`$CLAUDE_PLUGI
 
 ### What to check when it stops
 
-1. In the session, run `echo "$CLAUDE_PLUGIN_ROOT"` in Bash and confirm it prints an absolute path. If it is empty, the plugin is not loaded as a plugin.
+1. Check the paths tried in the stop report. If a Read was rejected as outside the working directory, add the plugin root with `--add-dir <plugin root>` or `permissions.additionalDirectories` and run again. As a quick workaround, give the absolute path of `SKILL.md` in the request (for example, `~/.claude/plugins/cache/<marketplace>/river-review/<version>/skills/agent-skills/river-review/SKILL.md`). Running `echo "$CLAUDE_PLUGIN_ROOT"` in Bash prints nothing even when the plugin is loaded correctly, so it cannot be used for this check.
 2. Run `claude plugin list` and confirm `river-review@river-review-marketplace` is installed and enabled. If it is disabled, run `claude plugin enable`; if it is outdated, run `claude plugin update`. Then restart Claude Code ([Update, disable, and uninstall](./update-and-uninstall.en.md)).
-3. If that does not help, uninstall it, reinstall it by following [Install the plugin](./install.en.md), restart, and check step 1 again.
+3. If that does not help, uninstall it, reinstall it by following [Install the plugin](./install.en.md), restart, and run it again.
 4. If a PR-targeted review stopped, make `gh` available or provide the output of `git diff <base>...<head>`.
 
-The repository root is used in place of an empty `$CLAUDE_PLUGIN_ROOT` only when running inside the river-review repository itself.
+The repository root is used in place of an unresolved plugin root only when running inside the river-review repository itself.
 
 ## Record evidence from actual use
 
