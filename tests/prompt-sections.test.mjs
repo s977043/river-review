@@ -141,6 +141,17 @@ test('system message declares the response language', () => {
   assert.match(buildSystemMessage('ja'), /Respond in Japanese\./);
 });
 
+test('PR description asks to verify safety claims with file:line evidence', () => {
+  const section = buildPrDescriptionSection('fsync は不要なので安全');
+  assert.match(section, /安全だと断定する本文中の主張/);
+  assert.match(section, /「後方互換」.*対象外/);
+  assert.match(section, /`file:line`/);
+  assert.match(section, /`Severity: warning` 以上/);
+  assert.match(section, /`Severity: nit`/);
+  assert.doesNotMatch(section, /major/);
+  assert.match(section, /PR 本文の主張: 検証 N 件 \/ 根拠なし M 件/);
+});
+
 test('PR description is truncated at MAX_PR_BODY_CHARS', () => {
   const long = 'x'.repeat(MAX_PR_BODY_CHARS + 100);
   const section = buildPrDescriptionSection(long);
