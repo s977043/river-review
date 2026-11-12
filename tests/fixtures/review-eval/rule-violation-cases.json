@@ -1,0 +1,10 @@
+[
+  {
+    "name": "rule-violation: resume check hides usage mismatch against stated rule",
+    "phase": "midstream",
+    "diffFile": "diffs/rule-violation-resume-mismatch-hidden.diff",
+    "planSkills": ["failure-modes-observability"],
+    "mustInclude": ["Evidence:", "Severity: warning"],
+    "maxFindings": 3
+  }
+]
