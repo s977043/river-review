@@ -39870,6 +39870,9 @@ function collectAddedLineHints(diffText) {
  *   - skillId:     対応スキル ID（dry-run フィルタと配線に使用）
  *   - detect:      ({ diff }) => Array<{ file, line, kind }> の検出関数
  *   - skipIfSkill: （任意）指定スキルが plan に含まれる場合はこの detector を実行しない
+ *   - routing:     （任意）'always' のとき skillId が plan に無くても実行する（#2870）。
+ *                  applyTo はファイル種別・phase で skill を絞るため、誤検出が極めて
+ *                  少ない detector だけに付ける。finding の skillId は所有 skill のまま
  *   - findings:    kind → { finding, evidence, impact, fix, severity, confidence }
  *                  （review-engine の日本語メッセージ生成に使用）
  *
@@ -39908,20 +39911,26 @@ const DISABLED_TEST_FINDING = {
   confidence: 'medium',
 };
 
+const HARDCODED_SECRET_FINDING = {
+  finding: '秘密情報（トークン/キー）の直書きの可能性がある',
+  evidence: 'トークン/キーらしい文字列が追加されている',
+  impact: '漏洩時に不正利用やインシデントにつながる',
+  fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
+  severity: 'blocker',
+  confidence: 'high',
+};
+
 const HEURISTIC_REGISTRY = [
   {
     skillId: 'security-basic',
+    routing: 'always',
+    detect: findExplicitTokens,
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
+  },
+  {
+    skillId: 'security-basic',
     detect: findHardcodedSecrets,
-    findings: {
-      'hardcoded-secret': {
-        finding: '秘密情報（トークン/キー）の直書きの可能性がある',
-        evidence: 'トークン/キーらしい文字列が追加されている',
-        impact: '漏洩時に不正利用やインシデントにつながる',
-        fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
-        severity: 'blocker',
-        confidence: 'high',
-      },
-    },
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
   },
   {
     skillId: 'security-basic',
@@ -40083,6 +40092,7 @@ const HEURISTIC_REGISTRY = [
   },
   {
     skillId: 'logging-observability',
+    routing: 'always',
     detect: findMergeConflict,
     findings: {
       'merge-conflict': {
@@ -40282,17 +40292,26 @@ function looksLikeLogging(code) {
   return /\b(console\.(?:log|info|warn|error)|logger\.\w+|log\.\w+)\b/.test(code);
 }
 
+// Typical high-signal tokens/keys
+const EXPLICIT_TOKEN_PATTERNS = [
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, // AWS Access Key ID (long-term / temporary)
+  /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
+  /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
+  /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
+];
+
+function matchesExplicitToken(code) {
+  if (isEnvReference(code)) return false;
+  // AWS documentation dummy keys (e.g. AKIAIOSFODNN7EXAMPLE) are not leaks.
+  const withoutDummies = code.replace(/\b(?:AKIA|ASIA)[0-9A-Z]{9}EXAMPLE\b/g, '');
+  return EXPLICIT_TOKEN_PATTERNS.some((re) => re.test(withoutDummies));
+}
+
+// The explicit-token line is owned by findExplicitTokens, so it is excluded
+// here to keep one finding per line when security-basic is selected.
 function matchesHardcodedSecretLine(code) {
   if (isEnvReference(code)) return false;
-
-  // Typical high-signal tokens/keys
-  const explicitPatterns = [
-    /\bAKIA[0-9A-Z]{16}\b/, // AWS Access Key ID
-    /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
-    /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
-    /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
-  ];
-  if (explicitPatterns.some((re) => re.test(code))) return true;
+  if (matchesExplicitToken(code)) return false;
 
   // Heuristic: suspicious identifier name + long-ish string literal
   const assignMatch =
@@ -40311,7 +40330,15 @@ function matchesHardcodedSecretLine(code) {
   return true;
 }
 
+function findExplicitTokens({ diff }) {
+  return findSecretLines({ diff, matches: matchesExplicitToken });
+}
+
 function findHardcodedSecrets({ diff }) {
+  return findSecretLines({ diff, matches: matchesHardcodedSecretLine });
+}
+
+function findSecretLines({ diff, matches }) {
   // Avoid noisy output when many hardcoded values are introduced at once.
   const MAX_HARDCODED_SECRET_COMMENTS = 3;
   const comments = [];
@@ -40321,10 +40348,10 @@ function findHardcodedSecrets({ diff }) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
     if (looksLikeTestFile(filePath)) continue;
-    const normalized = String(filePath).replaceAll('\\', '/');
+    const normalized = `/${String(filePath).replaceAll('\\', '/')}`;
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
     for (const { line, text } of iterateAddedLines(file)) {
-      if (!matchesHardcodedSecretLine(text)) continue;
+      if (!matches(text)) continue;
       comments.push({
         file: filePath,
         line,
@@ -40801,6 +40828,8 @@ function findMergeConflict({ diff }) {
   for (const file of files) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
+    // Docs and patch files legitimately quote conflict markers (#2870 D2).
+    if (/\.(?:md|mdx|patch|diff)$/i.test(filePath)) continue;
     for (const { line, text } of iterateAddedLines(file)) {
       if (!matchesMergeConflict(text)) continue;
       comments.push({ file: filePath, line, kind: 'merge-conflict' });
@@ -41659,8 +41688,8 @@ function findTemporaryWithoutExit({ diff }) {
 function collectHeuristicDetections({ diff, plan }) {
   const detections = [];
 
-  for (const { skillId, detect, skipIfSkill } of HEURISTIC_REGISTRY) {
-    if (!hasSkill(plan, skillId)) continue;
+  for (const { skillId, detect, skipIfSkill, routing } of HEURISTIC_REGISTRY) {
+    if (routing !== 'always' && !hasSkill(plan, skillId)) continue;
     // skipIfSkill: 上位スキルが選択されている場合は重複実行を避ける
     // （test-existence が選択されていれば coverage-gap の同一検出器は実行しない）。
     if (skipIfSkill && hasSkill(plan, skipIfSkill)) continue;
