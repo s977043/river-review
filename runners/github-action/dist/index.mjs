@@ -34321,15 +34321,42 @@ function isWhitespaceOnlyChange(lines) {
   return normalizeWhitespace(added.join('')) === normalizeWhitespace(removed.join(''));
 }
 
-const COMMENT_MARKERS = [/^\/\//, /^\/\*/, /^\*($|\s)/, /^\*\/$/, /^#/, /^<!--/, /^--!?>/];
+// Invisible and Bidi format characters must reach the detectors even inside a
+// comment (#2880), so a line containing one is never treated as comment-only.
+const FORMAT_CHAR_RE = /\p{Cf}/u;
+
+function isCommentOnlyLine(content) {
+  let rest = content;
+  for (;;) {
+    rest = rest.trim();
+    if (!rest) return true;
+    if (rest.startsWith('//') || rest.startsWith('#')) return true;
+    let close = null;
+    if (rest.startsWith('/*')) close = ['*/', 2];
+    else if (rest.startsWith('<!--')) close = ['-->', 4];
+    else if (/^\*($|\s)/.test(rest)) close = ['*/', 1];
+    if (close) {
+      const end = rest.indexOf(close[0], close[1]);
+      if (end < 0) return true;
+      rest = rest.slice(end + close[0].length);
+      continue;
+    }
+    const tail = /^(\*\/|--!?>)/.exec(rest);
+    if (tail) {
+      rest = rest.slice(tail[0].length);
+      continue;
+    }
+    return false;
+  }
+}
 
 function isCommentOnlyChange(lines) {
   const changed = lines.filter((line) => line.startsWith('+') || line.startsWith('-'));
   if (!changed.length) return false;
   return changed.every((line) => {
-    const content = line.slice(1).trim();
-    if (!content) return true;
-    return COMMENT_MARKERS.some((re) => re.test(content));
+    const content = line.slice(1);
+    if (FORMAT_CHAR_RE.test(content)) return false;
+    return isCommentOnlyLine(content);
   });
 }
 
@@ -36557,6 +36584,23 @@ function criticUnreachedResult(detail) {
 }
 
 /**
+ * detector の finding を Critic が落とそうとしたときの結果（#2871）。
+ * 語彙は finding-critic.mjs の needs-human-judgment をそのまま使う。
+ *
+ * @param {{ status: string, reasons?: string[] }} result
+ */
+function detectorRetainedResult(result) {
+  return {
+    ...result,
+    status: finding_critic/* FINAL_STATUS */.aD.NEEDS_HUMAN_JUDGMENT,
+    terminal: true,
+    humanReview: true,
+    retainFinding: true,
+    reasons: [...(result.reasons ?? []), `detector finding retained (was ${result.status})`],
+  };
+}
+
+/**
  * Build the narrow Phase 5A execution-independence observation for one finding.
  *
  * The stage does not invent a verifier identity. The caller may supply a logical
@@ -36714,6 +36758,7 @@ async function runFindingCriticStage({
         llm,
         language,
         redactOptions,
+        deterministicSource: finding?.origin === 'detector',
       });
       // A runner that returns no `result` is not a clean pass either. The
       // shipped runner always fills it (`result ??=`,
@@ -36737,6 +36782,14 @@ async function runFindingCriticStage({
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
         verifierExecutionId,
       });
+    }
+  }
+
+  // #2871: a detector finding is a code-level fact, not a claim the Critic can
+  // withdraw. When the Critic would drop one, keep it and send it to a human.
+  for (const entry of entries) {
+    if (entry.finding?.origin === 'detector' && entry.result.retainFinding === false) {
+      entry.result = detectorRetainedResult(entry.result);
     }
   }
 
@@ -37145,11 +37198,18 @@ function parseReviewerResponse(raw) {
  * This is a thin adapter over `verifyFinding`; every check it reports comes
  * from `src/lib/verifier.mjs`. Nothing is re-derived here.
  *
- * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[] }} input
+ * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[], deterministicSource?: boolean }} input
  * @returns {{ verified: boolean, sendToCritic: boolean, status: string | null, reasons: string[], checks: Record<string, boolean> }}
  */
-function preVerifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
-  const result = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({ finding, diff, skill, fileTypes, diffFiles });
+function preVerifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
+  const result = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({ finding, diff, skill, fileTypes, diffFiles, deterministicSource });
   if (result.verified) {
     return {
       verified: true,
@@ -39922,6 +39982,9 @@ function collectAddedLineHints(diffText) {
  *   - skillId:     対応スキル ID（dry-run フィルタと配線に使用）
  *   - detect:      ({ diff }) => Array<{ file, line, kind }> の検出関数
  *   - skipIfSkill: （任意）指定スキルが plan に含まれる場合はこの detector を実行しない
+ *   - routing:     （任意）'always' のとき skillId が plan に無くても実行する（#2870）。
+ *                  applyTo はファイル種別・phase で skill を絞るため、誤検出が極めて
+ *                  少ない detector だけに付ける。finding の skillId は所有 skill のまま
  *   - findings:    kind → { finding, evidence, impact, fix, severity, confidence }
  *                  （review-engine の日本語メッセージ生成に使用）
  *
@@ -39960,20 +40023,26 @@ const DISABLED_TEST_FINDING = {
   confidence: 'medium',
 };
 
+const HARDCODED_SECRET_FINDING = {
+  finding: '秘密情報（トークン/キー）の直書きの可能性がある',
+  evidence: 'トークン/キーらしい文字列が追加されている',
+  impact: '漏洩時に不正利用やインシデントにつながる',
+  fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
+  severity: 'blocker',
+  confidence: 'high',
+};
+
 const HEURISTIC_REGISTRY = [
   {
     skillId: 'security-basic',
+    routing: 'always',
+    detect: findExplicitTokens,
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
+  },
+  {
+    skillId: 'security-basic',
     detect: findHardcodedSecrets,
-    findings: {
-      'hardcoded-secret': {
-        finding: '秘密情報（トークン/キー）の直書きの可能性がある',
-        evidence: 'トークン/キーらしい文字列が追加されている',
-        impact: '漏洩時に不正利用やインシデントにつながる',
-        fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
-        severity: 'blocker',
-        confidence: 'high',
-      },
-    },
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
   },
   {
     skillId: 'security-basic',
@@ -40135,6 +40204,7 @@ const HEURISTIC_REGISTRY = [
   },
   {
     skillId: 'logging-observability',
+    routing: 'always',
     detect: findMergeConflict,
     findings: {
       'merge-conflict': {
@@ -40334,17 +40404,26 @@ function looksLikeLogging(code) {
   return /\b(console\.(?:log|info|warn|error)|logger\.\w+|log\.\w+)\b/.test(code);
 }
 
+// Typical high-signal tokens/keys
+const EXPLICIT_TOKEN_PATTERNS = [
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, // AWS Access Key ID (long-term / temporary)
+  /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
+  /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
+  /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
+];
+
+function matchesExplicitToken(code) {
+  if (isEnvReference(code)) return false;
+  // AWS documentation dummy keys (e.g. AKIAIOSFODNN7EXAMPLE) are not leaks.
+  const withoutDummies = code.replace(/\b(?:AKIA|ASIA)[0-9A-Z]{9}EXAMPLE\b/g, '');
+  return EXPLICIT_TOKEN_PATTERNS.some((re) => re.test(withoutDummies));
+}
+
+// The explicit-token line is owned by findExplicitTokens, so it is excluded
+// here to keep one finding per line when security-basic is selected.
 function matchesHardcodedSecretLine(code) {
   if (isEnvReference(code)) return false;
-
-  // Typical high-signal tokens/keys
-  const explicitPatterns = [
-    /\bAKIA[0-9A-Z]{16}\b/, // AWS Access Key ID
-    /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
-    /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
-    /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
-  ];
-  if (explicitPatterns.some((re) => re.test(code))) return true;
+  if (matchesExplicitToken(code)) return false;
 
   // Heuristic: suspicious identifier name + long-ish string literal
   const assignMatch =
@@ -40363,7 +40442,15 @@ function matchesHardcodedSecretLine(code) {
   return true;
 }
 
+function findExplicitTokens({ diff }) {
+  return findSecretLines({ diff, matches: matchesExplicitToken });
+}
+
 function findHardcodedSecrets({ diff }) {
+  return findSecretLines({ diff, matches: matchesHardcodedSecretLine });
+}
+
+function findSecretLines({ diff, matches }) {
   // Avoid noisy output when many hardcoded values are introduced at once.
   const MAX_HARDCODED_SECRET_COMMENTS = 3;
   const comments = [];
@@ -40373,10 +40460,10 @@ function findHardcodedSecrets({ diff }) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
     if (looksLikeTestFile(filePath)) continue;
-    const normalized = String(filePath).replaceAll('\\', '/');
+    const normalized = `/${String(filePath).replaceAll('\\', '/')}`;
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
     for (const { line, text } of iterateAddedLines(file)) {
-      if (!matchesHardcodedSecretLine(text)) continue;
+      if (!matches(text)) continue;
       comments.push({
         file: filePath,
         line,
@@ -40853,6 +40940,8 @@ function findMergeConflict({ diff }) {
   for (const file of files) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
+    // Docs and patch files legitimately quote conflict markers (#2870 D2).
+    if (/\.(?:md|mdx|patch|diff)$/i.test(filePath)) continue;
     for (const { line, text } of iterateAddedLines(file)) {
       if (!matchesMergeConflict(text)) continue;
       comments.push({ file: filePath, line, kind: 'merge-conflict' });
@@ -41100,17 +41189,167 @@ function isEmojiAdjacentChar(ch) {
   return EXTENDED_PICTOGRAPHIC_RE.test(ch);
 }
 
+const RTL_LETTER_RE =
+  /\p{scx=Arabic}|\p{scx=Hebrew}|\p{scx=Syriac}|\p{scx=Thaana}|\p{scx=Nko}|\p{scx=Mandaic}|\p{scx=Samaritan}|\p{scx=Adlam}/u;
+const JOIN_CONTROL_SCRIPT_RES = [
+  /\p{scx=Arabic}/u,
+  /\p{scx=Syriac}/u,
+  /\p{scx=Devanagari}/u,
+  /\p{scx=Bengali}/u,
+  /\p{scx=Gurmukhi}/u,
+  /\p{scx=Gujarati}/u,
+  /\p{scx=Oriya}/u,
+  /\p{scx=Tamil}/u,
+  /\p{scx=Telugu}/u,
+  /\p{scx=Kannada}/u,
+  /\p{scx=Malayalam}/u,
+  /\p{scx=Sinhala}/u,
+];
+const NEUTRAL_TEXT_RE = /[\p{P}\p{Zs}]/u;
+const LINE_BREAK_CHARS = new Set(['\n', '\r', '\v', '\f', '\u0085', '\u2028', '\u2029']);
+const STRING_QUOTES = new Set(['"', "'"]);
+const BEFORE_STRING_CHARS = new Set(['=', '(', ',', ':', '[', '{', '+', '?']);
+const AFTER_STRING_CHARS = new Set([',', ';', ')', ']', '}', ':', '+']);
+
+const RETURN_KEYWORD = 'return';
+
+/** \`return\` that starts its own token, as in \`  return "text";\`. */
+function endsWithReturnKeyword(cps, end) {
+  const start = end - RETURN_KEYWORD.length + 1;
+  if (start < 0 || cps.slice(start, end + 1).join('') !== RETURN_KEYWORD) return false;
+  const before = cps[start - 1];
+  return before === undefined || before === ' ' || before === '\t';
+}
+
+/**
+ * Whether a line leaves a string or a line continuation open for the next line.
+ * Comments are not recognized, so an apostrophe in one also reads as open, which
+ * only withdraws the exemption.
+ */
+function quoteStateAfter(text, state = null) {
+  let quote = state;
+  const cps = Array.from(String(text));
+  let trailingBackslashes = 0;
+  for (let i = 0; i < cps.length; i += 1) {
+    const ch = cps[i];
+    trailingBackslashes = ch === '\\' ? trailingBackslashes + 1 : 0;
+    if (ch === '\\') {
+      if (quote && i + 1 < cps.length) {
+        i += 1;
+        trailingBackslashes = 0;
+      }
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+    }
+  }
+  if (quote) return quote;
+  return trailingBackslashes % 2 === 1 ? '\\' : null;
+}
+
+function closingQuoteIndex(cps, open) {
+  for (let i = open + 1; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (LINE_BREAK_CHARS.has(ch) || ch === '`') return -1;
+    if (ch === '$' && cps[i + 1] === '{') return -1;
+    if (ch === '*' && cps[i + 1] === '/') return -1;
+    if (ch === '\\') i += 1;
+    else if (ch === cps[open]) return i;
+  }
+  return -1;
+}
+
+/**
+ * Mark the characters inside quoted strings this line proves by itself. One line
+ * cannot tell what a slash, backtick, or stray quote opens, so scanning stops
+ * there and everything after it counts as code, including comments.
+ */
+function markProvenStrings(cps) {
+  const inString = new Uint8Array(cps.length);
+  let before = '';
+  let lastCode = -1;
+  for (let i = 0; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (ch === ' ' || ch === '\t') continue;
+    if (STRING_QUOTES.has(ch)) {
+      if (before && !BEFORE_STRING_CHARS.has(before) && !endsWithReturnKeyword(cps, lastCode))
+        break;
+      const close = closingQuoteIndex(cps, i);
+      if (close < 0) break;
+      let after = close + 1;
+      while (cps[after] === ' ' || cps[after] === '\t') after += 1;
+      const lineEnds = after >= cps.length || (cps[after] === '\r' && after === cps.length - 1);
+      if (!lineEnds && !AFTER_STRING_CHARS.has(cps[after])) break;
+      inString.fill(1, i + 1, close);
+      before = ch;
+      i = close;
+    } else if (ch === '/' || ch === '`' || ch === '\\' || LINE_BREAK_CHARS.has(ch)) {
+      break;
+    } else {
+      before = ch;
+      lastCode = i;
+    }
+  }
+  return inString;
+}
+
+function nearestTextChars(cps, order) {
+  const nearest = new Array(cps.length);
+  let last = '';
+  for (const i of order) {
+    nearest[i] = last;
+    const ch = cps[i];
+    if (BIDI_MARK_CPS.has(ch.codePointAt(0))) continue;
+    if (STRING_QUOTES.has(ch) || !NEUTRAL_TEXT_RE.test(ch)) last = ch;
+  }
+  return nearest;
+}
+
+function buildTextContext(cps, exemptStrings) {
+  const forward = cps.map((_, i) => i);
+  return {
+    inString: exemptStrings ? markProvenStrings(cps) : new Uint8Array(cps.length),
+    left: nearestTextChars(cps, forward),
+    right: nearestTextChars(cps, forward.reverse()),
+  };
+}
+
+/** LRM / RLM / ALM are text formatting only inside right-to-left text. */
+function isRtlTextMark({ inString, left, right }, idx) {
+  if (!inString[idx]) return false;
+  const sides = [left[idx], right[idx]];
+  return (
+    sides.some((ch) => RTL_LETTER_RE.test(ch)) &&
+    sides.every((ch) => STRING_QUOTES.has(ch) || RTL_LETTER_RE.test(ch))
+  );
+}
+
+/** ZWJ / ZWNJ shape a word only between characters of one script that uses them. */
+function isScriptJoinControl({ inString }, cps, idx) {
+  const prev = cps[idx - 1] ?? '';
+  const next = cps[idx + 1] ?? '';
+  if (!prev || !next || !inString[idx]) return false;
+  return JOIN_CONTROL_SCRIPT_RES.some((re) => re.test(prev) && re.test(next));
+}
+
 /**
  * Classify the dangerous Unicode present on a single (added) code line.
  * Returns a Set of kinds among 'bidi-control' | 'invisible-unicode' |
  * 'confusable-whitespace'. Conservative by construction (emoji sequences,
- * leading BOM, and in-string confusable whitespace are treated as legitimate).
+ * leading BOM, in-string confusable whitespace, and bidi marks and join controls
+ * in proven strings of the scripts that use them are treated as legitimate).
  * @param {string} line
+ * @param {{ exemptStrings?: boolean }} [options] false when the line may continue a
+ *   string from a line that is open or not visible.
  * @returns {Set<string>}
  */
-function detectInvisibleUnicodeKinds(line) {
+function detectInvisibleUnicodeKinds(line, { exemptStrings = true } = {}) {
   const kinds = new Set();
   const cps = Array.from(String(line));
+  let textContext = null;
 
   for (let idx = 0; idx < cps.length; idx += 1) {
     const ch = cps[idx];
@@ -41118,8 +41357,14 @@ function detectInvisibleUnicodeKinds(line) {
     const prev = cps[idx - 1] ?? '';
     const next = cps[idx + 1] ?? '';
 
-    if (cpInRanges(cp, BIDI_CONTROL_RANGES) || BIDI_MARK_CPS.has(cp)) {
+    if (cpInRanges(cp, BIDI_CONTROL_RANGES)) {
       kinds.add('bidi-control');
+      continue;
+    }
+
+    if (BIDI_MARK_CPS.has(cp)) {
+      textContext ??= buildTextContext(cps, exemptStrings);
+      if (!isRtlTextMark(textContext, idx)) kinds.add('bidi-control');
       continue;
     }
 
@@ -41135,9 +41380,14 @@ function detectInvisibleUnicodeKinds(line) {
       continue;
     }
 
-    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence.
+    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence or
+    // in text of a script that shapes words with it.
     if (cp === ZWJ || cp === ZWNJ) {
-      if (!(isEmojiAdjacentChar(prev) || isEmojiAdjacentChar(next))) {
+      if (!(
+        isEmojiAdjacentChar(prev) ||
+        isEmojiAdjacentChar(next) ||
+        isScriptJoinControl((textContext ??= buildTextContext(cps, exemptStrings)), cps, idx)
+      )) {
         kinds.add('invisible-unicode');
       }
       continue;
@@ -41227,6 +41477,40 @@ function looksLikeSourceCodeFile(filePath) {
   );
 }
 
+// Languages whose `"` / `'` strings cannot span a raw line break, so a string
+// opened above the visible hunk cannot reach an added line. PHP, Ruby, shell,
+// SQL, and others can, or run code inside the quotes, and get no exemption.
+const STRING_EXEMPT_FILE_RE = /\.(js|jsx|ts|tsx|mjs|cjs|json)$/;
+
+/**
+ * Added lines with whether a string on them can be exempt. A line can be in a
+ * STRING_EXEMPT_FILE_RE file when the file starts there, or when the previous new-side line is visible and, read on its
+ * own and carried from the first visible line, closes every string.
+ */
+function* iterateAddedLinesWithStringContext(file) {
+  const exemptLanguage = STRING_EXEMPT_FILE_RE.test(String(file?.path ?? ''));
+  for (const hunk of ensureArray(file?.hunks)) {
+    let newLineNumber = hunk.newStart ?? 0;
+    let previous = newLineNumber <= 1 ? { open: false } : null;
+    let carried = null;
+    for (const rawLine of ensureArray(hunk.lines)) {
+      if (rawLine.startsWith('-') && !rawLine.startsWith('---')) continue;
+      const added = rawLine.startsWith('+') && !rawLine.startsWith('+++');
+      const text = rawLine.slice(1);
+      if (added) {
+        yield {
+          line: newLineNumber,
+          text,
+          exemptStrings: exemptLanguage && previous !== null && !previous.open,
+        };
+      }
+      carried = quoteStateAfter(text, carried === '\\' ? null : carried);
+      previous = { open: quoteStateAfter(text) !== null || carried !== null };
+      newLineNumber += 1;
+    }
+  }
+}
+
 function findInvisibleUnicode({ diff }) {
   const MAX_INVISIBLE_UNICODE_COMMENTS = 3;
   const comments = [];
@@ -41238,8 +41522,8 @@ function findInvisibleUnicode({ diff }) {
     if (!looksLikeSourceCodeFile(filePath)) continue;
     const normalized = String(filePath).replaceAll('\\', '/');
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
-    for (const { line, text } of iterateAddedLines(file)) {
-      const kinds = detectInvisibleUnicodeKinds(text);
+    for (const { line, text, exemptStrings } of iterateAddedLinesWithStringContext(file)) {
+      const kinds = detectInvisibleUnicodeKinds(text, { exemptStrings });
       // One finding per line, highest severity first.
       let kind = null;
       if (kinds.has('bidi-control')) kind = 'bidi-control';
@@ -41516,8 +41800,8 @@ function findTemporaryWithoutExit({ diff }) {
 function collectHeuristicDetections({ diff, plan }) {
   const detections = [];
 
-  for (const { skillId, detect, skipIfSkill } of HEURISTIC_REGISTRY) {
-    if (!hasSkill(plan, skillId)) continue;
+  for (const { skillId, detect, skipIfSkill, routing } of HEURISTIC_REGISTRY) {
+    if (routing !== 'always' && !hasSkill(plan, skillId)) continue;
     // skipIfSkill: 上位スキルが選択されている場合は重複実行を避ける
     // （test-existence が選択されていれば coverage-gap の同一検出器は実行しない）。
     if (skipIfSkill && hasSkill(plan, skipIfSkill)) continue;
@@ -45731,6 +46015,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: '(no-files)',
         line: 1,
+        origin: 'fallback',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: 'レビュー対象ファイルが特定できない',
           evidence: '差分ファイルが空',
@@ -45759,6 +46044,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: firstFile.path,
         line,
+        origin: 'fallback',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: 'マッチするスキルがなく自動指摘を生成できなかった',
           evidence: evidenceBase,
@@ -45780,6 +46066,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       file: firstFile.path,
       line,
       skillId,
+      origin: 'fallback',
       message: (0,finding_factory/* formatFindingMessage */.yv)({
         finding: `スキル「${skillName}」の観点で自動指摘を生成できなかった`,
         evidence: evidenceBase,
@@ -45802,6 +46089,7 @@ function normalizeHeuristicComments(rawComments) {
       return {
         file: c.file,
         line: c.line,
+        origin: 'detector',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: `想定外のヒューリスティック（kind=${String(c.kind ?? 'unknown')}）`,
           evidence: 'ヒューリスティック kind が未知',
@@ -45816,6 +46104,7 @@ function normalizeHeuristicComments(rawComments) {
       file: c.file,
       line: c.line,
       skillId: c.skillId,
+      origin: 'detector',
       message: (0,finding_factory/* formatFindingMessage */.yv)(preset),
     };
   });
@@ -45865,6 +46154,7 @@ function redactSecrets(text) {
  * @param {Array<object>} params.comments 検証対象（LLM / heuristic / fallback の一次集合）
  * @param {{diffText: string, files?: Array<object>}} params.diff 生の差分（LLM 用に間引く前）
  * @param {boolean} params.heuristicsUsed 一次集合が既に heuristic 由来か（fail-safe の抑止条件）
+ * @param {boolean} params.heuristicsFound 一次集合が detector の finding か。fallback は含まない
  * @param {string|null|undefined} params.llmSkipped debug.llmSkipped
  * @param {string|null|undefined} params.llmError debug.llmError
  * @returns {Promise<{comments: Array<object>, debugPatch: object}>}
@@ -45876,12 +46166,13 @@ async function runVerifierStage({
   fileTypes,
   includeFallback,
   heuristicsUsed,
+  heuristicsFound,
   llmSkipped,
   llmError,
 }) {
   const { verifyFinding } = await Promise.resolve(/* import() */).then(__nccwpck_require__.bind(__nccwpck_require__, 9341));
   const skill = plan?.selected?.[0] ?? {};
-  const runVerifier = (cmts) =>
+  const runVerifier = (cmts, deterministicSource = false) =>
     cmts.map((comment) => ({
       comment,
       verification: verifyFinding({
@@ -45892,6 +46183,7 @@ async function runVerifierStage({
         // #1644: parsed diff files carry addedLines, enabling the verifier's
         // machine determination of finding scope (in-diff / pre-existing).
         diffFiles: diff.files,
+        deterministicSource,
       }),
     }));
 
@@ -45899,7 +46191,7 @@ async function runVerifierStage({
   // built below can adopt it. Metadata only — display and gating are unchanged.
   const withScope = (r) => ({ ...r.comment, scope: r.verification.scope });
 
-  const verifierResults = runVerifier(comments);
+  const verifierResults = runVerifier(comments, heuristicsFound);
   let verified = verifierResults.filter((r) => r.verification.verified).map(withScope);
   const rejected = verifierResults.filter((r) => !r.verification.verified);
 
@@ -45967,11 +46259,11 @@ async function runVerifierStage({
       debugPatch.heuristicsCount = 0;
       debugPatch.fallbackIncluded = includeFallback;
     }
-    // Re-verify the fallback set so the emitted comments still satisfy the
-    // verifier invariant (heuristic/fallback findings use the full labeled
-    // format and pass). verifierStats above intentionally keeps describing the
-    // rejected LLM batch.
-    const fallbackResults = runVerifier(degraded);
+    // Re-verify the degraded set. Detector findings skip the severity and
+    // evidence checks because those values are code constants; fallback warnings
+    // are not real findings and keep every check. verifierStats above
+    // intentionally keeps describing the rejected LLM batch.
+    const fallbackResults = runVerifier(degraded, heuristic.length > 0);
     verified = fallbackResults.filter((r) => r.verification.verified).map(withScope);
     debugPatch.scopeStats = summarizeScope(fallbackResults);
   }
@@ -46167,7 +46459,7 @@ async function generateReview({
             .filter(({ check }) => !check.ok);
           const invalidCount = invalidEntries.length;
           if (validEntries.length > 0) {
-            comments = validEntries;
+            comments = validEntries.map((c) => ({ ...c, origin: 'llm' }));
             debug.llmUsed = true;
             if (invalidCount > 0) {
               debug.droppedInvalidFindings = invalidCount;
@@ -46212,10 +46504,9 @@ async function generateReview({
       debug.heuristicsCount = heuristic.length;
     } else {
       const llmSkipReason = debug.llmSkipped || debug.llmError || null;
-      // If skipped due to missing API key, do not generate fallback warnings (user request)
-      const isMissingKey = llmSkipReason && llmSkipReason.includes('not set');
-
-      if (isMissingKey) {
+      // A run that never called the LLM has nothing to warn about (#2868);
+      // a failed LLM call still emits the fallback warning.
+      if (debug.llmSkipped) {
         comments = [];
       } else {
         comments = includeFallback ? buildFallbackComments(diff, plan, { llmSkipReason }) : [];
@@ -46262,6 +46553,7 @@ async function generateReview({
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
+    heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
   });
@@ -46332,6 +46624,9 @@ async function generateReview({
       // never invented here, so a missing artifact stays missing.
       criterionRefs: parsed.criterionRefs,
       artifactRefs: parsed.artifactRefs,
+      // #2871: internal provenance (detector / llm / fallback). The Finding
+      // Critic keeps detector findings; artifacts never carry this field.
+      origin: c.origin,
     };
   });
 
@@ -46351,6 +46646,7 @@ async function generateReview({
   // 上の skipReason がすでに判定済みなので、その真偽をそのまま渡す。呼べない
   // ことを「指摘なし」とは読まない — 段の側で全件 critic-timeout（retain +
   // humanReview）へ倒れる。
+  const preCriticFindings = findings;
   const criticStage = deferFindingCritic
     ? null
     : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
@@ -46392,6 +46688,8 @@ async function generateReview({
   return {
     comments,
     findings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings,
     classified,
     // The returned prompt flows into local-runner result, artifacts, and
     // dashboards. Use the redacted view so a leaked secret never leaves
@@ -50338,10 +50636,20 @@ function resolveFindingScope({ finding, diffFiles }) {
 }
 
 /**
- * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null }} params
+ * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null, deterministicSource?: boolean }} params
+ *   deterministicSource: the finding comes from a detector, so its severity and
+ *   evidence are code constants rather than claims to check. Callers derive it
+ *   from the batch's provenance, never from the finding text.
  * @returns {{ verified: boolean, reasons: string[], checks: object, scope: 'in-diff'|'pre-existing', scopeSource: string, scopeSelfReported: string|null, scopeMismatch: boolean }}
  */
-function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
+function verifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
   // #1666: traceability refs are additive metadata and MUST NOT move the
   // `verified` decision in either direction. RE_EVIDENCE / RE_ACTIONABLE are
   // deliberately greedy to end-of-line, so appended refs would otherwise satisfy
@@ -50356,10 +50664,10 @@ function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
       : finding;
   const checks = {
     evidenceExists: checkEvidenceExists(findingForLengthChecks),
-    evidenceInDiff: checkEvidenceInDiff(finding, diff),
+    evidenceInDiff: deterministicSource || checkEvidenceInDiff(finding, diff),
     phaseCoherent: checkPhaseCoherent(finding, skill),
     filePhaseCoherent: checkFilePhaseCoherent(finding, fileTypes),
-    severityJustified: checkSeverityJustified(findingForLengthChecks, skill),
+    severityJustified: deterministicSource || checkSeverityJustified(findingForLengthChecks, skill),
     suggestionActionable: checkSuggestionActionable(findingForLengthChecks),
   };
 
@@ -50514,7 +50822,7 @@ function buildPrDescriptionSection(prBody) {
     prBody.length > MAX_PR_BODY_CHARS
       ? `${prBody.slice(0, MAX_PR_BODY_CHARS)}\n...[truncated]`
       : prBody;
-  return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。\n\n---\n${body}\n---\n`;
+  return `\n### PR Description\n\n以下はこの変更の PR 本文です。差分そのものに加えて、PR 本文がレビュー可能な状態かを確認してください。\n\n- Why（変更理由）と What（変更内容）が書かれているか\n- 本文の説明が差分と一致しているか（説明にあるが差分に無い／差分にあるが説明に無い）\n- 影響範囲が書かれているか\n- テスト方針・確認方法が書かれているか\n- 関連 Issue / 仕様 / 設計へのリンクがあるか\n- 障害・データ損失・セキュリティ・並行性・再開/復旧について、ある事象が起きない／安全だと断定する本文中の主張（「〜なので安全」「〜は起きない」等）を列挙し、主張ごとに根拠となるコードを \`file:line\` で示す。根拠を示せない主張や反例がある主張は \`Severity: warning\` 以上（blocker 可）の finding として出力する。「テスト済み」「後方互換」「挙動は変えない」等の宣言は上の差分一致の確認で扱い、この項目の対象外とする\n\nPR 本文に関する指摘は、対象を \`PR-DESCRIPTION:0\` として出力してください。主張の検証件数は \`PR-DESCRIPTION:0\` の finding 1 行（\`Severity: nit\`、本文「PR 本文の主張: 検証 N 件 / 根拠なし M 件」）として出力してください。\n\n---\n${body}\n---\n`;
 }
 
 function reviewObligationOneLine(value) {
@@ -109978,7 +110286,13 @@ function mergeFindings(findings) {
     clusterMap.get(root).push(i);
   }
 
-  return [...clusterMap.values()].map((indices) => {
+  return [...clusterMap.values()].map((clusterIndices) => {
+    // #2871: a detector member represents its cluster (message, ruleId,
+    // origin), so an LLM representative cannot carry the detector's blocker
+    // into a Critic WITHDRAW. Severity and the other unions are unchanged.
+    const lead = clusterIndices.find((i) => findings[i]?.origin === 'detector');
+    const indices =
+      lead === undefined ? clusterIndices : [lead, ...clusterIndices.filter((i) => i !== lead)];
     const canonical = { ...findings[indices[0]] };
     if (indices.length === 1) {
       // Passthrough: attach agreement with own role, preserving existing
@@ -110474,6 +110788,8 @@ async function runReviewerOrchestration({
   return {
     comments: allComments,
     findings: finalFindings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings: allFindings,
     classified,
     reviewerResults,
     reviewCoverage,
@@ -113386,8 +113702,15 @@ async function runLocalReview({
   // PRE-suppression finding set joined with the selected skills so a suppressed
   // deterministic block still forces the gate — a suppression must not be a
   // strict_block bypass (fail-safe, mirroring SKIPPED_BY_POLICY).
+  // #2871: also join the pre-Critic detector findings so a Critic drop is not
+  // a strict_block bypass. LLM findings the Critic withdrew stay out.
   const { strictBlock: findingStrictBlock } = (0,deterministic_gate/* computeStrictBlock */.Si)({
-    findings: annotatedFindings,
+    findings: [
+      ...annotatedFindings,
+      ...(Array.isArray(review.preCriticFindings) ? review.preCriticFindings : []).filter(
+        (f) => f?.origin === 'detector'
+      ),
+    ],
     selected: context.plan?.selected ?? [],
   });
 

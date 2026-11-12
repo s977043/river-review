@@ -1133,6 +1133,222 @@ test('invisible-unicode: flags bidi marks LRM/RLM/ALM (U+200E/200F/061C)', () =>
   assert.ok(invisibleUnicodeKinds(`const c = ${CP(0x061c)}3;`).includes('bidi-control'));
 });
 
+test('invisible-unicode canary: script text keeps its bidi marks and join controls', () => {
+  for (const line of [
+    `const a = "مرحبا${CP(0x200f)}!";`,
+    `const a = "${CP(0x200e)}مرحبا";`,
+    `const a = "مرحبا${CP(0x061c)}";`,
+    `  "a": "می${CP(0x200c)}خواهم"\r`,
+    `const a = 'say \\'می${CP(0x200c)}خواهم\\'';`,
+    `const a = "say \\"می${CP(0x200c)}خواهم\\"";\r`,
+    `const a = "می${CP(0x200c)}خواهم";`,
+    `const a = "क्${CP(0x200d)}ष";`,
+    `const a = "क्${CP(0x200c)}ष";`,
+    `{"label":"می${CP(0x200c)}خواهم"}`,
+  ]) {
+    assert.deepEqual(invisibleUnicodeKinds(line), [], line);
+  }
+});
+
+test('invisible-unicode: marks and join controls outside script text stay flagged', () => {
+  for (const [line, kind] of [
+    [`const a = "admin${CP(0x200f)}user";`, 'bidi-control'],
+    [`const مرحبا${CP(0x200f)} = 1;`, 'bidi-control'],
+    [`const a = "مرحبا"${CP(0x200f)};`, 'bidi-control'],
+    [`const a = "مرحبا" + ${CP(0x200f)}b;`, 'bidi-control'],
+    [`const a = ["${CP(0x200f)}", "مرحبا"];`, 'bidi-control'],
+    [`const ad${CP(0x200c)}min = 1;`, 'invisible-unicode'],
+    [`const a = "ad${CP(0x200d)}min";`, 'invisible-unicode'],
+    [`const می${CP(0x200c)}خواهم = 1;`, 'invisible-unicode'],
+    [`const a = "می${CP(0x200c)}admin";`, 'invisible-unicode'],
+    [`const a = "می${CP(0x200c)}क";`, 'invisible-unicode'],
+    [`const a = "می${CP(0x200c)}";`, 'invisible-unicode'],
+  ]) {
+    assert.ok(invisibleUnicodeKinds(line).includes(kind), line);
+  }
+});
+
+test('invisible-unicode: a line that cannot prove its strings stays flagged', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const line of [
+    `/* c */ export const ${id} = 1;`,
+    `export const s = \`\${${id}}\`;`,
+    `export const s = \`${id}\`;`,
+    `class A { #${id} = 2; }`,
+    `const r = /'/; const ${id} = 1;`,
+    `const r = /'/; const ${id} = '';`,
+    `\`; const ${id} = 1;`,
+    `// c${CP(0x2028)}const ${id} = 1;`,
+    `// c${CP(0x2029)}const ${id} = 1;`,
+    `// c\rconst ${id} = 1;`,
+    `"a${CP(0x2028)}${id}";`,
+    `"a\r${id}";`,
+    `* const ${id} = 1;`,
+    `* "${id}" const ${id} = 1;`,
+    `/* c */ const م${CP(0x200f)} = 1;`,
+    `// ${id}`,
+    `# ${id}`,
+    `# "${id}"`,
+    `don't */ const ${id} = 'a';`,
+    `"\${${id}}";`,
+    `"a */ ${id}";`,
+    `"a\`${id}";`,
+    `"${id}" const x = 1;`,
+    `"a\\" + ${id} + "b";`,
+    `const a = "${id}`,
+    `myreturn "${id}";`,
+    `obj.return "${id}";`,
+    `$return "${id}";`,
+    `@return "${id}";`,
+    `#return "${id}";`,
+    `x.y return "${id}";`.replace('x.y ', 'x.'),
+    `/* return */ "${id}";`,
+    `return "a" + ${id};`,
+    `const r = /,"/; const ${id} = 1, s = ",";`,
+    `const s = \`, "${id}",`,
+    `\\, "${id}",`,
+    `x\r,"${id}";`,
+    `const م${CP(0x200f)}م = 1;`,
+  ]) {
+    assert.notDeepEqual(invisibleUnicodeKinds(line), [], line);
+  }
+});
+
+function invisibleUnicodeKindsInHunk(header, body, file = 'src/payload.js') {
+  const diffText = `diff --git a/${file} b/${file}\n--- a/${file}\n+++ b/${file}\n${header}\n${body}\n`;
+  const parsed = parseUnifiedDiff(diffText);
+  return buildHeuristicComments({ diff: { files: parsed.files }, plan: IU_PLAN }).map(
+    (c) => c.kind
+  );
+}
+
+test('invisible-unicode: a string continued from the previous line is not exempt', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const [file, previous, added] of [
+    ['src/a.js', ' let x = "abc\\', `+", ${id} = "+"`],
+    ['src/a.ts', ' let x = "abc\\', `+", ${id} = "+"`],
+    ['src/a.php', ' $x = "abc', `+", ${id} = "+"`],
+    ['src/a.js', ' "abc\\', `+= ", ${id} = "+"`],
+    ['src/a.js', ` "abc\\\\\\`, `+", ${id} = "+"`],
+    ['src/a.js', '+let x = "abc\\', `+", ${id} = "+"`],
+    ['src/a.js', " let x = 'abc", `+', ${id} = '+'`],
+    ['src/a.js', ' let x = `abc', `+", ${id} = "+"`],
+    ['src/a.py', ' x = """abc', `+", ${id} = "+"`],
+  ]) {
+    const kinds = invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', `${previous}\n${added}`, file);
+    assert.ok(kinds.includes('invisible-unicode'), `${previous} / ${added}`);
+  }
+  const reopened = invisibleUnicodeKindsInHunk(
+    '@@ -1,2 +1,3 @@',
+    ` foo'\n x = 'abc\n+', ${id} = '+'`
+  );
+  assert.ok(reopened.includes('invisible-unicode'), 'previous line open on its own');
+  const chained = invisibleUnicodeKindsInHunk(
+    '@@ -1,2 +1,3 @@',
+    ` x = """abc\n def\n+", ${id} = "+"`,
+    'src/a.py'
+  );
+  assert.ok(chained.includes('invisible-unicode'), 'carried across lines');
+});
+
+test('invisible-unicode: strings are exempt only in JS, TS, and JSON files', () => {
+  const id = `ب${CP(0x200c)}ب`;
+  const quoteless = ' a\n b\n c';
+  for (const [name, file, header, body] of [
+    [
+      'A5 php, opened above the hunk',
+      'src/a.php',
+      '@@ -9,3 +9,4 @@',
+      `${quoteless}\n+", $${id} = "+";`,
+    ],
+    [
+      'A8 rb, opened above the hunk',
+      'src/a.rb',
+      '@@ -9,3 +9,4 @@',
+      `${quoteless}\n+", ${id} = "+"`,
+    ],
+    ['sh command substitution', 'src/a.sh', '@@ -1,1 +1,2 @@', ` a=1\n+x="$(${id})"`],
+    ['sql quoted identifier', 'db/a.sql', '@@ -1,1 +1,2 @@', ` select 1;\n+SELECT "${id}" FROM t;`],
+    ['py', 'app/a.py', '@@ -1,1 +1,2 @@', ` a = 1\n+x = "${id}"`],
+    ['go', 'src/a.go', '@@ -1,1 +1,2 @@', ` var a = 1\n+var x = "${id}"`],
+    ['js.php', 'src/a.js.php', '@@ -1,1 +1,2 @@', ` a\n+$x = "${id}";`],
+  ]) {
+    assert.ok(invisibleUnicodeKindsInHunk(header, body, file).includes('invisible-unicode'), name);
+  }
+  const a7 =
+    'diff --git a/src/a.php b/src/a.php\n--- a/src/a.php\n+++ b/src/a.php\n' +
+    `@@ -1,1 +1,2 @@\n a\n+$x = "start\n@@ -12,1 +13,2 @@\n k\n+", $${id} = "+";\n`;
+  const a7Kinds = buildHeuristicComments({
+    diff: { files: parseUnifiedDiff(a7).files },
+    plan: IU_PLAN,
+  }).map((c) => c.kind);
+  assert.ok(a7Kinds.includes('invisible-unicode'), 'A7 php, opened in an earlier hunk');
+  for (const file of ['src/a.js', 'src/a.jsx', 'src/a.ts', 'src/a.tsx', 'src/a.mjs', 'src/a.cjs']) {
+    assert.deepEqual(
+      invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', ` const a = 1;\n+const x = "${id}";`, file),
+      [],
+      file
+    );
+  }
+  assert.deepEqual(
+    invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', ` {\n+  "x": "${id}"`, 'src/a.json'),
+    []
+  );
+});
+
+test('invisible-unicode: a line whose previous line is not visible is not exempt', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  const kinds = invisibleUnicodeKindsInHunk('@@ -10,0 +11 @@', `+", ${id} = "+"`);
+  assert.ok(kinds.includes('invisible-unicode'));
+  const legit = invisibleUnicodeKindsInHunk('@@ -10,0 +11 @@', `+const a = "${id}";`);
+  assert.ok(legit.includes('invisible-unicode'));
+});
+
+test('invisible-unicode canary: closed previous lines and file starts keep the exemption', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const [header, body] of [
+    ['@@ -0,0 +1 @@', `+const a = "${id}";`],
+    ['@@ -1,1 +1,2 @@', ` const b = "x\\\\";\n+const a = "${id}";`],
+    ['@@ -1,1 +1,2 @@', ` const b = 'it\\'s';\n+const a = "${id}";`],
+    ['@@ -1,2 +1,2 @@', ` const b = 1;\n-const a = "old\n+const a = "${id}";`],
+    ['@@ -1,1 +1,2 @@', ` const b = 1; // C:\\\\\n+const a = "${id}";`],
+  ]) {
+    assert.deepEqual(invisibleUnicodeKindsInHunk(header, body), [], body);
+  }
+});
+
+test('invisible-unicode canary: return starts a string', () => {
+  const id = `می${CP(0x200c)}خواهم`;
+  for (const line of [`return "${id}";`, `  return '${id}';`, `\treturn "${id}"`]) {
+    assert.deepEqual(invisibleUnicodeKinds(line), [], line);
+  }
+  const continued = invisibleUnicodeKindsInHunk('@@ -1,1 +1,2 @@', ` x = "abc\\\n+return "${id}";`);
+  assert.ok(continued.includes('invisible-unicode'), 'continuation line');
+});
+
+test('invisible-unicode: a mark next to an ASCII token stays flagged', () => {
+  for (const line of [
+    `const s = "admin${CP(0x200f)}, مرحبا";`,
+    `const s = "مرحبا, ${CP(0x200f)}admin";`,
+    `const s = "مرحبا${CP(0x200f)}2";`,
+  ]) {
+    assert.ok(invisibleUnicodeKinds(line).includes('bidi-control'), line);
+  }
+});
+
+test('invisible-unicode: a line full of marks is scanned in linear time', () => {
+  const started = performance.now();
+  assert.ok(invisibleUnicodeKinds(CP(0x200f).repeat(40000)).includes('bidi-control'));
+  assert.ok(performance.now() - started < 2000);
+});
+
+test('invisible-unicode: override and isolate controls stay flagged inside script text', () => {
+  for (const cp of [0x202a, 0x202e, 0x2066, 0x2067, 0x2069]) {
+    const line = `const a = "مر${CP(cp)}حبا";`;
+    assert.ok(invisibleUnicodeKinds(line).includes('bidi-control'), line);
+  }
+});
+
 test('invisible-unicode: flags additional invisible formats (math op / braille / filler / CGJ / interlinear)', () => {
   assert.ok(invisibleUnicodeKinds(`const m = a${CP(0x2062)}b;`).includes('invisible-unicode'));
   assert.ok(invisibleUnicodeKinds(`const q =${CP(0x2800)}1;`).includes('invisible-unicode'));

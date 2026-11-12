@@ -87,7 +87,7 @@ Here, `independent` establishes **distinct logical execution IDs only**. It does
 - `--phase <upstream|midstream|downstream>`: Review phase (Default: `midstream`)
 - `--planner <off|order|prune>`: Planner mode (Default: `off`)
 - `--dry-run`: Run without calling external APIs
-- `--offline` (alias `--rules-only`): Skip AI even when an API key is set; review on deterministic mechanical checks only (reproduces the Auto-approve gate locally when CI is unavailable)
+- `--offline` (alias `--rules-only`): Skip AI even when an API key is set; review on deterministic mechanical checks only (reproduces the Auto-approve gate locally when CI is unavailable). A run in which a selected skill's check detects a blocking finding stops under `--gate`, as a run without an API key or with an unreachable LLM does (critical is `ESCALATE` / exit 3, major is `NO_GO` / exit 1). With `--fail-on critical`, a critical detection exits 1. Without `--gate`, `decision` and `issues` still carry the detection. Coverage generally follows each skill's `applyTo` and phase. Explicit tokens (`AKIA` / `ASIA`, `ghp_`, `sk-`) and conflict markers are detected in every file regardless of file type and phase, except tokens under tests or fixtures, AWS dummy keys ending in `EXAMPLE` such as `AKIAIOSFODNN7EXAMPLE`, and conflict markers in `.md`, `.mdx`, `.patch`, and `.diff` files. Secret detection inferred from variable names still follows `applyTo` and phase (#2870). A run with no detection emits no fallback warning and is `GO` (#2868). RLM / LRM in right-to-left text and ZWNJ / ZWJ in Persian or Indic text are not flagged inside a quoted string (`"` or `'`), only in `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, and `.json` files. In other languages such as PHP, Ruby, Python, shell, SQL, and Go they are flagged even inside strings, so legitimate i18n strings also stop the gate (known limitation). This applies only to a string that closes on its line and whose previous line does not end with a string or line continuation left open. A line whose previous line is not visible in the diff (other than the start of a file) gets no exemption. Comments and template literals are flagged when their start is visible on the line. Inside a template or block comment that began on an earlier line, a `"…"` part of the line can be exempted (its content is text and does not run). Unquoted YAML values, JSX text, and similar forms are flagged. Override and isolate controls are always flagged. Known limitation: in a string passed to `eval`, an exempted character can still run as code
 - `--debug`: Output debug info
 - `--explain`: Print the resolved skills / gates / config tier in human-readable form (to stderr)
 - `--estimate`: Cost estimation only (no review execution)
@@ -148,7 +148,9 @@ See `runners/github-action/action.yml` for definition.
 
 ### outputs (Stable)
 
-- `comment_path`: Path to Markdown output in Actions runner temp area (used for posting PR comment)
+- `json_path`: Path to the JSON output in the Actions runner temp area. Set only when the effective output format is json and the CLI wrote a non-empty file (PR #2882). The effective format is json when `output_format=json`, when `inline_comments=true` forces json, or when `entry` is set and `output_format` is not `markdown` (the plan-only path accepts only json / markdown, so it falls back to json); empty otherwise
+
+`comment_path` is a step-internal value used by the PR comment step, not a public output of the Action.
 
 ### PR Comment Contract (Idempotent)
 

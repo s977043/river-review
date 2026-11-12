@@ -151,7 +151,7 @@ skills:
     description: 'Reviews logging and observability practices'
 
   - id: pr-description
-    version: '0.2.0'
+    version: '0.3.0'
     name: 'PR Description Review'
     path: skills/midstream/pr-description/SKILL.md
     category: midstream

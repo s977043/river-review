@@ -534,7 +534,7 @@
     {
       "id": "pr-description",
       "path": "skills/midstream/pr-description",
-      "checksum": "sha256:b1a87a66e5122ef0cc4d04b3a383113b4d864bf8506c95f73c903b5e8d4a1b38",
+      "checksum": "sha256:9c2140f7c19f3ec76dcb2926fcd4f7d354105e512a4081c718d9c2a748274245",
       "files": 1
     },
     {
@@ -618,7 +618,7 @@
     {
       "id": "river-review",
       "path": "skills/agent-skills/river-review",
-      "checksum": "sha256:1bff2fd3ac6a721c0b542b7c139cc0b2a696be91fd837957634b28953fb660c8",
+      "checksum": "sha256:f40e0e1595ddb4d019fc3055e376d6f486341db75271554fd561de8bdfa7555a",
       "files": 11
     },
     {
