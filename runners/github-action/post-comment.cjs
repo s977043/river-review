@@ -60,6 +60,24 @@ function isRiverReviewComment(body) {
   );
 }
 
+/**
+ * #2869: under `gate: true` the River Review step exits non-zero (NO_GO=1,
+ * ESCALATE=3) and the `Gate:` line goes to stderr, so the comment body alone
+ * does not say why the job failed. Insert a note right after the marker so the
+ * body still starts with it.
+ *
+ * @param {string} body comment body starting with COMMENT_MARKER
+ * @returns {string}
+ */
+function withGateExitNote(body) {
+  const code = process.env.RIVER_REVIEWER_EXIT_CODE;
+  if (process.env.RIVER_REVIEWER_GATE !== 'true' || !code || code === '0') return body;
+  const note =
+    `> [!WARNING]\n> River Review exited ${code} under \`gate: true\`, so this job fails. ` +
+    'See the `Gate:` line in the job log.';
+  return `${COMMENT_MARKER}\n${note}\n\n${body.slice(COMMENT_MARKER.length).replace(/^\n/, '')}`;
+}
+
 module.exports = async function postComment({ github, context, core }) {
   const outputPath = process.env.RIVER_REVIEWER_COMMENT_PATH;
   if (!outputPath || !fs.existsSync(outputPath)) {
@@ -68,9 +86,14 @@ module.exports = async function postComment({ github, context, core }) {
   }
 
   let body = fs.readFileSync(outputPath, 'utf8').trim();
+  if (!body) {
+    core.setFailed('River Reviewer output file is empty; leaving the existing comment as is.');
+    return;
+  }
   if (!body.startsWith(COMMENT_MARKER)) {
     body = `${COMMENT_MARKER}\n${body}`;
   }
+  body = withGateExitNote(body);
   if (body.length > MAX_COMMENT_LENGTH) {
     body = `${body.slice(0, MAX_COMMENT_LENGTH)}\n\n…(truncated)`;
   }
@@ -111,5 +134,6 @@ module.exports = async function postComment({ github, context, core }) {
 };
 
 module.exports.isRiverReviewComment = isRiverReviewComment;
+module.exports.withGateExitNote = withGateExitNote;
 module.exports.COMMENT_MARKER = COMMENT_MARKER;
 module.exports.LEGACY_COMMENT_MARKER = LEGACY_COMMENT_MARKER;
