@@ -36472,6 +36472,23 @@ function criticUnreachedResult(detail) {
 }
 
 /**
+ * detector の finding を Critic が落とそうとしたときの結果（#2871）。
+ * 語彙は finding-critic.mjs の needs-human-judgment をそのまま使う。
+ *
+ * @param {{ status: string, reasons?: string[] }} result
+ */
+function detectorRetainedResult(result) {
+  return {
+    ...result,
+    status: finding_critic/* FINAL_STATUS */.aD.NEEDS_HUMAN_JUDGMENT,
+    terminal: true,
+    humanReview: true,
+    retainFinding: true,
+    reasons: [...(result.reasons ?? []), `detector finding retained (was ${result.status})`],
+  };
+}
+
+/**
  * Build the narrow Phase 5A execution-independence observation for one finding.
  *
  * The stage does not invent a verifier identity. The caller may supply a logical
@@ -36629,6 +36646,7 @@ async function runFindingCriticStage({
         llm,
         language,
         redactOptions,
+        deterministicSource: finding?.origin === 'detector',
       });
       // A runner that returns no `result` is not a clean pass either. The
       // shipped runner always fills it (`result ??=`,
@@ -36652,6 +36670,14 @@ async function runFindingCriticStage({
         result: criticUnreachedResult(`critic stage error: ${err?.message}`),
         verifierExecutionId,
       });
+    }
+  }
+
+  // #2871: a detector finding is a code-level fact, not a claim the Critic can
+  // withdraw. When the Critic would drop one, keep it and send it to a human.
+  for (const entry of entries) {
+    if (entry.finding?.origin === 'detector' && entry.result.retainFinding === false) {
+      entry.result = detectorRetainedResult(entry.result);
     }
   }
 
@@ -37060,11 +37086,18 @@ function parseReviewerResponse(raw) {
  * This is a thin adapter over `verifyFinding`; every check it reports comes
  * from `src/lib/verifier.mjs`. Nothing is re-derived here.
  *
- * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[] }} input
+ * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[], deterministicSource?: boolean }} input
  * @returns {{ verified: boolean, sendToCritic: boolean, status: string | null, reasons: string[], checks: Record<string, boolean> }}
  */
-function preVerifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
-  const result = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({ finding, diff, skill, fileTypes, diffFiles });
+function preVerifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
+  const result = (0,_verifier_mjs__WEBPACK_IMPORTED_MODULE_0__.verifyFinding)({ finding, diff, skill, fileTypes, diffFiles, deterministicSource });
   if (result.verified) {
     return {
       verified: true,
@@ -39837,6 +39870,9 @@ function collectAddedLineHints(diffText) {
  *   - skillId:     対応スキル ID（dry-run フィルタと配線に使用）
  *   - detect:      ({ diff }) => Array<{ file, line, kind }> の検出関数
  *   - skipIfSkill: （任意）指定スキルが plan に含まれる場合はこの detector を実行しない
+ *   - routing:     （任意）'always' のとき skillId が plan に無くても実行する（#2870）。
+ *                  applyTo はファイル種別・phase で skill を絞るため、誤検出が極めて
+ *                  少ない detector だけに付ける。finding の skillId は所有 skill のまま
  *   - findings:    kind → { finding, evidence, impact, fix, severity, confidence }
  *                  （review-engine の日本語メッセージ生成に使用）
  *
@@ -39875,20 +39911,26 @@ const DISABLED_TEST_FINDING = {
   confidence: 'medium',
 };
 
+const HARDCODED_SECRET_FINDING = {
+  finding: '秘密情報（トークン/キー）の直書きの可能性がある',
+  evidence: 'トークン/キーらしい文字列が追加されている',
+  impact: '漏洩時に不正利用やインシデントにつながる',
+  fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
+  severity: 'blocker',
+  confidence: 'high',
+};
+
 const HEURISTIC_REGISTRY = [
   {
     skillId: 'security-basic',
+    routing: 'always',
+    detect: findExplicitTokens,
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
+  },
+  {
+    skillId: 'security-basic',
     detect: findHardcodedSecrets,
-    findings: {
-      'hardcoded-secret': {
-        finding: '秘密情報（トークン/キー）の直書きの可能性がある',
-        evidence: 'トークン/キーらしい文字列が追加されている',
-        impact: '漏洩時に不正利用やインシデントにつながる',
-        fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
-        severity: 'blocker',
-        confidence: 'high',
-      },
-    },
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
   },
   {
     skillId: 'security-basic',
@@ -40050,6 +40092,7 @@ const HEURISTIC_REGISTRY = [
   },
   {
     skillId: 'logging-observability',
+    routing: 'always',
     detect: findMergeConflict,
     findings: {
       'merge-conflict': {
@@ -40249,17 +40292,26 @@ function looksLikeLogging(code) {
   return /\b(console\.(?:log|info|warn|error)|logger\.\w+|log\.\w+)\b/.test(code);
 }
 
+// Typical high-signal tokens/keys
+const EXPLICIT_TOKEN_PATTERNS = [
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, // AWS Access Key ID (long-term / temporary)
+  /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
+  /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
+  /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
+];
+
+function matchesExplicitToken(code) {
+  if (isEnvReference(code)) return false;
+  // AWS documentation dummy keys (e.g. AKIAIOSFODNN7EXAMPLE) are not leaks.
+  const withoutDummies = code.replace(/\b(?:AKIA|ASIA)[0-9A-Z]{9}EXAMPLE\b/g, '');
+  return EXPLICIT_TOKEN_PATTERNS.some((re) => re.test(withoutDummies));
+}
+
+// The explicit-token line is owned by findExplicitTokens, so it is excluded
+// here to keep one finding per line when security-basic is selected.
 function matchesHardcodedSecretLine(code) {
   if (isEnvReference(code)) return false;
-
-  // Typical high-signal tokens/keys
-  const explicitPatterns = [
-    /\bAKIA[0-9A-Z]{16}\b/, // AWS Access Key ID
-    /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
-    /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
-    /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
-  ];
-  if (explicitPatterns.some((re) => re.test(code))) return true;
+  if (matchesExplicitToken(code)) return false;
 
   // Heuristic: suspicious identifier name + long-ish string literal
   const assignMatch =
@@ -40278,7 +40330,15 @@ function matchesHardcodedSecretLine(code) {
   return true;
 }
 
+function findExplicitTokens({ diff }) {
+  return findSecretLines({ diff, matches: matchesExplicitToken });
+}
+
 function findHardcodedSecrets({ diff }) {
+  return findSecretLines({ diff, matches: matchesHardcodedSecretLine });
+}
+
+function findSecretLines({ diff, matches }) {
   // Avoid noisy output when many hardcoded values are introduced at once.
   const MAX_HARDCODED_SECRET_COMMENTS = 3;
   const comments = [];
@@ -40288,10 +40348,10 @@ function findHardcodedSecrets({ diff }) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
     if (looksLikeTestFile(filePath)) continue;
-    const normalized = String(filePath).replaceAll('\\', '/');
+    const normalized = `/${String(filePath).replaceAll('\\', '/')}`;
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
     for (const { line, text } of iterateAddedLines(file)) {
-      if (!matchesHardcodedSecretLine(text)) continue;
+      if (!matches(text)) continue;
       comments.push({
         file: filePath,
         line,
@@ -40768,6 +40828,8 @@ function findMergeConflict({ diff }) {
   for (const file of files) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
+    // Docs and patch files legitimately quote conflict markers (#2870 D2).
+    if (/\.(?:md|mdx|patch|diff)$/i.test(filePath)) continue;
     for (const { line, text } of iterateAddedLines(file)) {
       if (!matchesMergeConflict(text)) continue;
       comments.push({ file: filePath, line, kind: 'merge-conflict' });
@@ -41626,8 +41688,8 @@ function findTemporaryWithoutExit({ diff }) {
 function collectHeuristicDetections({ diff, plan }) {
   const detections = [];
 
-  for (const { skillId, detect, skipIfSkill } of HEURISTIC_REGISTRY) {
-    if (!hasSkill(plan, skillId)) continue;
+  for (const { skillId, detect, skipIfSkill, routing } of HEURISTIC_REGISTRY) {
+    if (routing !== 'always' && !hasSkill(plan, skillId)) continue;
     // skipIfSkill: 上位スキルが選択されている場合は重複実行を避ける
     // （test-existence が選択されていれば coverage-gap の同一検出器は実行しない）。
     if (skipIfSkill && hasSkill(plan, skipIfSkill)) continue;
@@ -45841,6 +45903,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: '(no-files)',
         line: 1,
+        origin: 'fallback',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: 'レビュー対象ファイルが特定できない',
           evidence: '差分ファイルが空',
@@ -45869,6 +45932,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: firstFile.path,
         line,
+        origin: 'fallback',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: 'マッチするスキルがなく自動指摘を生成できなかった',
           evidence: evidenceBase,
@@ -45890,6 +45954,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       file: firstFile.path,
       line,
       skillId,
+      origin: 'fallback',
       message: (0,finding_factory/* formatFindingMessage */.yv)({
         finding: `スキル「${skillName}」の観点で自動指摘を生成できなかった`,
         evidence: evidenceBase,
@@ -45912,6 +45977,7 @@ function normalizeHeuristicComments(rawComments) {
       return {
         file: c.file,
         line: c.line,
+        origin: 'detector',
         message: (0,finding_factory/* formatFindingMessage */.yv)({
           finding: `想定外のヒューリスティック（kind=${String(c.kind ?? 'unknown')}）`,
           evidence: 'ヒューリスティック kind が未知',
@@ -45926,6 +45992,7 @@ function normalizeHeuristicComments(rawComments) {
       file: c.file,
       line: c.line,
       skillId: c.skillId,
+      origin: 'detector',
       message: (0,finding_factory/* formatFindingMessage */.yv)(preset),
     };
   });
@@ -46280,7 +46347,7 @@ async function generateReview({
             .filter(({ check }) => !check.ok);
           const invalidCount = invalidEntries.length;
           if (validEntries.length > 0) {
-            comments = validEntries;
+            comments = validEntries.map((c) => ({ ...c, origin: 'llm' }));
             debug.llmUsed = true;
             if (invalidCount > 0) {
               debug.droppedInvalidFindings = invalidCount;
@@ -46325,10 +46392,9 @@ async function generateReview({
       debug.heuristicsCount = heuristic.length;
     } else {
       const llmSkipReason = debug.llmSkipped || debug.llmError || null;
-      // If skipped due to missing API key, do not generate fallback warnings (user request)
-      const isMissingKey = llmSkipReason && llmSkipReason.includes('not set');
-
-      if (isMissingKey) {
+      // A run that never called the LLM has nothing to warn about (#2868);
+      // a failed LLM call still emits the fallback warning.
+      if (debug.llmSkipped) {
         comments = [];
       } else {
         comments = includeFallback ? buildFallbackComments(diff, plan, { llmSkipReason }) : [];
@@ -46446,6 +46512,9 @@ async function generateReview({
       // never invented here, so a missing artifact stays missing.
       criterionRefs: parsed.criterionRefs,
       artifactRefs: parsed.artifactRefs,
+      // #2871: internal provenance (detector / llm / fallback). The Finding
+      // Critic keeps detector findings; artifacts never carry this field.
+      origin: c.origin,
     };
   });
 
@@ -46465,6 +46534,7 @@ async function generateReview({
   // 上の skipReason がすでに判定済みなので、その真偽をそのまま渡す。呼べない
   // ことを「指摘なし」とは読まない — 段の側で全件 critic-timeout（retain +
   // humanReview）へ倒れる。
+  const preCriticFindings = findings;
   const criticStage = deferFindingCritic
     ? null
     : await (0,finding_critic_stage/* runFindingCriticStage */.X4)({
@@ -46506,6 +46576,8 @@ async function generateReview({
   return {
     comments,
     findings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings,
     classified,
     // The returned prompt flows into local-runner result, artifacts, and
     // dashboards. Use the redacted view so a leaked secret never leaves
@@ -110102,7 +110174,13 @@ function mergeFindings(findings) {
     clusterMap.get(root).push(i);
   }
 
-  return [...clusterMap.values()].map((indices) => {
+  return [...clusterMap.values()].map((clusterIndices) => {
+    // #2871: a detector member represents its cluster (message, ruleId,
+    // origin), so an LLM representative cannot carry the detector's blocker
+    // into a Critic WITHDRAW. Severity and the other unions are unchanged.
+    const lead = clusterIndices.find((i) => findings[i]?.origin === 'detector');
+    const indices =
+      lead === undefined ? clusterIndices : [lead, ...clusterIndices.filter((i) => i !== lead)];
     const canonical = { ...findings[indices[0]] };
     if (indices.length === 1) {
       // Passthrough: attach agreement with own role, preserving existing
@@ -110598,6 +110676,8 @@ async function runReviewerOrchestration({
   return {
     comments: allComments,
     findings: finalFindings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings: allFindings,
     classified,
     reviewerResults,
     reviewCoverage,
@@ -113510,8 +113590,15 @@ async function runLocalReview({
   // PRE-suppression finding set joined with the selected skills so a suppressed
   // deterministic block still forces the gate — a suppression must not be a
   // strict_block bypass (fail-safe, mirroring SKIPPED_BY_POLICY).
+  // #2871: also join the pre-Critic detector findings so a Critic drop is not
+  // a strict_block bypass. LLM findings the Critic withdrew stay out.
   const { strictBlock: findingStrictBlock } = (0,deterministic_gate/* computeStrictBlock */.Si)({
-    findings: annotatedFindings,
+    findings: [
+      ...annotatedFindings,
+      ...(Array.isArray(review.preCriticFindings) ? review.preCriticFindings : []).filter(
+        (f) => f?.origin === 'detector'
+      ),
+    ],
     selected: context.plan?.selected ?? [],
   });
 

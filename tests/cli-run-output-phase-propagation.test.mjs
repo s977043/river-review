@@ -49,19 +49,36 @@ function createRepoWithChange() {
 }
 
 /**
+ * LLM 呼び出しを失敗させる env。閉じたローカルポートへ向けるので外部へは接続しない。
+ * LLM を呼ばない run（dry-run / offline）は fallback を出さず（#2868）、upstream /
+ * downstream には heuristic を持つ skill が無いので issues が空になる。呼び出しが
+ * 失敗した run は fallback を出すので、phase を名乗る issue が残る。
+ */
+const LLM_FAILURE_ENV = {
+  OPENAI_API_KEY: 'test-key',
+  RIVER_OPENAI_API_KEY: '',
+  RIVER_OFFLINE: '',
+  RIVER_OPENAI_BASE_URL: 'http://127.0.0.1:9/v1/chat/completions',
+};
+
+/**
  * CLI をサブプロセスで起動し、stdout を成果物ファイルへ書き出してから読み戻す。
  *
  * @param {string} dir リポジトリ
  * @param {string} phase `--phase` に渡す値
  * @param {string} format `--output` に渡す値
+ * @param {{ llmFailure?: boolean }} [options] true なら dry-run せず LLM 呼び出しを失敗させる
  * @returns {Promise<string>} 成果物ファイルの中身
  */
-async function writeArtifact(dir, phase, format) {
+async function writeArtifact(dir, phase, format, { llmFailure = false } = {}) {
   const result = await runCliAsSubprocess(
-    ['run', '.', '--dry-run', '--phase', phase, '--output', format],
+    ['run', '.', ...(llmFailure ? [] : ['--dry-run']), '--phase', phase, '--output', format],
     // RIVER_PHASE が開発者環境に残っていても結果が変わらないことを明示する。
     // `--phase` は明示指定なので env より優先される（src/cli.mjs:1929）。
-    { cwd: dir, env: { RIVER_PHASE: 'midstream' } }
+    {
+      cwd: dir,
+      env: { RIVER_PHASE: 'midstream', ...(llmFailure ? LLM_FAILURE_ENV : {}) },
+    }
   );
   assert.strictEqual(result.code, 0, `${phase}/${format}: ${result.stderr}`);
 
@@ -81,11 +98,11 @@ function loadYamlReview(artifact) {
 
 describe('river run --phase reaches every --output artifact (#1962 wiring pins)', () => {
   for (const phase of NON_DEFAULT_PHASES) {
-    test(`json artifact reports the requested phase (${phase})`, async (t) => {
+    test(`json artifact reports the requested phase (${phase})`, { timeout: 30_000 }, async (t) => {
       const { dir, cleanup } = await createRepoWithChange();
       t.after(cleanup);
 
-      const parsed = JSON.parse(await writeArtifact(dir, phase, 'json'));
+      const parsed = JSON.parse(await writeArtifact(dir, phase, 'json', { llmFailure: true }));
 
       assert.ok(Array.isArray(parsed.issues) && parsed.issues.length > 0, 'issues が空');
       for (const [i, issue] of parsed.issues.entries()) {
