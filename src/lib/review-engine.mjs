@@ -165,6 +165,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: '(no-files)',
         line: 1,
+        origin: 'fallback',
         message: formatFindingMessage({
           finding: 'レビュー対象ファイルが特定できない',
           evidence: '差分ファイルが空',
@@ -193,6 +194,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       {
         file: firstFile.path,
         line,
+        origin: 'fallback',
         message: formatFindingMessage({
           finding: 'マッチするスキルがなく自動指摘を生成できなかった',
           evidence: evidenceBase,
@@ -214,6 +216,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
       file: firstFile.path,
       line,
       skillId,
+      origin: 'fallback',
       message: formatFindingMessage({
         finding: `スキル「${skillName}」の観点で自動指摘を生成できなかった`,
         evidence: evidenceBase,
@@ -236,6 +239,7 @@ function normalizeHeuristicComments(rawComments) {
       return {
         file: c.file,
         line: c.line,
+        origin: 'detector',
         message: formatFindingMessage({
           finding: `想定外のヒューリスティック（kind=${String(c.kind ?? 'unknown')}）`,
           evidence: 'ヒューリスティック kind が未知',
@@ -250,6 +254,7 @@ function normalizeHeuristicComments(rawComments) {
       file: c.file,
       line: c.line,
       skillId: c.skillId,
+      origin: 'detector',
       message: formatFindingMessage(preset),
     };
   });
@@ -604,7 +609,7 @@ export async function generateReview({
             .filter(({ check }) => !check.ok);
           const invalidCount = invalidEntries.length;
           if (validEntries.length > 0) {
-            comments = validEntries;
+            comments = validEntries.map((c) => ({ ...c, origin: 'llm' }));
             debug.llmUsed = true;
             if (invalidCount > 0) {
               debug.droppedInvalidFindings = invalidCount;
@@ -769,6 +774,9 @@ export async function generateReview({
       // never invented here, so a missing artifact stays missing.
       criterionRefs: parsed.criterionRefs,
       artifactRefs: parsed.artifactRefs,
+      // #2871: internal provenance (detector / llm / fallback). The Finding
+      // Critic keeps detector findings; artifacts never carry this field.
+      origin: c.origin,
     };
   });
 
@@ -788,6 +796,7 @@ export async function generateReview({
   // 上の skipReason がすでに判定済みなので、その真偽をそのまま渡す。呼べない
   // ことを「指摘なし」とは読まない — 段の側で全件 critic-timeout（retain +
   // humanReview）へ倒れる。
+  const preCriticFindings = findings;
   const criticStage = deferFindingCritic
     ? null
     : await runFindingCriticStage({
@@ -829,6 +838,8 @@ export async function generateReview({
   return {
     comments,
     findings,
+    // #2871: strict_block の判定だけが読む。artifact には載せない。
+    preCriticFindings,
     classified,
     // The returned prompt flows into local-runner result, artifacts, and
     // dashboards. Use the redacted view so a leaked secret never leaves

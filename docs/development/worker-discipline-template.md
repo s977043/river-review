@@ -248,6 +248,7 @@
   head SHA を完了報告に書くこと（脱出手順は `docs/runbook/bot-pushed-head-kick.md`。オーガナイザーが自分のアカウントで
   空コミットを push する）。2026-10-07 の PR #2558 で発生した。
 - `runners/github-action/dist` への影響は、`scripts/node22.sh npm run build:action` を実行し、`git status` と `git diff --stat runners/github-action/dist` で判断すること。関数名を dist に grep しても判断できない。ncc がチャンク（例 `980.index.mjs`）に分割し、名前が残らないことがある。2026-10-28 の PR #2815 では `formatHtmlOutput` の grep が 0 件で「再ビルド不要」と報告したが、bot が `dist/980.index.mjs` などを再ビルドして push し、CI が止まった。
+- `build:action` の後は `git status` を見て、`origin/main` に無い番号付き dist チャンク（`dist/<数字>.index.mjs(.map)`）が増えていたら commit しないこと。worktree に `node_modules` が無いと主 checkout の依存で解決されて孤児チャンクが生成され、`Action dist freshness` は検出しない（2026-11-13、PR #2885 / PR #2893）。
 - commit が失敗して lint-staged の自動 stash（"lint-staged automatic backup"）が残ったら、drop も apply もしないこと。
   `git stash list` の該当行を完了報告に転記する。2026-10-07 の PR #2556 で発生した。
 - commit message は header と本文の各行を 100 文字以内にすること（commitlint の `header-max-length` /
