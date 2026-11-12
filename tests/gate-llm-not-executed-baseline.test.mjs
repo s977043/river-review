@@ -49,6 +49,13 @@ const BLOCKING = {
   inputsHash: '29a9280aad5eedac',
   exit: 1,
 };
+const HEURISTIC_ESCALATE = {
+  decision: 'human-review-required',
+  gate: 'ESCALATE',
+  reasonCode: 'DECISION_ESCALATED',
+  inputsHash: '077eee8ad4e25eb2',
+  exit: 3,
+};
 
 const ROLES = 'bug-hunter,security-scanner';
 const KEY = { OPENAI_API_KEY: 'test-key' };
@@ -89,6 +96,7 @@ const isolatedEnv = (env) => ({
   RIVER_AVAILABLE_CONTEXTS: undefined,
   RIVER_AVAILABLE_DEPENDENCIES: undefined,
   RIVER_PR_LABELS: undefined,
+  RIVER_PR_BODY: undefined,
   GITHUB_EVENT_PATH: undefined,
   RIVER_REVIEW_DISABLE_GLOBAL_CONFIG: '1',
   ...env,
@@ -203,21 +211,27 @@ const BOTH_PATHS = [
   ],
   ['TC-08 valid NO_ISSUES', { env: KEY }, { ...CLEAN, ...EXECUTED }],
   ['TC-08 valid NO_ISSUES, =1', { env: { ...KEY, ...OPT_IN } }, { ...CLEAN, ...EXECUTED }],
-  // The detector fires, but the verifier rejects the blocker ("Severity exceeds
-  // skill severity without justification"), so the CLI reports a clean run.
-  ['TC-09 no key, heuristic blocker', { source: MERGE_CONFLICT }, { ...CLEAN, ...SKIPPED }],
+  [
+    'TC-09 no key, heuristic blocker',
+    { source: MERGE_CONFLICT },
+    { ...HEURISTIC_ESCALATE, ...SKIPPED, issues: ['critical', 'critical'] },
+  ],
   [
     'TC-09 RIVER_OFFLINE, heuristic blocker',
     { env: OFFLINE, source: MERGE_CONFLICT },
-    { ...CLEAN, ...SKIPPED },
+    { ...HEURISTIC_ESCALATE, ...SKIPPED, issues: ['critical', 'critical'] },
   ],
-  // The same NBSP finding survives the verifier in .ts and is rejected in .js.
+  // The same NBSP finding reaches the gate in .ts and .js.
   [
     'TC-09 no key, NBSP in .ts',
     { file: 'src/app.ts', source: NBSP_SOURCE },
     { ...BLOCKING, ...SKIPPED, issues: ['major'] },
   ],
-  ['TC-09 no key, NBSP in .js', { source: NBSP_SOURCE }, { ...CLEAN, ...SKIPPED }],
+  [
+    'TC-09 no key, NBSP in .js',
+    { source: NBSP_SOURCE },
+    { ...BLOCKING, ...SKIPPED, issues: ['major'] },
+  ],
   [
     'TC-10a no key, heuristic minor',
     { source: SILENT_CATCH },
@@ -297,9 +311,8 @@ describe('LLM-not-executed baseline at the derivation layer (#2812)', () => {
     assert.equal(gateDecisionExitCode(gate.decision), expected.exit);
   }
 
-  // Derivation only for TC-10b and TC-09 critical: no no-key CLI input tried
-  // (NBSP, bidi control, AWS-shaped key, merge conflict) produced these findings.
-  // TC-09 major is also pinned through the CLI in BOTH_PATHS.
+  // Derivation only for TC-10b: no no-key CLI input tried produced that finding.
+  // TC-09 major and critical are also pinned through the CLI in BOTH_PATHS.
   for (const [pathName, extra] of [
     ['single reviewer', {}],
     ['--reviewers', fulfilledRole],
