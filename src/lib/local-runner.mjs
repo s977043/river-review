@@ -1,7 +1,13 @@
 import path from 'node:path';
 import { ConfigLoader } from '../config/loader.mjs';
 import { hasSelection, resolveSelectionSkillIds } from './selection.mjs';
-import { buildLlmDiffView, collectRepoDiff, renderDiffText } from './diff-processor.mjs';
+import {
+  buildLlmDiffView,
+  collectRepoDiff,
+  optimizeDiff,
+  renderDiffText,
+} from './diff-processor.mjs';
+import { collectHeuristicDetections } from './heuristic-review.mjs';
 import { generateReview } from './review-engine.mjs';
 import { runReviewerOrchestration } from './reviewer-orchestrator.mjs';
 import { runReviewConcernAnalyzer } from './review-concern-analyzer.mjs';
@@ -275,16 +281,19 @@ export async function planLocalReview({
     diff,
     rawChangedFiles,
     reviewFiles,
-    reviewFileScope,
-    availableContexts: contexts,
+    reviewFileScope: initialReviewFileScope,
+    availableContexts: initialContexts,
     availableDependencies: dependencies,
-    fullFileSupply,
+    fullFileSupply: initialFullFileSupply,
     config,
     configPath,
     configSource,
     prLabels,
     prBody,
   } = base;
+  let reviewFileScope = initialReviewFileScope;
+  let contexts = initialContexts;
+  let fullFileSupply = initialFullFileSupply;
   const requestedPlannerMode = normalizePlannerMode(plannerMode ?? process.env.RIVER_PLANNER_MODE, {
     defaultMode: 'off',
   });
@@ -329,6 +338,69 @@ export async function planLocalReview({
       prLabels,
       matchedLabels: ignoredLabels,
     };
+  }
+
+  // An empty prompt is not evidence that the raw changes are harmless. Before
+  // the CLI's no-changes shortcut, run the existing skill-routed detectors on
+  // comment-filtered files. Explicit exclusions, whitespace-only hunks and
+  // generated/Markdown/lockfile exclusions keep their existing scope (#2891).
+  if (!reviewFiles.length) {
+    const candidates = optimizeDiff(
+      { files: diff.files, diffText: diff.rawDiffText },
+      { includeMarkdown: normalizePhase(phase) === 'upstream', includeComments: true }
+    );
+    if (candidates.files.length) {
+      const candidatePaths = new Set(candidates.files.map((file) => file.path));
+      const detectorDiff = {
+        ...diff,
+        files: diff.files.filter((file) => candidatePaths.has(file.path)),
+      };
+      const candidateFullFileSupply = resolveFullFileSupply({
+        changedFiles: [...candidatePaths],
+        repoRoot,
+        security: config.security,
+        context: config.context,
+      });
+      const candidateContexts = resolveAvailableContexts(availableContexts, {
+        alwaysInclude: [
+          ...(prBody ? ['prDescription'] : []),
+          ...(candidateFullFileSupply.available ? ['fullFile'] : []),
+        ],
+      });
+      const detectorPlan = await buildExecutionPlan({
+        phase: normalizePhase(phase),
+        changedFiles: [...candidatePaths],
+        diffText: renderDiffText(detectorDiff.files),
+        availableContexts: candidateContexts,
+        availableDependencies: dependencies,
+        preferredModelHint,
+        plannerMode: 'off',
+        dryRun: true,
+        llmEnabled: false,
+        repoRoot,
+        riskMap,
+        skillIds: effectiveSkillIds,
+        manualReviewMode,
+        specDirs: config.review?.specDirs ?? [],
+      });
+      if (collectHeuristicDetections({ diff: detectorDiff, plan: detectorPlan }).length) {
+        reviewFiles.push(...candidatePaths);
+        fullFileSupply = candidateFullFileSupply;
+        contexts = candidateContexts;
+        // Chunking and phase-specific prompt views must not discard the hunks
+        // restored by this preflight a second time.
+        diff.includeCommentOnlyHunks = true;
+        diff.filesForReview = candidates.files;
+        diff.diffText = candidates.diffText;
+        diff.tokenEstimate = candidates.tokenEstimate;
+        diff.reduction = candidates.reduction;
+        reviewFileScope = deriveReviewFileScope(
+          { changedFiles: rawChangedFiles },
+          diff,
+          config.exclude?.files ?? []
+        );
+      }
+    }
   }
 
   if (!reviewFiles.length) {

@@ -341,7 +341,6 @@ const DROPPED_LINES = [
   ['TC-D2 closed block comment', '/* c */'],
   ['TC-D3 doc continuation', '* doc line'],
   ['TC-D4 block close', ' */'],
-  ['TC-D5 hash comment', '# py comment'],
   ['TC-D6 closed HTML comment', '<!-- x -->'],
   ['TC-D7 open doc block', '/** start'],
   ['TC-D8 block then line comment', '/* a */ // b'],
@@ -354,8 +353,8 @@ for (const [name, line] of DROPPED_LINES) {
   });
 }
 
-test('TC-R1 hash-prefixed code is still filtered as a comment (known gap, #2880 D3)', () => {
-  assert.equal(optimizeFromText(oneLineAddDiff('#x = 1;')).files.length, 0);
+test('TC-R1 hash-prefixed code is retained without assuming a comment language (#2891)', () => {
+  assert.equal(optimizeFromText(oneLineAddDiff('#x = 1;')).files.length, 1);
 });
 
 test('TC-E1 collectRepoDiff keeps a block comment before code for review (#2880)', async (t) => {

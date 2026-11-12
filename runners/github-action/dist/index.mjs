@@ -34119,6 +34119,7 @@ function computeStrictBlock({ findings, selected } = {}) {
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __nccwpck_require__) => {
 
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
+/* harmony export */   Jo: () => (/* binding */ optimizeDiff),
 /* harmony export */   KD: () => (/* binding */ collectRepoDiff),
 /* harmony export */   So: () => (/* binding */ extractDiffMeta),
 /* harmony export */   bJ: () => (/* binding */ classifyHunkBodyLine),
@@ -34128,7 +34129,7 @@ function computeStrictBlock({ findings, selected } = {}) {
 /* harmony export */   wT: () => (/* binding */ buildLlmDiffView),
 /* harmony export */   ye: () => (/* binding */ countChangedLinesFromText)
 /* harmony export */ });
-/* unused harmony exports optimizeDiff, deriveChangedFiles */
+/* unused harmony export deriveChangedFiles */
 /* harmony import */ var _git_mjs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(8613);
 /* harmony import */ var _file_classifier_mjs__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(4673);
 
@@ -34218,7 +34219,9 @@ function isCommentOnlyLine(content) {
   for (;;) {
     rest = rest.trim();
     if (!rest) return true;
-    if (rest.startsWith('//') || rest.startsWith('#')) return true;
+    // '#' is syntax in JS private fields, C directives and CSS selectors.
+    // Without language/parser context it is not evidence of a comment (#2891).
+    if (rest.startsWith('//')) return true;
     let close = null;
     if (rest.startsWith('/*')) close = ['*/', 2];
     else if (rest.startsWith('<!--')) close = ['-->', 4];
@@ -34258,10 +34261,10 @@ function compressHunkLines(lines) {
 /**
  * Filter and compress parsed diff files.
  * @param {{files: Array<{path: string, hunks: Array<{header: string, lines: string[]}>}>, diffText?: string}} diff
- * @param {{includeMarkdown?: boolean}} [options]
+ * @param {{includeMarkdown?: boolean, includeComments?: boolean}} [options]
  * @returns {{files: Array, diffText: string, tokenEstimate: number, reduction: number, rawTokenEstimate: number}}
  */
-function optimizeDiff(diff, { includeMarkdown = false } = {}) {
+function optimizeDiff(diff, { includeMarkdown = false, includeComments = false } = {}) {
   const rawTokenEstimate = Math.ceil((diff.diffText ?? '').length / 4);
   const optimizedFiles = [];
 
@@ -34273,10 +34276,9 @@ function optimizeDiff(diff, { includeMarkdown = false } = {}) {
     for (const hunk of file.hunks ?? []) {
       const lines = hunk.lines ?? [];
       if (isWhitespaceOnlyChange(lines)) continue;
-      // Markdown headings begin with '#', which the generic code-comment
-      // optimizer treats as a comment marker. Upstream explicitly reviews
-      // Markdown semantics, so do not apply comment-only filtering to Markdown.
-      if (!isIncludedMarkdown && isCommentOnlyChange(lines)) continue;
+      // Upstream explicitly reviews Markdown semantics, including HTML
+      // comments, so do not apply code-comment filtering to Markdown.
+      if (!includeComments && !isIncludedMarkdown && isCommentOnlyChange(lines)) continue;
 
       const compressedLines = compressHunkLines(lines);
       keptHunks.push({
@@ -34326,7 +34328,7 @@ function optimizeDiff(diff, { includeMarkdown = false } = {}) {
  *    re-rendered only when a file was actually excluded, so the common
  *    no-artifact case passes the caller's `diffText` through unchanged.
  *
- * @param {{files?: Array, filesForReview?: Array, rawDiffText?: string, diffText?: string}} diff
+ * @param {{files?: Array, filesForReview?: Array, rawDiffText?: string, diffText?: string, includeCommentOnlyHunks?: boolean}} diff
  * @param {{phase?: string}} [options]
  * @returns {{files: Array, diffText: string}}
  */
@@ -34351,7 +34353,7 @@ function buildLlmDiffView(diff, { phase } = {}) {
           files: sourceFiles,
           diffText: sourceDiffText,
         },
-        { includeMarkdown }
+        { includeMarkdown, includeComments: diff.includeCommentOnlyHunks === true }
       );
       return { files: optimized.files, diffText: optimized.diffText };
     }
@@ -109369,6 +109371,8 @@ async function resolveSelectionSkillIds(
   });
 }
 
+// EXTERNAL MODULE: ./src/lib/heuristic-review.mjs
+var heuristic_review = __nccwpck_require__(2294);
 // EXTERNAL MODULE: ./src/lib/review-engine.mjs + 14 modules
 var review_engine = __nccwpck_require__(7156);
 // EXTERNAL MODULE: ./src/lib/file-classifier.mjs
@@ -112743,6 +112747,7 @@ var pr_context = __nccwpck_require__(1891);
 
 
 
+
 function normalizePhase(phase) {
   const normalized = (phase || '').toLowerCase();
   if (planner_utils/* PHASES */.ZG.includes(normalized)) return normalized;
@@ -112960,16 +112965,19 @@ async function planLocalReview({
     diff,
     rawChangedFiles,
     reviewFiles,
-    reviewFileScope,
-    availableContexts: contexts,
+    reviewFileScope: initialReviewFileScope,
+    availableContexts: initialContexts,
     availableDependencies: dependencies,
-    fullFileSupply,
+    fullFileSupply: initialFullFileSupply,
     config,
     configPath,
     configSource,
     prLabels,
     prBody,
   } = base;
+  let reviewFileScope = initialReviewFileScope;
+  let contexts = initialContexts;
+  let fullFileSupply = initialFullFileSupply;
   const requestedPlannerMode = (0,planner_utils/* normalizePlannerMode */.p$)(plannerMode ?? process.env.RIVER_PLANNER_MODE, {
     defaultMode: 'off',
   });
@@ -113014,6 +113022,69 @@ async function planLocalReview({
       prLabels,
       matchedLabels: ignoredLabels,
     };
+  }
+
+  // An empty prompt is not evidence that the raw changes are harmless. Before
+  // the CLI's no-changes shortcut, run the existing skill-routed detectors on
+  // comment-filtered files. Explicit exclusions, whitespace-only hunks and
+  // generated/Markdown/lockfile exclusions keep their existing scope (#2891).
+  if (!reviewFiles.length) {
+    const candidates = (0,diff_processor/* optimizeDiff */.Jo)(
+      { files: diff.files, diffText: diff.rawDiffText },
+      { includeMarkdown: normalizePhase(phase) === 'upstream', includeComments: true }
+    );
+    if (candidates.files.length) {
+      const candidatePaths = new Set(candidates.files.map((file) => file.path));
+      const detectorDiff = {
+        ...diff,
+        files: diff.files.filter((file) => candidatePaths.has(file.path)),
+      };
+      const candidateFullFileSupply = resolveFullFileSupply({
+        changedFiles: [...candidatePaths],
+        repoRoot,
+        security: config.security,
+        context: config.context,
+      });
+      const candidateContexts = resolveAvailableContexts(availableContexts, {
+        alwaysInclude: [
+          ...(prBody ? ['prDescription'] : []),
+          ...(candidateFullFileSupply.available ? ['fullFile'] : []),
+        ],
+      });
+      const detectorPlan = await (0,review_runner.buildExecutionPlan)({
+        phase: normalizePhase(phase),
+        changedFiles: [...candidatePaths],
+        diffText: (0,diff_processor/* renderDiffText */.pQ)(detectorDiff.files),
+        availableContexts: candidateContexts,
+        availableDependencies: dependencies,
+        preferredModelHint,
+        plannerMode: 'off',
+        dryRun: true,
+        llmEnabled: false,
+        repoRoot,
+        riskMap,
+        skillIds: effectiveSkillIds,
+        manualReviewMode,
+        specDirs: config.review?.specDirs ?? [],
+      });
+      if ((0,heuristic_review/* collectHeuristicDetections */.bg)({ diff: detectorDiff, plan: detectorPlan }).length) {
+        reviewFiles.push(...candidatePaths);
+        fullFileSupply = candidateFullFileSupply;
+        contexts = candidateContexts;
+        // Chunking and phase-specific prompt views must not discard the hunks
+        // restored by this preflight a second time.
+        diff.includeCommentOnlyHunks = true;
+        diff.filesForReview = candidates.files;
+        diff.diffText = candidates.diffText;
+        diff.tokenEstimate = candidates.tokenEstimate;
+        diff.reduction = candidates.reduction;
+        reviewFileScope = (0,review_coverage/* deriveReviewFileScope */.or)(
+          { changedFiles: rawChangedFiles },
+          diff,
+          config.exclude?.files ?? []
+        );
+      }
+    }
   }
 
   if (!reviewFiles.length) {

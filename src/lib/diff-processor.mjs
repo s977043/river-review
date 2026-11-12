@@ -85,7 +85,9 @@ function isCommentOnlyLine(content) {
   for (;;) {
     rest = rest.trim();
     if (!rest) return true;
-    if (rest.startsWith('//') || rest.startsWith('#')) return true;
+    // '#' is syntax in JS private fields, C directives and CSS selectors.
+    // Without language/parser context it is not evidence of a comment (#2891).
+    if (rest.startsWith('//')) return true;
     let close = null;
     if (rest.startsWith('/*')) close = ['*/', 2];
     else if (rest.startsWith('<!--')) close = ['-->', 4];
@@ -125,10 +127,10 @@ function compressHunkLines(lines) {
 /**
  * Filter and compress parsed diff files.
  * @param {{files: Array<{path: string, hunks: Array<{header: string, lines: string[]}>}>, diffText?: string}} diff
- * @param {{includeMarkdown?: boolean}} [options]
+ * @param {{includeMarkdown?: boolean, includeComments?: boolean}} [options]
  * @returns {{files: Array, diffText: string, tokenEstimate: number, reduction: number, rawTokenEstimate: number}}
  */
-export function optimizeDiff(diff, { includeMarkdown = false } = {}) {
+export function optimizeDiff(diff, { includeMarkdown = false, includeComments = false } = {}) {
   const rawTokenEstimate = Math.ceil((diff.diffText ?? '').length / 4);
   const optimizedFiles = [];
 
@@ -140,10 +142,9 @@ export function optimizeDiff(diff, { includeMarkdown = false } = {}) {
     for (const hunk of file.hunks ?? []) {
       const lines = hunk.lines ?? [];
       if (isWhitespaceOnlyChange(lines)) continue;
-      // Markdown headings begin with '#', which the generic code-comment
-      // optimizer treats as a comment marker. Upstream explicitly reviews
-      // Markdown semantics, so do not apply comment-only filtering to Markdown.
-      if (!isIncludedMarkdown && isCommentOnlyChange(lines)) continue;
+      // Upstream explicitly reviews Markdown semantics, including HTML
+      // comments, so do not apply code-comment filtering to Markdown.
+      if (!includeComments && !isIncludedMarkdown && isCommentOnlyChange(lines)) continue;
 
       const compressedLines = compressHunkLines(lines);
       keptHunks.push({
@@ -193,7 +194,7 @@ export function optimizeDiff(diff, { includeMarkdown = false } = {}) {
  *    re-rendered only when a file was actually excluded, so the common
  *    no-artifact case passes the caller's `diffText` through unchanged.
  *
- * @param {{files?: Array, filesForReview?: Array, rawDiffText?: string, diffText?: string}} diff
+ * @param {{files?: Array, filesForReview?: Array, rawDiffText?: string, diffText?: string, includeCommentOnlyHunks?: boolean}} diff
  * @param {{phase?: string}} [options]
  * @returns {{files: Array, diffText: string}}
  */
@@ -218,7 +219,7 @@ export function buildLlmDiffView(diff, { phase } = {}) {
           files: sourceFiles,
           diffText: sourceDiffText,
         },
-        { includeMarkdown }
+        { includeMarkdown, includeComments: diff.includeCommentOnlyHunks === true }
       );
       return { files: optimized.files, diffText: optimized.diffText };
     }
