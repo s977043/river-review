@@ -160,7 +160,9 @@ usage error の終了コードはレビュー結果を含みません。表す�
 
 ### outputs（安定）
 
-- `comment_path`: Actions runner の一時領域に出力した Markdown のパス（PR コメント投稿で使用）
+- `json_path`: Actions runner の一時領域に出力した JSON のパス。`output_format=json` で、かつ CLI が空でないファイルを書いたときだけ設定される（PR #2882）。それ以外では空になる
+
+`comment_path` は PR コメント投稿 step が内部で使う step の値であり、Action の公開 output ではない。
 
 ### PR コメントの契約（idempotent）
 

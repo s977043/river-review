@@ -98,7 +98,7 @@ inputs:
     default: ''
 outputs:
   json_path:
-    description: 'Path to the JSON output file (only when output_format=json).'
+    description: 'Path to the JSON output file (set only when output_format=json and the CLI wrote a non-empty file).'
     value: ${{ steps.river.outputs.json_path }}
 runs:
   using: 'composite'
