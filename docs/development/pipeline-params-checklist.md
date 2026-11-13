@@ -18,6 +18,7 @@
 - [ ] `src/lib/repo-wide-fixtures-eval.mjs`—repo-wide eval 呼び出し（#688）
 - [ ] `tests/review-engine.test.mjs`—新パラメータ有無のテスト最低2件
 - [ ] `tests/review-engine-abort.test.mjs`—host cancellation を fallback に変換せず上位へ伝播する回帰テスト（#2564）
+- [ ] `tests/review-engine-generated-path-security.test.mjs`—生成物パス上の秘密情報・conflict marker の finding が出力段で残る回帰テスト（#2913）
 - [ ] `tests/review-eval.test.mjs`—既存の eval テスト
 - [ ] `tests/finding-format.test.mjs`—フォーマット検証テスト
 - [ ] `tests/finding-scope-propagation.test.mjs`—verifier の機械判定 scope が `findings[].scope` へ伝播することの回帰テスト（#1644）
