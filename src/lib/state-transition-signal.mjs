@@ -5,7 +5,8 @@ import { classifyHunkBodyLine, parseUnifiedDiff } from './diff-processor.mjs';
 // the testing and unknown-coverage skills when this signal fires.
 const SOURCE_PATH_RE = /\.(?:ts|tsx|js|jsx|mjs|cjs|py|go|rb|java|kt|rs|php)$/i;
 const TEST_PATH_RE =
-  /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$/i;
+  /(?:^|\/)(?:test|tests|__tests__|fixtures|__fixtures__)(?:\/|$)|\.(?:test|spec)\.[^.]+$|(?:^|\/)test_[^/]*\.py$|_test\.py$/i;
+const PYTHON_PATH_RE = /\.py$/i;
 
 // Statement forms only: `promise.catch(fn)` is a callback, not an exception path.
 const CATCH_STATEMENT_RE = /(?:^|[;}])\s*catch\s*[({]|^\s*(?:except|rescue)\b/;
@@ -19,6 +20,14 @@ const STATE_WRITE_RE =
 // A success value returned from inside a catch block: the recovered-exception
 // shape #2875 observed (failure reported as success).
 const SUCCESS_RETURN_RE = /\breturn\s+(?:true\b|\{[^}]*\b(?:ok|success)\s*:\s*true\b)/;
+// Python has no braces: an `except` block is the run of deeper-indented lines.
+const PY_EXCEPT_RE = /^(\s*)except\b[^:]*:\s*(?:#.*)?$/;
+const PY_SUCCESS_RETURN_RE =
+  /\breturn\s+(?:True\b|\{[^}]*["'](?:ok|success)["']\s*:\s*True\b|dict\([^)]*\b(?:ok|success)\s*=\s*True\b)/;
+
+function indentOf(text) {
+  return text.match(/^\s*/)[0].length;
+}
 
 const CATEGORY_KEYS = Object.freeze(['exception', 'resume', 'stateWrite', 'swallowedSuccess']);
 
@@ -52,26 +61,38 @@ export function detectStateTransitionSignal(diffText) {
     for (const file of parseUnifiedDiff(diffText).files ?? []) {
       const filePath = typeof file?.path === 'string' ? file.path : '';
       if (!SOURCE_PATH_RE.test(filePath) || TEST_PATH_RE.test(filePath)) continue;
+      const isPython = PYTHON_PATH_RE.test(filePath);
       for (const hunk of file.hunks ?? []) {
         const width =
           Number.isInteger(hunk?.parentCount) && hunk.parentCount > 1 ? hunk.parentCount : 1;
         let catchDepth = 0;
+        let exceptIndent = -1;
         for (const rawLine of hunk.lines ?? []) {
           const line = String(rawLine);
           const kind = classifyHunkBodyLine(line, hunk?.parentCount);
           if (kind === 'removed') continue;
           const text = line.slice(width);
-          const inCatch = catchDepth > 0;
-          const catchMatch = CATCH_STATEMENT_RE.exec(text);
-          if (catchMatch)
-            catchDepth = braceBalance(text.slice(text.indexOf('catch', catchMatch.index)));
-          else if (catchDepth > 0) catchDepth += braceBalance(text);
+          let inCatch;
+          if (isPython) {
+            if (exceptIndent >= 0 && text.trim() !== '' && indentOf(text) <= exceptIndent)
+              exceptIndent = -1;
+            inCatch = exceptIndent >= 0;
+            const exceptMatch = PY_EXCEPT_RE.exec(text);
+            if (exceptMatch) exceptIndent = exceptMatch[1].length;
+          } else {
+            inCatch = catchDepth > 0;
+            const catchMatch = CATCH_STATEMENT_RE.exec(text);
+            if (catchMatch)
+              catchDepth = braceBalance(text.slice(text.indexOf('catch', catchMatch.index)));
+            else if (catchDepth > 0) catchDepth += braceBalance(text);
+          }
           if (kind !== 'added') continue;
+          const successRe = isPython ? PY_SUCCESS_RETURN_RE : SUCCESS_RETURN_RE;
           const hits = {
             exception: EXCEPTION_RE.test(text),
             resume: RESUME_RE.test(text),
             stateWrite: STATE_WRITE_RE.test(text),
-            swallowedSuccess: inCatch && SUCCESS_RETURN_RE.test(text),
+            swallowedSuccess: inCatch && successRe.test(text),
           };
           let matched = false;
           for (const key of CATEGORY_KEYS) {

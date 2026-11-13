@@ -83,6 +83,32 @@ for (const [name, lines] of Object.entries(NEGATIVE_CASES)) {
   });
 }
 
+test('ignores Python test files named test_*.py and *_test.py', () => {
+  const lines = ['except Exception:', '    retry()', 'job.status = "x"', 'resume(job)'];
+  for (const path of ['scripts/test_calibrate.py', 'pkg/calibrate_test.py']) {
+    assert.equal(detectStateTransitionSignal(diffOf(lines, path)).signalLines, 0, path);
+  }
+});
+
+test('counts a success return inside a Python except block, not after it', () => {
+  const result = detectStateTransitionSignal(
+    diffOf(
+      [
+        'def collect(run):',
+        '    try:',
+        '        usage = fetch_usage(run.id)',
+        '    except Exception as err:',
+        '        log(err)',
+        '        return True',
+        '    return True',
+      ],
+      'scripts/calibrate.py'
+    )
+  );
+  assert.equal(result.categories.swallowedSuccess, 1);
+  assert.equal(result.categories.exception, 1);
+});
+
 test('ignores test files', () => {
   const lines = ['} catch (e) {', '  return { ok: true };', '}', 'job.status = "x";', 'retry();'];
   assert.equal(
