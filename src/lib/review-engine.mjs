@@ -229,6 +229,8 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
   });
 }
 
+const GENERATED_PATH_EXEMPT_KINDS = new Set(['hardcoded-secret', 'merge-conflict']);
+
 function normalizeHeuristicComments(rawComments) {
   return rawComments.map((c) => {
     // kind → プレゼンテーションは heuristic-review.mjs の単一レジストリ
@@ -255,6 +257,7 @@ function normalizeHeuristicComments(rawComments) {
       line: c.line,
       skillId: c.skillId,
       origin: 'detector',
+      kind: c.kind,
       message: formatFindingMessage(preset),
     };
   });
@@ -725,10 +728,16 @@ export async function generateReview({
   // `isGeneratedArtifactPath`, which is intentionally narrower than the LLM
   // diff's `isExcludedFile`: it matches only the generated directory, so real
   // findings on `.md` / lock files are NOT suppressed from output.
+  // #2913: a leaked token or a conflict marker in a generated file is not
+  // derived from source quality, so the double-count rationale does not apply.
+  // Keyed on detector `kind` (not skillId: merge-conflict shares
+  // `logging-observability` with detectors that must stay suppressed).
   const keptComments = [];
   const suppressedGeneratedPathComments = [];
   for (const c of comments) {
-    if (isGeneratedArtifactPath(c.file)) {
+    const isSecurityDetectorFinding =
+      c.origin === 'detector' && GENERATED_PATH_EXEMPT_KINDS.has(c.kind);
+    if (isGeneratedArtifactPath(c.file) && !isSecurityDetectorFinding) {
       suppressedGeneratedPathComments.push(c);
     } else {
       keptComments.push(c);
