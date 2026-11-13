@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.140.0](https://github.com/s977043/river-review/compare/v1.139.5...v1.140.0) (2026-11-13)
+
+
+### Features
+
+* **critic:** keep detector findings through the Finding Critic ([#2871](https://github.com/s977043/river-review/issues/2871)) ([#2894](https://github.com/s977043/river-review/issues/2894)) ([861feb6](https://github.com/s977043/river-review/commit/861feb6573b2c674778ba9bbdf35379592b47121))
+* **heuristic:** run explicit-token and merge-conflict detectors on every file ([#2870](https://github.com/s977043/river-review/issues/2870)) ([#2893](https://github.com/s977043/river-review/issues/2893)) ([7dc38ee](https://github.com/s977043/river-review/commit/7dc38eeff59bb7189a18865b4481b222b1880706))
+* **prompt:** verify safety claims in the PR body against code ([#2884](https://github.com/s977043/river-review/issues/2884)) ([#2901](https://github.com/s977043/river-review/issues/2901)) ([252b2bc](https://github.com/s977043/river-review/commit/252b2bcc1c289ca2e382ce55a21b2d66f83deeab))
+* **scripts:** add preflight.sh and per-worker scratch dirs (ADR-016 P2) ([#2876](https://github.com/s977043/river-review/issues/2876)) ([43600ab](https://github.com/s977043/river-review/commit/43600ab9a57df9012977ce9fb58a20436e6a899e))
+* **verifier:** stop rejecting deterministic detector findings ([#2872](https://github.com/s977043/river-review/issues/2872)) ([287e543](https://github.com/s977043/river-review/commit/287e543153ad1c48e2f72852108914b0bb35a629))
+
+
+### Bug Fixes
+
+* **action:** post PR comment when gate fails the River step ([#2869](https://github.com/s977043/river-review/issues/2869)) ([#2882](https://github.com/s977043/river-review/issues/2882)) ([98fa7d1](https://github.com/s977043/river-review/commit/98fa7d19cdb90e376b60fc86731c866dd26096da))
+* **agents:** resolve plugin root via body substitution ([#2879](https://github.com/s977043/river-review/issues/2879)) ([1525707](https://github.com/s977043/river-review/commit/1525707ca7033f7121cc70218df54898079dae54))
+* **diff:** keep hunks whose comment closes before code or hides format characters ([#2880](https://github.com/s977043/river-review/issues/2880)) ([#2892](https://github.com/s977043/river-review/issues/2892)) ([b6649c5](https://github.com/s977043/river-review/commit/b6649c5956355738740dad95a01aaa83f678cd9c))
+* **eval:** reject incomplete review coverage in convergence metric ([#2863](https://github.com/s977043/river-review/issues/2863)) ([d106a55](https://github.com/s977043/river-review/commit/d106a5582c1e85da60625cfe7662e2ef7478a879)), closes [#2701](https://github.com/s977043/river-review/issues/2701)
+* **review:** suppress the fallback warning when the LLM was skipped ([#2868](https://github.com/s977043/river-review/issues/2868)) ([#2885](https://github.com/s977043/river-review/issues/2885)) ([0d5316c](https://github.com/s977043/river-review/commit/0d5316cba85fd6f7285a2c6740d6532b98239ce0))
+
 ## [1.139.5](https://github.com/s977043/river-review/compare/v1.139.4...v1.139.5) (2026-11-05)
 
 
