@@ -1,4 +1,4 @@
-# #2701 Evidence-grounded Review PoC — 実行・判定計画
+# #2701 Evidence-grounded Review PoC—実行・判定計画
 
 > **Status: Proposal / observe-only（2026-11-15 JST）**。これは評価運用の作業計画であり、新しい製品仕様・品質Gate・承認・自動昇格の許可ではない。
 > 対象: `s977043/river-review`、計画時の `main` = `1c78b6ed93adb2aa421c72dd1a6b64d2c9af1fc4`。実行前にリモートHEAD、PR、CIを再取得する。
@@ -122,9 +122,9 @@ Phase 0〜3は外部モデル課金なしのread-only準備で進める。Phase 
 
 ## 参考一次資料（設計の着想であり、River Reviewの実測ではない）
 
-- [Google DeepMind: AlphaProof Code（2026-11-10）](https://google-deepmind.github.io/code-verification/) — 承認済み仕様と証明エージェントの分離。
-- [ProofCoder（2026-11-10、プレプリント）](https://arxiv.org/abs/2611.14106) — 検証状態を踏まえた局所的再試行。ただしコードレビューの精度ではない。
-- [Autonomous Code Review（2026-11-06、プレプリント）](https://arxiv.org/abs/2611.10098) — レビュー前後のテスト成否は指摘の真偽と別。
-- [ReviewBench（2026-10-05）](https://github.blog/ai-and-ml/github-copilot/reviewbench-an-open-benchmark-for-ai-code-review/) — 既知不具合の検出と全findingの有用性を分離。
+- [Google DeepMind: AlphaProof Code（2026-11-10）](https://google-deepmind.github.io/code-verification/)—承認済み仕様と証明エージェントの分離。
+- [ProofCoder（2026-11-10、プレプリント）](https://arxiv.org/abs/2611.14106)—検証状態を踏まえた局所的再試行。ただしコードレビューの精度ではない。
+- [Autonomous Code Review（2026-11-06、プレプリント）](https://arxiv.org/abs/2611.10098)—レビュー前後のテスト成否は指摘の真偽と別。
+- [ReviewBench（2026-10-05）](https://github.blog/ai-and-ml/github-copilot/reviewbench-an-open-benchmark-for-ai-code-review/)—既知不具合の検出と全findingの有用性を分離。
 
 **Decision**: 本番への導入は `Defer`。Phase 0〜3のread-only準備だけ次へ進める。Human承認に必要な独立正解・反証結果・費用/時間の観測はまだない。
