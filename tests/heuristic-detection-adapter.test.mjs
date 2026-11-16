@@ -37,9 +37,9 @@ test('collectHeuristicDetections preserves registry order and is uncapped while 
   assert.deepEqual(
     detections.map((detection) => detection.kind),
     [
-      'hardcoded-secret',
-      'hardcoded-secret',
-      'hardcoded-secret',
+      'explicit-token',
+      'explicit-token',
+      'explicit-token',
       'dangerous-eval',
       'dangerous-eval',
       'dangerous-eval',

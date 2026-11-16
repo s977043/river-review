@@ -39925,7 +39925,7 @@ const HEURISTIC_REGISTRY = [
     skillId: 'security-basic',
     routing: 'always',
     detect: findExplicitTokens,
-    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
+    findings: { 'explicit-token': HARDCODED_SECRET_FINDING },
   },
   {
     skillId: 'security-basic',
@@ -40331,14 +40331,14 @@ function matchesHardcodedSecretLine(code) {
 }
 
 function findExplicitTokens({ diff }) {
-  return findSecretLines({ diff, matches: matchesExplicitToken });
+  return findSecretLines({ diff, matches: matchesExplicitToken, kind: 'explicit-token' });
 }
 
 function findHardcodedSecrets({ diff }) {
-  return findSecretLines({ diff, matches: matchesHardcodedSecretLine });
+  return findSecretLines({ diff, matches: matchesHardcodedSecretLine, kind: 'hardcoded-secret' });
 }
 
-function findSecretLines({ diff, matches }) {
+function findSecretLines({ diff, matches, kind }) {
   // Avoid noisy output when many hardcoded values are introduced at once.
   const MAX_HARDCODED_SECRET_COMMENTS = 3;
   const comments = [];
@@ -40355,7 +40355,7 @@ function findSecretLines({ diff, matches }) {
       comments.push({
         file: filePath,
         line,
-        kind: 'hardcoded-secret',
+        kind,
       });
       if (comments.length >= MAX_HARDCODED_SECRET_COMMENTS) return comments;
     }
@@ -45967,7 +45967,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
   });
 }
 
-const GENERATED_PATH_EXEMPT_KINDS = new Set(['hardcoded-secret', 'merge-conflict']);
+const GENERATED_PATH_EXEMPT_KINDS = new Set(['explicit-token', 'merge-conflict']);
 
 function normalizeHeuristicComments(rawComments) {
   return rawComments.map((c) => {

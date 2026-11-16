@@ -229,7 +229,7 @@ function buildFallbackComments(diff, plan, { llmSkipReason = null } = {}) {
   });
 }
 
-const GENERATED_PATH_EXEMPT_KINDS = new Set(['hardcoded-secret', 'merge-conflict']);
+const GENERATED_PATH_EXEMPT_KINDS = new Set(['explicit-token', 'merge-conflict']);
 
 function normalizeHeuristicComments(rawComments) {
   return rawComments.map((c) => {

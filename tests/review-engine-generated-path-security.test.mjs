@@ -58,6 +58,26 @@ describe('generated-path filter keeps security detector findings (#2913)', () =>
     assert.equal(hit.ruleId, 'logging-observability');
   });
 
+  test('a key=value hardcoded secret in dist/ stays suppressed', async () => {
+    const result = await generateReview({
+      diff: {
+        diffText: 'diff placeholder',
+        files: [
+          fileEntry('dist/k.js', 2, "const serviceToken = 'DUMMY_TOKEN_123';"),
+          fileEntry('src/k.js', 2, "const serviceToken = 'DUMMY_TOKEN_123';"),
+        ],
+        changedFiles: ['dist/k.js', 'src/k.js'],
+      },
+      plan: { selected: [{ metadata: { id: 'security-basic' } }], skipped: [] },
+      phase: 'midstream',
+      dryRun: true,
+      includeFallback: false,
+    });
+    assert.ok(result.findings.some((f) => f.file === 'src/k.js'));
+    assert.ok(!result.findings.some((f) => f.file === 'dist/k.js'));
+    assert.equal(result.debug.suppressedGeneratedPathFindings, 1);
+  });
+
   test('a non-security finding of the same skill in dist/ stays suppressed', async () => {
     const result = await review([
       fileEntry('dist/z.js', 5, '  } catch (e) {}'),
