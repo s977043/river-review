@@ -36,6 +36,7 @@
 - 最初の比較は**post-reviewの指摘選別の品質**であり、新しい不具合を発見する能力の比較ではない。Aの見逃しをBが検出したと主張しない。
 - 根拠照合の仕様・検証対象・期待値は、Bから変更できない独立領域へ事前固定する。検証環境が失敗したら `inconclusive` であり `refute` や `clean` ではない。
 - 可能なら同じ保存済みReviewer runを両条件で再利用し、追加Reviewerの呼び出しを省く。現行run形式がBへの再評価を許容しない場合、実行器を二重実装せず、両armの `river run` を同条件で保存する計画へ切り替える。**この接続可能性は未検証**。
+- **replayの観測範囲**: `src/lib/paired-replay.mjs` の `pairFindings` はfingerprintとseverityの有無・変更を比較する。`retain / refute / inconclusive` の判定だけを変えても `activationCheck.observedDifference` はfalseのままになり得る。その結果の `activationCheck.verified: false` を「Verifierが実行されなかった」という確定事実にはせず、別の実行traceを確認する。**このPoCの本採点は独立のfinding判定台帳が担当**し、paired replayは観測可能なfinding差分がある場合の補助指標とする。差分を発生させるために本来維持すべき指摘を落とす操作は禁止。
 - 独立の正解判定者はA/Bの作者や採用候補から分離する。分離できない場合、探索結果は `exploratory` と明示し、本番採用判断には使わない。
 
 ### 固定条件
@@ -59,7 +60,7 @@
 | **0. Trust/readiness** | #2701のセキュリティ・PII・正解確認の独立レビュー、[#2812](https://github.com/s977043/river-review/issues/2812)ほかfalse-clean関連の最新状態確認。外部実行を許可する主体を指定 | 使用可能なsource/権限、秘密情報を除外する方法、Go/No-goを記録 | **未完了** |
 | **1. Corpus候補** | 運用者が**個別に**公開・利用可能な対象を選ぶ（過去履歴の無差別crawlは禁止） | 不具合候補5件＋正常/妥当な別実装候補5件。未確認は `unknown`、未適格は `ineligible` | **未収集** |
 | **2. 独立のoracleと凍結** | 対象revisionでの不具合原因・位置・再現証拠、正常例の欠陥不在の**限定範囲**を別担当が確認 | 凍結したdevelopment 6件（不具合3＋正常3）、held-out 4件（不具合2＋正常2）。正解・後日修正・非公開報告をReviewerの入力から隔離 | **未実施** |
-| **3. Dry run** | Phase 2の非機密メタデータが揃う | #2844 preflightの出力（構造チェックにすぎない）、入力形式/保存Run/manifestの対応確認。合成データでは実精度を主張しない | **ツールは導入済、実コーパスは未実施** |
+| **3. Dry run** | Phase 2の非機密メタデータが揃う | #2844 preflightと#1574 replayの境界を合成ケースで検証。実ケースの正解・実Runを使うPoCは別。合成データで精度を主張しない | **合成境界テストを本PRに追加、実コーパスは未実施** |
 | **4. Bounded comparison** | 事前に利用範囲と**実際の費用上限**を承認、対象・検証条件を固定 | 同じ指摘にA/Bを適用。可能な限り既存Runを再利用、結果・失敗・追加費用を記録。必要なときだけ既存 `river run` 経路で収集 | **未実施** |
 | **5. Independent score** | Phase 4の全Run、採点者の独立性を確認 | `river evolve replay` の比較**に加えて**、全findingを正解に照合。重大見逃し・有害なFP・時間/費用を別集計 | **未実施** |
 | **6. Human decision** | 少数試行の限界、残リスク、独立レビューを提示 | Human `Keep / Adapt / Revert / Defer`。PoC通過でもGate変更、canary、auto-approvalは**別判断** | **保留** |
@@ -90,6 +91,12 @@ Phase 0〜3は外部モデル課金なしのread-only準備で進める。Phase 
 - test `FAIL`（実行して仕様との不一致を観測）、`NOT_EXECUTED`（未起動）、`ENV_FAILURE`（環境側の失敗）、`INCONCLUSIVE`（根拠不足）を運用台帳で区別する。これらは**説明用の作業語彙**であり、新しい永続schemaやGateのenumを作る指示ではない。
 - source/oracleデータは候補の変更権限外・アクセス制御下で保管する。公開repoには非機密参照のみ。AIによる新しい「独立して確認した」という主張は認証済みの証拠に置き換えない。
 - 実行不能なら停止理由・再開条件を記録する。失敗した実験の結果を良好な評価として次へ送らない。
+
+### 2026-11-17のコード監査・実行接続の差分
+
+- `src/lib/paired-replay.mjs` の `pairFindings` / `activationCheck` を読み、**判定のみの差はpaired replayの差分に表れない**と確認した。既存replayの動作は変更しない。
+- `tests/incident-review-smoke-paired-boundary.test.mjs`（本PRで新設）に合成正負例、判定のみの非観測、criticalの全体集計、held-outの自己申告の未確認を固定した。テスト結果は**HEADのCIが完了するまで未検証**。
+- 合成テストは「独立oracleが存在する」証拠ではない。正解ラベル、実際のrunと費用、人の確認負荷は引き続き未収集とする。
 
 ## 7. 役割別計画レビュー（2026-11-15）
 
