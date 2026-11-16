@@ -21,7 +21,7 @@ River Review は、レビュー基準を **versioned / repo-owned な Skill** �
 
 ## はじめる
 
-> **導入前の注意（Claude Code）:** 同梱の PostToolUse hook は、Write / Edit / MultiEdit 後に利用先プロジェクトの Prettier を `--write` で実行し、作業ツリーを書き換える場合があります。整形 hook だけを個別に無効化する配布設定はありません。変更を避けたい場合は導入を見送り、導入後はプラグインを無効化・アンインストールしてください。手順と条件は [更新・無効化・アンインストール](https://river-review.the3396.com/guides/plugin/update-and-uninstall/) を参照してください。
+> **導入前の注意（Claude Code）:** 同梱の PostToolUse hook は、Write / Edit / MultiEdit 後に利用先プロジェクトの Prettier を `--write` で実行し、作業ツリーを書き換える場合があります。整形 hook だけを個別に無効化する配布設定はありません。変更を避けたい場合は導入を見送り、導入後はプラグインを無効化・アンインストールしてください（**既に書き換えられたファイルは自動復元されません**）。Stop hook は一時領域にもチェックポイントを生成します。手順と条件は [更新・無効化・アンインストール](https://river-review.the3396.com/guides/plugin/update-and-uninstall/) を参照してください。
 
 ### Claude Code（ローカル差分のレビュー）
 
@@ -39,10 +39,10 @@ River Review は、レビュー基準を **versioned / repo-owned な Skill** �
 ```text
 codex plugin marketplace add s977043/river-review
 codex plugin marketplace list
-codex plugin add river-review@<一覧で確認したマーケットプレイス名>
+codex plugin add river-review@river-review-marketplace
 ```
 
-Codex では同梱スキルを利用します。**Claude Code 専用の** `/river-review:review-local` **は Codex の配布定義には含まれません**。スキルの選択・利用は [プラグイン導入ガイド](https://river-review.the3396.com/guides/plugin/install/) を参照してください。コマンドの実行は使用中の Codex CLI の版で確認してください。
+Codex では同梱スキルを利用します。**Claude Code 専用の** `/river-review:review-local` **は Codex の配布定義には含まれません**。スキルの選択・利用は [プラグイン導入ガイド](https://river-review.the3396.com/guides/plugin/install/) を参照してください。上記のマーケットプレイス名は配布例です。`codex plugin marketplace list` の実際の登録名が異なる場合は読み替え、使用中の Codex CLI の版で確認してください。
 
 通常のプラグイン利用では、**River Review 専用の LLM API キーは不要**です。GitHub Actions や standalone `river run` のヘッドレス実行では、設定した LLM プロバイダーの API キーが必要です。
 
@@ -56,7 +56,10 @@ Codex では同梱スキルを利用します。**Claude Code 専用の** `/rive
 
 ## 得られるもの
 
-Claude Code では `/river-review:review-local` を入口に、コード・セキュリティ・テストなどの観点をチームの Skill へ拡張できます。Codex ではプラグインの同梱スキルを利用します。環境ごとに対応機能が異なるため、全コマンド・Skill の一覧は [コマンド・エージェント・スキル](https://river-review.the3396.com/guides/plugin/commands-and-skills/) を参照してください。
+Claude Code ではローカルレビューを入口に、チームの判断基準を拡張できます。Codex ではプラグインの同梱スキルを利用します。環境ごとに対応機能が異なります。
+
+- コマンド: Claude Code の入口は `/river-review:review-local`。その他のコマンドは [一覧](https://river-review.the3396.com/guides/plugin/commands-and-skills/) を参照してください。
+- スキル: コード・セキュリティ・テストなどの観点を同梱しています。配布先ごとの [コマンド・エージェント・スキル一覧](https://river-review.the3396.com/guides/plugin/commands-and-skills/) で詳細を確認してください。
 
 スキルを追加する前に、[Starter Cookbook](https://river-review.the3396.com/guides/starter-cookbook/) で既存の観点を試してください。プロジェクト固有の基準は [Skill作成チュートリアル](https://river-review.the3396.com/tutorials/creating-your-first-skill/) に沿って作成できます。
 
