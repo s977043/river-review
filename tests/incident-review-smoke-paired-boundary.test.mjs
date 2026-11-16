@@ -3,9 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  assessIncidentReviewSmoke,
-} from '../scripts/experiments/incident-review-smoke-preflight.mjs';
+import * as preflight from '../scripts/experiments/incident-review-smoke-preflight.mjs';
 import { buildPairedReplay } from '../src/lib/paired-replay.mjs';
 
 const NOW = new Date('2026-11-01T00:00:00.000Z');
@@ -68,6 +66,13 @@ function metadata() {
 }
 
 function replaySpec(input) {
+  const allegation = {
+    fingerprint: CRITICAL_FINGERPRINT,
+    severity: 'critical',
+    file: 'src/synthetic.mjs',
+    ruleId: 'synthetic-rule',
+    title: 'synthetic alleged bug',
+  };
   const runs = input.cases.map((entry, index) => ({
     runId: `baseline-${index}`,
     caseId: entry.caseId,
@@ -75,18 +80,7 @@ function replaySpec(input) {
     mergeBase: entry.source.mergeBase,
     timestamp: entry.source.reviewedAt,
     phase: 'midstream',
-    findings:
-      entry.label === 'bug'
-        ? [
-            {
-              fingerprint: CRITICAL_FINGERPRINT,
-              severity: 'critical',
-              file: 'src/synthetic.mjs',
-              ruleId: 'synthetic-rule',
-              title: 'synthetic alleged bug',
-            },
-          ]
-        : [],
+    findings: entry.label === 'bug' ? [{ ...allegation }] : [],
   }));
   const candidateRuns = structuredClone(runs);
   candidateRuns.forEach((run, index) => {
@@ -135,7 +129,7 @@ function replaySpec(input) {
 
 test('a new verifier disposition alone does not activate paired replay', () => {
   const input = metadata();
-  const checked = assessIncidentReviewSmoke(input);
+  const checked = preflight.assessIncidentReviewSmoke(input);
   assert.equal(checked.metadataStatus, 'complete');
   assert.equal(checked.evidenceTrust, 'unverified-input');
   assert.equal(checked.authorizesApproval, false);
@@ -178,7 +172,7 @@ test('critical loss remains visible outside a clean held-out scope', () => {
 test('operator-claimed held-out isolation is checked only by the preflight, not by replay', () => {
   const input = metadata();
   input.cases[1].usedForTuning = true;
-  const preflight = assessIncidentReviewSmoke(input);
+  const preflight = preflight.assessIncidentReviewSmoke(input);
   assert.equal(preflight.metadataStatus, 'incomplete');
   assert.notDeepEqual(preflight.cases[1].reasonCodes, []);
 
