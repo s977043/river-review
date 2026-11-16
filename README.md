@@ -21,7 +21,11 @@ River Review は、レビュー基準を **versioned / repo-owned な Skill** �
 
 ## はじめる
 
-### Claude Code（最短）
+> **導入前の注意（Claude Code）:** 同梱の PostToolUse hook は、Write / Edit / MultiEdit 後に利用先プロジェクトの Prettier を `--write` で実行し、作業ツリーを書き換える場合があります。整形 hook だけを個別に無効化する配布設定はありません。変更を避けたい場合は導入を見送り、導入後はプラグインを無効化・アンインストールしてください。手順と条件は [更新・無効化・アンインストール](https://river-review.the3396.com/guides/plugin/update-and-uninstall/) を参照してください。
+
+### Claude Code（ローカル差分のレビュー）
+
+既存 Git リポジトリで **tracked ファイルの未コミット差分**を用意してから実行してください。未追跡ファイルだけでは対象にならず、差分がない場合は既定ブランチとの比較のため `git fetch origin` が試みられる場合があります。まずは使い捨てのリポジトリで試すことを推奨します。
 
 ```text
 /plugin marketplace add s977043/river-review
@@ -30,15 +34,19 @@ River Review は、レビュー基準を **versioned / repo-owned な Skill** �
 /river-review:review-local
 ```
 
-### Codex
+### Codex（スキルの導入）
 
 ```text
 codex plugin marketplace add s977043/river-review
+codex plugin marketplace list
+codex plugin add river-review@<一覧で確認したマーケットプレイス名>
 ```
+
+Codex では同梱スキルを利用します。**Claude Code 専用の** `/river-review:review-local` **は Codex の配布定義には含まれません**。スキルの選択・利用は [プラグイン導入ガイド](https://river-review.the3396.com/guides/plugin/install/) を参照してください。コマンドの実行は使用中の Codex CLI の版で確認してください。
 
 通常のプラグイン利用では、**River Review 専用の LLM API キーは不要**です。GitHub Actions や standalone `river run` のヘッドレス実行では、設定した LLM プロバイダーの API キーが必要です。
 
-導入手順の詳細は [プラグインを導入する](https://river-review.the3396.com/guides/plugin/install/)、GitHub Actions 設定は [5分クイックスタート](https://river-review.the3396.com/guides/quickstart/) を参照してください。npm パッケージの公開は配布方針に含まれず、リポジトリ内の開発用 CLI は `npm run river -- ...` で実行します。
+導入手順の詳細は [プラグインを導入する](https://river-review.the3396.com/guides/plugin/install/)、GitHub Actions 設定は [クイックスタート](https://river-review.the3396.com/guides/quickstart/) を参照してください。npm パッケージの公開は配布方針に含まれず、リポジトリ内の開発用 CLI は `npm run river -- ...` で実行します。
 
 <!-- x-release-please-start-version -->
 
@@ -48,11 +56,7 @@ codex plugin marketplace add s977043/river-review
 
 ## 得られるもの
 
-得られるもの（プラグイン名で名前空間化されます）:
-
-- コマンド: `/river-review:setup-team` / `/river-review:review-local` / `/river-review:review-team` / `/river-review:challenge` が含まれる。加えて `/river-review:skill` / `/river-review:check` / `/river-review:pr` も使える。
-
-- スキル: オーケストレーターの `river-review` に加えて `river-review-code` / `river-review-security` / `river-review-security-audit` / `river-review-performance` の各スキルが含まれる。さらに `river-review-architecture` / `river-review-testing` / `river-review-frontend` も含まれる。加えて `river-review-docs` / `adversarial-review` / `review-team` / `unknown-coverage-review` も含まれる。いずれも `/river-review:<skill-name>` で呼び出せる
+Claude Code では `/river-review:review-local` を入口に、コード・セキュリティ・テストなどの観点をチームの Skill へ拡張できます。Codex ではプラグインの同梱スキルを利用します。環境ごとに対応機能が異なるため、全コマンド・Skill の一覧は [コマンド・エージェント・スキル](https://river-review.the3396.com/guides/plugin/commands-and-skills/) を参照してください。
 
 スキルを追加する前に、[Starter Cookbook](https://river-review.the3396.com/guides/starter-cookbook/) で既存の観点を試してください。プロジェクト固有の基準は [Skill作成チュートリアル](https://river-review.the3396.com/tutorials/creating-your-first-skill/) に沿って作成できます。
 
