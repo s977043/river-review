@@ -140,7 +140,7 @@ gh api "repos/:owner/:repo/pulls/<N>" --jq .body | grep -i 'closes\|fixes\|resol
 
 #### 7. リスク階層の確認
 
-[ADR-016](adr/016-repo-operation-risk-tiers.md) の階層表と PR の変更ファイルを突き合わせ、階層を決めてください。PR の階層は変更ファイルの最大値です。階層表に無いパスとファイル削除は崖として扱います。
+[ADR-016](adr/016-repo-operation-risk-tiers.md) の階層表と PR の変更ファイルを突き合わせ、階層を決めてください。PR の階層は変更ファイルの最大値です。階層表に無いパスとファイル削除は崖として扱います。この文書（`docs/governance.md`）の変更も崖です。
 
 - 崖: PR ごとに人間が判断してマージする。
 - 丘: 人間がマージする。digest はまだ無いため、当面は PR ごとに確認する。

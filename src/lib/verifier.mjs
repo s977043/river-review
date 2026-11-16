@@ -267,10 +267,20 @@ export function resolveFindingScope({ finding, diffFiles }) {
 }
 
 /**
- * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null }} params
+ * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null, deterministicSource?: boolean }} params
+ *   deterministicSource: the finding comes from a detector, so its severity and
+ *   evidence are code constants rather than claims to check. Callers derive it
+ *   from the batch's provenance, never from the finding text.
  * @returns {{ verified: boolean, reasons: string[], checks: object, scope: 'in-diff'|'pre-existing', scopeSource: string, scopeSelfReported: string|null, scopeMismatch: boolean }}
  */
-export function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
+export function verifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
   // #1666: traceability refs are additive metadata and MUST NOT move the
   // `verified` decision in either direction. RE_EVIDENCE / RE_ACTIONABLE are
   // deliberately greedy to end-of-line, so appended refs would otherwise satisfy
@@ -285,10 +295,10 @@ export function verifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
       : finding;
   const checks = {
     evidenceExists: checkEvidenceExists(findingForLengthChecks),
-    evidenceInDiff: checkEvidenceInDiff(finding, diff),
+    evidenceInDiff: deterministicSource || checkEvidenceInDiff(finding, diff),
     phaseCoherent: checkPhaseCoherent(finding, skill),
     filePhaseCoherent: checkFilePhaseCoherent(finding, fileTypes),
-    severityJustified: checkSeverityJustified(findingForLengthChecks, skill),
+    severityJustified: deterministicSource || checkSeverityJustified(findingForLengthChecks, skill),
     suggestionActionable: checkSuggestionActionable(findingForLengthChecks),
   };
 

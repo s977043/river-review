@@ -358,11 +358,18 @@ export function parseReviewerResponse(raw) {
  * This is a thin adapter over `verifyFinding`; every check it reports comes
  * from `src/lib/verifier.mjs`. Nothing is re-derived here.
  *
- * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[] }} input
+ * @param {{ finding: object, diff?: string, skill?: object, fileTypes?: object, diffFiles?: string[], deterministicSource?: boolean }} input
  * @returns {{ verified: boolean, sendToCritic: boolean, status: string | null, reasons: string[], checks: Record<string, boolean> }}
  */
-export function preVerifyFinding({ finding, diff, skill, fileTypes, diffFiles }) {
-  const result = verifyFinding({ finding, diff, skill, fileTypes, diffFiles });
+export function preVerifyFinding({
+  finding,
+  diff,
+  skill,
+  fileTypes,
+  diffFiles,
+  deterministicSource = false,
+}) {
+  const result = verifyFinding({ finding, diff, skill, fileTypes, diffFiles, deterministicSource });
   if (result.verified) {
     return {
       verified: true,

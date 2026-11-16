@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
+import { formatFindingMessage } from '../src/lib/finding-factory.mjs';
+import { HEURISTIC_KIND_PRESENTATIONS } from '../src/lib/heuristic-review.mjs';
 import { determineScopeFromDiff, verifyFinding } from '../src/lib/verifier.mjs';
 
 test('verifyFinding: passes for well-formed finding', () => {
@@ -641,4 +643,50 @@ test('verifyFinding: refs cannot pad a too-short Evidence / Fix into passing', (
   assert.equal(rejected.verified, false);
   assert.ok(rejected.reasons.includes('No evidence provided in finding'));
   assert.ok(rejected.reasons.includes('Fix/suggestion is missing or too brief'));
+});
+
+const PRESET_DIFF = 'diff --git a/src/app.js b/src/app.js\n+x';
+const verifyPreset = (preset, options = {}) =>
+  verifyFinding({
+    finding: { file: 'src/app.js', line: 1, message: formatFindingMessage(preset) },
+    diff: PRESET_DIFF,
+    skill: { metadata: { severity: 'minor' } },
+    ...options,
+  });
+
+test('verifyFinding: deterministicSource passes every heuristic kind (TC-10)', () => {
+  assert.ok(HEURISTIC_KIND_PRESENTATIONS.size > 0);
+  for (const [kind, preset] of HEURISTIC_KIND_PRESENTATIONS) {
+    const result = verifyPreset(preset, { deterministicSource: true });
+    assert.deepEqual(result.reasons, [], kind);
+    assert.equal(result.verified, true, kind);
+  }
+});
+
+test('verifyFinding: without deterministicSource, a minor skill rejects all but nits (TC-10)', () => {
+  assert.ok(HEURISTIC_KIND_PRESENTATIONS.size > 0);
+  for (const [kind, preset] of HEURISTIC_KIND_PRESENTATIONS) {
+    assert.equal(verifyPreset(preset).verified, preset.severity === 'nit', kind);
+  }
+});
+
+test('verifyFinding: deterministicSource exempts the dangerous-eval evidence text (TC-03)', () => {
+  const preset = HEURISTIC_KIND_PRESENTATIONS.get('dangerous-eval');
+  const skill = { metadata: { severity: 'critical' } };
+  assert.deepEqual(verifyPreset(preset, { skill }).reasons, [
+    'Evidence references file not found in diff',
+  ]);
+  assert.equal(verifyPreset(preset, { skill, deterministicSource: true }).verified, true);
+});
+
+test('verifyFinding: deterministicSource keeps the format checks', () => {
+  const result = verifyFinding({
+    finding: { message: 'Finding: issue\nSeverity: warning\nConfidence: high\nFix: short' },
+    diff: PRESET_DIFF,
+    skill: { metadata: {} },
+    deterministicSource: true,
+  });
+  assert.equal(result.verified, false);
+  assert.ok(result.reasons.includes('No evidence provided in finding'));
+  assert.ok(result.reasons.includes('Fix/suggestion is missing or too brief'));
 });

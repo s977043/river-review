@@ -13,6 +13,9 @@
  *   - skillId:     対応スキル ID（dry-run フィルタと配線に使用）
  *   - detect:      ({ diff }) => Array<{ file, line, kind }> の検出関数
  *   - skipIfSkill: （任意）指定スキルが plan に含まれる場合はこの detector を実行しない
+ *   - routing:     （任意）'always' のとき skillId が plan に無くても実行する（#2870）。
+ *                  applyTo はファイル種別・phase で skill を絞るため、誤検出が極めて
+ *                  少ない detector だけに付ける。finding の skillId は所有 skill のまま
  *   - findings:    kind → { finding, evidence, impact, fix, severity, confidence }
  *                  （review-engine の日本語メッセージ生成に使用）
  *
@@ -51,20 +54,26 @@ const DISABLED_TEST_FINDING = {
   confidence: 'medium',
 };
 
+const HARDCODED_SECRET_FINDING = {
+  finding: '秘密情報（トークン/キー）の直書きの可能性がある',
+  evidence: 'トークン/キーらしい文字列が追加されている',
+  impact: '漏洩時に不正利用やインシデントにつながる',
+  fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
+  severity: 'blocker',
+  confidence: 'high',
+};
+
 const HEURISTIC_REGISTRY = [
   {
     skillId: 'security-basic',
+    routing: 'always',
+    detect: findExplicitTokens,
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
+  },
+  {
+    skillId: 'security-basic',
     detect: findHardcodedSecrets,
-    findings: {
-      'hardcoded-secret': {
-        finding: '秘密情報（トークン/キー）の直書きの可能性がある',
-        evidence: 'トークン/キーらしい文字列が追加されている',
-        impact: '漏洩時に不正利用やインシデントにつながる',
-        fix: '環境変数（GitHub Secrets等）へ移し、漏洩時はローテーションも検討する',
-        severity: 'blocker',
-        confidence: 'high',
-      },
-    },
+    findings: { 'hardcoded-secret': HARDCODED_SECRET_FINDING },
   },
   {
     skillId: 'security-basic',
@@ -226,6 +235,7 @@ const HEURISTIC_REGISTRY = [
   },
   {
     skillId: 'logging-observability',
+    routing: 'always',
     detect: findMergeConflict,
     findings: {
       'merge-conflict': {
@@ -425,17 +435,26 @@ function looksLikeLogging(code) {
   return /\b(console\.(?:log|info|warn|error)|logger\.\w+|log\.\w+)\b/.test(code);
 }
 
+// Typical high-signal tokens/keys
+const EXPLICIT_TOKEN_PATTERNS = [
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, // AWS Access Key ID (long-term / temporary)
+  /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
+  /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
+  /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
+];
+
+function matchesExplicitToken(code) {
+  if (isEnvReference(code)) return false;
+  // AWS documentation dummy keys (e.g. AKIAIOSFODNN7EXAMPLE) are not leaks.
+  const withoutDummies = code.replace(/\b(?:AKIA|ASIA)[0-9A-Z]{9}EXAMPLE\b/g, '');
+  return EXPLICIT_TOKEN_PATTERNS.some((re) => re.test(withoutDummies));
+}
+
+// The explicit-token line is owned by findExplicitTokens, so it is excluded
+// here to keep one finding per line when security-basic is selected.
 function matchesHardcodedSecretLine(code) {
   if (isEnvReference(code)) return false;
-
-  // Typical high-signal tokens/keys
-  const explicitPatterns = [
-    /\bAKIA[0-9A-Z]{16}\b/, // AWS Access Key ID
-    /\bghp_[A-Za-z0-9]{36,}\b/, // GitHub token
-    /\bsk-(?:live|test)?_[A-Za-z0-9]{16,}\b/, // Stripe-like
-    /\bsk-[A-Za-z0-9]{16,}\b/, // OpenAI-like (generic)
-  ];
-  if (explicitPatterns.some((re) => re.test(code))) return true;
+  if (matchesExplicitToken(code)) return false;
 
   // Heuristic: suspicious identifier name + long-ish string literal
   const assignMatch =
@@ -454,7 +473,15 @@ function matchesHardcodedSecretLine(code) {
   return true;
 }
 
+function findExplicitTokens({ diff }) {
+  return findSecretLines({ diff, matches: matchesExplicitToken });
+}
+
 function findHardcodedSecrets({ diff }) {
+  return findSecretLines({ diff, matches: matchesHardcodedSecretLine });
+}
+
+function findSecretLines({ diff, matches }) {
   // Avoid noisy output when many hardcoded values are introduced at once.
   const MAX_HARDCODED_SECRET_COMMENTS = 3;
   const comments = [];
@@ -464,10 +491,10 @@ function findHardcodedSecrets({ diff }) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
     if (looksLikeTestFile(filePath)) continue;
-    const normalized = String(filePath).replaceAll('\\', '/');
+    const normalized = `/${String(filePath).replaceAll('\\', '/')}`;
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
     for (const { line, text } of iterateAddedLines(file)) {
-      if (!matchesHardcodedSecretLine(text)) continue;
+      if (!matches(text)) continue;
       comments.push({
         file: filePath,
         line,
@@ -944,6 +971,8 @@ function findMergeConflict({ diff }) {
   for (const file of files) {
     const filePath = file?.path;
     if (!filePath || filePath === '/dev/null') continue;
+    // Docs and patch files legitimately quote conflict markers (#2870 D2).
+    if (/\.(?:md|mdx|patch|diff)$/i.test(filePath)) continue;
     for (const { line, text } of iterateAddedLines(file)) {
       if (!matchesMergeConflict(text)) continue;
       comments.push({ file: filePath, line, kind: 'merge-conflict' });
@@ -1191,17 +1220,167 @@ function isEmojiAdjacentChar(ch) {
   return EXTENDED_PICTOGRAPHIC_RE.test(ch);
 }
 
+const RTL_LETTER_RE =
+  /\p{scx=Arabic}|\p{scx=Hebrew}|\p{scx=Syriac}|\p{scx=Thaana}|\p{scx=Nko}|\p{scx=Mandaic}|\p{scx=Samaritan}|\p{scx=Adlam}/u;
+const JOIN_CONTROL_SCRIPT_RES = [
+  /\p{scx=Arabic}/u,
+  /\p{scx=Syriac}/u,
+  /\p{scx=Devanagari}/u,
+  /\p{scx=Bengali}/u,
+  /\p{scx=Gurmukhi}/u,
+  /\p{scx=Gujarati}/u,
+  /\p{scx=Oriya}/u,
+  /\p{scx=Tamil}/u,
+  /\p{scx=Telugu}/u,
+  /\p{scx=Kannada}/u,
+  /\p{scx=Malayalam}/u,
+  /\p{scx=Sinhala}/u,
+];
+const NEUTRAL_TEXT_RE = /[\p{P}\p{Zs}]/u;
+const LINE_BREAK_CHARS = new Set(['\n', '\r', '\v', '\f', '\u0085', '\u2028', '\u2029']);
+const STRING_QUOTES = new Set(['"', "'"]);
+const BEFORE_STRING_CHARS = new Set(['=', '(', ',', ':', '[', '{', '+', '?']);
+const AFTER_STRING_CHARS = new Set([',', ';', ')', ']', '}', ':', '+']);
+
+const RETURN_KEYWORD = 'return';
+
+/** \`return\` that starts its own token, as in \`  return "text";\`. */
+function endsWithReturnKeyword(cps, end) {
+  const start = end - RETURN_KEYWORD.length + 1;
+  if (start < 0 || cps.slice(start, end + 1).join('') !== RETURN_KEYWORD) return false;
+  const before = cps[start - 1];
+  return before === undefined || before === ' ' || before === '\t';
+}
+
+/**
+ * Whether a line leaves a string or a line continuation open for the next line.
+ * Comments are not recognized, so an apostrophe in one also reads as open, which
+ * only withdraws the exemption.
+ */
+function quoteStateAfter(text, state = null) {
+  let quote = state;
+  const cps = Array.from(String(text));
+  let trailingBackslashes = 0;
+  for (let i = 0; i < cps.length; i += 1) {
+    const ch = cps[i];
+    trailingBackslashes = ch === '\\' ? trailingBackslashes + 1 : 0;
+    if (ch === '\\') {
+      if (quote && i + 1 < cps.length) {
+        i += 1;
+        trailingBackslashes = 0;
+      }
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+    }
+  }
+  if (quote) return quote;
+  return trailingBackslashes % 2 === 1 ? '\\' : null;
+}
+
+function closingQuoteIndex(cps, open) {
+  for (let i = open + 1; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (LINE_BREAK_CHARS.has(ch) || ch === '`') return -1;
+    if (ch === '$' && cps[i + 1] === '{') return -1;
+    if (ch === '*' && cps[i + 1] === '/') return -1;
+    if (ch === '\\') i += 1;
+    else if (ch === cps[open]) return i;
+  }
+  return -1;
+}
+
+/**
+ * Mark the characters inside quoted strings this line proves by itself. One line
+ * cannot tell what a slash, backtick, or stray quote opens, so scanning stops
+ * there and everything after it counts as code, including comments.
+ */
+function markProvenStrings(cps) {
+  const inString = new Uint8Array(cps.length);
+  let before = '';
+  let lastCode = -1;
+  for (let i = 0; i < cps.length; i += 1) {
+    const ch = cps[i];
+    if (ch === ' ' || ch === '\t') continue;
+    if (STRING_QUOTES.has(ch)) {
+      if (before && !BEFORE_STRING_CHARS.has(before) && !endsWithReturnKeyword(cps, lastCode))
+        break;
+      const close = closingQuoteIndex(cps, i);
+      if (close < 0) break;
+      let after = close + 1;
+      while (cps[after] === ' ' || cps[after] === '\t') after += 1;
+      const lineEnds = after >= cps.length || (cps[after] === '\r' && after === cps.length - 1);
+      if (!lineEnds && !AFTER_STRING_CHARS.has(cps[after])) break;
+      inString.fill(1, i + 1, close);
+      before = ch;
+      i = close;
+    } else if (ch === '/' || ch === '`' || ch === '\\' || LINE_BREAK_CHARS.has(ch)) {
+      break;
+    } else {
+      before = ch;
+      lastCode = i;
+    }
+  }
+  return inString;
+}
+
+function nearestTextChars(cps, order) {
+  const nearest = new Array(cps.length);
+  let last = '';
+  for (const i of order) {
+    nearest[i] = last;
+    const ch = cps[i];
+    if (BIDI_MARK_CPS.has(ch.codePointAt(0))) continue;
+    if (STRING_QUOTES.has(ch) || !NEUTRAL_TEXT_RE.test(ch)) last = ch;
+  }
+  return nearest;
+}
+
+function buildTextContext(cps, exemptStrings) {
+  const forward = cps.map((_, i) => i);
+  return {
+    inString: exemptStrings ? markProvenStrings(cps) : new Uint8Array(cps.length),
+    left: nearestTextChars(cps, forward),
+    right: nearestTextChars(cps, forward.reverse()),
+  };
+}
+
+/** LRM / RLM / ALM are text formatting only inside right-to-left text. */
+function isRtlTextMark({ inString, left, right }, idx) {
+  if (!inString[idx]) return false;
+  const sides = [left[idx], right[idx]];
+  return (
+    sides.some((ch) => RTL_LETTER_RE.test(ch)) &&
+    sides.every((ch) => STRING_QUOTES.has(ch) || RTL_LETTER_RE.test(ch))
+  );
+}
+
+/** ZWJ / ZWNJ shape a word only between characters of one script that uses them. */
+function isScriptJoinControl({ inString }, cps, idx) {
+  const prev = cps[idx - 1] ?? '';
+  const next = cps[idx + 1] ?? '';
+  if (!prev || !next || !inString[idx]) return false;
+  return JOIN_CONTROL_SCRIPT_RES.some((re) => re.test(prev) && re.test(next));
+}
+
 /**
  * Classify the dangerous Unicode present on a single (added) code line.
  * Returns a Set of kinds among 'bidi-control' | 'invisible-unicode' |
  * 'confusable-whitespace'. Conservative by construction (emoji sequences,
- * leading BOM, and in-string confusable whitespace are treated as legitimate).
+ * leading BOM, in-string confusable whitespace, and bidi marks and join controls
+ * in proven strings of the scripts that use them are treated as legitimate).
  * @param {string} line
+ * @param {{ exemptStrings?: boolean }} [options] false when the line may continue a
+ *   string from a line that is open or not visible.
  * @returns {Set<string>}
  */
-function detectInvisibleUnicodeKinds(line) {
+function detectInvisibleUnicodeKinds(line, { exemptStrings = true } = {}) {
   const kinds = new Set();
   const cps = Array.from(String(line));
+  let textContext = null;
 
   for (let idx = 0; idx < cps.length; idx += 1) {
     const ch = cps[idx];
@@ -1209,8 +1388,14 @@ function detectInvisibleUnicodeKinds(line) {
     const prev = cps[idx - 1] ?? '';
     const next = cps[idx + 1] ?? '';
 
-    if (cpInRanges(cp, BIDI_CONTROL_RANGES) || BIDI_MARK_CPS.has(cp)) {
+    if (cpInRanges(cp, BIDI_CONTROL_RANGES)) {
       kinds.add('bidi-control');
+      continue;
+    }
+
+    if (BIDI_MARK_CPS.has(cp)) {
+      textContext ??= buildTextContext(cps, exemptStrings);
+      if (!isRtlTextMark(textContext, idx)) kinds.add('bidi-control');
       continue;
     }
 
@@ -1226,9 +1411,14 @@ function detectInvisibleUnicodeKinds(line) {
       continue;
     }
 
-    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence.
+    // Bare ZERO WIDTH (NON-)JOINER: legitimate only inside an emoji sequence or
+    // in text of a script that shapes words with it.
     if (cp === ZWJ || cp === ZWNJ) {
-      if (!(isEmojiAdjacentChar(prev) || isEmojiAdjacentChar(next))) {
+      if (!(
+        isEmojiAdjacentChar(prev) ||
+        isEmojiAdjacentChar(next) ||
+        isScriptJoinControl((textContext ??= buildTextContext(cps, exemptStrings)), cps, idx)
+      )) {
         kinds.add('invisible-unicode');
       }
       continue;
@@ -1318,6 +1508,40 @@ function looksLikeSourceCodeFile(filePath) {
   );
 }
 
+// Languages whose `"` / `'` strings cannot span a raw line break, so a string
+// opened above the visible hunk cannot reach an added line. PHP, Ruby, shell,
+// SQL, and others can, or run code inside the quotes, and get no exemption.
+const STRING_EXEMPT_FILE_RE = /\.(js|jsx|ts|tsx|mjs|cjs|json)$/;
+
+/**
+ * Added lines with whether a string on them can be exempt. A line can be in a
+ * STRING_EXEMPT_FILE_RE file when the file starts there, or when the previous new-side line is visible and, read on its
+ * own and carried from the first visible line, closes every string.
+ */
+function* iterateAddedLinesWithStringContext(file) {
+  const exemptLanguage = STRING_EXEMPT_FILE_RE.test(String(file?.path ?? ''));
+  for (const hunk of ensureArray(file?.hunks)) {
+    let newLineNumber = hunk.newStart ?? 0;
+    let previous = newLineNumber <= 1 ? { open: false } : null;
+    let carried = null;
+    for (const rawLine of ensureArray(hunk.lines)) {
+      if (rawLine.startsWith('-') && !rawLine.startsWith('---')) continue;
+      const added = rawLine.startsWith('+') && !rawLine.startsWith('+++');
+      const text = rawLine.slice(1);
+      if (added) {
+        yield {
+          line: newLineNumber,
+          text,
+          exemptStrings: exemptLanguage && previous !== null && !previous.open,
+        };
+      }
+      carried = quoteStateAfter(text, carried === '\\' ? null : carried);
+      previous = { open: quoteStateAfter(text) !== null || carried !== null };
+      newLineNumber += 1;
+    }
+  }
+}
+
 function findInvisibleUnicode({ diff }) {
   const MAX_INVISIBLE_UNICODE_COMMENTS = 3;
   const comments = [];
@@ -1329,8 +1553,8 @@ function findInvisibleUnicode({ diff }) {
     if (!looksLikeSourceCodeFile(filePath)) continue;
     const normalized = String(filePath).replaceAll('\\', '/');
     if (normalized.includes('/fixtures/') || normalized.includes('/__fixtures__/')) continue;
-    for (const { line, text } of iterateAddedLines(file)) {
-      const kinds = detectInvisibleUnicodeKinds(text);
+    for (const { line, text, exemptStrings } of iterateAddedLinesWithStringContext(file)) {
+      const kinds = detectInvisibleUnicodeKinds(text, { exemptStrings });
       // One finding per line, highest severity first.
       let kind = null;
       if (kinds.has('bidi-control')) kind = 'bidi-control';
@@ -1607,8 +1831,8 @@ function findTemporaryWithoutExit({ diff }) {
 export function collectHeuristicDetections({ diff, plan }) {
   const detections = [];
 
-  for (const { skillId, detect, skipIfSkill } of HEURISTIC_REGISTRY) {
-    if (!hasSkill(plan, skillId)) continue;
+  for (const { skillId, detect, skipIfSkill, routing } of HEURISTIC_REGISTRY) {
+    if (routing !== 'always' && !hasSkill(plan, skillId)) continue;
     // skipIfSkill: 上位スキルが選択されている場合は重複実行を避ける
     // （test-existence が選択されていれば coverage-gap の同一検出器は実行しない）。
     if (skipIfSkill && hasSkill(plan, skipIfSkill)) continue;

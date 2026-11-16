@@ -106,7 +106,7 @@ async function resolveGateExitCode({
 }) {
   let severityCode = 0;
   if (failOn || warnOn || advisoryOnly) {
-    const { evaluateReviewGate } = await __webpack_require__.e(/* import() */ 85).then(__webpack_require__.bind(__webpack_require__, 6085));
+    const { evaluateReviewGate } = await __webpack_require__.e(/* import() */ 810).then(__webpack_require__.bind(__webpack_require__, 3810));
     const result = evaluateReviewGate(getGateInput(), {
       failOn: failOn ?? 'critical',
       warnOn: warnOn ?? 'major',

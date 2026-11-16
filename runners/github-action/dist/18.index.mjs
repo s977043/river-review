@@ -117,6 +117,7 @@ async function defaultCriticCall({ systemMessage, prompt, llm = {} }) {
  * @param {number} [input.hardCap]
  * @param {object} [input.redactOptions] redactText のオプション（trace 用）
  * @param {(turn: object) => Promise<unknown>} [input.callImpl]
+ * @param {boolean} [input.deterministicSource] detector 由来の finding（#2871）
  * @returns {Promise<{ finding: object, deterministic: object, exchanges: object[], result: object, validated: object, routed: object, trace: object[] }>}
  */
 async function runFindingCritic({
@@ -133,8 +134,16 @@ async function runFindingCritic({
   hardCap = _finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .HARD_CAP_INNER_ROUNDS */ .qS,
   redactOptions = {},
   callImpl = defaultCriticCall,
+  deterministicSource = false,
 }) {
-  const deterministic = (0,_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .preVerifyFinding */ .W2)({ finding, diff, skill, fileTypes, diffFiles });
+  const deterministic = (0,_finding_critic_mjs__WEBPACK_IMPORTED_MODULE_0__/* .preVerifyFinding */ .W2)({
+    finding,
+    diff,
+    skill,
+    fileTypes,
+    diffFiles,
+    deterministicSource,
+  });
 
   // 決定論の段で落ちた finding は Critic を呼ばずに終わる。status は
   // preVerifyFinding が決めたものをそのまま使い、ここで作り直さない。

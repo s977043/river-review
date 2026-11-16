@@ -38,6 +38,34 @@ const DIFF_TEXT = [
   '+}',
 ].join('\n');
 
+// A run that never calls the LLM emits no fallback (#2868), so a test that needs
+// findings without an LLM needs a diff a heuristic detects: security-basic's
+// dangerous-eval detector reads the added lines of the hunks.
+const EVAL_DIFF = {
+  diffText: [
+    'diff --git a/src/lib/run-code.mjs b/src/lib/run-code.mjs',
+    '--- a/src/lib/run-code.mjs',
+    '+++ b/src/lib/run-code.mjs',
+    '@@ -0,0 +1,3 @@',
+    '+export function runCode(code) {',
+    '+  return eval(code);',
+    '+}',
+  ].join('\n'),
+  files: [
+    {
+      path: 'src/lib/run-code.mjs',
+      addedLines: [1, 2, 3],
+      hunks: [
+        {
+          newStart: 1,
+          lines: ['+export function runCode(code) {', '+  return eval(code);', '+}'],
+        },
+      ],
+    },
+  ],
+};
+const EVAL_PLAN = { selected: [{ metadata: { id: 'security-basic' }, name: 'security-basic' }] };
+
 const FINDING = {
   id: 'rr-1',
   ruleId: 'security',
@@ -455,13 +483,11 @@ describe('#2334 the production wiring in generateReview (no runImpl injected)', 
   // so deleting either the call or the `findings = criticStage.findings`
   // assignment makes it fail. The Critic is enabled through the real config
   // path and no API key is needed — dryRun makes the LLM unavailable, which
-  // the stage must read as a fail-safe rather than as "no objection".
+  // the stage must read as a fail-safe rather than as "no objection". dryRun
+  // emits no fallback (#2868), so the findings come from the eval heuristic.
   const reviewArgs = () => ({
-    diff: {
-      diffText: DIFF_TEXT,
-      files: [{ path: 'src/lib/fetch-url.mjs', addedLines: [1, 2], hunks: [] }],
-    },
-    plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+    diff: EVAL_DIFF,
+    plan: EVAL_PLAN,
     phase: 'midstream',
     dryRun: true,
   });
@@ -748,13 +774,12 @@ describe('#2334 wiring pins (mutations that survived the first round)', () => {
     delete process.env.OPENAI_API_KEY;
     try {
       const result = await generateReview({
-        diff: ORCH_DIFF,
-        plan: { selected: [{ metadata: { id: 'security' }, name: 'security' }] },
+        diff: EVAL_DIFF,
+        plan: EVAL_PLAN,
         phase: 'midstream',
-        // `skipReason` is what encodes "the LLM cannot be called". dry-run is
-        // the form of it that still yields findings to attach a verdict to (a
-        // missing key short-circuits to an empty set, so it cannot distinguish
-        // the two branches). The mutation under test replaces
+        // `skipReason` is what encodes "the LLM cannot be called". A run that
+        // skips the LLM emits no fallback (#2868), so the findings to attach a
+        // verdict to come from the dangerous-eval heuristic. The mutation under test replaces
         // `llmAvailable: !skipReason` with `true`, which this catches either way.
         dryRun: true,
         config: { review: { findingCritic: { mode: 'active' } } },
