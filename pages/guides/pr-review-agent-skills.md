@@ -31,6 +31,8 @@ Agent Skills 形式またはそれに近い形で公開されているコミュ�
 | `@bjpl/aves/github-code-review` | Claude Skill       | GitHub PR の差分を解析し、コメント提案を生成する特化 Skill。                 | 公開 PR 前提が多いため、プライベートリポジトリ利用時の権限・認可を要確認。 |
 | `devlyai/AgentCheck`            | OSS エージェント群 | ローカルリポジトリ全体を読み込み、カスタムルール付きでコードレビューを行う。 | プロジェクト固有ルールを追加しやすい。Docker/Node 依存を事前に確認。       |
 
+注記: `@bjpl/aves/github-code-review` の旧カタログURLは、2026年11月17日のCIでHTTP 402を返しました。配布元とライセンスを独立確認できるまで導入対象に含めず、参考情報として扱います。
+
 ## 3. 取り込み時のチェックリスト
 
 1. **スキーマ適合**: `SKILL.md` フォーマットが Agent Skills 仕様に沿っているか（メタデータの必須キー、意図しない拡張フィールドがないか）。
@@ -51,5 +53,4 @@ Agent Skills 形式またはそれに近い形で公開されているコミュ�
 
 - Agent Skills カタログ: [https://github.com/skillcreatorai/Ai-Agent-Skills](https://github.com/skillcreatorai/Ai-Agent-Skills)
 - Awesome Agent Skills（コミュニティまとめ）: [https://github.com/travisvn/awesome-claude-skills](https://github.com/travisvn/awesome-claude-skills)
-- GitHub-code-review Skill: [https://claude-plugins.dev/skills/%40bjpl/aves/github-code-review](https://claude-plugins.dev/skills/%40bjpl/aves/github-code-review)
 - AgentCheck: [https://github.com/devlyai/AgentCheck](https://github.com/devlyai/AgentCheck)
