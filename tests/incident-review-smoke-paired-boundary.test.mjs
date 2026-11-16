@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { assessIncidentReviewSmoke } from '../scripts/experiments/incident-review-smoke-preflight.mjs';
+import {
+  assessIncidentReviewSmoke,
+} from '../scripts/experiments/incident-review-smoke-preflight.mjs';
 import { buildPairedReplay } from '../src/lib/paired-replay.mjs';
 
 const NOW = new Date('2026-11-01T00:00:00.000Z');
@@ -131,7 +133,7 @@ function replaySpec(input) {
   };
 }
 
-test('metadata-only preflight plus identical finding projections cannot certify verifier activation', () => {
+test('a new verifier disposition alone does not activate paired replay', () => {
   const input = metadata();
   const checked = assessIncidentReviewSmoke(input);
   assert.equal(checked.metadataStatus, 'complete');
@@ -158,7 +160,7 @@ test('metadata-only preflight plus identical finding projections cannot certify 
   assert.deepEqual(result.writeEffects, []);
 });
 
-test('a lost alleged critical finding remains visible even when the held-out clean case is quiet', () => {
+test('critical loss remains visible outside a clean held-out scope', () => {
   const experiment = replaySpec(metadata());
   experiment.candidate.runs[0].findings = [];
 
