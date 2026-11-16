@@ -67,7 +67,7 @@ function metadata() {
 
 function replaySpec(input) {
   const runs = input.cases.map((entry, index) => ({
-    runId: \`baseline-\${index}\`,
+    runId: `baseline-${index}`,
     caseId: entry.caseId,
     reviewedTarget: entry.source.reviewedTarget,
     mergeBase: entry.source.mergeBase,
@@ -88,7 +88,7 @@ function replaySpec(input) {
   }));
   const candidateRuns = structuredClone(runs);
   candidateRuns.forEach((run, index) => {
-    run.runId = \`candidate-\${index}\`;
+    run.runId = `candidate-${index}`;
   });
   return {
     hypothesis: 'synthetic verifier disposition-only experiment',
