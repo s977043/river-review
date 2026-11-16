@@ -21,7 +21,7 @@
 | [#2844](https://github.com/s977043/river-review/pull/2844) / `scripts/experiments/incident-review-smoke-preflight.mjs` | 人間が提出したケース**メタデータの構造**を検査する（read-only） | Ground truth の真正性検査、実際の精度の計算 |
 | `docs/development/2701-incident-revert-reviewer-benchmark-gap-analysis.md` | ケース適格性、信頼境界、分母、実験停止規則 | 類似した正解DB・永続データ契約 |
 | `river evolve replay` / `docs/development/1574-p2-paired-replay.md` | 保存済みbaseline/candidateのfingerprint突合、Manifest、held-out、activation観測 | LLM再実行、指摘の真偽判定、自動採用 |
-| [PR #2881](https://github.com/s977043/river-review/pull/2881)（Draft） | Verification-First / リスク別レビューの**広い**A/B/C評価計画 | 同じ内容の大規模な再設計。こちらは実験運用の一候補に限定 |
+| [PR #2881](https://github.com/s977043/river-review/pull/2881)（Open・未マージ、2026-11-17確認） | Verification-First / リスク別レビューの**広い**A/B/C評価計画 | 同じ内容の大規模な再設計。こちらは実験運用の一候補に限定 |
 | [#2781](https://github.com/s977043/river-review/issues/2781)、[#2267](https://github.com/s977043/river-review/issues/2267) | リスク評価、反証・独立検証 | 製品Gate変更、外部検証基盤の新設 |
 | [#2812](https://github.com/s977043/river-review/issues/2812)、[PR #2912](https://github.com/s977043/river-review/pull/2912) | 未実行をcleanと誤表示する問題、detector→strict blockの回帰を個別Ownerで扱う | このPoC文書PRで未関連のruntime修正を同梱しない |
 
