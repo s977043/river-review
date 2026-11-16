@@ -5,6 +5,7 @@ import { inferImpactTags } from '../../src/lib/impact-scope.mjs';
 import { classifyChangedFiles } from '../../src/lib/file-classifier.mjs';
 import { inferPhase } from '../../src/lib/phase-inference.mjs';
 import { analyzeTestImpact } from '../../src/lib/test-impact.mjs';
+import { detectStateTransitionSignal } from '../../src/lib/state-transition-signal.mjs';
 import { normalizePlannerMode } from '../../src/lib/planner-utils.mjs';
 import { HEURISTIC_SKILL_IDS } from '../../src/lib/heuristic-review.mjs';
 import { estimateTokens } from '../../src/lib/token-estimator.mjs';
@@ -252,6 +253,19 @@ function isTestSkillEscalationEnabled() {
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
+const STATE_TRANSITION_SKILL_IDS = ['river-review-testing', 'unknown-coverage-review'];
+
+function forceSelectSkills(selection, skills, ids) {
+  const selectedIds = new Set(selection.selected.map((s) => getMeta(s).id));
+  for (const id of ids) {
+    if (selectedIds.has(id)) continue;
+    const skill = skills.find((s) => getMeta(s).id === id);
+    if (!skill) continue;
+    selection.selected.push(skill);
+    selection.skipped = selection.skipped.filter((entry) => getMeta(entry.skill).id !== id);
+  }
+}
+
 export async function buildExecutionPlan(options) {
   const {
     phase,
@@ -304,14 +318,13 @@ export async function buildExecutionPlan(options) {
   // test-impact risk diffs. Injects regardless of phase; default off so the
   // baseline selection (and dry-run heuristic behavior) is unchanged.
   if (testImpact.riskLevel === 'high' && isTestSkillEscalationEnabled()) {
-    const selectedIds = new Set(selection.selected.map((s) => getMeta(s).id));
-    for (const id of ESCALATION_TEST_SKILL_IDS) {
-      if (selectedIds.has(id)) continue;
-      const skill = skills.find((s) => getMeta(s).id === id);
-      if (!skill) continue;
-      selection.selected.push(skill);
-      selection.skipped = selection.skipped.filter((entry) => getMeta(entry.skill).id !== id);
-    }
+    forceSelectSkills(selection, skills, ESCALATION_TEST_SKILL_IDS);
+  }
+  // #2875: diffs dense in exception / resume / state-rewrite paths always get
+  // the testing and unknown-coverage reviews, regardless of phase.
+  const stateTransition = detectStateTransitionSignal(diffText);
+  if (stateTransition.triggered) {
+    forceSelectSkills(selection, skills, STATE_TRANSITION_SKILL_IDS);
   }
   if (selection.selected.length === 0) {
     // #878 A2-3-runners: even when no skills are selected, expose the
