@@ -56,10 +56,13 @@ Codex では同梱スキルを利用します。**Claude Code 専用の** `/rive
 
 ## 得られるもの
 
-Claude Code ではローカルレビューを入口に、チームの判断基準を拡張できます。Codex ではプラグインの同梱スキルを利用します。環境ごとに対応機能が異なります。
+Claude Code はコマンド、Codex は同梱スキルを利用します。配布版ごとの差は [詳細一覧](https://river-review.the3396.com/guides/plugin/commands-and-skills/) を参照してください。
 
-- コマンド: Claude Code の入口は `/river-review:review-local`。その他のコマンドは [一覧](https://river-review.the3396.com/guides/plugin/commands-and-skills/) を参照してください。
-- スキル: コード・セキュリティ・テストなどの観点を同梱しています。配布先ごとの [コマンド・エージェント・スキル一覧](https://river-review.the3396.com/guides/plugin/commands-and-skills/) で詳細を確認してください。
+得られるもの（プラグイン名で名前空間化されます）:
+
+- コマンド: `/river-review:setup-team` / `/river-review:review-local` / `/river-review:review-team` / `/river-review:challenge` が含まれる。加えて `/river-review:skill` / `/river-review:check` / `/river-review:pr` も使える。
+
+- スキル: オーケストレーターの `river-review` に加えて `river-review-code` / `river-review-security` / `river-review-security-audit` / `river-review-performance` の各スキルが含まれる。さらに `river-review-architecture` / `river-review-testing` / `river-review-frontend` も含まれる。加えて `river-review-docs` / `adversarial-review` / `review-team` / `unknown-coverage-review` も含まれる。いずれも `/river-review:<skill-name>` で呼び出せる
 
 スキルを追加する前に、[Starter Cookbook](https://river-review.the3396.com/guides/starter-cookbook/) で既存の観点を試してください。プロジェクト固有の基準は [Skill作成チュートリアル](https://river-review.the3396.com/tutorials/creating-your-first-skill/) に沿って作成できます。
 
