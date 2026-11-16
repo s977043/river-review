@@ -172,9 +172,9 @@ test('critical loss remains visible outside a clean held-out scope', () => {
 test('operator-claimed held-out isolation is checked only by the preflight, not by replay', () => {
   const input = metadata();
   input.cases[1].usedForTuning = true;
-  const preflight = preflight.assessIncidentReviewSmoke(input);
-  assert.equal(preflight.metadataStatus, 'incomplete');
-  assert.notDeepEqual(preflight.cases[1].reasonCodes, []);
+  const preflightReport = preflight.assessIncidentReviewSmoke(input);
+  assert.equal(preflightReport.metadataStatus, 'incomplete');
+  assert.notDeepEqual(preflightReport.cases[1].reasonCodes, []);
 
   // Replay is a separate read-only comparison. It must not be cited as an
   // independent check that the operator's held-out partition was uncontaminated.
