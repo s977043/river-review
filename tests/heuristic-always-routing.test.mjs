@@ -66,7 +66,7 @@ describe('always-routed detectors through the CLI (#2870)', () => {
   ];
   for (const [id, file, source] of tokenFiles) {
     it(`${id} explicit AWS key in ${file} blocks the gate`, async (t) => {
-      assertBlocked(await runGate(t, file, source), 'hardcoded-secret');
+      assertBlocked(await runGate(t, file, source), 'explicit-token');
     });
   }
 
@@ -83,7 +83,7 @@ describe('always-routed detectors through the CLI (#2870)', () => {
   it('P10 upstream phase still detects an explicit token', async (t) => {
     assertBlocked(
       await runGate(t, 'main.py', `k = "${AWS_KEY}"\n`, ['--phase', 'upstream']),
-      'hardcoded-secret'
+      'explicit-token'
     );
   });
 });
@@ -195,7 +195,7 @@ ${lines.join('\n')}
     assert.deepEqual(
       comments.map((c) => c.kind),
       [
-        ...Array(3).fill('hardcoded-secret'),
+        ...Array(3).fill('explicit-token'),
         ...Array(3).fill('debugger-leftover'),
         ...Array(2).fill('merge-conflict'),
       ]

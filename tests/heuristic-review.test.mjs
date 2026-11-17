@@ -501,7 +501,7 @@ index 1111111..2222222 100644
 
   assert.equal(comments.length, 3);
   assert.equal(comments[0].file, 'src/config/keys.ts');
-  assert.ok(comments.every((c) => c.kind === 'hardcoded-secret'));
+  assert.ok(comments.every((c) => c.kind === 'explicit-token'));
 });
 
 test('buildHeuristicComments ignores env var references (process.env / import.meta.env)', () => {
