@@ -31,6 +31,8 @@ Community skills/tools published in Agent Skills format or similar. Manage Skill
 | `@bjpl/aves/github-code-review` | Claude Skill     | Specialized Skill analyzing GitHub PR diffs for comment suggestions. | Often assumes public PRs; check permissions/auth for private repos.            |
 | `devlyai/AgentCheck`            | OSS Agent Bundle | Reads entire local repo and performs code review with custom rules.  | Easy to add project-specific rules. Check Docker/Node dependencies beforehand. |
 
+Note: The former catalog URL for `@bjpl/aves/github-code-review` returned HTTP 402 during CI on November 17, 2026. Treat this as an unverified reference rather than an adoption candidate until the upstream source and license have been independently checked.
+
 ## 3. Import Checklist
 
 1. **Schema Compliance**: Does `SKILL.md` format follow Agent Skills spec (required metadata keys, no unintended extension fields)?
@@ -51,5 +53,4 @@ Community skills/tools published in Agent Skills format or similar. Manage Skill
 
 - Agent Skills Catalog: [https://github.com/skillcreatorai/Ai-Agent-Skills](https://github.com/skillcreatorai/Ai-Agent-Skills)
 - Awesome Agent Skills (Community list): [https://github.com/travisvn/awesome-claude-skills](https://github.com/travisvn/awesome-claude-skills)
-- GitHub-code-review Skill: [https://claude-plugins.dev/skills/%40bjpl/aves/github-code-review](https://claude-plugins.dev/skills/%40bjpl/aves/github-code-review)
 - AgentCheck: [https://github.com/devlyai/AgentCheck](https://github.com/devlyai/AgentCheck)
