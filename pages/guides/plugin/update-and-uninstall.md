@@ -45,7 +45,11 @@ Write / Edit / MultiEdit の後に `scripts/plugin-format-hook.sh` が動き、*
 
 ### Stop（タスクチェックポイント）
 
-`scripts/plugin-task-checkpoint-hook.sh` が Review Artifact を `$TMPDIR/river-review-task-checkpoint/` に出力します。作業ツリーには書きません。環境変数 `RIVER_TASK_CHECKPOINT_HOOK=0` で止められます。
+`scripts/plugin-task-checkpoint-hook.sh` は、Node.js・Git・River Review CLI が利用できる場合に動作します。`river review plan --plan-only --entry review-task` が成功すると、Review Artifact を `$TMPDIR/river-review-task-checkpoint/` に出力します。作業ツリーには書きません。
+
+前提不足や `stop_hook_active` の場合などは終了コード 0 でスキップします。成果物の有無を別途確認してください。出力はレビュー計画のチェックポイントです。実際のレビュー実行や品質ゲート通過の証拠ではなく、`NOT_EXECUTED` の場合があります。
+
+環境変数 `RIVER_TASK_CHECKPOINT_HOOK=0` で無効化できます。
 
 詳細は [安定インターフェース](../../reference/stable-interfaces.md) を参照してください。
 

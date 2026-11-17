@@ -45,7 +45,11 @@ After Write / Edit / MultiEdit, `scripts/plugin-format-hook.sh` runs and **forma
 
 ### Stop (task checkpoint)
 
-`scripts/plugin-task-checkpoint-hook.sh` writes a Review Artifact to `$TMPDIR/river-review-task-checkpoint/`. It does not write to the working tree. Set `RIVER_TASK_CHECKPOINT_HOOK=0` to stop it.
+`scripts/plugin-task-checkpoint-hook.sh` runs when Node.js, Git, and the River Review CLI are available. If `river review plan --plan-only --entry review-task` succeeds, it writes a Review Artifact to `$TMPDIR/river-review-task-checkpoint/`, not to the working tree.
+
+Missing prerequisites or `stop_hook_active` can cause a successful (exit 0) skip, so check whether an artifact was actually created. The artifact is a plan-only checkpoint, not evidence that a review ran or a quality gate passed (it may report `NOT_EXECUTED`).
+
+Set `RIVER_TASK_CHECKPOINT_HOOK=0` to disable the hook.
 
 See [Stable interfaces](../../reference/stable-interfaces.en.md) for details.
 
