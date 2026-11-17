@@ -34,7 +34,7 @@ River Review の外部試用と自然な Stars の増加を、**先行する利�
 1. 外部利用者の有効な初回レビュー完了人数（`run_status: completed` と対象diffの証拠が必要）。
 2. 無介助で成功した人数と、失敗・介助理由（失敗した参加者を分母から除かない）。
 3. 人間が採用・棄却・保留を理由付きで評価した指摘と参加人数。
-4. 初回試用から7〜13日後の追跡窓が閉じた同一開始コホートで、実際に再実行した人数。追跡開始と結果確定は区別し、自己申告や意向は別欄。
+4. 初回の**有効レビュー完了日から7〜13日後**の観測窓が閉じた同一完了コホートで、実際に有効レビューを再実行した人数。試用開始7日後のフォローアップとは区別し、自己申告や意向は別欄。
 5. Stars / Forks の実測差分。流入元別のStar獲得を根拠なく断定しない。
 
 ## 集計の定義と保存先
@@ -44,7 +44,8 @@ River Review の外部試用と自然な Stars の増加を、**先行する利�
 - **試用分母**: 参加同意人数と実際の試用開始人数を分け、外部テスターの匿名IDで週内ユニーク人数を集計する。無介助率の分母は**同じ試用開始コホートに属する開始者全員**。途中失敗、介助完了、進行中を分母から除かない。週次の開始・完了欄はそれぞれ当週のイベント人数であり、相互に割って率を出さない。2/3・4/5の探索判定も同一開始コホートで行う。失敗後に介助完了した場合は経緯として両方記録し、各欄を単純合算しない。作者のdogfoodは別計上。
 - **Time to First Value（TtFV）**: 未導入ホストでREADMEを開いた時刻から、対象のtracked diffに対して**観測された有効レビュー結果**を得た時刻まで。開始・終了・所要分数・介助有無は参加者の非公開記録へ保存。週次には完了者の中央値と範囲および母数のみを集計し、失敗・未完了を仮の所要時間で補わない。「5分」は測定前の仮説。
 - **人間による有用性**: 実行成立と有用な指摘は別。人間が実際のfindingを採用・棄却・保留した件数と理由、評価した参加者数を非公開証拠から匿名集計する。expected-findingsを成果に加えない。採用・棄却・保留は利用者判断であり、検出評価のTP/FP/FN/holdと混同しない。
-- **D7成熟と再利用**: 初回**試用開始日**から7日経過し、追跡期限がその週に到来する外部の参加者全員を成熟分母とする（未完了・連絡不能も含む）。D7実再利用は**初回の試用開始日から7〜13日後（JST）に、初回と別の日に有効なレビューを走らせたrun証拠**がある場合だけ認定する。初回試用開始から7日後はフォローアップ開始であり、観測窓が閉じる13日後までは**追跡中・暫定**として扱い、未観測を未再利用0件に確定しない。再利用率の確定分母・分子は、窓の終了した同一開始コホートから算出する。遅れて届いた証拠は元のコホートへ履歴付きで訂正し、別週の新規参加者として重複計上しない。期間外の再利用や自己申告・未実施回答・連絡不能は分ける。
+- **D7フォローアップ（試用開始起点）**: 初回**試用開始日から7日後（JST）**に連絡する。対象は同じ開始コホートの全員であり、未完了・導入失敗・連絡不能を除かない。連絡期限の到来人数・連絡実施人数・連絡不能人数を分けて記録する。これは継続利用率ではない。
+- **D7実再利用（初回有効レビュー完了起点）**: 初回の**有効レビュー完了日から7〜13日後（JST）**に、別の日の有効レビューを実行したrun証拠がある場合だけ認定する。再利用率の確定分母は、**初回有効レビューを完了し、13日後までの観測窓が閉じた同一完了コホート**とする。未成熟者を含めず、実再実行・自己申告のみ・未実施回答・連絡不能を分ける。窓が閉じるまでは追跡中として扱い、未観測を0件にしない。遅れて届いた証拠は元の完了コホートへ履歴付きで訂正する。期間外の再利用はD7に算入しない。無介助成功率の分母は引き続き試用を開始した全員とし、D7実再利用率の分母と混同しない。
 - **公開情報の制限**: source_public_evidence_url には公開確認済みのGitHub Issue/PR/記事だけを置く。参加者ID・同意履歴・生ログ・非公開Traffic snapshot・私的な証拠URLは公開Issueに書かず、非公開の照合元へ保持する。公開前に少人数（3〜5名）の再識別リスクを人間が点検し、必要なら期間統合・粗粒度化・非公開化する。複数の指標の根拠が異なる場合は、公開可の範囲で指標ごとに根拠を対応付ける。
 
 ## 週次記録テンプレート（#2924 のコメント用）
@@ -80,13 +81,15 @@ River Review の外部試用と自然な Stars の増加を、**先行する利�
 - ttfv_no_valid_result_count_this_week: unknown
 - participants_with_human_labeled_findings_this_week: unknown
 - human_labeled_findings_accepted_rejected_pending_this_week: unknown
-- d7_followup_due_participants_this_week: unknown
-- d7_followup_window_still_open_this_week: unknown
-- d7_window_closed_cohort_participants_this_week: unknown
-- d7_actual_reruns_in_closed_cohort_this_week: unknown
-- d7_self_report_only_in_closed_cohort_this_week: unknown
-- d7_no_rerun_reported_in_closed_cohort_this_week: unknown
-- d7_unknown_or_unreachable_in_closed_cohort_this_week: unknown
+- d7_contact_due_trial_starters_this_week: unknown
+- d7_contacted_trial_starters_this_week: unknown
+- d7_followup_unknown_or_unreachable_trial_starters_this_week: unknown
+- d7_valid_completion_window_open_this_week: unknown
+- d7_valid_completion_window_closed_participants_this_week: unknown
+- d7_valid_reruns_in_closed_completion_cohort_this_week: unknown
+- d7_self_report_only_in_closed_completion_cohort_this_week: unknown
+- d7_no_rerun_reported_in_closed_completion_cohort_this_week: unknown
+- d7_unknown_or_unreachable_in_closed_completion_cohort_this_week: unknown
 - growth_effort_minutes_this_week: unknown
 - technical_effort_minutes_separate_this_week: unknown
 - observation_vs_hypothesis: unknown
