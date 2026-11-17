@@ -21,7 +21,7 @@ River Review は、レビュー基準を **versioned / repo-owned な Skill** �
 
 ## はじめる
 
-> **導入前の注意（Claude Code）:** 同梱の PostToolUse hook は、Write / Edit / MultiEdit 後に利用先プロジェクトの Prettier を `--write` で実行し、作業ツリーを書き換える場合があります。整形 hook だけを個別に無効化する配布設定はありません。変更を避けたい場合は導入を見送り、導入後はプラグインを無効化・アンインストールしてください（**既に書き換えられたファイルは自動復元されません**）。Stop hook は一時領域にもチェックポイントを生成します。手順と条件は [更新・無効化・アンインストール](https://river-review.the3396.com/guides/plugin/update-and-uninstall/) を参照してください。
+> **導入前の注意（Claude Code）:** 同梱の PostToolUse hook は、Write / Edit / MultiEdit 後に利用先プロジェクトの Prettier を `--write` で実行し、作業ツリーを書き換える場合があります。整形 hook だけを個別に無効化する配布設定はありません。変更を避けたい場合は導入を見送り、導入後はプラグインを無効化・アンインストールしてください（**既に書き換えられたファイルは自動復元されません**）。Stop hook は River Review CLI を利用できる場合に限り、一時領域へチェックポイントを出力します。実行環境がない場合は成功コードでスキップするため、証拠の存在は別途確認してください。手順と条件は [更新・無効化・アンインストール](https://river-review.the3396.com/guides/plugin/update-and-uninstall/) を参照してください。
 
 ### Claude Code（ローカル差分のレビュー）
 
