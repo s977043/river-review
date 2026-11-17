@@ -1,7 +1,7 @@
 # #2701 Evidence-grounded Review PoC—実行・判定計画
 
-> **Status: Proposal / observe-only（2026-11-15 JST）**。これは評価運用の作業計画であり、新しい製品仕様・品質Gate・承認・自動昇格の許可ではない。
-> 対象: `s977043/river-review`、計画時の `main` = `1c78b6ed93adb2aa421c72dd1a6b64d2c9af1fc4`。実行前にリモートHEAD、PR、CIを再取得する。
+> **Status: Proposal / observe-only（2026-11-17 JST更新）**。これは評価運用の作業計画であり、新しい製品仕様・品質Gate・承認・自動昇格の許可ではない。
+> 対象: `s977043/river-review`、計画時の `main` = `1c78b6ed93adb2aa421c72dd1a6b64d2c9af1fc4`、最新確認の `main` = `0cbbb01214661bde332cd668ad78f842c39e761d`。実行前にリモートHEAD、PR、CIを再取得する。
 > Owner: [#2701](https://github.com/s977043/river-review/issues/2701)（正解データ）、[#1574](https://github.com/s977043/river-review/issues/1574)（paired replay）、[#2615](https://github.com/s977043/river-review/issues/2615)（効果）、[#2378](https://github.com/s977043/river-review/issues/2378)（Human Attention）。本書自体を新SSoTにはしない。
 
 ## 1. Decision / 完了条件
@@ -24,8 +24,10 @@
 | [PR #2881](https://github.com/s977043/river-review/pull/2881)（Open・未マージ、2026-11-17確認） | Verification-First / リスク別レビューの**広い**A/B/C評価計画 | 同じ内容の大規模な再設計。こちらは実験運用の一候補に限定 |
 | [#2781](https://github.com/s977043/river-review/issues/2781)、[#2267](https://github.com/s977043/river-review/issues/2267) | リスク評価、反証・独立検証 | 製品Gate変更、外部検証基盤の新設 |
 | [#2812](https://github.com/s977043/river-review/issues/2812)、[PR #2912](https://github.com/s977043/river-review/pull/2912) | 未実行をcleanと誤表示する問題、detector→strict blockの回帰を個別Ownerで扱う | このPoC文書PRで未関連のruntime修正を同梱しない |
+| [#2913](https://github.com/s977043/river-review/issues/2913)、[PR #2914](https://github.com/s977043/river-review/pull/2914) | `dist/` 上のセキュリティ指摘が出力段で抑止される既知のfalse-clean。PR #2914はDraftかつ未マージ | 未検証経路をcleanと採点しない。修正は別Owner |
+| [#2891](https://github.com/s977043/river-review/issues/2891) | コメントと判定されたhunkが除外され、detectorに到達しない経路 | 検出未実行を正常・陰性に昇格させない。修正は別Owner |
 
-`#2812` のfalse-clean問題が未解決なら、今回のshadow実験は「未実行/未検証を可視化する観測」に限る。**本番のレビュー深さの削減・Gate緩和への移行はしない。**
+`#2812`、`#2913`、`#2891` のfalse-clean・未実行経路が未解決の間、今回のshadow実験は「未実行/未検証を可視化する観測」に限る。**本番のレビュー深さの削減・Gate緩和への移行はしない。** 本採点では、対象diffと検査経路の実行traceを独立に確認する。
 
 ## 3. まず比較対象を最小化する（実験プロトコル）
 
@@ -57,8 +59,8 @@
 <!-- prettier-ignore -->
 | Phase | 作業（先行条件） | 成果物・出口条件 | 今回時点 |
 | --- | --- | --- | --- |
-| **0. Trust/readiness** | #2701のセキュリティ・PII・正解確認の独立レビュー、[#2812](https://github.com/s977043/river-review/issues/2812)ほかfalse-clean関連の最新状態確認。外部実行を許可する主体を指定 | 使用可能なsource/権限、秘密情報を除外する方法、Go/No-goを記録 | **未完了** |
-| **1. Corpus候補** | 運用者が**個別に**公開・利用可能な対象を選ぶ（過去履歴の無差別crawlは禁止） | 不具合候補5件＋正常/妥当な別実装候補5件。未確認は `unknown`、未適格は `ineligible` | **未収集** |
+| **0. Trust/readiness** | #2701のセキュリティ・PII・正解確認の独立レビュー、[#2812](https://github.com/s977043/river-review/issues/2812)・[#2913](https://github.com/s977043/river-review/issues/2913)・[#2891](https://github.com/s977043/river-review/issues/2891)の既知の検査欠落を区別。外部実行を許可する主体を指定 | 使用可能なsource/権限、秘密情報を除外する方法、Go/No-goを記録 | **未完了** |
+| **1. Corpus候補** | 運用者が**個別に**公開・利用可能な対象を選ぶ（過去履歴の無差別crawlは禁止） | 不具合候補5件＋正常/妥当な別実装候補5件。未確認は `unknown`、未適格は `ineligible` | **公開Issue/PRの候補を各5件棚卸し済み。正式選定・独立oracle・確定ラベルは0件** |
 | **2. 独立のoracleと凍結** | 対象revisionでの不具合原因・位置・再現証拠、正常例の欠陥不在の**限定範囲**を別担当が確認 | 凍結したdevelopment 6件（不具合3＋正常3）、held-out 4件（不具合2＋正常2）。正解・後日修正・非公開報告をReviewerの入力から隔離 | **未実施** |
 | **3. Dry run** | Phase 2の非機密メタデータが揃う | #2844 preflightと#1574 replayの境界を合成ケースで検証。実ケースの正解・実Runを使うPoCは別。合成データで精度を主張しない | **合成境界テストを本PRに追加、実コーパスは未実施** |
 | **4. Bounded comparison** | 事前に利用範囲と**実際の費用上限**を承認、対象・検証条件を固定 | 同じ指摘にA/Bを適用。可能な限り既存Runを再利用、結果・失敗・追加費用を記録。必要なときだけ既存 `river run` 経路で収集 | **未実施** |
@@ -95,7 +97,7 @@ Phase 0〜3は外部モデル課金なしのread-only準備で進める。Phase 
 ### 2026-11-17のコード監査・実行接続の差分
 
 - `src/lib/paired-replay.mjs` の `pairFindings` / `activationCheck` を読み、**判定のみの差はpaired replayの差分に表れない**と確認した。既存replayの動作は変更しない。
-- `tests/incident-review-smoke-paired-boundary.test.mjs`（本PRで新設）に合成正負例、判定のみの非観測、criticalの全体集計、held-outの自己申告の未確認を固定した。テスト結果は**HEADのCIが完了するまで未検証**。
+- `tests/incident-review-smoke-paired-boundary.test.mjs`（本PRで新設）に合成正負例、判定のみの非観測、criticalの全体集計、held-outの自己申告の未確認を固定した。前回HEAD `311348cc9b951dac4fb550653b8c835248c73b18` のNode 22全体テスト6,630件は成功。**本書更新後の新HEADはCIを再確認する**。
 - 合成テストは「独立oracleが存在する」証拠ではない。正解ラベル、実際のrunと費用、人の確認負荷は引き続き未収集とする。
 
 ## 7. 役割別計画レビュー（2026-11-15）
@@ -117,12 +119,14 @@ Phase 0〜3は外部モデル課金なしのread-only準備で進める。Phase 
 2. **正常・異常**: 陽性/陰性/別実装、未実行、環境失敗、証拠欠落を区別。修正: post-filterの検出能力の限界と分母を明記。
 3. **設計・信頼**: Owner/SSoT、host authority、oracle isolation、privacy、Cliff/Hillを照合。修正: 追加schemaと自動Gateを禁止。
 4. **統合**: #2844、`river evolve replay`、#2881、#2812、#2912との重複・依存を整理。未実行: 実Runの統合テストとCIは実験開始後。
-5. **完了判断**: このPRはdocs-only、全PoCは未検証。独立レビュー・正式採否・Human mergeは残す。
+5. **完了判断**: このPRはdocs＋合成テストのみ、実ケースPoCは未検証。旧HEADではGitHub Codexのコード・セキュリティレビューが完了。Phase 0の独立oracle/PIIレビュー、Humanの正式採否・マージは残る。
 
 ## 8. 直近の具体的な作業順
 
+先行するリンク検査の失敗は[#2921](https://github.com/s977043/river-review/issues/2921)・[PR #2932](https://github.com/s977043/river-review/pull/2932)で扱う。#2932のCIとCodexレビューは完了しているが、**ADR-016 Stage 1によるHumanマージ判断は未実施**。マージ後、最新mainを本PRへ履歴改変なしで取り込み、exact-head CIとレビューを再確認する。以前のcheckの成功を新HEADに流用せず、CI失敗を回避しない。
+
 1. [#2701](https://github.com/s977043/river-review/issues/2701)に本計画を関連付け、Phase 0の独立trust/PIIレビュー担当とHostのケース選定者を決める。
-2. [#2812](https://github.com/s977043/river-review/issues/2812)、[PR #2912](https://github.com/s977043/river-review/pull/2912)、[PR #2881](https://github.com/s977043/river-review/pull/2881)の最新状態を踏まえ、shadow評価に使える実行経路だけ選ぶ。既存PRへ無関係な修正を加えない。
+2. [#2812](https://github.com/s977043/river-review/issues/2812)、[#2913](https://github.com/s977043/river-review/issues/2913)、[#2891](https://github.com/s977043/river-review/issues/2891)、[PR #2912](https://github.com/s977043/river-review/pull/2912)、[PR #2881](https://github.com/s977043/river-review/pull/2881)の最新状態を確認し、shadow評価に使える実行経路だけ選ぶ。既存PRへ無関係な修正を加えない。
 3. 非機密・公開範囲で候補ケースの**参照先**を運用者が選び、各ケースのoriginal revision、scope、source digestを確認する。**選定するまでは正解ラベル0件（未収集）**。
 4. 実ケースの独立oracle確定後、既存 `incident-review-smoke-preflight.mjs` を実行し、`river evolve replay`との接続可否を確認する。新しいadapterが必要だと立証された場合のみ、最小の別PRで検討する。
 5. 実行予算と外部実行の許可がそろってからA/Bの記録と独立採点を行い、#2615へ効果・限界を引き継ぐ。
