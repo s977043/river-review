@@ -2,12 +2,23 @@
 // Semantics the schema leaves to the deterministic module (docs/development/qa-evidence-contract.md
 // §4.3, §5, hash and HEAD checks) are not tested here.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+
+import Ajv2020 from 'ajv/dist/2020.js';
 
 import { compileSchemaFile } from './helpers/schema-validator.mjs';
 
+// The configuration the deterministic module is specified to use: Ajv 2020 + ajv-formats, strict.
 const validate = compileSchemaFile('qa-evidence.schema.json', {
-  ajvOptions: { allErrors: true, allowUnionTypes: true },
+  ajvOptions: { allErrors: true, strict: true },
+});
+
+test('strict Ajv 2020 needs ajv-formats to compile the schema', () => {
+  const schema = JSON.parse(
+    readFileSync(new URL('../schemas/qa-evidence.schema.json', import.meta.url), 'utf8')
+  );
+  assert.throws(() => new Ajv2020({ strict: true }).compile(schema), /unknown format "date-time"/);
 });
 
 const SHA1 = 'a'.repeat(40);
@@ -91,12 +102,10 @@ test('minimal and full documents are accepted', () => {
   accepts(full());
 });
 
+// Each value below is rejected only by maxLength, never by a pattern or format as well.
+// target.repository (140) and target.subjectRevision (64) are omitted: their patterns already
+// cap the length, so no value can exceed maxLength without also failing the pattern.
 const STRING_LIMITS = [
-  [
-    'target.repository',
-    140,
-    (d, n) => (d.target.repository = `${'o'.repeat(39)}/${'r'.repeat(n - 40)}`),
-  ],
   ['expected.value', 4096, (d, n) => (ac0(d).expected.value = 'x'.repeat(n))],
   ['expected.source', 32, (d, n) => (ac0(d).expected.source = 'x'.repeat(n))],
   ['execution.runner', 128, (d, n) => (d.execution.runner = 'x'.repeat(n))],
@@ -116,11 +125,11 @@ const STRING_LIMITS = [
   ['artifact.sha256', 64, (d, n) => (ref0(d).sha256 = 'x'.repeat(n))],
   ['artifacts.reproduction', 8192, (d, n) => (d.artifacts.reproduction = 'x'.repeat(n))],
   ['gaps.items[]', 2048, (d, n) => (d.gaps.items[0] = 'x'.repeat(n))],
-  ['id (normalized)', 128, (d, n) => (ac0(d).id = 'a'.repeat(n))],
+  // A valid RFC 3339 value of length n: the fractional seconds absorb the padding.
   [
-    'id (raw, with whitespace)',
-    160,
-    (d, n) => (ac0(d).id = ` ${'a'.repeat(128)}${' '.repeat(n - 129)}`),
+    'attempt.startedAt',
+    64,
+    (d, n) => (attempt0(d).startedAt = `2026-11-20T00:00:00.${'1'.repeat(n - 21)}Z`),
   ],
 ];
 
@@ -169,7 +178,7 @@ const ARRAY_LIMITS = [
   ],
   [
     'artifacts.refs',
-    500,
+    1000,
     (d, n) => {
       d.artifacts.refs = Array.from({ length: n }, (_, i) => ({
         id: `r${i}`,
@@ -198,13 +207,13 @@ test('every bounded array accepts its limit and rejects limit + 1', () => {
   }
 });
 
-test('integer bounds: exitCode 0..255 or null, assertions 0..1,000,000', () => {
-  for (const ok of [0, 255, null]) {
+test('integer bounds: exitCode -2147483648..4294967295 or null, assertions 0..1,000,000', () => {
+  for (const ok of [0, 255, 256, -1073741819, 3221225477, -2147483648, 4294967295, null]) {
     const d = full();
     attempt0(d).exitCode = ok;
     accepts(d);
   }
-  for (const bad of [-1, 256, 1.5, '0']) {
+  for (const bad of [-2147483649, 4294967296, 1.5, '0']) {
     const d = full();
     attempt0(d).exitCode = bad;
     rejects(d);
@@ -255,16 +264,53 @@ const ID_SITES = [
   ['artifacts.refs[].id', (d, v) => (ref0(d).id = v)],
 ];
 
-test('ids outside [A-Za-z0-9._-] are rejected at every id site', () => {
+test('every id site accepts a raw length of 160 and rejects 161', () => {
   for (const [label, set] of ID_SITES) {
-    for (const bad of ['', '   ', 'AC 1', 'AC@1', 'AC/1', '`AC`', 'ＡＣ1', '\u212A', 'AC-1\n@x']) {
+    const atLimit = full();
+    set(atLimit, 'a'.repeat(160));
+    assert.equal(validate(atLimit), true, `${label}: ${JSON.stringify(validate.errors)}`);
+    const over = full();
+    set(over, 'a'.repeat(161));
+    assert.equal(validate(over), false, `${label} accepted 161 characters`);
+  }
+});
+
+test('id character set is left to the module, which judges the NFC-normalized value (§4.2)', () => {
+  // KELVIN SIGN normalizes to "K", so rejecting it on the raw value would contradict §4.2.
+  const kelvin = String.fromCodePoint(0x212a);
+  assert.equal(kelvin.normalize('NFC'), 'K');
+  for (const [label, set] of ID_SITES) {
+    for (const raw of [kelvin, ' AC-1 ', 'AC@1', '']) {
       const d = full();
-      set(d, bad);
-      assert.equal(validate(d), false, `${label} accepted ${JSON.stringify(bad)}`);
+      set(d, raw);
+      assert.equal(validate(d), true, `${label} rejected ${JSON.stringify(raw)}`);
     }
-    const d = full();
-    set(d, ' AC.1_x-2 ');
-    assert.equal(validate(d), true, `${label}: ${JSON.stringify(validate.errors)}`);
+    for (const notString of [1, null, ['AC-1']]) {
+      const d = full();
+      set(d, notString);
+      assert.equal(validate(d), false, `${label} accepted ${JSON.stringify(notString)}`);
+    }
+  }
+});
+
+const REQUIRED = [
+  ['root', (d) => d, ['schemaVersion', 'target', 'verification']],
+  ['target', (d) => d.target, ['repository', 'subjectRevision', 'acceptanceCriteria']],
+  ['acceptanceCriterion', ac0, ['id']],
+  ['runtime', (d) => d.environment.runtimes[0], ['name', 'version']],
+  ['verificationResult', (d) => d.verification[0], ['acId', 'status']],
+  ['attempt', attempt0, ['startedAt', 'status', 'logRef', 'assertions']],
+  ['assertions', (d) => attempt0(d).assertions, ['total', 'passed']],
+  ['artifactRef', ref0, ['id', 'root', 'path']],
+];
+
+test('removing any one required field rejects the whole document', () => {
+  for (const [label, pick, fields] of REQUIRED) {
+    for (const field of fields) {
+      const d = full();
+      delete pick(d)[field];
+      assert.equal(validate(d), false, `${label}.${field} missing was accepted`);
+    }
   }
 });
 
@@ -289,11 +335,15 @@ test('whole-document patterns: repository, subjectRevision, startedAt, artifact 
     (d) => (d.target.repository = 'name-only'),
     (d) => (d.target.repository = 'owner/name/extra'),
     (d) => (d.target.repository = '-owner/name'),
+    (d) => (d.target.repository = `${'o'.repeat(40)}/name`),
+    (d) => (d.target.repository = `owner/${'r'.repeat(101)}`),
     (d) => (d.target.subjectRevision = 'abc1234'),
     (d) => (d.target.subjectRevision = 'g'.repeat(40)),
     (d) => (d.target.subjectRevision = 'a'.repeat(41)),
     (d) => (d.target.acceptanceCriteria = []),
     (d) => (attempt0(d).startedAt = 'yesterday'),
+    (d) => (attempt0(d).startedAt = '2026-11-20T00:00:00'),
+    (d) => (attempt0(d).startedAt = '2026-11-20'),
     (d) => (ref0(d).path = '/etc/passwd'),
     (d) => (ref0(d).path = '../outside'),
     (d) => (ref0(d).path = 'logs/../../outside'),
@@ -301,6 +351,7 @@ test('whole-document patterns: repository, subjectRevision, startedAt, artifact 
     (d) => (ref0(d).path = 'logs/\u0000'),
     (d) => (ref0(d).path = 'https://example.com/log'),
     (d) => (ref0(d).path = 'C:/log'),
+    (d) => (ref0(d).path = 'trace:1.zip'),
     (d) => (ref0(d).path = ''),
   ];
   for (const change of cases) {
@@ -310,6 +361,8 @@ test('whole-document patterns: repository, subjectRevision, startedAt, artifact 
   }
   const ok = full();
   ok.target.subjectRevision = 'A'.repeat(64);
+  ok.target.repository = `${'o'.repeat(39)}/${'r'.repeat(100)}`;
+  attempt0(ok).startedAt = '2026-11-20T09:00:00.123+09:00';
   ref0(ok).path = 'logs/..hidden/run..txt';
   accepts(ok);
 });

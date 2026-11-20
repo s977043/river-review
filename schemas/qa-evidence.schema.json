@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://river-review.the3396.com/schemas/qa-evidence.schema.json",
   "title": "River Review QA Evidence",
-  "description": "Untrusted user input recording the result of QA the consumer ran themselves (ADR-017 D3 / D5). The SSoT for every field, requirement and failure treatment is `docs/development/qa-evidence-contract.md`; this schema is its stage-1 / stage-3 structural check (§7). Encoding rule: every object is closed (`additionalProperties: false`), every value is typed, every string has `maxLength` and every array has `maxItems`, so an undefined field, a wrong type or an over-long value rejects the whole document (`QA_EVIDENCE_MALFORMED` / `QA_EVIDENCE_TOO_LARGE`). `required`, `pattern`, `enum` and `const` are used ONLY where the contract rejects the whole document; a field whose absence or invalid value the contract treats as `do not count` (for example `basis`, `expected.source`, `execution.runner`, `environment.os`, `attempts[].command`, `refs[].sha256`) is typed and length-bounded here but not required or enumerated, because the deterministic module must count it as unverified instead of rejecting. Limits that JSON Schema cannot express are enforced by the deterministic module before schema validation: the evidence document is at most 1,048,576 bytes of UTF-8 and at most 16 levels of nesting; each referenced artifact is at most 104,857,600 bytes and all referenced artifacts together at most 536,870,912 bytes (`QA_ARTIFACT_TOO_LARGE`). Semantics outside this schema are decided by the deterministic module, never by this schema: id normalization with `nonEmptyNfcString` and uniqueness (§4.2), the C / T / V set comparison (§4.3), the verified conditions (§5), sha256 comparison and the artifact read rules (§3.5), the HEAD and `dirty` comparison (§5 condition 5), attempt ordering, status-to-last-attempt agreement and `passed <= total` (§3.4). Passing this schema never makes an acceptance criterion verified.",
+  "description": "Untrusted user input recording the result of QA the consumer ran themselves (ADR-017 D3 / D5). The SSoT for every field, requirement and failure treatment is `docs/development/qa-evidence-contract.md`; this schema is its stage-1 / stage-3 structural check (§7). Encoding rule: every object is closed (`additionalProperties: false`), every value is typed, every string has `maxLength` and every array has `maxItems`, so an undefined field or a wrong type rejects the whole document as `QA_EVIDENCE_MALFORMED` and an over-long string or over-long array rejects it as `QA_EVIDENCE_TOO_LARGE`. The deterministic module validates with Ajv 2020 (`ajv/dist/2020.js`) plus `ajv-formats` under `strict: true`; `ajv-formats` is required because `attempts[].startedAt` uses `format: date-time`, which strict Ajv refuses to compile without it. `required`, `pattern`, `enum` and `const` are used ONLY where the contract rejects the whole document; a field whose absence or invalid value the contract treats as `do not count` (for example `basis`, `expected.source`, `execution.runner`, `environment.os`, `attempts[].command`, `refs[].sha256`) is typed and length-bounded here but not required or enumerated, because the deterministic module must count it as unverified instead of rejecting. Limits that JSON Schema cannot express are enforced by the deterministic module before schema validation: the evidence document is at most 1,048,576 bytes of UTF-8 and at most 16 levels of nesting; each referenced artifact is at most 104,857,600 bytes and all referenced artifacts together at most 536,870,912 bytes (`QA_ARTIFACT_TOO_LARGE`). Semantics outside this schema are decided by the deterministic module, never by this schema: id normalization with `nonEmptyNfcString` and uniqueness (§4.2), the C / T / V set comparison (§4.3), the verified conditions (§5), sha256 comparison and the artifact read rules (§3.5), the HEAD and `dirty` comparison (§5 condition 5), attempt ordering, status-to-last-attempt agreement and `passed <= total` (§3.4). Passing this schema never makes an acceptance criterion verified.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "target", "verification"],
@@ -26,10 +26,9 @@
   },
   "$defs": {
     "id": {
-      "description": "AC id or artifact id (§4.2). The deterministic module normalizes with `nonEmptyNfcString` (trim, then NFC) and requires the result to be 1 to 128 characters of `[A-Za-z0-9._-]`; this pattern is the same rule on the raw value, allowing the surrounding whitespace that normalization removes. A raw value that only becomes ASCII through NFC (for example U+212A KELVIN SIGN) is rejected here.",
+      "description": "AC id or artifact id (§4.2). This schema checks only the type and the raw length (160, leaving room for surrounding whitespace). The character set and the 128-character limit apply to the NORMALIZED value: the deterministic module normalizes with `nonEmptyNfcString` (trim, then NFC) and then requires 1 to 128 characters of `[A-Za-z0-9._-]` (`QA_TARGET_AC_ID_INVALID` / `QA_ARTIFACT_ID_INVALID`). A raw pattern cannot express that order, because NFC can turn a non-ASCII value into an ASCII one (U+212A KELVIN SIGN becomes `K`).",
       "type": "string",
-      "maxLength": 160,
-      "pattern": "^\\s*[A-Za-z0-9._-]{1,128}\\s*$"
+      "maxLength": 160
     },
     "target": {
       "description": "§3.1.",
@@ -38,7 +37,7 @@
       "required": ["repository", "subjectRevision", "acceptanceCriteria"],
       "properties": {
         "repository": {
-          "description": "`owner/name`. Invalid rejects the whole document (`QA_TARGET_REPOSITORY_INVALID`).",
+          "description": "GitHub `owner/name` only in the first version (owner up to 39 characters, name up to 100). Invalid rejects the whole document (`QA_TARGET_REPOSITORY_INVALID`).",
           "type": "string",
           "maxLength": 140,
           "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$"
@@ -164,7 +163,7 @@
       "required": ["startedAt", "status", "logRef", "assertions"],
       "properties": {
         "startedAt": {
-          "description": "RFC 3339 date-time. Unparseable rejects the whole document (`QA_VERIFICATION_ATTEMPT_INVALID`); ordering is compared on the parsed epoch milliseconds by the deterministic module.",
+          "description": "RFC 3339 date-time with a mandatory time-zone offset (`Z` or `+09:00`); fractional seconds are allowed. Missing or unparseable rejects the whole document (`QA_VERIFICATION_ATTEMPT_INVALID`); ordering is compared on the parsed epoch milliseconds by the deterministic module.",
           "type": "string",
           "maxLength": 64,
           "format": "date-time"
@@ -188,15 +187,15 @@
           }
         },
         "command": {
-          "description": "Command with arguments. Missing counts the AC as unverified (`QA_EXECUTION_COMMAND_MISSING`). Redacted before any output or storage (§7).",
+          "description": "Command with arguments. Missing counts the AC as unverified (`QA_EXECUTION_COMMAND_MISSING`); longer than the limit rejects the whole document (`QA_EVIDENCE_TOO_LARGE`), so put a long command in an artifact and reference it. Redacted before any output or storage (§7).",
           "type": "string",
           "maxLength": 8192
         },
         "exitCode": {
-          "description": "0 to 255, or `null` when the value was not taken from a trustworthy path (for example through a pipe). `null` or missing counts the AC as unverified (`QA_EXECUTION_EXIT_CODE_UNKNOWN`); a non-integer or out-of-range value rejects the whole document (`QA_EVIDENCE_MALFORMED`).",
+          "description": "Integer from -2147483648 to 4294967295, or `null` when the value was not taken from a trustworthy path (for example through a pipe). The range covers POSIX exit statuses (0 to 255) and Windows exit codes, which are 32-bit values read as signed or unsigned. `null` or missing counts the AC as unverified (`QA_EXECUTION_EXIT_CODE_UNKNOWN`); a non-integer or out-of-range value rejects the whole document (`QA_EVIDENCE_MALFORMED`).",
           "type": ["integer", "null"],
-          "minimum": 0,
-          "maximum": 255
+          "minimum": -2147483648,
+          "maximum": 4294967295
         },
         "exitCodeSource": {
           "description": "How `exitCode` was taken, or why it is `null`.",
@@ -212,7 +211,7 @@
       "properties": {
         "refs": {
           "type": "array",
-          "maxItems": 500,
+          "maxItems": 1000,
           "items": { "$ref": "#/$defs/artifactRef" }
         },
         "reproduction": {
@@ -237,7 +236,7 @@
           "enum": ["repository", "artifacts"]
         },
         "path": {
-          "description": "Relative path from `root` with `/` separators. This schema rejects absolute paths, `..` segments, backslashes, NUL and URL-like values (`QA_ARTIFACT_PATH_REJECTED`). NFC normalization, root containment, symlinks, hard links, non-regular files, `.git/` and the `shouldExcludeForContext` rules are checked by the deterministic module when reading (§3.5).",
+          "description": "Relative path from `root` with `/` separators. This schema rejects absolute paths, `..` segments, backslashes, NUL and values that start like a URL scheme or drive letter (`QA_ARTIFACT_PATH_REJECTED`). The scheme-like rule is deliberately broad: a relative name such as `trace:1.zip` is rejected too. NFC normalization, root containment, symlinks, hard links, non-regular files, `.git/` and the `shouldExcludeForContext` rules are checked by the deterministic module when reading (§3.5).",
           "type": "string",
           "minLength": 1,
           "maxLength": 1024,

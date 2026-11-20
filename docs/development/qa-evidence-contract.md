@@ -37,8 +37,9 @@ qa-evidence
 | 全 AC を数えない | 証拠は受理するが、すべての AC を unverified に数える |
 | 数えない         | 該当する AC を unverified に数える                   |
 
-schema では、すべてのオブジェクトを `additionalProperties: false` とし、すべての文字列欄に最大長を置く。
-定義に無い欄や最大長を超える文字列は、全体を拒否する（`QA_EVIDENCE_TOO_LARGE`。本文の埋め込みもこれで止める）。
+schema では、すべてのオブジェクトを `additionalProperties: false` とし、すべての文字列欄に最大長、すべての配列に最大件数を置く。
+定義に無い欄と型の誤りは、全体を拒否する（`QA_EVIDENCE_MALFORMED`）。
+最大長を超える文字列と最大件数を超える配列も、全体を拒否する（`QA_EVIDENCE_TOO_LARGE`。本文の埋め込みもこれで止める）。
 上限ちょうどと上限 + 1 の検査は `tests/qa-evidence-schema.test.mjs` に置く。
 
 schema が `required`・`pattern`・`enum`・`const` で拒否するのは、本メモが「全体を拒否」とする欄だけとする。
@@ -48,33 +49,34 @@ schema が `required`・`pattern`・`enum`・`const` で拒否するのは、本
 
 ### 2.1 上限値
 
-| 対象                                               | 上限                              | 根拠                                                                                                 |
-| -------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 証拠 JSON 全体のバイト数（UTF-8）                  | 1,048,576（1 MiB）                | 証拠は参照と hash だけを持ち本文を持たない。AC 200 件に各 2 KB の記述を付けても 0.4 MB に収まる      |
-| ネストの深さ                                       | 16                                | schema が許す最大の深さは 6（root → verification → 結果 → attempts → 試行 → assertions）。その倍以上 |
-| `target.acceptanceCriteria`、`verification` の件数 | 200                               | 1 つの PR やタスクで人間が確定する AC の数として十分に多く、件数による処理量を抑える                 |
-| 1 件の AC の `attempts` の件数                     | 20                                | retry と再実行の記録には十分。flaky の判定は 2 件あれば足りる                                        |
-| `artifacts.refs` の件数                            | 500                               | 試行ごとのログ（最大 200 × 20）は共有できる。ファイルごとの hash 計算の回数を抑える                  |
-| `environment.runtimes` の件数                      | 20                                | 1 回の実行で使う処理系の数として十分                                                                 |
-| `gaps.items` の件数                                | 100                               | 不足・残余リスクの列挙として十分                                                                     |
-| id（AC・artifact）                                 | 正規化後 128 文字（生の値は 160） | §4.2。生の値は正規化で除かれる前後の空白の分だけ余裕を持たせる                                       |
-| `target.repository`                                | 140                               | GitHub の owner の最大 39 文字 + `/` + リポジトリ名の最大 100 文字                                   |
-| `target.subjectRevision`                           | 64                                | SHA-256 の commit id の桁数                                                                          |
-| `expected.value`                                   | 4,096                             | 期待結果は固定した短い記述。長い仕様は `sourceRef` で artifact を参照する                            |
-| 試行の `command`、`artifacts.reproduction`         | 8,192                             | 引数を含むコマンド行として十分。長い手順はファイルにして参照する                                     |
-| `refs[].path`                                      | 1,024                             | macOS の `PATH_MAX`。これより長い相対パスは実運用で想定しない                                        |
-| `gaps.items[]`                                     | 2,048                             | 1 件の不足・リスクの記述として十分                                                                   |
-| `execution.ciRun`                                  | 512                               | CI の run の URL として十分                                                                          |
-| `exitCodeSource`                                   | 256                               | 取得経路の短い説明                                                                                   |
-| `runner`、`os`、`browser`                          | 128                               | 名前と版の表記として十分                                                                             |
-| `runtimes[].name`・`version`、`locale`、`timezone` | 64                                | 名前と版の表記、BCP 47 の言語タグ、IANA のタイムゾーン名として十分                                   |
-| `notRunReason`                                     | 64                                | 定義済みの 4 値の最長は 23 文字                                                                      |
-| `basis`、`expected.source`、`viewport`             | 32                                | 定義済みの値、`1280x720` 形式の表記として十分                                                        |
-| `refs[].sha256`                                    | 64                                | SHA-256 の 16 進表記の桁数                                                                           |
-| 試行の `startedAt`                                 | 64                                | RFC 3339 の日時表記として十分                                                                        |
-| `assertions.total`・`passed`                       | 1,000,000                         | 1 回の試行の assertion 数として十分に大きく、整数の扱いで精度を失わない                              |
-| artifact 1 件のバイト数                            | 104,857,600（100 MiB）            | E2E の trace や動画を含められる大きさ。GitHub が 1 ファイルに許す上限と同じ                          |
-| artifact の合計バイト数                            | 536,870,912（512 MiB）            | hash の計算にかかる時間を 1 回の監査で数秒程度に抑える                                               |
+| 対象                                               | 上限                              | 根拠                                                                                                                                                                                  |
+| -------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 証拠 JSON 全体のバイト数（UTF-8）                  | 1,048,576（1 MiB）                | 証拠は参照と hash だけを持ち本文を持たない。AC 200 件に各 2 KB の記述を付けても 0.4 MB に収まる                                                                                       |
+| ネストの深さ                                       | 16                                | schema が許す最大の深さは 6（root → verification → 結果 → attempts → 試行 → assertions）。その倍以上                                                                                  |
+| `target.acceptanceCriteria`、`verification` の件数 | 200                               | 1 つの PR やタスクで人間が確定する AC の数として十分に多く、件数による処理量を抑える                                                                                                  |
+| 1 件の AC の `attempts` の件数                     | 20                                | retry と再実行の記録には十分。flaky の判定は 2 件あれば足りる                                                                                                                         |
+| `artifacts.refs` の件数                            | 1,000                             | AC 200 件それぞれに、ログ・trace・スクリーンショット・期待値の出所など 5 件までの成果物を付けられる。ログは試行どうしで共有できる。ファイルごとの hash 計算の回数を抑える             |
+| `environment.runtimes` の件数                      | 20                                | 1 回の実行で使う処理系の数として十分                                                                                                                                                  |
+| `gaps.items` の件数                                | 100                               | 不足・残余リスクの列挙として十分                                                                                                                                                      |
+| id（AC・artifact）                                 | 正規化後 128 文字（生の値は 160） | §4.2。schema は生の値の型と長さだけを検査し、文字種と 128 文字は正規化後の値を決定論のモジュールが判定する。生の値は正規化で除かれる前後の空白の分だけ余裕を持たせる                  |
+| `target.repository`                                | 140                               | 初版は GitHub の `owner/name` だけを対象とする。owner の最大 39 文字 + `/` + リポジトリ名の最大 100 文字（目安）                                                                      |
+| `target.subjectRevision`                           | 64                                | SHA-256 の commit id の桁数                                                                                                                                                           |
+| `expected.value`                                   | 4,096                             | 期待結果は固定した短い記述。長い仕様は `sourceRef` で artifact を参照する                                                                                                             |
+| 試行の `command`、`artifacts.reproduction`         | 8,192                             | 引数を含むコマンド行として十分。超えると証拠全体を拒否する（`QA_EVIDENCE_TOO_LARGE`）。長いコマンドや手順はファイルにして artifact として参照する                                     |
+| `refs[].path`                                      | 1,024                             | macOS の `PATH_MAX`（目安）。これより長い相対パスは実運用で想定しない                                                                                                                 |
+| `gaps.items[]`                                     | 2,048                             | 1 件の不足・リスクの記述として十分                                                                                                                                                    |
+| `execution.ciRun`                                  | 512                               | CI の run の URL として十分                                                                                                                                                           |
+| `exitCodeSource`                                   | 256                               | 取得経路の短い説明                                                                                                                                                                    |
+| `runner`、`os`、`browser`                          | 128                               | 名前と版の表記として十分                                                                                                                                                              |
+| `runtimes[].name`・`version`、`locale`、`timezone` | 64                                | 名前と版の表記、BCP 47 の言語タグ、IANA のタイムゾーン名として十分                                                                                                                    |
+| `notRunReason`                                     | 64                                | 定義済みの 4 値の最長は 23 文字                                                                                                                                                       |
+| `basis`、`expected.source`、`viewport`             | 32                                | 定義済みの値、`1280x720` 形式の表記として十分                                                                                                                                         |
+| `refs[].sha256`                                    | 64                                | SHA-256 の 16 進表記の桁数                                                                                                                                                            |
+| 試行の `startedAt`                                 | 64                                | RFC 3339 の日時表記として十分                                                                                                                                                         |
+| 試行の `exitCode`                                  | -2,147,483,648〜4,294,967,295     | POSIX の終了ステータスは 0〜255 だが、Windows の終了コードは 32 ビット値で、符号付き（例: -1073741819）でも符号なし（例: 3221225477）でも表記される。両方の表記を受け付ける範囲にする |
+| `assertions.total`・`passed`                       | 1,000,000                         | 1 回の試行の assertion 数として十分に大きく、整数の扱いで精度を失わない                                                                                                               |
+| artifact 1 件のバイト数                            | 104,857,600（100 MiB）            | E2E の trace や動画を含められる大きさの目安。GitHub が 1 ファイルに許す上限と同程度                                                                                                   |
+| artifact の合計バイト数                            | 536,870,912（512 MiB）            | hash の計算にかかる時間を 1 回の監査で数秒程度に抑える                                                                                                                                |
 
 バイト数と深さの上限は JSON Schema で表せないため、決定論のモジュールが schema の検証より前に検査する（§7 段階 1）。
 件数と文字列長の上限は schema に書く。
@@ -83,39 +85,39 @@ schema が `required`・`pattern`・`enum`・`const` で拒否するのは、本
 
 ### 3.1 target
 
-| 項目                                      | 必須                 | 規則                                                                          | 欠落・不正時                                                                               |
-| ----------------------------------------- | -------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `repository`                              | 必須                 | `owner/name` 形式                                                             | 全体を拒否（`QA_TARGET_REPOSITORY_INVALID`）                                               |
-| `subjectRevision`                         | 必須                 | 40 桁または 64 桁の hex。小文字に正規化して受理する。短縮 SHA は拒否する      | 全体を拒否（`QA_TARGET_REVISION_INVALID`）                                                 |
-| `acceptanceCriteria[]`                    | 必須（1 件以上）     | §4 の AC 規則                                                                 | 全体を拒否（`QA_TARGET_AC_EMPTY`、`QA_TARGET_AC_ID_INVALID`、`QA_TARGET_AC_ID_DUPLICATE`） |
-| `acceptanceCriteria[].expected.value`     | 必須                 | 固定した期待結果                                                              | 数えない（`QA_TARGET_EXPECTED_MISSING`）                                                   |
-| `acceptanceCriteria[].expected.source`    | 必須                 | `sourced` / `reproduced` / `derived`（§5）                                    | 数えない（`QA_TARGET_EXPECTED_SOURCE_MISSING`）                                            |
-| `acceptanceCriteria[].expected.sourceRef` | `sourced` のとき必須 | 出所となる artifact の id（§3.5）。§5 条件 6 で信頼できる版にあるかを確かめる | 数えない（`QA_TARGET_EXPECTED_SOURCE_UNRESOLVED`）                                         |
+| 項目                                      | 必須（欠落時の扱いは右欄） | 規則                                                                          | 欠落・不正時                                                                               |
+| ----------------------------------------- | -------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `repository`                              | 必須                       | `owner/name` 形式。初版は GitHub のリポジトリだけを対象とする                 | 全体を拒否（`QA_TARGET_REPOSITORY_INVALID`）                                               |
+| `subjectRevision`                         | 必須                       | 40 桁または 64 桁の hex。小文字に正規化して受理する。短縮 SHA は拒否する      | 全体を拒否（`QA_TARGET_REVISION_INVALID`）                                                 |
+| `acceptanceCriteria[]`                    | 必須（1 件以上）           | §4 の AC 規則                                                                 | 全体を拒否（`QA_TARGET_AC_EMPTY`、`QA_TARGET_AC_ID_INVALID`、`QA_TARGET_AC_ID_DUPLICATE`） |
+| `acceptanceCriteria[].expected.value`     | 必須                       | 固定した期待結果                                                              | 数えない（`QA_TARGET_EXPECTED_MISSING`）                                                   |
+| `acceptanceCriteria[].expected.source`    | 必須                       | `sourced` / `reproduced` / `derived`（§5）                                    | 数えない（`QA_TARGET_EXPECTED_SOURCE_MISSING`）                                            |
+| `acceptanceCriteria[].expected.sourceRef` | `sourced` のとき必須       | 出所となる artifact の id（§3.5）。§5 条件 6 で信頼できる版にあるかを確かめる | 数えない（`QA_TARGET_EXPECTED_SOURCE_UNRESOLVED`）                                         |
 
 証拠の `acceptanceCriteria[].required` は読まない。必須・任意は確定した AC 一覧から取る（§4）。
 
 ### 3.2 execution
 
-| 項目     | 必須 | 規則                                             | 欠落・不正時                                      |
-| -------- | ---- | ------------------------------------------------ | ------------------------------------------------- |
-| `runner` | 必須 | 実行に使った runner の名前                       | 全 AC を数えない（`QA_EXECUTION_RUNNER_MISSING`） |
-| `ciRun`  | 任意 | CI の run の参照。独立性の根拠には使わない（§6） | —                                                 |
+| 項目     | 必須（欠落時の扱いは右欄） | 規則                                             | 欠落・不正時                                      |
+| -------- | -------------------------- | ------------------------------------------------ | ------------------------------------------------- |
+| `runner` | 必須                       | 実行に使った runner の名前                       | 全 AC を数えない（`QA_EXECUTION_RUNNER_MISSING`） |
+| `ciRun`  | 任意                       | CI の run の参照。独立性の根拠には使わない（§6） | —                                                 |
 
 AC ごとに別のコマンドで判定する運用があるため、実行したコマンドと終了コードは、実行全体ではなく試行ごとに持つ（§3.4）。
 
 ### 3.3 environment
 
-| 項目                                        | 必須 | 規則                                                                          | 欠落・不正時                                    |
-| ------------------------------------------- | ---- | ----------------------------------------------------------------------------- | ----------------------------------------------- |
-| `os`                                        | 必須 | —                                                                             | 全 AC を数えない（`QA_ENVIRONMENT_INCOMPLETE`） |
-| `runtimes`                                  | 任意 | 使った処理系と版（例: `node` の版）。実行環境の差を後から追えるよう記録を推奨 | —                                               |
-| `browser`、`viewport`、`locale`、`timezone` | 任意 | E2E では記録を推奨                                                            | —                                               |
+| 項目                                        | 必須（欠落時の扱いは右欄） | 規則                                                                          | 欠落・不正時                                    |
+| ------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------- |
+| `os`                                        | 必須                       | —                                                                             | 全 AC を数えない（`QA_ENVIRONMENT_INCOMPLETE`） |
+| `runtimes`                                  | 任意                       | 使った処理系と版（例: `node` の版）。実行環境の差を後から追えるよう記録を推奨 | —                                               |
+| `browser`、`viewport`、`locale`、`timezone` | 任意                       | E2E では記録を推奨                                                            | —                                               |
 
 ### 3.4 verification
 
 確定した AC 1 件につき、結果を 1 件だけ持つ。
 
-| 項目           | 必須                                                                    | 規則                                                                                                                                                                      | 欠落・不正時                                                                      |
+| 項目           | 必須（欠落時の扱いは右欄）                                              | 規則                                                                                                                                                                      | 欠落・不正時                                                                      |
 | -------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `acId`         | 必須                                                                    | §4 の id 規則                                                                                                                                                             | 全体を拒否（`QA_VERIFICATION_AC_UNKNOWN`、`QA_VERIFICATION_AC_DUPLICATE`）        |
 | `status`       | 必須                                                                    | `PASS` / `FAIL` / `SKIP` / `NOT_RUN`。試行があるときは、最後の試行の status と一致しなければならない                                                                      | 全体を拒否（`QA_VERIFICATION_STATUS_INVALID`、`QA_VERIFICATION_STATUS_MISMATCH`） |
@@ -125,15 +127,15 @@ AC ごとに別のコマンドで判定する運用があるため、実行し�
 
 各試行は次の欄を持つ。
 
-| 項目             | 規則                                                                                                                      | 欠落・不正時                                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `startedAt`      | ISO 8601。比較は解析した時刻（epoch ミリ秒）で行う。配列は厳密な昇順とし、同じ時刻は認めない                              | 解析できない値は全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）。順序の逆転・同時刻は全体を拒否（`QA_VERIFICATION_ATTEMPTS_UNORDERED`） |
-| `status`         | `PASS` / `FAIL` だけ                                                                                                      | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                         |
-| `logRef`         | §3.5 の artifact の id                                                                                                    | 存在しない id は全体を拒否（`QA_ARTIFACT_REF_UNKNOWN`）                                                                                 |
-| `assertions`     | `total` と `passed` の 0 以上の整数。`passed ≤ total`                                                                     | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                         |
-| `command`        | 実行したコマンド（引数を含む）。出力・保存の前に redaction を通す（§7）                                                   | 該当 AC を数えない（`QA_EXECUTION_COMMAND_MISSING`）                                                                                    |
-| `exitCode`       | 0〜255 の整数。取得経路が確かでない値（パイプ越しなど）は `null`                                                          | `null` なら該当 AC を数えない（`QA_EXECUTION_EXIT_CODE_UNKNOWN`）。整数でない値・範囲外は全体を拒否（`QA_EVIDENCE_MALFORMED`）          |
-| `exitCodeSource` | `exitCode` を取った経路（例: ラッパーで数値を取った、runner の結果ファイルから読んだ）。`exitCode` が `null` のときは理由 | —                                                                                                                                       |
+| 項目             | 規則                                                                                                                                        | 欠落・不正時                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `startedAt`      | RFC 3339 の日時（タイムゾーンの指定が必須。小数秒は可）。比較は解析した時刻（epoch ミリ秒）で行う。配列は厳密な昇順とし、同じ時刻は認めない | 欠落・解析できない値は全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）。順序の逆転・同時刻は全体を拒否（`QA_VERIFICATION_ATTEMPTS_UNORDERED`） |
+| `status`         | `PASS` / `FAIL` だけ                                                                                                                        | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                               |
+| `logRef`         | §3.5 の artifact の id                                                                                                                      | 欠落は全体を拒否（`QA_EVIDENCE_MALFORMED`）。存在しない id は全体を拒否（`QA_ARTIFACT_REF_UNKNOWN`）                                          |
+| `assertions`     | `total` と `passed` の 0 以上の整数。`passed ≤ total`                                                                                       | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                               |
+| `command`        | 実行したコマンド（引数を含む）。出力・保存の前に redaction を通す（§7）                                                                     | 該当 AC を数えない（`QA_EXECUTION_COMMAND_MISSING`）                                                                                          |
+| `exitCode`       | -2147483648〜4294967295 の整数（§2.1。Windows の終了コードを含む）。取得経路が確かでない値（パイプ越しなど）は `null`                       | `null` なら該当 AC を数えない（`QA_EXECUTION_EXIT_CODE_UNKNOWN`）。整数でない値・範囲外は全体を拒否（`QA_EVIDENCE_MALFORMED`）                |
+| `exitCodeSource` | `exitCode` を取った経路（例: ラッパーで数値を取った、runner の結果ファイルから読んだ）。`exitCode` が `null` のときは理由                   | —                                                                                                                                             |
 
 試行の `status` と `exitCode` が食い違う場合（`exitCode` が 0 以外なのに `PASS`、0 なのに `FAIL`）は、該当 AC を数えない（`QA_EXECUTION_EXIT_CODE_MISMATCH`）。
 teardown やカバレッジの閾値など、判定と無関係な理由で終了コードだけが 0 以外になる運用があるため、証拠全体は拒否しない。
@@ -143,14 +145,14 @@ teardown やカバレッジの閾値など、判定と無関係な理由で終�
 
 ### 3.5 artifacts
 
-| 項目                 | 必須 | 規則                                                                                                         | 欠落・不正時                                                                                                                             |
-| -------------------- | ---- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `refs[].id`          | 必須 | §4 と同じ id の文字種・最大長。証拠内で一意                                                                  | 全体を拒否（`QA_ARTIFACT_ID_INVALID`）                                                                                                   |
-| `refs[].root`        | 必須 | `repository`（対象リポジトリ）または `artifacts`（host が渡す artifact ディレクトリ）                        | 全体を拒否（`QA_ARTIFACT_PATH_REJECTED`）                                                                                                |
-| `refs[].path`        | 必須 | `root` からの相対パス（下記の読み取り規則）。URL は受け付けない（River Review はネットワークから取得しない） | 全体を拒否（`QA_ARTIFACT_PATH_REJECTED`）                                                                                                |
-| `refs[].sha256`      | 必須 | 64 桁の hex。小文字に正規化して比較する                                                                      | 参照する AC を数えない（`QA_ARTIFACT_HASH_MISMATCH`。ファイルが無ければ `QA_ARTIFACT_UNRESOLVED`、上限超過なら `QA_ARTIFACT_TOO_LARGE`） |
-| `refs[].sensitivity` | 任意 | `restricted` / `public`。欠落時は `restricted`                                                               | —                                                                                                                                        |
-| `reproduction`       | 任意 | 再実行の手順。出力・保存の前に redaction を通す                                                              | —                                                                                                                                        |
+| 項目                 | 必須（欠落時の扱いは右欄） | 規則                                                                                                                                                                                                                                  | 欠落・不正時                                                                                                                             |
+| -------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `refs[].id`          | 必須                       | §4 と同じ id の文字種・最大長。証拠内で一意                                                                                                                                                                                           | 全体を拒否（`QA_ARTIFACT_ID_INVALID`）                                                                                                   |
+| `refs[].root`        | 必須                       | `repository`（対象リポジトリ）または `artifacts`（host が渡す artifact ディレクトリ）                                                                                                                                                 | 全体を拒否（`QA_ARTIFACT_PATH_REJECTED`）                                                                                                |
+| `refs[].path`        | 必須                       | `root` からの相対パス（下記の読み取り規則）。URL は受け付けない（River Review はネットワークから取得しない）。schema は `英字:` で始まる値を URL の scheme やドライブ名とみなして拒否するため、`trace:1.zip` のような名前も拒否される | 全体を拒否（`QA_ARTIFACT_PATH_REJECTED`）                                                                                                |
+| `refs[].sha256`      | 必須                       | 64 桁の hex。小文字に正規化して比較する                                                                                                                                                                                               | 参照する AC を数えない（`QA_ARTIFACT_HASH_MISMATCH`。ファイルが無ければ `QA_ARTIFACT_UNRESOLVED`、上限超過なら `QA_ARTIFACT_TOO_LARGE`） |
+| `refs[].sensitivity` | 任意                       | `restricted` / `public`。欠落時は `restricted`                                                                                                                                                                                        | —                                                                                                                                        |
+| `reproduction`       | 任意                       | 再実行の手順。出力・保存の前に redaction を通す                                                                                                                                                                                       | —                                                                                                                                        |
 
 CI のログや trace は、CI の artifact ストアや作業ツリーの外に置かれることが多い。
 そのため、対象リポジトリのほかに、host が明示的に渡したディレクトリを 2 つ目のルート（`artifacts`）として認める。
@@ -268,6 +270,9 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 | 3    | §3 の形式と整合（全体を拒否する reasonCode）                                            | 全体を拒否                                                                                    |
 | 4    | §4.3 の照合（全体を拒否する組み合わせを含む）                                           | 表のとおり                                                                                    |
 | 5    | §5 の AC ごとの判定                                                                     | 数えない                                                                                      |
+
+- 段階 1 と 3 の構造の検査には `schemas/qa-evidence.schema.json` を使う。検証モジュールは Ajv 2020（`ajv/dist/2020.js`）と `ajv-formats` を `strict: true` で使う。`startedAt` が `format: date-time` を使うので、`ajv-formats` が無いと strict の Ajv は schema をコンパイルできない
+- schema の一括検査は、段階 1 の違反（定義に無い欄、型、長さ、件数）と段階 3 の違反（必須欄の欠落、パターン、enum）を 1 回で同時に返すことがある。その場合は、両方の段階の違反をすべて報告してよい。どちらの場合も全体を拒否する扱いは変わらない
 
 - redaction には既存の `redactText`（`src/lib/secret-redactor.mjs`。import 例は `src/lib/review-engine.mjs:21`）を使い、再実装しない。文字列単位で適用できるかは、schema の PR で確かめる（本メモの作成時点では、リポジトリの読み取り制限によりこのファイルを確認していない）
 - 秘密情報らしい値が見つかっても、証拠は拒否しない。置換した写しで処理を続け、置換した件数だけを監査結果に記録する
