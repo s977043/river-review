@@ -73,6 +73,27 @@ const full = () => ({
       ],
     },
     { acId: 'AC-2', status: 'NOT_RUN', notRunReason: 'out-of-scope' },
+    {
+      acId: 'AC-3',
+      status: 'NOT_RUN',
+      subcases: [
+        {
+          id: 'normal',
+          status: 'PASS',
+          basis: 'verified',
+          attempts: [
+            {
+              startedAt: '2026-11-20T00:01:00Z',
+              status: 'PASS',
+              logRef: 'log-1',
+              assertions: { total: 1, passed: 1 },
+            },
+          ],
+        },
+        { id: 'forbidden', status: 'NOT_RUN', notRunReason: 'requires-human-judgment' },
+      ],
+      controls: [{ revision: 'd'.repeat(40), status: 'FAIL', logRef: 'log-1' }],
+    },
   ],
   artifacts: {
     refs: [
@@ -96,6 +117,9 @@ const rejects = (doc) => assert.equal(validate(doc), false, JSON.stringify(doc).
 const attempt0 = (d) => d.verification[0].attempts[0];
 const ac0 = (d) => d.target.acceptanceCriteria[0];
 const ref0 = (d) => d.artifacts.refs[0];
+const ac3 = (d) => d.verification[2];
+const subcase0 = (d) => ac3(d).subcases[0];
+const control0 = (d) => ac3(d).controls[0];
 
 test('minimal and full documents are accepted', () => {
   accepts(minimal());
@@ -119,6 +143,8 @@ const STRING_LIMITS = [
   ['environment.timezone', 64, (d, n) => (d.environment.timezone = 'x'.repeat(n))],
   ['verification.basis', 32, (d, n) => (d.verification[0].basis = 'x'.repeat(n))],
   ['notRunReason', 64, (d, n) => (d.verification[1].notRunReason = 'x'.repeat(n))],
+  ['subcase.basis', 32, (d, n) => (subcase0(d).basis = 'x'.repeat(n))],
+  ['subcase.notRunReason', 64, (d, n) => (ac3(d).subcases[1].notRunReason = 'x'.repeat(n))],
   ['attempt.command', 8192, (d, n) => (attempt0(d).command = 'x'.repeat(n))],
   ['attempt.exitCodeSource', 256, (d, n) => (attempt0(d).exitCodeSource = 'x'.repeat(n))],
   ['artifact.path', 1024, (d, n) => (ref0(d).path = 'x'.repeat(n))],
@@ -167,6 +193,27 @@ const ARRAY_LIMITS = [
     20,
     (d, n) => {
       d.verification[0].attempts = Array.from({ length: n }, () => ({ ...attempt0(d) }));
+    },
+  ],
+  [
+    'subcases',
+    20,
+    (d, n) => {
+      ac3(d).subcases = Array.from({ length: n }, (_, i) => ({ id: `s${i}`, status: 'SKIP' }));
+    },
+  ],
+  [
+    'subcase.attempts',
+    20,
+    (d, n) => {
+      subcase0(d).attempts = Array.from({ length: n }, () => ({ ...subcase0(d).attempts[0] }));
+    },
+  ],
+  [
+    'controls',
+    10,
+    (d, n) => {
+      ac3(d).controls = Array.from({ length: n }, () => ({ ...control0(d) }));
     },
   ],
   [
@@ -246,6 +293,9 @@ const OBJECTS = [
   ['artifacts', (d) => d.artifacts],
   ['artifactRef', ref0],
   ['gaps', (d) => d.gaps],
+  ['subcase', subcase0],
+  ['subcase attempt', (d) => subcase0(d).attempts[0]],
+  ['control', control0],
 ];
 
 test('a field the schema does not define is rejected at every object level', () => {
@@ -262,6 +312,8 @@ const ID_SITES = [
   ['verification[].acId', (d, v) => (d.verification[0].acId = v)],
   ['attempts[].logRef', (d, v) => (attempt0(d).logRef = v)],
   ['artifacts.refs[].id', (d, v) => (ref0(d).id = v)],
+  ['subcases[].id', (d, v) => (subcase0(d).id = v)],
+  ['controls[].logRef', (d, v) => (control0(d).logRef = v)],
 ];
 
 test('every id site accepts a raw length of 160 and rejects 161', () => {
@@ -302,6 +354,8 @@ const REQUIRED = [
   ['attempt', attempt0, ['startedAt', 'status', 'logRef', 'assertions']],
   ['assertions', (d) => attempt0(d).assertions, ['total', 'passed']],
   ['artifactRef', ref0, ['id', 'root', 'path']],
+  ['subcase', subcase0, ['id', 'status']],
+  ['control', control0, ['revision', 'status', 'logRef']],
 ];
 
 test('removing any one required field rejects the whole document', () => {
@@ -322,6 +376,10 @@ test('values outside a whole-document enum or const are rejected', () => {
     (d) => (attempt0(d).status = 'SKIP'),
     (d) => (ref0(d).root = 'home'),
     (d) => (ref0(d).sensitivity = 'private'),
+    (d) => (subcase0(d).status = 'pass'),
+    (d) => (control0(d).status = 'SKIP'),
+    (d) => (control0(d).revision = 'abc1234'),
+    (d) => (control0(d).revision = 'g'.repeat(40)),
   ];
   for (const change of cases) {
     const d = full();
@@ -382,10 +440,30 @@ test('fields the contract counts as unverified are not rejected by the schema', 
     (d) => delete attempt0(d).exitCode,
     (d) => (ref0(d).sha256 = 'not-a-hash'),
     (d) => delete ref0(d).sha256,
+    (d) => delete ac3(d).controls,
+    (d) => (control0(d).status = 'PASS'),
+    (d) => (subcase0(d).basis = 'observed'),
   ];
   for (const change of cases) {
     const d = full();
     change(d);
     accepts(d);
   }
+});
+
+test('an AC with subcases carries no basis, attempts or notRunReason of its own (§3.4.1)', () => {
+  const fields = {
+    basis: 'verified',
+    attempts: [],
+    notRunReason: 'out-of-scope',
+  };
+  for (const [field, value] of Object.entries(fields)) {
+    const d = full();
+    ac3(d)[field] = value;
+    assert.equal(validate(d), false, `AC with subcases accepted its own ${field}`);
+  }
+  const empty = full();
+  ac3(empty).subcases = [];
+  Object.assign(ac3(empty), fields);
+  accepts(empty);
 });

@@ -151,10 +151,58 @@
           "items": { "$ref": "#/$defs/attempt" }
         },
         "notRunReason": {
-          "description": "`criteria-ambiguous` / `environment-unavailable` / `out-of-scope` / `execution-failed`, expected for `SKIP` / `NOT_RUN`. Missing or any other value is recorded as `QA_VERIFICATION_REASON_MISSING` by the deterministic module; it does not reject the document.",
+          "description": "`criteria-ambiguous` / `environment-unavailable` / `out-of-scope` / `execution-failed` / `requires-human-judgment`, expected for `SKIP` / `NOT_RUN`. This is the only vocabulary for why a result is `SKIP` / `NOT_RUN`; a consumer maps any external tool's reason codes onto it before handing the evidence over. Missing or any other value is recorded as `QA_VERIFICATION_REASON_MISSING` by the deterministic module; it does not reject the document.",
           "type": "string",
           "maxLength": 64
+        },
+        "subcases": {
+          "description": "Cases inside one AC (§3.4.1), for example the normal path and a permission error. A non-empty `subcases` forbids the AC's own `basis`, `attempts` and `notRunReason`. The deterministic module checks that subcase ids are unique within the AC (`QA_VERIFICATION_SUBCASE_ID_INVALID`) and that the AC `status` equals the worst subcase status, ordered FAIL > NOT_RUN > SKIP > PASS (`QA_VERIFICATION_SUBCASE_STATUS_MISMATCH`). An empty array means no subcases.",
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/subcase" }
+        },
+        "controls": {
+          "description": "Control runs on a revision before the change, expected to FAIL (§3.4.2). Recorded only in the first version: they are not a verified condition. A missing control (`QA_CONTROL_MISSING`) or a control that passed (`QA_CONTROL_PASSED`) is kept in the audit result's Gaps by the deterministic module.",
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/control" }
         }
+      },
+      "if": {
+        "required": ["subcases"],
+        "properties": { "subcases": { "type": "array", "minItems": 1 } }
+      },
+      "then": {
+        "properties": { "basis": false, "attempts": false, "notRunReason": false }
+      }
+    },
+    "subcase": {
+      "description": "Same rules as an AC result (§3.4.1). The id follows §4.2 and is unique within the AC.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "status": { "$ref": "#/$defs/verificationResult/properties/status" },
+        "basis": { "$ref": "#/$defs/verificationResult/properties/basis" },
+        "attempts": { "$ref": "#/$defs/verificationResult/properties/attempts" },
+        "notRunReason": { "$ref": "#/$defs/verificationResult/properties/notRunReason" }
+      }
+    },
+    "control": {
+      "description": "One run of the same check on a revision before the change (§3.4.2). River Review does not confirm that `revision` precedes the change; it is self-reported (§10).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "status", "logRef"],
+      "properties": {
+        "revision": {
+          "description": "Full 40- or 64-digit hex commit id the control ran on. Invalid rejects the whole document (`QA_EVIDENCE_MALFORMED`).",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$"
+        },
+        "status": { "$ref": "#/$defs/attempt/properties/status" },
+        "logRef": { "$ref": "#/$defs/attempt/properties/logRef" }
       }
     },
     "attempt": {
