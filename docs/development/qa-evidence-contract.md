@@ -2,8 +2,7 @@
 
 ## Status
 
-**Stability: Experimental.** 本メモは設計だけを扱い、実装と schema はまだ無い。
-`schemas/qa-evidence.schema.json` は本メモを正本として別 PR で作り、その PR で `pages/reference/stable-interfaces.md`（ja / en）に Experimental として登録する。
+**Stability: Experimental.** 本メモが正本で、`schemas/qa-evidence.schema.json` はその構造の検査にあたる。schema は `pages/reference/stable-interfaces.md`（ja / en）に Experimental として登録済み。決定論の検証モジュールと writer はまだ無い。
 本文の行番号（`:NN`）は main `e78b5234` 時点の値を示す。
 
 ADR-017（`docs/adr/017-qa-evidence-intake.md`）の D3・D5 を具体化する。用語は ADR-017 の「用語」節に従う。
@@ -40,7 +39,45 @@ qa-evidence
 
 schema では、すべてのオブジェクトを `additionalProperties: false` とし、すべての文字列欄に最大長を置く。
 定義に無い欄や最大長を超える文字列は、全体を拒否する（`QA_EVIDENCE_TOO_LARGE`。本文の埋め込みもこれで止める）。
-上限値は schema の PR で決め、上限ちょうどと上限 + 1 の fixture を置く。
+上限ちょうどと上限 + 1 の検査は `tests/qa-evidence-schema.test.mjs` に置く。
+
+schema が `required`・`pattern`・`enum`・`const` で拒否するのは、本メモが「全体を拒否」とする欄だけとする。
+「数えない」「全 AC を数えない」とする欄（`basis`、`expected.source`、`execution.runner`、`environment.os`、試行の `command`・`exitCode`、`refs[].sha256` など）は、schema では型と最大長だけを検査する。
+欠落や値の誤りで証拠全体を拒否してしまうと、その AC を unverified に数える扱いと食い違うため。
+値の判定は決定論のモジュールが行う。
+
+### 2.1 上限値
+
+| 対象                                               | 上限                              | 根拠                                                                                                 |
+| -------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 証拠 JSON 全体のバイト数（UTF-8）                  | 1,048,576（1 MiB）                | 証拠は参照と hash だけを持ち本文を持たない。AC 200 件に各 2 KB の記述を付けても 0.4 MB に収まる      |
+| ネストの深さ                                       | 16                                | schema が許す最大の深さは 6（root → verification → 結果 → attempts → 試行 → assertions）。その倍以上 |
+| `target.acceptanceCriteria`、`verification` の件数 | 200                               | 1 つの PR やタスクで人間が確定する AC の数として十分に多く、件数による処理量を抑える                 |
+| 1 件の AC の `attempts` の件数                     | 20                                | retry と再実行の記録には十分。flaky の判定は 2 件あれば足りる                                        |
+| `artifacts.refs` の件数                            | 500                               | 試行ごとのログ（最大 200 × 20）は共有できる。ファイルごとの hash 計算の回数を抑える                  |
+| `environment.runtimes` の件数                      | 20                                | 1 回の実行で使う処理系の数として十分                                                                 |
+| `gaps.items` の件数                                | 100                               | 不足・残余リスクの列挙として十分                                                                     |
+| id（AC・artifact）                                 | 正規化後 128 文字（生の値は 160） | §4.2。生の値は正規化で除かれる前後の空白の分だけ余裕を持たせる                                       |
+| `target.repository`                                | 140                               | GitHub の owner の最大 39 文字 + `/` + リポジトリ名の最大 100 文字                                   |
+| `target.subjectRevision`                           | 64                                | SHA-256 の commit id の桁数                                                                          |
+| `expected.value`                                   | 4,096                             | 期待結果は固定した短い記述。長い仕様は `sourceRef` で artifact を参照する                            |
+| 試行の `command`、`artifacts.reproduction`         | 8,192                             | 引数を含むコマンド行として十分。長い手順はファイルにして参照する                                     |
+| `refs[].path`                                      | 1,024                             | macOS の `PATH_MAX`。これより長い相対パスは実運用で想定しない                                        |
+| `gaps.items[]`                                     | 2,048                             | 1 件の不足・リスクの記述として十分                                                                   |
+| `execution.ciRun`                                  | 512                               | CI の run の URL として十分                                                                          |
+| `exitCodeSource`                                   | 256                               | 取得経路の短い説明                                                                                   |
+| `runner`、`os`、`browser`                          | 128                               | 名前と版の表記として十分                                                                             |
+| `runtimes[].name`・`version`、`locale`、`timezone` | 64                                | 名前と版の表記、BCP 47 の言語タグ、IANA のタイムゾーン名として十分                                   |
+| `notRunReason`                                     | 64                                | 定義済みの 4 値の最長は 23 文字                                                                      |
+| `basis`、`expected.source`、`viewport`             | 32                                | 定義済みの値、`1280x720` 形式の表記として十分                                                        |
+| `refs[].sha256`                                    | 64                                | SHA-256 の 16 進表記の桁数                                                                           |
+| 試行の `startedAt`                                 | 64                                | RFC 3339 の日時表記として十分                                                                        |
+| `assertions.total`・`passed`                       | 1,000,000                         | 1 回の試行の assertion 数として十分に大きく、整数の扱いで精度を失わない                              |
+| artifact 1 件のバイト数                            | 104,857,600（100 MiB）            | E2E の trace や動画を含められる大きさ。GitHub が 1 ファイルに許す上限と同じ                          |
+| artifact の合計バイト数                            | 536,870,912（512 MiB）            | hash の計算にかかる時間を 1 回の監査で数秒程度に抑える                                               |
+
+バイト数と深さの上限は JSON Schema で表せないため、決定論のモジュールが schema の検証より前に検査する（§7 段階 1）。
+件数と文字列長の上限は schema に書く。
 
 ## 3. 各欄
 
@@ -127,7 +164,7 @@ host が渡していない場合、`root: artifacts` の参照は `QA_ARTIFACT_U
 - 通常ファイルだけを読む。FIFO・デバイス・ディレクトリは拒否する。ハードリンク（リンク数 2 以上）も拒否する
 - 開いたファイル記述子から種類とリンク数を確かめ、同じ記述子から hash を計算する（検査と読み取りの間の差し替えを防ぐ）
 - 成分ごとの検査を終えてから開くまでの間に、途中のディレクトリを symlink に差し替えられると、リポジトリの外のファイルを開けてしまう。開く時点まで symlink を拒否できる方式（ルートから成分ごとに symlink を辿らずに開く、など）を実装の要件とし、差し替えの競合を再現する fixture を置く。そうした方式を実装できない環境では、artifact を読まずに `QA_ARTIFACT_UNRESOLVED` とする
-- 1 ファイルあたりと合計のバイト数に上限を置く。上限値は schema の PR で決める
+- 1 ファイルあたりと合計のバイト数に上限を置く（§2.1。1 ファイル 100 MiB、合計 512 MiB）
 - 未追跡のファイル（CI の成果物など）も読んでよい。そのため artifact は対象 revision に結び付かない。これは §10 の残余リスクとして扱う
 
 `sensitivity: restricted` の artifact は、出力に id だけを出し、パスとサイズを出さない。

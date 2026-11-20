@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/qa-evidence.schema.json",
+  "title": "River Review QA Evidence",
+  "description": "Untrusted user input recording the result of QA the consumer ran themselves (ADR-017 D3 / D5). The SSoT for every field, requirement and failure treatment is `docs/development/qa-evidence-contract.md`; this schema is its stage-1 / stage-3 structural check (§7). Encoding rule: every object is closed (`additionalProperties: false`), every value is typed, every string has `maxLength` and every array has `maxItems`, so an undefined field, a wrong type or an over-long value rejects the whole document (`QA_EVIDENCE_MALFORMED` / `QA_EVIDENCE_TOO_LARGE`). `required`, `pattern`, `enum` and `const` are used ONLY where the contract rejects the whole document; a field whose absence or invalid value the contract treats as `do not count` (for example `basis`, `expected.source`, `execution.runner`, `environment.os`, `attempts[].command`, `refs[].sha256`) is typed and length-bounded here but not required or enumerated, because the deterministic module must count it as unverified instead of rejecting. Limits that JSON Schema cannot express are enforced by the deterministic module before schema validation: the evidence document is at most 1,048,576 bytes of UTF-8 and at most 16 levels of nesting; each referenced artifact is at most 104,857,600 bytes and all referenced artifacts together at most 536,870,912 bytes (`QA_ARTIFACT_TOO_LARGE`). Semantics outside this schema are decided by the deterministic module, never by this schema: id normalization with `nonEmptyNfcString` and uniqueness (§4.2), the C / T / V set comparison (§4.3), the verified conditions (§5), sha256 comparison and the artifact read rules (§3.5), the HEAD and `dirty` comparison (§5 condition 5), attempt ordering, status-to-last-attempt agreement and `passed <= total` (§3.4). Passing this schema never makes an acceptance criterion verified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "target", "verification"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Version of THIS document shape.",
+      "type": "string",
+      "const": "1"
+    },
+    "target": { "$ref": "#/$defs/target" },
+    "execution": { "$ref": "#/$defs/execution" },
+    "environment": { "$ref": "#/$defs/environment" },
+    "verification": {
+      "description": "One result per confirmed AC (§3.4). Duplicate or unknown `acId` and the C / T / V comparison are decided by the deterministic module (§4.3).",
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/verificationResult" }
+    },
+    "artifacts": { "$ref": "#/$defs/artifacts" },
+    "gaps": { "$ref": "#/$defs/gaps" }
+  },
+  "$defs": {
+    "id": {
+      "description": "AC id or artifact id (§4.2). The deterministic module normalizes with `nonEmptyNfcString` (trim, then NFC) and requires the result to be 1 to 128 characters of `[A-Za-z0-9._-]`; this pattern is the same rule on the raw value, allowing the surrounding whitespace that normalization removes. A raw value that only becomes ASCII through NFC (for example U+212A KELVIN SIGN) is rejected here.",
+      "type": "string",
+      "maxLength": 160,
+      "pattern": "^\\s*[A-Za-z0-9._-]{1,128}\\s*$"
+    },
+    "target": {
+      "description": "§3.1.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "subjectRevision", "acceptanceCriteria"],
+      "properties": {
+        "repository": {
+          "description": "`owner/name`. Invalid rejects the whole document (`QA_TARGET_REPOSITORY_INVALID`).",
+          "type": "string",
+          "maxLength": 140,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$"
+        },
+        "subjectRevision": {
+          "description": "Full 40- or 64-digit hex commit id; short SHAs are rejected (`QA_TARGET_REVISION_INVALID`). Lower-cased by the deterministic module, which also compares it with the HEAD River Review observed (§5 condition 5).",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$"
+        },
+        "acceptanceCriteria": {
+          "description": "The AC list as the evidence states it (T). It is compared with the confirmed list, never trusted as the population (§4.1, §4.3).",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "items": { "$ref": "#/$defs/acceptanceCriterion" }
+        }
+      }
+    },
+    "acceptanceCriterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "required": {
+          "description": "Accepted but never read: required / optional comes from the confirmed AC list (§3.1, §4.1).",
+          "type": "boolean"
+        },
+        "expected": {
+          "description": "Fixed expected result. A missing `value` or `source` counts the AC as unverified, not a whole-document rejection, so neither is required here.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "description": "Missing: `QA_TARGET_EXPECTED_MISSING`. Compared with the confirmed list before redaction (§5 condition 7).",
+              "type": "string",
+              "maxLength": 4096
+            },
+            "source": {
+              "description": "`sourced` / `reproduced` / `derived` (§5). Missing or any other value counts the AC as unverified (`QA_TARGET_EXPECTED_SOURCE_MISSING`), decided by the deterministic module.",
+              "type": "string",
+              "maxLength": 32
+            },
+            "sourceRef": {
+              "description": "Artifact id the expected value comes from; required by the deterministic module when `source` is `sourced` (`QA_TARGET_EXPECTED_SOURCE_UNRESOLVED`).",
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      }
+    },
+    "execution": {
+      "description": "§3.2. A missing `runner` counts every AC as unverified (`QA_EXECUTION_RUNNER_MISSING`).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runner": { "type": "string", "maxLength": 128 },
+        "ciRun": {
+          "description": "Reference to a CI run. Recorded only; never a basis for independence (§6).",
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    },
+    "environment": {
+      "description": "§3.3. A missing `os` counts every AC as unverified (`QA_ENVIRONMENT_INCOMPLETE`).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": { "type": "string", "maxLength": 128 },
+        "runtimes": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "version"],
+            "properties": {
+              "name": { "type": "string", "maxLength": 64 },
+              "version": { "type": "string", "maxLength": 64 }
+            }
+          }
+        },
+        "browser": { "type": "string", "maxLength": 128 },
+        "viewport": { "type": "string", "maxLength": 32 },
+        "locale": { "type": "string", "maxLength": 64 },
+        "timezone": { "type": "string", "maxLength": 64 }
+      }
+    },
+    "verificationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acId", "status"],
+      "properties": {
+        "acId": { "$ref": "#/$defs/id" },
+        "status": {
+          "description": "Invalid rejects the whole document (`QA_VERIFICATION_STATUS_INVALID`). Agreement with the last attempt is checked by the deterministic module (`QA_VERIFICATION_STATUS_MISMATCH`).",
+          "type": "string",
+          "enum": ["PASS", "FAIL", "SKIP", "NOT_RUN"]
+        },
+        "basis": {
+          "description": "`verified` / `explore`. Missing or any other value counts the AC as unverified (`QA_VERIFICATION_BASIS_MISSING`), decided by the deterministic module.",
+          "type": "string",
+          "maxLength": 32
+        },
+        "attempts": {
+          "description": "Every attempt, strictly ascending by `startedAt` (checked by the deterministic module: `QA_VERIFICATION_ATTEMPTS_UNORDERED`). Empty for `PASS` / `FAIL` counts the AC as unverified (`QA_VERIFICATION_ATTEMPTS_EMPTY`), so there is no `minItems` here.",
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/attempt" }
+        },
+        "notRunReason": {
+          "description": "`criteria-ambiguous` / `environment-unavailable` / `out-of-scope` / `execution-failed`, expected for `SKIP` / `NOT_RUN`. Missing or any other value is recorded as `QA_VERIFICATION_REASON_MISSING` by the deterministic module; it does not reject the document.",
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "status", "logRef", "assertions"],
+      "properties": {
+        "startedAt": {
+          "description": "RFC 3339 date-time. Unparseable rejects the whole document (`QA_VERIFICATION_ATTEMPT_INVALID`); ordering is compared on the parsed epoch milliseconds by the deterministic module.",
+          "type": "string",
+          "maxLength": 64,
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PASS", "FAIL"]
+        },
+        "logRef": {
+          "description": "Artifact id (§3.5). An id absent from `artifacts.refs` rejects the whole document (`QA_ARTIFACT_REF_UNKNOWN`), checked by the deterministic module.",
+          "$ref": "#/$defs/id"
+        },
+        "assertions": {
+          "description": "`passed <= total` is checked by the deterministic module (`QA_VERIFICATION_ATTEMPT_INVALID`).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "passed"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+            "passed": { "type": "integer", "minimum": 0, "maximum": 1000000 }
+          }
+        },
+        "command": {
+          "description": "Command with arguments. Missing counts the AC as unverified (`QA_EXECUTION_COMMAND_MISSING`). Redacted before any output or storage (§7).",
+          "type": "string",
+          "maxLength": 8192
+        },
+        "exitCode": {
+          "description": "0 to 255, or `null` when the value was not taken from a trustworthy path (for example through a pipe). `null` or missing counts the AC as unverified (`QA_EXECUTION_EXIT_CODE_UNKNOWN`); a non-integer or out-of-range value rejects the whole document (`QA_EVIDENCE_MALFORMED`).",
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 255
+        },
+        "exitCodeSource": {
+          "description": "How `exitCode` was taken, or why it is `null`.",
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "artifacts": {
+      "description": "§3.5. The evidence holds references and hashes only, never artifact bodies.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "refs": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/artifactRef" }
+        },
+        "reproduction": {
+          "description": "Steps to re-run. Redacted before any output or storage (§7).",
+          "type": "string",
+          "maxLength": 8192
+        }
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "root", "path"],
+      "properties": {
+        "id": {
+          "description": "Unique within the evidence; uniqueness is checked by the deterministic module (`QA_ARTIFACT_ID_INVALID`).",
+          "$ref": "#/$defs/id"
+        },
+        "root": {
+          "description": "`repository` (the target repository) or `artifacts` (the directory the host passes). Anything else rejects the whole document (`QA_ARTIFACT_PATH_REJECTED`).",
+          "type": "string",
+          "enum": ["repository", "artifacts"]
+        },
+        "path": {
+          "description": "Relative path from `root` with `/` separators. This schema rejects absolute paths, `..` segments, backslashes, NUL and URL-like values (`QA_ARTIFACT_PATH_REJECTED`). NFC normalization, root containment, symlinks, hard links, non-regular files, `.git/` and the `shouldExcludeForContext` rules are checked by the deterministic module when reading (§3.5).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "not": {
+            "anyOf": [
+              { "pattern": "^/" },
+              { "pattern": "(?:^|/)\\.\\.(?:/|$)" },
+              { "pattern": "\\\\" },
+              { "pattern": "\\u0000" },
+              { "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:" }
+            ]
+          }
+        },
+        "sha256": {
+          "description": "64-digit hex, lower-cased and compared by the deterministic module. Missing, malformed or mismatched counts the referring ACs as unverified (`QA_ARTIFACT_HASH_MISMATCH`), so it is length-bounded but not required or patterned here.",
+          "type": "string",
+          "maxLength": 64
+        },
+        "sensitivity": {
+          "description": "`restricted` (default when missing) outputs the id only, without path or size.",
+          "type": "string",
+          "enum": ["restricted", "public"]
+        }
+      }
+    },
+    "gaps": {
+      "description": "§3.6. Redacted before any output or storage.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "maxLength": 2048 }
+        }
+      }
+    }
+  }
+}
