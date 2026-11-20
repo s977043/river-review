@@ -92,7 +92,7 @@ const full = () => ({
         },
         { id: 'forbidden', status: 'NOT_RUN', notRunReason: 'requires-human-judgment' },
       ],
-      controls: [{ revision: 'd'.repeat(40), status: 'FAIL', logRef: 'log-1' }],
+      controls: [{ revision: 'd'.repeat(40), status: 'FAIL', logRef: 'control-log' }],
     },
   ],
   artifacts: {
@@ -105,6 +105,7 @@ const full = () => ({
         sha256: 'c'.repeat(64),
         sensitivity: 'public',
       },
+      { id: 'control-log', root: 'artifacts', path: 'logs/control.txt', sha256: 'e'.repeat(64) },
     ],
     reproduction: 'npm ci && npm test',
   },
@@ -380,6 +381,9 @@ test('values outside a whole-document enum or const are rejected', () => {
     (d) => (control0(d).status = 'SKIP'),
     (d) => (control0(d).revision = 'abc1234'),
     (d) => (control0(d).revision = 'g'.repeat(40)),
+    (d) => (control0(d).revision = 'd'.repeat(41)),
+    (d) => (control0(d).revision = 'd'.repeat(63)),
+    (d) => (control0(d).revision = 'd'.repeat(65)),
   ];
   for (const change of cases) {
     const d = full();
@@ -442,6 +446,8 @@ test('fields the contract counts as unverified are not rejected by the schema', 
     (d) => delete ref0(d).sha256,
     (d) => delete ac3(d).controls,
     (d) => (control0(d).status = 'PASS'),
+    (d) => (control0(d).revision = 'D'.repeat(64)),
+    (d) => (control0(d).revision = d.target.subjectRevision),
     (d) => (subcase0(d).basis = 'observed'),
   ];
   for (const change of cases) {
@@ -461,6 +467,11 @@ test('an AC with subcases carries no basis, attempts or notRunReason of its own 
     const d = full();
     ac3(d)[field] = value;
     assert.equal(validate(d), false, `AC with subcases accepted its own ${field}`);
+    const single = full();
+    ac3(single).subcases = [subcase0(single)];
+    ac3(single).status = 'PASS';
+    ac3(single)[field] = value;
+    assert.equal(validate(single), false, `AC with one subcase accepted its own ${field}`);
   }
   const empty = full();
   ac3(empty).subcases = [];

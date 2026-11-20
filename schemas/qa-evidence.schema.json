@@ -162,7 +162,7 @@
           "items": { "$ref": "#/$defs/subcase" }
         },
         "controls": {
-          "description": "Control runs on a revision before the change, expected to FAIL (§3.4.2). Recorded only in the first version: they are not a verified condition. A missing control (`QA_CONTROL_MISSING`) or a control that passed (`QA_CONTROL_PASSED`) is kept in the audit result's Gaps by the deterministic module.",
+          "description": "Control runs on a revision before the change, expected to FAIL (§3.4.2). Recorded only in the first version: they are not a verified condition. A missing control (`QA_CONTROL_MISSING`), a control that passed (`QA_CONTROL_PASSED`), a control on the same revision as `target.subjectRevision` (`QA_CONTROL_SAME_REVISION`) and a control log that cannot be resolved, mismatches its hash or exceeds the size limit (`QA_CONTROL_LOG_UNRESOLVED`) are kept in the audit result's Gaps by the deterministic module and never stop the AC from being counted; a control `logRef` naming an id absent from `artifacts.refs` still rejects the whole document (`QA_ARTIFACT_REF_UNKNOWN`). Controls belong to the AC, not to a subcase.",
           "type": "array",
           "maxItems": 10,
           "items": { "$ref": "#/$defs/control" }
