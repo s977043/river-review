@@ -13,6 +13,8 @@ ADR-017（`docs/adr/017-qa-evidence-intake.md`）の D3・D5 を具体化する�
 - 利用者が自分で実行した QA の結果を、River Review に渡すための形式
 - 証拠の JSON は信頼しない利用者入力。確定した AC の一覧と、独立性・provenance の根拠は、証拠とは別の入力から取る（§4、§6）
 - River Review はこの証拠を決定論のコードで検証し、監査結果を出す。completion-assessment には件数だけを部分投影する。完了の state は completion-judge が決める
+- ファイルの検査・hash の計算・git による HEAD と `dirty` の観測は、host 側で動く決定論のモジュールが行う。skill と completion-judge はその結果を読むだけとする。Agent が要求できる能力は全 runtime の共通部分だけで、Codex は `run-command` を持たないため（`agents/contracts/adapter-map.json:10-14`、`schemas/agent-contract.schema.json:46-50`）
+- 読み取りだけの環境、git を実行できない環境、artifact を読めない環境でも、検証は安全側に倒れる（`QA_TARGET_REVISION_UNOBSERVED`、`QA_ARTIFACT_UNRESOLVED`）。権限の拡張は前提にしない
 - 初版では、独立性が全件 `unknown` になるため、どの AC も verified に数えない（§5 条件 8、§9）。QA 証拠から `COMPLETE` や `INCOMPLETE` は生じない（§8）
 
 ## 2. 全体の構造
@@ -44,75 +46,83 @@ schema では、すべてのオブジェクトを `additionalProperties: false` 
 
 ### 3.1 target
 
-| 項目                                      | 必須                                 | 規則                                                                     | 欠落・不正時                                                                               |
-| ----------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `repository`                              | 必須                                 | `owner/name` 形式                                                        | 全体を拒否（`QA_TARGET_REPOSITORY_INVALID`）                                               |
-| `subjectRevision`                         | 必須                                 | 40 桁または 64 桁の hex。小文字に正規化して受理する。短縮 SHA は拒否する | 全体を拒否（`QA_TARGET_REVISION_INVALID`）                                                 |
-| `acceptanceCriteria[]`                    | 必須（1 件以上）                     | §4 の AC 規則                                                            | 全体を拒否（`QA_TARGET_AC_EMPTY`、`QA_TARGET_AC_ID_INVALID`、`QA_TARGET_AC_ID_DUPLICATE`） |
-| `acceptanceCriteria[].expected.value`     | 必須                                 | 固定した期待結果                                                         | 数えない（`QA_TARGET_EXPECTED_MISSING`）                                                   |
-| `acceptanceCriteria[].expected.source`    | 必須                                 | `sourced` / `reproduced` / `derived`（§5）                               | 数えない（`QA_TARGET_EXPECTED_SOURCE_MISSING`）                                            |
-| `acceptanceCriteria[].expected.sourceRef` | `sourced` と `reproduced` のとき必須 | 出所または再現の根拠となる artifact の id（§3.5）                        | 数えない（`QA_TARGET_EXPECTED_SOURCE_UNRESOLVED`）                                         |
+| 項目                                      | 必須                 | 規則                                                                          | 欠落・不正時                                                                               |
+| ----------------------------------------- | -------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `repository`                              | 必須                 | `owner/name` 形式                                                             | 全体を拒否（`QA_TARGET_REPOSITORY_INVALID`）                                               |
+| `subjectRevision`                         | 必須                 | 40 桁または 64 桁の hex。小文字に正規化して受理する。短縮 SHA は拒否する      | 全体を拒否（`QA_TARGET_REVISION_INVALID`）                                                 |
+| `acceptanceCriteria[]`                    | 必須（1 件以上）     | §4 の AC 規則                                                                 | 全体を拒否（`QA_TARGET_AC_EMPTY`、`QA_TARGET_AC_ID_INVALID`、`QA_TARGET_AC_ID_DUPLICATE`） |
+| `acceptanceCriteria[].expected.value`     | 必須                 | 固定した期待結果                                                              | 数えない（`QA_TARGET_EXPECTED_MISSING`）                                                   |
+| `acceptanceCriteria[].expected.source`    | 必須                 | `sourced` / `reproduced` / `derived`（§5）                                    | 数えない（`QA_TARGET_EXPECTED_SOURCE_MISSING`）                                            |
+| `acceptanceCriteria[].expected.sourceRef` | `sourced` のとき必須 | 出所となる artifact の id（§3.5）。§5 条件 6 で信頼できる版にあるかを確かめる | 数えない（`QA_TARGET_EXPECTED_SOURCE_UNRESOLVED`）                                         |
 
 証拠の `acceptanceCriteria[].required` は読まない。必須・任意は確定した AC 一覧から取る（§4）。
 
 ### 3.2 execution
 
-| 項目       | 必須 | 規則                                                                                                 | 欠落・不正時                                                                                                                 |
-| ---------- | ---- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `runner`   | 必須 | 実行に使った runner の名前                                                                           | 全 AC を数えない（`QA_EXECUTION_RUNNER_MISSING`）                                                                            |
-| `command`  | 必須 | 実行したコマンド（引数を含む）。出力・保存の前に redaction を通す（§7）                              | 全 AC を数えない（`QA_EXECUTION_COMMAND_MISSING`）                                                                           |
-| `exitCode` | 必須 | 0〜255 の整数。取得経路が確かでない値（パイプ越しなど）は `null` とし、`exitCodeSource` に理由を書く | `null` なら全 AC を数えない（`QA_EXECUTION_EXIT_CODE_UNKNOWN`）。整数でない値・範囲外は全体を拒否（`QA_EVIDENCE_MALFORMED`） |
-| `ciRun`    | 任意 | CI の run の参照。独立性の根拠には使わない（§6）                                                     | —                                                                                                                            |
+| 項目     | 必須 | 規則                                             | 欠落・不正時                                      |
+| -------- | ---- | ------------------------------------------------ | ------------------------------------------------- |
+| `runner` | 必須 | 実行に使った runner の名前                       | 全 AC を数えない（`QA_EXECUTION_RUNNER_MISSING`） |
+| `ciRun`  | 任意 | CI の run の参照。独立性の根拠には使わない（§6） | —                                                 |
 
-`exitCode` と AC 別の結果の整合は両方向で検査する。対象は `verification` の要素が 1 件以上ある場合に限る。
-
-- `exitCode` が 0 以外なのに、`verification` の全件が `PASS` → 全体を拒否（`QA_EXECUTION_EXIT_CODE_MISMATCH`）
-- `exitCode` が 0 なのに、`verification` に `FAIL` がある → 全体を拒否（`QA_EXECUTION_EXIT_CODE_MISMATCH`）
+AC ごとに別のコマンドで判定する運用があるため、実行したコマンドと終了コードは、実行全体ではなく試行ごとに持つ（§3.4）。
 
 ### 3.3 environment
 
-| 項目                                        | 必須 | 規則               | 欠落・不正時                                    |
-| ------------------------------------------- | ---- | ------------------ | ----------------------------------------------- |
-| `os`                                        | 必須 | —                  | 全 AC を数えない（`QA_ENVIRONMENT_INCOMPLETE`） |
-| `browser`、`viewport`、`locale`、`timezone` | 任意 | E2E では記録を推奨 | —                                               |
+| 項目                                        | 必須 | 規則                                                                          | 欠落・不正時                                    |
+| ------------------------------------------- | ---- | ----------------------------------------------------------------------------- | ----------------------------------------------- |
+| `os`                                        | 必須 | —                                                                             | 全 AC を数えない（`QA_ENVIRONMENT_INCOMPLETE`） |
+| `runtimes`                                  | 任意 | 使った処理系と版（例: `node` の版）。実行環境の差を後から追えるよう記録を推奨 | —                                               |
+| `browser`、`viewport`、`locale`、`timezone` | 任意 | E2E では記録を推奨                                                            | —                                               |
 
 ### 3.4 verification
 
 確定した AC 1 件につき、結果を 1 件だけ持つ。
 
-| 項目         | 必須                                                                    | 規則                                                                                                 | 欠落・不正時                                                                      |
-| ------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `acId`       | 必須                                                                    | §4 の id 規則                                                                                        | 全体を拒否（`QA_VERIFICATION_AC_UNKNOWN`、`QA_VERIFICATION_AC_DUPLICATE`）        |
-| `status`     | 必須                                                                    | `PASS` / `FAIL` / `SKIP` / `NOT_RUN`。試行があるときは、最後の試行の status と一致しなければならない | 全体を拒否（`QA_VERIFICATION_STATUS_INVALID`、`QA_VERIFICATION_STATUS_MISMATCH`） |
-| `basis`      | 必須                                                                    | `verified`（assertion 付きの検証）または `explore`（観測のみ）。1 件の結果に 1 つ                    | 数えない（`QA_VERIFICATION_BASIS_MISSING`）                                       |
-| `attempts[]` | `PASS` / `FAIL` のとき必須（1 件以上）。`SKIP` / `NOT_RUN` では空でよい | すべての試行（下表）                                                                                 | 数えない（`QA_VERIFICATION_ATTEMPTS_EMPTY`）                                      |
+| 項目           | 必須                                                                    | 規則                                                                                                                                                                      | 欠落・不正時                                                                      |
+| -------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `acId`         | 必須                                                                    | §4 の id 規則                                                                                                                                                             | 全体を拒否（`QA_VERIFICATION_AC_UNKNOWN`、`QA_VERIFICATION_AC_DUPLICATE`）        |
+| `status`       | 必須                                                                    | `PASS` / `FAIL` / `SKIP` / `NOT_RUN`。試行があるときは、最後の試行の status と一致しなければならない                                                                      | 全体を拒否（`QA_VERIFICATION_STATUS_INVALID`、`QA_VERIFICATION_STATUS_MISMATCH`） |
+| `basis`        | 必須                                                                    | `verified`（assertion 付きの検証）または `explore`（観測のみ）。1 件の結果に 1 つ                                                                                         | 数えない（`QA_VERIFICATION_BASIS_MISSING`）                                       |
+| `attempts[]`   | `PASS` / `FAIL` のとき必須（1 件以上）。`SKIP` / `NOT_RUN` では空でよい | すべての試行（下表）                                                                                                                                                      | 数えない（`QA_VERIFICATION_ATTEMPTS_EMPTY`）                                      |
+| `notRunReason` | `SKIP` / `NOT_RUN` のとき必須                                           | 確定しなかった理由。`criteria-ambiguous`（条件が曖昧）/ `environment-unavailable`（環境が無い）/ `out-of-scope`（許可範囲外）/ `execution-failed`（実行したが確定しない） | 理由を記録できない（`QA_VERIFICATION_REASON_MISSING`。AC はもともと数えない）     |
 
 各試行は次の欄を持つ。
 
-| 項目         | 規則                                                                                         | 欠落・不正時                                                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `startedAt`  | ISO 8601。比較は解析した時刻（epoch ミリ秒）で行う。配列は厳密な昇順とし、同じ時刻は認めない | 解析できない値は全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）。順序の逆転・同時刻は全体を拒否（`QA_VERIFICATION_ATTEMPTS_UNORDERED`） |
-| `status`     | `PASS` / `FAIL` だけ                                                                         | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                         |
-| `logRef`     | §3.5 の artifact の id                                                                       | 存在しない id は全体を拒否（`QA_ARTIFACT_REF_UNKNOWN`）                                                                                 |
-| `assertions` | `total` と `passed` の 0 以上の整数。`passed ≤ total`                                        | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                         |
+| 項目             | 規則                                                                                                                      | 欠落・不正時                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `startedAt`      | ISO 8601。比較は解析した時刻（epoch ミリ秒）で行う。配列は厳密な昇順とし、同じ時刻は認めない                              | 解析できない値は全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）。順序の逆転・同時刻は全体を拒否（`QA_VERIFICATION_ATTEMPTS_UNORDERED`） |
+| `status`         | `PASS` / `FAIL` だけ                                                                                                      | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                         |
+| `logRef`         | §3.5 の artifact の id                                                                                                    | 存在しない id は全体を拒否（`QA_ARTIFACT_REF_UNKNOWN`）                                                                                 |
+| `assertions`     | `total` と `passed` の 0 以上の整数。`passed ≤ total`                                                                     | 全体を拒否（`QA_VERIFICATION_ATTEMPT_INVALID`）                                                                                         |
+| `command`        | 実行したコマンド（引数を含む）。出力・保存の前に redaction を通す（§7）                                                   | 該当 AC を数えない（`QA_EXECUTION_COMMAND_MISSING`）                                                                                    |
+| `exitCode`       | 0〜255 の整数。取得経路が確かでない値（パイプ越しなど）は `null`                                                          | `null` なら該当 AC を数えない（`QA_EXECUTION_EXIT_CODE_UNKNOWN`）。整数でない値・範囲外は全体を拒否（`QA_EVIDENCE_MALFORMED`）          |
+| `exitCodeSource` | `exitCode` を取った経路（例: ラッパーで数値を取った、runner の結果ファイルから読んだ）。`exitCode` が `null` のときは理由 | —                                                                                                                                       |
+
+試行の `status` と `exitCode` が食い違う場合（`exitCode` が 0 以外なのに `PASS`、0 なのに `FAIL`）は、該当 AC を数えない（`QA_EXECUTION_EXIT_CODE_MISMATCH`）。
+teardown やカバレッジの閾値など、判定と無関係な理由で終了コードだけが 0 以外になる運用があるため、証拠全体は拒否しない。
 
 - 結果全体の `assertions`・`flaky` などの自己申告は schema に置かない。flaky は River Review が `attempts` から判定する（§5 条件 3）
 - `assertions` も利用者の自己申告であり、将来 host 経路が加わっても、それだけでは信頼の根拠にならない
 
 ### 3.5 artifacts
 
-| 項目                 | 必須 | 規則                                                                                                          | 欠落・不正時                                                                                                                             |
-| -------------------- | ---- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `refs[].id`          | 必須 | §4 と同じ id の文字種・最大長。証拠内で一意                                                                   | 全体を拒否（`QA_ARTIFACT_ID_INVALID`）                                                                                                   |
-| `refs[].path`        | 必須 | リポジトリ内の相対パス（下記の読み取り規則）。URL は受け付けない（River Review はネットワークから取得しない） | 全体を拒否（`QA_ARTIFACT_PATH_REJECTED`）                                                                                                |
-| `refs[].sha256`      | 必須 | 64 桁の hex。小文字に正規化して比較する                                                                       | 参照する AC を数えない（`QA_ARTIFACT_HASH_MISMATCH`。ファイルが無ければ `QA_ARTIFACT_UNRESOLVED`、上限超過なら `QA_ARTIFACT_TOO_LARGE`） |
-| `refs[].sensitivity` | 任意 | `restricted` / `public`。欠落時は `restricted`                                                                | —                                                                                                                                        |
-| `reproduction`       | 任意 | 再実行の手順。出力・保存の前に redaction を通す                                                               | —                                                                                                                                        |
+| 項目                 | 必須 | 規則                                                                                                         | 欠落・不正時                                                                                                                             |
+| -------------------- | ---- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `refs[].id`          | 必須 | §4 と同じ id の文字種・最大長。証拠内で一意                                                                  | 全体を拒否（`QA_ARTIFACT_ID_INVALID`）                                                                                                   |
+| `refs[].root`        | 必須 | `repository`（対象リポジトリ）または `artifacts`（host が渡す artifact ディレクトリ）                        | 全体を拒否（`QA_ARTIFACT_PATH_REJECTED`）                                                                                                |
+| `refs[].path`        | 必須 | `root` からの相対パス（下記の読み取り規則）。URL は受け付けない（River Review はネットワークから取得しない） | 全体を拒否（`QA_ARTIFACT_PATH_REJECTED`）                                                                                                |
+| `refs[].sha256`      | 必須 | 64 桁の hex。小文字に正規化して比較する                                                                      | 参照する AC を数えない（`QA_ARTIFACT_HASH_MISMATCH`。ファイルが無ければ `QA_ARTIFACT_UNRESOLVED`、上限超過なら `QA_ARTIFACT_TOO_LARGE`） |
+| `refs[].sensitivity` | 任意 | `restricted` / `public`。欠落時は `restricted`                                                               | —                                                                                                                                        |
+| `reproduction`       | 任意 | 再実行の手順。出力・保存の前に redaction を通す                                                              | —                                                                                                                                        |
 
-読み取り規則（hash を計算するときに River Review が守る）:
+CI のログや trace は、CI の artifact ストアや作業ツリーの外に置かれることが多い。
+そのため、対象リポジトリのほかに、host が明示的に渡したディレクトリを 2 つ目のルート（`artifacts`）として認める。
+host が渡していない場合、`root: artifacts` の参照は `QA_ARTIFACT_UNRESOLVED` とする。
+
+読み取り規則（hash を計算するときに River Review が守る。どちらのルートにも同じ規則を適用する）:
 
 - パスは NFC に正規化し、絶対パス・`..` を含むパスは拒否する
-- パスのすべての成分を実体まで解決し、リポジトリの中に収まることを確かめる。途中の成分を含め、symlink は拒否する
+- パスのすべての成分を実体まで解決し、指定したルートの中に収まることを確かめる。途中の成分を含め、symlink は拒否する
 - `.git/` 配下と、既存の除外規則（`src/lib/repo-context.mjs:82` が使う `shouldExcludeForContext`）に当たるパスは、読む前に拒否する。除外規則は再実装せず import する
 - 通常ファイルだけを読む。FIFO・デバイス・ディレクトリは拒否する。ハードリンク（リンク数 2 以上）も拒否する
 - 開いたファイル記述子から種類とリンク数を確かめ、同じ記述子から hash を計算する（検査と読み取りの間の差し替えを防ぐ）
@@ -171,18 +181,20 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 2. `basis` が `verified`（`QA_VERIFICATION_EXPLORE_ONLY`）で、すべての試行の `assertions` が `total ≥ 1` かつ `passed = total`（`QA_VERIFICATION_ASSERTIONS_MISSING`）
 3. すべての試行が `PASS`。途中に `FAIL` がある AC は flaky とし、数えない（`QA_VERIFICATION_FLAKY`）
 4. すべての試行の `logRef` が解決でき、hash が一致する（§3.5）。hash の一致は改変が無いことだけを示し、ログの内容が正しいことは示さない。ログの内容の検証は本契約の範囲外とする
-5. `target.subjectRevision` が、River Review が観測した HEAD と一致し、追跡中のファイルに未コミットの変更が無い（既存の `dirty` の判定を使う。`src/lib/result-store.mjs:74-78`）。HEAD の不一致は stale（`QA_TARGET_REVISION_STALE`）。HEAD を取得できない、または `dirty` が `true` か不明なら `QA_TARGET_REVISION_UNOBSERVED`
-6. 期待値の出所が `sourced` または `reproduced` で、`sourceRef` が解決でき hash が一致する（`QA_TARGET_EXPECTED_DERIVED`）
+5. `target.subjectRevision` が、River Review が観測した HEAD と一致し、追跡中のファイルに未コミットの変更が無い（既存の `dirty` の判定を使う。`src/lib/result-store.mjs:74-78`）。HEAD の不一致は stale（`QA_TARGET_REVISION_STALE`）。HEAD を取得できない、または `dirty` が `true` か不明なら `QA_TARGET_REVISION_UNOBSERVED`。`dirty` は River Review が監査する時点で判定する。依存の導入やスナップショットの更新で追跡中のファイルが変わると `dirty` になるため、変わったファイルの一覧を監査結果の Gaps に残す。利用者には、追跡中のファイルを変えない手順で証拠を作るよう、利用者向けガイドで案内する
+6. 期待値の出所が `sourced` で、`sourceRef` が解決でき hash が一致し、その出所が変更前から在る（§4.1 と同じく、host が head とは別に用意した版にある）。`derived` は `QA_TARGET_EXPECTED_DERIVED`、`reproduced` は `QA_TARGET_EXPECTED_REPRODUCED`、出所が head 側にしか無い場合は `QA_TARGET_EXPECTED_SOURCE_UNTRUSTED`
 7. §3 の実行全体に関わる必須欄がそろい、証拠の `expected.value` が確定した AC 一覧の期待結果と一致する（`QA_TARGET_EXPECTED_MISMATCH`）。比較は redaction の前の値で行う
 8. 独立性が `unknown` ではない（`QA_INDEPENDENCE_UNKNOWN`）。初版では、この条件を満たす経路が無い（§9）
 
 期待値の出所は 3 区分とする。
 
-| 区分         | 意味                                 | verified に数えるか                                 |
-| ------------ | ------------------------------------ | --------------------------------------------------- |
-| `sourced`    | 要求・仕様など、出所が示された期待値 | 数える（`sourceRef` の検証が必要）                  |
-| `reproduced` | 主張された挙動を再現して得た期待値   | 数える（再現の根拠となる `sourceRef` の検証が必要） |
-| `derived`    | 検証する側が導いた期待値             | 数えない（参考結果）                                |
+| 区分         | 意味                                               | verified に数えるか                                                                    |
+| ------------ | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `sourced`    | 要求・仕様など、変更前から在る出所が示された期待値 | 数える（`sourceRef` が信頼できる版にあることの検証が必要）                             |
+| `reproduced` | 主張された挙動を再現して得た期待値                 | 数えない（参考結果。「主張どおり動いた」ことしか示さず、要件を満たした根拠にならない） |
+| `derived`    | 検証する側が導いた期待値                           | 数えない（参考結果）                                                                   |
+
+`sourced` でも、変更自身が加えた文書（head 側にしか無い出所）から取った期待値は、要件を満たした根拠にならないので数えない。
 
 テストの方針:
 
@@ -279,7 +291,7 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 将来、独立性の host 経路を加えるときは、その前に次をすべて解消する。
 
 - 確定した AC 一覧を head 側から読む限り、PR の作成者が母集団を書き換えられる（§4.1）
-- artifact は作業ツリーから読むため、対象 revision に結び付かない（§3.5）
+- artifact は作業ツリーや host が渡すディレクトリから読むため、対象 revision に結び付かない。どちらのルートも利用者が中身を決められる（§3.5）
 - HEAD は利用者が任意に決められる（§5 条件 5）
 - `assertions`・試行の記録・期待値の出所は自己申告である（§3.4、§5）。試行を省いた証拠は見分けられない
 
@@ -306,13 +318,15 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 | `QA_TARGET_EXPECTED_SOURCE_MISSING`    | 数えない              | 3.1      |
 | `QA_TARGET_EXPECTED_SOURCE_UNRESOLVED` | 数えない              | 3.1      |
 | `QA_TARGET_EXPECTED_DERIVED`           | 数えない              | 5        |
+| `QA_TARGET_EXPECTED_REPRODUCED`        | 数えない              | 5        |
+| `QA_TARGET_EXPECTED_SOURCE_UNTRUSTED`  | 数えない              | 5        |
 | `QA_TARGET_EXPECTED_MISMATCH`          | 数えない              | 5        |
 | `QA_TARGET_REVISION_STALE`             | 数えない              | 5        |
 | `QA_TARGET_REVISION_UNOBSERVED`        | 数えない              | 5        |
 | `QA_EXECUTION_RUNNER_MISSING`          | 全 AC を数えない      | 3.2      |
-| `QA_EXECUTION_COMMAND_MISSING`         | 全 AC を数えない      | 3.2      |
-| `QA_EXECUTION_EXIT_CODE_UNKNOWN`       | 全 AC を数えない      | 3.2      |
-| `QA_EXECUTION_EXIT_CODE_MISMATCH`      | 全体を拒否            | 3.2      |
+| `QA_EXECUTION_COMMAND_MISSING`         | 数えない              | 3.4      |
+| `QA_EXECUTION_EXIT_CODE_UNKNOWN`       | 数えない              | 3.4      |
+| `QA_EXECUTION_EXIT_CODE_MISMATCH`      | 数えない              | 3.4      |
 | `QA_ENVIRONMENT_INCOMPLETE`            | 全 AC を数えない      | 3.3      |
 | `QA_VERIFICATION_AC_UNKNOWN`           | 全体を拒否            | 3.4、4.3 |
 | `QA_VERIFICATION_AC_DUPLICATE`         | 全体を拒否            | 3.4      |
@@ -321,6 +335,7 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 | `QA_VERIFICATION_STATUS_MISMATCH`      | 全体を拒否            | 3.4      |
 | `QA_VERIFICATION_BASIS_MISSING`        | 数えない              | 3.4      |
 | `QA_VERIFICATION_ATTEMPTS_EMPTY`       | 数えない              | 3.4      |
+| `QA_VERIFICATION_REASON_MISSING`       | 記録のみ              | 3.4      |
 | `QA_VERIFICATION_ATTEMPTS_UNORDERED`   | 全体を拒否            | 3.4      |
 | `QA_VERIFICATION_ATTEMPT_INVALID`      | 全体を拒否            | 3.4      |
 | `QA_VERIFICATION_NOT_PASS`             | 数えない              | 5        |

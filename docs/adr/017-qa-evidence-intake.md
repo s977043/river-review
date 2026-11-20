@@ -143,7 +143,7 @@ AC 別の実行事実（PASS / FAIL / SKIP / NOT_RUN、初回結果と retry）
 ```
 
 - 観測しただけの AC（explore）は、検証済みにしない
-- 期待値の出所は 3 つに分ける: 出所が示されたもの、主張を再現したもの、検証する側が導いたもの。検証する側が導いた期待値による結果は参考結果であり、要件を満たした PASS に数えない
+- 期待値の出所は 3 つに分ける: 出所が示されたもの、主張を再現したもの、検証する側が導いたもの。要件を満たした PASS に数えるのは、変更前から在る出所が示されたものだけとする。主張を再現した結果は「主張どおり動いた」ことしか示さないので、参考結果とする。検証する側が導いた期待値による結果も参考結果とする
 - テストが通ったことで、レビューの指摘を自動的に解消しない（ADR-011 の「finding が消えた ≠ 解決」と同じ考え方。`docs/adr/011-review-resolution-loop.md:42`）
 - 監査の結果は observe（記録するだけで判定を強制しない）であり、Gate を上書きしない。Gate の入力は増やさない（ADR-013 D11 `:300-320`）
 
@@ -158,10 +158,11 @@ QA 証拠の JSON は、利用者が作る入力です。River Review はこれ�
 - `reviewer-independence` が保証するのは run ID の不一致だけである（`src/lib/reviewer-independence.mjs:59-62`）。証拠の中で利用者が自己申告した ID は、独立性の根拠にしない
 - host の情報が無い場合、独立性は `unknown` であり、その AC は verified に数えない（ADR-013 D6 `:180-213`）
 - 実行と監査が同じセッションで行われた場合も、独立性は `unknown`
-- 終了コードは数値で記録する。パイプ越しなど取得経路が確かでない値は、不明として扱う
+- 終了コードは試行ごとに数値で記録する。パイプ越しなど取得経路が確かでない値は、不明として扱う
+- ファイルの検査・hash の計算・git による観測は、host 側で動く決定論のモジュールが行い、skill と completion-judge はその結果を読むだけとする。Agent が要求できる能力は全 runtime の共通部分だけで、Codex は `run-command` を持たないため（`agents/contracts/adapter-map.json:10-14`）
 - 証拠はログの本文を持たず、参照と sha256 だけを持つ。River Review は artifact の本文を出力しない。trace やログの中の秘密情報を取り除くのは利用者の責務である
 - 証拠の中の文字列（コマンドの引数、再現手順など）は、既存の redaction を通した写しだけを出力・保存する
-- 参照されたファイルは、リポジトリ内の通常ファイルだけを読む。symlink、`.git/` 配下、既存の除外規則に当たるパスは読む前に拒否する
+- 参照されたファイルは、対象リポジトリと、host が明示的に渡した artifact ディレクトリの中の通常ファイルだけを読む。symlink、`.git/` 配下、既存の除外規則に当たるパスは読む前に拒否する
 - サイズ、深さ、件数、文字列長の上限を超えた入力は、fail-closed で拒否する
 
 確認した範囲（main `e78b5234`）では、利用者に偽造されない形で run と実行者を River Review に渡す既存の経路はありません（調査結果は `docs/development/qa-evidence-contract.md` §9）。
@@ -244,14 +245,14 @@ River Review は本文を取り込まず、参照と hash だけを扱います�
 実装は次の順に、PR を分けて進めます。各 PR は人間がマージします（ADR-016 の段階 1）。
 階層は ADR-016 の階層表（`:125-164`）による見込みで、PR ごとに確認します。
 
-| 手順 | 内容                                                                                                                          | 階層の見込み                                   |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 1    | 本 ADR と、入力契約の設計メモ（`docs/development/qa-evidence-contract.md`）                                                   | 崖（`docs/adr/**`）                            |
-| 2    | QA 証拠の schema と、`pages/reference/stable-interfaces.md`（ja / en）への Experimental 登録                                  | 崖（stable-interfaces）                        |
-| 3    | 合成の負例・正例 fixture と、決定論の検証モジュール                                                                           | 丘                                             |
-| 4    | completion-assessment への部分投影、QA 証拠を読む新しい skill と `inputContext` の拡張（planner 層の単体テストまで）、QA 計画 | 丘（`deterministicGate.command` に触れれば崖） |
-| 5    | 入力の配線、completion capability の実装、3 モードの Flow と GitHub Action への配布、条件 1・2 の CI 検証                     | 崖（`flows/**`、`agents/**`）                  |
-| 6    | 利用者向けガイドと、公開リポジトリ 1 件での試行（PoC: proof of concept）                                                      | 原っぱ・丘                                     |
+| 手順 | 内容                                                                                                                                                         | 階層の見込み                                                           |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| 1    | 本 ADR と、入力契約の設計メモ（`docs/development/qa-evidence-contract.md`）                                                                                  | 崖（`docs/adr/**`）                                                    |
+| 2    | QA 証拠の schema と、`pages/reference/stable-interfaces.md`（ja / en）への Experimental 登録                                                                 | 崖（stable-interfaces）                                                |
+| 3    | 合成の負例・正例 fixture と、決定論の検証モジュール                                                                                                          | 丘                                                                     |
+| 4    | completion-assessment への部分投影、QA 証拠を読む新しい skill と `inputContext` の拡張（planner 層の単体テストまで）、QA 計画                                | 丘（`deterministicGate.command` に触れれば崖）                         |
+| 5    | 入力の配線、completion capability の実装、3 モードの Flow と GitHub Action への配布、Claude Code と Codex の両プラグインへの配線と配布、条件 1・2 の CI 検証 | 崖（`flows/**`、`agents/**`、`.claude-plugin/**`、`.codex-plugin/**`） |
+| 6    | 利用者向けガイドと、公開リポジトリ 1 件での試行（PoC: proof of concept）                                                                                     | 原っぱ・丘                                                             |
 
 各段階で、Review Only の既存テストが変わらないことを確かめます。
 
@@ -260,6 +261,14 @@ River Review は本文を取り込まず、参照と hash だけを扱います�
 
 - QA 証拠が無いとき: 当該 skill は選ばれず、その理由は GitHub Action 経路の出力（review の成果物）に残る
 - QA 証拠があるとき: 当該 skill は選ばれる
+
+Claude Code と Codex の両方で使えるようにするため、手順 5 では次も行います。
+
+- Codex の入口は `skills/agent-skills/` だけで、agents や commands を持たない（`agents/contracts/adapter-map.json:10-14`）。共通の入口 skill から 3 モードへ接続する
+- プラグインの配布物は allowlist で決まり、runner・schemas・Flow・検証モジュールを含まない（`scripts/build-plugin-dist.mjs:29-56`）。検証モジュールとその依存をどう届けるかを決め、配布物の再生成と鮮度の検証に加える
+- QA 証拠を読む新しい skill が見つからない、または選ばれない場合でも、必須の検証と completion-judge の判定に到達する経路を持つ
+- completion-judge の入力を足すときは、`schemas/agent-contract.schema.json` の `inputKind`（閉じた enum、`:120-135`）も更新する
+- 両プラグインをインストールした状態で、QA 証拠の有無、差分 0 件、読み取りだけの環境の各場合に、同じ判定と理由が出ることを確かめる
 
 本 ADR を Accepted にするかは、§Status の 3 つがそろった時点で判断します。
 承認者が条件 1 または条件 2 の解釈を認めない場合は、ADR-004 の改訂を先に行います。
@@ -274,7 +283,7 @@ River Review は本文を取り込まず、参照と hash だけを扱います�
 
 ### Trade-offs
 
-- 利用者が証拠を公開契約の形で出力する手間が増える
+- 利用者が証拠を公開契約の形で出力する手間が増える。初版は verified が常に 0 なので、得られる価値（不足・stale・矛盾の指摘）がこの手間に見合わないおそれがある。必須欄の重さは手順 6 の PoC で手間を実測し、Experimental の範囲で見直す
 - 初版では独立性が常に `unknown` で、QA 証拠からは verified の AC が生まれない。得られるのは不足・矛盾・stale の指摘と残余リスクである
 - host が base 側の AC 一覧を渡す経路を配線するまでは、AC の母集団は信頼できず、件数の投影も行われない
 - 新しい公開 schema が 1 つ増え、Experimental から Stable へ昇格させる判断が後で必要になる
