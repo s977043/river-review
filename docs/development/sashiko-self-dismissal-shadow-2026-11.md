@@ -1,56 +1,101 @@
-# Sashiko-style Self-Dismissal Audit: shadow evaluation plan
+# Sashiko型の自己棄却監査：shadow評価計画
 
-> Status: **Proposal / shadow-only** (2026-11-22). No runtime wiring or change to Gate, Review Coverage, approval, merge authority, or QA execution.
->
-> Baseline: s977043/river-review main e78b523464992f3a37200e8974fa732d65638ebe. Recheck its head and open PRs before implementation or merge.
+> Status: Proposal / shadow-only（2026-11-22）。
+> 本番のReview Coverage・Gate・承認・マージ権限は変更しない。
+> 基準main: e78b523464992f3a37200e8974fa732d65638ebe。
+> 実行前とマージ前にHEADを再確認する。
 
-## Source and observed gap
+## 情報源と検証仮説
 
-Google's [Sashiko report](https://cloud.google.com/blog/products/application-development/lessons-from-building-sashiko-an-agentic-code-review-system) describes specialist reviews returning both proposed bugs and concerns they dismissed. Separate triage and verification can revisit the dismissed concerns. Production numbers from Linux are **not** acceptance criteria for River Review.
+- [Google Sashiko公式報告](https://cloud.google.com/blog/products/application-development/lessons-from-building-sashiko-an-agentic-code-review-system)
 
-River Review already has candidate finding deduplication in src/lib/reviewer-orchestrator.mjs, deterministic verification in src/lib/verifier.mjs, opt-in Finding Critic in src/lib/finding-critic-stage.mjs, and run-ID separation in src/lib/reviewer-independence.mjs. The state projection in src/lib/finding-evidence-state.mjs treats reviewer withdrawal as unresolved, not refuted. These are existing owners to reuse.
+Sashikoは専門レビューで発見した不具合候補だけでなく、担当者が棄却した懸念も別の検証へ送る。
+Linuxでの運用実績をRiver Reviewの性能保証とは扱わない。
 
-The remaining **hypothesis**, not a proven production defect, is that a reviewer may dismiss a concern before emitting a finding, so Finding Critic never observes it. No stable production source of such rejected concerns has yet been demonstrated.
+River ReviewにはFinding Criticがある。
+また、差分の検証と実行IDの分離、レビュー範囲の観測機能も存在する。
+それぞれの既存Ownerを再利用する。
 
-## Decision and scope
+今回の仮説は「候補がFindingになる前に自己棄却されると、既存Criticから見えない可能性がある」こと。
+本番で実際に発生しているかは未確認。
+この段階で製品の出力契約を新設しない。
 
-Implement an isolated offline evaluation of self-dismissal **recovery candidates**, not a new review runtime. The pure helper compares second-pass bug claims to human-frozen benchmark labels and returns structural audit candidates only. A claim never becomes an accepted finding or an input to severity, scoreReview, deriveVerdict, Review Coverage, completion status, or merge decisions.
+## 対応範囲
 
-The checks are deliberately weak and explicit: same subject revision, syntactically plausible path and line references, and logical run-ID separation using the existing helper. These do **not** prove cited source exists, bug correctness, model independence, or cryptographically trustworthy provenance. Every candidate still needs human evidence audit.
+オフラインの人間ラベル付き比較評価のみを実装する。
+対象はsrc/lib/self-dismissal-shadow-eval.mjsと専用テスト。
+真の不具合と誤警報を別々の分母で数える。
+評価結果はレビュー判定や品質ゲートへ渡さない。
 
-Cases require unique id, self-dismissed original disposition, human oracle (bug or not-bug), subject revision and finder run ID. Optional verification records a claim (bug, not-bug, unresolved), subject revision, verifier run ID and evidence references. Frozen oracle assignment occurs before evaluating candidate output. Malformed input and duplicate IDs fail loudly. Stale revision, missing citation, unknown run identity and missing or unresolved verifier result produce no audit candidate.
+入力には固有ID・自己棄却の事実・人間が確定した正解・対象revisionを含める。
+再検証側には実行ID・対象revision・候補判定・コード参照を含める。
+正解ラベルは再検証前に凍結することを前提とする。
 
-## Stages and stopping rules
+実装が検査するのはrevisionの一致と参照の形式である。
+さらに既存の実行ID分離ヘルパーを再利用する。
+どの検査も証拠の真正性やコード上の正しさを証明しない。
+構造チェックを通過した結果は「人間の証拠監査候補」としてのみ扱う。
 
-- **Stage 0 / baseline**: confirm main, #1978, #2212, #2455 and QA intake PR #2934; no conflicting owner.
-- **Stage 1 / offline evaluation**: pure helper, synthetic tests and this proposal. Targeted test and repository CI required. Absolutely no production-path import.
-- **Stage 2 / paired replay**: freeze historical human-labeled cases, run same-revision A/B comparison; measure bug recovery, false alarms, unresolved coverage, elapsed time, token usage and human review effort.
-- **Stage 3 / opt-in adapter**: evaluate a bounded source for dismissed concerns, reusing existing Finding Critic and deterministic verifier. Requires schema, skill, risk and rollback review first.
-- **Stage 4 / adoption**: opt-in only after demonstrating benefits without critical or major recall regression, false-clean, or unbounded cost.
+不正入力やID重複はエラーにする。
+古いrevision・参照不足・同一実行者・未実行・未解決は合格扱いしない。
+対象が0件なら率はnullとする。0件を完全レビューとはみなさない。
 
-Stop if an LLM claim is treated as confirmed, a stale or same-execution report counts as independently verified, unrun checks become clean, human labels are changed after evaluation, or any new merge/approval authority is proposed. Missing data is unknown, never success.
+## 段階導入
 
-## Five-perspective design review
+- **Stage 0**: #1978・#2212・#2455・PR #2934との責務境界を再確認。
+- **Stage 1**: 独立した評価ヘルパーと合成テストを追加。CI成功が必要。
+- **Stage 2**: 実PRから人間ラベル付きの過去ケースを凍結し、同一SHAで比較。
+- **Stage 3**: 実測に基づき既存Criticへのopt-in接続を別PRで検討。
+- **Stage 4**: 重大見逃しと誤検知が悪化せず、費用上限を守れる場合だけ導入判断。
 
-- **Security**: fabricated citations and run IDs can appear structurally valid. Human evidence audit is mandatory; no promotion or approval authority.
-- **Quality assurance**: a precision gain may hide critical misses. Freeze human oracles, report independent denominators, and retain negative controls.
-- **Architecture**: reuse existing Critic, reviewer-independence and Review Coverage owners; do not create a competing truth-state or Gate mechanism.
-- **Maintenance**: avoid runtime, registry, or schema changes while QA intake PR #2934 is under review.
-- **Operations / cost**: avoid new model calls until recall, false alarms, time, costs and human attention have been measured.
+Stage 2では再発見候補数・誤警報数・不明領域を記録する。
+さらに実行時間・トークン費用・人間確認負荷を記録する。
+Stage 2以降のデータが揃うまで自動検証を製品へ接続しない。
 
-This is a reasoned five-perspective assessment, **not five independently executed agent attestations**. It cannot replace an independent PR review.
+## 停止条件
 
-## Validation and human merge handoff
+- LLMの自己申告だけでFindingを確定する場合。
+- 根拠のない実行IDや古いrevisionが独立検証として通過する場合。
+- 検証未実行をcleanと分類する場合。
+- 評価結果を見てから人間の正解ラベルを書き換える場合。
+- Gate・承認・QA実行の責務を追加する場合。
 
-Run targeted Node tests, npm run lint, npm test, and applicable npm run meta:validate on the actual PR head; CI is the authoritative full-tree check. Inspect the diff for production imports, new schemas, leaked secrets, inconsistent records, and weakened guardrails. Review both PR comment channels, current HEAD, and all eight required GitHub checks.
+停止時には入力と未解決事項を記録する。
+成功扱いへ暗黙に変換しない。
 
-ADR-016 stage 1 forbids **agent merge of any tier**. Only a human maintainer may merge after confirming complete checks, no blocked label, review findings resolved, and no stale approvals. Do not enable auto-merge or alter branch protection.
+## 5観点による設計レビュー
 
-## Related work
+- **セキュリティ**: コード引用と実行IDは偽造できる。人間の証拠監査を必須とする。
+- **品質保証**: 誤検知の減少だけを成果としない。重大な見逃しの変化も測る。
+- **アーキテクチャ**: 既存Finding Criticを再利用する。判定状態機械を増やさない。
+- **保守性**: PR #2934のQA入力契約とは別に扱う。本番の配線を変更しない。
+- **運用コスト**: 初期段階ではLLMを追加実行しない。実測後に予算を判断する。
 
-- #1978 — Evidence-Grounded Adversarial Review and Finding Critic
-- #2212 — Review Coverage
-- #2455 — Review Concern evaluation
-- #1857 — Semantic Precision
-- PR #2934 — Proposed QA evidence intake
-- PR #2881 — Verification-First proposal
+このレビューは設計観点の自己点検である。
+独立した5エージェントの実行証跡ではない。
+マージ前の独立レビューを置き換えない。
+
+## 検証とマージ条件
+
+対象PRのHEADで次の検証を行う。
+
+- node --test tests/self-dismissal-shadow-eval.test.mjs
+- npm run lint
+- npm test
+- npm run meta:validate
+
+必須CI・最新HEAD・PRの両コメント経路・blocking labelを確認する。
+独立レビューの重大指摘が残る場合はマージしない。
+
+ADR-016段階1ではエージェントによるマージは禁止されている。
+人間が最終マージを実施する。
+auto-mergeも有効にしない。
+
+## 関連IssueとPR
+
+- #1978: Finding Critic
+- #2212: Review Coverage
+- #2455: Review Concern
+- #1857: Semantic Precision
+- PR #2934: QA Evidence Intake
+- PR #2881: Verification-First

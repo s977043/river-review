@@ -54,7 +54,9 @@ export function evaluateSelfDismissalShadow(input = {}) {
     if (seen.has(entry.id)) throw new TypeError('duplicate case id: ' + entry.id);
     seen.add(entry.id);
     if (entry.initialDisposition !== 'dismissed' || !TRUTH.has(entry.oracle)) {
-      throw new TypeError('case ' + entry.id + ': expected a self-dismissal and frozen human oracle');
+      throw new TypeError(
+        'case ' + entry.id + ': expected a self-dismissal and frozen human oracle'
+      );
     }
 
     const check = evaluateReviewerIndependence({
