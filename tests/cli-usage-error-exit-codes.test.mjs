@@ -252,7 +252,12 @@ const CONTRACTS = {
 // #2626 で 3 フラグと `--estimate` の併用を拒否し、C3 が 178 -> 179 になった。
 // BEFORE は workdir の検証で exit 2（ファイルが揃っていれば exit 0 で見積りだけ出る）、
 // AFTER は parse 層の usage error で exit 1（実測）。
-const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 179, C4: 1 };
+// ADR-017 T10 で QA 証拠の 3 フラグ（`--qa-evidence` / `--qa-artifacts` /
+// `--qa-audit-output`）を新設し、片方だけの指定 3 形・値欠落 2 形・`doctor` 1 形を
+// 追加して C3 が 179 -> 185 になった。BEFORE ではいずれも
+// `Error: unknown option --qa-....` の exit 1 で、exit code は動いていない。受理形は
+// VALID_CASES 側へ 2 行（通常の語順 / フラグ先行語順）pin した（103 -> 105）。
+const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 185, C4: 1 };
 
 /** 一時 repo 配下の「存在しないパス」に実行時に差し替えるプレースホルダ。 */
 const NONEXISTENT_PATH = '<nonexistent-path>';
@@ -367,6 +372,34 @@ const CASES = [
       '--plan-feedback-task',
       'TASK-0001',
     ],
+    contract: 'C3',
+  },
+  // ADR-017 T10: QA 証拠の 3 フラグは `run` だけが読み、`--qa-evidence` と
+  // `--qa-audit-output` は揃えて渡す。`--qa-artifacts` は `--qa-evidence` と一緒に限る。
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--qa-evidence', 'e.json'],
+    contract: 'C3',
+  },
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--qa-audit-output', 'a.json'],
+    contract: 'C3',
+  },
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--qa-artifacts', 'd'],
+    contract: 'C3',
+  },
+  { surface: 'run', kind: 'value-missing', argv: ['run', '.', '--qa-evidence'], contract: 'C3' },
+  { surface: 'run', kind: 'value-missing', argv: ['run', '.', '--qa-artifacts'], contract: 'C3' },
+  {
+    surface: 'doctor',
+    kind: 'unknown-option',
+    argv: ['doctor', '.', '--qa-evidence', 'e.json', '--qa-audit-output', 'a.json'],
     contract: 'C3',
   },
 
@@ -1817,11 +1850,11 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // テーブルそのものの健全性（転記ミス・重複の検出）
   // ---------------------------------------------------------------------------
 
-  test('the matrix pins 180 usage-error cases and every row is unique', () => {
+  test('the matrix pins 186 usage-error cases and every row is unique', () => {
     assert.equal(
       CASES.length,
-      180,
-      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）+ PR #2621 の plan-feedback 不正形 4 件（exit code は動いていない）+ #2626 の plan-feedback と --estimate の併用 1 件（exit 2 -> 1）'
+      186,
+      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）+ PR #2621 の plan-feedback 不正形 4 件（exit code は動いていない）+ #2626 の plan-feedback と --estimate の併用 1 件（exit 2 -> 1）+ ADR-017 T10 の QA 証拠フラグ 6 件（exit code は動いていない）'
     );
     const keys = new Set(CASES.map(caseKey));
     assert.equal(keys.size, CASES.length, '同一 (surface, kind, argv) の行が重複している');
@@ -1848,11 +1881,11 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // 「フラグ先行形を拒否」も v1.72.1 の「`--phase Upstream` を誤拒否」も
   // 壊したのは**成功側**であり、守りが薄いのは逆だった。行を消すだけで
   // 黙って保護が減るのを防ぐ。
-  test('the success-side table pins 103 legitimate argv forms', () => {
+  test('the success-side table pins 105 legitimate argv forms', () => {
     assert.equal(
       VALID_CASES.length,
-      103,
-      'コマンド面ごとの正常形: run 16 (#1759 C3 で --context 未知語彙 1行追加、#2065 で run --base main を1行追加、PR #2621 で plan-feedback の両語順 2行追加) / doctor 5 / skills 16 (#2051 で skills --base main を1行追加、#2081 で後置サブコマンド 1行と ./import 明示パス 1行追加) / runs 7 (#1759 B2 で1行追加) / review 23 (#2046 で review plan --base を1行追加、#2065 で review exec --base を1行追加、#2054 PR-3 で review plan --entry を1行追加、#2011 AC7 P2 で review exec --entry を1行追加) / eval 2 / feedback 2 / suppression 8 (#2401 で --skill の両語順 2行追加) / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
+      105,
+      'コマンド面ごとの正常形: run 18 (#1759 C3 で --context 未知語彙 1行追加、#2065 で run --base main を1行追加、PR #2621 で plan-feedback の両語順 2行追加、ADR-017 T10 で QA 証拠フラグの両語順 2行追加) / doctor 5 / skills 16 (#2051 で skills --base main を1行追加、#2081 で後置サブコマンド 1行と ./import 明示パス 1行追加) / runs 7 (#1759 B2 で1行追加) / review 23 (#2046 で review plan --base を1行追加、#2065 で review exec --base を1行追加、#2054 PR-3 で review plan --entry を1行追加、#2011 AC7 P2 で review exec --entry を1行追加) / eval 2 / feedback 2 / suppression 8 (#2401 で --skill の両語順 2行追加) / promote 6 / evolve 15 (#1759 C4 で --month 2026-01 / 2026-12 の境界値 2行追加、#1759 B1 で aggregate/--min 2 の両語順 2行追加、#1880 で prompt-ab の両語順 2行追加) / help 2 / コマンド無し 1'
     );
   });
 
@@ -2043,6 +2076,25 @@ const VALID_CASES = [
       'run',
       '.',
     ],
+    command: 'run',
+    target: '.',
+  },
+  // ADR-017 T10: QA 証拠の 3 フラグを揃えた形（両語順）。
+  {
+    argv: [
+      'run',
+      '.',
+      '--qa-evidence',
+      'e.json',
+      '--qa-artifacts',
+      'd',
+      '--qa-audit-output',
+      'a.json',
+    ],
+    command: 'run',
+  },
+  {
+    argv: ['--qa-evidence', 'e.json', '--qa-audit-output', 'a.json', 'run', '.'],
     command: 'run',
     target: '.',
   },

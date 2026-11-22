@@ -254,6 +254,13 @@ export const OPTION_SAMPLES = {
       'task-dir',
     ],
   },
+  // ADR-017 T10: `--qa-evidence` and `--qa-audit-output` are accepted only together.
+  '--qa-evidence': { value: ['evidence.json'], pre: ['--qa-audit-output', 'audit.json'] },
+  '--qa-artifacts': {
+    value: ['qa-artifacts'],
+    pre: ['--qa-evidence', 'evidence.json', '--qa-audit-output', 'audit.json'],
+  },
+  '--qa-audit-output': { value: ['audit.json'], pre: ['--qa-evidence', 'evidence.json'] },
 };
 
 /**

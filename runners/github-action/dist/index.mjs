@@ -12466,6 +12466,13 @@ module.exports = function(str) {
 
 /***/ }),
 
+/***/ 7247:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports = __nccwpck_require__.p + "7b3d7adc22124578235f.json";
+
+/***/ }),
+
 /***/ 9896:
 /***/ ((module) => {
 
@@ -51891,6 +51898,17 @@ function consumeOption(parsed, arg, args) {
     if (arg === '--plan-feedback') parsed.planFeedbackFile = value;
     else if (arg === '--plan-feedback-workdir') parsed.planFeedbackWorkdir = value;
     else parsed.planFeedbackTask = value;
+    return 'continue';
+  }
+  if (arg === '--qa-evidence' || arg === '--qa-artifacts' || arg === '--qa-audit-output') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: ' + arg + ' option requires a path.');
+      return 'break';
+    }
+    if (arg === '--qa-evidence') parsed.qaEvidenceFile = value;
+    else if (arg === '--qa-artifacts') parsed.qaArtifactsDir = value;
+    else parsed.qaAuditOutput = value;
     return 'continue';
   }
   if (arg === '--format') {
@@ -115225,6 +115243,1001 @@ Dependencies: ${
   return 0;
 }
 
+// EXTERNAL MODULE: ./src/lib/promotion-candidates.mjs
+var promotion_candidates = __nccwpck_require__(3077);
+;// CONCATENATED MODULE: ./src/lib/qa-evidence.mjs
+// Deterministic validator for QA evidence (ADR-017 D3 / D5).
+//
+// The SSoT for every rule here is docs/development/qa-evidence-contract.md; section numbers in
+// comments (§N) point there. Stages follow §7: stage 0 settles the AC population from host input
+// only, stages 1-4 decide whether the evidence is accepted at all, and stage 5 judges each AC.
+//
+// The judging functions are pure. File access is confined to `resolveQaArtifacts` (§3.5).
+// Independence is an injected argument; the production entry point `auditQaEvidence` always
+// passes `unknown`, so no AC is verified in the first version (§5 condition 8, §9).
+
+
+
+
+
+
+
+
+
+
+
+
+const QA_EVIDENCE_LIMITS = Object.freeze({
+  evidenceBytes: 1_048_576,
+  depth: 16,
+  artifactBytes: 104_857_600,
+  artifactTotalBytes: 536_870_912,
+});
+
+const PRODUCTION_INDEPENDENCE = 'unknown';
+
+// §12, in table order. `reject` = 全体を拒否, `uncount-all` = 全 AC を数えない,
+// `uncount` = 数えない, `record` = 記録のみ.
+const QA_REASON_CODES = Object.freeze({
+  QA_TARGET_REPOSITORY_INVALID: 'reject',
+  QA_TARGET_REVISION_INVALID: 'reject',
+  QA_TARGET_AC_EMPTY: 'reject',
+  QA_TARGET_AC_ID_INVALID: 'reject',
+  QA_TARGET_AC_ID_DUPLICATE: 'reject',
+  QA_TARGET_AC_MISSING: 'reject',
+  QA_TARGET_AC_UNKNOWN: 'reject',
+  QA_TARGET_EXPECTED_MISSING: 'uncount',
+  QA_TARGET_EXPECTED_SOURCE_MISSING: 'uncount',
+  QA_TARGET_EXPECTED_SOURCE_UNRESOLVED: 'uncount',
+  QA_TARGET_EXPECTED_DERIVED: 'uncount',
+  QA_TARGET_EXPECTED_REPRODUCED: 'uncount',
+  QA_TARGET_EXPECTED_SOURCE_UNTRUSTED: 'uncount',
+  QA_TARGET_EXPECTED_MISMATCH: 'uncount',
+  QA_TARGET_REVISION_STALE: 'uncount',
+  QA_TARGET_REVISION_UNOBSERVED: 'uncount',
+  QA_EXECUTION_RUNNER_MISSING: 'uncount-all',
+  QA_EXECUTION_COMMAND_MISSING: 'uncount',
+  QA_EXECUTION_EXIT_CODE_UNKNOWN: 'uncount',
+  QA_EXECUTION_EXIT_CODE_MISMATCH: 'uncount',
+  QA_ENVIRONMENT_INCOMPLETE: 'uncount-all',
+  QA_VERIFICATION_AC_UNKNOWN: 'reject',
+  QA_VERIFICATION_AC_DUPLICATE: 'reject',
+  QA_VERIFICATION_AC_MISSING: 'uncount',
+  QA_VERIFICATION_STATUS_INVALID: 'reject',
+  QA_VERIFICATION_STATUS_MISMATCH: 'reject',
+  QA_VERIFICATION_BASIS_MISSING: 'uncount',
+  QA_VERIFICATION_ATTEMPTS_EMPTY: 'uncount',
+  QA_VERIFICATION_REASON_MISSING: 'record',
+  QA_VERIFICATION_ATTEMPTS_UNORDERED: 'reject',
+  QA_VERIFICATION_ATTEMPT_INVALID: 'reject',
+  QA_VERIFICATION_SUBCASE_ID_INVALID: 'reject',
+  QA_VERIFICATION_SUBCASE_STATUS_MISMATCH: 'reject',
+  QA_CONTROL_MISSING: 'record',
+  QA_CONTROL_PASSED: 'record',
+  QA_CONTROL_SAME_REVISION: 'record',
+  QA_CONTROL_LOG_UNRESOLVED: 'record',
+  QA_VERIFICATION_NOT_PASS: 'uncount',
+  QA_VERIFICATION_EXPLORE_ONLY: 'uncount',
+  QA_VERIFICATION_ASSERTIONS_MISSING: 'uncount',
+  QA_VERIFICATION_FLAKY: 'uncount',
+  QA_ARTIFACT_ID_INVALID: 'reject',
+  QA_ARTIFACT_REF_UNKNOWN: 'reject',
+  QA_ARTIFACT_PATH_REJECTED: 'reject',
+  QA_ARTIFACT_HASH_MISMATCH: 'uncount',
+  QA_ARTIFACT_UNRESOLVED: 'uncount',
+  QA_ARTIFACT_TOO_LARGE: 'uncount',
+  QA_AC_POPULATION_UNKNOWN: 'uncount-all',
+  QA_INDEPENDENCE_UNKNOWN: 'uncount',
+  QA_EVIDENCE_MALFORMED: 'reject',
+  QA_EVIDENCE_TOO_LARGE: 'reject',
+  QA_EVIDENCE_REDACTION_FAILED: 'reject',
+});
+
+// Order of an AC's reasonCodes: stage 0, then §5 conditions 1-8. Field-level codes of §3 sit
+// with the condition they defeat.
+const AC_REASON_ORDER = Object.freeze([
+  'QA_AC_POPULATION_UNKNOWN',
+  // 1
+  'QA_VERIFICATION_AC_MISSING',
+  'QA_VERIFICATION_NOT_PASS',
+  // 2
+  'QA_VERIFICATION_BASIS_MISSING',
+  'QA_VERIFICATION_EXPLORE_ONLY',
+  'QA_VERIFICATION_ATTEMPTS_EMPTY',
+  'QA_VERIFICATION_ASSERTIONS_MISSING',
+  // 3
+  'QA_VERIFICATION_FLAKY',
+  // 4
+  'QA_ARTIFACT_UNRESOLVED',
+  'QA_ARTIFACT_HASH_MISMATCH',
+  'QA_ARTIFACT_TOO_LARGE',
+  'QA_EXECUTION_COMMAND_MISSING',
+  'QA_EXECUTION_EXIT_CODE_UNKNOWN',
+  'QA_EXECUTION_EXIT_CODE_MISMATCH',
+  // 5
+  'QA_TARGET_REVISION_STALE',
+  'QA_TARGET_REVISION_UNOBSERVED',
+  // 6
+  'QA_TARGET_EXPECTED_SOURCE_MISSING',
+  'QA_TARGET_EXPECTED_SOURCE_UNRESOLVED',
+  'QA_TARGET_EXPECTED_DERIVED',
+  'QA_TARGET_EXPECTED_REPRODUCED',
+  'QA_TARGET_EXPECTED_SOURCE_UNTRUSTED',
+  // 7
+  'QA_EXECUTION_RUNNER_MISSING',
+  'QA_ENVIRONMENT_INCOMPLETE',
+  'QA_TARGET_EXPECTED_MISSING',
+  'QA_TARGET_EXPECTED_MISMATCH',
+  // 8
+  'QA_INDEPENDENCE_UNKNOWN',
+]);
+
+const RECORD_ORDER = Object.freeze([
+  'QA_VERIFICATION_REASON_MISSING',
+  'QA_CONTROL_MISSING',
+  'QA_CONTROL_PASSED',
+  'QA_CONTROL_SAME_REVISION',
+  'QA_CONTROL_LOG_UNRESOLVED',
+]);
+const REJECT_ORDER = Object.freeze(
+  Object.keys(QA_REASON_CODES).filter((code) => QA_REASON_CODES[code] === 'reject')
+);
+
+const ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
+const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const BASIS_VALUES = new Set(['verified', 'explore']);
+const SOURCE_VALUES = new Set(['sourced', 'reproduced', 'derived']);
+const NOT_RUN_REASONS = new Set([
+  'criteria-ambiguous',
+  'environment-unavailable',
+  'out-of-scope',
+  'execution-failed',
+  'requires-human-judgment',
+]);
+// §3.4.1: worst first.
+const STATUS_SEVERITY = Object.freeze({ FAIL: 0, NOT_RUN: 1, SKIP: 2, PASS: 3 });
+const STAGE_ONE_KEYWORDS = new Set(['additionalProperties', 'type', 'maxLength', 'maxItems']);
+
+const ordered = (codes, order) => order.filter((code) => codes.has(code));
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const asArray = (value) => (Array.isArray(value) ? value : []);
+const lowerHex = (value) => (typeof value === 'string' ? value.toLowerCase() : null);
+const isNonBlank = (value) => typeof value === 'string' && value.trim() !== '';
+
+/** §4.2: normalized id, or null when it is not a valid id. */
+function normalizeQaId(value) {
+  const normalized = (0,promotion_candidates/* nonEmptyNfcString */.bS)(value);
+  return normalized !== null && ID_PATTERN.test(normalized) ? normalized : null;
+}
+
+let compiledSchema = null;
+function schemaValidator() {
+  if (!compiledSchema) {
+    const schema = JSON.parse(
+      (0,external_node_fs_.readFileSync)(new URL(/* asset import */ __nccwpck_require__(7247), __nccwpck_require__.b), 'utf8')
+    );
+    const ajv = new _2020({ allErrors: true, strict: true });
+    ajv_formats_dist(ajv);
+    compiledSchema = ajv.compile(schema);
+  }
+  return compiledSchema;
+}
+
+function nestingDepth(root) {
+  let max = 0;
+  const stack = [[root, 1]];
+  while (stack.length) {
+    const [value, depth] = stack.pop();
+    if (value === null || typeof value !== 'object') continue;
+    if (depth > max) max = depth;
+    if (max > QA_EVIDENCE_LIMITS.depth) return max;
+    for (const child of Object.values(value)) stack.push([child, depth + 1]);
+  }
+  return max;
+}
+
+function pointerSegments(instancePath) {
+  if (!instancePath) return [];
+  return instancePath
+    .slice(1)
+    .split('/')
+    .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'));
+}
+
+const ATTEMPT_FIELD =
+  /^verification\/\*(?:\/subcases\/\*)?\/attempts\/\*\/(?:startedAt|status|assertions)(?:\/|$)/;
+const FIELD_CODES = [
+  [/^target\/repository$/, 'QA_TARGET_REPOSITORY_INVALID'],
+  [/^target\/subjectRevision$/, 'QA_TARGET_REVISION_INVALID'],
+  [/^target\/acceptanceCriteria$/, 'QA_TARGET_AC_EMPTY'],
+  [/^target\/acceptanceCriteria\/\*\/id$/, 'QA_TARGET_AC_ID_INVALID'],
+  [/^verification\/\*(?:\/subcases\/\*)?\/status$/, 'QA_VERIFICATION_STATUS_INVALID'],
+  [/^verification\/\*\/subcases\/\*\/id$/, 'QA_VERIFICATION_SUBCASE_ID_INVALID'],
+  [/^artifacts\/refs\/\*\/id$/, 'QA_ARTIFACT_ID_INVALID'],
+  [/^artifacts\/refs\/\*\/(?:root|path)$/, 'QA_ARTIFACT_PATH_REJECTED'],
+];
+
+function codeForSchemaError(error) {
+  if (error.keyword === 'if') return null;
+  if (error.keyword === 'maxLength' || error.keyword === 'maxItems') return 'QA_EVIDENCE_TOO_LARGE';
+  const segments = pointerSegments(error.instancePath);
+  if (error.keyword === 'required') segments.push(error.params.missingProperty);
+  const key = segments.map((segment) => (/^\d+$/.test(segment) ? '*' : segment)).join('/');
+  if (ATTEMPT_FIELD.test(key) && error.keyword !== 'additionalProperties') {
+    return 'QA_VERIFICATION_ATTEMPT_INVALID';
+  }
+  if (error.keyword === 'type' || error.keyword === 'additionalProperties') {
+    return 'QA_EVIDENCE_MALFORMED';
+  }
+  for (const [pattern, code] of FIELD_CODES) if (pattern.test(key)) return code;
+  return 'QA_EVIDENCE_MALFORMED';
+}
+
+/** §3.5: true when the relative artifact path must be rejected before any read. */
+function isArtifactPathRejected(path) {
+  if (typeof path !== 'string' || path === '') return true;
+  const normalized = (0,promotion_candidates/* nfc */.aX)(path);
+  if (normalized.startsWith('/') || normalized.includes('\\') || normalized.includes('\0')) {
+    return true;
+  }
+  const segments = normalized.split('/');
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..'))
+    return true;
+  if (segments.some((segment) => segment.toLowerCase() === '.git')) return true;
+  return (0,secret_redactor/* shouldExcludeForContext */.g)(normalized);
+}
+
+function defaultRedact(text) {
+  const { text: redacted, hits } = (0,secret_redactor/* redactText */.Rd)(text);
+  return { text: redacted, count: hits.reduce((sum, hit) => sum + hit.count, 0) };
+}
+
+function redactCopy(value, redact, counter) {
+  if (typeof value === 'string') {
+    const { text, count } = redact(value);
+    counter.count += count;
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((item) => redactCopy(item, redact, counter));
+  if (isObject(value)) {
+    const copy = {};
+    for (const [key, item] of Object.entries(value)) copy[key] = redactCopy(item, redact, counter);
+    return copy;
+  }
+  return value;
+}
+
+/**
+ * Stage 0 (§4.1): settle the AC population from host input only.
+ *
+ * @param {{ trusted?: boolean, source?: { path?: string, sha256?: string, approvalRef?: string },
+ *   criteria?: Array<{ id: string, required: boolean, expected: string }> } | null | undefined} population
+ * @returns {{ determined: boolean, criteria: Map<string, { required: boolean, expected: string }> }}
+ */
+function determineAcPopulation(population) {
+  const undetermined = { determined: false, criteria: new Map() };
+  if (!isObject(population) || population.trusted !== true) return undetermined;
+  const source = population.source;
+  if (
+    !isObject(source) ||
+    !isNonBlank(source.path) ||
+    !isNonBlank(source.approvalRef) ||
+    !SHA256_PATTERN.test(lowerHex(source.sha256) ?? '')
+  ) {
+    return undetermined;
+  }
+  const list = population.criteria;
+  if (!Array.isArray(list) || list.length === 0) return undetermined;
+  const criteria = new Map();
+  for (const criterion of list) {
+    const id = isObject(criterion) ? normalizeQaId(criterion.id) : null;
+    if (
+      id === null ||
+      criteria.has(id) ||
+      typeof criterion.required !== 'boolean' ||
+      typeof criterion.expected !== 'string'
+    ) {
+      return undetermined;
+    }
+    criteria.set(id, { required: criterion.required, expected: criterion.expected });
+  }
+  return { determined: true, criteria };
+}
+
+function rejected(stage, violations) {
+  const codes = new Set(violations.map((violation) => violation.code));
+  return { accepted: false, stage, rejectReasons: ordered(codes, REJECT_ORDER), violations };
+}
+
+function checkAttempts(attempts, basePath, artifactIds, push) {
+  let previous = null;
+  attempts.forEach((attempt, index) => {
+    if (!isObject(attempt)) return;
+    const path = `${basePath}/attempts/${index}`;
+    const time = typeof attempt.startedAt === 'string' ? Date.parse(attempt.startedAt) : NaN;
+    if (Number.isNaN(time)) push('QA_VERIFICATION_ATTEMPT_INVALID', `${path}/startedAt`);
+    else {
+      if (previous !== null && time <= previous) {
+        push('QA_VERIFICATION_ATTEMPTS_UNORDERED', `${path}/startedAt`);
+      }
+      previous = time;
+    }
+    const assertions = attempt.assertions;
+    if (isObject(assertions) && assertions.passed > assertions.total) {
+      push('QA_VERIFICATION_ATTEMPT_INVALID', `${path}/assertions`);
+    }
+    if (attempt.logRef !== undefined && !artifactIds.has(normalizeQaId(attempt.logRef))) {
+      push('QA_ARTIFACT_REF_UNKNOWN', `${path}/logRef`);
+    }
+  });
+}
+
+function checkStatusAgainstAttempts(result, path, push) {
+  const attempts = asArray(result.attempts);
+  const last = attempts[attempts.length - 1];
+  // An invalid status is already reported by the schema; do not report it twice as a mismatch.
+  if (
+    isObject(last) &&
+    STATUS_SEVERITY[result.status] !== undefined &&
+    (last.status === 'PASS' || last.status === 'FAIL') &&
+    last.status !== result.status
+  ) {
+    push('QA_VERIFICATION_STATUS_MISMATCH', `${path}/status`);
+  }
+}
+
+function checkSemantics(evidence, push) {
+  const target = isObject(evidence.target) ? evidence.target : {};
+  const seenAc = new Set();
+  asArray(target.acceptanceCriteria).forEach((criterion, index) => {
+    if (!isObject(criterion) || criterion.id === undefined) return;
+    const id = normalizeQaId(criterion.id);
+    const path = `/target/acceptanceCriteria/${index}/id`;
+    if (id === null) push('QA_TARGET_AC_ID_INVALID', path);
+    else if (seenAc.has(id)) push('QA_TARGET_AC_ID_DUPLICATE', path);
+    else seenAc.add(id);
+  });
+
+  const artifactIds = new Set();
+  const refs = isObject(evidence.artifacts) ? asArray(evidence.artifacts.refs) : [];
+  refs.forEach((ref, index) => {
+    if (!isObject(ref)) return;
+    const path = `/artifacts/refs/${index}`;
+    if (ref.id !== undefined) {
+      const id = normalizeQaId(ref.id);
+      if (id === null || artifactIds.has(id)) push('QA_ARTIFACT_ID_INVALID', `${path}/id`);
+      else artifactIds.add(id);
+    }
+    if (typeof ref.path === 'string' && isArtifactPathRejected(ref.path)) {
+      push('QA_ARTIFACT_PATH_REJECTED', `${path}/path`);
+    }
+  });
+
+  const seenResults = new Set();
+  asArray(evidence.verification).forEach((result, index) => {
+    if (!isObject(result)) return;
+    const path = `/verification/${index}`;
+    const acId = normalizeQaId(result.acId);
+    if (acId !== null) {
+      if (seenResults.has(acId)) push('QA_VERIFICATION_AC_DUPLICATE', `${path}/acId`);
+      seenResults.add(acId);
+    }
+    const subcases = asArray(result.subcases);
+    if (subcases.length === 0) {
+      checkStatusAgainstAttempts(result, path, push);
+      checkAttempts(asArray(result.attempts), path, artifactIds, push);
+    } else {
+      const seenSubcases = new Set();
+      let worst = null;
+      subcases.forEach((subcase, subIndex) => {
+        if (!isObject(subcase)) return;
+        const subPath = `${path}/subcases/${subIndex}`;
+        if (subcase.id !== undefined) {
+          const id = normalizeQaId(subcase.id);
+          if (id === null || seenSubcases.has(id)) {
+            push('QA_VERIFICATION_SUBCASE_ID_INVALID', `${subPath}/id`);
+          } else seenSubcases.add(id);
+        }
+        checkStatusAgainstAttempts(subcase, subPath, push);
+        checkAttempts(asArray(subcase.attempts), subPath, artifactIds, push);
+        const severity = STATUS_SEVERITY[subcase.status];
+        if (severity !== undefined && (worst === null || severity < STATUS_SEVERITY[worst])) {
+          worst = subcase.status;
+        }
+      });
+      if (
+        worst !== null &&
+        STATUS_SEVERITY[result.status] !== undefined &&
+        result.status !== worst
+      ) {
+        push('QA_VERIFICATION_SUBCASE_STATUS_MISMATCH', `${path}/status`);
+      }
+    }
+    asArray(result.controls).forEach((control, controlIndex) => {
+      if (isObject(control) && !artifactIds.has(normalizeQaId(control.logRef))) {
+        push('QA_ARTIFACT_REF_UNKNOWN', `${path}/controls/${controlIndex}/logRef`);
+      }
+    });
+  });
+}
+
+function compareSets(evidence, population, push) {
+  const targetIds = new Set(
+    asArray(evidence.target.acceptanceCriteria).map((criterion) => normalizeQaId(criterion.id))
+  );
+  const confirmed = population.determined ? new Set(population.criteria.keys()) : targetIds;
+  const resultIds = new Set();
+  evidence.verification.forEach((result, index) => {
+    const id = normalizeQaId(result.acId);
+    resultIds.add(id);
+    if (id === null || (!confirmed.has(id) && !targetIds.has(id))) {
+      push('QA_VERIFICATION_AC_UNKNOWN', `/verification/${index}/acId`);
+    }
+  });
+  evidence.target.acceptanceCriteria.forEach((criterion, index) => {
+    if (!confirmed.has(normalizeQaId(criterion.id))) {
+      push('QA_TARGET_AC_UNKNOWN', `/target/acceptanceCriteria/${index}/id`);
+    }
+  });
+  for (const id of confirmed) {
+    if (!targetIds.has(id) && resultIds.has(id))
+      push('QA_TARGET_AC_MISSING', '/target/acceptanceCriteria');
+  }
+}
+
+/**
+ * Stages 1-4 (§7): decide whether the evidence is accepted as a whole.
+ *
+ * @param {string | Buffer} raw - the evidence document as received
+ * @param {{ population: ReturnType<typeof determineAcPopulation>,
+ *   redact?: (text: string) => { text: string, count: number } }} options
+ */
+function checkQaEvidence(raw, { population, redact = defaultRedact }) {
+  if (typeof raw !== 'string' && !Buffer.isBuffer(raw)) {
+    return rejected(1, [{ code: 'QA_EVIDENCE_MALFORMED', path: '' }]);
+  }
+  const bytes = typeof raw === 'string' ? Buffer.byteLength(raw, 'utf8') : raw.length;
+  if (bytes > QA_EVIDENCE_LIMITS.evidenceBytes) {
+    return rejected(1, [{ code: 'QA_EVIDENCE_TOO_LARGE', path: '' }]);
+  }
+  let evidence;
+  try {
+    evidence = JSON.parse(typeof raw === 'string' ? raw : raw.toString('utf8'));
+  } catch {
+    return rejected(1, [{ code: 'QA_EVIDENCE_MALFORMED', path: '' }]);
+  }
+  if (nestingDepth(evidence) > QA_EVIDENCE_LIMITS.depth) {
+    return rejected(1, [{ code: 'QA_EVIDENCE_TOO_LARGE', path: '' }]);
+  }
+
+  const validate = schemaValidator();
+  const schemaViolations = validate(evidence)
+    ? []
+    : validate.errors
+        .map((error) => ({
+          code: codeForSchemaError(error),
+          path: error.instancePath,
+          keyword: error.keyword,
+        }))
+        .filter((violation) => violation.code !== null);
+  if (schemaViolations.some((violation) => STAGE_ONE_KEYWORDS.has(violation.keyword))) {
+    return rejected(
+      1,
+      schemaViolations.map(({ code, path }) => ({ code, path }))
+    );
+  }
+
+  const counter = { count: 0 };
+  let redactedEvidence;
+  try {
+    redactedEvidence = redactCopy(evidence, redact, counter);
+  } catch {
+    return rejected(2, [{ code: 'QA_EVIDENCE_REDACTION_FAILED', path: '' }]);
+  }
+
+  const violations = schemaViolations.map(({ code, path }) => ({ code, path }));
+  const push = (code, path) => violations.push({ code, path });
+  checkSemantics(evidence, push);
+  if (violations.length) return rejected(3, violations);
+
+  compareSets(evidence, population, push);
+  if (violations.length) return rejected(4, violations);
+
+  return {
+    accepted: true,
+    stage: null,
+    rejectReasons: [],
+    violations: [],
+    evidence,
+    redactedEvidence,
+    redactionCount: counter.count,
+  };
+}
+
+// §3.5: the open itself must refuse a symlink in any component. Only macOS 11+ offers that to
+// Node (O_NOFOLLOW_ANY); Node 22 has no openat2 / RESOLVE_NO_SYMLINKS for Linux, so every other
+// platform reads nothing and reports the artifact unresolved.
+const O_NOFOLLOW_ANY_DARWIN = 0x20000000;
+function canOpenWithoutSymlinks(platform) {
+  return platform === 'darwin' && Number.parseInt((0,external_node_os_.release)(), 10) >= 20;
+}
+
+async function readArtifact(ref, { roots, limits, budget, onBeforeOpen, openFile, platform }) {
+  const rootDir = roots?.[ref.root];
+  if (typeof rootDir !== 'string' || isArtifactPathRejected(ref.path)) {
+    return { state: 'unresolved' };
+  }
+  if (!canOpenWithoutSymlinks(platform)) return { state: 'unresolved' };
+  let realRoot;
+  try {
+    realRoot = await (0,promises_.realpath)(rootDir);
+  } catch {
+    return { state: 'unresolved' };
+  }
+  const relative = (0,promotion_candidates/* nfc */.aX)(ref.path);
+  // Refuse a visible symlink before opening anything; the open flag covers a later swap.
+  let current = realRoot;
+  for (const segment of relative.split('/')) {
+    current = (0,external_node_path_.join)(current, segment);
+    const entry = await (0,promises_.lstat)(current).catch(() => null);
+    if (entry === null || entry.isSymbolicLink()) return { state: 'unresolved' };
+  }
+  if (onBeforeOpen) await onBeforeOpen({ root: realRoot, path: relative });
+  let handle;
+  try {
+    handle = await openFile(
+      current,
+      external_node_fs_.constants.O_RDONLY | external_node_fs_.constants.O_NONBLOCK | O_NOFOLLOW_ANY_DARWIN
+    );
+  } catch {
+    return { state: 'unresolved' };
+  }
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.nlink !== 1) return { state: 'unresolved' };
+    if (stat.size > limits.artifactBytes || budget.used + stat.size > limits.artifactTotalBytes) {
+      return { state: 'too-large' };
+    }
+    const hash = (0,external_node_crypto_.createHash)('sha256');
+    const chunk = Buffer.alloc(1 << 20);
+    let size = 0;
+    for (;;) {
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
+      if (bytesRead === 0) break;
+      size += bytesRead;
+      if (size > limits.artifactBytes || budget.used + size > limits.artifactTotalBytes) {
+        return { state: 'too-large' };
+      }
+      hash.update(chunk.subarray(0, bytesRead));
+    }
+    budget.used += size;
+    return { state: 'ok', sha256: hash.digest('hex'), size };
+  } catch {
+    return { state: 'unresolved' };
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * §3.5: read and hash every referenced artifact under the read rules.
+ *
+ * @param {Array<{ id: string, root: string, path: string }>} refs - `artifacts.refs` of accepted evidence
+ * @param {{ roots?: { repository?: string, artifacts?: string },
+ *   limits?: { artifactBytes: number, artifactTotalBytes: number },
+ *   onBeforeOpen?: (target: { root: string, path: string }) => unknown,
+ *   openFile?: typeof open, platform?: string }} [options]
+ *   `onBeforeOpen` runs after every check and right before the open; tests use it to swap a
+ *   directory for a symlink in that window. `openFile` and `platform` let tests observe which
+ *   paths reach the open.
+ * @returns {Promise<Map<string, { state: 'ok' | 'unresolved' | 'too-large', sha256?: string, size?: number }>>}
+ */
+async function resolveQaArtifacts(
+  refs,
+  {
+    roots = {},
+    limits = QA_EVIDENCE_LIMITS,
+    onBeforeOpen,
+    openFile = promises_.open,
+    platform = process.platform,
+  } = {}
+) {
+  const resolutions = new Map();
+  const budget = { used: 0 };
+  const options = { roots, limits, budget, onBeforeOpen, openFile, platform };
+  for (const ref of asArray(refs)) {
+    const id = normalizeQaId(ref?.id);
+    if (id === null || resolutions.has(id)) continue;
+    resolutions.set(id, await readArtifact(ref, options));
+  }
+  return resolutions;
+}
+
+function artifactCode(id, refsById, resolutions) {
+  const ref = refsById.get(id);
+  const resolution = resolutions.get(id);
+  if (!ref || !resolution || resolution.state === 'unresolved') return 'QA_ARTIFACT_UNRESOLVED';
+  if (resolution.state === 'too-large') return 'QA_ARTIFACT_TOO_LARGE';
+  const declared = lowerHex(ref.sha256);
+  if (declared === null || !SHA256_PATTERN.test(declared) || declared !== resolution.sha256) {
+    return 'QA_ARTIFACT_HASH_MISMATCH';
+  }
+  return null;
+}
+
+// §5 conditions 1-4 for one result without subcases (an AC or a subcase).
+function judgeResult(result, refsById, resolutions) {
+  const codes = new Set();
+  const records = new Set();
+  const attempts = asArray(result.attempts);
+  if (result.status !== 'PASS') codes.add('QA_VERIFICATION_NOT_PASS');
+  if (!BASIS_VALUES.has(result.basis)) codes.add('QA_VERIFICATION_BASIS_MISSING');
+  else if (result.basis === 'explore') codes.add('QA_VERIFICATION_EXPLORE_ONLY');
+  if ((result.status === 'PASS' || result.status === 'FAIL') && attempts.length === 0) {
+    codes.add('QA_VERIFICATION_ATTEMPTS_EMPTY');
+  }
+  if (
+    (result.status === 'SKIP' || result.status === 'NOT_RUN') &&
+    !NOT_RUN_REASONS.has(result.notRunReason)
+  ) {
+    records.add('QA_VERIFICATION_REASON_MISSING');
+  }
+  const statuses = new Set(attempts.map((attempt) => attempt.status));
+  if (statuses.has('PASS') && statuses.has('FAIL')) codes.add('QA_VERIFICATION_FLAKY');
+  for (const attempt of attempts) {
+    const { total, passed } = attempt.assertions;
+    if (!(total >= 1 && passed === total)) codes.add('QA_VERIFICATION_ASSERTIONS_MISSING');
+    const logCode = artifactCode(normalizeQaId(attempt.logRef), refsById, resolutions);
+    if (logCode) codes.add(logCode);
+    if (!isNonBlank(attempt.command)) codes.add('QA_EXECUTION_COMMAND_MISSING');
+    if (!Number.isInteger(attempt.exitCode)) codes.add('QA_EXECUTION_EXIT_CODE_UNKNOWN');
+    else if ((attempt.status === 'PASS') !== (attempt.exitCode === 0)) {
+      codes.add('QA_EXECUTION_EXIT_CODE_MISMATCH');
+    }
+  }
+  return { codes, records };
+}
+
+function judgeControls(result, subjectRevision, refsById, resolutions) {
+  const records = new Set();
+  const controls = asArray(result.controls);
+  if (controls.length === 0) records.add('QA_CONTROL_MISSING');
+  for (const control of controls) {
+    if (control.status === 'PASS') records.add('QA_CONTROL_PASSED');
+    if (lowerHex(control.revision) === subjectRevision) records.add('QA_CONTROL_SAME_REVISION');
+    if (artifactCode(normalizeQaId(control.logRef), refsById, resolutions)) {
+      records.add('QA_CONTROL_LOG_UNRESOLVED');
+    }
+  }
+  return records;
+}
+
+// §5 conditions 5-8 and the stage-0 code; independent of the AC's result.
+function judgeCommon({
+  criterion,
+  confirmed,
+  population,
+  globalCodes,
+  revisionCodes,
+  refsById,
+  resolutions,
+  trustedSources,
+  independence,
+}) {
+  const codes = new Set([...globalCodes, ...revisionCodes]);
+  const expected = isObject(criterion?.expected) ? criterion.expected : {};
+  if (!SOURCE_VALUES.has(expected.source)) codes.add('QA_TARGET_EXPECTED_SOURCE_MISSING');
+  else if (expected.source === 'derived') codes.add('QA_TARGET_EXPECTED_DERIVED');
+  else if (expected.source === 'reproduced') codes.add('QA_TARGET_EXPECTED_REPRODUCED');
+  else {
+    const sourceId = normalizeQaId(expected.sourceRef);
+    if (sourceId === null || artifactCode(sourceId, refsById, resolutions)) {
+      codes.add('QA_TARGET_EXPECTED_SOURCE_UNRESOLVED');
+    } else if (!trustedSources.has(sourceId)) {
+      codes.add('QA_TARGET_EXPECTED_SOURCE_UNTRUSTED');
+    }
+  }
+  if (typeof expected.value !== 'string') codes.add('QA_TARGET_EXPECTED_MISSING');
+  else if (population.determined && confirmed && expected.value !== confirmed.expected) {
+    codes.add('QA_TARGET_EXPECTED_MISMATCH');
+  }
+  if (independence !== 'known') codes.add('QA_INDEPENDENCE_UNKNOWN');
+  return codes;
+}
+
+function revisionCodes(subjectRevision, observed) {
+  const codes = new Set();
+  const head = lowerHex(observed?.head);
+  if (head === null || !COMMIT_PATTERN.test(head)) codes.add('QA_TARGET_REVISION_UNOBSERVED');
+  else if (head !== subjectRevision) codes.add('QA_TARGET_REVISION_STALE');
+  if (observed?.dirty !== false) codes.add('QA_TARGET_REVISION_UNOBSERVED');
+  return codes;
+}
+
+// §7: ids are matched on their original value but output only after redaction. An id the
+// redactor changes is replaced by a numbered alias, so references to the same id still agree and
+// different ids stay distinct; `<` cannot occur in a valid id, so an alias never equals one.
+function createIdAliases(redact) {
+  const aliases = new Map();
+  return (id) => {
+    if (id === null) return null;
+    if (!aliases.has(id)) {
+      let unchanged = false;
+      try {
+        unchanged = redact(id).text === id;
+      } catch {
+        unchanged = false;
+      }
+      aliases.set(id, unchanged ? id : `<redacted-id-${aliases.size + 1}>`);
+    }
+    return aliases.get(id);
+  };
+}
+
+// Rewrites every id field of the redacted copy from the original document, so the copy and the
+// result name each id the same way.
+function aliasIdsInCopy(original, redactedCopy, outId) {
+  const copy = structuredClone(redactedCopy);
+  const alias = (source, target, key) => {
+    if (!isObject(source) || !isObject(target)) return;
+    const id = normalizeQaId(source[key]);
+    if (id !== null) target[key] = outId(id);
+  };
+  const pairs = (source, target, key) =>
+    asArray(source?.[key]).map((item, index) => [item, asArray(target?.[key])[index]]);
+  for (const [criterion, copied] of pairs(original.target, copy.target, 'acceptanceCriteria')) {
+    alias(criterion, copied, 'id');
+    alias(criterion?.expected, copied?.expected, 'sourceRef');
+  }
+  for (const [ref, copied] of pairs(original.artifacts, copy.artifacts, 'refs')) {
+    alias(ref, copied, 'id');
+  }
+  const aliasAttempts = (source, target) => {
+    for (const [attempt, copied] of pairs(source, target, 'attempts')) {
+      alias(attempt, copied, 'logRef');
+    }
+  };
+  for (const [result, copied] of pairs(original, copy, 'verification')) {
+    alias(result, copied, 'acId');
+    aliasAttempts(result, copied);
+    for (const [subcase, copiedSubcase] of pairs(result, copied, 'subcases')) {
+      alias(subcase, copiedSubcase, 'id');
+      aliasAttempts(subcase, copiedSubcase);
+    }
+    for (const [control, copiedControl] of pairs(result, copied, 'controls')) {
+      alias(control, copiedControl, 'logRef');
+    }
+  }
+  return copy;
+}
+
+/**
+ * Stage 5 (§5) and the projection (§8.1). Pure.
+ *
+ * @param {object} input
+ * @param {ReturnType<typeof checkQaEvidence>} input.checked
+ * @param {ReturnType<typeof determineAcPopulation>} input.population
+ * @param {{ head?: string | null, dirty?: boolean | null, changedFiles?: string[] }} [input.observed]
+ * @param {Map<string, { state: string, sha256?: string, size?: number }>} [input.artifactResolutions]
+ * @param {string} [input.independence] - only `known` satisfies §5 condition 8
+ * @param {Iterable<string>} [input.trustedSourceIds] - artifact ids the host found in a trusted tree
+ * @param {(text: string) => { text: string, count: number }} [input.redact] - for `changedFiles`
+ */
+function judgeQaEvidence({
+  checked,
+  population,
+  observed,
+  artifactResolutions = new Map(),
+  independence = PRODUCTION_INDEPENDENCE,
+  trustedSourceIds = [],
+  redact = defaultRedact,
+}) {
+  const projectionFor = (verified) =>
+    population.determined
+      ? {
+          total: population.criteria.size,
+          verified,
+          unverified: population.criteria.size - verified,
+        }
+      : null;
+  const base = {
+    accepted: checked.accepted,
+    stage: checked.stage,
+    rejectReasons: checked.rejectReasons,
+    violations: checked.violations,
+    populationDetermined: population.determined,
+  };
+  if (!checked.accepted) {
+    return {
+      ...base,
+      globalReasonCodes: [],
+      criteria: [],
+      projection: projectionFor(0),
+      redaction: null,
+      artifacts: [],
+    };
+  }
+
+  const { evidence } = checked;
+  const outId = createIdAliases(redact);
+  const redactedEvidence = aliasIdsInCopy(evidence, checked.redactedEvidence, outId);
+  const subjectRevision = evidence.target.subjectRevision.toLowerCase();
+  const refs = isObject(evidence.artifacts) ? asArray(evidence.artifacts.refs) : [];
+  const refsById = new Map(refs.map((ref) => [normalizeQaId(ref.id), ref]));
+  const trustedSources = new Set([...trustedSourceIds].map(normalizeQaId));
+  const globalCodes = new Set();
+  if (!population.determined) globalCodes.add('QA_AC_POPULATION_UNKNOWN');
+  if (!isNonBlank(evidence.execution?.runner)) globalCodes.add('QA_EXECUTION_RUNNER_MISSING');
+  if (!isNonBlank(evidence.environment?.os)) globalCodes.add('QA_ENVIRONMENT_INCOMPLETE');
+  const revision = revisionCodes(subjectRevision, observed);
+
+  const targetById = new Map(
+    evidence.target.acceptanceCriteria.map((criterion) => [normalizeQaId(criterion.id), criterion])
+  );
+  const resultById = new Map(
+    evidence.verification.map((result) => [normalizeQaId(result.acId), result])
+  );
+  const confirmedIds = population.determined
+    ? [...population.criteria.keys()]
+    : [...targetById.keys()];
+
+  const criteria = confirmedIds.map((acId) => {
+    const result = resultById.get(acId);
+    const codes = judgeCommon({
+      criterion: targetById.get(acId),
+      confirmed: population.criteria.get(acId),
+      population,
+      globalCodes,
+      revisionCodes: revision,
+      refsById,
+      resolutions: artifactResolutions,
+      trustedSources,
+      independence,
+    });
+    let records = new Set();
+    const subcases = [];
+    if (!result) codes.add('QA_VERIFICATION_AC_MISSING');
+    else {
+      const resultSubcases = asArray(result.subcases);
+      if (resultSubcases.length === 0) {
+        const judged = judgeResult(result, refsById, artifactResolutions);
+        judged.codes.forEach((code) => codes.add(code));
+        records = judged.records;
+      } else {
+        for (const subcase of resultSubcases) {
+          const judged = judgeResult(subcase, refsById, artifactResolutions);
+          judged.codes.forEach((code) => codes.add(code));
+          subcases.push({
+            id: outId(normalizeQaId(subcase.id)),
+            status: subcase.status,
+            reasonCodes: ordered(judged.codes, AC_REASON_ORDER),
+            records: ordered(judged.records, RECORD_ORDER),
+          });
+        }
+      }
+      judgeControls(result, subjectRevision, refsById, artifactResolutions).forEach((code) =>
+        records.add(code)
+      );
+    }
+    return {
+      acId: outId(acId),
+      required: population.criteria.get(acId)?.required ?? null,
+      status: result ? result.status : 'NOT_RUN',
+      verified: codes.size === 0,
+      reasonCodes: ordered(codes, AC_REASON_ORDER),
+      records: ordered(records, RECORD_ORDER),
+      subcases,
+    };
+  });
+
+  // §3.5: a restricted artifact is output by id only, so its path leaves the output copy too.
+  const outputRefs = (
+    isObject(redactedEvidence.artifacts) ? asArray(redactedEvidence.artifacts.refs) : []
+  ).map((ref) => {
+    if (ref.sensitivity === 'public') return ref;
+    const restricted = { ...ref };
+    delete restricted.path;
+    return restricted;
+  });
+  const outputEvidence = isObject(redactedEvidence.artifacts)
+    ? { ...redactedEvidence, artifacts: { ...redactedEvidence.artifacts, refs: outputRefs } }
+    : redactedEvidence;
+  const artifacts = refs.map((ref, index) => {
+    const id = normalizeQaId(ref.id);
+    const resolution = artifactResolutions.get(id);
+    const entry = { id: outId(id), state: resolution?.state ?? 'unresolved' };
+    if (ref.sensitivity === 'public') {
+      entry.path = (0,promotion_candidates/* nfc */.aX)(outputRefs[index].path);
+      if (resolution?.size !== undefined) entry.size = resolution.size;
+    }
+    return entry;
+  });
+  let changedFiles;
+  try {
+    changedFiles = asArray(observed?.changedFiles)
+      .filter((file) => typeof file === 'string')
+      .map((file) => redact(file).text);
+  } catch {
+    changedFiles = null;
+  }
+
+  return {
+    ...base,
+    globalReasonCodes: ordered(globalCodes, AC_REASON_ORDER),
+    criteria,
+    projection: projectionFor(criteria.filter((criterion) => criterion.verified).length),
+    revision: {
+      observedHead: lowerHex(observed?.head),
+      dirty: typeof observed?.dirty === 'boolean' ? observed.dirty : null,
+      changedFiles,
+    },
+    redaction: { replaced: checked.redactionCount, evidence: outputEvidence },
+    artifacts,
+  };
+}
+
+/**
+ * Stages 0-5 with every dependency injectable. Tests use this; production uses `auditQaEvidence`.
+ *
+ * @param {object} input
+ * @param {string | Buffer} input.evidence
+ * @param {Parameters<typeof determineAcPopulation>[0]} input.population
+ * @param {{ head?: string | null, dirty?: boolean | null, changedFiles?: string[] }} [input.observed]
+ * @param {{ repository?: string, artifacts?: string }} [input.roots]
+ * @param {string} [input.independence]
+ * @param {Iterable<string>} [input.trustedSourceIds]
+ * @param {(text: string) => { text: string, count: number }} [input.redact]
+ * @param {{ artifactBytes: number, artifactTotalBytes: number }} [input.limits]
+ * @param {(target: { root: string, path: string }) => unknown} [input.onBeforeOpen]
+ */
+async function evaluateQaEvidence({
+  evidence,
+  population,
+  observed,
+  roots,
+  independence = PRODUCTION_INDEPENDENCE,
+  trustedSourceIds = [],
+  redact,
+  limits,
+  onBeforeOpen,
+}) {
+  const settled = determineAcPopulation(population);
+  const checked = checkQaEvidence(evidence, { population: settled, ...(redact ? { redact } : {}) });
+  const artifactResolutions = checked.accepted
+    ? await resolveQaArtifacts(checked.evidence.artifacts?.refs, { roots, limits, onBeforeOpen })
+    : new Map();
+  return judgeQaEvidence({
+    checked,
+    population: settled,
+    observed,
+    artifactResolutions,
+    independence,
+    trustedSourceIds,
+    ...(redact ? { redact } : {}),
+  });
+}
+
+/**
+ * Production entry point. Independence is always `unknown`, no source is trusted and the AC
+ * population is never trusted whatever `population.trusted` says, because the first version wires
+ * no host path for any of them (§4.1, §9): every AC stays unverified.
+ *
+ * @param {{ evidence: string | Buffer, population: Parameters<typeof determineAcPopulation>[0],
+ *   observed?: { head?: string | null, dirty?: boolean | null, changedFiles?: string[] },
+ *   roots?: { repository?: string, artifacts?: string } }} input
+ */
+function auditQaEvidence({ evidence, population, observed, roots }) {
+  return evaluateQaEvidence({
+    evidence,
+    population: isObject(population) ? { ...population, trusted: false } : population,
+    observed,
+    roots,
+    independence: PRODUCTION_INDEPENDENCE,
+    trustedSourceIds: [],
+  });
+}
+
 ;// CONCATENATED MODULE: ./src/core/cost-estimator.mjs
 const cost_estimator_DEFAULT_MODEL = 'gpt-4-turbo';
 const PRICING_LAST_UPDATED = '2026-05-14'; // adjust when pricing changes
@@ -115362,6 +116375,10 @@ Pricing last updated: ${this.lastUpdated}`;
 // and exit codes are unchanged; only the enclosing function and the relative
 // import depth (static and dynamic imports) differ from the original inline
 // block. The shared render helpers live in src/cli/render.mjs.
+
+
+
+
 
 
 
@@ -115582,6 +116599,69 @@ async function persistRunArtifacts(result, parsed, targetPath) {
   }
 }
 
+/** The input context `run` makes available only when QA evidence is passed (ADR-017 D2). */
+const QA_EVIDENCE_CONTEXT = 'qaEvidence';
+
+/**
+ * Read the QA evidence file for `auditQaEvidence`.
+ *
+ * Reads at most one byte past the evidence limit, so an oversized file still reaches the
+ * validator and is rejected there as `QA_EVIDENCE_TOO_LARGE` without being loaded whole. A
+ * non-regular file is refused before any read, so a FIFO cannot block the run.
+ *
+ * @param {string} file
+ * @returns {Buffer}
+ */
+function readQaEvidenceFile(file) {
+  const fd = (0,external_node_fs_.openSync)(file, external_node_fs_.constants.O_RDONLY | external_node_fs_.constants.O_NONBLOCK);
+  try {
+    if (!(0,external_node_fs_.fstatSync)(fd).isFile()) throw new Error('not a regular file');
+    const buffer = Buffer.alloc(QA_EVIDENCE_LIMITS.evidenceBytes + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const bytesRead = (0,external_node_fs_.readSync)(fd, buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    return buffer.subarray(0, length);
+  } finally {
+    (0,external_node_fs_.closeSync)(fd);
+  }
+}
+
+/**
+ * Audit the QA evidence against what this run observed and write the result.
+ *
+ * The HEAD and `dirty` are the ones `planLocalReview` already took with `getHeadSha` /
+ * `isWorkingTreeDirty` (src/lib/git.mjs). The AC population and independence stay at the production defaults inside
+ * `auditQaEvidence`: no population is passed, so it is undetermined.
+ *
+ * @returns {Promise<boolean>} false when the result could not be written
+ */
+async function writeQaEvidenceAudit(parsed, evidence, context) {
+  const result = await auditQaEvidence({
+    evidence,
+    population: null,
+    observed: { head: context.commitSha ?? null, dirty: context.dirty ?? null },
+    roots: {
+      repository: context.repoRoot,
+      ...(parsed.qaArtifactsDir !== null
+        ? { artifacts: external_node_path_.resolve(external_node_process_.cwd(), parsed.qaArtifactsDir) }
+        : {}),
+    },
+  });
+  try {
+    (0,external_node_fs_.writeFileSync)(parsed.qaAuditOutput, JSON.stringify(result, null, 2) + '\n');
+  } catch (error) {
+    console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
+    return false;
+  }
+  console.error(
+    `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
+  );
+  return true;
+}
+
 /**
  * Handle the default `run` command (local review against the git repo).
  *
@@ -115602,6 +116682,19 @@ async function runRunCommand(parsed, targetPath) {
       console.error('Error: invalid source-matched plan feedback: ' + error.message);
       return 2;
     }
+  }
+  let qaEvidence = null;
+  let availableContexts = parsed.availableContexts;
+  if (parsed.qaEvidenceFile !== null) {
+    try {
+      qaEvidence = readQaEvidenceFile(parsed.qaEvidenceFile);
+    } catch (error) {
+      console.error(`Error: cannot read --qa-evidence: ${error.message}`);
+      return 2;
+    }
+    availableContexts = [
+      ...new Set([...(0,utils/* resolveAvailableContexts */.ud)(parsed.availableContexts), QA_EVIDENCE_CONTEXT]),
+    ];
   }
   // Resolve --skill-set to its skill ids up front so an unknown name fails
   // fast with a clear message before any review work begins.
@@ -115625,7 +116718,7 @@ async function runRunCommand(parsed, targetPath) {
     phase: parsed.phase,
     dryRun: parsed.dryRun,
     debug: parsed.debug,
-    availableContexts: parsed.availableContexts,
+    availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     baseRef: parsed.base,
@@ -115663,6 +116756,11 @@ Dependencies: ${
       ? context.availableDependencies.join(', ')
       : 'not specified (skip disabled)'
   }`);
+
+  // Before the early returns below, so evidence for a run without changes is still audited.
+  if (qaEvidence !== null && !(await writeQaEvidenceAudit(parsed, qaEvidence, context))) {
+    return 1;
+  }
 
   if (context.status === 'skipped-by-label') {
     const labels = context.matchedLabels?.length
@@ -115723,7 +116821,7 @@ Dependencies: ${
     // no-op. They stay as a safety net for the fallback path: dropping them
     // would silently disable `--context` / `--dependency` the day this call
     // stops passing `context`.
-    availableContexts: parsed.availableContexts,
+    availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     reviewers: parsed.reviewers,
@@ -117086,8 +118184,6 @@ function buildPrScaffold(entry) {
   };
 }
 
-// EXTERNAL MODULE: ./src/lib/promotion-candidates.mjs
-var promotion_candidates = __nccwpck_require__(3077);
 ;// CONCATENATED MODULE: ./src/cli/commands/promote.mjs
 // `river promote` subcommand handler (Judgment Promotion Loop Phase 2,
 // #1568-B / #1622).
@@ -118278,6 +119374,10 @@ Options:
   --plan-feedback-workdir <dir>   Source task directory with plan.md and review-questions.json
   --plan-feedback-task <TASK>     TASK-XXXX; all three flags must be supplied
                                   (not with --estimate)
+  --qa-evidence <file>       (run, Experimental) QA evidence JSON to audit (ADR-017)
+  --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
+  --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
+                             The review output, gate and exit code do not change
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
@@ -118490,6 +119590,9 @@ const BASE_CONSUMING_SURFACES = new Set([
  */
 const ENTRY_CONSUMING_SURFACES = new Set(['review plan', 'review exec']);
 
+/** The surface that reads the QA evidence flags (`src/cli/commands/run.mjs`). */
+const QA_EVIDENCE_CONSUMING_SURFACES = new Set(['run']);
+
 /**
  * Command-scoped option allowlist (#2065).
  *
@@ -118537,6 +119640,17 @@ const COMMAND_SCOPED_OPTIONS = [
     surfaces: ENTRY_CONSUMING_SURFACES,
     why: 'that surface does not resolve a review Flow entry',
   },
+  // ADR-017 D6: QA evidence rides on `river run` instead of a new top-level command.
+  ...[
+    ['--qa-evidence', 'qaEvidenceFile'],
+    ['--qa-artifacts', 'qaArtifactsDir'],
+    ['--qa-audit-output', 'qaAuditOutput'],
+  ].map(([token, field]) => ({
+    token,
+    given: (parsed) => parsed[field] !== null,
+    surfaces: QA_EVIDENCE_CONSUMING_SURFACES,
+    why: 'that surface does not audit QA evidence',
+  })),
 ];
 
 /**
@@ -118782,6 +119896,9 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--plan-feedback',
   '--plan-feedback-workdir',
   '--plan-feedback-task',
+  '--qa-evidence',
+  '--qa-artifacts',
+  '--qa-audit-output',
   '--format',
   '--context',
   '--dependency',
@@ -119604,6 +120721,9 @@ function parseArgs(argv) {
     planFeedbackWorkdir: null,
     planFeedbackTask: null,
     planFeedbackProjection: null,
+    qaEvidenceFile: null,
+    qaArtifactsDir: null,
+    qaAuditOutput: null,
     base: null,
     entry: null,
     skillSet: null,
@@ -119813,6 +120933,17 @@ function parseArgs(argv) {
   // followed by a bad option prints both the advisory and the error, and this
   // change is about de-duplicating the advisory, not about suppressing it on
   // the error path.
+  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
+  // and `run` adds it after reading the file. Naming it in `--context` must not stand in for that.
+  if (parsed.availableContexts?.includes(QA_EVIDENCE_CONTEXT)) {
+    parsed.availableContexts = parsed.availableContexts.filter(
+      (ctx) => ctx !== QA_EVIDENCE_CONTEXT
+    );
+    console.warn(
+      `Warning: --context ${QA_EVIDENCE_CONTEXT} is ignored; ` +
+        'it becomes available only when --qa-evidence is passed to river run.'
+    );
+  }
   if (parsed.availableContexts) {
     warnUnknownInputContexts(parsed.availableContexts);
   }
@@ -119849,6 +120980,20 @@ function parseArgs(argv) {
       );
       usageError(parsed);
     }
+  }
+
+  // The audit result has no place in the closed `--output json` artifact, so a QA run must
+  // name the file that receives it; artifacts without evidence would never be read.
+  if (!parsed.usageError && (parsed.qaEvidenceFile !== null) !== (parsed.qaAuditOutput !== null)) {
+    console.error('Error: --qa-evidence and --qa-audit-output must be used together.');
+    usageError(parsed);
+  } else if (
+    !parsed.usageError &&
+    parsed.qaArtifactsDir !== null &&
+    parsed.qaEvidenceFile === null
+  ) {
+    console.error('Error: --qa-artifacts requires --qa-evidence.');
+    usageError(parsed);
   }
 
   if (applyPhaseFallback(parsed)) {

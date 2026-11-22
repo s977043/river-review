@@ -664,6 +664,21 @@
     "readBy": ["feedback", "suppression"],
     "acceptedUnconsumedOn": []
   },
+  "--qa-artifacts": {
+    "writes": ["qaArtifactsDir"],
+    "readBy": ["run"],
+    "acceptedUnconsumedOn": []
+  },
+  "--qa-audit-output": {
+    "writes": ["qaAuditOutput"],
+    "readBy": ["run"],
+    "acceptedUnconsumedOn": []
+  },
+  "--qa-evidence": {
+    "writes": ["qaEvidenceFile"],
+    "readBy": ["run"],
+    "acceptedUnconsumedOn": []
+  },
   "--quiet": {
     "writes": ["quiet"],
     "readBy": ["run"],

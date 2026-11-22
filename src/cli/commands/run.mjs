@@ -5,8 +5,19 @@
 // and exit codes are unchanged; only the enclosing function and the relative
 // import depth (static and dynamic imports) differ from the original inline
 // block. The shared render helpers live in src/cli/render.mjs.
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  openSync,
+  readSync,
+  writeFileSync,
+} from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
 import { planLocalReview, runLocalReview } from '../../lib/local-runner.mjs';
+import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../../lib/qa-evidence.mjs';
+import { resolveAvailableContexts } from '../../lib/utils.mjs';
 import { SkillLoaderError, resolveSkillSet } from '../../../runners/core/skill-loader.mjs';
 import CostEstimator from '../../core/cost-estimator.mjs';
 import { resolveDepthToReviewMode } from '../../lib/review-plan-generator.mjs';
@@ -235,6 +246,69 @@ async function persistRunArtifacts(result, parsed, targetPath) {
   }
 }
 
+/** The input context `run` makes available only when QA evidence is passed (ADR-017 D2). */
+export const QA_EVIDENCE_CONTEXT = 'qaEvidence';
+
+/**
+ * Read the QA evidence file for `auditQaEvidence`.
+ *
+ * Reads at most one byte past the evidence limit, so an oversized file still reaches the
+ * validator and is rejected there as `QA_EVIDENCE_TOO_LARGE` without being loaded whole. A
+ * non-regular file is refused before any read, so a FIFO cannot block the run.
+ *
+ * @param {string} file
+ * @returns {Buffer}
+ */
+function readQaEvidenceFile(file) {
+  const fd = openSync(file, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+  try {
+    if (!fstatSync(fd).isFile()) throw new Error('not a regular file');
+    const buffer = Buffer.alloc(QA_EVIDENCE_LIMITS.evidenceBytes + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const bytesRead = readSync(fd, buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    return buffer.subarray(0, length);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Audit the QA evidence against what this run observed and write the result.
+ *
+ * The HEAD and `dirty` are the ones `planLocalReview` already took with `getHeadSha` /
+ * `isWorkingTreeDirty` (src/lib/git.mjs). The AC population and independence stay at the production defaults inside
+ * `auditQaEvidence`: no population is passed, so it is undetermined.
+ *
+ * @returns {Promise<boolean>} false when the result could not be written
+ */
+async function writeQaEvidenceAudit(parsed, evidence, context) {
+  const result = await auditQaEvidence({
+    evidence,
+    population: null,
+    observed: { head: context.commitSha ?? null, dirty: context.dirty ?? null },
+    roots: {
+      repository: context.repoRoot,
+      ...(parsed.qaArtifactsDir !== null
+        ? { artifacts: path.resolve(process.cwd(), parsed.qaArtifactsDir) }
+        : {}),
+    },
+  });
+  try {
+    writeFileSync(parsed.qaAuditOutput, JSON.stringify(result, null, 2) + '\n');
+  } catch (error) {
+    console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
+    return false;
+  }
+  console.error(
+    `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
+  );
+  return true;
+}
+
 /**
  * Handle the default `run` command (local review against the git repo).
  *
@@ -255,6 +329,19 @@ export async function runRunCommand(parsed, targetPath) {
       console.error('Error: invalid source-matched plan feedback: ' + error.message);
       return 2;
     }
+  }
+  let qaEvidence = null;
+  let availableContexts = parsed.availableContexts;
+  if (parsed.qaEvidenceFile !== null) {
+    try {
+      qaEvidence = readQaEvidenceFile(parsed.qaEvidenceFile);
+    } catch (error) {
+      console.error(`Error: cannot read --qa-evidence: ${error.message}`);
+      return 2;
+    }
+    availableContexts = [
+      ...new Set([...resolveAvailableContexts(parsed.availableContexts), QA_EVIDENCE_CONTEXT]),
+    ];
   }
   // Resolve --skill-set to its skill ids up front so an unknown name fails
   // fast with a clear message before any review work begins.
@@ -278,7 +365,7 @@ export async function runRunCommand(parsed, targetPath) {
     phase: parsed.phase,
     dryRun: parsed.dryRun,
     debug: parsed.debug,
-    availableContexts: parsed.availableContexts,
+    availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     baseRef: parsed.base,
@@ -316,6 +403,11 @@ Dependencies: ${
       ? context.availableDependencies.join(', ')
       : 'not specified (skip disabled)'
   }`);
+
+  // Before the early returns below, so evidence for a run without changes is still audited.
+  if (qaEvidence !== null && !(await writeQaEvidenceAudit(parsed, qaEvidence, context))) {
+    return 1;
+  }
 
   if (context.status === 'skipped-by-label') {
     const labels = context.matchedLabels?.length
@@ -376,7 +468,7 @@ Dependencies: ${
     // no-op. They stay as a safety net for the fallback path: dropping them
     // would silently disable `--context` / `--dependency` the day this call
     // stops passing `context`.
-    availableContexts: parsed.availableContexts,
+    availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     reviewers: parsed.reviewers,

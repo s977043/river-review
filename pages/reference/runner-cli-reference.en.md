@@ -1,6 +1,6 @@
 # Runner CLI Reference
 
-> **Scope note**: this page covers only the `--reviewers` and [`--plan-feedback`](#plan-feedback) flags of `river run` and the validation commands.
+> **Scope note**: this page covers only the `--reviewers`, [`--plan-feedback`](#plan-feedback), and [`--qa-evidence`](#qa-evidence) flags of `river run` and the validation commands.
 >
 > - For every other `river run` flag (`--phase` / `--planner` / `--dry-run` / `--output` / `--max-cost` / `--debug` / `--estimate` and so on), see **[stable-interfaces.en.md](./stable-interfaces.en.md)**.
 > - For the `river review exec` flags used in a W-check (`--artifact`, `--ensemble`, `--phase`), see the **[W-check guide](../guides/w-check.en.md)** and **[cli-review-exec-spec.en.md](./cli-review-exec-spec.en.md)**.
@@ -122,6 +122,45 @@ Before the review starts, input that fails any of these checks is rejected (`src
 
 Once validation passes, exit codes are the same as `river run` without these flags.
 
+## `--qa-evidence` flags (Experimental) {#qa-evidence}
+
+These flags take evidence of QA the consumer ran themselves (JSON in the `schemas/qa-evidence.schema.json` format), audit it with the deterministic validator (`auditQaEvidence` in `src/lib/qa-evidence.mjs`), and write the audit result to a file. ADR-017 sets the policy and `docs/development/qa-evidence-contract.md` is the source of truth for each field. As an Experimental interface, the format may change without notice.
+
+```sh
+river run . --output json \
+  --qa-evidence ./qa-evidence.json \
+  --qa-artifacts ./ci-artifacts \
+  --qa-audit-output ./qa-audit.json > review.json
+```
+
+| Flag                       | Value                                                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `--qa-evidence <file>`     | The QA evidence JSON                                                                                                    |
+| `--qa-artifacts <dir>`     | The directory that `artifacts.refs[].root: artifacts` in the evidence refers to. Without it, those refs stay unresolved |
+| `--qa-audit-output <file>` | Where the audit result JSON is written                                                                                  |
+
+### Acceptance rules
+
+- Only `river run` accepts them (a usage error on every other surface)
+- Pass `--qa-evidence` and `--qa-audit-output` together. `--qa-artifacts` is accepted only with `--qa-evidence`
+
+### Behavior
+
+- The audit result is not added to the `--output` artifact; it goes only to the `--qa-audit-output` file. The `--output json` artifact follows `schemas/output.schema.json`, which allows no undeclared fields
+- The review output, gate, and exit code are the same as without QA evidence. The audit result is recorded and never changes the verdict
+- The HEAD and `dirty` used for comparison are the review's own values (`git rev-parse HEAD` and `git status --porcelain`). Untracked files also make the tree `dirty`
+- No AC population is passed and independence stays `unknown`, so in the first version no AC is verified
+- The `qaEvidence` input context becomes available only when `--qa-evidence` is passed. `--context qaEvidence` is removed with a warning
+- The audit result is written even when there are no changes (`No changes to review`)
+- Evidence that is not JSON or exceeds the 1 MiB limit is recorded as rejected in the audit result, without changing the exit code
+
+### Exit codes
+
+| Code | Condition                                                                                                |
+| ---- | -------------------------------------------------------------------------------------------------------- |
+| `1`  | The flags break an acceptance rule (usage error), or the `--qa-audit-output` file could not be written   |
+| `2`  | The `--qa-evidence` file cannot be read (missing or not a regular file). The run stops before the review |
+
 ## Commands
 
 - Agents: `npm run agents:validate` (or `node scripts/validate-agents.mjs`)
@@ -132,12 +171,12 @@ Once validation passes, exit codes are the same as `river run` without these fla
 
 ### `river run` / `src/cli.mjs`
 
-| Code | Meaning                                                                                                                     |
-| ---- | --------------------------------------------------------------------------------------------------------------------------- |
-| `0`  | Success                                                                                                                     |
-| `1`  | Runtime error, schema error, or argument error (including an unknown command and a missing or invalid option value)         |
-| `2`  | The `--warn-on` warning threshold was exceeded, or [`--plan-feedback`](#plan-feedback) input validation failed              |
-| `3`  | An `--gate` ESCALATE verdict, a configuration error raised by the `review` handler, or an unimplemented `review` subcommand |
+| Code | Meaning                                                                                                                                                                 |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Success                                                                                                                                                                 |
+| `1`  | Runtime error, schema error, or argument error (including an unknown command and a missing or invalid option value)                                                     |
+| `2`  | The `--warn-on` warning threshold was exceeded, [`--plan-feedback`](#plan-feedback) input validation failed, or the [`--qa-evidence`](#qa-evidence) file cannot be read |
+| `3`  | An `--gate` ESCALATE verdict, a configuration error raised by the `review` handler, or an unimplemented `review` subcommand                                             |
 
 The exit code for argument errors (usage errors) was unified to exit 1 plus a stderr summary in #1709. Unknown commands and missing or invalid option values were unified in Slice 2. Unknown options, surplus positionals, and the value-missing paths that remained (for example `--from` / `--cases`) were unified in Slice 3. Printing the full help to stdout and exiting 0 is kept only for an explicit `--help` and for invocation with no arguments.
 

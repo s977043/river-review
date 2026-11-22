@@ -1,6 +1,6 @@
 # `--reviewers` フラグリファレンス
 
-> **スコープ注意**: このページは `river run` の `--reviewers` フラグ・[`--plan-feedback` フラグ](#plan-feedback)・検証コマンドのみを扱います。
+> **スコープ注意**: このページは `river run` の `--reviewers` フラグ・[`--plan-feedback` フラグ](#plan-feedback)・[`--qa-evidence` フラグ](#qa-evidence)・検証コマンドのみを扱います。
 >
 > - `river run` の全フラグ（`--phase` / `--planner` / `--dry-run` / `--output` / `--max-cost` / `--debug` / `--estimate` など）は **[stable-interfaces.md](./stable-interfaces.md)** を参照してください。
 > - W-check で使用する `river review exec` のフラグ（`--artifact`, `--ensemble`, `--phase`）は **[W-check ガイド](../guides/w-check.md)** および **[cli-review-exec-spec.md](./cli-review-exec-spec.md)** を参照してください。
@@ -122,6 +122,45 @@ river run . --dry-run --output html \
 
 検証を通った後の終了コードは、フラグを付けない `river run` と同じです。
 
+## `--qa-evidence` フラグ（Experimental） {#qa-evidence}
+
+利用者が自分で実行した QA の証拠（`schemas/qa-evidence.schema.json` の形式の JSON）を受け取り、決定論の検証モジュール（`src/lib/qa-evidence.mjs` の `auditQaEvidence`）で監査した結果をファイルへ書き出します。方針は ADR-017、各欄の扱いは `docs/development/qa-evidence-contract.md` が正本です。Experimental のため、予告なく形式を変えることがあります。
+
+```sh
+river run . --output json \
+  --qa-evidence ./qa-evidence.json \
+  --qa-artifacts ./ci-artifacts \
+  --qa-audit-output ./qa-audit.json > review.json
+```
+
+| フラグ                     | 値                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `--qa-evidence <file>`     | QA 証拠の JSON                                                                                   |
+| `--qa-artifacts <dir>`     | 証拠の `artifacts.refs[].root: artifacts` が指すディレクトリ。省略すると、その参照は解決されない |
+| `--qa-audit-output <file>` | 監査結果の JSON の書き出し先                                                                     |
+
+### 受理条件
+
+- `river run` だけが受理する（他の面では usage error）
+- `--qa-evidence` と `--qa-audit-output` は揃えて指定する。`--qa-artifacts` は `--qa-evidence` と一緒のときだけ指定できる
+
+### 挙動
+
+- 監査結果は `--output` の成果物に載せず、`--qa-audit-output` のファイルにだけ書く。`--output json` の成果物は `schemas/output.schema.json` に従い、定義に無い欄を持てないため
+- レビューの出力・gate・終了コードは、QA 証拠を渡さない場合と同じである。監査結果は記録だけで、判定を変えない
+- 照合に使う HEAD と `dirty` は、レビューと同じ値（`git rev-parse HEAD` と `git status --porcelain`）である。未追跡のファイルがあっても `dirty` になる
+- AC の母集団は渡さず、独立性は `unknown` のままである。そのため初版では、どの AC も verified にならない
+- 入力コンテキスト `qaEvidence` は、`--qa-evidence` を渡したときだけ available になる。`--context qaEvidence` は警告を出して取り除く
+- 変更が無い（`No changes to review`）場合も、監査結果を書き出す
+- JSON として解釈できない・上限（1 MiB）を超える証拠は、終了コードを変えずに、監査結果の側で拒否として記録する
+
+### 終了コード
+
+| コード | 条件                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------ |
+| `1`    | 受理条件に反する指定（usage error）、または `--qa-audit-output` へ書き込めなかった         |
+| `2`    | `--qa-evidence` のファイルを読めない（存在しない・通常ファイルでない）。レビュー前に止まる |
+
 ## コマンド
 
 - Agents: `npm run agents:validate` (または `node scripts/validate-agents.mjs`)
@@ -132,12 +171,12 @@ river run . --dry-run --output html \
 
 ### `river run` / `src/cli.mjs`
 
-| コード | 意味                                                                                      |
-| ------ | ----------------------------------------------------------------------------------------- |
-| `0`    | 正常終了                                                                                  |
-| `1`    | 実行エラー・スキーマエラー・引数エラー（不明コマンド / オプション値の欠落・不正値を含む） |
-| `2`    | `--warn-on` の警告しきい値超過、[`--plan-feedback`](#plan-feedback) の入力検証の失敗      |
-| `3`    | `--gate` の ESCALATE 判定、`review` ハンドラの設定エラー、`review` の未実装サブコマンド   |
+| コード | 意味                                                                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`    | 正常終了                                                                                                                                   |
+| `1`    | 実行エラー・スキーマエラー・引数エラー（不明コマンド / オプション値の欠落・不正値を含む）                                                  |
+| `2`    | `--warn-on` の警告しきい値超過、[`--plan-feedback`](#plan-feedback) の入力検証の失敗、[`--qa-evidence`](#qa-evidence) のファイルを読めない |
+| `3`    | `--gate` の ESCALATE 判定、`review` ハンドラの設定エラー、`review` の未実装サブコマンド                                                    |
 
 引数エラー（usage error）の exit code は #1709 で exit 1 + stderr 要約へ統一されました。不明コマンドとオプション値の欠落・不正値は Slice 2 で統一済みです。未知オプション・余剰 positional・残っていた値欠落経路（例: `--from` / `--cases`）も Slice 3 で統一されました。help 全文の stdout 出力と exit 0 の組み合わせは、明示的な `--help` と引数なし起動だけが維持します。
 
