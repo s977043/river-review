@@ -707,6 +707,63 @@ function revisionCodes(subjectRevision, observed) {
   return codes;
 }
 
+// §7: ids are matched on their original value but output only after redaction. An id the
+// redactor changes is replaced by a numbered alias, so references to the same id still agree and
+// different ids stay distinct; `<` cannot occur in a valid id, so an alias never equals one.
+function createIdAliases(redact) {
+  const aliases = new Map();
+  return (id) => {
+    if (id === null) return null;
+    if (!aliases.has(id)) {
+      let unchanged = false;
+      try {
+        unchanged = redact(id).text === id;
+      } catch {
+        unchanged = false;
+      }
+      aliases.set(id, unchanged ? id : `<redacted-id-${aliases.size + 1}>`);
+    }
+    return aliases.get(id);
+  };
+}
+
+// Rewrites every id field of the redacted copy from the original document, so the copy and the
+// result name each id the same way.
+function aliasIdsInCopy(original, redactedCopy, outId) {
+  const copy = structuredClone(redactedCopy);
+  const alias = (source, target, key) => {
+    if (!isObject(source) || !isObject(target)) return;
+    const id = normalizeQaId(source[key]);
+    if (id !== null) target[key] = outId(id);
+  };
+  const pairs = (source, target, key) =>
+    asArray(source?.[key]).map((item, index) => [item, asArray(target?.[key])[index]]);
+  for (const [criterion, copied] of pairs(original.target, copy.target, 'acceptanceCriteria')) {
+    alias(criterion, copied, 'id');
+    alias(criterion?.expected, copied?.expected, 'sourceRef');
+  }
+  for (const [ref, copied] of pairs(original.artifacts, copy.artifacts, 'refs')) {
+    alias(ref, copied, 'id');
+  }
+  const aliasAttempts = (source, target) => {
+    for (const [attempt, copied] of pairs(source, target, 'attempts')) {
+      alias(attempt, copied, 'logRef');
+    }
+  };
+  for (const [result, copied] of pairs(original, copy, 'verification')) {
+    alias(result, copied, 'acId');
+    aliasAttempts(result, copied);
+    for (const [subcase, copiedSubcase] of pairs(result, copied, 'subcases')) {
+      alias(subcase, copiedSubcase, 'id');
+      aliasAttempts(subcase, copiedSubcase);
+    }
+    for (const [control, copiedControl] of pairs(result, copied, 'controls')) {
+      alias(control, copiedControl, 'logRef');
+    }
+  }
+  return copy;
+}
+
 /**
  * Stage 5 (§5) and the projection (§8.1). Pure.
  *
@@ -754,7 +811,9 @@ export function judgeQaEvidence({
     };
   }
 
-  const { evidence, redactedEvidence } = checked;
+  const { evidence } = checked;
+  const outId = createIdAliases(redact);
+  const redactedEvidence = aliasIdsInCopy(evidence, checked.redactedEvidence, outId);
   const subjectRevision = evidence.target.subjectRevision.toLowerCase();
   const refs = isObject(evidence.artifacts) ? asArray(evidence.artifacts.refs) : [];
   const refsById = new Map(refs.map((ref) => [normalizeQaId(ref.id), ref]));
@@ -802,7 +861,7 @@ export function judgeQaEvidence({
           const judged = judgeResult(subcase, refsById, artifactResolutions);
           judged.codes.forEach((code) => codes.add(code));
           subcases.push({
-            id: normalizeQaId(subcase.id),
+            id: outId(normalizeQaId(subcase.id)),
             status: subcase.status,
             reasonCodes: ordered(judged.codes, AC_REASON_ORDER),
             records: ordered(judged.records, RECORD_ORDER),
@@ -814,7 +873,7 @@ export function judgeQaEvidence({
       );
     }
     return {
-      acId,
+      acId: outId(acId),
       required: population.criteria.get(acId)?.required ?? null,
       status: result ? result.status : 'NOT_RUN',
       verified: codes.size === 0,
@@ -839,7 +898,7 @@ export function judgeQaEvidence({
   const artifacts = refs.map((ref, index) => {
     const id = normalizeQaId(ref.id);
     const resolution = artifactResolutions.get(id);
-    const entry = { id, state: resolution?.state ?? 'unresolved' };
+    const entry = { id: outId(id), state: resolution?.state ?? 'unresolved' };
     if (ref.sensitivity === 'public') {
       entry.path = nfc(outputRefs[index].path);
       if (resolution?.size !== undefined) entry.size = resolution.size;

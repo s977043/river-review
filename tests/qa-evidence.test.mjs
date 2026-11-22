@@ -455,6 +455,85 @@ describe('document limits (§2.1)', () => {
 
 describe('redaction and output (§3.5, §7)', () => {
   const token = `ghp_${'A'.repeat(36)}`;
+  // Token-shaped values that are also valid ids ([A-Za-z0-9._-], at most 128 characters).
+  const idTokens = ['A', 'B', 'C', 'D'].map((letter) => `ghp_${letter.repeat(36)}`);
+  const [logToken, specToken, acToken, subcaseToken] = idTokens;
+  const tokenIdPatch = [
+    { op: 'set', path: '/artifacts/refs/0/id', value: logToken },
+    { op: 'set', path: '/verification/0/attempts/0/logRef', value: logToken },
+    { op: 'set', path: '/artifacts/refs/3/id', value: specToken },
+    { op: 'set', path: '/target/acceptanceCriteria/0/expected/sourceRef', value: specToken },
+    { op: 'set', path: '/target/acceptanceCriteria/0/id', value: acToken },
+    { op: 'set', path: '/verification/0/acId', value: acToken },
+  ];
+  const tokenIdContext = [
+    { op: 'set', path: '/population/criteria/0/id', value: acToken },
+    { op: 'set', path: '/trustedSourceIds', value: [specToken] },
+  ];
+  const subcasePatch = [
+    { op: 'delete', path: '/verification/0/basis' },
+    { op: 'delete', path: '/verification/0/attempts' },
+    {
+      op: 'set',
+      path: '/verification/0/subcases',
+      value: [
+        {
+          id: subcaseToken,
+          status: 'PASS',
+          basis: 'verified',
+          attempts: [{ ...BASE.evidence.verification[0].attempts[0], logRef: logToken }],
+        },
+      ],
+    },
+  ];
+  const leakedTokens = (result) => {
+    const text = JSON.stringify(result);
+    return idTokens.filter((value) => text.includes(value));
+  };
+
+  test('token-shaped ids never reach the auditQaEvidence result', async () => {
+    const plain = await auditQaEvidence(
+      buildInput({ evidencePatch: tokenIdPatch, contextPatch: tokenIdContext })
+    );
+    assert.equal(plain.accepted, true);
+    assert.deepEqual(leakedTokens(plain), []);
+    const withSubcase = await auditQaEvidence(
+      buildInput({
+        evidencePatch: [...tokenIdPatch, ...subcasePatch],
+        contextPatch: tokenIdContext,
+      })
+    );
+    assert.equal(withSubcase.accepted, true);
+    assert.equal(withSubcase.criteria[0].subcases.length, 1);
+    assert.deepEqual(leakedTokens(withSubcase), []);
+  });
+
+  test('redacted ids stay matched on the original value and consistent across the output', () => {
+    const result = judgeFixture(
+      buildInput({
+        evidencePatch: [...tokenIdPatch, ...subcasePatch],
+        contextPatch: tokenIdContext,
+      })
+    );
+    assert.deepEqual(leakedTokens(result), []);
+    assert.equal(result.criteria[0].verified, true);
+    const [criterion] = result.criteria;
+    const copy = result.redaction.evidence;
+    const logId = result.artifacts[0].id;
+    const specId = result.artifacts[3].id;
+    assert.notEqual(logId, specId);
+    assert.equal(new Set(result.artifacts.map((artifact) => artifact.id)).size, 5);
+    assert.deepEqual(
+      copy.artifacts.refs.map((ref) => ref.id),
+      result.artifacts.map((artifact) => artifact.id)
+    );
+    assert.equal(copy.verification[0].subcases[0].attempts[0].logRef, logId);
+    assert.equal(copy.target.acceptanceCriteria[0].expected.sourceRef, specId);
+    assert.equal(copy.target.acceptanceCriteria[0].id, criterion.acId);
+    assert.equal(copy.verification[0].acId, criterion.acId);
+    assert.equal(copy.verification[0].subcases[0].id, criterion.subcases[0].id);
+    assert.equal(new Set([criterion.acId, criterion.subcases[0].id, logId, specId]).size, 4);
+  });
 
   test('outputs carry only the redacted copy; comparisons use the original value', () => {
     const result = judgeFixture(
