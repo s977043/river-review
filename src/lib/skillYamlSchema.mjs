@@ -22,6 +22,7 @@ export const InputContextEnum = z.enum([
   'reviewExternal',
   'findingsPool',
   'prDescription',
+  'qaEvidence',
 ]);
 const OutputKindEnum = z.enum([
   'findings',

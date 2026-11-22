@@ -26,7 +26,8 @@ export type InputContext =
   | 'reviewSelf'
   | 'reviewExternal'
   | 'findingsPool'
-  | 'prDescription';
+  | 'prDescription'
+  | 'qaEvidence';
 
 /**
  * Output kind that skills can produce

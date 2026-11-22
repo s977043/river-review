@@ -70,7 +70,8 @@
         "reviewSelf",
         "reviewExternal",
         "findingsPool",
-        "prDescription"
+        "prDescription",
+        "qaEvidence"
       ]
     },
     "outputKind": {
