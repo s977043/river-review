@@ -50205,7 +50205,7 @@ function isLlmEnabled(env = process.env) {
   );
 }
 
-/** The input context `river run` adds only after reading `--qa-evidence` (ADR-017 D2). */
+/** The input context `river run` adds only when the audit accepts `--qa-evidence` (ADR-017 D2). */
 const QA_EVIDENCE_CONTEXT = 'qaEvidence';
 
 /**
@@ -50222,7 +50222,8 @@ const QA_EVIDENCE_CONTEXT = 'qaEvidence';
  * `src/lib/review-plan.mjs` (`river review exec` / Phase 3).
  *
  * `RIVER_AVAILABLE_CONTEXTS` never supplies {@link QA_EVIDENCE_CONTEXT}: that context stands for
- * QA evidence the caller actually read (ADR-017 D2), so only the caller's own list may carry it.
+ * QA evidence the caller audited and accepted (ADR-017 D2), so only the caller's own list may
+ * carry it.
  *
  * @param {string[] | null | undefined} inputContexts
  * @param {{ defaultContexts?: string[]; alwaysInclude?: string[] }} [options]
@@ -116719,25 +116720,29 @@ function resolveQaAuditOutput(parsed) {
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * The HEAD is the one `planLocalReview` took with `getHeadSha`. `dirty` and `changedFiles` come
- * from tracked files only (`listTrackedChanges`), per §5 condition 5; the review's own `dirty`
- * (`isWorkingTreeDirty`) is left as it is. The AC population and independence stay at the
- * production defaults inside `auditQaEvidence`: no population is passed, so it is undetermined.
+ * Runs before `planLocalReview`, because whether the evidence was accepted decides whether the
+ * `qaEvidence` context is available to skill selection. The repository root and HEAD come from
+ * the same `ensureGitRepo` / `getHeadSha` calls `planLocalReview` makes. `dirty` and
+ * `changedFiles` come from tracked files only (`listTrackedChanges`), per §5 condition 5; the
+ * review's own `dirty` (`isWorkingTreeDirty`) is left as it is. The AC population and
+ * independence stay at the production defaults inside `auditQaEvidence`: no population is
+ * passed, so it is undetermined.
  *
- * @returns {Promise<boolean>} false when the result could not be written
+ * @returns {Promise<{ accepted: boolean } | null>} null when the result could not be written
  */
-async function writeQaEvidenceAudit(parsed, evidence, context, outputPath) {
-  const trackedChanges = await (0,git/* listTrackedChanges */.iJ)(context.repoRoot);
+async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
+  const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
+  const trackedChanges = await (0,git/* listTrackedChanges */.iJ)(repoRoot);
   const result = await auditQaEvidence({
     evidence,
     population: null,
     observed: {
-      head: context.commitSha ?? null,
+      head: await (0,git/* getHeadSha */.JA)(repoRoot),
       dirty: trackedChanges === null ? null : trackedChanges.length > 0,
       changedFiles: trackedChanges ?? [],
     },
     roots: {
-      repository: context.repoRoot,
+      repository: repoRoot,
       ...(parsed.qaArtifactsDir !== null
         ? { artifacts: external_node_path_.resolve(external_node_process_.cwd(), parsed.qaArtifactsDir) }
         : {}),
@@ -116747,12 +116752,12 @@ async function writeQaEvidenceAudit(parsed, evidence, context, outputPath) {
     (0,external_node_fs_.writeFileSync)(outputPath, JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });
   } catch (error) {
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
-    return false;
+    return null;
   }
   console.error(
     `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
   );
-  return true;
+  return result;
 }
 
 /**
@@ -116793,9 +116798,6 @@ async function runRunCommand(parsed, targetPath) {
       console.error(`Error: --qa-audit-output is refused: ${error.message}`);
       return 1;
     }
-    availableContexts = [
-      ...new Set([...(0,utils/* resolveAvailableContexts */.ud)(parsed.availableContexts), utils/* QA_EVIDENCE_CONTEXT */.Jq]),
-    ];
   }
   // Resolve --skill-set to its skill ids up front so an unknown name fails
   // fast with a clear message before any review work begins.
@@ -116813,6 +116815,18 @@ async function runRunCommand(parsed, targetPath) {
   }
 
   const manualReviewMode = (0,review_plan_generator/* resolveDepthToReviewMode */.c8)(parsed.depth);
+
+  // Before planLocalReview (and so before its early returns): only evidence the audit accepted
+  // makes the qaEvidence context available to skill selection.
+  if (qaEvidence !== null) {
+    const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
+    if (audit === null) return 1;
+    if (audit.accepted) {
+      availableContexts = [
+        ...new Set([...(0,utils/* resolveAvailableContexts */.ud)(parsed.availableContexts), utils/* QA_EVIDENCE_CONTEXT */.Jq]),
+      ];
+    }
+  }
 
   const context = await planLocalReview({
     cwd: targetPath,
@@ -116857,14 +116871,6 @@ Dependencies: ${
       ? context.availableDependencies.join(', ')
       : 'not specified (skip disabled)'
   }`);
-
-  // Before the early returns below, so evidence for a run without changes is still audited.
-  if (
-    qaEvidence !== null &&
-    !(await writeQaEvidenceAudit(parsed, qaEvidence, context, qaAuditOutputPath))
-  ) {
-    return 1;
-  }
 
   if (context.status === 'skipped-by-label') {
     const labels = context.matchedLabels?.length
@@ -121038,7 +121044,7 @@ function parseArgs(argv) {
   // change is about de-duplicating the advisory, not about suppressing it on
   // the error path.
   // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
-  // and `run` adds it after reading the file. Naming it in `--context` must not stand in for that.
+  // and `run` adds it once the audit accepts it. Naming it in `--context` must not stand in for that.
   if (parsed.availableContexts?.includes(utils/* QA_EVIDENCE_CONTEXT */.Jq)) {
     parsed.availableContexts = parsed.availableContexts.filter(
       (ctx) => ctx !== utils/* QA_EVIDENCE_CONTEXT */.Jq

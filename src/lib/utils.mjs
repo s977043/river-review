@@ -47,7 +47,7 @@ export function isLlmEnabled(env = process.env) {
   );
 }
 
-/** The input context `river run` adds only after reading `--qa-evidence` (ADR-017 D2). */
+/** The input context `river run` adds only when the audit accepts `--qa-evidence` (ADR-017 D2). */
 export const QA_EVIDENCE_CONTEXT = 'qaEvidence';
 
 /**
@@ -64,7 +64,8 @@ export const QA_EVIDENCE_CONTEXT = 'qaEvidence';
  * `src/lib/review-plan.mjs` (`river review exec` / Phase 3).
  *
  * `RIVER_AVAILABLE_CONTEXTS` never supplies {@link QA_EVIDENCE_CONTEXT}: that context stands for
- * QA evidence the caller actually read (ADR-017 D2), so only the caller's own list may carry it.
+ * QA evidence the caller audited and accepted (ADR-017 D2), so only the caller's own list may
+ * carry it.
  *
  * @param {string[] | null | undefined} inputContexts
  * @param {{ defaultContexts?: string[]; alwaysInclude?: string[] }} [options]

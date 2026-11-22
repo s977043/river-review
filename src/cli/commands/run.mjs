@@ -18,7 +18,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { listTrackedChanges } from '../../lib/git.mjs';
+import { ensureGitRepo, getHeadSha, listTrackedChanges } from '../../lib/git.mjs';
 import { planLocalReview, runLocalReview } from '../../lib/local-runner.mjs';
 import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../../lib/qa-evidence.mjs';
 import { QA_EVIDENCE_CONTEXT, resolveAvailableContexts } from '../../lib/utils.mjs';
@@ -318,25 +318,29 @@ function resolveQaAuditOutput(parsed) {
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * The HEAD is the one `planLocalReview` took with `getHeadSha`. `dirty` and `changedFiles` come
- * from tracked files only (`listTrackedChanges`), per §5 condition 5; the review's own `dirty`
- * (`isWorkingTreeDirty`) is left as it is. The AC population and independence stay at the
- * production defaults inside `auditQaEvidence`: no population is passed, so it is undetermined.
+ * Runs before `planLocalReview`, because whether the evidence was accepted decides whether the
+ * `qaEvidence` context is available to skill selection. The repository root and HEAD come from
+ * the same `ensureGitRepo` / `getHeadSha` calls `planLocalReview` makes. `dirty` and
+ * `changedFiles` come from tracked files only (`listTrackedChanges`), per §5 condition 5; the
+ * review's own `dirty` (`isWorkingTreeDirty`) is left as it is. The AC population and
+ * independence stay at the production defaults inside `auditQaEvidence`: no population is
+ * passed, so it is undetermined.
  *
- * @returns {Promise<boolean>} false when the result could not be written
+ * @returns {Promise<{ accepted: boolean } | null>} null when the result could not be written
  */
-async function writeQaEvidenceAudit(parsed, evidence, context, outputPath) {
-  const trackedChanges = await listTrackedChanges(context.repoRoot);
+async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
+  const repoRoot = await ensureGitRepo(targetPath);
+  const trackedChanges = await listTrackedChanges(repoRoot);
   const result = await auditQaEvidence({
     evidence,
     population: null,
     observed: {
-      head: context.commitSha ?? null,
+      head: await getHeadSha(repoRoot),
       dirty: trackedChanges === null ? null : trackedChanges.length > 0,
       changedFiles: trackedChanges ?? [],
     },
     roots: {
-      repository: context.repoRoot,
+      repository: repoRoot,
       ...(parsed.qaArtifactsDir !== null
         ? { artifacts: path.resolve(process.cwd(), parsed.qaArtifactsDir) }
         : {}),
@@ -346,12 +350,12 @@ async function writeQaEvidenceAudit(parsed, evidence, context, outputPath) {
     writeFileSync(outputPath, JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });
   } catch (error) {
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
-    return false;
+    return null;
   }
   console.error(
     `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
   );
-  return true;
+  return result;
 }
 
 /**
@@ -392,9 +396,6 @@ export async function runRunCommand(parsed, targetPath) {
       console.error(`Error: --qa-audit-output is refused: ${error.message}`);
       return 1;
     }
-    availableContexts = [
-      ...new Set([...resolveAvailableContexts(parsed.availableContexts), QA_EVIDENCE_CONTEXT]),
-    ];
   }
   // Resolve --skill-set to its skill ids up front so an unknown name fails
   // fast with a clear message before any review work begins.
@@ -412,6 +413,18 @@ export async function runRunCommand(parsed, targetPath) {
   }
 
   const manualReviewMode = resolveDepthToReviewMode(parsed.depth);
+
+  // Before planLocalReview (and so before its early returns): only evidence the audit accepted
+  // makes the qaEvidence context available to skill selection.
+  if (qaEvidence !== null) {
+    const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
+    if (audit === null) return 1;
+    if (audit.accepted) {
+      availableContexts = [
+        ...new Set([...resolveAvailableContexts(parsed.availableContexts), QA_EVIDENCE_CONTEXT]),
+      ];
+    }
+  }
 
   const context = await planLocalReview({
     cwd: targetPath,
@@ -456,14 +469,6 @@ Dependencies: ${
       ? context.availableDependencies.join(', ')
       : 'not specified (skip disabled)'
   }`);
-
-  // Before the early returns below, so evidence for a run without changes is still audited.
-  if (
-    qaEvidence !== null &&
-    !(await writeQaEvidenceAudit(parsed, qaEvidence, context, qaAuditOutputPath))
-  ) {
-    return 1;
-  }
 
   if (context.status === 'skipped-by-label') {
     const labels = context.matchedLabels?.length

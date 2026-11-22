@@ -1730,7 +1730,7 @@ function parseArgs(argv) {
   // change is about de-duplicating the advisory, not about suppressing it on
   // the error path.
   // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
-  // and `run` adds it after reading the file. Naming it in `--context` must not stand in for that.
+  // and `run` adds it once the audit accepts it. Naming it in `--context` must not stand in for that.
   if (parsed.availableContexts?.includes(QA_EVIDENCE_CONTEXT)) {
     parsed.availableContexts = parsed.availableContexts.filter(
       (ctx) => ctx !== QA_EVIDENCE_CONTEXT

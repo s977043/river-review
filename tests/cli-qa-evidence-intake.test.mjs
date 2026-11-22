@@ -180,9 +180,18 @@ describe('river run --qa-evidence', () => {
     assert.equal(existsSync(join(artifacts, 'audit.json')), false);
   });
 
-  for (const [name, content, code] of [
-    ['not JSON', '{ not json', 'QA_EVIDENCE_MALFORMED'],
-    ['over the size limit', `"${'x'.repeat(1_048_576)}"`, 'QA_EVIDENCE_TOO_LARGE'],
+  const duplicateAc = structuredClone(BASE.evidence);
+  duplicateAc.target.acceptanceCriteria.push(duplicateAc.target.acceptanceCriteria[0]);
+  for (const [name, content, stage, code] of [
+    ['not JSON', '{ not json', 1, 'QA_EVIDENCE_MALFORMED'],
+    ['over the size limit', `"${'x'.repeat(1_048_576)}"`, 1, 'QA_EVIDENCE_TOO_LARGE'],
+    [
+      'with an undefined field',
+      JSON.stringify({ ...BASE.evidence, unexpected: true }),
+      1,
+      'QA_EVIDENCE_MALFORMED',
+    ],
+    ['with a duplicate AC id', JSON.stringify(duplicateAc), 3, 'QA_TARGET_AC_ID_DUPLICATE'],
   ]) {
     test(`evidence ${name} is rejected in the audit while the review still runs`, async (t) => {
       const { dir, cleanup } = await createRepoWithSilentCatchChange();
@@ -200,8 +209,10 @@ describe('river run --qa-evidence', () => {
       assert.ok(Array.isArray(JSON.parse(run.stdout).issues));
       const audit = JSON.parse(readFileSync(auditPath, 'utf8'));
       assert.equal(audit.accepted, false);
-      assert.equal(audit.stage, 1);
+      assert.equal(audit.stage, stage);
       assert.deepEqual(audit.rejectReasons, [code]);
+      // Rejected evidence never makes the context available to skill selection.
+      assert.doesNotMatch(contextsLine(run.stderr), /\bqaEvidence\b/);
     });
   }
 
