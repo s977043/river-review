@@ -27,8 +27,8 @@ var loader = __webpack_require__(3833);
 var artifact_resolver = __webpack_require__(4281);
 // EXTERNAL MODULE: ./src/lib/diff-processor.mjs
 var diff_processor = __webpack_require__(861);
-// EXTERNAL MODULE: ./runners/core/review-runner.mjs + 4 modules
-var review_runner = __webpack_require__(2821);
+// EXTERNAL MODULE: ./runners/core/review-runner.mjs + 5 modules
+var review_runner = __webpack_require__(9713);
 // EXTERNAL MODULE: ./src/lib/review-engine.mjs + 14 modules
 var review_engine = __webpack_require__(7156);
 // EXTERNAL MODULE: ./src/lib/pr-context.mjs
