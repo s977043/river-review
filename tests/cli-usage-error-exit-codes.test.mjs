@@ -1913,7 +1913,7 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
     );
   });
 
-  test('the contract distribution is C1:0 / C2:0 / C3:178 / C4:1 (0 of 179 exit 0)', () => {
+  test('the contract distribution is C1:0 / C2:0 / C3:188 / C4:1 (0 of 189 exit 0)', () => {
     const counts = { C1: 0, C2: 0, C3: 0, C4: 0 };
     for (const testCase of CASES) counts[testCase.contract] += 1;
     assert.deepEqual(
@@ -1930,7 +1930,7 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   });
 
   // ---------------------------------------------------------------------------
-  // 108 ケースの本体
+  // 189 ケースの本体
   // ---------------------------------------------------------------------------
 
   for (const testCase of CASES) {
@@ -1976,7 +1976,7 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   //   書き込みも起きなかった形が、AFTER では書き込みまで完了する。この領域は
   //   本テストでは検出できない（前文の該当節を参照）。
   test('no usage-error case leaves a write side effect (.river must not exist)', () => {
-    // 表の 106 ケースはすべて usage error であり、Slice 3 の原則は「データ
+    // 表の 189 ケースはすべて usage error であり、Slice 3 の原則は「データ
     // 書き込みは全入力検証後に行う」。suppression の穴 2 件は Slice 3 まで、
     // #1746 W2 の `--severity BOGUS` / `--expires notadate` は v1.72.0 まで、
     // exit 0 のまま .river/memory/index.json へエントリを書き込んでいた。
