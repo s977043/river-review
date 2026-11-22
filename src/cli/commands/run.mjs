@@ -9,15 +9,19 @@ import {
   closeSync,
   constants as fsConstants,
   fstatSync,
+  lstatSync,
   openSync,
   readSync,
+  realpathSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { listTrackedChanges } from '../../lib/git.mjs';
 import { planLocalReview, runLocalReview } from '../../lib/local-runner.mjs';
 import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../../lib/qa-evidence.mjs';
-import { resolveAvailableContexts } from '../../lib/utils.mjs';
+import { QA_EVIDENCE_CONTEXT, resolveAvailableContexts } from '../../lib/utils.mjs';
 import { SkillLoaderError, resolveSkillSet } from '../../../runners/core/skill-loader.mjs';
 import CostEstimator from '../../core/cost-estimator.mjs';
 import { resolveDepthToReviewMode } from '../../lib/review-plan-generator.mjs';
@@ -246,9 +250,6 @@ async function persistRunArtifacts(result, parsed, targetPath) {
   }
 }
 
-/** The input context `run` makes available only when QA evidence is passed (ADR-017 D2). */
-export const QA_EVIDENCE_CONTEXT = 'qaEvidence';
-
 /**
  * Read the QA evidence file for `auditQaEvidence`.
  *
@@ -276,20 +277,64 @@ function readQaEvidenceFile(file) {
   }
 }
 
+function isWithin(child, root) {
+  const relative = path.relative(root, child);
+  return relative === '' || (relative.split(path.sep)[0] !== '..' && !path.isAbsolute(relative));
+}
+
+/**
+ * Check `--qa-audit-output` before anything is observed or reviewed.
+ *
+ * The file is created, never overwritten: an existing path (a symlink included, so nothing
+ * outside the named path is written through it), the evidence file and anything under
+ * `--qa-artifacts` are refused, so the audit cannot replace what it audits.
+ *
+ * @returns {string} the path to create
+ */
+function resolveQaAuditOutput(parsed) {
+  const output = path.resolve(process.cwd(), parsed.qaAuditOutput);
+  if (output === path.resolve(process.cwd(), parsed.qaEvidenceFile)) {
+    throw new Error('it is the --qa-evidence file');
+  }
+  if (lstatSync(output, { throwIfNoEntry: false })) throw new Error('the path already exists');
+  const parent = realpathSync(path.dirname(output));
+  if (!statSync(parent).isDirectory()) throw new Error('its parent is not a directory');
+  const target = path.join(parent, path.basename(output));
+  if (parsed.qaArtifactsDir !== null) {
+    const artifacts = path.resolve(process.cwd(), parsed.qaArtifactsDir);
+    let realArtifacts = artifacts;
+    try {
+      realArtifacts = realpathSync(artifacts);
+    } catch {
+      // A missing directory has no real path; the lexical check above still applies.
+    }
+    if (isWithin(output, artifacts) || isWithin(target, realArtifacts)) {
+      throw new Error('it is inside --qa-artifacts');
+    }
+  }
+  return target;
+}
+
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * The HEAD and `dirty` are the ones `planLocalReview` already took with `getHeadSha` /
- * `isWorkingTreeDirty` (src/lib/git.mjs). The AC population and independence stay at the production defaults inside
- * `auditQaEvidence`: no population is passed, so it is undetermined.
+ * The HEAD is the one `planLocalReview` took with `getHeadSha`. `dirty` and `changedFiles` come
+ * from tracked files only (`listTrackedChanges`), per §5 condition 5; the review's own `dirty`
+ * (`isWorkingTreeDirty`) is left as it is. The AC population and independence stay at the
+ * production defaults inside `auditQaEvidence`: no population is passed, so it is undetermined.
  *
  * @returns {Promise<boolean>} false when the result could not be written
  */
-async function writeQaEvidenceAudit(parsed, evidence, context) {
+async function writeQaEvidenceAudit(parsed, evidence, context, outputPath) {
+  const trackedChanges = await listTrackedChanges(context.repoRoot);
   const result = await auditQaEvidence({
     evidence,
     population: null,
-    observed: { head: context.commitSha ?? null, dirty: context.dirty ?? null },
+    observed: {
+      head: context.commitSha ?? null,
+      dirty: trackedChanges === null ? null : trackedChanges.length > 0,
+      changedFiles: trackedChanges ?? [],
+    },
     roots: {
       repository: context.repoRoot,
       ...(parsed.qaArtifactsDir !== null
@@ -298,7 +343,7 @@ async function writeQaEvidenceAudit(parsed, evidence, context) {
     },
   });
   try {
-    writeFileSync(parsed.qaAuditOutput, JSON.stringify(result, null, 2) + '\n');
+    writeFileSync(outputPath, JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });
   } catch (error) {
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return false;
@@ -331,13 +376,21 @@ export async function runRunCommand(parsed, targetPath) {
     }
   }
   let qaEvidence = null;
+  let qaAuditOutputPath = null;
   let availableContexts = parsed.availableContexts;
   if (parsed.qaEvidenceFile !== null) {
+    // Input and output problems stop the run here, before HEAD is observed or anything reviewed.
     try {
       qaEvidence = readQaEvidenceFile(parsed.qaEvidenceFile);
     } catch (error) {
       console.error(`Error: cannot read --qa-evidence: ${error.message}`);
-      return 2;
+      return 1;
+    }
+    try {
+      qaAuditOutputPath = resolveQaAuditOutput(parsed);
+    } catch (error) {
+      console.error(`Error: --qa-audit-output is refused: ${error.message}`);
+      return 1;
     }
     availableContexts = [
       ...new Set([...resolveAvailableContexts(parsed.availableContexts), QA_EVIDENCE_CONTEXT]),
@@ -405,7 +458,10 @@ Dependencies: ${
   }`);
 
   // Before the early returns below, so evidence for a run without changes is still audited.
-  if (qaEvidence !== null && !(await writeQaEvidenceAudit(parsed, qaEvidence, context))) {
+  if (
+    qaEvidence !== null &&
+    !(await writeQaEvidenceAudit(parsed, qaEvidence, context, qaAuditOutputPath))
+  ) {
     return 1;
   }
 

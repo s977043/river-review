@@ -379,6 +379,35 @@ export async function isWorkingTreeDirty(cwd) {
   return status.length > 0;
 }
 
+/**
+ * List tracked files whose working tree or index differs from HEAD.
+ *
+ * Unlike {@link isWorkingTreeDirty}, untracked files are ignored: QA evidence is judged against
+ * HEAD's tracked content (docs/development/qa-evidence-contract.md §5 condition 5), and CI
+ * outputs or the evidence file itself are usually untracked. A rename lists its new path.
+ *
+ * Fail-soft like `isWorkingTreeDirty`: null means "could not determine", never "clean".
+ *
+ * @param {string} cwd
+ * @returns {Promise<string[]|null>}
+ */
+export async function listTrackedChanges(cwd) {
+  const status = await runGitRaw(['status', '--porcelain=v1', '-z', '--untracked-files=no'], {
+    cwd,
+  }).catch(() => null);
+  if (status === null) return null;
+  const entries = status.split('\0');
+  const files = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (entry.length < 4) continue;
+    files.push(entry.slice(3));
+    // `-z` puts a rename's or copy's source path in the next entry.
+    if (entry[0] === 'R' || entry[0] === 'C') index += 1;
+  }
+  return files;
+}
+
 const C_ESCAPES = new Map([
   ['a', 0x07],
   ['b', 0x08],

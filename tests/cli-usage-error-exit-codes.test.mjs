@@ -257,7 +257,10 @@ const CONTRACTS = {
 // 追加して C3 が 179 -> 185 になった。BEFORE ではいずれも
 // `Error: unknown option --qa-....` の exit 1 で、exit code は動いていない。受理形は
 // VALID_CASES 側へ 2 行（通常の語順 / フラグ先行語順）pin した（103 -> 105）。
-const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 185, C4: 1 };
+// 同じ PR のレビュー対応で `--qa-audit-output` の値欠落・`--estimate` との併用・
+// 読めない証拠ファイル（ハンドラがレビュー前に exit 1。exit 2 は --warn-on 専用）の
+// 3 形を足し、C3 が 185 -> 188 になった。
+const EXPECTED_CONTRACT_COUNTS = { C1: 0, C2: 0, C3: 188, C4: 1 };
 
 /** 一時 repo 配下の「存在しないパス」に実行時に差し替えるプレースホルダ。 */
 const NONEXISTENT_PATH = '<nonexistent-path>';
@@ -396,6 +399,27 @@ const CASES = [
   },
   { surface: 'run', kind: 'value-missing', argv: ['run', '.', '--qa-evidence'], contract: 'C3' },
   { surface: 'run', kind: 'value-missing', argv: ['run', '.', '--qa-artifacts'], contract: 'C3' },
+  {
+    surface: 'run',
+    kind: 'value-missing',
+    argv: ['run', '.', '--qa-evidence', 'e.json', '--qa-audit-output'],
+    contract: 'C3',
+  },
+  // `--estimate` は plan-feedback（#2626）と同じく併用を拒否する。証拠には一時 repo に
+  // 実在する `a.txt` を渡し、ハンドラの読み取り失敗ではなく parse 層の拒否で止まる形にする。
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--estimate', '--qa-evidence', 'a.txt', '--qa-audit-output', 'a.json'],
+    contract: 'C3',
+  },
+  // 読めない証拠ファイルはハンドラがレビュー前に exit 1 で止める（exit 2 は --warn-on 専用）。
+  {
+    surface: 'run',
+    kind: 'invalid-value',
+    argv: ['run', '.', '--qa-evidence', NONEXISTENT_PATH, '--qa-audit-output', 'a.json'],
+    contract: 'C3',
+  },
   {
     surface: 'doctor',
     kind: 'unknown-option',
@@ -1850,11 +1874,11 @@ describe('#1709 canary: CLI usage-error exit codes (pinned to CURRENT behavior)'
   // テーブルそのものの健全性（転記ミス・重複の検出）
   // ---------------------------------------------------------------------------
 
-  test('the matrix pins 186 usage-error cases and every row is unique', () => {
+  test('the matrix pins 189 usage-error cases and every row is unique', () => {
     assert.equal(
       CASES.length,
-      186,
-      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）+ PR #2621 の plan-feedback 不正形 4 件（exit code は動いていない）+ #2626 の plan-feedback と --estimate の併用 1 件（exit 2 -> 1）+ ADR-017 T10 の QA 証拠フラグ 6 件（exit code は動いていない）'
+      189,
+      '#1709 の実測マトリクス 78 ケース + Slice 3 で pin した suppression の穴 2 件 + #1746 W2 の値検証 3 件 + #1753 M2 の --expires 2 件 + #1755 の review サブコマンド 2 件 + #1797 の --fingerprint-algo 2 件 + #1860 の evolve prompt-compare 2 件 + #1759 C4 の --month 不正な月 2 件 + #1880 の evolve prompt-ab 2 件 + #2046 の review plan --base 不正値 2 件 + #2051 の skills --base 不正値 2 件 + #2057 の run --base 不正値 2 件 + #2065 の --base を読まない面での拒否 44 件（228 形の掃引で exit code が動いたのは 53 件。重複指定は単発形と等価なので代表 1 件のみ収録し、runs diff の 3 件は逆に変化形ではないが契約として収録している）+ #2081 の skills 後置サブコマンド 4 件 + 同 round 3 のパス併記形 1 件 + 範囲レビュー v1.100.0 minor の後置 resolve 固有オプション 1 件 + #2054 PR-3 の --entry 3 件（値欠落 / 未知 entry / doctor で拒否）+ 2026-09-09 の --artifact 不正形 5 件（review exec の 4 種と review plan の代表 1 形。変異注入で穴が実測されたための追加で exit code は動いていない）+ #2401 の suppression add --skill 値欠落 1 件（exit code は動いていない）+ PR #2621 の plan-feedback 不正形 4 件（exit code は動いていない）+ #2626 の plan-feedback と --estimate の併用 1 件（exit 2 -> 1）+ ADR-017 T10 の QA 証拠フラグ 9 件（うち読めない証拠ファイルの 1 件はハンドラ層の exit 1）'
     );
     const keys = new Set(CASES.map(caseKey));
     assert.equal(keys.size, CASES.length, '同一 (surface, kind, argv) の行が重複している');

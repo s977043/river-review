@@ -39279,6 +39279,7 @@ function deriveGateDecision({
 /* harmony export */   Rd: () => (/* binding */ detectDefaultBranch),
 /* harmony export */   XS: () => (/* binding */ GitError),
 /* harmony export */   Zb: () => (/* binding */ resolveBaseMergeBase),
+/* harmony export */   iJ: () => (/* binding */ listTrackedChanges),
 /* harmony export */   kG: () => (/* binding */ GitRepoNotFoundError),
 /* harmony export */   mM: () => (/* binding */ isWorkingTreeDirty)
 /* harmony export */ });
@@ -39664,6 +39665,35 @@ async function isWorkingTreeDirty(cwd) {
   const status = await runGit(['status', '--porcelain'], { cwd }).catch(() => null);
   if (status === null) return null;
   return status.length > 0;
+}
+
+/**
+ * List tracked files whose working tree or index differs from HEAD.
+ *
+ * Unlike {@link isWorkingTreeDirty}, untracked files are ignored: QA evidence is judged against
+ * HEAD's tracked content (docs/development/qa-evidence-contract.md §5 condition 5), and CI
+ * outputs or the evidence file itself are usually untracked. A rename lists its new path.
+ *
+ * Fail-soft like `isWorkingTreeDirty`: null means "could not determine", never "clean".
+ *
+ * @param {string} cwd
+ * @returns {Promise<string[]|null>}
+ */
+async function listTrackedChanges(cwd) {
+  const status = await runGitRaw(['status', '--porcelain=v1', '-z', '--untracked-files=no'], {
+    cwd,
+  }).catch(() => null);
+  if (status === null) return null;
+  const entries = status.split('\0');
+  const files = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (entry.length < 4) continue;
+    files.push(entry.slice(3));
+    // `-z` puts a rename's or copy's source path in the next entry.
+    if (entry[0] === 'R' || entry[0] === 'C') index += 1;
+  }
+  return files;
 }
 
 const C_ESCAPES = new Map([
@@ -50107,6 +50137,7 @@ function tokensToChars(maxTokens, _opts = {}) {
 /* harmony export */ __nccwpck_require__.d(__webpack_exports__, {
 /* harmony export */   E1: () => (/* binding */ parseList),
 /* harmony export */   Ip: () => (/* binding */ shouldExclude),
+/* harmony export */   Jq: () => (/* binding */ QA_EVIDENCE_CONTEXT),
 /* harmony export */   Rq: () => (/* binding */ isLlmEnabled),
 /* harmony export */   TK: () => (/* binding */ resolveAvailableDependencies),
 /* harmony export */   hN: () => (/* binding */ isOfflineMode),
@@ -50162,6 +50193,9 @@ function isLlmEnabled(env = process.env) {
   );
 }
 
+/** The input context `river run` adds only after reading `--qa-evidence` (ADR-017 D2). */
+const QA_EVIDENCE_CONTEXT = 'qaEvidence';
+
 /**
  * Resolve the effective `availableContexts` for `buildExecutionPlan`'s
  * `inputContext`-based skill selection. Combines caller-supplied contexts
@@ -50175,6 +50209,9 @@ function isLlmEnabled(env = process.env) {
  * Shared between `src/lib/local-runner.mjs` (legacy `river run`) and
  * `src/lib/review-plan.mjs` (`river review exec` / Phase 3).
  *
+ * `RIVER_AVAILABLE_CONTEXTS` never supplies {@link QA_EVIDENCE_CONTEXT}: that context stands for
+ * QA evidence the caller actually read (ADR-017 D2), so only the caller's own list may carry it.
+ *
  * @param {string[] | null | undefined} inputContexts
  * @param {{ defaultContexts?: string[]; alwaysInclude?: string[] }} [options]
  * @returns {string[]}
@@ -50183,7 +50220,9 @@ function resolveAvailableContexts(
   inputContexts,
   { defaultContexts = ['diff'], alwaysInclude = [] } = {}
 ) {
-  const envContexts = parseList(process.env.RIVER_AVAILABLE_CONTEXTS);
+  const envContexts = parseList(process.env.RIVER_AVAILABLE_CONTEXTS).filter(
+    (ctx) => ctx !== QA_EVIDENCE_CONTEXT
+  );
   const base = inputContexts && inputContexts.length ? inputContexts : defaultContexts;
   return [...new Set([...alwaysInclude, ...base, ...envContexts])];
 }
@@ -116387,6 +116426,7 @@ Pricing last updated: ${this.lastUpdated}`;
 
 
 
+
 /**
  * Warn when `--baseline` was given but the run returned before the comparison (#1936).
  *
@@ -116599,9 +116639,6 @@ async function persistRunArtifacts(result, parsed, targetPath) {
   }
 }
 
-/** The input context `run` makes available only when QA evidence is passed (ADR-017 D2). */
-const QA_EVIDENCE_CONTEXT = 'qaEvidence';
-
 /**
  * Read the QA evidence file for `auditQaEvidence`.
  *
@@ -116629,20 +116666,64 @@ function readQaEvidenceFile(file) {
   }
 }
 
+function isWithin(child, root) {
+  const relative = external_node_path_.relative(root, child);
+  return relative === '' || (relative.split(external_node_path_.sep)[0] !== '..' && !external_node_path_.isAbsolute(relative));
+}
+
+/**
+ * Check `--qa-audit-output` before anything is observed or reviewed.
+ *
+ * The file is created, never overwritten: an existing path (a symlink included, so nothing
+ * outside the named path is written through it), the evidence file and anything under
+ * `--qa-artifacts` are refused, so the audit cannot replace what it audits.
+ *
+ * @returns {string} the path to create
+ */
+function resolveQaAuditOutput(parsed) {
+  const output = external_node_path_.resolve(external_node_process_.cwd(), parsed.qaAuditOutput);
+  if (output === external_node_path_.resolve(external_node_process_.cwd(), parsed.qaEvidenceFile)) {
+    throw new Error('it is the --qa-evidence file');
+  }
+  if ((0,external_node_fs_.lstatSync)(output, { throwIfNoEntry: false })) throw new Error('the path already exists');
+  const parent = (0,external_node_fs_.realpathSync)(external_node_path_.dirname(output));
+  if (!(0,external_node_fs_.statSync)(parent).isDirectory()) throw new Error('its parent is not a directory');
+  const target = external_node_path_.join(parent, external_node_path_.basename(output));
+  if (parsed.qaArtifactsDir !== null) {
+    const artifacts = external_node_path_.resolve(external_node_process_.cwd(), parsed.qaArtifactsDir);
+    let realArtifacts = artifacts;
+    try {
+      realArtifacts = (0,external_node_fs_.realpathSync)(artifacts);
+    } catch {
+      // A missing directory has no real path; the lexical check above still applies.
+    }
+    if (isWithin(output, artifacts) || isWithin(target, realArtifacts)) {
+      throw new Error('it is inside --qa-artifacts');
+    }
+  }
+  return target;
+}
+
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * The HEAD and `dirty` are the ones `planLocalReview` already took with `getHeadSha` /
- * `isWorkingTreeDirty` (src/lib/git.mjs). The AC population and independence stay at the production defaults inside
- * `auditQaEvidence`: no population is passed, so it is undetermined.
+ * The HEAD is the one `planLocalReview` took with `getHeadSha`. `dirty` and `changedFiles` come
+ * from tracked files only (`listTrackedChanges`), per §5 condition 5; the review's own `dirty`
+ * (`isWorkingTreeDirty`) is left as it is. The AC population and independence stay at the
+ * production defaults inside `auditQaEvidence`: no population is passed, so it is undetermined.
  *
  * @returns {Promise<boolean>} false when the result could not be written
  */
-async function writeQaEvidenceAudit(parsed, evidence, context) {
+async function writeQaEvidenceAudit(parsed, evidence, context, outputPath) {
+  const trackedChanges = await (0,git/* listTrackedChanges */.iJ)(context.repoRoot);
   const result = await auditQaEvidence({
     evidence,
     population: null,
-    observed: { head: context.commitSha ?? null, dirty: context.dirty ?? null },
+    observed: {
+      head: context.commitSha ?? null,
+      dirty: trackedChanges === null ? null : trackedChanges.length > 0,
+      changedFiles: trackedChanges ?? [],
+    },
     roots: {
       repository: context.repoRoot,
       ...(parsed.qaArtifactsDir !== null
@@ -116651,7 +116732,7 @@ async function writeQaEvidenceAudit(parsed, evidence, context) {
     },
   });
   try {
-    (0,external_node_fs_.writeFileSync)(parsed.qaAuditOutput, JSON.stringify(result, null, 2) + '\n');
+    (0,external_node_fs_.writeFileSync)(outputPath, JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });
   } catch (error) {
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return false;
@@ -116684,16 +116765,24 @@ async function runRunCommand(parsed, targetPath) {
     }
   }
   let qaEvidence = null;
+  let qaAuditOutputPath = null;
   let availableContexts = parsed.availableContexts;
   if (parsed.qaEvidenceFile !== null) {
+    // Input and output problems stop the run here, before HEAD is observed or anything reviewed.
     try {
       qaEvidence = readQaEvidenceFile(parsed.qaEvidenceFile);
     } catch (error) {
       console.error(`Error: cannot read --qa-evidence: ${error.message}`);
-      return 2;
+      return 1;
+    }
+    try {
+      qaAuditOutputPath = resolveQaAuditOutput(parsed);
+    } catch (error) {
+      console.error(`Error: --qa-audit-output is refused: ${error.message}`);
+      return 1;
     }
     availableContexts = [
-      ...new Set([...(0,utils/* resolveAvailableContexts */.ud)(parsed.availableContexts), QA_EVIDENCE_CONTEXT]),
+      ...new Set([...(0,utils/* resolveAvailableContexts */.ud)(parsed.availableContexts), utils/* QA_EVIDENCE_CONTEXT */.Jq]),
     ];
   }
   // Resolve --skill-set to its skill ids up front so an unknown name fails
@@ -116758,7 +116847,10 @@ Dependencies: ${
   }`);
 
   // Before the early returns below, so evidence for a run without changes is still audited.
-  if (qaEvidence !== null && !(await writeQaEvidenceAudit(parsed, qaEvidence, context))) {
+  if (
+    qaEvidence !== null &&
+    !(await writeQaEvidenceAudit(parsed, qaEvidence, context, qaAuditOutputPath))
+  ) {
     return 1;
   }
 
@@ -120935,12 +121027,12 @@ function parseArgs(argv) {
   // the error path.
   // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
   // and `run` adds it after reading the file. Naming it in `--context` must not stand in for that.
-  if (parsed.availableContexts?.includes(QA_EVIDENCE_CONTEXT)) {
+  if (parsed.availableContexts?.includes(utils/* QA_EVIDENCE_CONTEXT */.Jq)) {
     parsed.availableContexts = parsed.availableContexts.filter(
-      (ctx) => ctx !== QA_EVIDENCE_CONTEXT
+      (ctx) => ctx !== utils/* QA_EVIDENCE_CONTEXT */.Jq
     );
     console.warn(
-      `Warning: --context ${QA_EVIDENCE_CONTEXT} is ignored; ` +
+      `Warning: --context ${utils/* QA_EVIDENCE_CONTEXT */.Jq} is ignored; ` +
         'it becomes available only when --qa-evidence is passed to river run.'
     );
   }
@@ -120993,6 +121085,10 @@ function parseArgs(argv) {
     parsed.qaEvidenceFile === null
   ) {
     console.error('Error: --qa-artifacts requires --qa-evidence.');
+    usageError(parsed);
+  } else if (!parsed.usageError && parsed.qaEvidenceFile !== null && parsed.estimate) {
+    // Rejected like the plan-feedback flags (#2626): --estimate only estimates cost.
+    console.error('Error: --qa-evidence and --qa-audit-output cannot be combined with --estimate.');
     usageError(parsed);
   }
 

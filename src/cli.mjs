@@ -15,7 +15,7 @@ import { GitError, GitRepoNotFoundError } from './lib/git.mjs';
 import { SkillLoaderError } from '../runners/core/skill-loader.mjs';
 import { ProjectRulesError } from './lib/rules.mjs';
 import { RiskMapError } from './lib/risk-map.mjs';
-import { parseList } from './lib/utils.mjs';
+import { QA_EVIDENCE_CONTEXT, parseList } from './lib/utils.mjs';
 import { PLANNER_MODES, PHASES } from './lib/planner-utils.mjs';
 import { SEVERITY_RANK } from './lib/finding-factory.mjs';
 import { DEPTH_TO_REVIEW_MODE } from './lib/review-plan-generator.mjs';
@@ -47,7 +47,7 @@ import { runEvalCommand } from './cli/commands/eval.mjs';
 import { runFeedbackCommand } from './cli/commands/feedback.mjs';
 import { runSuppressionCommand } from './cli/commands/suppression.mjs';
 import { runDoctorCommand } from './cli/commands/doctor.mjs';
-import { QA_EVIDENCE_CONTEXT, runRunCommand } from './cli/commands/run.mjs';
+import { runRunCommand } from './cli/commands/run.mjs';
 import { runPromoteCommand } from './cli/commands/promote.mjs';
 import { runEvolveCommand } from './cli/commands/evolve.mjs';
 import {
@@ -1789,6 +1789,10 @@ function parseArgs(argv) {
     parsed.qaEvidenceFile === null
   ) {
     console.error('Error: --qa-artifacts requires --qa-evidence.');
+    usageError(parsed);
+  } else if (!parsed.usageError && parsed.qaEvidenceFile !== null && parsed.estimate) {
+    // Rejected like the plan-feedback flags (#2626): --estimate only estimates cost.
+    console.error('Error: --qa-evidence and --qa-audit-output cannot be combined with --estimate.');
     usageError(parsed);
   }
 
