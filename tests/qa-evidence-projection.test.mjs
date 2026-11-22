@@ -15,7 +15,10 @@ import {
   evaluateQaEvidence,
   judgeQaEvidence,
 } from '../src/lib/qa-evidence.mjs';
-import { projectQaEvidence } from '../src/lib/qa-evidence-projection.mjs';
+import {
+  QA_PROJECTION_REASON_CODE,
+  projectQaEvidence,
+} from '../src/lib/qa-evidence-projection.mjs';
 import { compileSchema } from './helpers/schema-validator.mjs';
 
 const FIXTURES = new URL('./fixtures/qa-evidence/', import.meta.url);
@@ -116,6 +119,13 @@ function assertProjectionContract(projected) {
 
 const UNVERIFIED = 'ACCEPTANCE_CRITERION_UNVERIFIED';
 
+describe('reason code', () => {
+  test('the projected code is the completion vocabulary member §8.1 names', () => {
+    assert.equal(QA_PROJECTION_REASON_CODE, UNVERIFIED);
+    assert.ok(COMPLETION_REASON_CODES.includes(QA_PROJECTION_REASON_CODE));
+  });
+});
+
 describe('production path (auditQaEvidence)', () => {
   const inputs = {
     'base evidence with a trusted-looking population': {
@@ -200,6 +210,18 @@ describe('injected path with a determined population', () => {
     assert.equal('state' in projected, false);
     assert.equal('evidence' in projected, false);
     assert.doesNotMatch(JSON.stringify(projected), /"tests"|"present"/);
+  });
+
+  test('the input result is left unchanged', () => {
+    const results = [
+      judge(twoCriteria()),
+      judge({ evidence: '{', population: twoCriteria().population }),
+    ];
+    for (const result of results) {
+      const before = structuredClone(result);
+      projectQaEvidence(result);
+      assert.deepEqual(result, before);
+    }
   });
 
   test('the schema check itself rejects a state, a QA_ code and a negative count', () => {
