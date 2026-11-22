@@ -397,6 +397,42 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 - 追加 QA: レビューの所見から作る。由来の所見 ID（既存 finding の ID）を持つ
 - 各項目は由来（`acceptance-criterion` / `review-finding`）、優先度、重複先の項目 ID を持つ
 
+構造は `schemas/qa-plan.schema.json` で検査し、組み立ては `src/lib/qa-plan.mjs` の `buildQaPlan` が行う（writer は未配線）。
+
+```text
+qa-plan
+├── schemaVersion … "1"
+├── basic         … 基本 QA（1 件以上）
+└── additional    … 追加 QA（0 件でもよい）
+```
+
+| 欄            | 基本 QA                                  | 追加 QA                                                                                   |
+| ------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `id`          | `ac:<acId>`                              | `finding:<findingId>`                                                                     |
+| `origin`      | `acceptance-criterion`                   | `review-finding`                                                                          |
+| `acId`        | 確定した AC の id（§4.2 で正規化した値） | —                                                                                         |
+| `findingId`   | —                                        | 所見の既存の `id`（例: `rr-1`）。`nonEmptyNfcString` を通すだけで再導出しない             |
+| `priority`    | 必須の AC は `P1`、任意の AC は `P3`     | 所見の severity を `normalizeSeverity` → `severityToPriority` で写した値                  |
+| `duplicateOf` | `null`                                   | 所見の `criterionRefs` のうち、確定した AC に一致する最初の id の基本 QA。無ければ `null` |
+
+- すべての欄は必須とする。QA 計画は River Review が出力するもので、利用者入力ではないため
+- 項目は id だけを持ち、AC や所見の本文を写さない。本文を写すと、redaction と文字列の上限が QA 計画にも要るため
+- 優先度の語彙は `src/lib/finding-factory.mjs` の `severityToPriority`（`P1`〜`P4`）に合わせる。severity が不明な所見は `normalizeSeverity` の fail-safe により `P2` になる
+- AC の `required` が `false` のときだけ任意とし、欠落は必須として扱う（安全側）
+- `duplicateOf` は記録だけとし、重複とした項目も計画から消さない
+- `:` は正規化した AC の id に現れない（§4.2）ので、2 種類の項目の id は衝突しない。項目の id が計画内で一意であることと、`duplicateOf` が同じ計画の項目を指すことは `buildQaPlan` が保証し、schema では検査しない
+- AC の id が §4.2 に違反する場合、所見の id が空または上限を超える場合、id が重複する場合、件数が上限を超える場合は、`buildQaPlan` が例外を投げる。AC や所見を黙って落とさない
+
+上限値:
+
+| 対象                                    | 上限  | 根拠                                                                          |
+| --------------------------------------- | ----- | ----------------------------------------------------------------------------- |
+| `buildQaPlan` が受け取る AC の件数      | 200   | §2.1 の `target.acceptanceCriteria` と同じ                                    |
+| `basic` の件数                          | 1,000 | AC 200 件それぞれに 5 件まで。`buildQaPlan` は AC 1 件につき 1 件を作る       |
+| `additional` の件数、受け取る所見の件数 | 500   | 1 回のレビューの所見として十分。超えたら例外を投げ、切り捨てない              |
+| `acId`、`findingId`                     | 160   | §2.1 の id の生の値と同じ。AC の id は正規化後 128 文字の規則（§4.2）も満たす |
+| `id`、`duplicateOf`                     | 168   | `finding:` の 8 文字 + 160                                                    |
+
 ## 12. reasonCode 一覧
 
 テストでは、本表の reasonCode の集合と、負例 fixture が実際に出した reasonCode の集合が一致することを、両方向で確かめる。表の行数も定数で固定する。
