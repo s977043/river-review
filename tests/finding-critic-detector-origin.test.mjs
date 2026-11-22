@@ -431,4 +431,38 @@ describe('#2871 review follow-up: the strict_block safety net joins detector fin
     });
     assert.equal(result.strictBlock, true);
   });
+
+  it('local-runner: a detector blocker only in preCriticFindings sets strictBlock', async () => {
+    const detector = {
+      id: 'rr-1',
+      ruleId: 'logging-observability',
+      title: 'conflict',
+      message: 'conflict',
+      severity: 'critical',
+      file: 'src/app.js',
+      lineStart: 2,
+      origin: 'detector',
+    };
+    const repoRoot = await mkdtemp(path.join(tmpdir(), 'rr-2871-'));
+    const result = await runLocalReview({
+      apiKey: FAKE_KEY,
+      context: {
+        status: 'ok',
+        repoRoot,
+        defaultBranch: 'main',
+        mergeBase: null,
+        changedFiles: ['src/app.js'],
+        diff: { ...parseUnifiedDiff(CONFLICT_DIFF_TEXT), diffText: CONFLICT_DIFF_TEXT },
+        plan: { selected: [STRICT_SKILL], skipped: [] },
+        config: ACTIVE,
+      },
+      generateReviewImpl: async () => ({
+        findings: [],
+        preCriticFindings: [detector],
+        comments: [],
+        debug: {},
+      }),
+    });
+    assert.equal(result.strictBlock, true);
+  });
 });
