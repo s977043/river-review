@@ -152,7 +152,8 @@ All three paths are resolved against the working directory the CLI was started i
 
 - A run without the three QA flags behaves as before
 - When input and output succeed, the audit result does not affect the review verdict, the gate, or the exit code. It is recorded only
-- When input or output fails (the evidence file cannot be read, or `--qa-audit-output` is refused), the run stops with exit 1 before HEAD is observed and before the review (fail-fast)
+- When the evidence file cannot be read or `--qa-audit-output` fails the up-front check, the run stops with exit 1 before HEAD is observed and before the review (fail-fast)
+- When the actual write fails after that check (permissions, disk space, or a path created after the check), the run also exits 1 before the review, but possibly after HEAD is observed
 - The audit result is not added to the `--output` artifact; it goes only to the `--qa-audit-output` file. The `--output json` artifact follows `schemas/output.schema.json`, which allows no undeclared fields
 - HEAD for comparison is `git rev-parse HEAD`. `dirty` and the list of changed files come from tracked files only (equivalent to `git status --porcelain --untracked-files=no`), so untracked files do not make the tree `dirty`. The review's own judgment is unchanged
 - No AC population is passed and independence stays `unknown`, so in the first version no AC is verified
@@ -162,9 +163,9 @@ All three paths are resolved against the working directory the CLI was started i
 
 ### Exit codes
 
-| Code | Condition                                                                                                                                                                          |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `1`  | The flags break an acceptance rule (usage error), the `--qa-evidence` file cannot be read, or `--qa-audit-output` is refused or cannot be written. The run stops before the review |
+| Code | Condition                                                                                                                                                                                                                              |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`  | The flags break an acceptance rule (usage error), the `--qa-evidence` file cannot be read, or `--qa-audit-output` is refused or cannot be written. Each stops before the review (only a write failure may come after HEAD is observed) |
 
 ## Commands
 

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
-import { listTrackedChanges } from '../src/lib/git.mjs';
+import { listTrackedChanges, parsePorcelainZPaths } from '../src/lib/git.mjs';
 import { auditQaEvidence } from '../src/lib/qa-evidence.mjs';
 import { runCliAsSubprocess } from './helpers/cli.mjs';
 import { cleanupTempDirAsync, createTempDir } from './helpers/temp-dir.mjs';
@@ -273,6 +273,21 @@ describe('river run --qa-evidence', () => {
 });
 
 describe('listTrackedChanges', () => {
+  test('skips the source path of a rename or copy in either status column', () => {
+    assert.deepEqual(parsePorcelainZPaths(' R new.txt\0old-name.txt\0 M next.txt\0'), [
+      'new.txt',
+      'next.txt',
+    ]);
+    assert.deepEqual(parsePorcelainZPaths(' C copy.txt\0orig-name.txt\0M  next.txt\0'), [
+      'copy.txt',
+      'next.txt',
+    ]);
+    assert.deepEqual(parsePorcelainZPaths('R  new.txt\0old-name.txt\0 M next.txt\0'), [
+      'new.txt',
+      'next.txt',
+    ]);
+  });
+
   test('lists tracked changes, the new path of a rename, and no untracked file', async (t) => {
     const { dir, cleanup } = await createTempGitRepo({
       initialFiles: { 'a.txt': 'a\n', 'b.txt': 'b\n', 'c.txt': 'c\n' },

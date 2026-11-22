@@ -39283,7 +39283,7 @@ function deriveGateDecision({
 /* harmony export */   kG: () => (/* binding */ GitRepoNotFoundError),
 /* harmony export */   mM: () => (/* binding */ isWorkingTreeDirty)
 /* harmony export */ });
-/* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, unquoteGitPath, normalizeGitPathToken, collectAddedLineHints */
+/* unused harmony exports resolveRefToCommit, resolveRefToCommitCandidate, findMergeBase, findMergeBaseCandidate, isAncestorRef, parsePorcelainZPaths, unquoteGitPath, normalizeGitPathToken, collectAddedLineHints */
 /* harmony import */ var node_child_process__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(1421);
 /* harmony import */ var node_util__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(7975);
 
@@ -39684,14 +39684,26 @@ async function listTrackedChanges(cwd) {
     cwd,
   }).catch(() => null);
   if (status === null) return null;
+  return parsePorcelainZPaths(status);
+}
+
+/**
+ * Paths of `git status --porcelain=v1 -z` output, one per entry.
+ *
+ * `-z` puts a rename's or copy's source path in the next entry. Either status column can carry
+ * the R / C (index and working tree respectively), so both are checked before skipping it.
+ *
+ * @param {string} status
+ * @returns {string[]}
+ */
+function parsePorcelainZPaths(status) {
   const entries = status.split('\0');
   const files = [];
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
     if (entry.length < 4) continue;
     files.push(entry.slice(3));
-    // `-z` puts a rename's or copy's source path in the next entry.
-    if (entry[0] === 'R' || entry[0] === 'C') index += 1;
+    if (/[RC]/.test(entry.slice(0, 2))) index += 1;
   }
   return files;
 }
