@@ -9,7 +9,7 @@
 // passes `unknown`, so no AC is verified in the first version (§5 condition 8, §9).
 import { createHash } from 'node:crypto';
 import { constants as fsConstants, readFileSync } from 'node:fs';
-import { open, readlink, realpath } from 'node:fs/promises';
+import { lstat, open, realpath } from 'node:fs/promises';
 import { release } from 'node:os';
 import { join } from 'node:path';
 
@@ -507,20 +507,20 @@ export function checkQaEvidence(raw, { population, redact = defaultRedact }) {
   };
 }
 
-// §3.5: open without following a symlink in any component, or report that this platform cannot.
+// §3.5: the open itself must refuse a symlink in any component. Only macOS 11+ offers that to
+// Node (O_NOFOLLOW_ANY); Node 22 has no openat2 / RESOLVE_NO_SYMLINKS for Linux, so every other
+// platform reads nothing and reports the artifact unresolved.
 const O_NOFOLLOW_ANY_DARWIN = 0x20000000;
-function noFollowStrategy() {
-  if (process.platform === 'darwin' && Number.parseInt(release(), 10) >= 20) return 'darwin';
-  if (process.platform === 'linux') return 'linux';
-  return null;
+function canOpenWithoutSymlinks(platform) {
+  return platform === 'darwin' && Number.parseInt(release(), 10) >= 20;
 }
 
-async function readArtifact(ref, { roots, limits, budget, onBeforeOpen }) {
+async function readArtifact(ref, { roots, limits, budget, onBeforeOpen, openFile, platform }) {
   const rootDir = roots?.[ref.root];
-  if (typeof rootDir !== 'string' || isArtifactPathRejected(ref.path))
+  if (typeof rootDir !== 'string' || isArtifactPathRejected(ref.path)) {
     return { state: 'unresolved' };
-  const strategy = noFollowStrategy();
-  if (strategy === null) return { state: 'unresolved' };
+  }
+  if (!canOpenWithoutSymlinks(platform)) return { state: 'unresolved' };
   let realRoot;
   try {
     realRoot = await realpath(rootDir);
@@ -528,24 +528,24 @@ async function readArtifact(ref, { roots, limits, budget, onBeforeOpen }) {
     return { state: 'unresolved' };
   }
   const relative = nfc(ref.path);
-  const fullPath = join(realRoot, ...relative.split('/'));
+  // Refuse a visible symlink before opening anything; the open flag covers a later swap.
+  let current = realRoot;
+  for (const segment of relative.split('/')) {
+    current = join(current, segment);
+    const entry = await lstat(current).catch(() => null);
+    if (entry === null || entry.isSymbolicLink()) return { state: 'unresolved' };
+  }
   if (onBeforeOpen) await onBeforeOpen({ root: realRoot, path: relative });
-  const flags =
-    fsConstants.O_RDONLY |
-    fsConstants.O_NONBLOCK |
-    (strategy === 'darwin' ? O_NOFOLLOW_ANY_DARWIN : fsConstants.O_NOFOLLOW);
   let handle;
   try {
-    handle = await open(fullPath, flags);
+    handle = await openFile(
+      current,
+      fsConstants.O_RDONLY | fsConstants.O_NONBLOCK | O_NOFOLLOW_ANY_DARWIN
+    );
   } catch {
     return { state: 'unresolved' };
   }
   try {
-    if (strategy === 'linux') {
-      // The kernel's record of what was opened: any symlink on the way changes it.
-      const opened = await readlink(`/proc/self/fd/${handle.fd}`).catch(() => null);
-      if (opened !== fullPath) return { state: 'unresolved' };
-    }
     const stat = await handle.stat();
     if (!stat.isFile() || stat.nlink !== 1) return { state: 'unresolved' };
     if (stat.size > limits.artifactBytes || budget.used + stat.size > limits.artifactTotalBytes) {
@@ -578,21 +578,30 @@ async function readArtifact(ref, { roots, limits, budget, onBeforeOpen }) {
  * @param {Array<{ id: string, root: string, path: string }>} refs - `artifacts.refs` of accepted evidence
  * @param {{ roots?: { repository?: string, artifacts?: string },
  *   limits?: { artifactBytes: number, artifactTotalBytes: number },
- *   onBeforeOpen?: (target: { root: string, path: string }) => unknown }} [options]
+ *   onBeforeOpen?: (target: { root: string, path: string }) => unknown,
+ *   openFile?: typeof open, platform?: string }} [options]
  *   `onBeforeOpen` runs after every check and right before the open; tests use it to swap a
- *   directory for a symlink in that window.
+ *   directory for a symlink in that window. `openFile` and `platform` let tests observe which
+ *   paths reach the open.
  * @returns {Promise<Map<string, { state: 'ok' | 'unresolved' | 'too-large', sha256?: string, size?: number }>>}
  */
 export async function resolveQaArtifacts(
   refs,
-  { roots = {}, limits = QA_EVIDENCE_LIMITS, onBeforeOpen } = {}
+  {
+    roots = {},
+    limits = QA_EVIDENCE_LIMITS,
+    onBeforeOpen,
+    openFile = open,
+    platform = process.platform,
+  } = {}
 ) {
   const resolutions = new Map();
   const budget = { used: 0 };
+  const options = { roots, limits, budget, onBeforeOpen, openFile, platform };
   for (const ref of asArray(refs)) {
     const id = normalizeQaId(ref?.id);
     if (id === null || resolutions.has(id)) continue;
-    resolutions.set(id, await readArtifact(ref, { roots, limits, budget, onBeforeOpen }));
+    resolutions.set(id, await readArtifact(ref, options));
   }
   return resolutions;
 }
@@ -708,6 +717,7 @@ function revisionCodes(subjectRevision, observed) {
  * @param {Map<string, { state: string, sha256?: string, size?: number }>} [input.artifactResolutions]
  * @param {string} [input.independence] - only `known` satisfies §5 condition 8
  * @param {Iterable<string>} [input.trustedSourceIds] - artifact ids the host found in a trusted tree
+ * @param {(text: string) => { text: string, count: number }} [input.redact] - for `changedFiles`
  */
 export function judgeQaEvidence({
   checked,
@@ -716,6 +726,7 @@ export function judgeQaEvidence({
   artifactResolutions = new Map(),
   independence = PRODUCTION_INDEPENDENCE,
   trustedSourceIds = [],
+  redact = defaultRedact,
 }) {
   const projectionFor = (verified) =>
     population.determined
@@ -802,28 +813,47 @@ export function judgeQaEvidence({
         records.add(code)
       );
     }
-    const reasonCodes = ordered(codes, AC_REASON_ORDER);
     return {
       acId,
       required: population.criteria.get(acId)?.required ?? null,
       status: result ? result.status : 'NOT_RUN',
-      verified: reasonCodes.length === 0,
-      reasonCodes,
+      verified: codes.size === 0,
+      reasonCodes: ordered(codes, AC_REASON_ORDER),
       records: ordered(records, RECORD_ORDER),
       subcases,
     };
   });
 
-  const artifacts = refs.map((ref) => {
+  // §3.5: a restricted artifact is output by id only, so its path leaves the output copy too.
+  const outputRefs = (
+    isObject(redactedEvidence.artifacts) ? asArray(redactedEvidence.artifacts.refs) : []
+  ).map((ref) => {
+    if (ref.sensitivity === 'public') return ref;
+    const restricted = { ...ref };
+    delete restricted.path;
+    return restricted;
+  });
+  const outputEvidence = isObject(redactedEvidence.artifacts)
+    ? { ...redactedEvidence, artifacts: { ...redactedEvidence.artifacts, refs: outputRefs } }
+    : redactedEvidence;
+  const artifacts = refs.map((ref, index) => {
     const id = normalizeQaId(ref.id);
     const resolution = artifactResolutions.get(id);
     const entry = { id, state: resolution?.state ?? 'unresolved' };
     if (ref.sensitivity === 'public') {
-      entry.path = nfc(ref.path);
+      entry.path = nfc(outputRefs[index].path);
       if (resolution?.size !== undefined) entry.size = resolution.size;
     }
     return entry;
   });
+  let changedFiles;
+  try {
+    changedFiles = asArray(observed?.changedFiles)
+      .filter((file) => typeof file === 'string')
+      .map((file) => redact(file).text);
+  } catch {
+    changedFiles = null;
+  }
 
   return {
     ...base,
@@ -833,9 +863,9 @@ export function judgeQaEvidence({
     revision: {
       observedHead: lowerHex(observed?.head),
       dirty: typeof observed?.dirty === 'boolean' ? observed.dirty : null,
-      changedFiles: asArray(observed?.changedFiles).filter((file) => typeof file === 'string'),
+      changedFiles,
     },
-    redaction: { replaced: checked.redactionCount, evidence: redactedEvidence },
+    redaction: { replaced: checked.redactionCount, evidence: outputEvidence },
     artifacts,
   };
 }
@@ -877,12 +907,14 @@ export async function evaluateQaEvidence({
     artifactResolutions,
     independence,
     trustedSourceIds,
+    ...(redact ? { redact } : {}),
   });
 }
 
 /**
- * Production entry point. Independence is always `unknown` and no source is trusted, because the
- * first version has no host path for either (§9): every AC stays unverified.
+ * Production entry point. Independence is always `unknown`, no source is trusted and the AC
+ * population is never trusted whatever `population.trusted` says, because the first version wires
+ * no host path for any of them (§4.1, §9): every AC stays unverified.
  *
  * @param {{ evidence: string | Buffer, population: Parameters<typeof determineAcPopulation>[0],
  *   observed?: { head?: string | null, dirty?: boolean | null, changedFiles?: string[] },
@@ -891,7 +923,7 @@ export async function evaluateQaEvidence({
 export function auditQaEvidence({ evidence, population, observed, roots }) {
   return evaluateQaEvidence({
     evidence,
-    population,
+    population: isObject(population) ? { ...population, trusted: false } : population,
     observed,
     roots,
     independence: PRODUCTION_INDEPENDENCE,
