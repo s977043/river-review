@@ -1,0 +1,32 @@
+{
+  "description": "Two attempts with the same startedAt (§3.4).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/1",
+      "value": {
+        "startedAt": "2026-11-20T00:00:00Z",
+        "status": "PASS",
+        "logRef": "log-pass",
+        "assertions": {
+          "total": 3,
+          "passed": 3
+        },
+        "command": "npm test",
+        "exitCode": 0,
+        "exitCodeSource": "wrapper"
+      }
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_VERIFICATION_ATTEMPTS_UNORDERED"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

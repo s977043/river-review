@@ -1,0 +1,21 @@
+{
+  "description": "acceptanceCriteria is empty (§3.1).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/acceptanceCriteria",
+      "value": []
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_TARGET_AC_EMPTY"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

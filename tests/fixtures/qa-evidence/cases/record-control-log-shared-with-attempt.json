@@ -1,0 +1,29 @@
+{
+  "description": "The control and the attempt point at the same broken log: the attempt side stops the count (§3.4.2).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/controls/0/logRef",
+      "value": "log-pass"
+    },
+    {
+      "op": "set",
+      "path": "/artifacts/refs/0/sha256",
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_ARTIFACT_HASH_MISMATCH"],
+        "records": ["QA_CONTROL_LOG_UNRESOLVED"]
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

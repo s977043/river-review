@@ -1,0 +1,30 @@
+{
+  "description": "Condition 4: a root: artifacts log while the host passed no artifact directory (§3.5).",
+  "contextPatch": [
+    {
+      "op": "delete",
+      "path": "/roots/artifacts"
+    }
+  ],
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0/logRef",
+      "value": "ci-pass"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_ARTIFACT_UNRESOLVED"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

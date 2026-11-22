@@ -1,0 +1,24 @@
+{
+  "description": "Condition 6: reproduced expected value.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/acceptanceCriteria/0/expected/source",
+      "value": "reproduced"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_TARGET_EXPECTED_REPRODUCED"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

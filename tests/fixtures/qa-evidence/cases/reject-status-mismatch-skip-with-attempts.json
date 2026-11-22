@@ -1,0 +1,26 @@
+{
+  "description": "SKIP with an attempt: the last attempt is PASS, so the status disagrees (§3.4).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/status",
+      "value": "SKIP"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/notRunReason",
+      "value": "out-of-scope"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_VERIFICATION_STATUS_MISMATCH"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

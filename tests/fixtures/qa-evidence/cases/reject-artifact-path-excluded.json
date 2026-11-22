@@ -1,0 +1,21 @@
+{
+  "description": "A path the existing exclusion rule rejects (shouldExcludeForContext, §3.5).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/artifacts/refs/0/path",
+      "value": "config/.env"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_ARTIFACT_PATH_REJECTED"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

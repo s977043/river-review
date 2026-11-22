@@ -1,0 +1,24 @@
+{
+  "description": "Condition 2: PASS with no attempts.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts",
+      "value": []
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_ATTEMPTS_EMPTY"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

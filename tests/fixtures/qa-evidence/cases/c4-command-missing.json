@@ -1,0 +1,23 @@
+{
+  "description": "Condition 4: no command.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/verification/0/attempts/0/command"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_EXECUTION_COMMAND_MISSING"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

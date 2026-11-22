@@ -1,0 +1,23 @@
+{
+  "description": "Condition 6: sourced without sourceRef.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/target/acceptanceCriteria/0/expected/sourceRef"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_TARGET_EXPECTED_SOURCE_UNRESOLVED"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

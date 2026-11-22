@@ -1,0 +1,72 @@
+{
+  "description": "§3.4.1: a NOT_RUN subcase without a reason is recorded on that subcase; AC status is the worst (NOT_RUN).",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/verification/0/basis"
+    },
+    {
+      "op": "delete",
+      "path": "/verification/0/attempts"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/status",
+      "value": "NOT_RUN"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/subcases",
+      "value": [
+        {
+          "id": "S1",
+          "status": "PASS",
+          "basis": "verified",
+          "attempts": [
+            {
+              "startedAt": "2026-11-20T00:00:00Z",
+              "status": "PASS",
+              "logRef": "log-pass",
+              "assertions": {
+                "total": 3,
+                "passed": 3
+              },
+              "command": "npm test",
+              "exitCode": 0,
+              "exitCodeSource": "wrapper"
+            }
+          ]
+        },
+        {
+          "id": "S2",
+          "status": "NOT_RUN",
+          "basis": "verified"
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_NOT_PASS"],
+        "records": [],
+        "subcases": {
+          "S1": {
+            "reasonCodes": [],
+            "records": []
+          },
+          "S2": {
+            "reasonCodes": ["QA_VERIFICATION_NOT_PASS"],
+            "records": ["QA_VERIFICATION_REASON_MISSING"]
+          }
+        }
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

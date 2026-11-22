@@ -1,0 +1,15 @@
+{
+  "description": "Upper-case subject revision and sha256 are lower-cased before comparison.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/subjectRevision",
+      "value": "0123456789ABCDEF0123456789ABCDEF01234567"
+    },
+    {
+      "op": "set",
+      "path": "/artifacts/refs/0/sha256",
+      "value": "CAF49ADDF10AE00679B3E1CA5EE77EA9CCA2E84A0D3F5BDB9C338D0B8A685052"
+    }
+  ]
+}

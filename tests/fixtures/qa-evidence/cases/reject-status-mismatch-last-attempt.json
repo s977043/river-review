@@ -1,0 +1,21 @@
+{
+  "description": "AC status FAIL while its last attempt is PASS (§3.4).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/status",
+      "value": "FAIL"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_VERIFICATION_STATUS_MISMATCH"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

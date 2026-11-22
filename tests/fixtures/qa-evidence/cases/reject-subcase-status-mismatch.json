@@ -1,0 +1,60 @@
+{
+  "description": "AC status PASS while one subcase is SKIP: the worst subcase decides (§3.4.1).",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/verification/0/basis"
+    },
+    {
+      "op": "delete",
+      "path": "/verification/0/attempts"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/status",
+      "value": "PASS"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/subcases",
+      "value": [
+        {
+          "id": "S1",
+          "status": "PASS",
+          "basis": "verified",
+          "attempts": [
+            {
+              "startedAt": "2026-11-20T00:00:00Z",
+              "status": "PASS",
+              "logRef": "log-pass",
+              "assertions": {
+                "total": 3,
+                "passed": 3
+              },
+              "command": "npm test",
+              "exitCode": 0,
+              "exitCodeSource": "wrapper"
+            }
+          ]
+        },
+        {
+          "id": "S2",
+          "status": "SKIP",
+          "basis": "verified",
+          "notRunReason": "out-of-scope"
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_VERIFICATION_SUBCASE_STATUS_MISMATCH"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

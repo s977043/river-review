@@ -1,0 +1,24 @@
+{
+  "description": "Condition 7: expected.value differs from the confirmed list.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/acceptanceCriteria/0/expected/value",
+      "value": "returns 201"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_TARGET_EXPECTED_MISMATCH"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

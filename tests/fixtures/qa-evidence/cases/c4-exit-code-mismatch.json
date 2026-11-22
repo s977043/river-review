@@ -1,0 +1,24 @@
+{
+  "description": "Condition 4: PASS with exitCode 1.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0/exitCode",
+      "value": 1
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_EXECUTION_EXIT_CODE_MISMATCH"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "description": "repository is not owner/name (§3.1).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/repository",
+      "value": "https://example.com/owner/name"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_TARGET_REPOSITORY_INVALID"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

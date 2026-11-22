@@ -1,0 +1,23 @@
+{
+  "description": "Condition 2: basis missing.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/verification/0/basis"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_BASIS_MISSING"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

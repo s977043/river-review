@@ -1,0 +1,31 @@
+{
+  "description": "§6: a run id the user wrote into the evidence does not make independence known.",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/independence",
+      "value": "unknown"
+    }
+  ],
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/execution/ciRun",
+      "value": "https://ci.example/runs/42"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_INDEPENDENCE_UNKNOWN"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

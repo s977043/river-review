@@ -1,0 +1,23 @@
+{
+  "description": "Condition 4: no sha256 declared counts as a mismatch.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/artifacts/refs/0/sha256"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_ARTIFACT_HASH_MISMATCH"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

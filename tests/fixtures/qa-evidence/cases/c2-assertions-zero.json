@@ -1,0 +1,27 @@
+{
+  "description": "Condition 2: an attempt with total 0.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0/assertions",
+      "value": {
+        "total": 0,
+        "passed": 0
+      }
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_ASSERTIONS_MISSING"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

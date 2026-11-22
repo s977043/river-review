@@ -1,0 +1,21 @@
+{
+  "description": "exitCode above 4294967295 (§3.4).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0/exitCode",
+      "value": 4294967296
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_EVIDENCE_MALFORMED"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

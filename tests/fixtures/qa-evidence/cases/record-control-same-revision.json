@@ -1,0 +1,24 @@
+{
+  "description": "A control on the subject revision, compared case-insensitively: recorded only.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/controls/0/revision",
+      "value": "0123456789ABCDEF0123456789ABCDEF01234567"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": [],
+        "records": ["QA_CONTROL_SAME_REVISION"]
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 1,
+      "unverified": 0
+    }
+  }
+}

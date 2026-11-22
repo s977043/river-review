@@ -1,0 +1,21 @@
+{
+  "description": "A control logRef that names no artifact (§3.4.2).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/controls/0/logRef",
+      "value": "log-nowhere"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_ARTIFACT_REF_UNKNOWN"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}
