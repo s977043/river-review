@@ -1,0 +1,43 @@
+{
+  "description": "A confirmed AC has a result but no target entry (§4.3).",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/population/criteria",
+      "value": [
+        {
+          "id": "AC-1",
+          "required": true,
+          "expected": "returns 200"
+        },
+        {
+          "id": "AC-2",
+          "required": false,
+          "expected": "returns 404"
+        }
+      ]
+    }
+  ],
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/1",
+      "value": {
+        "acId": "AC-2",
+        "status": "NOT_RUN",
+        "notRunReason": "out-of-scope"
+      }
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 4,
+      "reasons": ["QA_TARGET_AC_MISSING"]
+    },
+    "projection": {
+      "total": 2,
+      "verified": 0,
+      "unverified": 2
+    }
+  }
+}

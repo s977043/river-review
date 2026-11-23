@@ -1,0 +1,18 @@
+{
+  "description": "Nesting depth 17, one over the limit of 16 (§2.1). The depth check runs before the schema.",
+  "raw": {
+    "kind": "nested",
+    "depth": 17
+  },
+  "expect": {
+    "rejected": {
+      "stage": 1,
+      "reasons": ["QA_EVIDENCE_TOO_LARGE"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

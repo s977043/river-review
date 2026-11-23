@@ -1,0 +1,21 @@
+{
+  "description": "A field the schema does not define (§2).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/execution/operator",
+      "value": "someone"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 1,
+      "reasons": ["QA_EVIDENCE_MALFORMED"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

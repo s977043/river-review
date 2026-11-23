@@ -1,0 +1,24 @@
+{
+  "description": "Condition 4: the declared sha256 differs from the file.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/artifacts/refs/0/sha256",
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_ARTIFACT_HASH_MISMATCH"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "description": "Condition 1 via §4.3: a confirmed and listed AC without any result counts as NOT_RUN.",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/population/criteria",
+      "value": [
+        {
+          "id": "AC-1",
+          "required": true,
+          "expected": "returns 200"
+        },
+        {
+          "id": "AC-2",
+          "required": false,
+          "expected": "returns 404"
+        }
+      ]
+    }
+  ],
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/acceptanceCriteria/1",
+      "value": {
+        "id": "AC-2",
+        "expected": {
+          "value": "returns 404",
+          "source": "sourced",
+          "sourceRef": "spec-ac-1"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": [],
+        "records": []
+      },
+      "AC-2": {
+        "reasonCodes": ["QA_VERIFICATION_AC_MISSING"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 2,
+      "verified": 1,
+      "unverified": 1
+    }
+  }
+}

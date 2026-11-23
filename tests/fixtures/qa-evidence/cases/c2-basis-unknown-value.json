@@ -1,0 +1,24 @@
+{
+  "description": "Condition 2: basis outside the vocabulary counts as missing.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/basis",
+      "value": "manual"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_BASIS_MISSING"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

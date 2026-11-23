@@ -1,0 +1,21 @@
+{
+  "description": "A typed field holds the wrong type (§2).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/execution/runner",
+      "value": 5
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 1,
+      "reasons": ["QA_EVIDENCE_MALFORMED"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Stage 0: the confirmed list is not trusted. The target stands in as the population; no projection.",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/population/trusted",
+      "value": false
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": ["QA_AC_POPULATION_UNKNOWN"],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_AC_POPULATION_UNKNOWN"],
+        "records": []
+      }
+    },
+    "projection": null
+  }
+}

@@ -1,0 +1,1 @@
+synthetic log: control run on the base revision failed as expected

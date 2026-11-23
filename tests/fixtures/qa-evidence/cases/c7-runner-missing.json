@@ -1,0 +1,23 @@
+{
+  "description": "Condition 7: execution.runner missing counts every AC as unverified.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/execution/runner"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": ["QA_EXECUTION_RUNNER_MISSING"],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_EXECUTION_RUNNER_MISSING"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

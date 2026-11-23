@@ -1,0 +1,10 @@
+{
+  "description": "The log lives in the host-provided artifact directory (§3.5).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0/logRef",
+      "value": "ci-pass"
+    }
+  ]
+}

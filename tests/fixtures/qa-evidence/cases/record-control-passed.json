@@ -1,0 +1,24 @@
+{
+  "description": "A control that passed: recorded only.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/controls/0/status",
+      "value": "PASS"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": [],
+        "records": ["QA_CONTROL_PASSED"]
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 1,
+      "unverified": 0
+    }
+  }
+}

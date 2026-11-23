@@ -1,0 +1,10 @@
+{
+  "description": "subcases: [] means no subcases, so the AC keeps its own basis and attempts (§3.4.1).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/subcases",
+      "value": []
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "description": "Condition 3: a FAIL attempt before the final PASS. The FAIL attempt is otherwise consistent so only FLAKY applies.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0",
+      "value": {
+        "startedAt": "2026-11-20T00:00:00Z",
+        "status": "FAIL",
+        "logRef": "log-fail",
+        "assertions": {
+          "total": 3,
+          "passed": 3
+        },
+        "command": "npm test",
+        "exitCode": 1,
+        "exitCodeSource": "wrapper"
+      }
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/1",
+      "value": {
+        "startedAt": "2026-11-20T00:05:00Z",
+        "status": "PASS",
+        "logRef": "log-pass",
+        "assertions": {
+          "total": 3,
+          "passed": 3
+        },
+        "command": "npm test",
+        "exitCode": 0,
+        "exitCodeSource": "wrapper"
+      }
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_FLAKY"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

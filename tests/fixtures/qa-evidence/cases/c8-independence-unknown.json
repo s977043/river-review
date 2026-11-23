@@ -1,0 +1,24 @@
+{
+  "description": "Condition 8: independence unknown, the production value.",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/independence",
+      "value": "unknown"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_INDEPENDENCE_UNKNOWN"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

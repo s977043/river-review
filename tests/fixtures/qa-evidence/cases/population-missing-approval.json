@@ -1,0 +1,19 @@
+{
+  "description": "Stage 0: the confirmed list has no approval record.",
+  "contextPatch": [
+    {
+      "op": "delete",
+      "path": "/population/source/approvalRef"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": ["QA_AC_POPULATION_UNKNOWN"],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_AC_POPULATION_UNKNOWN"],
+        "records": []
+      }
+    },
+    "projection": null
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "description": "No control: recorded only (§3.4.2).",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/verification/0/controls"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": [],
+        "records": ["QA_CONTROL_MISSING"]
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 1,
+      "unverified": 0
+    }
+  }
+}

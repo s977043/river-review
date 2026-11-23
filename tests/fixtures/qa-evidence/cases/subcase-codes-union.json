@@ -1,0 +1,108 @@
+{
+  "description": "§3.4.1: each subcase keeps its own codes and the AC keeps their union in condition order.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/verification/0/basis"
+    },
+    {
+      "op": "delete",
+      "path": "/verification/0/attempts"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/status",
+      "value": "PASS"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/subcases",
+      "value": [
+        {
+          "id": "S1",
+          "status": "PASS",
+          "basis": "verified",
+          "attempts": [
+            {
+              "startedAt": "2026-11-20T00:00:00Z",
+              "status": "PASS",
+              "logRef": "log-pass",
+              "assertions": {
+                "total": 3,
+                "passed": 3
+              },
+              "exitCode": 0,
+              "exitCodeSource": "wrapper"
+            }
+          ]
+        },
+        {
+          "id": "S2",
+          "status": "PASS",
+          "basis": "explore",
+          "attempts": [
+            {
+              "startedAt": "2026-11-20T00:00:00Z",
+              "status": "PASS",
+              "logRef": "log-pass",
+              "assertions": {
+                "total": 3,
+                "passed": 3
+              },
+              "command": "npm test",
+              "exitCode": 0,
+              "exitCodeSource": "wrapper"
+            }
+          ]
+        },
+        {
+          "id": "S3",
+          "status": "PASS",
+          "basis": "verified",
+          "attempts": [
+            {
+              "startedAt": "2026-11-20T00:00:00Z",
+              "status": "PASS",
+              "logRef": "log-pass",
+              "assertions": {
+                "total": 3,
+                "passed": 3
+              },
+              "command": "npm test",
+              "exitCode": 0,
+              "exitCodeSource": "wrapper"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_EXPLORE_ONLY", "QA_EXECUTION_COMMAND_MISSING"],
+        "records": [],
+        "subcases": {
+          "S1": {
+            "reasonCodes": ["QA_EXECUTION_COMMAND_MISSING"],
+            "records": []
+          },
+          "S2": {
+            "reasonCodes": ["QA_VERIFICATION_EXPLORE_ONLY"],
+            "records": []
+          },
+          "S3": {
+            "reasonCodes": [],
+            "records": []
+          }
+        }
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

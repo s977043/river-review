@@ -1,0 +1,23 @@
+{
+  "description": "Condition 7: expected.value missing.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/target/acceptanceCriteria/0/expected/value"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_TARGET_EXPECTED_MISSING"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

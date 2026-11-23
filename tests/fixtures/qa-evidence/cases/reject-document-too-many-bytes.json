@@ -1,0 +1,18 @@
+{
+  "description": "The document is 1,048,577 bytes, one over the 1 MiB limit, padded with whitespace so it is otherwise valid (§2.1).",
+  "raw": {
+    "kind": "padded",
+    "bytes": 1048577
+  },
+  "expect": {
+    "rejected": {
+      "stage": 1,
+      "reasons": ["QA_EVIDENCE_TOO_LARGE"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

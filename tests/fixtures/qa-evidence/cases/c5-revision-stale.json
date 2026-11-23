@@ -1,0 +1,24 @@
+{
+  "description": "Condition 5: observed HEAD differs.",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/observed/head",
+      "value": "fedcba9876543210fedcba9876543210fedcba98"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_TARGET_REVISION_STALE"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}
