@@ -2614,6 +2614,21 @@ untrusted checkout; over-broad GITHUB_TOKEN permissions; and unpinned third-part
 
 - findings / questions
 
+### `qa-evidence-consistency`
+
+- 名前: `QA Evidence Consistency Review`
+- 概要: `利用者が実行した QA の証拠を読み、AC ごとの記録の不足・矛盾・残余リスクの書き漏れを指摘する。verified や COMPLETE の判定は行わない。`
+- 対象:
+  - `**/*`
+- 重要度: minor
+- タグ: qa-evidence / downstream
+- 依存関係: none
+- 適用条件: phase=downstream, inputContext=qaEvidence
+
+チェック項目の例:
+
+- findings / questions
+
 ### `review-policy-standard-downstream`
 
 - 名前: `Standard Review Policy for Downstream`
