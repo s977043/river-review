@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://river-review.the3396.com/schemas/qa-plan.schema.json",
+  "title": "River Review QA Plan",
+  "description": "QA plan River Review hands to the consumer before they run QA (ADR-017 D6). The SSoT for every field and limit is `docs/development/qa-evidence-contract.md` §11. A plan has basic QA items, at least one per confirmed acceptance criterion and present even when the review has no findings, and additional QA items, each made from one review finding and carrying that finding's existing `id`. Items hold ids only, never AC or finding text, so the plan needs no redaction of its own. Encoding rule (same as `schemas/qa-evidence.schema.json`): every object is closed (`additionalProperties: false`), every string has `maxLength` and every array has `maxItems`. The schema compiles under Ajv 2020 with `strict: true`. Semantics outside this schema are decided by the builder (`src/lib/qa-plan.mjs`), never by this schema: id normalization with `nonEmptyNfcString`, the AC id character set, item id uniqueness, and that `duplicateOf` names an item in the same plan.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "basic", "additional"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Version of THIS document shape.",
+      "type": "string",
+      "const": "1"
+    },
+    "basic": {
+      "description": "Basic QA: at least one item per confirmed AC. Never empty, because a confirmed AC list has at least one AC and basic QA is not skipped when the review has no findings.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/basicItem" }
+    },
+    "additional": {
+      "description": "Additional QA: one item per review finding the caller passed in. Empty when there are no findings.",
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/additionalItem" }
+    }
+  },
+  "$defs": {
+    "itemId": {
+      "description": "Plan item id, unique within the plan (checked by the builder). The builder writes `ac:<acId>` or `finding:<findingId>`; the colon cannot occur in a normalized AC id, so the two forms never collide. 168 is the 8 characters of `finding:` plus the 160 of `sourceId`.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 168
+    },
+    "sourceId": {
+      "description": "AC id or finding id copied from its source after `nonEmptyNfcString` (§4.2). 160 matches the raw id length of `schemas/qa-evidence.schema.json`.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "priority": {
+      "description": "`P1` (highest) to `P4`, the vocabulary of `severityToPriority` in `src/lib/finding-factory.mjs`.",
+      "type": "string",
+      "enum": ["P1", "P2", "P3", "P4"]
+    },
+    "duplicateOf": {
+      "description": "Id of the plan item this item overlaps, or `null`. Recorded only: an item marked as a duplicate stays in the plan.",
+      "anyOf": [{ "$ref": "#/$defs/itemId" }, { "type": "null" }]
+    },
+    "basicItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "origin", "acId", "priority", "duplicateOf"],
+      "properties": {
+        "id": { "$ref": "#/$defs/itemId" },
+        "origin": { "type": "string", "const": "acceptance-criterion" },
+        "acId": { "$ref": "#/$defs/sourceId" },
+        "priority": {
+          "description": "`P1` for a required AC, `P3` for an optional one.",
+          "$ref": "#/$defs/priority"
+        },
+        "duplicateOf": { "$ref": "#/$defs/duplicateOf" }
+      }
+    },
+    "additionalItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "origin", "findingId", "priority", "duplicateOf"],
+      "properties": {
+        "id": { "$ref": "#/$defs/itemId" },
+        "origin": { "type": "string", "const": "review-finding" },
+        "findingId": {
+          "description": "The finding's existing `id` (for example `rr-1`), never re-derived.",
+          "$ref": "#/$defs/sourceId"
+        },
+        "priority": {
+          "description": "The finding severity mapped with `normalizeSeverity` and then `severityToPriority`.",
+          "$ref": "#/$defs/priority"
+        },
+        "duplicateOf": {
+          "description": "The basic item of the first confirmed AC named in the finding's `criterionRefs`, or `null`.",
+          "$ref": "#/$defs/duplicateOf"
+        }
+      }
+    }
+  }
+}
