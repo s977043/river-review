@@ -50205,7 +50205,11 @@ function isLlmEnabled(env = process.env) {
   );
 }
 
-/** The input context `river run` adds only when the audit accepts `--qa-evidence` (ADR-017 D2). */
+/**
+ * The input context for QA evidence (ADR-017 D2). Nothing makes it available yet: `river run`
+ * records the `--qa-evidence` audit only, and passing the evidence to skills is a later wiring
+ * (ADR-017 rollout step 5).
+ */
 const QA_EVIDENCE_CONTEXT = 'qaEvidence';
 
 /**
@@ -50222,8 +50226,7 @@ const QA_EVIDENCE_CONTEXT = 'qaEvidence';
  * `src/lib/review-plan.mjs` (`river review exec` / Phase 3).
  *
  * `RIVER_AVAILABLE_CONTEXTS` never supplies {@link QA_EVIDENCE_CONTEXT}: that context stands for
- * QA evidence the caller audited and accepted (ADR-017 D2), so only the caller's own list may
- * carry it.
+ * QA evidence passed to the run itself (ADR-017 D2), so only the caller's own list may carry it.
  *
  * @param {string[] | null | undefined} inputContexts
  * @param {{ defaultContexts?: string[]; alwaysInclude?: string[] }} [options]
@@ -116439,7 +116442,6 @@ Pricing last updated: ${this.lastUpdated}`;
 
 
 
-
 /**
  * Warn when `--baseline` was given but the run returned before the comparison (#1936).
  *
@@ -116699,7 +116701,13 @@ function resolveQaAuditOutput(parsed) {
     throw new Error('it is the --qa-evidence file');
   }
   if ((0,external_node_fs_.lstatSync)(output, { throwIfNoEntry: false })) throw new Error('the path already exists');
-  const parent = (0,external_node_fs_.realpathSync)(external_node_path_.dirname(output));
+  let parent;
+  try {
+    parent = (0,external_node_fs_.realpathSync)(external_node_path_.dirname(output));
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error('its parent directory does not exist');
+    throw error;
+  }
   if (!(0,external_node_fs_.statSync)(parent).isDirectory()) throw new Error('its parent is not a directory');
   const target = external_node_path_.join(parent, external_node_path_.basename(output));
   if (parsed.qaArtifactsDir !== null) {
@@ -116720,8 +116728,9 @@ function resolveQaAuditOutput(parsed) {
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * Runs before `planLocalReview`, because whether the evidence was accepted decides whether the
- * `qaEvidence` context is available to skill selection. The repository root and HEAD come from
+ * Runs before `planLocalReview`, so a failed write stops the run before the review. The audit is
+ * recorded only: it does not make the `qaEvidence` context available, because no skill receives
+ * the evidence itself yet (ADR-017 rollout step 5). The repository root and HEAD come from
  * the same `ensureGitRepo` / `getHeadSha` calls `planLocalReview` makes. `dirty` and
  * `changedFiles` come from tracked files only (`listTrackedChanges`), per §5 condition 5; the
  * review's own `dirty` (`isWorkingTreeDirty`) is left as it is. The AC population and
@@ -116783,7 +116792,6 @@ async function runRunCommand(parsed, targetPath) {
   }
   let qaEvidence = null;
   let qaAuditOutputPath = null;
-  let availableContexts = parsed.availableContexts;
   if (parsed.qaEvidenceFile !== null) {
     // Input and output problems stop the run here, before HEAD is observed or anything reviewed.
     try {
@@ -116816,16 +116824,11 @@ async function runRunCommand(parsed, targetPath) {
 
   const manualReviewMode = (0,review_plan_generator/* resolveDepthToReviewMode */.c8)(parsed.depth);
 
-  // Before planLocalReview (and so before its early returns): only evidence the audit accepted
-  // makes the qaEvidence context available to skill selection.
+  // Before planLocalReview (and so before its early returns), so the audit is written even when
+  // there is nothing to review.
   if (qaEvidence !== null) {
     const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
     if (audit === null) return 1;
-    if (audit.accepted) {
-      availableContexts = [
-        ...new Set([...(0,utils/* resolveAvailableContexts */.ud)(parsed.availableContexts), utils/* QA_EVIDENCE_CONTEXT */.Jq]),
-      ];
-    }
   }
 
   const context = await planLocalReview({
@@ -116833,7 +116836,7 @@ async function runRunCommand(parsed, targetPath) {
     phase: parsed.phase,
     dryRun: parsed.dryRun,
     debug: parsed.debug,
-    availableContexts,
+    availableContexts: parsed.availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     baseRef: parsed.base,
@@ -116931,7 +116934,7 @@ Dependencies: ${
     // no-op. They stay as a safety net for the fallback path: dropping them
     // would silently disable `--context` / `--dependency` the day this call
     // stops passing `context`.
-    availableContexts,
+    availableContexts: parsed.availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     reviewers: parsed.reviewers,
@@ -119487,7 +119490,8 @@ Options:
   --qa-evidence <file>       (run, Experimental) QA evidence JSON to audit (ADR-017)
   --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
   --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
-                             The review output, gate and exit code do not change
+                             The audit is recorded only: the review output, gate and
+                             exit code do not change
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
@@ -121043,15 +121047,16 @@ function parseArgs(argv) {
   // followed by a bad option prints both the advisory and the error, and this
   // change is about de-duplicating the advisory, not about suppressing it on
   // the error path.
-  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
-  // and `run` adds it once the audit accepts it. Naming it in `--context` must not stand in for that.
+  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed.
+  // `run --qa-evidence` records the audit only; passing the evidence to skills is a later wiring
+  // (ADR-017 rollout step 5). Naming it in `--context` must not stand in for that. An emptied list
+  // becomes null so callers fall back to their default contexts, as when --context is absent.
   if (parsed.availableContexts?.includes(utils/* QA_EVIDENCE_CONTEXT */.Jq)) {
-    parsed.availableContexts = parsed.availableContexts.filter(
-      (ctx) => ctx !== utils/* QA_EVIDENCE_CONTEXT */.Jq
-    );
+    const remaining = parsed.availableContexts.filter((ctx) => ctx !== utils/* QA_EVIDENCE_CONTEXT */.Jq);
+    parsed.availableContexts = remaining.length > 0 ? remaining : null;
     console.warn(
       `Warning: --context ${utils/* QA_EVIDENCE_CONTEXT */.Jq} is ignored; ` +
-        'it becomes available only when --qa-evidence is passed to river run.'
+        'no CLI input makes it available yet (river run --qa-evidence records the audit only).'
     );
   }
   if (parsed.availableContexts) {

@@ -2,12 +2,14 @@
 // file and hands it to `auditQaEvidence` with the HEAD and `dirty` the run observed. The audit is
 // cross-checked against a direct `auditQaEvidence` call rather than against hand-written values.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import process from 'node:process';
 import { describe, test } from 'node:test';
 
 import { listTrackedChanges, parsePorcelainZPaths } from '../src/lib/git.mjs';
-import { auditQaEvidence } from '../src/lib/qa-evidence.mjs';
+import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../src/lib/qa-evidence.mjs';
 import { runCliAsSubprocess } from './helpers/cli.mjs';
 import { cleanupTempDirAsync, createTempDir } from './helpers/temp-dir.mjs';
 import {
@@ -87,7 +89,8 @@ describe('river run --qa-evidence', () => {
     assert.ok(audit.criteria.every((criterion) => criterion.verified === false));
     // Restricted artifacts (no `sensitivity`) leave the output by id only.
     assert.doesNotMatch(readFileSync(auditPath, 'utf8'), /logs\/pass\.txt/);
-    assert.match(contextsLine(run.stderr), /\bqaEvidence\b/);
+    // Accepted evidence is recorded only: no skill receives its body yet (ADR-017 rollout step 5).
+    assert.doesNotMatch(contextsLine(run.stderr), /\bqaEvidence\b/);
   });
 
   test('the review output and exit code are those of the same run without QA evidence', async (t) => {
@@ -104,13 +107,33 @@ describe('river run --qa-evidence', () => {
       ['run', '.', '--dry-run', '--output', 'json', ...qaFlags(evidencePath, join(work, 'a.json'))],
       { cwd: dir }
     );
+    assert.equal(JSON.parse(readFileSync(join(work, 'a.json'), 'utf8')).accepted, true);
     assert.equal(withQa.code, plain.code);
     assert.deepEqual(JSON.parse(withQa.stdout), JSON.parse(plain.stdout));
+    assert.equal(contextsLine(withQa.stderr), contextsLine(plain.stderr));
     assert.doesNotMatch(contextsLine(plain.stderr), /\bqaEvidence\b/);
     assert.doesNotMatch(plain.stderr, /QA evidence audit/);
   });
 
-  test('--context qaEvidence alone does not make the context available', async (t) => {
+  test('--context qaEvidence alone resolves the same skills as no --context', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const resolve = (extra) =>
+      runCliAsSubprocess(
+        ['skills', 'resolve', '--path', 'src/app.js', '--output', 'json', ...extra],
+        { cwd: dir }
+      );
+    const plain = await resolve([]);
+    const alone = await resolve(['--context', 'qaEvidence']);
+    assert.equal(plain.code, 0, plain.stderr);
+    assert.equal(alone.code, 0, alone.stderr);
+    assert.match(alone.stderr, /--context qaEvidence is ignored/);
+    const plainSelected = JSON.parse(plain.stdout).selected;
+    assert.ok(plainSelected.length > 0);
+    assert.deepEqual(JSON.parse(alone.stdout).selected, plainSelected);
+  });
+
+  test('--context diff,qaEvidence does not make the context available', async (t) => {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
     t.after(cleanup);
     const run = await runCliAsSubprocess(
@@ -156,7 +179,7 @@ describe('river run --qa-evidence', () => {
       [dangling, /already exists/],
       [evidencePath, /--qa-evidence file/],
       [join(artifacts, 'audit.json'), /inside --qa-artifacts/],
-      [join(work, 'no-dir', 'audit.json'), /ENOENT/],
+      [join(work, 'no-dir', 'audit.json'), /its parent directory does not exist$/m],
     ]) {
       const run = await runCliAsSubprocess(
         [
@@ -177,6 +200,37 @@ describe('river run --qa-evidence', () => {
     }
     assert.equal(readFileSync(existing, 'utf8'), 'keep\n');
     assert.equal(existsSync(join(work, 'nowhere.json')), false);
+    assert.equal(existsSync(join(artifacts, 'audit.json')), false);
+  });
+
+  test('an output under --qa-artifacts reached through a symlink is refused', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const work = scratch(t);
+    const artifacts = scratch(t);
+    const link = join(work, 'artifacts-link');
+    symlinkSync(artifacts, link);
+    const evidencePath = join(work, 'evidence.json');
+    writeFileSync(evidencePath, evidenceFor(await git(['rev-parse', 'HEAD'], dir)));
+    // Either side may be the link: the output path, or the --qa-artifacts root.
+    for (const [auditPath, artifactsRoot] of [
+      [join(link, 'audit.json'), artifacts],
+      [join(artifacts, 'audit.json'), link],
+    ]) {
+      const run = await runCliAsSubprocess(
+        [
+          'run',
+          '.',
+          '--dry-run',
+          '--output',
+          'json',
+          ...qaFlags(evidencePath, auditPath, artifactsRoot),
+        ],
+        { cwd: dir }
+      );
+      assert.equal(run.code, 1, `${auditPath}: ${run.stderr}`);
+      assert.match(run.stderr, /--qa-audit-output is refused: it is inside --qa-artifacts/);
+    }
     assert.equal(existsSync(join(artifacts, 'audit.json')), false);
   });
 
@@ -234,6 +288,27 @@ describe('river run --qa-evidence', () => {
     }
   });
 
+  test(
+    'a FIFO as --qa-evidence is not a regular file and stops with exit 1',
+    { skip: process.platform === 'win32' },
+    async (t) => {
+      const { dir, cleanup } = await createRepoWithSilentCatchChange();
+      t.after(cleanup);
+      const work = scratch(t);
+      const fifo = join(work, 'evidence.fifo');
+      execFileSync('mkfifo', [fifo]);
+      const auditPath = join(work, 'audit.json');
+      const run = await runCliAsSubprocess(
+        ['run', '.', '--dry-run', '--output', 'json', ...qaFlags(fifo, auditPath)],
+        { cwd: dir }
+      );
+      assert.equal(run.code, 1, run.stderr);
+      assert.match(run.stderr, /cannot read --qa-evidence: not a regular file/);
+      assert.doesNotMatch(run.stderr, /River Review \(local\)/, 'the review must not start');
+      assert.equal(existsSync(auditPath), false);
+    }
+  );
+
   test('a run without changes still writes the audit against a clean HEAD', async (t) => {
     const { dir, cleanup } = await createTempGitRepo({
       initialFiles: { 'src/app.js': 'export const value = 1;\n' },
@@ -280,6 +355,17 @@ describe('river run --qa-evidence', () => {
     const audit = JSON.parse(readFileSync(auditPath, 'utf8'));
     assert.equal(audit.revision.dirty, false);
     assert.deepEqual(audit.revision.changedFiles, []);
+  });
+});
+
+describe('QA_EVIDENCE_LIMITS', () => {
+  test('matches the literal limits of docs/development/qa-evidence-contract.md §2.1', () => {
+    assert.deepEqual(QA_EVIDENCE_LIMITS, {
+      evidenceBytes: 1048576,
+      depth: 16,
+      artifactBytes: 104857600,
+      artifactTotalBytes: 536870912,
+    });
   });
 });
 
