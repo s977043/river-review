@@ -52216,6 +52216,8 @@ function applyPhaseFallback(parsed) {
   return false;
 }
 
+// EXTERNAL MODULE: external "node:fs/promises"
+var promises_ = __nccwpck_require__(1455);
 // EXTERNAL MODULE: ./src/lib/diff-processor.mjs
 var diff_processor = __nccwpck_require__(861);
 // EXTERNAL MODULE: ./src/config/artifact-resolver.mjs
@@ -52367,6 +52369,8 @@ function resolveFlowInputBindings({ entry = null, document, resolved = {} }) {
 
 
 
+
+
 /**
  * Resolve the git diff for `--base` (or the auto-detected default branch).
  *
@@ -52445,6 +52449,44 @@ function resolvedFlowInputs(artifact, entry, document, resolved) {
 }
 
 /**
+ * Ids of the skills a `--plan` file selects whose `inputContext` needs QA evidence.
+ *
+ * Replay runs the saved `selectedSkills` without re-planning, so a plan that names a QA evidence
+ * skill would run it without the evidence, which the main CLI does not pass to skills yet
+ * (ADR-017 D2, rollout step 5). Both the bare plan and the full artifact's `plan` are read, so
+ * either shape is covered. A file that cannot be read or parsed yields none, and the replay
+ * reports it as before.
+ *
+ * @param {string} planFile
+ * @returns {Promise<string[]>}
+ */
+async function replayedSkillsNeedingQaEvidence(planFile) {
+  let parsed;
+  try {
+    parsed = JSON.parse(await (0,promises_.readFile)(planFile, 'utf8'));
+  } catch {
+    return [];
+  }
+  const ids = new Set(
+    [parsed?.selectedSkills, parsed?.plan?.selectedSkills]
+      .filter(Array.isArray)
+      .flat()
+      .map((entry) => entry?.id)
+      .filter((id) => typeof id === 'string')
+  );
+  if (ids.size === 0) return [];
+  return (await (0,skill_loader/* loadAllSkillMetadata */.Qv)())
+    .map(({ metadata }) => metadata)
+    .filter(
+      (metadata) =>
+        ids.has(metadata.id) &&
+        Array.isArray(metadata.inputContext) &&
+        metadata.inputContext.includes(utils/* QA_EVIDENCE_CONTEXT */.Jq)
+    )
+    .map((metadata) => metadata.id);
+}
+
+/**
  * Handle the `review` command (plan | exec | verify | route).
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
@@ -52494,6 +52536,18 @@ async function runReviewCommand(parsed) {
         : 'Error: river review requires a subcommand (plan | exec | verify | route).'
     );
     return 1;
+  }
+  // Only an executing replay runs the skills; `--dry-run` echoes the source plan.
+  if (isExecPlanReplay && !parsed.dryRun) {
+    const needsQaEvidence = await replayedSkillsNeedingQaEvidence(external_node_path_.resolve(parsed.planFile));
+    if (needsQaEvidence.length > 0) {
+      console.error(
+        `Error: review exec --plan cannot run ${needsQaEvidence.join(', ')}: ` +
+          `it requires the ${utils/* QA_EVIDENCE_CONTEXT */.Jq} input context, and the main CLI does not ` +
+          'pass QA evidence to skills yet.'
+      );
+      return 1;
+    }
   }
   try {
     const { runReviewPlan, runReviewExecReplay, ReviewPlanError, resolveReviewOutputFormat } =
@@ -108518,8 +108572,6 @@ Provide your review as a JSON array of comments (compatible with GitHub Review A
 `.trim();
 };
 
-// EXTERNAL MODULE: external "node:fs/promises"
-var promises_ = __nccwpck_require__(1455);
 // EXTERNAL MODULE: external "node:crypto"
 var external_node_crypto_ = __nccwpck_require__(7598);
 ;// CONCATENATED MODULE: ./src/lib/usage-persistence.mjs

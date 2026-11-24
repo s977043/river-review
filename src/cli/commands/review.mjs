@@ -4,6 +4,7 @@
 // refactor (#issue: split main() into per-subcommand handlers). Behavior,
 // messages, and exit codes are unchanged; only the enclosing function and the
 // relative import depth differ from the original inline block.
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import {
@@ -14,7 +15,12 @@ import {
 } from '../../lib/git.mjs';
 import { collectRepoDiff } from '../../lib/diff-processor.mjs';
 import { resolveFlowInputBindings } from '../../lib/flow-input-bindings.mjs';
-import { SkillLoaderError, resolveSkillSet } from '../../../runners/core/skill-loader.mjs';
+import { QA_EVIDENCE_CONTEXT } from '../../lib/utils.mjs';
+import {
+  SkillLoaderError,
+  loadAllSkillMetadata,
+  resolveSkillSet,
+} from '../../../runners/core/skill-loader.mjs';
 
 /**
  * Resolve the git diff for `--base` (or the auto-detected default branch).
@@ -94,6 +100,44 @@ function resolvedFlowInputs(artifact, entry, document, resolved) {
 }
 
 /**
+ * Ids of the skills a `--plan` file selects whose `inputContext` needs QA evidence.
+ *
+ * Replay runs the saved `selectedSkills` without re-planning, so a plan that names a QA evidence
+ * skill would run it without the evidence, which the main CLI does not pass to skills yet
+ * (ADR-017 D2, rollout step 5). Both the bare plan and the full artifact's `plan` are read, so
+ * either shape is covered. A file that cannot be read or parsed yields none, and the replay
+ * reports it as before.
+ *
+ * @param {string} planFile
+ * @returns {Promise<string[]>}
+ */
+async function replayedSkillsNeedingQaEvidence(planFile) {
+  let parsed;
+  try {
+    parsed = JSON.parse(await readFile(planFile, 'utf8'));
+  } catch {
+    return [];
+  }
+  const ids = new Set(
+    [parsed?.selectedSkills, parsed?.plan?.selectedSkills]
+      .filter(Array.isArray)
+      .flat()
+      .map((entry) => entry?.id)
+      .filter((id) => typeof id === 'string')
+  );
+  if (ids.size === 0) return [];
+  return (await loadAllSkillMetadata())
+    .map(({ metadata }) => metadata)
+    .filter(
+      (metadata) =>
+        ids.has(metadata.id) &&
+        Array.isArray(metadata.inputContext) &&
+        metadata.inputContext.includes(QA_EVIDENCE_CONTEXT)
+    )
+    .map((metadata) => metadata.id);
+}
+
+/**
  * Handle the `review` command (plan | exec | verify | route).
  *
  * @param {Record<string, unknown>} parsed - parseArgs() result.
@@ -143,6 +187,18 @@ export async function runReviewCommand(parsed) {
         : 'Error: river review requires a subcommand (plan | exec | verify | route).'
     );
     return 1;
+  }
+  // Only an executing replay runs the skills; `--dry-run` echoes the source plan.
+  if (isExecPlanReplay && !parsed.dryRun) {
+    const needsQaEvidence = await replayedSkillsNeedingQaEvidence(path.resolve(parsed.planFile));
+    if (needsQaEvidence.length > 0) {
+      console.error(
+        `Error: review exec --plan cannot run ${needsQaEvidence.join(', ')}: ` +
+          `it requires the ${QA_EVIDENCE_CONTEXT} input context, and the main CLI does not ` +
+          'pass QA evidence to skills yet.'
+      );
+      return 1;
+    }
   }
   try {
     const { runReviewPlan, runReviewExecReplay, ReviewPlanError, resolveReviewOutputFormat } =
