@@ -18,7 +18,10 @@ import { resolveFlowInputBindings } from '../../lib/flow-input-bindings.mjs';
 import { QA_EVIDENCE_CONTEXT } from '../../lib/utils.mjs';
 import {
   SkillLoaderError,
-  loadAllSkillMetadata,
+  createSkillValidator,
+  listSkillFiles,
+  loadSchema,
+  loadSkillMetadata,
   resolveSkillSet,
 } from '../../../runners/core/skill-loader.mjs';
 
@@ -100,41 +103,120 @@ function resolvedFlowInputs(artifact, entry, document, resolved) {
 }
 
 /**
- * Ids of the skills a `--plan` file selects whose `inputContext` needs QA evidence.
+ * Metadata of every skill file under the default skills directory, and the files that failed to
+ * load. `loadAllSkillMetadata` logs and drops a failing file, which cannot tell a missing skill
+ * from one that failed, so the same exported pieces are run here without the drop.
+ *
+ * @returns {Promise<{ metadata: object[], failedFiles: string[] }>}
+ */
+async function loadSkillMetadataReport() {
+  const validator = createSkillValidator(await loadSchema());
+  const metadata = [];
+  const failedFiles = [];
+  for (const filePath of await listSkillFiles()) {
+    try {
+      metadata.push((await loadSkillMetadata(filePath, { validator })).metadata);
+    } catch {
+      failedFiles.push(filePath);
+    }
+  }
+  return { metadata, failedFiles };
+}
+
+/**
+ * Check the skills an executing `review exec --plan <file>` would run before it runs them.
  *
  * Replay runs the saved `selectedSkills` without re-planning, so a plan that names a QA evidence
  * skill would run it without the evidence, which the main CLI does not pass to skills yet
- * (ADR-017 D2, rollout step 5). Both the bare plan and the full artifact's `plan` are read, so
- * either shape is covered. A file that cannot be read or parsed yields none, and the replay
- * reports it as before.
+ * (ADR-017 D2, rollout step 5).
  *
- * @param {string} planFile
- * @returns {Promise<string[]>}
+ * The plan file is read once. The selected skills come from `runReviewExecReplay` itself in echo
+ * mode, so the shape rule and the format checks are the replay's own, and a malformed plan throws
+ * its `ReviewPlanError` before anything is decided here. The returned reader serves that same
+ * content for `planFile` to the executing replay and delegates every other path, so what runs is
+ * what was checked.
+ *
+ * Replay hands the selected entries to `generateReview` by id without loading them, so an id with
+ * no metadata still runs. When every skill file loads, such an id names no skill and cannot
+ * declare `qaEvidence`. When a skill file fails to load, the id may be that skill, so the replay
+ * is refused rather than run unchecked; so is a failure to load the metadata at all.
+ *
+ * @param {string} planFile - the resolved path the replay is given.
+ * @param {{
+ *   runReviewExecReplayImpl: Function,
+ *   readFileImpl?: (p: string) => Promise<string>,
+ *   loadSkillMetadataReportImpl?: () => Promise<{ metadata: object[], failedFiles: string[] }>,
+ * }} deps
+ * @returns {Promise<{ refusal: string } | { readFileImpl: (p: string) => Promise<string> }>}
  */
-async function replayedSkillsNeedingQaEvidence(planFile) {
-  let parsed;
-  try {
-    parsed = JSON.parse(await readFile(planFile, 'utf8'));
-  } catch {
-    return [];
+export async function confirmReplayPlan(
+  planFile,
+  {
+    runReviewExecReplayImpl,
+    readFileImpl = (p) => readFile(p, 'utf8'),
+    loadSkillMetadataReportImpl = loadSkillMetadataReport,
   }
-  const ids = new Set(
-    [parsed?.selectedSkills, parsed?.plan?.selectedSkills]
-      .filter(Array.isArray)
-      .flat()
-      .map((entry) => entry?.id)
-      .filter((id) => typeof id === 'string')
+) {
+  let raw;
+  let readError = null;
+  try {
+    raw = await readFileImpl(planFile);
+  } catch (err) {
+    readError = err;
+  }
+  const servePlan = async (p) => {
+    if (p !== planFile) return readFileImpl(p);
+    if (readError) throw readError;
+    return raw;
+  };
+
+  // The echo only parses the plan; the manifest is left out so its warning prints once.
+  let probe = raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      delete parsed.executionManifest;
+      probe = JSON.stringify(parsed);
+    }
+  } catch {
+    // Not JSON: the echo reports it.
+  }
+  const echo = await runReviewExecReplayImpl({
+    planFile,
+    executeReview: false,
+    readFileImpl: async (p) => (p === planFile && !readError ? probe : servePlan(p)),
+  });
+  const ids = [...new Set(echo.plan.selectedSkills.map((skill) => skill.id))];
+  if (ids.length === 0) return { readFileImpl: servePlan };
+
+  let report;
+  try {
+    report = await loadSkillMetadataReportImpl();
+  } catch (err) {
+    return { refusal: `review exec --plan cannot load skill metadata: ${err.message}` };
+  }
+  const metadataById = new Map(report.metadata.map((metadata) => [metadata.id, metadata]));
+  const unknown = ids.filter((id) => !metadataById.has(id));
+  if (unknown.length > 0 && report.failedFiles.length > 0) {
+    return {
+      refusal:
+        `review exec --plan cannot run ${unknown.join(', ')}: no loadable skill metadata, ` +
+        `and ${report.failedFiles.length} skill file(s) failed to load ` +
+        `(${report.failedFiles.join(', ')}), so its inputContext cannot be checked.`,
+    };
+  }
+  const needsQaEvidence = ids.filter((id) =>
+    (metadataById.get(id)?.inputContext ?? []).includes(QA_EVIDENCE_CONTEXT)
   );
-  if (ids.size === 0) return [];
-  return (await loadAllSkillMetadata())
-    .map(({ metadata }) => metadata)
-    .filter(
-      (metadata) =>
-        ids.has(metadata.id) &&
-        Array.isArray(metadata.inputContext) &&
-        metadata.inputContext.includes(QA_EVIDENCE_CONTEXT)
-    )
-    .map((metadata) => metadata.id);
+  if (needsQaEvidence.length > 0) {
+    return {
+      refusal:
+        `review exec --plan cannot run ${needsQaEvidence.join(', ')}: ` +
+        `it requires the ${QA_EVIDENCE_CONTEXT} input context, and the main CLI does not ` +
+        'pass QA evidence to skills yet.',
+    };
+  }
+  return { readFileImpl: servePlan };
 }
 
 /**
@@ -187,18 +269,6 @@ export async function runReviewCommand(parsed) {
         : 'Error: river review requires a subcommand (plan | exec | verify | route).'
     );
     return 1;
-  }
-  // Only an executing replay runs the skills; `--dry-run` echoes the source plan.
-  if (isExecPlanReplay && !parsed.dryRun) {
-    const needsQaEvidence = await replayedSkillsNeedingQaEvidence(path.resolve(parsed.planFile));
-    if (needsQaEvidence.length > 0) {
-      console.error(
-        `Error: review exec --plan cannot run ${needsQaEvidence.join(', ')}: ` +
-          `it requires the ${QA_EVIDENCE_CONTEXT} input context, and the main CLI does not ` +
-          'pass QA evidence to skills yet.'
-      );
-      return 1;
-    }
   }
   try {
     const { runReviewPlan, runReviewExecReplay, ReviewPlanError, resolveReviewOutputFormat } =
@@ -263,8 +333,22 @@ export async function runReviewCommand(parsed) {
     let resolved;
     try {
       if (isExecPlanReplay) {
+        const planFile = path.resolve(parsed.planFile);
+        // Only an executing replay runs the skills; `--dry-run` echoes the source plan.
+        let planReader;
+        if (!parsed.dryRun) {
+          const confirmed = await confirmReplayPlan(planFile, {
+            runReviewExecReplayImpl: runReviewExecReplay,
+          });
+          if ('refusal' in confirmed) {
+            console.error(`Error: ${confirmed.refusal}`);
+            return 1;
+          }
+          planReader = confirmed.readFileImpl;
+        }
         artifact = await runReviewExecReplay({
-          planFile: path.resolve(parsed.planFile),
+          planFile,
+          ...(planReader ? { readFileImpl: planReader } : {}),
           debug: parsed.debug,
           // #878 A2-3-impl: replay executes (not just echoes) unless --dry-run.
           // The source plan stays the source of truth (no re-plan); the diff

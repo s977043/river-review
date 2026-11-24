@@ -11,6 +11,8 @@ import { describe, test } from 'node:test';
 import { listTrackedChanges, parsePorcelainZPaths } from '../src/lib/git.mjs';
 import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../src/lib/qa-evidence.mjs';
 import { buildExecutionPlan } from '../runners/core/review-runner.mjs';
+import { confirmReplayPlan } from '../src/cli/commands/review.mjs';
+import { runReviewExecReplay } from '../src/lib/review-plan.mjs';
 import { runCliAsSubprocess } from './helpers/cli.mjs';
 import { cleanupTempDirAsync, createTempDir } from './helpers/temp-dir.mjs';
 import {
@@ -477,6 +479,132 @@ describe('river review exec --plan with a QA evidence skill', () => {
       JSON.parse(run.stdout).plan.selectedSkills.map((skill) => skill.id),
       ['test-existence']
     );
+  });
+
+  test('--dry-run still echoes a plan selecting it', async (t) => {
+    const work = scratch(t);
+    const planPath = join(work, 'plan.json');
+    writeFileSync(planPath, JSON.stringify(fullArtifact(QA_SKILL_ID)));
+    const run = await runCliAsSubprocess(['review', 'exec', '--plan', planPath, '--dry-run'], {
+      cwd: work,
+    });
+    assert.equal(run.code, 0, run.stderr);
+  });
+
+  // The replay takes `plan` only from a full artifact (`version: "1"` and a `plan` object).
+  for (const [name, plan, code] of [
+    [
+      'a full artifact with another top-level selectedSkills',
+      { ...fullArtifact('test-existence'), selectedSkills: [{ id: QA_SKILL_ID }] },
+      0,
+    ],
+    [
+      'a bare plan with another nested plan.selectedSkills',
+      {
+        selectedSkills: [{ id: QA_SKILL_ID }],
+        plan: { selectedSkills: [{ id: 'test-existence' }] },
+      },
+      1,
+    ],
+  ]) {
+    test(`${name} is judged by the selectedSkills the replay uses (exit ${code})`, async (t) => {
+      const run = await replay(t, plan);
+      assert.equal(run.code, code, run.stderr);
+    });
+  }
+
+  for (const [name, plan, message] of [
+    [
+      'an empty skill id',
+      {
+        ...fullArtifact(QA_SKILL_ID),
+        plan: { selectedSkills: [{ id: QA_SKILL_ID }, { id: '' }] },
+      },
+      /selectedSkills\[1\]\.id must be a non-empty string/,
+    ],
+    [
+      'a non-array selectedSkills',
+      { selectedSkills: QA_SKILL_ID },
+      /must have plan\.selectedSkills/,
+    ],
+  ]) {
+    test(`a malformed plan (${name}) keeps the replay's exit 3`, async (t) => {
+      const run = await replay(t, plan);
+      assert.equal(run.code, 3, run.stderr);
+      assert.match(run.stderr, message);
+    });
+  }
+
+  // Every skill file in the repository loads, so an unknown id names no skill.
+  test('an id that no skill file defines replays as before', async (t) => {
+    const run = await replay(t, fullArtifact('no-such-skill'));
+    assert.equal(run.code, 0, run.stderr);
+  });
+
+  describe('confirmReplayPlan', () => {
+    const PLAN = '/plans/plan.json';
+    const planText = (skillId) => JSON.stringify(fullArtifact(skillId));
+
+    test('reads the plan once and serves the checked content to the replay', async () => {
+      const reads = [];
+      const readFileImpl = async (p) => {
+        reads.push(p);
+        if (p !== PLAN) return `other:${p}`;
+        // A plan swapped after the check must not reach the replay.
+        return reads.filter((r) => r === PLAN).length === 1
+          ? planText('test-existence')
+          : planText(QA_SKILL_ID);
+      };
+      const confirmed = await confirmReplayPlan(PLAN, {
+        runReviewExecReplayImpl: runReviewExecReplay,
+        readFileImpl,
+      });
+      assert.ok('readFileImpl' in confirmed, confirmed.refusal);
+      const replayed = await runReviewExecReplay({
+        planFile: PLAN,
+        readFileImpl: confirmed.readFileImpl,
+      });
+      assert.deepEqual(
+        replayed.plan.selectedSkills.map((skill) => skill.id),
+        ['test-existence']
+      );
+      assert.deepEqual(reads, [PLAN]);
+      assert.equal(await confirmed.readFileImpl('/repo/diff.patch'), 'other:/repo/diff.patch');
+    });
+
+    const otherSkill = { id: 'test-existence', inputContext: ['diff'] };
+    for (const [name, loadSkillMetadataReportImpl, refusal] of [
+      [
+        'an id missing while a skill file failed to load',
+        async () => ({ metadata: [otherSkill], failedFiles: ['skills/broken/SKILL.md'] }),
+        /cannot run qa-evidence-consistency: no loadable skill metadata, and 1 skill file\(s\) failed to load \(skills\/broken\/SKILL\.md\)/,
+      ],
+      [
+        'a loader that throws',
+        async () => {
+          throw new Error('schema unreadable');
+        },
+        /cannot load skill metadata: schema unreadable/,
+      ],
+    ]) {
+      test(`refuses ${name}`, async () => {
+        const confirmed = await confirmReplayPlan(PLAN, {
+          runReviewExecReplayImpl: runReviewExecReplay,
+          readFileImpl: async () => planText(QA_SKILL_ID),
+          loadSkillMetadataReportImpl,
+        });
+        assert.match(confirmed.refusal ?? '', refusal);
+      });
+    }
+
+    test('allows an id missing while every skill file loaded', async () => {
+      const confirmed = await confirmReplayPlan(PLAN, {
+        runReviewExecReplayImpl: runReviewExecReplay,
+        readFileImpl: async () => planText(QA_SKILL_ID),
+        loadSkillMetadataReportImpl: async () => ({ metadata: [otherSkill], failedFiles: [] }),
+      });
+      assert.ok('readFileImpl' in confirmed, confirmed.refusal);
+    });
   });
 });
 

@@ -160,7 +160,7 @@ river run . --output json \
 - 入力コンテキスト `qaEvidence` は、証拠が監査で受理された（`accepted: true`）ときも available にならない。監査結果は記録だけで、`qaEvidence` を skill の入力にする配線は後続（ADR-017 Rollout 手順 5）にあたる。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
 - 初版で artifact を読むのは macOS 11 以降だけである。他の OS では、証拠の artifact の参照は解決されない（unresolved）
 - GitHub Action からはまだ配線していない。QA の 3 フラグを渡せるのは `river run` だけである
-- `river review exec --plan <file>` は、保存済みの計画が `inputContext` に `qaEvidence` を要求する skill を選んでいると、再生の前に exit 1 で止まる。bare plan と Review Artifact のどちらの形でも同じで、`--dry-run` の echo は対象外である
+- `river review exec --plan <file>` は、保存済みの計画が `inputContext` に `qaEvidence` を要求する skill を選んでいると、再生の前に exit 1 で止まる。選んだ id の metadata が無く、読み込みに失敗した skill ファイルがある場合も、`inputContext` を確かめられないので同じく止まる。どの skill を選んだかは再生と同じ規則で読み、計画の形式の誤りは従来どおり exit 3 になる。`--dry-run` の echo は対象外である
 - 変更が無い（`No changes to review`）場合も、監査結果を書き出す
 - JSON として解釈できない・上限（1 MiB）を超える証拠は、終了コードを変えずに、監査結果の側で拒否として記録する
 - 監査で証拠が全体として拒否された場合（`accepted: false`）も、監査結果は書き出し、レビューは続け、終了コードは QA を指定しない場合と同じになる
