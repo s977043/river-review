@@ -1,0 +1,15 @@
+{
+  "description": "Ids with surrounding whitespace match after nonEmptyNfcString.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/acId",
+      "value": " AC-1 "
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0/logRef",
+      "value": "log-pass "
+    }
+  ]
+}

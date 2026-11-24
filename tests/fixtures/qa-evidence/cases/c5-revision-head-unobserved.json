@@ -1,0 +1,24 @@
+{
+  "description": "Condition 5: HEAD could not be read.",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/observed/head",
+      "value": null
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_TARGET_REVISION_UNOBSERVED"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

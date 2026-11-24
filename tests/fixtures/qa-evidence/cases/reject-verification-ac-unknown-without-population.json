@@ -1,0 +1,28 @@
+{
+  "description": "Population unknown: the target stands in for it and the comparison still rejects (§4.1, §4.3). No projection.",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/population/trusted",
+      "value": false
+    }
+  ],
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/1",
+      "value": {
+        "acId": "AC-9",
+        "status": "NOT_RUN",
+        "notRunReason": "out-of-scope"
+      }
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 4,
+      "reasons": ["QA_VERIFICATION_AC_UNKNOWN"]
+    },
+    "projection": null
+  }
+}

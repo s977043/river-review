@@ -1,0 +1,25 @@
+{
+  "description": "A result for an AC in neither the confirmed list nor the target (§4.3).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/1",
+      "value": {
+        "acId": "AC-9",
+        "status": "NOT_RUN",
+        "notRunReason": "out-of-scope"
+      }
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 4,
+      "reasons": ["QA_VERIFICATION_AC_UNKNOWN"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

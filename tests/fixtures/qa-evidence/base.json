@@ -1,0 +1,93 @@
+{
+  "description": "Base for every case: one AC that meets §5 conditions 1-8 once independence is injected as known and spec-ac-1 is treated as a trusted source. Each file under cases/ and valid/ applies JSON-pointer patches to this base.",
+  "evidence": {
+    "schemaVersion": "1",
+    "target": {
+      "repository": "owner/name",
+      "subjectRevision": "0123456789abcdef0123456789abcdef01234567",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-1",
+          "expected": { "value": "returns 200", "source": "sourced", "sourceRef": "spec-ac-1" }
+        }
+      ]
+    },
+    "execution": { "runner": "node-test" },
+    "environment": { "os": "linux" },
+    "verification": [
+      {
+        "acId": "AC-1",
+        "status": "PASS",
+        "basis": "verified",
+        "attempts": [
+          {
+            "startedAt": "2026-11-20T00:00:00Z",
+            "status": "PASS",
+            "logRef": "log-pass",
+            "assertions": { "total": 3, "passed": 3 },
+            "command": "npm test",
+            "exitCode": 0,
+            "exitCodeSource": "wrapper"
+          }
+        ],
+        "controls": [
+          {
+            "revision": "fedcba9876543210fedcba9876543210fedcba98",
+            "status": "FAIL",
+            "logRef": "log-control"
+          }
+        ]
+      }
+    ],
+    "artifacts": {
+      "refs": [
+        {
+          "id": "log-pass",
+          "root": "repository",
+          "path": "logs/pass.txt",
+          "sha256": "caf49addf10ae00679b3e1ca5ee77ea9cca2e84a0d3f5bdb9c338d0b8a685052"
+        },
+        {
+          "id": "log-fail",
+          "root": "repository",
+          "path": "logs/fail.txt",
+          "sha256": "04fb896772d163c9d35f4e66e5da5c2983d9cb9d15b2c980faa84fdbaa502f10"
+        },
+        {
+          "id": "log-control",
+          "root": "repository",
+          "path": "logs/control.txt",
+          "sha256": "6973303c5046d3a174886437a824c7527d8764c7978da57946bf7432c6b5059e"
+        },
+        {
+          "id": "spec-ac-1",
+          "root": "repository",
+          "path": "spec/ac-1.txt",
+          "sha256": "05759b096f36b2fc57d2af3f74fc1e24bca6480a992d62bcbc7ad1c1b48eec6c"
+        },
+        {
+          "id": "ci-pass",
+          "root": "artifacts",
+          "path": "ci/pass.txt",
+          "sha256": "27e57b79fead46ac854b2b10b8a0f952dcb16c328c15aeacbc2063a4510a85c1"
+        }
+      ]
+    },
+    "gaps": { "items": [] }
+  },
+  "context": {
+    "population": {
+      "trusted": true,
+      "source": {
+        "path": "docs/requirements/task.md",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "approvalRef": "approval-1"
+      },
+      "criteria": [{ "id": "AC-1", "required": true, "expected": "returns 200" }]
+    },
+    "observed": { "head": "0123456789abcdef0123456789abcdef01234567", "dirty": false },
+    "independence": "known",
+    "trustedSourceIds": ["spec-ac-1"],
+    "roots": { "repository": "repo", "artifacts": "host-artifacts" }
+  }
+}

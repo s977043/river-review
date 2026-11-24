@@ -1,0 +1,26 @@
+{
+  "description": "Two artifact refs with the same id (§3.5).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/artifacts/refs/5",
+      "value": {
+        "id": "log-pass",
+        "root": "repository",
+        "path": "logs/fail.txt",
+        "sha256": "04fb896772d163c9d35f4e66e5da5c2983d9cb9d15b2c980faa84fdbaa502f10"
+      }
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_ARTIFACT_ID_INVALID"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

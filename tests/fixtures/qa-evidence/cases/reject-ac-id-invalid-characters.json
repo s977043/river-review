@@ -1,0 +1,26 @@
+{
+  "description": "An AC id with a character outside [A-Za-z0-9._-] after normalization (§4.2).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/acceptanceCriteria/0/id",
+      "value": "AC 1"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/acId",
+      "value": "AC 1"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_TARGET_AC_ID_INVALID"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

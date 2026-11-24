@@ -1,0 +1,21 @@
+{
+  "description": "A short SHA (§3.1).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/subjectRevision",
+      "value": "0123456"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_TARGET_REVISION_INVALID"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

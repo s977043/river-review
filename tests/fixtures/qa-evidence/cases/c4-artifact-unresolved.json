@@ -1,0 +1,24 @@
+{
+  "description": "Condition 4: the log file does not exist.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/artifacts/refs/0/path",
+      "value": "logs/missing.txt"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_ARTIFACT_UNRESOLVED"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

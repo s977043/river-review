@@ -1,0 +1,34 @@
+{
+  "description": "Condition 1: status SKIP with a reason and no attempts.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/status",
+      "value": "SKIP"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/attempts",
+      "value": []
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/notRunReason",
+      "value": "environment-unavailable"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_NOT_PASS"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

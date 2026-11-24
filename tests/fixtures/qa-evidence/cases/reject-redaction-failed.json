@@ -1,0 +1,21 @@
+{
+  "description": "The redactor throws (§7 stage 2).",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/redaction",
+      "value": "fail"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 2,
+      "reasons": ["QA_EVIDENCE_REDACTION_FAILED"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

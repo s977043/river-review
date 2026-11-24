@@ -1,0 +1,29 @@
+{
+  "description": "NOT_RUN without notRunReason: recorded, and the AC is not counted by condition 1 anyway.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/status",
+      "value": "NOT_RUN"
+    },
+    {
+      "op": "set",
+      "path": "/verification/0/attempts",
+      "value": []
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_VERIFICATION_NOT_PASS"],
+        "records": ["QA_VERIFICATION_REASON_MISSING"]
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "description": "An AC with subcases also carries its own basis and attempts (§3.4.1).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/subcases",
+      "value": [
+        {
+          "id": "S1",
+          "status": "PASS",
+          "basis": "verified",
+          "attempts": [
+            {
+              "startedAt": "2026-11-20T00:00:00Z",
+              "status": "PASS",
+              "logRef": "log-pass",
+              "assertions": {
+                "total": 3,
+                "passed": 3
+              },
+              "command": "npm test",
+              "exitCode": 0,
+              "exitCodeSource": "wrapper"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_EVIDENCE_MALFORMED"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

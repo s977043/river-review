@@ -1,0 +1,27 @@
+{
+  "description": "Condition 4: the log exceeds the per-file limit (limit lowered for the fixture; the real constant is tested with a sparse file).",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/limits",
+      "value": {
+        "artifactBytes": 10,
+        "artifactTotalBytes": 536870912
+      }
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_ARTIFACT_TOO_LARGE", "QA_TARGET_EXPECTED_SOURCE_UNRESOLVED"],
+        "records": ["QA_CONTROL_LOG_UNRESOLVED"]
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "description": "Two ascending PASS attempts.",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/1",
+      "value": {
+        "startedAt": "2026-11-20T00:00:00.5Z",
+        "status": "PASS",
+        "logRef": "log-pass",
+        "assertions": {
+          "total": 3,
+          "passed": 3
+        },
+        "command": "npm test",
+        "exitCode": 0,
+        "exitCodeSource": "wrapper"
+      }
+    }
+  ]
+}

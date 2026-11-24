@@ -1,0 +1,28 @@
+{
+  "description": "Two AC ids equal after trimming (§4.2).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/acceptanceCriteria/1",
+      "value": {
+        "id": " AC-1 ",
+        "expected": {
+          "value": "returns 200",
+          "source": "sourced",
+          "sourceRef": "spec-ac-1"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_TARGET_AC_ID_DUPLICATE"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

@@ -1,0 +1,1 @@
+synthetic CI log kept outside the repository: 3 assertions passed

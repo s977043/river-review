@@ -1,0 +1,24 @@
+{
+  "description": "Condition 6: the source exists only on the head side (no trusted source ids).",
+  "contextPatch": [
+    {
+      "op": "set",
+      "path": "/trustedSourceIds",
+      "value": []
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": [],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_TARGET_EXPECTED_SOURCE_UNTRUSTED"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

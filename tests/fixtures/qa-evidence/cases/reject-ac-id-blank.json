@@ -1,0 +1,21 @@
+{
+  "description": "An AC id that normalizes to null (§4.2).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/target/acceptanceCriteria/0/id",
+      "value": "   "
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_TARGET_AC_ID_INVALID"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

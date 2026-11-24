@@ -1,0 +1,21 @@
+{
+  "description": "An attempt status other than PASS / FAIL (§3.4).",
+  "evidencePatch": [
+    {
+      "op": "set",
+      "path": "/verification/0/attempts/0/status",
+      "value": "SKIP"
+    }
+  ],
+  "expect": {
+    "rejected": {
+      "stage": 3,
+      "reasons": ["QA_VERIFICATION_ATTEMPT_INVALID"]
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}

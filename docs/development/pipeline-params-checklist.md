@@ -58,6 +58,7 @@
 - [ ] `tests/review-runner-inferred-phase.test.mjs`—phase 推論経路のテスト
 - [ ] `tests/heuristic-review.test.mjs`—本番 plan 経路を通したヒューリスティック検出器のテスト
 - [ ] `tests/skill-routing-regression.test.mjs`—ADR/依存有無による routing 回帰テスト
+- [ ] `tests/qa-evidence-skill-selection.test.mjs`—`qaEvidence` の有無による QA 証拠 skill の選択と skip 理由のテスト
 - [ ] plan 経由で下流関数に渡される場合は下流関数のチェックリストも確認
 
 ## 機械検証（#1827）

@@ -12,7 +12,7 @@ Issue #310: 目標ディレクトリ構造・粒度の決定（入口 + 専門�
 skills/
 ├── upstream/      # 49 スキル（設計・アーキテクチャレビュー）
 ├── midstream/     # 61 スキル（コード・実装レビュー）
-├── downstream/    # 8 スキル（テスト・QAレビュー）
+├── downstream/    # 9 スキル（テスト・QAレビュー）
 ├── registry.yaml  # スキル登録
 └── _template.md   # スキルテンプレート
 ```

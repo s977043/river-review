@@ -1,0 +1,23 @@
+{
+  "description": "Condition 7: environment.os missing counts every AC as unverified.",
+  "evidencePatch": [
+    {
+      "op": "delete",
+      "path": "/environment/os"
+    }
+  ],
+  "expect": {
+    "globalReasonCodes": ["QA_ENVIRONMENT_INCOMPLETE"],
+    "criteria": {
+      "AC-1": {
+        "reasonCodes": ["QA_ENVIRONMENT_INCOMPLETE"],
+        "records": []
+      }
+    },
+    "projection": {
+      "total": 1,
+      "verified": 0,
+      "unverified": 1
+    }
+  }
+}
