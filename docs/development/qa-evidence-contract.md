@@ -396,6 +396,32 @@ Flow には `executeFlow` の `capabilities['evaluate-completion']` として注
   - `total` が `verified + unverified` と一致しない投影、`verified` の件数が監査結果の AC と一致しない投影
   - `verified` が 0 でない、または `unverified` が `total` と一致しない fallback の件数
 
+#### 8.3.1 後続の配線（T12）が守る条件
+
+QA artifact の hash の確定順序:
+
+- hash の対象は、後で足す欄（`skillFindings` など）も含めた監査結果の全体とする。保存形式は `JSON.stringify(audit, null, 2)` の末尾に改行 1 つ
+- host は次の順に処理する。assessment を作った後に、そのパスの中身を書き換えない
+  1. 最終の監査結果を確定する
+  2. `serializeQaArtifact(finalAudit)` を呼ぶ
+  3. その `content` を書き込み、書き込みの完了を確かめる
+  4. 同じ `finalAudit` と `{path, sha256}` で capability を作る
+- 本モジュールはファイルを読まない。実ファイルと sha256 の一致は host の責務とする
+
+degraded の表示:
+
+- capability が例外を投げると、`executeFlow` は step を degraded にして続ける（`src/lib/flow-runner.mjs:453`）
+- `review exec` の JSON では `steps` に出る（`src/cli/commands/review.mjs:302`）。Markdown と `--summary-file`（`src/lib/review-plan-summary.mjs:24`）には出ず、終了コードも変わらない
+- T12 では人向けの出力に、completion の成否、degraded の理由、assessment が作られなかったことを表示する。gate と Review Only の終了コードは変えない
+
+scope と利用モード:
+
+- scope は Flow の `intent.purpose` から決まる（`task-completion` は task、`final-convergence` は final）。ADR-017 の 3 モードとは別の軸である
+- T12 で `qa-only` など別の purpose を使うなら、scope の解決を拡張する
+- 既存の task / final の Flow は `diff` を必須の入力にしている（`flows/task-completion-review.flow.json:8`、`flows/final-review.flow.json:12`）。差分の無い QA Only には inputs の定義が要る
+- Review Only の Flow には、この capability を注入しない
+- completion-judge の必須部分は、capability を作る前に揃える経路が要る。task では `tasks`、final では `validation` と `requirements`、投影が無いときは AC の件数が必須になる。既存の Flow の inputs はパスを渡すだけで、これらの値へ自動では変換されない
+
 ## 9. host 経路（既存経路の調査結果）
 
 確認した範囲（main `e78b5234`）では、利用者に偽造されない形で「どの run か」「実行者と監査者が別か」を River Review に渡す既存の経路は無い。
