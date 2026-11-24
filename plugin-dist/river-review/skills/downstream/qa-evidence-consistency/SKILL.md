@@ -49,7 +49,7 @@ Why: QA 証拠（`schemas/qa-evidence.schema.json`）を読み、記録の不足
 
 ## Guidance
 
-- 所見は差分の行ではなく AC にアンカーし、対象を `QA-EVIDENCE:<AC id>` とする。証拠全体に関わる所見は `QA-EVIDENCE:0` とする。
+- 所見は差分の行ではなく AC にアンカーし、対象を `QA-EVIDENCE:<AC id>:0` とする。証拠全体に関わる所見は `QA-EVIDENCE:0` とする。所見の行は `<file>:<line>:` の形で解析されるので、行番号の位置に `0` を置く（ファイルは `QA-EVIDENCE:<AC id>`、行は無し）。
 - `PASS` / `FAIL` の AC に試行の記録が無い、`SKIP` / `NOT_RUN` の AC に `notRunReason` が無い、といった欠落を指摘する。
 - AC の `status` が最後の試行の結果と食い違う、サブケースの最も悪い結果と食い違う、といった矛盾を指摘する。
 - `basis: explore` の AC や、期待値の出所が `reproduced` / `derived` の AC を、要件を満たした根拠のように説明している記述を指摘する。
@@ -68,9 +68,9 @@ Why: QA 証拠（`schemas/qa-evidence.schema.json`）を読み、記録の不足
 ```yaml
 findings:
   - severity: minor
-    file: QA-EVIDENCE:AC-2
+    file: QA-EVIDENCE:AC-2:0
     issue: AC-2 の status は PASS だが、最後の試行の結果は FAIL と記録されている
     suggestion: 最後の試行の結果と AC の status のどちらが正しいかを確認し、証拠を作り直す
 questions:
-  - 'QA-EVIDENCE:AC-4 は 1 回目が FAIL、2 回目が PASS だが Gaps に記載が無い。flaky として扱うか'
+  - 'QA-EVIDENCE:AC-4:0 は 1 回目が FAIL、2 回目が PASS だが Gaps に記載が無い。flaky として扱うか'
 ```

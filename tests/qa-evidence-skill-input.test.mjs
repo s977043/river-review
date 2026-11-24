@@ -8,7 +8,7 @@ import { describe, test } from 'node:test';
 import { buildExecutionPlan } from '../runners/core/review-runner.mjs';
 import { planLocalReview, qaEvidenceForReview, runLocalReview } from '../src/lib/local-runner.mjs';
 import { auditQaEvidence, qaEvidenceSkillInput } from '../src/lib/qa-evidence.mjs';
-import { buildPrompt, generateReview } from '../src/lib/review-engine.mjs';
+import { buildPrompt, generateReview, parseLineComments } from '../src/lib/review-engine.mjs';
 import { runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
 import { compileReviewPrompt } from '../src/prompt/compiler.mjs';
 import { buildReviewRequest } from '../src/prompt/review-request.mjs';
@@ -208,6 +208,43 @@ describe('the Prompt Compiler path (ADR-006)', () => {
         rendererId
       );
     }
+  });
+});
+
+describe('the QA-EVIDENCE finding anchor', () => {
+  const skillText = readFileSync(
+    new URL('../skills/downstream/qa-evidence-consistency/SKILL.md', import.meta.url),
+    'utf8'
+  );
+  const section = buildQaEvidenceSection({ evidence: {}, audit: {} });
+  const anchors = (text) => [...text.matchAll(/QA-EVIDENCE:[^\s`'"）、。]+/g)].map((m) => m[0]);
+
+  test('the SKILL.md and the prompt write AC anchors in the same <id>:0 form', () => {
+    assert.ok(skillText.includes('`QA-EVIDENCE:<AC id>:0`'));
+    assert.ok(section.includes('`QA-EVIDENCE:<AC id>:0`'));
+    for (const text of [skillText, section]) {
+      assert.ok(text.includes('`QA-EVIDENCE:0`'));
+      // Every concrete AC anchor carries the :0 line slot the parser needs.
+      for (const anchor of anchors(text).filter((a) => /^QA-EVIDENCE:AC-/.test(a))) {
+        assert.match(anchor, /^QA-EVIDENCE:AC-\d+:0$/, anchor);
+      }
+    }
+  });
+
+  test('parses into a QA-EVIDENCE file with no line, and the bare form is not parsed', () => {
+    const message = 'Finding: x Evidence: status differs Fix: rebuild the record Severity: nit';
+    assert.deepEqual(
+      parseLineComments(`QA-EVIDENCE:AC-2:0: ${message}`)?.map(({ file, line }) => ({
+        file,
+        line,
+      })),
+      [{ file: 'QA-EVIDENCE:AC-2', line: 0 }]
+    );
+    assert.deepEqual(
+      parseLineComments(`QA-EVIDENCE:0: ${message}`)?.map(({ file, line }) => ({ file, line })),
+      [{ file: 'QA-EVIDENCE', line: 0 }]
+    );
+    assert.equal(parseLineComments(`QA-EVIDENCE:AC-2: ${message}`), null);
   });
 });
 

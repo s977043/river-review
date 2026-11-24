@@ -552,8 +552,8 @@
     {
       "id": "qa-evidence-consistency",
       "path": "skills/downstream/qa-evidence-consistency",
-      "checksum": "sha256:7e91fc08a756ee7383c6ecf8ae579a40d9af137be9ceb8396d1bb23998bdb5f0",
-      "files": 1
+      "checksum": "sha256:f848ca200d953346ed418d833da6fc9f271b1db5664d12b4224cafe91f6cda5f",
+      "files": 2
     },
     {
       "id": "react-router-action-contract",
