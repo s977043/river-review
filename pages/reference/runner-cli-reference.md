@@ -157,10 +157,12 @@ river run . --output json \
 - 監査結果は `--output` の成果物に載せず、`--qa-audit-output` のファイルにだけ書く。`--output json` の成果物は `schemas/output.schema.json` に従い、定義に無い欄を持てないため
 - 照合に使う HEAD は `git rev-parse HEAD` である。`dirty` と変わったファイルの一覧は、追跡中のファイルだけで判定する（`git status --porcelain --untracked-files=no` 相当）。未追跡のファイルは `dirty` にしない。レビュー側の判定は変えない
 - AC の母集団は渡さず、独立性は `unknown` のままである。そのため初版では、どの AC も verified にならない
-- 入力コンテキスト `qaEvidence` は、`--qa-evidence` の証拠が監査で受理された（`accepted: true`）ときだけ available になる。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
+- 入力コンテキスト `qaEvidence` は、証拠が監査で受理された（`accepted: true`）ときも available にならない。監査結果は記録だけで、`qaEvidence` を skill の入力にする配線は後続（ADR-017 Rollout 手順 5）にあたる。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
+- 初版で artifact を読むのは macOS 11 以降だけである。他の OS では、証拠の artifact の参照は解決されない（unresolved）
+- GitHub Action からはまだ配線していない。QA の 3 フラグを渡せるのは `river run` だけである
 - 変更が無い（`No changes to review`）場合も、監査結果を書き出す
 - JSON として解釈できない・上限（1 MiB）を超える証拠は、終了コードを変えずに、監査結果の側で拒否として記録する
-- 監査で証拠が全体として拒否された場合（`accepted: false`）も、監査結果は書き出し、レビューは続け、終了コードは QA を指定しない場合と同じになる。このとき `qaEvidence` は available にならない
+- 監査で証拠が全体として拒否された場合（`accepted: false`）も、監査結果は書き出し、レビューは続け、終了コードは QA を指定しない場合と同じになる
 
 ### 終了コード
 

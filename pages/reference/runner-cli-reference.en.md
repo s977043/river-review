@@ -157,10 +157,12 @@ All three paths are resolved against the working directory the CLI was started i
 - The audit result is not added to the `--output` artifact; it goes only to the `--qa-audit-output` file. The `--output json` artifact follows `schemas/output.schema.json`, which allows no undeclared fields
 - HEAD for comparison is `git rev-parse HEAD`. `dirty` and the list of changed files come from tracked files only (equivalent to `git status --porcelain --untracked-files=no`), so untracked files do not make the tree `dirty`. The review's own judgment is unchanged
 - No AC population is passed and independence stays `unknown`, so in the first version no AC is verified
-- The `qaEvidence` input context becomes available only when the audit accepts the `--qa-evidence` evidence (`accepted: true`). `--context qaEvidence` is removed with a warning, and `qaEvidence` in the `RIVER_AVAILABLE_CONTEXTS` environment variable is ignored
+- The `qaEvidence` input context does not become available, even when the audit accepts the evidence (`accepted: true`). The audit result is recorded only; wiring `qaEvidence` as a skill input comes later (ADR-017 rollout step 5). `--context qaEvidence` is removed with a warning, and `qaEvidence` in the `RIVER_AVAILABLE_CONTEXTS` environment variable is ignored
+- In the first version, artifacts are read only on macOS 11 or later. On other operating systems, the artifact references in the evidence stay unresolved
+- The GitHub Action does not pass these flags yet; only `river run` accepts the three QA flags
 - The audit result is written even when there are no changes (`No changes to review`)
 - Evidence that is not JSON or exceeds the 1 MiB limit is recorded as rejected in the audit result, without changing the exit code
-- When the audit rejects the evidence as a whole (`accepted: false`), the audit result is still written, the review continues, and the exit code is the same as without QA; `qaEvidence` is not made available
+- When the audit rejects the evidence as a whole (`accepted: false`), the audit result is still written, the review continues, and the exit code is the same as without QA
 
 ### Exit codes
 
