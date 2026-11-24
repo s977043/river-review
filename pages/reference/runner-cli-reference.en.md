@@ -151,7 +151,7 @@ All three paths are resolved against the working directory the CLI was started i
 ### Behavior
 
 - A run without the three QA flags behaves as before
-- The audit result itself is not an input to the review verdict, the gate, or the exit code. Accepted evidence does reach skills that read `qaEvidence` (below), so their findings may join the review result
+- Neither the audit result nor the findings of skills that read `qaEvidence` are an input to the review issues, the score, the verdict, the gate, or the exit code (ADR-017 D2)
 - When the evidence file cannot be read or `--qa-audit-output` fails the up-front check, the run stops with exit 1 before HEAD is observed and before the review (fail-fast)
 - When the actual write fails after that check (permissions, disk space, or a path created after the check), the run also exits 1 before the review, but possibly after HEAD is observed
 - The audit result is not added to the `--output` artifact; it goes only to the `--qa-audit-output` file. The `--output json` artifact follows `schemas/output.schema.json`, which allows no undeclared fields
@@ -159,7 +159,9 @@ All three paths are resolved against the working directory the CLI was started i
 - No AC population is passed and independence stays `unknown`, so in the first version no AC is verified
 - The `qaEvidence` input context becomes available only when the audit accepts the evidence (`accepted: true`). When the plan selects a skill that declares `qaEvidence` in its `inputContext` (such as `qa-evidence-consistency`), the review prompt receives the evidence itself: the redacted copy held in the audit result (restricted artifacts without their paths) and the rest of the audit result, nothing the `--qa-audit-output` file does not hold. A run whose plan selects no such skill keeps its prompt unchanged
 - Strings in the evidence are redacted according to the `security.redact` setting, as the repository context in the review prompt is
-- A finding whose target starts with `QA-EVIDENCE:` is capped at severity `minor`, so it never counts as a blocking finding for the gate. It still appears in the review result and so affects the score. Besides the diff, its evidence may cite the public artifact paths of the evidence passed to the review
+- A finding whose target starts with `QA-EVIDENCE` (`QA-EVIDENCE:<AC id>:0` / `QA-EVIDENCE:0`) is removed from the review issues and never reaches the Finding Critic, the score, or the gate. It is written to the `skillFindings` field of the `--qa-audit-output` file instead. Besides the diff, its evidence may cite the public artifact paths of the evidence passed to the review
+- `skillFindings` is an array whose entries hold `target` (the AC id, or `null` for the evidence as a whole), `severity`, `confidence`, `title`, `message`, `evidence`, and `suggestion`. Only redacted strings are written
+- The audit file is created before the review (an existing path is never overwritten), kept open, and rewritten with `skillFindings` after the review. `skillFindings` is written only when the evidence was passed to a skill that reads `qaEvidence` and the LLM ran, so a missing field means no skill read the evidence. If the rewrite fails, the run stops with exit 1 without printing the review result
 - Rejected evidence (`accepted: false`) and a run without the three QA flags leave `qaEvidence` unavailable. `--context qaEvidence` is removed with a warning, and `qaEvidence` in the `RIVER_AVAILABLE_CONTEXTS` environment variable is ignored
 - In the first version, artifacts are read only on macOS 11 or later. On other operating systems, the artifact references in the evidence stay unresolved
 - The GitHub Action does not pass these flags yet; only `river run` accepts the three QA flags

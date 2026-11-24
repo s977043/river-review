@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
 import { buildExecutionPlan } from '../runners/core/review-runner.mjs';
-import { qaEvidenceRedactor } from '../src/cli/commands/run.mjs';
+import { main } from '../src/cli.mjs';
+import { qaEvidenceRedactor, qaSkillFindingsForAudit } from '../src/cli/commands/run.mjs';
 import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { planLocalReview, qaEvidenceForReview, runLocalReview } from '../src/lib/local-runner.mjs';
 import {
@@ -257,7 +258,7 @@ describe('the QA-EVIDENCE finding anchor', () => {
   });
 });
 
-describe('QA-EVIDENCE findings through generateReview (verifier and severity)', () => {
+describe('QA-EVIDENCE findings through generateReview (verifier and separation)', () => {
   const APP_DIFF = `diff --git a/src/app.ts b/src/app.ts
 index 1111111..2222222 100644
 --- a/src/app.ts
@@ -267,7 +268,7 @@ index 1111111..2222222 100644
 +const b = 2;
 `;
   // The first selected skill is the one the verifier checks severity against; a critical one
-  // lets a blocker reach the findings, so the cap below is what keeps QA findings minor.
+  // lets a blocker through, so a QA finding keeps the severity it was given.
   const PLAN = {
     selected: [{ metadata: { id: 'any-critical', phase: 'downstream', severity: 'critical' } }],
     skipped: [],
@@ -329,15 +330,47 @@ index 1111111..2222222 100644
       ].join('\n'),
       { qaEvidence }
     );
-    const kept = result.findings.map((f) => `${f.file}:${f.severity}`).sort();
-    assert.deepEqual(kept, ['QA-EVIDENCE:AC-1:minor', 'src/app.ts:critical']);
+    // The QA finding leaves the review findings and comments for qaEvidenceFindings.
+    assert.deepEqual(
+      result.findings.map((f) => `${f.file}:${f.severity}`),
+      ['src/app.ts:critical']
+    );
+    assert.deepEqual(
+      result.comments.map((c) => c.file),
+      ['src/app.ts']
+    );
+    assert.deepEqual(
+      result.qaEvidenceFindings.map((f) => `${f.file}:${f.severity}`),
+      ['QA-EVIDENCE:AC-1:critical']
+    );
     assert.deepEqual(rejectedFiles(result).sort(), ['QA-EVIDENCE:AC-2', 'src/app.ts']);
   });
 
   test('without QA evidence the same QA finding is checked against the diff only', async () => {
     const result = await review(line('QA-EVIDENCE:AC-1:0', 'ci/pass.txt'));
     assert.deepEqual(result.findings, []);
+    assert.deepEqual(result.qaEvidenceFindings, []);
     assert.deepEqual(rejectedFiles(result), ['QA-EVIDENCE:AC-1']);
+  });
+
+  test('the orchestration path collects QA findings apart from the review findings', async () => {
+    const qaFinding = { file: 'QA-EVIDENCE:AC-1', lineStart: 0, title: 'x', severity: 'major' };
+    const files = [{ path: 'src/a.js', hunks: [{ header: '@@ -1 +1,2 @@', lines: ['+x'] }] }];
+    const result = await runReviewerOrchestration({
+      diff: { files, filesForReview: files, changedFiles: ['src/a.js'], diffText: '' },
+      reviewers: ['bug-hunter', 'test-gap'],
+      progress: false,
+      env: {},
+      generateReviewImpl: async () => ({
+        findings: [],
+        comments: [],
+        qaEvidenceFindings: [qaFinding],
+        prompt: 'test',
+      }),
+    });
+    assert.deepEqual(result.findings, []);
+    assert.equal(result.qaEvidenceFindings.length, 1);
+    assert.equal(result.qaEvidenceFindings[0].file, 'QA-EVIDENCE:AC-1');
   });
 
   test('qaEvidencePublicPaths takes public paths only', () => {
@@ -359,6 +392,138 @@ index 1111111..2222222 100644
     for (const input of [undefined, null, {}, { evidence: { artifacts: {} } }]) {
       assert.deepEqual(qaEvidencePublicPaths(input), []);
     }
+  });
+});
+
+describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
+  const token = `ghp_${'B'.repeat(36)}`;
+  const saved = {};
+  beforeEach(() => {
+    saved.fetch = globalThis.fetch;
+    saved.key = process.env.OPENAI_API_KEY;
+    saved.offline = process.env.RIVER_OFFLINE;
+    saved.log = console.log;
+    saved.error = console.error;
+    saved.warn = console.warn;
+    delete process.env.RIVER_OFFLINE;
+    process.env.OPENAI_API_KEY = 'test-key-not-a-real-credential';
+  });
+  afterEach(() => {
+    globalThis.fetch = saved.fetch;
+    if (saved.key === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = saved.key;
+    if (saved.offline === undefined) delete process.env.RIVER_OFFLINE;
+    else process.env.RIVER_OFFLINE = saved.offline;
+    console.log = saved.log;
+    console.error = saved.error;
+    console.warn = saved.warn;
+  });
+
+  const appLine =
+    'src/app.js:1: Finding: the change swallows an error Evidence: src/app.js keeps the catch ' +
+    'Impact: failures are hidden Fix: rethrow the error with context Severity: nit Confidence: high';
+  const qaLine =
+    `QA-EVIDENCE:AC-1:0: Finding: AC-1 cites ${token} Evidence: ci/pass.txt shows the run ` +
+    'Impact: the record cannot be trusted Fix: rebuild the evidence record from the run ' +
+    'Severity: nit Confidence: high';
+
+  async function runWith(t, llmOutput, { qa = true, phase = 'downstream' } = {}) {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const head = (await runGit(['rev-parse', 'HEAD'], dir)).stdout.trim();
+    const work = createTempDir({ prefix: 'river-qa-llm-' });
+    t.after(() => cleanupTempDirAsync(work));
+    const evidencePath = join(work, 'evidence.json');
+    const auditPath = join(work, 'audit.json');
+    writeFileSync(evidencePath, evidenceWithSecret(head));
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: llmOutput } }] }),
+      text: async () => '',
+    });
+    const out = [];
+    console.log = (...args) => out.push(args.join(' '));
+    console.error = () => {};
+    console.warn = () => {};
+    const qaArgs = qa ? ['--qa-evidence', evidencePath, '--qa-audit-output', auditPath] : [];
+    const code = await main(['run', dir, '--phase', phase, '--output', 'json', ...qaArgs]);
+    console.log = saved.log;
+    return { code, artifact: JSON.parse(out.join('\n')), auditPath };
+  }
+
+  test('QA findings leave the issues, the score and the gate unchanged', async (t) => {
+    const without = await runWith(t, appLine);
+    const withQa = await runWith(t, `${appLine}\n${qaLine}`);
+    assert.equal(withQa.code, without.code);
+    assert.deepEqual(withQa.artifact, without.artifact);
+    assert.deepEqual(
+      withQa.artifact.issues.map((issue) => issue.file),
+      ['src/app.js']
+    );
+    const plain = await runWith(t, `${appLine}\n${qaLine}`, { qa: false });
+    assert.equal(plain.code, without.code);
+    assert.deepEqual(plain.artifact.decision, without.artifact.decision);
+  });
+
+  test('the audit result carries the redacted skill findings', async (t) => {
+    const run = await runWith(t, `${appLine}\n${qaLine}`);
+    assert.equal(run.code, 0);
+    const text = readFileSync(run.auditPath, 'utf8');
+    const audit = JSON.parse(text);
+    assert.equal(audit.accepted, true);
+    assert.equal(audit.skillFindings.length, 1);
+    const [finding] = audit.skillFindings;
+    assert.equal(finding.target, 'AC-1');
+    assert.equal(finding.severity, 'minor');
+    assert.ok(!text.includes(token), 'skill findings are redacted');
+    assert.match(finding.message, /REDACTED/);
+  });
+
+  test('no skillFindings field when no selected skill read the evidence', async (t) => {
+    const run = await runWith(t, `${appLine}\n${qaLine}`, { phase: 'midstream' });
+    assert.equal(run.code, 0);
+    const audit = JSON.parse(readFileSync(run.auditPath, 'utf8'));
+    assert.equal(audit.accepted, true);
+    assert.equal('skillFindings' in audit, false);
+  });
+
+  // A key the planner accepts but the OpenAI reviewer cannot use: the QA skill is selected and
+  // the LLM call is skipped, so no skill read the evidence.
+  test('no skillFindings field when the selected QA skill never reached the LLM', async (t) => {
+    delete process.env.OPENAI_API_KEY;
+    const savedAnthropic = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = 'test-key-not-a-real-credential';
+    t.after(() => {
+      if (savedAnthropic === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = savedAnthropic;
+    });
+    const run = await runWith(t, `${appLine}\n${qaLine}`);
+    assert.equal(run.artifact.llmNotExecuted, true);
+    const audit = JSON.parse(readFileSync(run.auditPath, 'utf8'));
+    assert.equal(audit.accepted, true);
+    assert.equal('skillFindings' in audit, false);
+  });
+
+  test('qaSkillFindingsForAudit maps the whole-evidence anchor to a null target', () => {
+    const redact = (text) => ({ text: text.replace('secret', '<R>'), count: 1 });
+    assert.deepEqual(
+      qaSkillFindingsForAudit(
+        [{ file: 'QA-EVIDENCE', message: 'a secret', severity: 'minor' }],
+        redact
+      ),
+      [
+        {
+          target: null,
+          severity: 'minor',
+          confidence: null,
+          title: null,
+          message: 'a <R>',
+          evidence: null,
+          suggestion: null,
+        },
+      ]
+    );
   });
 });
 

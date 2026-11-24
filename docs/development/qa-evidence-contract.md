@@ -353,6 +353,16 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 - `INCOMPLETE`（確認した不成立）は、completion-assessment の evidence に `missing` / `unreadable` が無い場合だけ許される（`:464-488`）。QA の投影は tests の evidence を `present` にせず、初版の独立性は常に `unknown` なので、初版では QA 証拠から `INCOMPLETE` は生じない。利用者が報告した `FAIL` は、監査結果に「利用者が報告した不成立」として残す
 - 初版で QA 証拠から `COMPLETE` と `INCOMPLETE` が生じないことを、テストで固定する
 
+### 8.3 QA 証拠を読む skill の所見
+
+ADR-017 D2 のとおり、QA 証拠を読む skill の所見はレビューの指摘（issues）にしない。
+
+- 対象が `QA-EVIDENCE` で始まる所見（`QA-EVIDENCE:<AC id>:0` / `QA-EVIDENCE:0`）は、レビューの所見から取り除く。Finding Critic・score・gate の入力にもしない
+- 取り除いた所見は、監査結果のファイル（`river run --qa-audit-output`）の `skillFindings` 欄に書く。要素は `target`（AC の id。証拠全体は `null`）・`severity`・`confidence`・`title`・`message`・`evidence`・`suggestion` を持ち、文字列は §7 と同じ redaction を通した値だけを書く
+- `skillFindings` を書くのは、QA 証拠を読む skill に証拠を渡し、LLM が実行された場合だけとする。欄が無いことは、証拠を読んだ skill が無かったことを表す
+- 所見の `severity` は skill の報告をそのまま写したもので、QA の判定（verified・state）には使わない
+- verifier は、これらの所見の根拠として、差分に加えて、skill に渡した証拠の public な artifact のパスを認める。restricted の artifact はパスを渡していないので、根拠にできない
+
 ## 9. host 経路（既存経路の調査結果）
 
 確認した範囲（main `e78b5234`）では、利用者に偽造されない形で「どの run か」「実行者と監査者が別か」を River Review に渡す既存の経路は無い。

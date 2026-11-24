@@ -151,7 +151,7 @@ river run . --output json \
 ### 挙動
 
 - QA の 3 フラグを指定しない実行は、従来どおりである
-- 監査結果そのものは、レビューの判定・gate・終了コードの入力にならない。ただし受理された証拠は、下記のとおり `qaEvidence` を読む skill に渡るので、その skill の所見がレビュー結果に加わることがある
+- 監査結果と、`qaEvidence` を読む skill の所見は、レビューの指摘（issues）・score・判定・gate・終了コードの入力にならない（ADR-017 D2）
 - 証拠ファイルを読めない場合と、`--qa-audit-output` の事前検証に通らない場合は、HEAD の観測とレビューの前に exit 1 で止まる（fail-fast）
 - 事前検証の後の実際の書き込みに失敗した場合（権限・容量・検証後に同名のパスができた競合など）も exit 1 で、レビューの前に止まる。ただし HEAD の観測の後になり得る
 - 監査結果は `--output` の成果物に載せず、`--qa-audit-output` のファイルにだけ書く。`--output json` の成果物は `schemas/output.schema.json` に従い、定義に無い欄を持てないため
@@ -159,7 +159,9 @@ river run . --output json \
 - AC の母集団は渡さず、独立性は `unknown` のままである。そのため初版では、どの AC も verified にならない
 - 証拠が監査で受理された（`accepted: true`）ときだけ、入力コンテキスト `qaEvidence` が available になる。`inputContext` に `qaEvidence` を宣言した skill（`qa-evidence-consistency` など）が計画で選ばれると、レビューのプロンプトに証拠の本体が渡る。渡すのは監査結果に含まれる redaction 後の写し（restricted の artifact はパスを除いたもの）と、監査結果の残りの欄だけで、`--qa-audit-output` のファイルに無い値は渡さない。`qaEvidence` を宣言した skill が選ばれない実行では、プロンプトは変わらない
 - 証拠の文字列の redaction は、設定 `security.redact` に従う（レビューのプロンプトに載るリポジトリの文脈と同じ扱い）
-- 対象が `QA-EVIDENCE:` で始まる所見は、severity を `minor` に抑えるので、gate の blocking の件数には入らない。ただし所見としてレビュー結果に載るので、score には影響する。根拠には差分のほか、渡した証拠の public な artifact のパスを引用できる
+- 対象が `QA-EVIDENCE` で始まる所見（`QA-EVIDENCE:<AC id>:0` / `QA-EVIDENCE:0`）は、レビューの指摘から取り除き、Finding Critic・score・gate にも渡さない。代わりに `--qa-audit-output` のファイルの `skillFindings` 欄へ書く。根拠には差分のほか、渡した証拠の public な artifact のパスを引用できる
+- `skillFindings` は配列で、要素は `target`（AC の id。証拠全体なら `null`）・`severity`・`confidence`・`title`・`message`・`evidence`・`suggestion` を持つ。文字列は redaction 後の値だけを書く
+- 監査結果のファイルは、レビューの前に新規作成（既存のパスは上書きしない）で書き、ファイルを開いたままレビューの後に `skillFindings` を加えて書き直す。`skillFindings` を書くのは、`qaEvidence` を読む skill に証拠を渡し、LLM が実行された場合だけである。欄が無いことは、証拠を読んだ skill が無かったことを表す。書き直しに失敗した場合は、レビュー結果を出力せずに exit 1 で止まる
 - 拒否された証拠（`accepted: false`）と、QA の 3 フラグを指定しない実行では、`qaEvidence` は available にならない。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
 - 初版で artifact を読むのは macOS 11 以降だけである。他の OS では、証拠の artifact の参照は解決されない（unresolved）
 - GitHub Action からはまだ配線していない。QA の 3 フラグを渡せるのは `river run` だけである

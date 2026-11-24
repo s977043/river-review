@@ -174,7 +174,8 @@ Options:
   --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
   --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
                              Accepted evidence is passed, redacted, to skills that read the
-                             qaEvidence context; the audit result is not a gate input.
+                             qaEvidence context; their findings go to this file (skillFindings),
+                             not to the review issues, score or gate.
                              Input/output errors stop the run with exit 1
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.

@@ -210,7 +210,7 @@ describe('river run --qa-evidence', () => {
     assert.equal(help.code, 0, help.stderr);
     assert.match(
       help.stdout,
-      /Accepted evidence is passed, redacted, to skills that read the\s+qaEvidence context; the audit result is not a gate input\.\s+Input\/output errors stop the run with exit 1/
+      /Accepted evidence is passed, redacted, to skills that read the\s+qaEvidence context; their findings go to this file \(skillFindings\),\s+not to the review issues, score or gate\.\s+Input\/output errors stop the run with exit 1/
     );
   });
 

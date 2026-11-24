@@ -9,18 +9,19 @@ import {
   closeSync,
   constants as fsConstants,
   fstatSync,
+  ftruncateSync,
   lstatSync,
   openSync,
   readSync,
   realpathSync,
   statSync,
-  writeFileSync,
+  writeSync,
 } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { ensureGitRepo, getHeadSha, listTrackedChanges } from '../../lib/git.mjs';
 import { ConfigLoader } from '../../config/loader.mjs';
-import { planLocalReview, runLocalReview } from '../../lib/local-runner.mjs';
+import { planLocalReview, qaEvidenceForReview, runLocalReview } from '../../lib/local-runner.mjs';
 import { createRedactionPrimitives } from '../../lib/repo-context.mjs';
 import {
   QA_EVIDENCE_LIMITS,
@@ -355,15 +356,20 @@ export function qaEvidenceRedactor(security) {
  * independence stay at the production defaults inside `auditQaEvidence`: no population is
  * passed, so it is undetermined.
  *
- * @returns {Promise<{ accepted: boolean } | null>} null when the result could not be written
+ * The file is created with `wx` and its descriptor kept open, so the review's QA findings can be
+ * added to the same file afterwards (`writeQaSkillFindings`) without opening the path again.
+ *
+ * @returns {Promise<{ audit: object, file: { fd: number, redact: Function } } | null>} null when
+ *   the result could not be written
  */
 async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
   const repoRoot = await ensureGitRepo(targetPath);
   const trackedChanges = await listTrackedChanges(repoRoot);
   const { config } = await new ConfigLoader().load(repoRoot);
+  const redact = qaEvidenceRedactor(config.security);
   const result = await auditQaEvidence({
     evidence,
-    redact: qaEvidenceRedactor(config.security),
+    redact,
     population: null,
     observed: {
       head: await getHeadSha(repoRoot),
@@ -377,16 +383,74 @@ async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
         : {}),
     },
   });
+  let fd = null;
   try {
-    writeFileSync(outputPath, JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });
+    fd = openSync(outputPath, 'wx');
+    writeSync(fd, JSON.stringify(result, null, 2) + '\n');
   } catch (error) {
+    if (fd !== null) closeSync(fd);
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return null;
   }
   console.error(
     `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
   );
-  return result;
+  return { audit: result, file: { fd, redact } };
+}
+
+function redactStrings(value, redact) {
+  if (typeof value === 'string') return redact(value).text;
+  if (Array.isArray(value)) return value.map((item) => redactStrings(item, redact));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, redactStrings(item, redact)])
+    );
+  }
+  return value;
+}
+
+/**
+ * The `skillFindings` entries of the audit result: the review's findings on the QA evidence
+ * (ADR-017 D2), with every string redacted. `target` is the AC id of a `QA-EVIDENCE:<AC id>`
+ * anchor, or null for `QA-EVIDENCE` (the evidence as a whole).
+ */
+export function qaSkillFindingsForAudit(findings, redact) {
+  return (findings ?? []).map((finding) =>
+    redactStrings(
+      {
+        target: String(finding.file ?? '').replace(/^QA-EVIDENCE:?/, '') || null,
+        severity: finding.severity ?? null,
+        confidence: finding.confidence ?? null,
+        title: finding.title ?? null,
+        message: finding.message ?? null,
+        evidence: finding.evidence ?? null,
+        suggestion: finding.suggestion ?? null,
+      },
+      redact
+    )
+  );
+}
+
+/**
+ * Rewrite the audit file through the descriptor `writeQaEvidenceAudit` kept, adding
+ * `skillFindings`. Called only when the review passed the evidence to a skill and reached the
+ * LLM, so an absent `skillFindings` means no skill read the evidence.
+ *
+ * @returns {boolean} false when the file could not be rewritten
+ */
+function writeQaSkillFindings(parsed, file, audit, findings) {
+  const content = { ...audit, skillFindings: qaSkillFindingsForAudit(findings, file.redact) };
+  try {
+    ftruncateSync(file.fd, 0);
+    writeSync(file.fd, JSON.stringify(content, null, 2) + '\n', 0);
+  } catch (error) {
+    console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
+    return false;
+  }
+  console.error(
+    `QA evidence skill findings (${content.skillFindings.length}) written: ${parsed.qaAuditOutput}`
+  );
+  return true;
 }
 
 /**
@@ -397,6 +461,16 @@ async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
  * @returns {Promise<number>} process exit code.
  */
 export async function runRunCommand(parsed, targetPath) {
+  // The QA audit file's descriptor stays open from the audit to the review's QA findings.
+  const qa = { file: null };
+  try {
+    return await runRunCommandWithQa(parsed, targetPath, qa);
+  } finally {
+    if (qa.file !== null) closeSync(qa.file.fd);
+  }
+}
+
+async function runRunCommandWithQa(parsed, targetPath, qa) {
   if (parsed.planFeedbackFile !== null) {
     try {
       const { loadPlanFeedbackProjection } = await import('../../lib/plan-feedback-projection.mjs');
@@ -447,10 +521,13 @@ export async function runRunCommand(parsed, targetPath) {
   // Before planLocalReview (and so before its early returns), so the audit is written even when
   // there is nothing to review.
   let qaSkillInput = null;
+  let qaAudit = null;
   if (qaEvidence !== null) {
-    const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
-    if (audit === null) return 1;
-    qaSkillInput = qaEvidenceSkillInput(audit);
+    const written = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
+    if (written === null) return 1;
+    qa.file = written.file;
+    qaAudit = written.audit;
+    qaSkillInput = qaEvidenceSkillInput(qaAudit);
   }
 
   const context = await planLocalReview({
@@ -568,6 +645,18 @@ Dependencies: ${
     // be silenced in CI. Previously parsed but never consumed.
     quiet: parsed.quiet,
   });
+
+  // ADR-017 D2: the review's findings on the QA evidence go to the audit result, never to the
+  // issues. Written only when a skill received the evidence and the LLM ran, before any output.
+  if (
+    qa.file !== null &&
+    result.status === 'ok' &&
+    result.llmNotExecuted !== true &&
+    qaEvidenceForReview(context) !== undefined &&
+    !writeQaSkillFindings(parsed, qa.file, qaAudit, result.qaEvidenceFindings)
+  ) {
+    return 1;
+  }
 
   if (parsed.explain) {
     printExplain(result);

@@ -919,6 +919,9 @@ export async function runLocalReview({
     files: context.diff.filesForReview ?? context.diff.files,
     comments: keptComments,
     findings: keptFindings,
+    // ADR-017 D2: findings on the QA evidence, kept out of `findings` (and so out of the issues,
+    // the score and the gate). `river run --qa-evidence` writes them to the audit result.
+    qaEvidenceFindings: review.qaEvidenceFindings ?? [],
     suppressedFindings,
     classified: review.classified,
     reviewerResults: review.reviewerResults ?? null,

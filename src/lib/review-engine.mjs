@@ -7,7 +7,6 @@ import {
   parseFindingMessage,
   normalizeSeverity,
   normalizeScope,
-  SEVERITY_RANK,
 } from './finding-factory.mjs';
 import { qaEvidencePublicPaths } from './qa-evidence.mjs';
 import { QA_EVIDENCE_ANCHOR } from './verifier.mjs';
@@ -63,18 +62,9 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
 // Backward-compatible internal export. The SSoT now lives with redactText.
 export { resolveRedactOptions };
 
-/**
- * A finding anchored to the QA evidence is capped at `minor`, so it never counts as a blocking
- * finding (ADR-017 D4: the QA audit is observe-only and adds no gate input). The cap keys on
- * the anchor, not on which skill the reviewer meant, since a finding line names no skill.
- */
-export const QA_EVIDENCE_SEVERITY_CAP = 'minor';
-
-function capQaEvidenceSeverity(file, severity) {
-  if (!QA_EVIDENCE_ANCHOR.test(String(file ?? ''))) return severity;
-  return SEVERITY_RANK[severity] > SEVERITY_RANK[QA_EVIDENCE_SEVERITY_CAP]
-    ? QA_EVIDENCE_SEVERITY_CAP
-    : severity;
+/** True for a finding anchored to the QA evidence (`QA-EVIDENCE:<AC id>` / `QA-EVIDENCE`). */
+export function isQaEvidenceFinding(finding) {
+  return QA_EVIDENCE_ANCHOR.test(String(finding?.file ?? ''));
 }
 
 function sanitizeSkillName(name) {
@@ -773,7 +763,7 @@ export async function generateReview({
   // Build structured findings from verified comments
   let findings = comments.map((c, i) => {
     const parsed = parseFindingMessage(c.message);
-    const severity = capQaEvidenceSeverity(c.file, normalizeSeverity(parsed.severity));
+    const severity = normalizeSeverity(parsed.severity);
     // Confidence is guaranteed present+valid here (validateFindingMessage gates
     // it upstream), so the 'medium' branch is currently unreachable; it is kept
     // as a conservative default in case an unverified path ever reaches this.
@@ -807,6 +797,14 @@ export async function generateReview({
       origin: c.origin,
     };
   });
+
+  // ADR-017 D2: findings on the QA evidence are not review issues. They leave here, before the
+  // Finding Critic, the issue list, the score and the gate, and go to the QA audit result.
+  const qaEvidenceFindings = findings.filter(isQaEvidenceFinding);
+  if (qaEvidenceFindings.length > 0) {
+    findings = findings.filter((finding) => !isQaEvidenceFinding(finding));
+    comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+  }
 
   findings.sort((a, b) => {
     const bA = computeFindingBreakdown(a);
@@ -866,6 +864,8 @@ export async function generateReview({
   return {
     comments,
     findings,
+    // ADR-017 D2: QA 証拠に付いた所見。issues・score・gate には入れず、QA 監査結果へ出す。
+    qaEvidenceFindings,
     // #2871: strict_block の判定だけが読む。artifact には載せない。
     preCriticFindings,
     classified,

@@ -45277,7 +45277,7 @@ __nccwpck_require__.d(__webpack_exports__, {
   _Q: () => (/* reexport */ secret_redactor/* resolveRedactOptions */._Q)
 });
 
-// UNUSED EXPORTS: QA_EVIDENCE_SEVERITY_CAP, buildPrompt, computeBackoffMs, isRetryableNetworkError, isRetryableStatus, parseLineComments
+// UNUSED EXPORTS: buildPrompt, computeBackoffMs, isQaEvidenceFinding, isRetryableNetworkError, isRetryableStatus, parseLineComments
 
 // EXTERNAL MODULE: ./src/config/loader.mjs + 1 modules
 var loader = __nccwpck_require__(3833);
@@ -46909,18 +46909,9 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
 // Backward-compatible internal export. The SSoT now lives with redactText.
 
 
-/**
- * A finding anchored to the QA evidence is capped at `minor`, so it never counts as a blocking
- * finding (ADR-017 D4: the QA audit is observe-only and adds no gate input). The cap keys on
- * the anchor, not on which skill the reviewer meant, since a finding line names no skill.
- */
-const QA_EVIDENCE_SEVERITY_CAP = 'minor';
-
-function capQaEvidenceSeverity(file, severity) {
-  if (!verifier/* QA_EVIDENCE_ANCHOR */.TK.test(String(file ?? ''))) return severity;
-  return finding_factory/* SEVERITY_RANK */.f3[severity] > finding_factory/* SEVERITY_RANK */.f3[QA_EVIDENCE_SEVERITY_CAP]
-    ? QA_EVIDENCE_SEVERITY_CAP
-    : severity;
+/** True for a finding anchored to the QA evidence (`QA-EVIDENCE:<AC id>` / `QA-EVIDENCE`). */
+function isQaEvidenceFinding(finding) {
+  return verifier/* QA_EVIDENCE_ANCHOR */.TK.test(String(finding?.file ?? ''));
 }
 
 function sanitizeSkillName(name) {
@@ -47619,7 +47610,7 @@ async function generateReview({
   // Build structured findings from verified comments
   let findings = comments.map((c, i) => {
     const parsed = (0,finding_factory/* parseFindingMessage */.UB)(c.message);
-    const severity = capQaEvidenceSeverity(c.file, (0,finding_factory/* normalizeSeverity */.lv)(parsed.severity));
+    const severity = (0,finding_factory/* normalizeSeverity */.lv)(parsed.severity);
     // Confidence is guaranteed present+valid here (validateFindingMessage gates
     // it upstream), so the 'medium' branch is currently unreachable; it is kept
     // as a conservative default in case an unverified path ever reaches this.
@@ -47653,6 +47644,14 @@ async function generateReview({
       origin: c.origin,
     };
   });
+
+  // ADR-017 D2: findings on the QA evidence are not review issues. They leave here, before the
+  // Finding Critic, the issue list, the score and the gate, and go to the QA audit result.
+  const qaEvidenceFindings = findings.filter(isQaEvidenceFinding);
+  if (qaEvidenceFindings.length > 0) {
+    findings = findings.filter((finding) => !isQaEvidenceFinding(finding));
+    comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+  }
 
   findings.sort((a, b) => {
     const bA = (0,breakdown/* computeFindingBreakdown */._)(a);
@@ -47712,6 +47711,8 @@ async function generateReview({
   return {
     comments,
     findings,
+    // ADR-017 D2: QA 証拠に付いた所見。issues・score・gate には入れず、QA 監査結果へ出す。
+    qaEvidenceFindings,
     // #2871: strict_block の判定だけが読む。artifact には載せない。
     preCriticFindings,
     classified,
@@ -111900,6 +111901,18 @@ async function runReviewerOrchestration({
   const allFindings = deduped.map((f) => ({ ...f, id: `rr-${nextId++}` }));
 
   const allComments = succeeded.flatMap((r) => r.comments ?? []);
+  // ADR-017 D2: every role receives the QA evidence, so the same QA finding can come back from
+  // several roles; they are merged like review findings but stay out of them.
+  const qaEvidenceFindings = mergeFindings(
+    succeeded.flatMap((r) =>
+      (r.qaEvidenceFindings ?? []).map((f) => ({
+        ...f,
+        reviewerRole: r.reviewerRole,
+        chunkLabel: r.chunkLabel ?? null,
+        sourceExecutionIds: [r.executionId],
+      }))
+    )
+  );
 
   // --- #2334 / #1978: Finding Critic（マージ後の 1 箇所だけ）---
   //
@@ -112010,6 +112023,7 @@ async function runReviewerOrchestration({
   return {
     comments: allComments,
     findings: finalFindings,
+    qaEvidenceFindings,
     // #2871: strict_block の判定だけが読む。artifact には載せない。
     preCriticFindings: allFindings,
     classified,
@@ -115017,6 +115031,9 @@ async function runLocalReview({
     files: context.diff.filesForReview ?? context.diff.files,
     comments: keptComments,
     findings: keptFindings,
+    // ADR-017 D2: findings on the QA evidence, kept out of `findings` (and so out of the issues,
+    // the score and the gate). `river run --qa-evidence` writes them to the audit result.
+    qaEvidenceFindings: review.qaEvidenceFindings ?? [],
     suppressedFindings,
     classified: review.classified,
     reviewerResults: review.reviewerResults ?? null,
@@ -117052,15 +117069,20 @@ function qaEvidenceRedactor(security) {
  * independence stay at the production defaults inside `auditQaEvidence`: no population is
  * passed, so it is undetermined.
  *
- * @returns {Promise<{ accepted: boolean } | null>} null when the result could not be written
+ * The file is created with `wx` and its descriptor kept open, so the review's QA findings can be
+ * added to the same file afterwards (`writeQaSkillFindings`) without opening the path again.
+ *
+ * @returns {Promise<{ audit: object, file: { fd: number, redact: Function } } | null>} null when
+ *   the result could not be written
  */
 async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
   const repoRoot = await (0,git/* ensureGitRepo */.NC)(targetPath);
   const trackedChanges = await (0,git/* listTrackedChanges */.iJ)(repoRoot);
   const { config } = await new loader/* ConfigLoader */.UT().load(repoRoot);
+  const redact = qaEvidenceRedactor(config.security);
   const result = await (0,qa_evidence/* auditQaEvidence */.d3)({
     evidence,
-    redact: qaEvidenceRedactor(config.security),
+    redact,
     population: null,
     observed: {
       head: await (0,git/* getHeadSha */.JA)(repoRoot),
@@ -117074,16 +117096,74 @@ async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
         : {}),
     },
   });
+  let fd = null;
   try {
-    (0,external_node_fs_.writeFileSync)(outputPath, JSON.stringify(result, null, 2) + '\n', { flag: 'wx' });
+    fd = (0,external_node_fs_.openSync)(outputPath, 'wx');
+    (0,external_node_fs_.writeSync)(fd, JSON.stringify(result, null, 2) + '\n');
   } catch (error) {
+    if (fd !== null) (0,external_node_fs_.closeSync)(fd);
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return null;
   }
   console.error(
     `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
   );
-  return result;
+  return { audit: result, file: { fd, redact } };
+}
+
+function redactStrings(value, redact) {
+  if (typeof value === 'string') return redact(value).text;
+  if (Array.isArray(value)) return value.map((item) => redactStrings(item, redact));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, redactStrings(item, redact)])
+    );
+  }
+  return value;
+}
+
+/**
+ * The `skillFindings` entries of the audit result: the review's findings on the QA evidence
+ * (ADR-017 D2), with every string redacted. `target` is the AC id of a `QA-EVIDENCE:<AC id>`
+ * anchor, or null for `QA-EVIDENCE` (the evidence as a whole).
+ */
+function qaSkillFindingsForAudit(findings, redact) {
+  return (findings ?? []).map((finding) =>
+    redactStrings(
+      {
+        target: String(finding.file ?? '').replace(/^QA-EVIDENCE:?/, '') || null,
+        severity: finding.severity ?? null,
+        confidence: finding.confidence ?? null,
+        title: finding.title ?? null,
+        message: finding.message ?? null,
+        evidence: finding.evidence ?? null,
+        suggestion: finding.suggestion ?? null,
+      },
+      redact
+    )
+  );
+}
+
+/**
+ * Rewrite the audit file through the descriptor `writeQaEvidenceAudit` kept, adding
+ * `skillFindings`. Called only when the review passed the evidence to a skill and reached the
+ * LLM, so an absent `skillFindings` means no skill read the evidence.
+ *
+ * @returns {boolean} false when the file could not be rewritten
+ */
+function writeQaSkillFindings(parsed, file, audit, findings) {
+  const content = { ...audit, skillFindings: qaSkillFindingsForAudit(findings, file.redact) };
+  try {
+    (0,external_node_fs_.ftruncateSync)(file.fd, 0);
+    (0,external_node_fs_.writeSync)(file.fd, JSON.stringify(content, null, 2) + '\n', 0);
+  } catch (error) {
+    console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
+    return false;
+  }
+  console.error(
+    `QA evidence skill findings (${content.skillFindings.length}) written: ${parsed.qaAuditOutput}`
+  );
+  return true;
 }
 
 /**
@@ -117094,6 +117174,16 @@ async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
  * @returns {Promise<number>} process exit code.
  */
 async function runRunCommand(parsed, targetPath) {
+  // The QA audit file's descriptor stays open from the audit to the review's QA findings.
+  const qa = { file: null };
+  try {
+    return await runRunCommandWithQa(parsed, targetPath, qa);
+  } finally {
+    if (qa.file !== null) (0,external_node_fs_.closeSync)(qa.file.fd);
+  }
+}
+
+async function runRunCommandWithQa(parsed, targetPath, qa) {
   if (parsed.planFeedbackFile !== null) {
     try {
       const { loadPlanFeedbackProjection } = await __nccwpck_require__.e(/* import() */ 448).then(__nccwpck_require__.bind(__nccwpck_require__, 5448));
@@ -117144,10 +117234,13 @@ async function runRunCommand(parsed, targetPath) {
   // Before planLocalReview (and so before its early returns), so the audit is written even when
   // there is nothing to review.
   let qaSkillInput = null;
+  let qaAudit = null;
   if (qaEvidence !== null) {
-    const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
-    if (audit === null) return 1;
-    qaSkillInput = (0,qa_evidence/* qaEvidenceSkillInput */.Fw)(audit);
+    const written = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
+    if (written === null) return 1;
+    qa.file = written.file;
+    qaAudit = written.audit;
+    qaSkillInput = (0,qa_evidence/* qaEvidenceSkillInput */.Fw)(qaAudit);
   }
 
   const context = await planLocalReview({
@@ -117265,6 +117358,18 @@ Dependencies: ${
     // be silenced in CI. Previously parsed but never consumed.
     quiet: parsed.quiet,
   });
+
+  // ADR-017 D2: the review's findings on the QA evidence go to the audit result, never to the
+  // issues. Written only when a skill received the evidence and the LLM ran, before any output.
+  if (
+    qa.file !== null &&
+    result.status === 'ok' &&
+    result.llmNotExecuted !== true &&
+    qaEvidenceForReview(context) !== undefined &&
+    !writeQaSkillFindings(parsed, qa.file, qaAudit, result.qaEvidenceFindings)
+  ) {
+    return 1;
+  }
 
   if (parsed.explain) {
     printExplain(result);
@@ -119813,7 +119918,8 @@ Options:
   --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
   --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
                              Accepted evidence is passed, redacted, to skills that read the
-                             qaEvidence context; the audit result is not a gate input.
+                             qaEvidence context; their findings go to this file (skillFindings),
+                             not to the review issues, score or gate.
                              Input/output errors stop the run with exit 1
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.

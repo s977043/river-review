@@ -1022,6 +1022,18 @@ export async function runReviewerOrchestration({
   const allFindings = deduped.map((f) => ({ ...f, id: `rr-${nextId++}` }));
 
   const allComments = succeeded.flatMap((r) => r.comments ?? []);
+  // ADR-017 D2: every role receives the QA evidence, so the same QA finding can come back from
+  // several roles; they are merged like review findings but stay out of them.
+  const qaEvidenceFindings = mergeFindings(
+    succeeded.flatMap((r) =>
+      (r.qaEvidenceFindings ?? []).map((f) => ({
+        ...f,
+        reviewerRole: r.reviewerRole,
+        chunkLabel: r.chunkLabel ?? null,
+        sourceExecutionIds: [r.executionId],
+      }))
+    )
+  );
 
   // --- #2334 / #1978: Finding Critic（マージ後の 1 箇所だけ）---
   //
@@ -1132,6 +1144,7 @@ export async function runReviewerOrchestration({
   return {
     comments: allComments,
     findings: finalFindings,
+    qaEvidenceFindings,
     // #2871: strict_block の判定だけが読む。artifact には載せない。
     preCriticFindings: allFindings,
     classified,
