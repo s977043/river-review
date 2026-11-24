@@ -21,7 +21,6 @@ import process from 'node:process';
 import { ensureGitRepo, getHeadSha, listTrackedChanges } from '../../lib/git.mjs';
 import { planLocalReview, runLocalReview } from '../../lib/local-runner.mjs';
 import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../../lib/qa-evidence.mjs';
-import { QA_EVIDENCE_CONTEXT, resolveAvailableContexts } from '../../lib/utils.mjs';
 import { SkillLoaderError, resolveSkillSet } from '../../../runners/core/skill-loader.mjs';
 import CostEstimator from '../../core/cost-estimator.mjs';
 import { resolveDepthToReviewMode } from '../../lib/review-plan-generator.mjs';
@@ -297,7 +296,13 @@ function resolveQaAuditOutput(parsed) {
     throw new Error('it is the --qa-evidence file');
   }
   if (lstatSync(output, { throwIfNoEntry: false })) throw new Error('the path already exists');
-  const parent = realpathSync(path.dirname(output));
+  let parent;
+  try {
+    parent = realpathSync(path.dirname(output));
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error('its parent directory does not exist');
+    throw error;
+  }
   if (!statSync(parent).isDirectory()) throw new Error('its parent is not a directory');
   const target = path.join(parent, path.basename(output));
   if (parsed.qaArtifactsDir !== null) {
@@ -318,8 +323,9 @@ function resolveQaAuditOutput(parsed) {
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * Runs before `planLocalReview`, because whether the evidence was accepted decides whether the
- * `qaEvidence` context is available to skill selection. The repository root and HEAD come from
+ * Runs before `planLocalReview`, so a failed write stops the run before the review. The audit is
+ * recorded only: it does not make the `qaEvidence` context available, because no skill receives
+ * the evidence itself yet (ADR-017 rollout step 5). The repository root and HEAD come from
  * the same `ensureGitRepo` / `getHeadSha` calls `planLocalReview` makes. `dirty` and
  * `changedFiles` come from tracked files only (`listTrackedChanges`), per §5 condition 5; the
  * review's own `dirty` (`isWorkingTreeDirty`) is left as it is. The AC population and
@@ -381,7 +387,6 @@ export async function runRunCommand(parsed, targetPath) {
   }
   let qaEvidence = null;
   let qaAuditOutputPath = null;
-  let availableContexts = parsed.availableContexts;
   if (parsed.qaEvidenceFile !== null) {
     // Input and output problems stop the run here, before HEAD is observed or anything reviewed.
     try {
@@ -414,16 +419,11 @@ export async function runRunCommand(parsed, targetPath) {
 
   const manualReviewMode = resolveDepthToReviewMode(parsed.depth);
 
-  // Before planLocalReview (and so before its early returns): only evidence the audit accepted
-  // makes the qaEvidence context available to skill selection.
+  // Before planLocalReview (and so before its early returns), so the audit is written even when
+  // there is nothing to review.
   if (qaEvidence !== null) {
     const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
     if (audit === null) return 1;
-    if (audit.accepted) {
-      availableContexts = [
-        ...new Set([...resolveAvailableContexts(parsed.availableContexts), QA_EVIDENCE_CONTEXT]),
-      ];
-    }
   }
 
   const context = await planLocalReview({
@@ -431,7 +431,7 @@ export async function runRunCommand(parsed, targetPath) {
     phase: parsed.phase,
     dryRun: parsed.dryRun,
     debug: parsed.debug,
-    availableContexts,
+    availableContexts: parsed.availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     baseRef: parsed.base,
@@ -529,7 +529,7 @@ Dependencies: ${
     // no-op. They stay as a safety net for the fallback path: dropping them
     // would silently disable `--context` / `--dependency` the day this call
     // stops passing `context`.
-    availableContexts,
+    availableContexts: parsed.availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     reviewers: parsed.reviewers,

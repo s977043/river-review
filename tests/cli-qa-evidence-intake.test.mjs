@@ -2,12 +2,17 @@
 // file and hands it to `auditQaEvidence` with the HEAD and `dirty` the run observed. The audit is
 // cross-checked against a direct `auditQaEvidence` call rather than against hand-written values.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import process from 'node:process';
 import { describe, test } from 'node:test';
 
 import { listTrackedChanges, parsePorcelainZPaths } from '../src/lib/git.mjs';
-import { auditQaEvidence } from '../src/lib/qa-evidence.mjs';
+import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../src/lib/qa-evidence.mjs';
+import { buildExecutionPlan } from '../runners/core/review-runner.mjs';
+import { confirmReplayPlan } from '../src/cli/commands/review.mjs';
+import { runReviewExecReplay } from '../src/lib/review-plan.mjs';
 import { runCliAsSubprocess } from './helpers/cli.mjs';
 import { cleanupTempDirAsync, createTempDir } from './helpers/temp-dir.mjs';
 import {
@@ -45,6 +50,11 @@ function qaFlags(evidencePath, auditPath, artifactsDir) {
     ...(artifactsDir ? ['--qa-artifacts', artifactsDir] : []),
   ];
 }
+
+const QA_SKILL_ID = 'qa-evidence-consistency';
+
+const IGNORED_CONTEXT_WARNING =
+  /--context qaEvidence is ignored; no CLI input makes it available yet \(river run --qa-evidence records the audit only\)/;
 
 function contextsLine(stderr) {
   return stderr.split('\n').find((line) => line.startsWith('Contexts:'));
@@ -87,7 +97,8 @@ describe('river run --qa-evidence', () => {
     assert.ok(audit.criteria.every((criterion) => criterion.verified === false));
     // Restricted artifacts (no `sensitivity`) leave the output by id only.
     assert.doesNotMatch(readFileSync(auditPath, 'utf8'), /logs\/pass\.txt/);
-    assert.match(contextsLine(run.stderr), /\bqaEvidence\b/);
+    // Accepted evidence is recorded only: no skill receives its body yet (ADR-017 rollout step 5).
+    assert.doesNotMatch(contextsLine(run.stderr), /\bqaEvidence\b/);
   });
 
   test('the review output and exit code are those of the same run without QA evidence', async (t) => {
@@ -104,13 +115,83 @@ describe('river run --qa-evidence', () => {
       ['run', '.', '--dry-run', '--output', 'json', ...qaFlags(evidencePath, join(work, 'a.json'))],
       { cwd: dir }
     );
+    assert.equal(JSON.parse(readFileSync(join(work, 'a.json'), 'utf8')).accepted, true);
     assert.equal(withQa.code, plain.code);
     assert.deepEqual(JSON.parse(withQa.stdout), JSON.parse(plain.stdout));
+    assert.equal(contextsLine(withQa.stderr), contextsLine(plain.stderr));
     assert.doesNotMatch(contextsLine(plain.stderr), /\bqaEvidence\b/);
     assert.doesNotMatch(plain.stderr, /QA evidence audit/);
   });
 
-  test('--context qaEvidence alone does not make the context available', async (t) => {
+  // A dry run skips the QA skill as LLM-only before it reaches inputContext, so the contexts the
+  // downstream run hands to planning are replayed into buildExecutionPlan to see the selection.
+  test('accepted evidence leaves the QA skill skipped for missing qaEvidence downstream', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const work = scratch(t);
+    const evidencePath = join(work, 'evidence.json');
+    const auditPath = join(work, 'audit.json');
+    writeFileSync(evidencePath, evidenceFor(await git(['rev-parse', 'HEAD'], dir)));
+
+    const run = await runCliAsSubprocess(
+      [
+        'run',
+        '.',
+        '--dry-run',
+        '--phase',
+        'downstream',
+        '--output',
+        'json',
+        ...qaFlags(evidencePath, auditPath),
+      ],
+      { cwd: dir }
+    );
+    assert.equal(run.code, 0, run.stderr);
+    assert.equal(JSON.parse(readFileSync(auditPath, 'utf8')).accepted, true);
+    const contexts = contextsLine(run.stderr)
+      .replace(/^Contexts:\s*/, '')
+      .split(', ');
+
+    const plan = await buildExecutionPlan({
+      phase: 'downstream',
+      changedFiles: ['src/app.js'],
+      availableContexts: contexts,
+    });
+    const idOf = (skill) => (skill.metadata ?? skill).id;
+    assert.ok(!plan.selected.map(idOf).includes(QA_SKILL_ID));
+    const skipped = plan.skipped.find((entry) => idOf(entry.skill) === QA_SKILL_ID);
+    assert.ok(skipped, `${QA_SKILL_ID} must be skipped`);
+    assert.deepEqual(skipped.reasons, ['missing inputContext: qaEvidence']);
+  });
+
+  test('--help states that input/output errors stop the run with exit 1', async () => {
+    const help = await runCliAsSubprocess(['--help']);
+    assert.equal(help.code, 0, help.stderr);
+    assert.match(
+      help.stdout,
+      /The audit result alone does not change the review output, gate\s+or exit code; input\/output errors stop the run with exit 1/
+    );
+  });
+
+  test('--context qaEvidence alone resolves the same skills as no --context', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const resolve = (extra) =>
+      runCliAsSubprocess(
+        ['skills', 'resolve', '--path', 'src/app.js', '--output', 'json', ...extra],
+        { cwd: dir }
+      );
+    const plain = await resolve([]);
+    const alone = await resolve(['--context', 'qaEvidence']);
+    assert.equal(plain.code, 0, plain.stderr);
+    assert.equal(alone.code, 0, alone.stderr);
+    assert.match(alone.stderr, IGNORED_CONTEXT_WARNING);
+    const plainSelected = JSON.parse(plain.stdout).selected;
+    assert.ok(plainSelected.length > 0);
+    assert.deepEqual(JSON.parse(alone.stdout).selected, plainSelected);
+  });
+
+  test('--context diff,qaEvidence does not make the context available', async (t) => {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
     t.after(cleanup);
     const run = await runCliAsSubprocess(
@@ -120,7 +201,7 @@ describe('river run --qa-evidence', () => {
     assert.equal(run.code, 0, run.stderr);
     assert.doesNotMatch(contextsLine(run.stderr), /\bqaEvidence\b/);
     assert.match(contextsLine(run.stderr), /\bdiff\b/);
-    assert.match(run.stderr, /--context qaEvidence is ignored/);
+    assert.match(run.stderr, IGNORED_CONTEXT_WARNING);
   });
 
   for (const [name, extra] of [
@@ -156,7 +237,7 @@ describe('river run --qa-evidence', () => {
       [dangling, /already exists/],
       [evidencePath, /--qa-evidence file/],
       [join(artifacts, 'audit.json'), /inside --qa-artifacts/],
-      [join(work, 'no-dir', 'audit.json'), /ENOENT/],
+      [join(work, 'no-dir', 'audit.json'), /its parent directory does not exist$/m],
     ]) {
       const run = await runCliAsSubprocess(
         [
@@ -177,6 +258,60 @@ describe('river run --qa-evidence', () => {
     }
     assert.equal(readFileSync(existing, 'utf8'), 'keep\n');
     assert.equal(existsSync(join(work, 'nowhere.json')), false);
+    assert.equal(existsSync(join(artifacts, 'audit.json')), false);
+  });
+
+  test('an output whose parent is a regular file keeps the original error', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const work = scratch(t);
+    const evidencePath = join(work, 'evidence.json');
+    writeFileSync(evidencePath, evidenceFor(await git(['rev-parse', 'HEAD'], dir)));
+    const run = await runCliAsSubprocess(
+      [
+        'run',
+        '.',
+        '--dry-run',
+        '--output',
+        'json',
+        ...qaFlags(evidencePath, join(evidencePath, 'audit.json')),
+      ],
+      { cwd: dir }
+    );
+    assert.equal(run.code, 1, run.stderr);
+    assert.match(run.stderr, /--qa-audit-output is refused: ENOTDIR/);
+    assert.doesNotMatch(run.stderr, /its parent directory does not exist/);
+    assert.doesNotMatch(run.stderr, /River Review \(local\)/, 'the review must not start');
+  });
+
+  test('an output under --qa-artifacts reached through a symlink is refused', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const work = scratch(t);
+    const artifacts = scratch(t);
+    const link = join(work, 'artifacts-link');
+    symlinkSync(artifacts, link);
+    const evidencePath = join(work, 'evidence.json');
+    writeFileSync(evidencePath, evidenceFor(await git(['rev-parse', 'HEAD'], dir)));
+    // Either side may be the link: the output path, or the --qa-artifacts root.
+    for (const [auditPath, artifactsRoot] of [
+      [join(link, 'audit.json'), artifacts],
+      [join(artifacts, 'audit.json'), link],
+    ]) {
+      const run = await runCliAsSubprocess(
+        [
+          'run',
+          '.',
+          '--dry-run',
+          '--output',
+          'json',
+          ...qaFlags(evidencePath, auditPath, artifactsRoot),
+        ],
+        { cwd: dir }
+      );
+      assert.equal(run.code, 1, `${auditPath}: ${run.stderr}`);
+      assert.match(run.stderr, /--qa-audit-output is refused: it is inside --qa-artifacts/);
+    }
     assert.equal(existsSync(join(artifacts, 'audit.json')), false);
   });
 
@@ -234,6 +369,27 @@ describe('river run --qa-evidence', () => {
     }
   });
 
+  test(
+    'a FIFO as --qa-evidence is not a regular file and stops with exit 1',
+    { skip: process.platform === 'win32' },
+    async (t) => {
+      const { dir, cleanup } = await createRepoWithSilentCatchChange();
+      t.after(cleanup);
+      const work = scratch(t);
+      const fifo = join(work, 'evidence.fifo');
+      execFileSync('mkfifo', [fifo]);
+      const auditPath = join(work, 'audit.json');
+      const run = await runCliAsSubprocess(
+        ['run', '.', '--dry-run', '--output', 'json', ...qaFlags(fifo, auditPath)],
+        { cwd: dir }
+      );
+      assert.equal(run.code, 1, run.stderr);
+      assert.match(run.stderr, /cannot read --qa-evidence: not a regular file/);
+      assert.doesNotMatch(run.stderr, /River Review \(local\)/, 'the review must not start');
+      assert.equal(existsSync(auditPath), false);
+    }
+  );
+
   test('a run without changes still writes the audit against a clean HEAD', async (t) => {
     const { dir, cleanup } = await createTempGitRepo({
       initialFiles: { 'src/app.js': 'export const value = 1;\n' },
@@ -280,6 +436,186 @@ describe('river run --qa-evidence', () => {
     const audit = JSON.parse(readFileSync(auditPath, 'utf8'));
     assert.equal(audit.revision.dirty, false);
     assert.deepEqual(audit.revision.changedFiles, []);
+  });
+});
+
+describe('river review exec --plan with a QA evidence skill', () => {
+  function fullArtifact(skillId) {
+    return {
+      version: '1',
+      timestamp: '2026-11-24T00:00:00Z',
+      phase: 'downstream',
+      status: 'ok',
+      plan: { selectedSkills: [{ id: skillId }], skippedSkills: [], plannerMode: 'off' },
+    };
+  }
+
+  async function replay(t, plan) {
+    const work = scratch(t);
+    const planPath = join(work, 'plan.json');
+    writeFileSync(planPath, JSON.stringify(plan));
+    return runCliAsSubprocess(['review', 'exec', '--plan', planPath], { cwd: work });
+  }
+
+  for (const [name, plan] of [
+    ['a full artifact', fullArtifact(QA_SKILL_ID)],
+    ['a bare plan', { selectedSkills: [{ id: QA_SKILL_ID }] }],
+  ]) {
+    test(`${name} selecting it is refused with exit 1`, async (t) => {
+      const run = await replay(t, plan);
+      assert.equal(run.code, 1, run.stderr);
+      assert.match(
+        run.stderr,
+        /review exec --plan cannot run qa-evidence-consistency: it requires the qaEvidence input context, and the main CLI does not pass QA evidence to skills yet/
+      );
+      assert.equal(run.stdout, '');
+    });
+  }
+
+  test('a plan without a QA evidence skill replays as before', async (t) => {
+    const run = await replay(t, fullArtifact('test-existence'));
+    assert.equal(run.code, 0, run.stderr);
+    assert.deepEqual(
+      JSON.parse(run.stdout).plan.selectedSkills.map((skill) => skill.id),
+      ['test-existence']
+    );
+  });
+
+  test('--dry-run still echoes a plan selecting it', async (t) => {
+    const work = scratch(t);
+    const planPath = join(work, 'plan.json');
+    writeFileSync(planPath, JSON.stringify(fullArtifact(QA_SKILL_ID)));
+    const run = await runCliAsSubprocess(['review', 'exec', '--plan', planPath, '--dry-run'], {
+      cwd: work,
+    });
+    assert.equal(run.code, 0, run.stderr);
+  });
+
+  // The replay takes `plan` only from a full artifact (`version: "1"` and a `plan` object).
+  for (const [name, plan, code] of [
+    [
+      'a full artifact with another top-level selectedSkills',
+      { ...fullArtifact('test-existence'), selectedSkills: [{ id: QA_SKILL_ID }] },
+      0,
+    ],
+    [
+      'a bare plan with another nested plan.selectedSkills',
+      {
+        selectedSkills: [{ id: QA_SKILL_ID }],
+        plan: { selectedSkills: [{ id: 'test-existence' }] },
+      },
+      1,
+    ],
+  ]) {
+    test(`${name} is judged by the selectedSkills the replay uses (exit ${code})`, async (t) => {
+      const run = await replay(t, plan);
+      assert.equal(run.code, code, run.stderr);
+    });
+  }
+
+  for (const [name, plan, message] of [
+    [
+      'an empty skill id',
+      {
+        ...fullArtifact(QA_SKILL_ID),
+        plan: { selectedSkills: [{ id: QA_SKILL_ID }, { id: '' }] },
+      },
+      /selectedSkills\[1\]\.id must be a non-empty string/,
+    ],
+    [
+      'a non-array selectedSkills',
+      { selectedSkills: QA_SKILL_ID },
+      /must have plan\.selectedSkills/,
+    ],
+  ]) {
+    test(`a malformed plan (${name}) keeps the replay's exit 3`, async (t) => {
+      const run = await replay(t, plan);
+      assert.equal(run.code, 3, run.stderr);
+      assert.match(run.stderr, message);
+    });
+  }
+
+  // Every skill file in the repository loads, so an unknown id names no skill.
+  test('an id that no skill file defines replays as before', async (t) => {
+    const run = await replay(t, fullArtifact('no-such-skill'));
+    assert.equal(run.code, 0, run.stderr);
+  });
+
+  describe('confirmReplayPlan', () => {
+    const PLAN = '/plans/plan.json';
+    const planText = (skillId) => JSON.stringify(fullArtifact(skillId));
+
+    test('reads the plan once and serves the checked content to the replay', async () => {
+      const reads = [];
+      const readFileImpl = async (p) => {
+        reads.push(p);
+        if (p !== PLAN) return `other:${p}`;
+        // A plan swapped after the check must not reach the replay.
+        return reads.filter((r) => r === PLAN).length === 1
+          ? planText('test-existence')
+          : planText(QA_SKILL_ID);
+      };
+      const confirmed = await confirmReplayPlan(PLAN, {
+        runReviewExecReplayImpl: runReviewExecReplay,
+        readFileImpl,
+      });
+      assert.ok('readFileImpl' in confirmed, confirmed.refusal);
+      const replayed = await runReviewExecReplay({
+        planFile: PLAN,
+        readFileImpl: confirmed.readFileImpl,
+      });
+      assert.deepEqual(
+        replayed.plan.selectedSkills.map((skill) => skill.id),
+        ['test-existence']
+      );
+      assert.deepEqual(reads, [PLAN]);
+      assert.equal(await confirmed.readFileImpl('/repo/diff.patch'), 'other:/repo/diff.patch');
+    });
+
+    const otherSkill = { id: 'test-existence', inputContext: ['diff'] };
+    for (const [name, loadSkillMetadataReportImpl, refusal] of [
+      [
+        'an id missing while a skill file failed to load',
+        async () => ({ metadata: [otherSkill], failedFiles: ['skills/broken/SKILL.md'] }),
+        /cannot run qa-evidence-consistency: no loadable skill metadata, and 1 skill file\(s\) failed to load \(skills\/broken\/SKILL\.md\)/,
+      ],
+      [
+        'a loader that throws',
+        async () => {
+          throw new Error('schema unreadable');
+        },
+        /cannot load skill metadata: schema unreadable/,
+      ],
+    ]) {
+      test(`refuses ${name}`, async () => {
+        const confirmed = await confirmReplayPlan(PLAN, {
+          runReviewExecReplayImpl: runReviewExecReplay,
+          readFileImpl: async () => planText(QA_SKILL_ID),
+          loadSkillMetadataReportImpl,
+        });
+        assert.match(confirmed.refusal ?? '', refusal);
+      });
+    }
+
+    test('allows an id missing while every skill file loaded', async () => {
+      const confirmed = await confirmReplayPlan(PLAN, {
+        runReviewExecReplayImpl: runReviewExecReplay,
+        readFileImpl: async () => planText(QA_SKILL_ID),
+        loadSkillMetadataReportImpl: async () => ({ metadata: [otherSkill], failedFiles: [] }),
+      });
+      assert.ok('readFileImpl' in confirmed, confirmed.refusal);
+    });
+  });
+});
+
+describe('QA_EVIDENCE_LIMITS', () => {
+  test('matches the literal limits of docs/development/qa-evidence-contract.md §2.1', () => {
+    assert.deepEqual(QA_EVIDENCE_LIMITS, {
+      evidenceBytes: 1048576,
+      depth: 16,
+      artifactBytes: 104857600,
+      artifactTotalBytes: 536870912,
+    });
   });
 });
 
