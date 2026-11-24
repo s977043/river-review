@@ -21,7 +21,11 @@ River Review は、レビュー基準を **versioned / repo-owned な Skill** �
 
 ## はじめる
 
-### Claude Code（最短）
+> **導入前の注意（Claude Code）:** 同梱の PostToolUse hook は、Write / Edit / MultiEdit 後に利用先プロジェクトの Prettier を `--write` で実行し、作業ツリーを書き換える場合があります。整形 hook だけを個別に無効化する配布設定はありません。変更を避けたい場合は導入を見送り、導入後はプラグインを無効化・アンインストールしてください（**既に書き換えられたファイルは自動復元されません**）。Stop hook は River Review CLI を利用できる場合に限り、一時領域へチェックポイントを出力します。実行環境がない場合は成功コードでスキップするため、証拠の存在は別途確認してください。手順と条件は [更新・無効化・アンインストール](https://river-review.the3396.com/guides/plugin/update-and-uninstall/) を参照してください。
+
+### Claude Code（ローカル差分のレビュー）
+
+既存 Git リポジトリで **tracked ファイルの未コミット差分**を用意してから実行してください。未追跡ファイルだけでは対象にならず、差分がゼロの場合、既定ブランチとの比較を試みます。その過程で `git fetch origin` を実行する可能性があります。まずは使い捨てのリポジトリで試すことを推奨します。
 
 ```text
 /plugin marketplace add s977043/river-review
@@ -30,15 +34,19 @@ River Review は、レビュー基準を **versioned / repo-owned な Skill** �
 /river-review:review-local
 ```
 
-### Codex
+### Codex（スキルの導入）
 
 ```text
 codex plugin marketplace add s977043/river-review
+codex plugin marketplace list
+codex plugin add river-review@river-review-marketplace
 ```
+
+Codex では同梱スキルを利用します。**Claude Code 専用の** `/river-review:review-local` **は Codex の配布定義には含まれません**。スキルの選択・利用は [プラグイン導入ガイド](https://river-review.the3396.com/guides/plugin/install/) を参照してください。上記のマーケットプレイス名は配布例です。`codex plugin marketplace list` の実際の登録名が異なる場合は読み替え、使用中の Codex CLI の版で確認してください。
 
 通常のプラグイン利用では、**River Review 専用の LLM API キーは不要**です。GitHub Actions や standalone `river run` のヘッドレス実行では、設定した LLM プロバイダーの API キーが必要です。
 
-導入手順の詳細は [プラグインを導入する](https://river-review.the3396.com/guides/plugin/install/)、GitHub Actions 設定は [5分クイックスタート](https://river-review.the3396.com/guides/quickstart/) を参照してください。npm パッケージの公開は配布方針に含まれず、リポジトリ内の開発用 CLI は `npm run river -- ...` で実行します。
+導入手順の詳細は [プラグインを導入する](https://river-review.the3396.com/guides/plugin/install/)、GitHub Actions 設定は [クイックスタート](https://river-review.the3396.com/guides/quickstart/) を参照してください。npm パッケージの公開は配布方針に含まれず、リポジトリ内の開発用 CLI は `npm run river -- ...` で実行します。
 
 <!-- x-release-please-start-version -->
 
@@ -47,6 +55,8 @@ codex plugin marketplace add s977043/river-review
 <!-- x-release-please-end -->
 
 ## 得られるもの
+
+Claude Code はコマンド、Codex は同梱スキルを利用します。配布版ごとの差は [詳細一覧](https://river-review.the3396.com/guides/plugin/commands-and-skills/) を参照してください。
 
 得られるもの（プラグイン名で名前空間化されます）:
 
