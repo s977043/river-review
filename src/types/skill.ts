@@ -11,7 +11,8 @@ export type InputContext =
   | 'reviewSelf'
   | 'reviewExternal'
   | 'findingsPool'
-  | 'prDescription';
+  | 'prDescription'
+  | 'qaEvidence';
 export type OutputKind =
   'findings' | 'summary' | 'actions' | 'tests' | 'metrics' | 'questions' | 'review-audit';
 export type ModelHint = 'cheap' | 'balanced' | 'high-accuracy';

@@ -31,7 +31,7 @@ Upgrade to `v0.51.0` or later. The plan layer now defaults `availableContexts` t
 
 ### Declaring which contexts are available
 
-Declare the artifacts this environment can supply so that skills gated on them are selected. There is no way to declare a context of your own: the vocabulary is a closed enum defined in `schemas/skill.schema.json` (`$defs.inputContext`)—`diff`, `fullFile`, `tests`, `adr`, `commitMessage`, `repoConfig`, `reviewSelf`, `reviewExternal`, `findingsPool`, `prDescription`—and a skill's `inputContext` is validated against it. Matching is exact and case-sensitive, so a name outside that list can never make a skill eligible. If your CI produces an artifact with no entry here, there is nothing to declare; the skill that would consume it does not exist yet.
+Declare the artifacts this environment can supply so that skills gated on them are selected. There is no way to declare a context of your own: the vocabulary is a closed enum defined in `schemas/skill.schema.json` (`$defs.inputContext`)—`diff`, `fullFile`, `tests`, `adr`, `commitMessage`, `repoConfig`, `reviewSelf`, `reviewExternal`, `findingsPool`, `prDescription`, `qaEvidence`—and a skill's `inputContext` is validated against it. Matching is exact and case-sensitive, so a name outside that list can never make a skill eligible. If your CI produces an artifact with no entry here, there is nothing to declare; the skill that would consume it does not exist yet.
 
 Set `RIVER_AVAILABLE_CONTEXTS` before invoking the CLI:
 

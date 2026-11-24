@@ -32331,7 +32331,7 @@ var dist = __nccwpck_require__(2815);
  * @typedef {'upstream' | 'midstream' | 'downstream'} PhaseEnum
  * @typedef {PhaseEnum | PhaseEnum[]} Phase
  * @typedef {'info' | 'minor' | 'major' | 'critical'} Severity
- * @typedef {'diff' | 'fullFile' | 'tests' | 'adr' | 'commitMessage' | 'repoConfig' | 'reviewSelf' | 'reviewExternal' | 'findingsPool' | 'prDescription'} InputContext
+ * @typedef {'diff' | 'fullFile' | 'tests' | 'adr' | 'commitMessage' | 'repoConfig' | 'reviewSelf' | 'reviewExternal' | 'findingsPool' | 'prDescription' | 'qaEvidence'} InputContext
  * @typedef {'findings' | 'summary' | 'actions' | 'tests' | 'metrics' | 'questions' | 'review-audit'} OutputKind
  * @typedef {'cheap' | 'balanced' | 'high-accuracy'} ModelHint
  * @typedef {'code_search' | 'test_runner' | 'adr_lookup' | 'repo_metadata' | 'coverage_report' | 'tracing' | `custom:${string}`} Dependency
