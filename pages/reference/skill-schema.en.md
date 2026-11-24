@@ -15,7 +15,7 @@ The required fields are `id` / `name` / `description` / `category`. In addition,
 - `trigger` (object, optional): wrapper for `phase` and `applyTo` (or `files`). If both top-level and `trigger` values exist, top-level takes precedence.
 - `tags` (string[], optional): keywords that group related skills.
 - `severity` (string, optional): impact level; one of `info`/`minor`/`major`/`critical`.
-- `inputContext` (string[], optional): required inputs the skill expects. Allowed values are `diff` | `fullFile` | `tests` | `adr` | `commitMessage` | `repoConfig` | `reviewSelf` | `reviewExternal` | `findingsPool` | `prDescription`.
+- `inputContext` (string[], optional): required inputs the skill expects. Allowed values are `diff` | `fullFile` | `tests` | `adr` | `commitMessage` | `repoConfig` | `reviewSelf` | `reviewExternal` | `findingsPool` | `prDescription` | `qaEvidence`.
 - `outputKind` (string[], optional, default `['findings']`): output categories produced by the skill. Allowed values are `findings` | `summary` | `actions` | `tests` | `metrics` | `questions` | `review-audit`.
 - `modelHint` (string, optional): model selection hint; one of `cheap`/`balanced`/`high-accuracy`.
 - `evaluationType` (string, optional): which evaluation layer runs this skill; one of `deterministic` / `heuristic` / `agentic`. `deterministic` lets an external command decide pass/fail with no LLM, `heuristic` uses pure-code detectors, and `agentic` is LLM-backed. Skills that omit it keep their current behavior, and the `executionOrder` field of the review plan is derived from these declarations. See [Judgment Placement](../explanation/judgment-placement.en.md) for the design principle behind choosing a layer.

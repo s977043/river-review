@@ -14,7 +14,8 @@ export type InputContext =
   | 'reviewSelf'
   | 'reviewExternal'
   | 'findingsPool'
-  | 'prDescription';
+  | 'prDescription'
+  | 'qaEvidence';
 export type Dependency =
   | 'code_search'
   | 'test_runner'
