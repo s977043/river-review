@@ -8,6 +8,7 @@ import {
   QA_PLAN_MAX_FINDINGS,
   buildQaPlan,
 } from '../src/lib/qa-plan.mjs';
+import { normalizeQaId } from '../src/lib/qa-evidence.mjs';
 
 import { compileSchemaFile } from './helpers/schema-validator.mjs';
 
@@ -224,6 +225,41 @@ test('ids are compared after nonEmptyNfcString, and the finding id is otherwise 
   assert.equal(plan.basic[0].acId, 'K-1');
   assert.equal(plan.additional[0].findingId, 'rr-1');
   assert.equal(plan.additional[0].duplicateOf, 'ac:K-1');
+});
+
+test('buildQaPlan accepts exactly the AC ids that the QA evidence validator accepts', () => {
+  const kelvin = String.fromCodePoint(0x212a);
+  const inputs = [
+    'AC-1',
+    'a.b_c-D9',
+    ` ${kelvin}-1 `,
+    `${kelvin}${'a'.repeat(127)}`,
+    'AC 1',
+    'ac:1',
+    'AC/1',
+    'e\u0301',
+    '',
+    '   ',
+    'a'.repeat(128),
+    'a'.repeat(129),
+    42,
+    null,
+  ];
+  for (const raw of inputs) {
+    const expected = normalizeQaId(raw);
+    const label = JSON.stringify(raw)?.slice(0, 40);
+    if (expected === null) {
+      assert.throws(() => buildQaPlan({ acceptanceCriteria: [{ id: raw }] }), label);
+    } else {
+      assert.equal(
+        buildQaPlan({ acceptanceCriteria: [{ id: raw }] }).basic[0].acId,
+        expected,
+        label
+      );
+    }
+  }
+  assert.equal(normalizeQaId(` ${kelvin}-1 `), 'K-1');
+  assert.equal(normalizeQaId('a'.repeat(129)), null);
 });
 
 test('invalid input throws instead of dropping an AC or a finding', () => {

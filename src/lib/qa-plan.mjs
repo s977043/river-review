@@ -2,20 +2,20 @@
 // docs/development/qa-evidence-contract.md §11, schemas/qa-plan.schema.json.
 import { normalizeSeverity, severityToPriority } from './finding-factory.mjs';
 import { nonEmptyNfcString } from './promotion-candidates.mjs';
+import { normalizeQaId } from './qa-evidence.mjs';
 
 export const QA_PLAN_SCHEMA_VERSION = '1';
 export const QA_PLAN_MAX_ACCEPTANCE_CRITERIA = 200;
 export const QA_PLAN_MAX_FINDINGS = 500;
 
-const AC_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 const MAX_FINDING_ID_LENGTH = 160;
 
 const basicItemId = (acId) => `ac:${acId}`;
 const additionalItemId = (findingId) => `finding:${findingId}`;
 
 function normalizeAcId(raw, index) {
-  const id = nonEmptyNfcString(raw);
-  if (id === null || !AC_ID_PATTERN.test(id)) {
+  const id = normalizeQaId(raw);
+  if (id === null) {
     throw new TypeError(`acceptanceCriteria[${index}].id is not a valid AC id`);
   }
   return id;
