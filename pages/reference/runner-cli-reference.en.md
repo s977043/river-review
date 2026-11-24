@@ -1,6 +1,6 @@
 # Runner CLI Reference
 
-> **Scope note**: this page covers only the `--reviewers` and [`--plan-feedback`](#plan-feedback) flags of `river run` and the validation commands.
+> **Scope note**: this page covers only the `--reviewers`, [`--plan-feedback`](#plan-feedback), and [`--qa-evidence`](#qa-evidence) flags of `river run` and the validation commands.
 >
 > - For every other `river run` flag (`--phase` / `--planner` / `--dry-run` / `--output` / `--max-cost` / `--debug` / `--estimate` and so on), see **[stable-interfaces.en.md](./stable-interfaces.en.md)**.
 > - For the `river review exec` flags used in a W-check (`--artifact`, `--ensemble`, `--phase`), see the **[W-check guide](../guides/w-check.en.md)** and **[cli-review-exec-spec.en.md](./cli-review-exec-spec.en.md)**.
@@ -121,6 +121,52 @@ Before the review starts, input that fails any of these checks is rejected (`src
 | `2`  | Input validation failed (missing file, symlink, oversize, `STALE`, and so on). Prints `Error: invalid source-matched plan feedback: ...` and no HTML |
 
 Once validation passes, exit codes are the same as `river run` without these flags.
+
+## `--qa-evidence` flags (Experimental) {#qa-evidence}
+
+These flags take evidence of QA the consumer ran themselves (JSON in the `schemas/qa-evidence.schema.json` format), audit it with the deterministic validator (`auditQaEvidence` in `src/lib/qa-evidence.mjs`), and write the audit result to a file. ADR-017 sets the policy and `docs/development/qa-evidence-contract.md` is the source of truth for each field. As an Experimental interface, the format may change without notice.
+
+```sh
+river run . --output json \
+  --qa-evidence ./qa-evidence.json \
+  --qa-artifacts ./ci-artifacts \
+  --qa-audit-output ./qa-audit.json > review.json
+```
+
+| Flag                       | Value                                                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `--qa-evidence <file>`     | The QA evidence JSON                                                                                                    |
+| `--qa-artifacts <dir>`     | The directory that `artifacts.refs[].root: artifacts` in the evidence refers to. Without it, those refs stay unresolved |
+| `--qa-audit-output <file>` | Where the audit result JSON is written. The file is created; an existing file is never overwritten                      |
+
+All three paths are resolved against the working directory the CLI was started in (cwd), not against the target repository path (`river run <path>`).
+
+### Acceptance rules
+
+- Only `river run` accepts them (a usage error on every other surface)
+- Pass `--qa-evidence` and `--qa-audit-output` together. `--qa-artifacts` is accepted only with `--qa-evidence`
+- They cannot be combined with `--estimate` (the same rule as `--plan-feedback`, #2626)
+- `--qa-audit-output` must name a path that does not exist yet. An existing path (a symlink included), the `--qa-evidence` file itself, a path under `--qa-artifacts`, and a path whose parent directory is missing are refused
+
+### Behavior
+
+- A run without the three QA flags behaves as before
+- When input and output succeed, the audit result does not affect the review verdict, the gate, or the exit code. It is recorded only
+- When the evidence file cannot be read or `--qa-audit-output` fails the up-front check, the run stops with exit 1 before HEAD is observed and before the review (fail-fast)
+- When the actual write fails after that check (permissions, disk space, or a path created after the check), the run also exits 1 before the review, but possibly after HEAD is observed
+- The audit result is not added to the `--output` artifact; it goes only to the `--qa-audit-output` file. The `--output json` artifact follows `schemas/output.schema.json`, which allows no undeclared fields
+- HEAD for comparison is `git rev-parse HEAD`. `dirty` and the list of changed files come from tracked files only (equivalent to `git status --porcelain --untracked-files=no`), so untracked files do not make the tree `dirty`. The review's own judgment is unchanged
+- No AC population is passed and independence stays `unknown`, so in the first version no AC is verified
+- The `qaEvidence` input context becomes available only when the audit accepts the `--qa-evidence` evidence (`accepted: true`). `--context qaEvidence` is removed with a warning, and `qaEvidence` in the `RIVER_AVAILABLE_CONTEXTS` environment variable is ignored
+- The audit result is written even when there are no changes (`No changes to review`)
+- Evidence that is not JSON or exceeds the 1 MiB limit is recorded as rejected in the audit result, without changing the exit code
+- When the audit rejects the evidence as a whole (`accepted: false`), the audit result is still written, the review continues, and the exit code is the same as without QA; `qaEvidence` is not made available
+
+### Exit codes
+
+| Code | Condition                                                                                                                                                                                                                              |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`  | The flags break an acceptance rule (usage error), the `--qa-evidence` file cannot be read, or `--qa-audit-output` is refused or cannot be written. Each stops before the review (only a write failure may come after HEAD is observed) |
 
 ## Commands
 

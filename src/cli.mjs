@@ -15,7 +15,7 @@ import { GitError, GitRepoNotFoundError } from './lib/git.mjs';
 import { SkillLoaderError } from '../runners/core/skill-loader.mjs';
 import { ProjectRulesError } from './lib/rules.mjs';
 import { RiskMapError } from './lib/risk-map.mjs';
-import { parseList } from './lib/utils.mjs';
+import { QA_EVIDENCE_CONTEXT, parseList } from './lib/utils.mjs';
 import { PLANNER_MODES, PHASES } from './lib/planner-utils.mjs';
 import { SEVERITY_RANK } from './lib/finding-factory.mjs';
 import { DEPTH_TO_REVIEW_MODE } from './lib/review-plan-generator.mjs';
@@ -170,6 +170,10 @@ Options:
   --plan-feedback-workdir <dir>   Source task directory with plan.md and review-questions.json
   --plan-feedback-task <TASK>     TASK-XXXX; all three flags must be supplied
                                   (not with --estimate)
+  --qa-evidence <file>       (run, Experimental) QA evidence JSON to audit (ADR-017)
+  --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
+  --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
+                             The review output, gate and exit code do not change
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
@@ -382,6 +386,9 @@ const BASE_CONSUMING_SURFACES = new Set([
  */
 const ENTRY_CONSUMING_SURFACES = new Set(['review plan', 'review exec']);
 
+/** The surface that reads the QA evidence flags (`src/cli/commands/run.mjs`). */
+const QA_EVIDENCE_CONSUMING_SURFACES = new Set(['run']);
+
 /**
  * Command-scoped option allowlist (#2065).
  *
@@ -429,6 +436,17 @@ const COMMAND_SCOPED_OPTIONS = [
     surfaces: ENTRY_CONSUMING_SURFACES,
     why: 'that surface does not resolve a review Flow entry',
   },
+  // ADR-017 D6: QA evidence rides on `river run` instead of a new top-level command.
+  ...[
+    ['--qa-evidence', 'qaEvidenceFile'],
+    ['--qa-artifacts', 'qaArtifactsDir'],
+    ['--qa-audit-output', 'qaAuditOutput'],
+  ].map(([token, field]) => ({
+    token,
+    given: (parsed) => parsed[field] !== null,
+    surfaces: QA_EVIDENCE_CONSUMING_SURFACES,
+    why: 'that surface does not audit QA evidence',
+  })),
 ];
 
 /**
@@ -674,6 +692,9 @@ const KNOWN_OPTION_TOKENS = new Set([
   '--plan-feedback',
   '--plan-feedback-workdir',
   '--plan-feedback-task',
+  '--qa-evidence',
+  '--qa-artifacts',
+  '--qa-audit-output',
   '--format',
   '--context',
   '--dependency',
@@ -1496,6 +1517,9 @@ function parseArgs(argv) {
     planFeedbackWorkdir: null,
     planFeedbackTask: null,
     planFeedbackProjection: null,
+    qaEvidenceFile: null,
+    qaArtifactsDir: null,
+    qaAuditOutput: null,
     base: null,
     entry: null,
     skillSet: null,
@@ -1705,6 +1729,17 @@ function parseArgs(argv) {
   // followed by a bad option prints both the advisory and the error, and this
   // change is about de-duplicating the advisory, not about suppressing it on
   // the error path.
+  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
+  // and `run` adds it once the audit accepts it. Naming it in `--context` must not stand in for that.
+  if (parsed.availableContexts?.includes(QA_EVIDENCE_CONTEXT)) {
+    parsed.availableContexts = parsed.availableContexts.filter(
+      (ctx) => ctx !== QA_EVIDENCE_CONTEXT
+    );
+    console.warn(
+      `Warning: --context ${QA_EVIDENCE_CONTEXT} is ignored; ` +
+        'it becomes available only when --qa-evidence is passed to river run.'
+    );
+  }
   if (parsed.availableContexts) {
     warnUnknownInputContexts(parsed.availableContexts);
   }
@@ -1741,6 +1776,24 @@ function parseArgs(argv) {
       );
       usageError(parsed);
     }
+  }
+
+  // The audit result has no place in the closed `--output json` artifact, so a QA run must
+  // name the file that receives it; artifacts without evidence would never be read.
+  if (!parsed.usageError && (parsed.qaEvidenceFile !== null) !== (parsed.qaAuditOutput !== null)) {
+    console.error('Error: --qa-evidence and --qa-audit-output must be used together.');
+    usageError(parsed);
+  } else if (
+    !parsed.usageError &&
+    parsed.qaArtifactsDir !== null &&
+    parsed.qaEvidenceFile === null
+  ) {
+    console.error('Error: --qa-artifacts requires --qa-evidence.');
+    usageError(parsed);
+  } else if (!parsed.usageError && parsed.qaEvidenceFile !== null && parsed.estimate) {
+    // Rejected like the plan-feedback flags (#2626): --estimate only estimates cost.
+    console.error('Error: --qa-evidence and --qa-audit-output cannot be combined with --estimate.');
+    usageError(parsed);
   }
 
   if (applyPhaseFallback(parsed)) {

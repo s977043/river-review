@@ -47,6 +47,9 @@ export function isLlmEnabled(env = process.env) {
   );
 }
 
+/** The input context `river run` adds only when the audit accepts `--qa-evidence` (ADR-017 D2). */
+export const QA_EVIDENCE_CONTEXT = 'qaEvidence';
+
 /**
  * Resolve the effective `availableContexts` for `buildExecutionPlan`'s
  * `inputContext`-based skill selection. Combines caller-supplied contexts
@@ -60,6 +63,10 @@ export function isLlmEnabled(env = process.env) {
  * Shared between `src/lib/local-runner.mjs` (legacy `river run`) and
  * `src/lib/review-plan.mjs` (`river review exec` / Phase 3).
  *
+ * `RIVER_AVAILABLE_CONTEXTS` never supplies {@link QA_EVIDENCE_CONTEXT}: that context stands for
+ * QA evidence the caller audited and accepted (ADR-017 D2), so only the caller's own list may
+ * carry it.
+ *
  * @param {string[] | null | undefined} inputContexts
  * @param {{ defaultContexts?: string[]; alwaysInclude?: string[] }} [options]
  * @returns {string[]}
@@ -68,7 +75,9 @@ export function resolveAvailableContexts(
   inputContexts,
   { defaultContexts = ['diff'], alwaysInclude = [] } = {}
 ) {
-  const envContexts = parseList(process.env.RIVER_AVAILABLE_CONTEXTS);
+  const envContexts = parseList(process.env.RIVER_AVAILABLE_CONTEXTS).filter(
+    (ctx) => ctx !== QA_EVIDENCE_CONTEXT
+  );
   const base = inputContexts && inputContexts.length ? inputContexts : defaultContexts;
   return [...new Set([...alwaysInclude, ...base, ...envContexts])];
 }

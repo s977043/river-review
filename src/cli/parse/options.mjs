@@ -290,6 +290,17 @@ export function consumeOption(parsed, arg, args) {
     else parsed.planFeedbackTask = value;
     return 'continue';
   }
+  if (arg === '--qa-evidence' || arg === '--qa-artifacts' || arg === '--qa-audit-output') {
+    const value = args.shift();
+    if (!value || value.startsWith('-')) {
+      console.error('Error: ' + arg + ' option requires a path.');
+      return 'break';
+    }
+    if (arg === '--qa-evidence') parsed.qaEvidenceFile = value;
+    else if (arg === '--qa-artifacts') parsed.qaArtifactsDir = value;
+    else parsed.qaAuditOutput = value;
+    return 'continue';
+  }
   if (arg === '--format') {
     const value = args.shift();
     if (!value || value.startsWith('-')) {

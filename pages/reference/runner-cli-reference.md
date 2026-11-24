@@ -1,6 +1,6 @@
 # `--reviewers` フラグリファレンス
 
-> **スコープ注意**: このページは `river run` の `--reviewers` フラグ・[`--plan-feedback` フラグ](#plan-feedback)・検証コマンドのみを扱います。
+> **スコープ注意**: このページは `river run` の `--reviewers` フラグ・[`--plan-feedback` フラグ](#plan-feedback)・[`--qa-evidence` フラグ](#qa-evidence)・検証コマンドのみを扱います。
 >
 > - `river run` の全フラグ（`--phase` / `--planner` / `--dry-run` / `--output` / `--max-cost` / `--debug` / `--estimate` など）は **[stable-interfaces.md](./stable-interfaces.md)** を参照してください。
 > - W-check で使用する `river review exec` のフラグ（`--artifact`, `--ensemble`, `--phase`）は **[W-check ガイド](../guides/w-check.md)** および **[cli-review-exec-spec.md](./cli-review-exec-spec.md)** を参照してください。
@@ -121,6 +121,52 @@ river run . --dry-run --output html \
 | `2`    | 入力の検証に失敗した（ファイル欠落・symlink・サイズ超過・`STALE` など）。`Error: invalid source-matched plan feedback: ...` を出し、HTML は出しません |
 
 検証を通った後の終了コードは、フラグを付けない `river run` と同じです。
+
+## `--qa-evidence` フラグ（Experimental） {#qa-evidence}
+
+利用者が自分で実行した QA の証拠（`schemas/qa-evidence.schema.json` の形式の JSON）を受け取り、決定論の検証モジュール（`src/lib/qa-evidence.mjs` の `auditQaEvidence`）で監査した結果をファイルへ書き出します。方針は ADR-017、各欄の扱いは `docs/development/qa-evidence-contract.md` が正本です。Experimental のため、予告なく形式を変えることがあります。
+
+```sh
+river run . --output json \
+  --qa-evidence ./qa-evidence.json \
+  --qa-artifacts ./ci-artifacts \
+  --qa-audit-output ./qa-audit.json > review.json
+```
+
+| フラグ                     | 値                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `--qa-evidence <file>`     | QA 証拠の JSON                                                                                   |
+| `--qa-artifacts <dir>`     | 証拠の `artifacts.refs[].root: artifacts` が指すディレクトリ。省略すると、その参照は解決されない |
+| `--qa-audit-output <file>` | 監査結果の JSON の書き出し先。新規作成だけで、既存のファイルは上書きしない                       |
+
+3 つのパスは、いずれも CLI を起動した作業ディレクトリ（cwd）を基準に解決する。対象リポジトリのパス（`river run <path>`）は基準にならない。
+
+### 受理条件
+
+- `river run` だけが受理する（他の面では usage error）
+- `--qa-evidence` と `--qa-audit-output` は揃えて指定する。`--qa-artifacts` は `--qa-evidence` と一緒のときだけ指定できる
+- `--estimate` とは併用できない（`--plan-feedback` と同じ扱い。#2626）
+- `--qa-audit-output` には、まだ存在しないパスを指定する。既存のパス（symlink を含む）、`--qa-evidence` のファイル自身、`--qa-artifacts` の配下、親ディレクトリが無いパスは拒否する
+
+### 挙動
+
+- QA の 3 フラグを指定しない実行は、従来どおりである
+- 入出力に成功した場合、監査の結果はレビューの判定・gate・終了コードに影響しない。監査結果は記録だけである
+- 証拠ファイルを読めない場合と、`--qa-audit-output` の事前検証に通らない場合は、HEAD の観測とレビューの前に exit 1 で止まる（fail-fast）
+- 事前検証の後の実際の書き込みに失敗した場合（権限・容量・検証後に同名のパスができた競合など）も exit 1 で、レビューの前に止まる。ただし HEAD の観測の後になり得る
+- 監査結果は `--output` の成果物に載せず、`--qa-audit-output` のファイルにだけ書く。`--output json` の成果物は `schemas/output.schema.json` に従い、定義に無い欄を持てないため
+- 照合に使う HEAD は `git rev-parse HEAD` である。`dirty` と変わったファイルの一覧は、追跡中のファイルだけで判定する（`git status --porcelain --untracked-files=no` 相当）。未追跡のファイルは `dirty` にしない。レビュー側の判定は変えない
+- AC の母集団は渡さず、独立性は `unknown` のままである。そのため初版では、どの AC も verified にならない
+- 入力コンテキスト `qaEvidence` は、`--qa-evidence` の証拠が監査で受理された（`accepted: true`）ときだけ available になる。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
+- 変更が無い（`No changes to review`）場合も、監査結果を書き出す
+- JSON として解釈できない・上限（1 MiB）を超える証拠は、終了コードを変えずに、監査結果の側で拒否として記録する
+- 監査で証拠が全体として拒否された場合（`accepted: false`）も、監査結果は書き出し、レビューは続け、終了コードは QA を指定しない場合と同じになる。このとき `qaEvidence` は available にならない
+
+### 終了コード
+
+| コード | 条件                                                                                                                                                                                                    |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`    | 受理条件に反する指定（usage error）、`--qa-evidence` のファイルを読めない、`--qa-audit-output` を受け付けない・書き込めない。いずれもレビュー前に止まる（書き込みの失敗だけは HEAD の観測後になり得る） |
 
 ## コマンド
 
