@@ -33,6 +33,8 @@ Upgrade to `v0.51.0` or later. The plan layer now defaults `availableContexts` t
 
 Declare the artifacts this environment can supply so that skills gated on them are selected. There is no way to declare a context of your own: the vocabulary is a closed enum defined in `schemas/skill.schema.json` (`$defs.inputContext`)—`diff`, `fullFile`, `tests`, `adr`, `commitMessage`, `repoConfig`, `reviewSelf`, `reviewExternal`, `findingsPool`, `prDescription`, `qaEvidence`—and a skill's `inputContext` is validated against it. Matching is exact and case-sensitive, so a name outside that list can never make a skill eligible. If your CI produces an artifact with no entry here, there is nothing to declare; the skill that would consume it does not exist yet.
 
+`qaEvidence` cannot be declared this way on the CLI: `--context qaEvidence` is removed with a warning and `qaEvidence` in `RIVER_AVAILABLE_CONTEXTS` is ignored. It becomes available only when `river run --qa-evidence` passes evidence that the audit accepts (see [`--qa-evidence`](../../pages/reference/runner-cli-reference.en.md#qa-evidence)).
+
 Set `RIVER_AVAILABLE_CONTEXTS` before invoking the CLI:
 
 ```bash
@@ -59,7 +61,7 @@ A skill declares `inputContext: ['<X>']` but `<X>` is not in the effective `avai
 
 **Resolution options:**
 
-1. Add `<X>` to `RIVER_AVAILABLE_CONTEXTS` or `--context` if the artifact is genuinely available in this environment.
+1. Add `<X>` to `RIVER_AVAILABLE_CONTEXTS` or `--context` if the artifact is genuinely available in this environment. This does not apply to `qaEvidence`, which only `river run --qa-evidence` with accepted evidence makes available.
 2. Drop the `inputContext` constraint from the skill metadata if it should always run.
 3. Leave the skill skipped—`skippedSkills` is the correct outcome when the input is missing.
 
