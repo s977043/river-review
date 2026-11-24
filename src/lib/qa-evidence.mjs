@@ -989,3 +989,21 @@ export function auditQaEvidence({ evidence, population, observed, roots }) {
     trustedSourceIds: [],
   });
 }
+
+/**
+ * The input a skill reading `qaEvidence` receives (ADR-017 rollout step 5): the redacted copy of
+ * accepted evidence, with restricted artifact paths already removed, and the rest of the audit.
+ * Built from the audit result alone, so it holds nothing the `--qa-audit-output` file does not.
+ * Rejected evidence gives null, and so does an accepted result without its redacted copy.
+ *
+ * @param {Awaited<ReturnType<typeof auditQaEvidence>>} audit
+ * @returns {{ evidence: object, audit: object } | null}
+ */
+export function qaEvidenceSkillInput(audit) {
+  if (audit?.accepted !== true || !isObject(audit.redaction?.evidence)) return null;
+  const { redaction, ...rest } = audit;
+  return {
+    evidence: redaction.evidence,
+    audit: { ...rest, redaction: { replaced: redaction.replaced } },
+  };
+}

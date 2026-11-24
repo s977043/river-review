@@ -31,6 +31,7 @@ import {
   buildHandoffSection,
   buildPrDescriptionSection,
   buildProjectRulesSection,
+  buildQaEvidenceSection,
   buildReviewObligationsSection,
   buildRiskAssessmentSection,
   buildSkillSummary,
@@ -92,6 +93,7 @@ export function buildPrompt({
   reviewMode,
   repoContext,
   prBody,
+  qaEvidence,
   reviewObligations,
   maxChars = MAX_PROMPT_CHARS,
   config = defaultConfig,
@@ -114,7 +116,7 @@ ${buildFileSummary(diffFiles)}
 Relevant skills:
 ${buildSkillSummary(plan)}
 
-${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${buildRepoContextSection(repoContext)}${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(
+${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${buildRepoContextSection(repoContext)}${buildPrDescriptionSection(prBody)}${buildQaEvidenceSection(qaEvidence)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(
     {
       language,
       severity,
@@ -440,6 +442,9 @@ export async function generateReview({
   reviewMode,
   repoContext,
   prBody,
+  // ADR-017 rollout step 5: `qaEvidenceSkillInput` (src/lib/qa-evidence.mjs), passed only when a
+  // selected skill declares the `qaEvidence` input context.
+  qaEvidence,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
   signal,
@@ -472,6 +477,7 @@ export async function generateReview({
     reviewMode,
     repoContext,
     prBody,
+    qaEvidence,
     reviewObligations,
     maxChars: maxPromptChars,
     config: effectiveConfig,
@@ -543,6 +549,7 @@ export async function generateReview({
     riskAssessment,
     repoContext,
     prBody,
+    qaEvidence,
     reviewObligations,
     language,
     openAIConfig,

@@ -127,8 +127,8 @@ async function loadSkillMetadataReport() {
  * Check the skills an executing `review exec --plan <file>` would run before it runs them.
  *
  * Replay runs the saved `selectedSkills` without re-planning, so a plan that names a QA evidence
- * skill would run it without the evidence, which the main CLI does not pass to skills yet
- * (ADR-017 D2, rollout step 5).
+ * skill would run it without the evidence: only `river run --qa-evidence` passes the evidence to
+ * skills, and a replay has no audited evidence to pass (ADR-017 D2, rollout step 5).
  *
  * The plan file is read once. The selected skills come from `runReviewExecReplay` itself in echo
  * mode, so the shape rule and the format checks are the replay's own, and a malformed plan throws
@@ -212,8 +212,8 @@ export async function confirmReplayPlan(
     return {
       refusal:
         `review exec --plan cannot run ${needsQaEvidence.join(', ')}: ` +
-        `it requires the ${QA_EVIDENCE_CONTEXT} input context, and the main CLI does not ` +
-        'pass QA evidence to skills yet.',
+        `it requires the ${QA_EVIDENCE_CONTEXT} input context, and a replay does not ` +
+        'pass QA evidence to skills (use river run --qa-evidence).',
     };
   }
   return { readFileImpl: servePlan };

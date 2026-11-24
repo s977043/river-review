@@ -796,6 +796,7 @@ export async function runReviewerOrchestration({
   config,
   reviewers,
   prBody,
+  qaEvidence,
   signals,
   // #1689: observability knobs. `quiet` comes from the CLI `--quiet` flag;
   // `timeoutMs` / `progress` are explicit overrides above env and config.
@@ -855,6 +856,7 @@ export async function runReviewerOrchestration({
     reviewMode,
     config,
     prBody,
+    qaEvidence,
     // #2334: Critic はマージ後に 1 回だけ走らせる。per-reviewer × chunk で
     // 走らせるとマージ前の finding を判定してしまい、ADR-011 が指定した
     // 挿入点（merge 後 → verifier → runFindingCritic）とずれる。

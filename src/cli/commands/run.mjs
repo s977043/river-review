@@ -20,7 +20,11 @@ import path from 'node:path';
 import process from 'node:process';
 import { ensureGitRepo, getHeadSha, listTrackedChanges } from '../../lib/git.mjs';
 import { planLocalReview, runLocalReview } from '../../lib/local-runner.mjs';
-import { QA_EVIDENCE_LIMITS, auditQaEvidence } from '../../lib/qa-evidence.mjs';
+import {
+  QA_EVIDENCE_LIMITS,
+  auditQaEvidence,
+  qaEvidenceSkillInput,
+} from '../../lib/qa-evidence.mjs';
 import { SkillLoaderError, resolveSkillSet } from '../../../runners/core/skill-loader.mjs';
 import CostEstimator from '../../core/cost-estimator.mjs';
 import { resolveDepthToReviewMode } from '../../lib/review-plan-generator.mjs';
@@ -323,10 +327,10 @@ function resolveQaAuditOutput(parsed) {
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * Runs before `planLocalReview`, so a failed write stops the run before the review. The audit is
- * recorded only: it does not make the `qaEvidence` context available, because no skill receives
- * the evidence itself yet (ADR-017 rollout step 5). The repository root and HEAD come from
- * the same `ensureGitRepo` / `getHeadSha` calls `planLocalReview` makes. `dirty` and
+ * Runs before `planLocalReview`, so a failed write stops the run before the review. The caller
+ * turns an accepted result into the skill input that makes the `qaEvidence` context available
+ * (ADR-017 rollout step 5); a rejected result leaves it unavailable. The repository root and
+ * HEAD come from the same `ensureGitRepo` / `getHeadSha` calls `planLocalReview` makes. `dirty` and
  * `changedFiles` come from tracked files only (`listTrackedChanges`), per §5 condition 5; the
  * review's own `dirty` (`isWorkingTreeDirty`) is left as it is. The AC population and
  * independence stay at the production defaults inside `auditQaEvidence`: no population is
@@ -421,9 +425,11 @@ export async function runRunCommand(parsed, targetPath) {
 
   // Before planLocalReview (and so before its early returns), so the audit is written even when
   // there is nothing to review.
+  let qaSkillInput = null;
   if (qaEvidence !== null) {
     const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
     if (audit === null) return 1;
+    qaSkillInput = qaEvidenceSkillInput(audit);
   }
 
   const context = await planLocalReview({
@@ -437,6 +443,7 @@ export async function runRunCommand(parsed, targetPath) {
     baseRef: parsed.base,
     skillIds,
     manualReviewMode,
+    qaEvidence: qaSkillInput,
   });
 
   const estimator = new CostEstimator(
