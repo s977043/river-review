@@ -203,6 +203,29 @@ describe('river run --qa-evidence', () => {
     assert.equal(existsSync(join(artifacts, 'audit.json')), false);
   });
 
+  test('an output whose parent is a regular file keeps the original error', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const work = scratch(t);
+    const evidencePath = join(work, 'evidence.json');
+    writeFileSync(evidencePath, evidenceFor(await git(['rev-parse', 'HEAD'], dir)));
+    const run = await runCliAsSubprocess(
+      [
+        'run',
+        '.',
+        '--dry-run',
+        '--output',
+        'json',
+        ...qaFlags(evidencePath, join(evidencePath, 'audit.json')),
+      ],
+      { cwd: dir }
+    );
+    assert.equal(run.code, 1, run.stderr);
+    assert.match(run.stderr, /--qa-audit-output is refused: ENOTDIR/);
+    assert.doesNotMatch(run.stderr, /its parent directory does not exist/);
+    assert.doesNotMatch(run.stderr, /River Review \(local\)/, 'the review must not start');
+  });
+
   test('an output under --qa-artifacts reached through a symlink is refused', async (t) => {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
     t.after(cleanup);

@@ -119490,8 +119490,8 @@ Options:
   --qa-evidence <file>       (run, Experimental) QA evidence JSON to audit (ADR-017)
   --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
   --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
-                             The audit is recorded only: the review output, gate and
-                             exit code do not change
+                             The audit result alone does not change the review output, gate
+                             or exit code; input/output errors stop the run with exit 1
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
