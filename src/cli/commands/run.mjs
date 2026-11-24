@@ -19,7 +19,9 @@ import {
 import path from 'node:path';
 import process from 'node:process';
 import { ensureGitRepo, getHeadSha, listTrackedChanges } from '../../lib/git.mjs';
+import { ConfigLoader } from '../../config/loader.mjs';
 import { planLocalReview, runLocalReview } from '../../lib/local-runner.mjs';
+import { createRedactionPrimitives } from '../../lib/repo-context.mjs';
 import {
   QA_EVIDENCE_LIMITS,
   auditQaEvidence,
@@ -325,6 +327,23 @@ function resolveQaAuditOutput(parsed) {
 }
 
 /**
+ * The redactor for QA evidence strings, built from `security.redact` the same way as the repo
+ * context the prompt receives (`createRedactionPrimitives`), with the count the audit records.
+ *
+ * @param {object | undefined} security - the loaded config's `security` section.
+ * @returns {(text: string) => { text: string, count: number }}
+ */
+export function qaEvidenceRedactor(security) {
+  const { maybeRedact, totalHits } = createRedactionPrimitives(security);
+  const hitCount = () => [...totalHits.values()].reduce((sum, count) => sum + count, 0);
+  return (text) => {
+    const before = hitCount();
+    const redacted = maybeRedact(text);
+    return { text: redacted, count: hitCount() - before };
+  };
+}
+
+/**
  * Audit the QA evidence against what this run observed and write the result.
  *
  * Runs before `planLocalReview`, so a failed write stops the run before the review. The caller
@@ -341,8 +360,10 @@ function resolveQaAuditOutput(parsed) {
 async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
   const repoRoot = await ensureGitRepo(targetPath);
   const trackedChanges = await listTrackedChanges(repoRoot);
+  const { config } = await new ConfigLoader().load(repoRoot);
   const result = await auditQaEvidence({
     evidence,
+    redact: qaEvidenceRedactor(config.security),
     population: null,
     observed: {
       head: await getHeadSha(repoRoot),

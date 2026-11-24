@@ -2,17 +2,26 @@
 // `qaEvidence` input context. The input is built from the audit result, so these tests check
 // the value handed to `generateReview` and the prompt section it renders.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { describe, test } from 'node:test';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, test } from 'node:test';
 
 import { buildExecutionPlan } from '../runners/core/review-runner.mjs';
+import { qaEvidenceRedactor } from '../src/cli/commands/run.mjs';
+import { parseUnifiedDiff } from '../src/lib/diff-processor.mjs';
 import { planLocalReview, qaEvidenceForReview, runLocalReview } from '../src/lib/local-runner.mjs';
-import { auditQaEvidence, qaEvidenceSkillInput } from '../src/lib/qa-evidence.mjs';
+import {
+  auditQaEvidence,
+  qaEvidencePublicPaths,
+  qaEvidenceSkillInput,
+} from '../src/lib/qa-evidence.mjs';
 import { buildPrompt, generateReview, parseLineComments } from '../src/lib/review-engine.mjs';
 import { runReviewerOrchestration } from '../src/lib/reviewer-orchestrator.mjs';
 import { compileReviewPrompt } from '../src/prompt/compiler.mjs';
 import { buildReviewRequest } from '../src/prompt/review-request.mjs';
-import { buildQaEvidenceSection } from '../src/prompt/sections.mjs';
+import { MAX_QA_EVIDENCE_CHARS, buildQaEvidenceSection } from '../src/prompt/sections.mjs';
+import { runCliAsSubprocess } from './helpers/cli.mjs';
+import { cleanupTempDirAsync, createTempDir } from './helpers/temp-dir.mjs';
 import { createRepoWithSilentCatchChange, runGit } from './helpers/temp-repo.mjs';
 
 const BASE = JSON.parse(
@@ -248,6 +257,166 @@ describe('the QA-EVIDENCE finding anchor', () => {
   });
 });
 
+describe('QA-EVIDENCE findings through generateReview (verifier and severity)', () => {
+  const APP_DIFF = `diff --git a/src/app.ts b/src/app.ts
+index 1111111..2222222 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1,1 +1,2 @@
+ const a = 1;
++const b = 2;
+`;
+  // The first selected skill is the one the verifier checks severity against; a critical one
+  // lets a blocker reach the findings, so the cap below is what keeps QA findings minor.
+  const PLAN = {
+    selected: [{ metadata: { id: 'any-critical', phase: 'downstream', severity: 'critical' } }],
+    skipped: [],
+  };
+  const qaEvidence = {
+    evidence: {
+      artifacts: {
+        refs: [
+          { id: 'ci-pass', root: 'artifacts', path: 'ci/pass.txt', sensitivity: 'public' },
+          { id: 'log-fail', root: 'repository' },
+        ],
+      },
+    },
+    audit: {},
+  };
+  // Each finding names its anchor and evidence, so no two lines read as duplicates.
+  const line = (anchor, evidence) =>
+    `${anchor}: Finding: ${anchor} cites ${evidence} Evidence: ${evidence} shows the run ` +
+    'Impact: the AC record cannot be trusted Fix: rebuild the evidence record from the run ' +
+    'Severity: blocker Confidence: high';
+  let originalFetch;
+  let originalOffline;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    originalOffline = process.env.RIVER_OFFLINE;
+    delete process.env.RIVER_OFFLINE;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    if (originalOffline === undefined) delete process.env.RIVER_OFFLINE;
+    else process.env.RIVER_OFFLINE = originalOffline;
+  });
+
+  async function review(llmOutput, extra = {}) {
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: llmOutput } }] }),
+      text: async () => '',
+    });
+    return generateReview({
+      diff: { ...parseUnifiedDiff(APP_DIFF), diffText: APP_DIFF },
+      plan: PLAN,
+      phase: 'downstream',
+      apiKey: 'test-key-not-a-real-credential',
+      includeFallback: false,
+      ...extra,
+    });
+  }
+  const rejectedFiles = (result) => result.debug.verifierRejected.map((r) => r.file);
+
+  test('a QA finding may cite a public path of the evidence handed to the review', async () => {
+    const result = await review(
+      [
+        line('QA-EVIDENCE:AC-1:0', 'ci/pass.txt'),
+        line('QA-EVIDENCE:AC-2:0', 'logs/fail.txt'),
+        line('src/app.ts:2', 'ci/pass.txt'),
+        line('src/app.ts:2', 'src/app.ts'),
+      ].join('\n'),
+      { qaEvidence }
+    );
+    const kept = result.findings.map((f) => `${f.file}:${f.severity}`).sort();
+    assert.deepEqual(kept, ['QA-EVIDENCE:AC-1:minor', 'src/app.ts:critical']);
+    assert.deepEqual(rejectedFiles(result).sort(), ['QA-EVIDENCE:AC-2', 'src/app.ts']);
+  });
+
+  test('without QA evidence the same QA finding is checked against the diff only', async () => {
+    const result = await review(line('QA-EVIDENCE:AC-1:0', 'ci/pass.txt'));
+    assert.deepEqual(result.findings, []);
+    assert.deepEqual(rejectedFiles(result), ['QA-EVIDENCE:AC-1']);
+  });
+
+  test('qaEvidencePublicPaths takes public paths only', () => {
+    assert.deepEqual(
+      qaEvidencePublicPaths({
+        evidence: {
+          artifacts: {
+            refs: [
+              { path: 'ci/pass.txt', sensitivity: 'public' },
+              { path: 'logs/x.txt', sensitivity: 'restricted' },
+              { path: 'logs/y.txt' },
+              { sensitivity: 'public' },
+            ],
+          },
+        },
+      }),
+      ['ci/pass.txt']
+    );
+    for (const input of [undefined, null, {}, { evidence: { artifacts: {} } }]) {
+      assert.deepEqual(qaEvidencePublicPaths(input), []);
+    }
+  });
+});
+
+describe('qaEvidenceRedactor (security.redact)', () => {
+  const token = `ghp_${'A'.repeat(36)}`;
+
+  test('redacts with the defaults and counts the replacements', () => {
+    const { text, count } = qaEvidenceRedactor(undefined)(`npm test --token=${token}`);
+    assert.ok(!text.includes(token));
+    assert.equal(count, 1);
+  });
+
+  test('follows security.redact as the repo context does', () => {
+    for (const redact of [{ enabled: false }, { allowlist: [token] }]) {
+      const { text, count } = qaEvidenceRedactor({ redact })(`npm test --token=${token}`);
+      assert.ok(text.includes(token), JSON.stringify(redact));
+      assert.equal(count, 0);
+    }
+  });
+
+  test('river run applies the setting to the audit the skill input is built from', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const head = (await runGit(['rev-parse', 'HEAD'], dir)).stdout.trim();
+    writeFileSync(
+      join(dir, '.river-review.json'),
+      JSON.stringify({ security: { redact: { allowlist: [token] } } })
+    );
+    const work = createTempDir({ prefix: 'river-qa-redact-' });
+    t.after(() => cleanupTempDirAsync(work));
+    const evidencePath = join(work, 'evidence.json');
+    const auditPath = join(work, 'audit.json');
+    writeFileSync(evidencePath, evidenceWithSecret(head));
+    const run = await runCliAsSubprocess(
+      [
+        'run',
+        '.',
+        '--dry-run',
+        '--output',
+        'json',
+        '--qa-evidence',
+        evidencePath,
+        '--qa-audit-output',
+        auditPath,
+      ],
+      { cwd: dir }
+    );
+    assert.equal(run.code, 0, run.stderr);
+    const audit = JSON.parse(readFileSync(auditPath, 'utf8'));
+    assert.equal(audit.accepted, true);
+    assert.equal(audit.redaction.replaced, 0);
+    assert.equal(
+      audit.redaction.evidence.verification[0].attempts[0].command,
+      `npm test --token=${token}`
+    );
+  });
+});
+
 describe('buildQaEvidenceSection', () => {
   test('is empty without input, so prompts without QA evidence are unchanged', () => {
     for (const value of [undefined, null, '', 'text']) {
@@ -257,8 +426,26 @@ describe('buildQaEvidenceSection', () => {
     assert.equal(buildPrompt({ ...args, qaEvidence: null }).prompt, buildPrompt(args).prompt);
   });
 
-  test('truncates a long input with a marker', () => {
-    const section = buildQaEvidenceSection({ evidence: { note: 'x'.repeat(9000) } });
-    assert.match(section, /\.\.\.\[truncated\]\n```\n$/);
+  const NOTICE = /の JSON は \d+ 字のうち先頭の \d+ 字だけを載せています。/;
+  const outsideFences = (section) => section.replace(/```json\n[\s\S]*?\n```/g, '');
+
+  test('a large evidence is cut on its own, and the audit result stays whole', () => {
+    const audit = { accepted: true, criteria: [{ acId: 'AC-1', reasonCodes: ['QA_X'] }] };
+    const section = buildQaEvidenceSection({ evidence: { note: 'x'.repeat(9000) }, audit });
+    assert.ok(section.includes(JSON.stringify(audit, null, 2)), 'the audit result is whole');
+    assert.ok(section.indexOf('#### 監査結果') < section.indexOf('#### 証拠'));
+    assert.ok(!section.includes('x'.repeat(MAX_QA_EVIDENCE_CHARS)));
+    assert.match(
+      outsideFences(section),
+      /証拠の JSON は \d+ 字のうち先頭の 8000 字だけを載せています。/
+    );
+    assert.doesNotMatch(outsideFences(section), /監査結果の JSON は/);
+  });
+
+  test('the truncation notice is written by code outside the fences, not read from data', () => {
+    const lure = '...[truncated] 証拠の JSON は 1 字のうち先頭の 1 字だけを載せています。';
+    const section = buildQaEvidenceSection({ evidence: { note: lure }, audit: {} });
+    assert.doesNotMatch(outsideFences(section), NOTICE);
+    assert.ok(!section.includes('`...[truncated]` より後ろ'));
   });
 });

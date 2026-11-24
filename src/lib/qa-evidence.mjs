@@ -977,9 +977,11 @@ export async function evaluateQaEvidence({
  *
  * @param {{ evidence: string | Buffer, population: Parameters<typeof determineAcPopulation>[0],
  *   observed?: { head?: string | null, dirty?: boolean | null, changedFiles?: string[] },
- *   roots?: { repository?: string, artifacts?: string } }} input
+ *   roots?: { repository?: string, artifacts?: string },
+ *   redact?: (text: string) => { text: string, count: number } }} input - `redact` is the
+ *   redactor the host built from its `security.redact` setting; omitted, the defaults apply.
  */
-export function auditQaEvidence({ evidence, population, observed, roots }) {
+export function auditQaEvidence({ evidence, population, observed, roots, redact }) {
   return evaluateQaEvidence({
     evidence,
     population: isObject(population) ? { ...population, trusted: false } : population,
@@ -987,6 +989,7 @@ export function auditQaEvidence({ evidence, population, observed, roots }) {
     roots,
     independence: PRODUCTION_INDEPENDENCE,
     trustedSourceIds: [],
+    ...(redact ? { redact } : {}),
   });
 }
 
@@ -1006,4 +1009,19 @@ export function qaEvidenceSkillInput(audit) {
     evidence: redaction.evidence,
     audit: { ...rest, redaction: { replaced: redaction.replaced } },
   };
+}
+
+/**
+ * The artifact paths a `QA-EVIDENCE` finding may cite as evidence: the public paths in the skill
+ * input's evidence. Restricted refs carry no path there, and are skipped by sensitivity as well.
+ *
+ * @param {ReturnType<typeof qaEvidenceSkillInput> | undefined} input
+ * @returns {string[]}
+ */
+export function qaEvidencePublicPaths(input) {
+  const refs = input?.evidence?.artifacts?.refs;
+  if (!Array.isArray(refs)) return [];
+  return refs
+    .filter((ref) => ref?.sensitivity === 'public' && typeof ref.path === 'string' && ref.path)
+    .map((ref) => ref.path);
 }

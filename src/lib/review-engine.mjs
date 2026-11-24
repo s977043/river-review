@@ -7,7 +7,10 @@ import {
   parseFindingMessage,
   normalizeSeverity,
   normalizeScope,
+  SEVERITY_RANK,
 } from './finding-factory.mjs';
+import { qaEvidencePublicPaths } from './qa-evidence.mjs';
+import { QA_EVIDENCE_ANCHOR } from './verifier.mjs';
 import { defaultConfig } from '../config/default.mjs';
 import { summarizeSkill } from '../../runners/core/review-runner.mjs';
 import {
@@ -59,6 +62,20 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
  */
 // Backward-compatible internal export. The SSoT now lives with redactText.
 export { resolveRedactOptions };
+
+/**
+ * A finding anchored to the QA evidence is capped at `minor`, so it never counts as a blocking
+ * finding (ADR-017 D4: the QA audit is observe-only and adds no gate input). The cap keys on
+ * the anchor, not on which skill the reviewer meant, since a finding line names no skill.
+ */
+export const QA_EVIDENCE_SEVERITY_CAP = 'minor';
+
+function capQaEvidenceSeverity(file, severity) {
+  if (!QA_EVIDENCE_ANCHOR.test(String(file ?? ''))) return severity;
+  return SEVERITY_RANK[severity] > SEVERITY_RANK[QA_EVIDENCE_SEVERITY_CAP]
+    ? QA_EVIDENCE_SEVERITY_CAP
+    : severity;
+}
 
 function sanitizeSkillName(name) {
   if (!name) return '';
@@ -309,6 +326,7 @@ function redactSecrets(text) {
  * @param {boolean} params.heuristicsFound 一次集合が detector の finding か。fallback は含まない
  * @param {string|null|undefined} params.llmSkipped debug.llmSkipped
  * @param {string|null|undefined} params.llmError debug.llmError
+ * @param {string[]} [params.qaEvidencePaths] QA 証拠の public な artifact のパス。`QA-EVIDENCE` の所見だけが根拠に使える
  * @returns {Promise<{comments: Array<object>, debugPatch: object}>}
  */
 async function runVerifierStage({
@@ -321,6 +339,7 @@ async function runVerifierStage({
   heuristicsFound,
   llmSkipped,
   llmError,
+  qaEvidencePaths = [],
 }) {
   const { verifyFinding } = await import('./verifier.mjs');
   const skill = plan?.selected?.[0] ?? {};
@@ -336,6 +355,7 @@ async function runVerifierStage({
         // machine determination of finding scope (in-diff / pre-existing).
         diffFiles: diff.files,
         deterministicSource,
+        qaEvidencePaths,
       }),
     }));
 
@@ -713,6 +733,7 @@ export async function generateReview({
     heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
+    qaEvidencePaths: qaEvidencePublicPaths(qaEvidence),
   });
   Object.assign(debug, verifierStage.debugPatch);
   // Replace comments with verified-only set
@@ -752,7 +773,7 @@ export async function generateReview({
   // Build structured findings from verified comments
   let findings = comments.map((c, i) => {
     const parsed = parseFindingMessage(c.message);
-    const severity = normalizeSeverity(parsed.severity);
+    const severity = capQaEvidenceSeverity(c.file, normalizeSeverity(parsed.severity));
     // Confidence is guaranteed present+valid here (validateFindingMessage gates
     // it upstream), so the 'medium' branch is currently unreachable; it is kept
     // as a conservative default in case an unverified path ever reaches this.
