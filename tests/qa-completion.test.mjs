@@ -443,3 +443,123 @@ describe('injection through executeFlow', () => {
     );
   });
 });
+
+describe('cross-field consistency', () => {
+  const claim = { ref: 'TASK-1', claimSource: ['todo-checkbox'], missingEvidence: ['tests'] };
+
+  test('tasks.unsupportedClaims above the listed claims is refused', () => {
+    const parts = judgeParts('task');
+    parts.tasks = { ...parts.tasks, unsupportedClaims: 1 };
+    parts.unsupportedClaims = [];
+    assert.throws(() => build('task', AUDITS.mixed(), parts), /tasks\.unsupportedClaims/);
+    delete parts.unsupportedClaims;
+    assert.throws(() => build('task', AUDITS.mixed(), parts), /tasks\.unsupportedClaims/);
+  });
+
+  test('tasks.unsupportedClaims below the listed claims is refused', () => {
+    const parts = judgeParts('task');
+    parts.unsupportedClaims = [claim];
+    parts.reasonCodes = ['UNSUPPORTED_COMPLETION_CLAIM'];
+    assert.throws(() => build('task', AUDITS.mixed(), parts), /tasks\.unsupportedClaims/);
+  });
+
+  test('a count that matches the list is accepted', () => {
+    const parts = judgeParts('task');
+    parts.tasks = { ...parts.tasks, unsupportedClaims: 1 };
+    parts.unsupportedClaims = [claim];
+    parts.reasonCodes = ['UNSUPPORTED_COMPLETION_CLAIM'];
+    const { assessment } = build('task', AUDITS.mixed(), parts);
+    assertConforms(assessment);
+  });
+
+  test('a judge reasonCode outside the completion vocabulary is refused, not dropped', () => {
+    const parts = { ...judgeParts('task'), reasonCodes: ['QA_INDEPENDENCE_UNKNOWN'] };
+    assert.throws(() => build('task', AUDITS.mixed(), parts), /outside the completion vocabulary/);
+  });
+
+  for (const outcome of ['unconfirmed-only', 'failed-only']) {
+    test(`ALL_REQUIREMENTS_SATISFIED with ${EXPECTED_STATE[outcome]} is refused`, () => {
+      const parts = { ...judgeParts('task'), reasonCodes: ['ALL_REQUIREMENTS_SATISFIED'] };
+      assert.throws(() => build('task', AUDITS[outcome](), parts), /contradicts state/);
+    });
+  }
+
+  test('ALL_REQUIREMENTS_SATISFIED is kept when the state is BLOCKED', () => {
+    const parts = {
+      ...judgeParts('task'),
+      reasonCodes: ['ALL_REQUIREMENTS_SATISFIED'],
+      blockedBy: ['artifact store unreachable'],
+    };
+    const { assessment } = build('task', AUDITS.mixed(), parts);
+    assert.ok(assessment.reasonCodes.includes('ALL_REQUIREMENTS_SATISFIED'));
+  });
+
+  test('a projection whose total is not verified + unverified is refused', () => {
+    const audit = AUDITS.mixed();
+    audit.projection = { ...audit.projection, total: audit.projection.total + 1 };
+    assert.throws(() => classifyQaAudit(audit), /not consistent/);
+  });
+
+  test('a projection whose verified count disagrees with the criteria is refused', () => {
+    const audit = AUDITS['all-verified']();
+    audit.projection = { ...audit.projection, verified: 0, unverified: audit.projection.total };
+    assert.throws(() => classifyQaAudit(audit), /not consistent/);
+    const rejected = AUDITS['evidence-rejected']();
+    rejected.projection = { ...rejected.projection, verified: 1, unverified: 0 };
+    assert.throws(() => classifyQaAudit(rejected), /not consistent/);
+  });
+
+  test('a judge fallback whose counts do not add up is refused', () => {
+    const parts = judgeParts('final');
+    for (const counts of [
+      { total: 2, verified: 0, unverified: 1 },
+      { total: 2, verified: 1, unverified: 2 },
+    ]) {
+      parts.acceptanceCriteria = counts;
+      assert.throws(
+        () => build('final', AUDITS['population-undetermined'](), parts),
+        /unverified = total/
+      );
+    }
+  });
+});
+
+describe('QA artifact pinning', () => {
+  test('the stored form is the audit result as given, not a canonicalized copy', () => {
+    const audit = AUDITS.mixed();
+    const { content, sha256 } = serializeQaArtifact(audit);
+    assert.equal(content, `${JSON.stringify(audit, null, 2)}\n`);
+    assert.equal(sha256, createHash('sha256').update(content).digest('hex'));
+  });
+
+  test('the same audit re-serialized with another key order is refused', () => {
+    const audit = AUDITS.mixed();
+    const reordered = Object.fromEntries(Object.entries(audit).reverse());
+    assert.deepEqual(reordered, audit);
+    const sha256 = createHash('sha256')
+      .update(`${JSON.stringify(reordered, null, 2)}\n`)
+      .digest('hex');
+    assert.throws(
+      () =>
+        buildQaCompletionAssessment({
+          scope: 'task',
+          audit,
+          qaArtifact: { path: 'qa/audit.json', sha256 },
+          judge: judgeParts('task'),
+        }),
+      /does not match/
+    );
+  });
+
+  test('an upper-case sha256 is accepted and recorded in lower case', () => {
+    const audit = AUDITS.mixed();
+    const { sha256 } = serializeQaArtifact(audit);
+    const { assessment } = buildQaCompletionAssessment({
+      scope: 'task',
+      audit,
+      qaArtifact: { path: 'qa/audit.json', sha256: sha256.toUpperCase() },
+      judge: judgeParts('task'),
+    });
+    assert.ok(assessment.evidence.at(-1).note.includes(`sha256 ${sha256})`));
+  });
+});

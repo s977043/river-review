@@ -389,6 +389,12 @@ Flow には `executeFlow` の `capabilities['evaluate-completion']` として注
 - 表は `COMPLETE` を持たない。全 AC が verified でも、QA 証拠だけでは `COMPLETE` にしない（§8.2）
 - evidence に `missing` / `unreadable` があれば、`INCOMPLETE` は `UNVERIFIED` に倒す。schema（`:464-488`）が禁じるのは `missing` だけだが、§8.2 に合わせて `unreadable` も含める
 - `validation.state` が `REQUIRES_HUMAN_JUDGMENT` なら `HUMAN_JUDGMENT_REQUIRED`、completion-judge が `blockedBy` を渡せば `BLOCKED` を、表より優先する
+- 次の入力は黙って直さず、例外にする
+  - `tasks.unsupportedClaims` と `unsupportedClaims` の件数の不一致
+  - completion の語彙に無い reasonCode
+  - `UNVERIFIED` / `INCOMPLETE` と `ALL_REQUIREMENTS_SATISFIED` の組
+  - `total` が `verified + unverified` と一致しない投影、`verified` の件数が監査結果の AC と一致しない投影
+  - `verified` が 0 でない、または `unverified` が `total` と一致しない fallback の件数
 
 ## 9. host 経路（既存経路の調査結果）
 

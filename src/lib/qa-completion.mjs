@@ -39,6 +39,7 @@ const FAILURE_REASON_CODES = new Set([
 ]);
 // Evidence states that forbid INCOMPLETE (§8.2; schema "missing ... forbids INCOMPLETE").
 const UNCHECKED_EVIDENCE_STATES = new Set(['missing', 'unreadable']);
+const UNSATISFIED_STATES = new Set(['UNVERIFIED', 'INCOMPLETE']);
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const SCOPE_BY_INTENT = Object.freeze({ 'task-completion': 'task', 'final-convergence': 'final' });
 
@@ -59,7 +60,8 @@ function schemaValidator() {
 }
 
 /**
- * Schema check plus the rule the schema delegates to code: one evidence entry per kind.
+ * Schema check plus the rules the schema delegates to code: one evidence entry per kind, and
+ * `tasks.unsupportedClaims` equal to the length of `unsupportedClaims` (an absent list is empty).
  *
  * @param {unknown} document
  * @returns {{ valid: boolean, errors: object[] }}
@@ -73,6 +75,17 @@ export function validateCompletionAssessment(document) {
   const duplicate = kinds.find((kind, index) => kinds.indexOf(kind) !== index);
   if (duplicate !== undefined) {
     errors.push({ instancePath: '/evidence', message: `duplicate evidence kind: ${duplicate}` });
+  }
+  if (document?.tasks !== undefined) {
+    const listed = Array.isArray(document.unsupportedClaims)
+      ? document.unsupportedClaims.length
+      : 0;
+    if (document.tasks?.unsupportedClaims !== listed) {
+      errors.push({
+        instancePath: '/tasks/unsupportedClaims',
+        message: `tasks.unsupportedClaims must equal the ${listed} listed unsupportedClaims`,
+      });
+    }
   }
   return { valid: errors.length === 0, errors };
 }
@@ -97,8 +110,15 @@ export function serializeQaArtifact(audit) {
 export function classifyQaAudit(audit) {
   const none = { confirmedFailures: [], unconfirmed: [] };
   if (audit === null || audit === undefined) return { outcome: 'evidence-absent', ...none };
-  if (audit.accepted !== true) return { outcome: 'evidence-rejected', ...none };
   const projected = projectQaEvidence(audit);
+  if (projected !== null) {
+    const { total, verified, unverified } = projected.acceptanceCriteria;
+    const verifiedCriteria = audit.criteria.filter((criterion) => criterion.verified).length;
+    if (total !== verified + unverified || verified !== verifiedCriteria) {
+      throw new Error('QA audit projection is not consistent with its criteria');
+    }
+  }
+  if (audit.accepted !== true) return { outcome: 'evidence-rejected', ...none };
   if (projected === null) return { outcome: 'population-undetermined', ...none };
 
   const confirmedFailures = [];
@@ -143,8 +163,10 @@ function acceptanceCounts(projected, judgeCounts) {
   if (projected) return projected.acceptanceCriteria;
   if (judgeCounts === undefined) return undefined;
   // Without a determined QA population nothing was verified by QA (§8.1).
-  if (judgeCounts.verified !== 0) {
-    throw new Error('acceptanceCriteria.verified must be 0 when the QA population is undetermined');
+  if (judgeCounts.verified !== 0 || judgeCounts.unverified !== judgeCounts.total) {
+    throw new Error(
+      'acceptanceCriteria must have verified 0 and unverified = total when the QA population is undetermined'
+    );
   }
   return judgeCounts;
 }
@@ -189,7 +211,14 @@ export function buildQaCompletionAssessment({ scope, audit, qaArtifact, judge = 
     },
   ];
 
-  const reasonCodes = new Set(Array.isArray(judge.reasonCodes) ? judge.reasonCodes : []);
+  const judgeReasonCodes = Array.isArray(judge.reasonCodes) ? judge.reasonCodes : [];
+  const unknownCode = judgeReasonCodes.find((code) => !REASON_CODE_ORDER.includes(code));
+  if (unknownCode !== undefined) {
+    throw new Error(
+      `judge.reasonCodes has a value outside the completion vocabulary: ${unknownCode}`
+    );
+  }
+  const reasonCodes = new Set(judgeReasonCodes);
   if (projected) projected.reasonCodes.forEach((code) => reasonCodes.add(code));
   if (!projected || projected.reasonCodes.length === 0) {
     reasonCodes.add('EVIDENCE_SOURCE_UNAVAILABLE');
@@ -207,6 +236,9 @@ export function buildQaCompletionAssessment({ scope, audit, qaArtifact, judge = 
     }),
     reasonCodes: REASON_CODE_ORDER.filter((code) => reasonCodes.has(code)),
   };
+  if (UNSATISFIED_STATES.has(assessment.state) && reasonCodes.has('ALL_REQUIREMENTS_SATISFIED')) {
+    throw new Error(`ALL_REQUIREMENTS_SATISFIED contradicts state ${assessment.state}`);
+  }
   const acceptanceCriteria = acceptanceCounts(projected, judge.acceptanceCriteria);
   if (acceptanceCriteria !== undefined || scope === 'final') {
     if (acceptanceCriteria === undefined) {
