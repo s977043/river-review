@@ -23,6 +23,7 @@ import {
   classifyQaAudit,
   createQaCompletionCapability,
   serializeQaArtifact,
+  validateCompletionAssessment,
 } from '../src/lib/qa-completion.mjs';
 import { compileCompletionAssessmentValidator } from './helpers/schema-validator.mjs';
 
@@ -562,4 +563,198 @@ describe('QA artifact pinning', () => {
     });
     assert.ok(assessment.evidence.at(-1).note.includes(`sha256 ${sha256})`));
   });
+
+  test('a path of only whitespace is refused', () => {
+    const audit = AUDITS.mixed();
+    assert.throws(
+      () =>
+        buildQaCompletionAssessment({
+          scope: 'task',
+          audit,
+          qaArtifact: { path: ' ', sha256: serializeQaArtifact(audit).sha256 },
+          judge: judgeParts('task'),
+        }),
+      /qaArtifact needs a path/
+    );
+  });
+});
+
+describe('only reported failures count as confirmed', () => {
+  // Independence is known in both, so the AC's reasonCodes are only the ones named here.
+  test('a PASS with failed assertions is unconfirmed, not a confirmed FAIL', () => {
+    const evidence = structuredClone(BASE.evidence);
+    evidence.verification[0].attempts[0].assertions = { total: 3, passed: 2 };
+    const audit = judge({ evidence });
+    assert.deepEqual(audit.criteria[0].reasonCodes, ['QA_VERIFICATION_ASSERTIONS_MISSING']);
+    assert.deepEqual(classifyQaAudit(audit), {
+      outcome: 'unconfirmed-only',
+      confirmedFailures: [],
+      unconfirmed: ['AC-1'],
+    });
+    assert.equal(build('task', audit).assessment.state, 'UNVERIFIED');
+  });
+
+  test('a SKIP is unconfirmed, not a confirmed FAIL', () => {
+    const evidence = structuredClone(BASE.evidence);
+    Object.assign(evidence.verification[0], {
+      status: 'SKIP',
+      attempts: [],
+      notRunReason: 'out-of-scope',
+    });
+    const audit = judge({ evidence });
+    assert.deepEqual(audit.criteria[0].reasonCodes, ['QA_VERIFICATION_NOT_PASS']);
+    assert.deepEqual(classifyQaAudit(audit), {
+      outcome: 'unconfirmed-only',
+      confirmedFailures: [],
+      unconfirmed: ['AC-1'],
+    });
+    assert.equal(build('task', audit).assessment.state, 'UNVERIFIED');
+  });
+});
+
+describe('precedence and reason codes', () => {
+  test('human judgment wins over a judge-reported blocker', () => {
+    const parts = judgeParts('final');
+    parts.validation = { state: 'REQUIRES_HUMAN_JUDGMENT', rationale: 'value call' };
+    parts.humanJudgment = { boundary: 'business-value', question: 'worth shipping?' };
+    parts.blockedBy = ['artifact store unreachable'];
+    const { assessment } = build('final', AUDITS.mixed(), parts);
+    assert.equal(assessment.state, 'HUMAN_JUDGMENT_REQUIRED');
+    assert.equal('blockedBy' in assessment, false);
+  });
+
+  const expectedCodes = {
+    'evidence-absent': ['ACCEPTANCE_CRITERION_UNVERIFIED', 'EVIDENCE_SOURCE_UNAVAILABLE'],
+    'population-undetermined': ['ACCEPTANCE_CRITERION_UNVERIFIED', 'EVIDENCE_SOURCE_UNAVAILABLE'],
+    'all-verified': ['EVIDENCE_SOURCE_UNAVAILABLE'],
+    mixed: ['ACCEPTANCE_CRITERION_UNVERIFIED'],
+  };
+  for (const [outcome, codes] of Object.entries(expectedCodes)) {
+    test(`${outcome}: reasonCodes in schema order`, () => {
+      assert.deepEqual(build('task', AUDITS[outcome]()).assessment.reasonCodes, codes);
+    });
+  }
+
+  test('judge codes merge in schema order', () => {
+    const parts = judgeParts('task');
+    parts.tasks = { ...parts.tasks, unsupportedClaims: 1 };
+    parts.unsupportedClaims = [
+      { ref: 'TASK-1', claimSource: ['todo-checkbox'], missingEvidence: ['tests'] },
+    ];
+    parts.reasonCodes = ['UNSUPPORTED_COMPLETION_CLAIM'];
+    assert.deepEqual(build('task', AUDITS.mixed(), parts).assessment.reasonCodes, [
+      'ACCEPTANCE_CRITERION_UNVERIFIED',
+      'UNSUPPORTED_COMPLETION_CLAIM',
+    ]);
+  });
+
+  test('an audit missing one of its criteria is refused', () => {
+    const audit = AUDITS.mixed();
+    audit.criteria = audit.criteria.filter((criterion) => criterion.acId !== 'AC-2');
+    assert.throws(() => classifyQaAudit(audit), /disagree with its projection/);
+  });
+});
+
+describe('a capability failure inside executeFlow', () => {
+  test('a mismatched QA artifact degrades the step without a result', async () => {
+    const document = readFlow('task-completion-review.flow.json');
+    const audit = AUDITS.mixed();
+    const result = await executeFlow({
+      document,
+      inputs: Object.fromEntries(document.inputs.map((input) => [input.name, 'x'])),
+      capabilities: {
+        'evaluate-completion': createQaCompletionCapability({
+          audit,
+          qaArtifact: { path: 'qa/audit.json', sha256: '0'.repeat(64) },
+          judge: judgeParts('task'),
+        }),
+      },
+    });
+    const step = result.steps.find((record) => record.id === 'evaluate-completion');
+    assert.equal(step.outcome, 'degraded');
+    assert.equal(
+      step.reason,
+      'capability "evaluate-completion" failed: qaArtifact.sha256 does not match the audit result'
+    );
+    assert.equal('result' in step, false);
+    assert.equal(result.stopped, false);
+  });
+});
+
+describe('which refusals the schema itself makes', () => {
+  // `schema`: the test-side validator of schemas/completion-assessment.schema.json.
+  // `module`: validateCompletionAssessment. Builder-only checks (vocabulary contradictions, count
+  // consistency, QA artifact pinning) never reach a document and are not listed.
+  const base = () => build('task', AUDITS.mixed()).assessment;
+  const finalBase = () => build('final', AUDITS.mixed()).assessment;
+  const cases = {
+    'tasks.unsupportedClaims differs from the list': {
+      doc: () => ({ ...base(), tasks: { ...base().tasks, unsupportedClaims: 1 } }),
+      schema: true,
+      module: false,
+    },
+    'duplicate evidence kind': {
+      doc: () => ({
+        ...base(),
+        evidence: [...base().evidence, { kind: 'diff', state: 'present' }],
+      }),
+      schema: true,
+      module: false,
+    },
+    'reasonCode outside the vocabulary': {
+      doc: () => ({ ...base(), reasonCodes: ['QA_INDEPENDENCE_UNKNOWN'] }),
+      schema: false,
+      module: false,
+    },
+    'task scope without tasks': {
+      doc: () => {
+        const doc = base();
+        delete doc.tasks;
+        return doc;
+      },
+      schema: false,
+      module: false,
+    },
+    'final scope without validation': {
+      doc: () => {
+        const doc = finalBase();
+        delete doc.validation;
+        return doc;
+      },
+      schema: false,
+      module: false,
+    },
+    'INCOMPLETE with missing evidence': {
+      doc: () => ({
+        ...base(),
+        evidence: base().evidence.map((entry) =>
+          entry.kind === 'tests' ? { ...entry, state: 'missing' } : entry
+        ),
+      }),
+      schema: false,
+      module: false,
+    },
+    'goal needing human judgment recorded as BLOCKED': {
+      doc: () => ({
+        ...finalBase(),
+        state: 'BLOCKED',
+        blockedBy: ['x'],
+        validation: { state: 'REQUIRES_HUMAN_JUDGMENT', rationale: 'value call' },
+      }),
+      schema: false,
+      module: false,
+    },
+    'BLOCKED without blockedBy': {
+      doc: () => ({ ...base(), state: 'BLOCKED' }),
+      schema: false,
+      module: false,
+    },
+  };
+  for (const [name, { doc, schema, module }] of Object.entries(cases)) {
+    test(name, () => {
+      const document = doc();
+      assert.equal(validateAssessment(document), schema, 'schema');
+      assert.equal(validateCompletionAssessment(document).valid, module, 'module');
+    });
+  }
 });
