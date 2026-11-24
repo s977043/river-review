@@ -160,6 +160,7 @@ All three paths are resolved against the working directory the CLI was started i
 - The `qaEvidence` input context does not become available, even when the audit accepts the evidence (`accepted: true`). The audit result is recorded only; wiring `qaEvidence` as a skill input comes later (ADR-017 rollout step 5). `--context qaEvidence` is removed with a warning, and `qaEvidence` in the `RIVER_AVAILABLE_CONTEXTS` environment variable is ignored
 - In the first version, artifacts are read only on macOS 11 or later. On other operating systems, the artifact references in the evidence stay unresolved
 - The GitHub Action does not pass these flags yet; only `river run` accepts the three QA flags
+- `river review exec --plan <file>` stops with exit 1 before the replay when the saved plan selects a skill whose `inputContext` requires `qaEvidence`. This holds for a bare plan and a Review Artifact alike; the `--dry-run` echo is not affected
 - The audit result is written even when there are no changes (`No changes to review`)
 - Evidence that is not JSON or exceeds the 1 MiB limit is recorded as rejected in the audit result, without changing the exit code
 - When the audit rejects the evidence as a whole (`accepted: false`), the audit result is still written, the review continues, and the exit code is the same as without QA
