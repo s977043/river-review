@@ -992,19 +992,16 @@ test.describe('verifier stage keeps checking everything that is not a detector b
   }
   const summarize = (result) => result.findings.map((f) => `${f.ruleId}:${f.severity}`);
 
-  test('TC-04 an LLM blocker above the first skill severity is still rejected', async (t) => {
+  test('TC-04 an LLM blocker is not capped by the first skill severity', async (t) => {
     const result = await review(t, {
       fetchImpl: reply(finding('blocker')),
       reviewPlan: plan('minor'),
     });
-    assert.deepEqual(result.findings, []);
-    assert.equal(result.debug.verifierStats.rejected, 1);
-    assert.deepEqual(result.debug.verifierRejected[0].reasons, [
-      'Severity exceeds skill severity without justification',
-    ]);
+    assert.deepEqual(summarize(result), ['unknown:critical']);
+    assert.equal(result.debug.verifierStats.rejected, 0);
   });
 
-  test('TC-04 an LLM blocker quoting a detector preset is still rejected', async (t) => {
+  test('TC-04 an LLM blocker quoting a detector preset stays an LLM finding', async (t) => {
     const preset = HEURISTIC_KIND_PRESENTATIONS.get('merge-conflict');
     const result = await review(t, {
       fetchImpl: reply(
@@ -1013,10 +1010,10 @@ test.describe('verifier stage keeps checking everything that is not a detector b
       ),
       reviewPlan: plan('minor'),
     });
-    assert.deepEqual(result.findings, []);
-    assert.deepEqual(result.debug.verifierRejected[0].reasons, [
-      'Severity exceeds skill severity without justification',
-    ]);
+    assert.deepEqual(
+      result.findings.map((f) => [f.ruleId, f.severity, f.origin]),
+      [['unknown', 'critical', 'llm']]
+    );
   });
 
   test('TC-04 control: an LLM blocker under a critical first skill passes', async (t) => {
@@ -1056,7 +1053,7 @@ test.describe('verifier stage keeps checking everything that is not a detector b
 
   test('TC-08 a degraded batch keeps the detector finding', async (t) => {
     const result = await review(t, {
-      fetchImpl: reply(finding('blocker')),
+      fetchImpl: reply(finding('blocker', 'src/ghost.js')),
       added: '<<<<<<< HEAD',
       reviewPlan: plan('minor', [
         { metadata: { id: 'logging-observability', name: 'l', severity: 'minor' } },
