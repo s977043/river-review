@@ -92,6 +92,25 @@ describe('formatHtmlOutput', () => {
     const html = formatHtmlOutput(MOCK_RESULT_EMPTY, 'downstream');
     assert.ok(html.includes('指摘事項なし'), 'should render no-findings message');
   });
+  it('labels zero findings as static-only when semantic review did not run', () => {
+    const html = formatHtmlOutput({ findings: [], llmNotExecuted: true }, 'midstream');
+    assert.match(html, /<h2>Summary \(static checks only\)<\/h2>/);
+    assert.match(html, /<h2>Findings \(static checks only\)<\/h2>/);
+    assert.match(html, /静的チェックで記録された指摘は0件です。意味レビューの結果は未取得です。/);
+    assert.doesNotMatch(html, /指摘事項なし。/);
+  });
+
+  it('keeps static critical findings visible when semantic review did not run', () => {
+    const html = formatHtmlOutput(
+      { ...MOCK_RESULT_FINDINGS, llmNotExecuted: true },
+      'midstream'
+    );
+    assert.match(html, /<h2>Findings \(static checks only\)<\/h2>/);
+    assert.ok(html.includes('SQL Injection'));
+    assert.ok(html.includes('src/auth.js:42'));
+    assert.ok(html.includes('Use parameterized queries.'));
+    assert.ok(!html.includes('<details'));
+  });
 });
 
 describe('formatLoopDashboardHtml (#1191)', () => {

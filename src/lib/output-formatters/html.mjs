@@ -208,7 +208,7 @@ export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
   }
 
   // Summary
-  parts.push('<h2>Summary</h2>');
+  parts.push(llmNotExecuted ? '<h2>Summary (static checks only)</h2>' : '<h2>Summary</h2>');
   parts.push('<div class="counts">');
   for (const [sev, count] of Object.entries(issueCountBySeverity)) {
     const color = SEVERITY_COLOR[sev] ?? '#757575';
@@ -246,9 +246,13 @@ export function formatHtmlOutput(result, phase, { planFeedback = null } = {}) {
   }
 
   // Findings
-  parts.push('<h2>Findings</h2>');
+  parts.push(llmNotExecuted ? '<h2>Findings (static checks only)</h2>' : '<h2>Findings</h2>');
   if (findings.length === 0) {
-    parts.push('<p>指摘事項なし。</p>');
+    parts.push(
+      llmNotExecuted
+        ? '<p>静的チェックで記録された指摘は0件です。意味レビューの結果は未取得です。</p>'
+        : '<p>指摘事項なし。</p>'
+    );
   } else {
     parts.push('<table>');
     parts.push(
