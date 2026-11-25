@@ -55,6 +55,16 @@ export function isLlmEnabled(env = process.env) {
 export const QA_EVIDENCE_CONTEXT = 'qaEvidence';
 
 /**
+ * True for a skill that declares the {@link QA_EVIDENCE_CONTEXT} input context. Accepts a loaded
+ * skill (`{ metadata }`) or bare metadata.
+ * @param {object | null | undefined} skill
+ * @returns {boolean}
+ */
+export function readsQaEvidence(skill) {
+  return Boolean((skill?.metadata ?? skill)?.inputContext?.includes(QA_EVIDENCE_CONTEXT));
+}
+
+/**
  * Resolve the effective `availableContexts` for `buildExecutionPlan`'s
  * `inputContext`-based skill selection. Combines caller-supplied contexts
  * with `RIVER_AVAILABLE_CONTEXTS` (deduplicated). If the caller does not

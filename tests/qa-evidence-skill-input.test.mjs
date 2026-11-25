@@ -609,6 +609,30 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     assert.deepEqual(plain.artifact.decision, without.artifact.decision);
   });
 
+  // The selected QA skill declares severity minor; it must not cap the review's own findings.
+  for (const [severity, expected] of [
+    ['nit', 'minor'],
+    ['warning', 'major'],
+    ['blocker', 'critical'],
+  ]) {
+    test(`a ${severity} review finding is judged the same with and without QA evidence`, async (t) => {
+      const line = appLine.replace('Severity: nit', `Severity: ${severity}`);
+      const plain = await runWith(t, line, { qa: false });
+      const withQa = await runWith(t, line);
+      const view = (run) => ({
+        code: run.code,
+        issues: run.artifact.issues,
+        decision: run.artifact.decision,
+        gate: run.artifact.gate,
+      });
+      assert.deepEqual(
+        plain.artifact.issues.map((issue) => issue.severity),
+        [expected]
+      );
+      assert.deepEqual(view(withQa), view(plain));
+    });
+  }
+
   test('the audit result carries the redacted skill findings', async (t) => {
     const run = await runWith(t, `${appLine}\n${qaLine}`);
     assert.equal(run.code, 0);

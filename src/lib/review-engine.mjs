@@ -17,7 +17,7 @@ import {
   HEURISTIC_SKILL_IDS,
   HEURISTIC_KIND_PRESENTATIONS,
 } from './heuristic-review.mjs';
-import { isOfflineMode } from './utils.mjs';
+import { isOfflineMode, readsQaEvidence } from './utils.mjs';
 import { getReviewDepthConfig } from './review-plan-generator.mjs';
 import { buildRepoContextSection } from './repo-context.mjs';
 import { redactText, resolveRedactOptions } from './secret-redactor.mjs';
@@ -719,10 +719,17 @@ export async function generateReview({
   // 段の本体は runVerifierStage（同ファイル、上）にある。#1644 の scope 判定と
   // 全件棄却時の fail-safe もその内側にある。debug への反映は patch の
   // Object.assign 1 回だけで、key の挿入順は抽出前と同一である。
+  // ADR-017 D2: the stage judges a finding against plan.selected[0], so each batch gets only its
+  // own skills. Otherwise a selected QA skill (severity minor) would reject the review's blocker
+  // findings, and the review would verify differently whenever QA evidence is passed.
+  const qaSkills = (plan?.selected ?? []).filter(readsQaEvidence);
+  const reviewPlan = qaSkills.length
+    ? { ...plan, selected: plan.selected.filter((skill) => !readsQaEvidence(skill)) }
+    : plan;
   const verifierStage = await runVerifierStage({
     comments,
     diff,
-    plan,
+    plan: reviewPlan,
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
@@ -738,7 +745,7 @@ export async function generateReview({
     const qaStage = await runVerifierStage({
       comments: qaEvidenceComments,
       diff,
-      plan,
+      plan: qaSkills.length ? { ...plan, selected: qaSkills } : plan,
       fileTypes,
       includeFallback: false,
       heuristicsUsed: true,
