@@ -4,7 +4,8 @@
 // tests/fixtures/qa-evidence/base.json; the documents are checked with the test-side validator.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import fs, { readFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -756,5 +757,27 @@ describe('which refusals the schema itself makes', () => {
       assert.equal(validateAssessment(document), schema, 'schema');
       assert.equal(validateCompletionAssessment(document).valid, module, 'module');
     });
+  }
+});
+
+// ncc rewrites path expressions it evaluates at module load (src/lib/flow-loader.mjs), so the
+// schema is read on first validation, not on import.
+test('importing the module reads no schema; the first validation reads it once', async () => {
+  const reads = [];
+  const original = fs.readFileSync;
+  fs.readFileSync = (path, ...rest) => {
+    if (String(path).endsWith('completion-assessment.schema.json')) reads.push(String(path));
+    return original(path, ...rest);
+  };
+  syncBuiltinESMExports();
+  try {
+    const fresh = await import('../src/lib/qa-completion.mjs?lazy-schema');
+    assert.equal(reads.length, 0, 'import');
+    fresh.validateCompletionAssessment({});
+    fresh.validateCompletionAssessment({});
+    assert.equal(reads.length, 1, 'validation');
+  } finally {
+    fs.readFileSync = original;
+    syncBuiltinESMExports();
   }
 });
