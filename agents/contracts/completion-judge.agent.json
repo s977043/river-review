@@ -24,6 +24,11 @@
       "path": "src/lib/team-lead-synthesizer.mjs",
       "symbol": "synthesizeTeamLeadReport",
       "note": "Existing aggregation of reviewer results into one report."
+    },
+    {
+      "path": "src/lib/qa-completion.mjs",
+      "symbol": "createQaCompletionCapability",
+      "note": "evaluate-completion for QA evidence: assembles and validates a completion-assessment from the QA audit result and its projection, never COMPLETE from QA evidence alone, and adds no gate input."
     }
   ]
 }
