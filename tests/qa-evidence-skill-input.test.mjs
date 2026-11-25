@@ -2,7 +2,8 @@
 // `qaEvidence` input context. The input is built from the audit result, so these tests check
 // the value handed to `generateReview` and the prompt section it renders.
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import fs, { appendFileSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
@@ -318,7 +319,10 @@ index 1111111..2222222 100644
       ...extra,
     });
   }
-  const rejectedFiles = (result) => result.debug.verifierRejected.map((r) => r.file);
+  const rejectedFiles = (result) =>
+    [...result.debug.verifierRejected, ...(result.debug.qaEvidenceVerifierRejected ?? [])].map(
+      (r) => r.file
+    );
 
   test('a QA finding may cite a public path of the evidence handed to the review', async () => {
     const result = await review(
@@ -427,21 +431,39 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     'Impact: the record cannot be trusted Fix: rebuild the evidence record from the run ' +
     'Severity: nit Confidence: high';
 
-  async function runWith(t, llmOutput, { qa = true, phase = 'downstream' } = {}) {
+  async function runWith(
+    t,
+    llmOutput,
+    {
+      qa = true,
+      phase = 'downstream',
+      evidence = null,
+      onFetch = () => {},
+      prepare = () => {},
+    } = {}
+  ) {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
     t.after(cleanup);
+    prepare(dir);
     const head = (await runGit(['rev-parse', 'HEAD'], dir)).stdout.trim();
     const work = createTempDir({ prefix: 'river-qa-llm-' });
     t.after(() => cleanupTempDirAsync(work));
     const evidencePath = join(work, 'evidence.json');
     const auditPath = join(work, 'audit.json');
-    writeFileSync(evidencePath, evidenceWithSecret(head));
-    globalThis.fetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ choices: [{ message: { content: llmOutput } }] }),
-      text: async () => '',
-    });
+    writeFileSync(evidencePath, evidence ?? evidenceWithSecret(head));
+    // Every message the review sends to the LLM, as one text per request.
+    const requests = [];
+    globalThis.fetch = async (_url, init) => {
+      const body = JSON.parse(init?.body ?? '{}');
+      requests.push((body.messages ?? []).map((m) => m.content).join('\n'));
+      onFetch({ auditPath });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: llmOutput } }] }),
+        text: async () => '',
+      };
+    };
     const out = [];
     console.log = (...args) => out.push(args.join(' '));
     console.error = () => {};
@@ -449,8 +471,129 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     const qaArgs = qa ? ['--qa-evidence', evidencePath, '--qa-audit-output', auditPath] : [];
     const code = await main(['run', dir, '--phase', phase, '--output', 'json', ...qaArgs]);
     console.log = saved.log;
-    return { code, artifact: JSON.parse(out.join('\n')), auditPath };
+    const artifact = out.length > 0 ? JSON.parse(out.join('\n')) : null;
+    return { code, artifact, auditPath, work, requests };
   }
+
+  test('a reply of QA findings only reviews the diff as NO_ISSUES does', async (t) => {
+    // A conflict marker, which an always-on detector reports, so NO_ISSUES has a heuristic issue.
+    const prepare = (dir) =>
+      appendFileSync(join(dir, 'src/app.js'), '<<<<<<< HEAD\n=======\n>>>>>>> other\n');
+    const noIssues = await runWith(t, 'NO_ISSUES', { prepare });
+    const qaOnly = await runWith(t, qaLine, { prepare });
+    assert.ok(noIssues.artifact.issues.length > 0, 'the heuristic review runs on NO_ISSUES');
+    assert.equal(qaOnly.code, noIssues.code);
+    assert.deepEqual(qaOnly.artifact, noIssues.artifact);
+    const audit = JSON.parse(readFileSync(qaOnly.auditPath, 'utf8'));
+    assert.equal(audit.skillFindings.length, 1);
+  });
+
+  test('the LLM request carries the redacted evidence and its audit result', async (t) => {
+    const run = await runWith(t, appLine);
+    assert.equal(run.code, 0);
+    const sent = run.requests.join('\n');
+    assert.match(sent, /### QA Evidence/);
+    assert.match(sent, /#### 監査結果/);
+    assert.ok(sent.includes('"accepted": true'), 'the audit result');
+    const controlRevision = BASE.evidence.verification[0].controls[0].revision;
+    assert.ok(sent.includes(controlRevision), 'a value only the evidence holds');
+    assert.ok(sent.includes('ci/pass.txt'), 'a public path of the evidence');
+    assert.ok(sent.includes('npm test --token=<REDACTED'), 'the redacted command');
+    assert.ok(!sent.includes(TOKEN), 'the secret');
+    for (const restricted of RESTRICTED_PATHS) {
+      assert.ok(!sent.includes(restricted), restricted);
+    }
+  });
+
+  test('no QA section reaches the LLM without accepted evidence a selected skill reads', async (t) => {
+    const runs = {
+      'no --qa-evidence': await runWith(t, appLine, { qa: false }),
+      'rejected evidence': await runWith(t, appLine, { evidence: '{ not json' }),
+      'QA skill not selected': await runWith(t, appLine, { phase: 'midstream' }),
+    };
+    for (const [name, run] of Object.entries(runs)) {
+      assert.equal(run.code, 0, name);
+      assert.ok(run.requests.length > 0, `${name}: the LLM was called`);
+      assert.doesNotMatch(run.requests.join('\n'), /### QA Evidence/, name);
+    }
+  });
+
+  const shortWrite = (real, fd, buffer, offset, length, position) => {
+    if (typeof buffer === 'string') {
+      const bytes = Buffer.from(buffer);
+      const at = typeof offset === 'number' ? offset : null;
+      return real(fd, bytes, 0, Math.min(16, bytes.length), at);
+    }
+    return real(fd, buffer, offset, Math.min(16, length), position);
+  };
+  const faults = {
+    'short writes': (real, call, ...args) => shortWrite(real, ...args),
+    'an error after a partial write': (real, call, ...args) => {
+      if (call === 1) return shortWrite(real, ...args);
+      throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
+    },
+    'a write that writes nothing': () => 0,
+  };
+
+  // Fault `writeSync` for the writes whose content holds `marker`; the CLI's named import follows.
+  function faultWrites(t, marker, fault) {
+    const real = fs.writeSync;
+    let calls = 0;
+    fs.writeSync = (fd, buffer, ...rest) => {
+      const text = typeof buffer === 'string' ? buffer : Buffer.from(buffer).toString('utf8');
+      if (!text.includes(marker)) return real(fd, buffer, ...rest);
+      calls += 1;
+      return fault(real, calls, fd, buffer, ...rest);
+    };
+    syncBuiltinESMExports();
+    t.after(() => {
+      fs.writeSync = real;
+      syncBuiltinESMExports();
+    });
+  }
+  const filesIn = (dir) => readdirSync(dir).sort();
+
+  for (const [name, fault] of Object.entries(faults)) {
+    test(`the first audit write under ${name} publishes the whole file or nothing`, async (t) => {
+      faultWrites(t, '"accepted"', fault);
+      const run = await runWith(t, `${appLine}\n${qaLine}`);
+      if (name === 'short writes') {
+        assert.equal(run.code, 0);
+        assert.equal(JSON.parse(readFileSync(run.auditPath, 'utf8')).skillFindings.length, 1);
+        assert.deepEqual(filesIn(run.work), ['audit.json', 'evidence.json']);
+      } else {
+        assert.equal(run.code, 1);
+        assert.deepEqual(filesIn(run.work), ['evidence.json']);
+      }
+    });
+
+    test(`the skill findings update under ${name} keeps a whole audit file`, async (t) => {
+      faultWrites(t, '"skillFindings"', fault);
+      const run = await runWith(t, `${appLine}\n${qaLine}`);
+      const audit = JSON.parse(readFileSync(run.auditPath, 'utf8'));
+      assert.equal(audit.accepted, true);
+      assert.deepEqual(filesIn(run.work), ['audit.json', 'evidence.json']);
+      if (name === 'short writes') {
+        assert.equal(run.code, 0);
+        assert.equal(audit.skillFindings.length, 1);
+      } else {
+        assert.equal(run.code, 1);
+        assert.equal('skillFindings' in audit, false, 'the audit written before the review');
+      }
+    });
+  }
+
+  test('the update refuses a path swapped after the audit was written', async (t) => {
+    const run = await runWith(t, `${appLine}\n${qaLine}`, {
+      onFetch: ({ auditPath }) => {
+        renameSync(auditPath, `${auditPath}.moved`);
+        writeFileSync(auditPath, 'someone else\n');
+      },
+    });
+    assert.equal(run.code, 1);
+    assert.equal(readFileSync(run.auditPath, 'utf8'), 'someone else\n');
+    assert.deepEqual(filesIn(run.work), ['audit.json', 'audit.json.moved', 'evidence.json']);
+  });
 
   test('QA findings leave the issues, the score and the gate unchanged', async (t) => {
     const without = await runWith(t, appLine);
