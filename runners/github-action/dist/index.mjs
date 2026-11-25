@@ -32294,15 +32294,17 @@ __nccwpck_require__.d(__webpack_exports__, {
   vN: () => (/* binding */ SkillLoaderError),
   m: () => (/* binding */ createSkillValidator),
   KJ: () => (/* binding */ defaultPaths),
+  zD: () => (/* binding */ listSkillFiles),
   Qv: () => (/* binding */ loadAllSkillMetadata),
   rn: () => (/* binding */ loadPacks),
   e$: () => (/* binding */ loadSchema),
+  jY: () => (/* binding */ loadSkillMetadata),
   l1: () => (/* binding */ loadSkills),
   eJ: () => (/* binding */ parseFrontMatter),
   mw: () => (/* binding */ resolveSkillSet)
 });
 
-// UNUSED EXPORTS: listSkillFiles, listSkillPackageDirs, loadRecommendationSets, loadRegistry, loadSkillFile, loadSkillMetadata, parseSkillFile, resolveRecommendationSet, selectPacks, selectRecommendationSets
+// UNUSED EXPORTS: listSkillPackageDirs, loadRecommendationSets, loadRegistry, loadSkillFile, parseSkillFile, resolveRecommendationSet, selectPacks, selectRecommendationSets
 
 // EXTERNAL MODULE: external "fs"
 var external_fs_ = __nccwpck_require__(9896);
@@ -50205,7 +50207,11 @@ function isLlmEnabled(env = process.env) {
   );
 }
 
-/** The input context `river run` adds only when the audit accepts `--qa-evidence` (ADR-017 D2). */
+/**
+ * The input context for QA evidence (ADR-017 D2). Nothing makes it available yet: `river run`
+ * records the `--qa-evidence` audit only, and passing the evidence to skills is a later wiring
+ * (ADR-017 rollout step 5).
+ */
 const QA_EVIDENCE_CONTEXT = 'qaEvidence';
 
 /**
@@ -50222,8 +50228,7 @@ const QA_EVIDENCE_CONTEXT = 'qaEvidence';
  * `src/lib/review-plan.mjs` (`river review exec` / Phase 3).
  *
  * `RIVER_AVAILABLE_CONTEXTS` never supplies {@link QA_EVIDENCE_CONTEXT}: that context stands for
- * QA evidence the caller audited and accepted (ADR-017 D2), so only the caller's own list may
- * carry it.
+ * QA evidence passed to the run itself (ADR-017 D2), so only the caller's own list may carry it.
  *
  * @param {string[] | null | undefined} inputContexts
  * @param {{ defaultContexts?: string[]; alwaysInclude?: string[] }} [options]
@@ -52213,6 +52218,8 @@ function applyPhaseFallback(parsed) {
   return false;
 }
 
+// EXTERNAL MODULE: external "node:fs/promises"
+var promises_ = __nccwpck_require__(1455);
 // EXTERNAL MODULE: ./src/lib/diff-processor.mjs
 var diff_processor = __nccwpck_require__(861);
 // EXTERNAL MODULE: ./src/config/artifact-resolver.mjs
@@ -52364,6 +52371,8 @@ function resolveFlowInputBindings({ entry = null, document, resolved = {} }) {
 
 
 
+
+
 /**
  * Resolve the git diff for `--base` (or the auto-detected default branch).
  *
@@ -52439,6 +52448,123 @@ function resolvedFlowInputs(artifact, entry, document, resolved) {
     if (index !== -1) unboundInputNames.splice(index, 1);
   }
   return { inputs, inputSources, unboundInputNames };
+}
+
+/**
+ * Metadata of every skill file under the default skills directory, and the files that failed to
+ * load. `loadAllSkillMetadata` logs and drops a failing file, which cannot tell a missing skill
+ * from one that failed, so the same exported pieces are run here without the drop.
+ *
+ * @returns {Promise<{ metadata: object[], failedFiles: string[] }>}
+ */
+async function loadSkillMetadataReport() {
+  const validator = (0,skill_loader/* createSkillValidator */.m)(await (0,skill_loader/* loadSchema */.e$)());
+  const metadata = [];
+  const failedFiles = [];
+  for (const filePath of await (0,skill_loader/* listSkillFiles */.zD)()) {
+    try {
+      metadata.push((await (0,skill_loader/* loadSkillMetadata */.jY)(filePath, { validator })).metadata);
+    } catch {
+      failedFiles.push(filePath);
+    }
+  }
+  return { metadata, failedFiles };
+}
+
+/**
+ * Check the skills an executing `review exec --plan <file>` would run before it runs them.
+ *
+ * Replay runs the saved `selectedSkills` without re-planning, so a plan that names a QA evidence
+ * skill would run it without the evidence, which the main CLI does not pass to skills yet
+ * (ADR-017 D2, rollout step 5).
+ *
+ * The plan file is read once. The selected skills come from `runReviewExecReplay` itself in echo
+ * mode, so the shape rule and the format checks are the replay's own, and a malformed plan throws
+ * its `ReviewPlanError` before anything is decided here. The returned reader serves that same
+ * content for `planFile` to the executing replay and delegates every other path, so what runs is
+ * what was checked.
+ *
+ * Replay hands the selected entries to `generateReview` by id without loading them, so an id with
+ * no metadata still runs. When every skill file loads, such an id names no skill and cannot
+ * declare `qaEvidence`. When a skill file fails to load, the id may be that skill, so the replay
+ * is refused rather than run unchecked; so is a failure to load the metadata at all.
+ *
+ * @param {string} planFile - the resolved path the replay is given.
+ * @param {{
+ *   runReviewExecReplayImpl: Function,
+ *   readFileImpl?: (p: string) => Promise<string>,
+ *   loadSkillMetadataReportImpl?: () => Promise<{ metadata: object[], failedFiles: string[] }>,
+ * }} deps
+ * @returns {Promise<{ refusal: string } | { readFileImpl: (p: string) => Promise<string> }>}
+ */
+async function confirmReplayPlan(
+  planFile,
+  {
+    runReviewExecReplayImpl,
+    readFileImpl = (p) => (0,promises_.readFile)(p, 'utf8'),
+    loadSkillMetadataReportImpl = loadSkillMetadataReport,
+  }
+) {
+  let raw;
+  let readError = null;
+  try {
+    raw = await readFileImpl(planFile);
+  } catch (err) {
+    readError = err;
+  }
+  const servePlan = async (p) => {
+    if (p !== planFile) return readFileImpl(p);
+    if (readError) throw readError;
+    return raw;
+  };
+
+  // The echo only parses the plan; the manifest is left out so its warning prints once.
+  let probe = raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      delete parsed.executionManifest;
+      probe = JSON.stringify(parsed);
+    }
+  } catch {
+    // Not JSON: the echo reports it.
+  }
+  const echo = await runReviewExecReplayImpl({
+    planFile,
+    executeReview: false,
+    readFileImpl: async (p) => (p === planFile && !readError ? probe : servePlan(p)),
+  });
+  const ids = [...new Set(echo.plan.selectedSkills.map((skill) => skill.id))];
+  if (ids.length === 0) return { readFileImpl: servePlan };
+
+  let report;
+  try {
+    report = await loadSkillMetadataReportImpl();
+  } catch (err) {
+    return { refusal: `review exec --plan cannot load skill metadata: ${err.message}` };
+  }
+  const metadataById = new Map(report.metadata.map((metadata) => [metadata.id, metadata]));
+  const unknown = ids.filter((id) => !metadataById.has(id));
+  if (unknown.length > 0 && report.failedFiles.length > 0) {
+    return {
+      refusal:
+        `review exec --plan cannot run ${unknown.join(', ')}: no loadable skill metadata, ` +
+        `and ${report.failedFiles.length} skill file(s) failed to load ` +
+        `(${report.failedFiles.join(', ')}), so its inputContext cannot be checked.`,
+    };
+  }
+  const needsQaEvidence = ids.filter((id) =>
+    (metadataById.get(id)?.inputContext ?? []).includes(utils/* QA_EVIDENCE_CONTEXT */.Jq)
+  );
+  if (needsQaEvidence.length > 0) {
+    return {
+      refusal:
+        `review exec --plan cannot run ${needsQaEvidence.join(', ')}: ` +
+        `it requires the ${utils/* QA_EVIDENCE_CONTEXT */.Jq} input context, and the main CLI does not ` +
+        'pass QA evidence to skills yet.',
+    };
+  }
+  return { readFileImpl: servePlan };
 }
 
 /**
@@ -52555,8 +52681,22 @@ async function runReviewCommand(parsed) {
     let resolved;
     try {
       if (isExecPlanReplay) {
+        const planFile = external_node_path_.resolve(parsed.planFile);
+        // Only an executing replay runs the skills; `--dry-run` echoes the source plan.
+        let planReader;
+        if (!parsed.dryRun) {
+          const confirmed = await confirmReplayPlan(planFile, {
+            runReviewExecReplayImpl: runReviewExecReplay,
+          });
+          if ('refusal' in confirmed) {
+            console.error(`Error: ${confirmed.refusal}`);
+            return 1;
+          }
+          planReader = confirmed.readFileImpl;
+        }
         artifact = await runReviewExecReplay({
-          planFile: external_node_path_.resolve(parsed.planFile),
+          planFile,
+          ...(planReader ? { readFileImpl: planReader } : {}),
           debug: parsed.debug,
           // #878 A2-3-impl: replay executes (not just echoes) unless --dry-run.
           // The source plan stays the source of truth (no re-plan); the diff
@@ -108515,8 +108655,6 @@ Provide your review as a JSON array of comments (compatible with GitHub Review A
 `.trim();
 };
 
-// EXTERNAL MODULE: external "node:fs/promises"
-var promises_ = __nccwpck_require__(1455);
 // EXTERNAL MODULE: external "node:crypto"
 var external_node_crypto_ = __nccwpck_require__(7598);
 ;// CONCATENATED MODULE: ./src/lib/usage-persistence.mjs
@@ -116439,7 +116577,6 @@ Pricing last updated: ${this.lastUpdated}`;
 
 
 
-
 /**
  * Warn when `--baseline` was given but the run returned before the comparison (#1936).
  *
@@ -116699,7 +116836,13 @@ function resolveQaAuditOutput(parsed) {
     throw new Error('it is the --qa-evidence file');
   }
   if ((0,external_node_fs_.lstatSync)(output, { throwIfNoEntry: false })) throw new Error('the path already exists');
-  const parent = (0,external_node_fs_.realpathSync)(external_node_path_.dirname(output));
+  let parent;
+  try {
+    parent = (0,external_node_fs_.realpathSync)(external_node_path_.dirname(output));
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error('its parent directory does not exist');
+    throw error;
+  }
   if (!(0,external_node_fs_.statSync)(parent).isDirectory()) throw new Error('its parent is not a directory');
   const target = external_node_path_.join(parent, external_node_path_.basename(output));
   if (parsed.qaArtifactsDir !== null) {
@@ -116720,8 +116863,9 @@ function resolveQaAuditOutput(parsed) {
 /**
  * Audit the QA evidence against what this run observed and write the result.
  *
- * Runs before `planLocalReview`, because whether the evidence was accepted decides whether the
- * `qaEvidence` context is available to skill selection. The repository root and HEAD come from
+ * Runs before `planLocalReview`, so a failed write stops the run before the review. The audit is
+ * recorded only: it does not make the `qaEvidence` context available, because no skill receives
+ * the evidence itself yet (ADR-017 rollout step 5). The repository root and HEAD come from
  * the same `ensureGitRepo` / `getHeadSha` calls `planLocalReview` makes. `dirty` and
  * `changedFiles` come from tracked files only (`listTrackedChanges`), per §5 condition 5; the
  * review's own `dirty` (`isWorkingTreeDirty`) is left as it is. The AC population and
@@ -116783,7 +116927,6 @@ async function runRunCommand(parsed, targetPath) {
   }
   let qaEvidence = null;
   let qaAuditOutputPath = null;
-  let availableContexts = parsed.availableContexts;
   if (parsed.qaEvidenceFile !== null) {
     // Input and output problems stop the run here, before HEAD is observed or anything reviewed.
     try {
@@ -116816,16 +116959,11 @@ async function runRunCommand(parsed, targetPath) {
 
   const manualReviewMode = (0,review_plan_generator/* resolveDepthToReviewMode */.c8)(parsed.depth);
 
-  // Before planLocalReview (and so before its early returns): only evidence the audit accepted
-  // makes the qaEvidence context available to skill selection.
+  // Before planLocalReview (and so before its early returns), so the audit is written even when
+  // there is nothing to review.
   if (qaEvidence !== null) {
     const audit = await writeQaEvidenceAudit(parsed, qaEvidence, targetPath, qaAuditOutputPath);
     if (audit === null) return 1;
-    if (audit.accepted) {
-      availableContexts = [
-        ...new Set([...(0,utils/* resolveAvailableContexts */.ud)(parsed.availableContexts), utils/* QA_EVIDENCE_CONTEXT */.Jq]),
-      ];
-    }
   }
 
   const context = await planLocalReview({
@@ -116833,7 +116971,7 @@ async function runRunCommand(parsed, targetPath) {
     phase: parsed.phase,
     dryRun: parsed.dryRun,
     debug: parsed.debug,
-    availableContexts,
+    availableContexts: parsed.availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     baseRef: parsed.base,
@@ -116931,7 +117069,7 @@ Dependencies: ${
     // no-op. They stay as a safety net for the fallback path: dropping them
     // would silently disable `--context` / `--dependency` the day this call
     // stops passing `context`.
-    availableContexts,
+    availableContexts: parsed.availableContexts,
     availableDependencies: parsed.availableDependencies,
     plannerMode: parsed.plannerMode,
     reviewers: parsed.reviewers,
@@ -119487,7 +119625,8 @@ Options:
   --qa-evidence <file>       (run, Experimental) QA evidence JSON to audit (ADR-017)
   --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
   --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
-                             The review output, gate and exit code do not change
+                             The audit result alone does not change the review output, gate
+                             or exit code; input/output errors stop the run with exit 1
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
@@ -121043,15 +121182,16 @@ function parseArgs(argv) {
   // followed by a bad option prints both the advisory and the error, and this
   // change is about de-duplicating the advisory, not about suppressing it on
   // the error path.
-  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
-  // and `run` adds it once the audit accepts it. Naming it in `--context` must not stand in for that.
+  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed.
+  // `run --qa-evidence` records the audit only; passing the evidence to skills is a later wiring
+  // (ADR-017 rollout step 5). Naming it in `--context` must not stand in for that. An emptied list
+  // becomes null so callers fall back to their default contexts, as when --context is absent.
   if (parsed.availableContexts?.includes(utils/* QA_EVIDENCE_CONTEXT */.Jq)) {
-    parsed.availableContexts = parsed.availableContexts.filter(
-      (ctx) => ctx !== utils/* QA_EVIDENCE_CONTEXT */.Jq
-    );
+    const remaining = parsed.availableContexts.filter((ctx) => ctx !== utils/* QA_EVIDENCE_CONTEXT */.Jq);
+    parsed.availableContexts = remaining.length > 0 ? remaining : null;
     console.warn(
       `Warning: --context ${utils/* QA_EVIDENCE_CONTEXT */.Jq} is ignored; ` +
-        'it becomes available only when --qa-evidence is passed to river run.'
+        'no CLI input makes it available yet (river run --qa-evidence records the audit only).'
     );
   }
   if (parsed.availableContexts) {

@@ -173,7 +173,8 @@ Options:
   --qa-evidence <file>       (run, Experimental) QA evidence JSON to audit (ADR-017)
   --qa-artifacts <dir>       Second root for artifacts the evidence refers to (root: artifacts)
   --qa-audit-output <file>   File that receives the audit result; required with --qa-evidence.
-                             The review output, gate and exit code do not change
+                             The audit result alone does not change the review output, gate
+                             or exit code; input/output errors stop the run with exit 1
   --format <mode>   (review) Output format for review plan|exec|verify|route: text|markdown|json. Takes
                     precedence over --output; plan|exec reject a conflicting explicit pair.
                     Default: json (text is parsed but not implemented for review yet)
@@ -1729,15 +1730,16 @@ function parseArgs(argv) {
   // followed by a bad option prints both the advisory and the error, and this
   // change is about de-duplicating the advisory, not about suppressing it on
   // the error path.
-  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed,
-  // and `run` adds it once the audit accepts it. Naming it in `--context` must not stand in for that.
+  // ADR-017 D2: the QA evidence context is available only when the evidence itself is passed.
+  // `run --qa-evidence` records the audit only; passing the evidence to skills is a later wiring
+  // (ADR-017 rollout step 5). Naming it in `--context` must not stand in for that. An emptied list
+  // becomes null so callers fall back to their default contexts, as when --context is absent.
   if (parsed.availableContexts?.includes(QA_EVIDENCE_CONTEXT)) {
-    parsed.availableContexts = parsed.availableContexts.filter(
-      (ctx) => ctx !== QA_EVIDENCE_CONTEXT
-    );
+    const remaining = parsed.availableContexts.filter((ctx) => ctx !== QA_EVIDENCE_CONTEXT);
+    parsed.availableContexts = remaining.length > 0 ? remaining : null;
     console.warn(
       `Warning: --context ${QA_EVIDENCE_CONTEXT} is ignored; ` +
-        'it becomes available only when --qa-evidence is passed to river run.'
+        'no CLI input makes it available yet (river run --qa-evidence records the audit only).'
     );
   }
   if (parsed.availableContexts) {
