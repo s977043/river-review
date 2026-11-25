@@ -663,6 +663,12 @@ export async function generateReview({
     debug.llmSkipped = skipReason;
   }
 
+  // ADR-017 D2: the review's fallbacks (heuristic when empty, degrade when the verifier rejects
+  // all) decide on the review's own comments, so a reply holding only QA findings reviews the
+  // diff as NO_ISSUES does. QA findings are verified on their own, without a fallback.
+  const qaEvidenceComments = comments.filter(isQaEvidenceFinding);
+  comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+
   if (!comments.length) {
     const heuristic = buildHeuristicComments({ diff, plan });
     debug.heuristicsUsed = true;
@@ -683,7 +689,7 @@ export async function generateReview({
     }
   }
 
-  const formatChecks = comments.map((c) => ({
+  const formatChecks = [...comments, ...qaEvidenceComments].map((c) => ({
     file: c.file,
     line: c.line,
     ...validateFindingMessage(c.message),
@@ -723,11 +729,26 @@ export async function generateReview({
     heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
-    qaEvidencePaths: qaEvidencePublicPaths(qaEvidence),
   });
   Object.assign(debug, verifierStage.debugPatch);
   // Replace comments with verified-only set
   comments = verifierStage.comments;
+  if (qaEvidenceComments.length > 0) {
+    // heuristicsUsed: true turns the stage's degrade off; only the verifier pass runs.
+    const qaStage = await runVerifierStage({
+      comments: qaEvidenceComments,
+      diff,
+      plan,
+      fileTypes,
+      includeFallback: false,
+      heuristicsUsed: true,
+      heuristicsFound: false,
+      qaEvidencePaths: qaEvidencePublicPaths(qaEvidence),
+    });
+    debug.qaEvidenceVerifierStats = qaStage.debugPatch.verifierStats;
+    debug.qaEvidenceVerifierRejected = qaStage.debugPatch.verifierRejected;
+    comments = [...comments, ...qaStage.comments];
+  }
 
   // #1597: Output-stage filter for findings that point at a machine-generated
   // build-artifact directory (a `dist/` path segment). #1570 excluded these
