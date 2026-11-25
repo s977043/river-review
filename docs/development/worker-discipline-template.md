@@ -69,6 +69,7 @@
   許可済みの `mv` を使う（`rm` は `.claude/settings.json` の `permissions.deny` に `Bash(rm:*)` があり実行できない）。
   2026-09-20、PR #2327 の変異復元で同じ事故が再発した（未コミットの修正 1 件が消え、`git status` から
   気づいて再適用した）。変異注入の復元は、注入前に退避したコピーからの `cp` に限ること。
+- `skills/` 配下では `.bak` を残置しないこと。`.gitignore` 済みでも、skill の manifest 再生成（`scripts/generate-skill-manifest.mjs`）がファイル数とチェックサムに数え、CI の Skill schema validation（manifest 鮮度検査）が落ちる（2026-11-25、PR #2952）。変異の退避先は worktree の外（scratchpad）にすること。
 - **変異テストの注入は、自分専用の worktree で行うこと。** 読み取り専用として渡された共有 worktree の
   `src/` を一時的にでも書き換えないこと。並行して別のレビュアーが同じ worktree でテストを実走している
   場合、その結果が汚染される（2026-09-15 のウェーブで、7 観点並列レビューのうち 1 名が共有 worktree で
