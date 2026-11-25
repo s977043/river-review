@@ -47566,10 +47566,17 @@ async function generateReview({
   // 段の本体は runVerifierStage（同ファイル、上）にある。#1644 の scope 判定と
   // 全件棄却時の fail-safe もその内側にある。debug への反映は patch の
   // Object.assign 1 回だけで、key の挿入順は抽出前と同一である。
+  // ADR-017 D2: the stage judges a finding against plan.selected[0], so each batch gets only its
+  // own skills. Otherwise a selected QA skill (severity minor) would reject the review's blocker
+  // findings, and the review would verify differently whenever QA evidence is passed.
+  const qaSkills = (plan?.selected ?? []).filter(utils/* readsQaEvidence */.jf);
+  const reviewPlan = qaSkills.length
+    ? { ...plan, selected: plan.selected.filter((skill) => !(0,utils/* readsQaEvidence */.jf)(skill)) }
+    : plan;
   const verifierStage = await runVerifierStage({
     comments,
     diff,
-    plan,
+    plan: reviewPlan,
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
@@ -47585,7 +47592,7 @@ async function generateReview({
     const qaStage = await runVerifierStage({
       comments: qaEvidenceComments,
       diff,
-      plan,
+      plan: qaSkills.length ? { ...plan, selected: qaSkills } : plan,
       fileTypes,
       includeFallback: false,
       heuristicsUsed: true,
@@ -51262,6 +51269,7 @@ function tokensToChars(maxTokens, _opts = {}) {
 /* harmony export */   Rq: () => (/* binding */ isLlmEnabled),
 /* harmony export */   TK: () => (/* binding */ resolveAvailableDependencies),
 /* harmony export */   hN: () => (/* binding */ isOfflineMode),
+/* harmony export */   jf: () => (/* binding */ readsQaEvidence),
 /* harmony export */   ud: () => (/* binding */ resolveAvailableContexts)
 /* harmony export */ });
 /* harmony import */ var minimatch__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(6826);
@@ -51320,6 +51328,16 @@ function isLlmEnabled(env = process.env) {
  * (ADR-017 rollout step 5).
  */
 const QA_EVIDENCE_CONTEXT = 'qaEvidence';
+
+/**
+ * True for a skill that declares the {@link QA_EVIDENCE_CONTEXT} input context. Accepts a loaded
+ * skill (`{ metadata }`) or bare metadata.
+ * @param {object | null | undefined} skill
+ * @returns {boolean}
+ */
+function readsQaEvidence(skill) {
+  return Boolean((skill?.metadata ?? skill)?.inputContext?.includes(QA_EVIDENCE_CONTEXT));
+}
 
 /**
  * Resolve the effective `availableContexts` for `buildExecutionPlan`'s
@@ -114697,10 +114715,7 @@ function filterSuppressedComments(comments, suppressedFindings) {
  */
 function qaEvidenceForReview(context) {
   if (!context?.qaEvidence) return undefined;
-  const reads = (context.plan?.selected ?? []).some((skill) =>
-    (skill?.metadata ?? skill)?.inputContext?.includes(utils/* QA_EVIDENCE_CONTEXT */.Jq)
-  );
-  return reads ? context.qaEvidence : undefined;
+  return (context.plan?.selected ?? []).some(utils/* readsQaEvidence */.jf) ? context.qaEvidence : undefined;
 }
 
 /**
