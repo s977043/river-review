@@ -428,7 +428,10 @@ ADR-017 D2 のとおり、QA 証拠を読む skill の所見はレビューの�
 
 - 対象が `QA-EVIDENCE` で始まる所見（`QA-EVIDENCE:<AC id>:0` / `QA-EVIDENCE:0`）は、レビューの所見から取り除く。Finding Critic・score・gate の入力にもしない
 - 取り除いた所見は、監査結果のファイル（`river run --qa-audit-output`）の `skillFindings` 欄に書く。要素は `target`（AC の id。証拠全体は `null`）・`severity`・`confidence`・`title`・`message`・`evidence`・`suggestion` を持ち、文字列は §7 と同じ redaction を通した値だけを書く
-- `skillFindings` を書くのは、QA 証拠を読む skill に証拠を渡し、LLM が実行された場合だけとする。欄が無いことは、証拠を読んだ skill が無かったことを表す
+- `skillFindings` を書くのは、QA 証拠を読む skill に証拠を渡し、レビューのすべての LLM 呼び出しが完了した場合だけとする（Review Coverage の全 unit が `completed`）。通信・応答・解析の失敗やタイムアウトが 1 件でもあれば、`--reviewers` の一部のロールだけでも書かない。欄が無いことは、証拠を読み終えた skill が無かったことを表し、`skillFindings: []` は読み終えて所見が 0 件だったことを表す
+- §7 段階 2 の redaction は、設定 `security.redact.enabled: false` でも掛ける。設定はレビュー対象の作業ツリーから読むので、変更自身が証拠の redaction を切れないようにする。`allowlist` などの調整は反映する
+- stale な証拠（`QA_TARGET_REVISION_STALE`）も、全体としては受理されるので本文は skill に渡る。stale は AC を数えない理由で、証拠の拒否ではない（§5 条件 5、§12。ADR-017 Failure modes 1）。skill の所見は gate に入らないので、stale な証拠の読み取りが判定を変えることは無い
+- QA Only（差分なし）では、QA 証拠を読む skill は読まない。`river run` はレビューするファイルが 0 件だと skill を選ぶ前にレビューを終え（監査結果は書く。`src/lib/local-runner.mjs` の `no-changes`）、0 件では `applyTo` を満たす skill も無い（ADR-017 D2）。skill の選択条件はこの PR で変えず、QA Only での読み取りは後続で決める
 - 所見の `severity` は skill の報告をそのまま写したもので、QA の判定（verified・state）には使わない
 - verifier は、これらの所見の根拠として、差分に加えて、skill に渡した証拠の public な artifact のパスを認める。restricted の artifact はパスを渡していないので、根拠にできない
 
