@@ -46117,7 +46117,9 @@ async function runVerifierStage({
       verification: verifyFinding({
         finding: comment,
         diff: diff.diffText,
-        skill,
+        // One prompt covers every selected skill, so an LLM comment belongs to none of them and
+        // plan.selected[0]'s severity is no bound on it: a minor first skill dropped its blockers.
+        skill: comment.origin === 'llm' ? {} : skill,
         fileTypes,
         // #1644: parsed diff files carry addedLines, enabling the verifier's
         // machine determination of finding scope (in-diff / pre-existing).
