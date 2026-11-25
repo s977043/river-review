@@ -47510,6 +47510,12 @@ async function generateReview({
     debug.llmSkipped = skipReason;
   }
 
+  // ADR-017 D2: the review's fallbacks (heuristic when empty, degrade when the verifier rejects
+  // all) decide on the review's own comments, so a reply holding only QA findings reviews the
+  // diff as NO_ISSUES does. QA findings are verified on their own, without a fallback.
+  const qaEvidenceComments = comments.filter(isQaEvidenceFinding);
+  comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+
   if (!comments.length) {
     const heuristic = (0,heuristic_review/* buildHeuristicComments */.zq)({ diff, plan });
     debug.heuristicsUsed = true;
@@ -47530,7 +47536,7 @@ async function generateReview({
     }
   }
 
-  const formatChecks = comments.map((c) => ({
+  const formatChecks = [...comments, ...qaEvidenceComments].map((c) => ({
     file: c.file,
     line: c.line,
     ...(0,finding_factory/* validateFindingMessage */.xv)(c.message),
@@ -47570,11 +47576,26 @@ async function generateReview({
     heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
-    qaEvidencePaths: (0,qa_evidence/* qaEvidencePublicPaths */.nh)(qaEvidence),
   });
   Object.assign(debug, verifierStage.debugPatch);
   // Replace comments with verified-only set
   comments = verifierStage.comments;
+  if (qaEvidenceComments.length > 0) {
+    // heuristicsUsed: true turns the stage's degrade off; only the verifier pass runs.
+    const qaStage = await runVerifierStage({
+      comments: qaEvidenceComments,
+      diff,
+      plan,
+      fileTypes,
+      includeFallback: false,
+      heuristicsUsed: true,
+      heuristicsFound: false,
+      qaEvidencePaths: (0,qa_evidence/* qaEvidencePublicPaths */.nh)(qaEvidence),
+    });
+    debug.qaEvidenceVerifierStats = qaStage.debugPatch.verifierStats;
+    debug.qaEvidenceVerifierRejected = qaStage.debugPatch.verifierRejected;
+    comments = [...comments, ...qaStage.comments];
+  }
 
   // #1597: Output-stage filter for findings that point at a machine-generated
   // build-artifact directory (a `dist/` path segment). #1570 excluded these
@@ -116757,6 +116778,7 @@ Pricing last updated: ${this.lastUpdated}`;
 
 
 
+
 /**
  * Warn when `--baseline` was given but the run returned before the comparison (#1936).
  *
@@ -117069,8 +117091,9 @@ function qaEvidenceRedactor(security) {
  * independence stay at the production defaults inside `auditQaEvidence`: no population is
  * passed, so it is undetermined.
  *
- * The file is created with `wx` and its descriptor kept open, so the review's QA findings can be
- * added to the same file afterwards (`writeQaSkillFindings`) without opening the path again.
+ * The content is written whole to a temporary `wx` file and hard-linked to the output path, so
+ * the path appears only complete and an existing path is never overwritten. The descriptor is
+ * kept open, so `writeQaSkillFindings` can check that the path still names this file.
  *
  * @returns {Promise<{ audit: object, file: { fd: number, redact: Function } } | null>} null when
  *   the result could not be written
@@ -117096,19 +117119,68 @@ async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
         : {}),
     },
   });
-  let fd = null;
+  let fd;
   try {
-    fd = (0,external_node_fs_.openSync)(outputPath, 'wx');
-    (0,external_node_fs_.writeSync)(fd, JSON.stringify(result, null, 2) + '\n');
+    const temp = writeTempFile(outputPath, JSON.stringify(result, null, 2) + '\n');
+    try {
+      // link, unlike rename, fails on an existing path, so the output is still never overwritten.
+      (0,external_node_fs_.linkSync)(temp.path, outputPath);
+    } catch (error) {
+      (0,external_node_fs_.closeSync)(temp.fd);
+      throw error;
+    } finally {
+      unlinkQuietly(temp.path);
+    }
+    fd = temp.fd;
   } catch (error) {
-    if (fd !== null) (0,external_node_fs_.closeSync)(fd);
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return null;
   }
   console.error(
     `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
   );
-  return { audit: result, file: { fd, redact } };
+  return { audit: result, file: { fd, path: outputPath, redact } };
+}
+
+function unlinkQuietly(file) {
+  try {
+    (0,external_node_fs_.unlinkSync)(file);
+  } catch {
+    // Already gone, or not removable: the output path is decided either way.
+  }
+}
+
+function writeAll(fd, text) {
+  const buffer = Buffer.from(text, 'utf8');
+  let offset = 0;
+  while (offset < buffer.length) {
+    const written = (0,external_node_fs_.writeSync)(fd, buffer, offset, buffer.length - offset, offset);
+    if (!(written > 0)) throw new Error(`short write (${offset} of ${buffer.length} bytes)`);
+    offset += written;
+  }
+}
+
+/**
+ * Write `text` whole to a new file (`wx`) next to `outputPath` and flush it, so the audit file
+ * is only ever published complete. On failure the temporary file is removed.
+ *
+ * @returns {{ fd: number, path: string }}
+ */
+function writeTempFile(outputPath, text) {
+  const file = external_node_path_.join(
+    external_node_path_.dirname(outputPath),
+    `.${external_node_path_.basename(outputPath)}.${external_node_process_.pid}.${(0,external_node_crypto_.randomBytes)(6).toString('hex')}.tmp`
+  );
+  const fd = (0,external_node_fs_.openSync)(file, 'wx');
+  try {
+    writeAll(fd, text);
+    (0,external_node_fs_.fsyncSync)(fd);
+  } catch (error) {
+    (0,external_node_fs_.closeSync)(fd);
+    unlinkQuietly(file);
+    throw error;
+  }
+  return { fd, path: file };
 }
 
 function redactStrings(value, redact) {
@@ -117145,17 +117217,35 @@ function qaSkillFindingsForAudit(findings, redact) {
 }
 
 /**
- * Rewrite the audit file through the descriptor `writeQaEvidenceAudit` kept, adding
- * `skillFindings`. Called only when the review passed the evidence to a skill and reached the
- * LLM, so an absent `skillFindings` means no skill read the evidence.
+ * Replace the audit file with one that adds `skillFindings`. Called only when the review passed
+ * the evidence to a skill and reached the LLM, so an absent `skillFindings` means no skill read
+ * the evidence.
  *
- * @returns {boolean} false when the file could not be rewritten
+ * The new content is written whole to a temporary file and renamed over the audit file, so the
+ * audit written before the review stays until the replacement is complete. The rename happens
+ * only while the path still names the file `writeQaEvidenceAudit` created (same device and
+ * inode as the descriptor it kept), so a path swapped in the meantime is refused, not replaced.
+ *
+ * @returns {boolean} false when the file could not be replaced
  */
 function writeQaSkillFindings(parsed, file, audit, findings) {
   const content = { ...audit, skillFindings: qaSkillFindingsForAudit(findings, file.redact) };
   try {
-    (0,external_node_fs_.ftruncateSync)(file.fd, 0);
-    (0,external_node_fs_.writeSync)(file.fd, JSON.stringify(content, null, 2) + '\n', 0);
+    const temp = writeTempFile(file.path, JSON.stringify(content, null, 2) + '\n');
+    try {
+      const current = (0,external_node_fs_.lstatSync)(file.path, { bigint: true, throwIfNoEntry: false });
+      const own = (0,external_node_fs_.fstatSync)(file.fd, { bigint: true });
+      if (!current || current.dev !== own.dev || current.ino !== own.ino) {
+        throw new Error('the file was replaced after the audit was written');
+      }
+      (0,external_node_fs_.renameSync)(temp.path, file.path);
+    } catch (error) {
+      (0,external_node_fs_.closeSync)(temp.fd);
+      unlinkQuietly(temp.path);
+      throw error;
+    }
+    (0,external_node_fs_.closeSync)(file.fd);
+    file.fd = temp.fd;
   } catch (error) {
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return false;
