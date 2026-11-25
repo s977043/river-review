@@ -403,9 +403,10 @@ Flow には `executeFlow` の `capabilities['evaluate-completion']` として注
 行番号の基準:
 
 - 本節の行番号も main `e78b5234` 時点の値を示す
-- 引用先のファイルは、本モジュールを足したブランチでも変えていない
-  - `src/lib/flow-runner.mjs`、`src/cli/commands/review.mjs`、`src/lib/review-plan-summary.mjs`
+- 次の引用先は、`e78b5234` から main `cf26e08a` まで変わっていない
+  - `src/lib/flow-runner.mjs`、`src/lib/review-plan-summary.mjs`
   - `flows/*.flow.json`、`schemas/completion-assessment.schema.json`
+- `src/cli/commands/review.mjs` は PR #2949 で変わった。main `cf26e08a` では `:295` が `:435`、`:302` が `:442` にあたる
 - ADR-017 は `e78b5234` の後に追加したので、その行番号だけは追加後（PR #2934）の版を指す
 
 現状の配線:
