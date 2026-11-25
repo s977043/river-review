@@ -161,7 +161,7 @@ river run . --output json \
 - 証拠の文字列の redaction は、設定 `security.redact` に従う（レビューのプロンプトに載るリポジトリの文脈と同じ扱い）
 - 対象が `QA-EVIDENCE` で始まる所見（`QA-EVIDENCE:<AC id>:0` / `QA-EVIDENCE:0`）は、レビューの指摘から取り除き、Finding Critic・score・gate にも渡さない。代わりに `--qa-audit-output` のファイルの `skillFindings` 欄へ書く。根拠には差分のほか、渡した証拠の public な artifact のパスを引用できる
 - `skillFindings` は配列で、要素は `target`（AC の id。証拠全体なら `null`）・`severity`・`confidence`・`title`・`message`・`evidence`・`suggestion` を持つ。文字列は redaction 後の値だけを書く
-- 監査結果のファイルは、レビューの前に新規作成（既存のパスは上書きしない）で書き、ファイルを開いたままレビューの後に `skillFindings` を加えて書き直す。`skillFindings` を書くのは、`qaEvidence` を読む skill に証拠を渡し、LLM が実行された場合だけである。欄が無いことは、証拠を読んだ skill が無かったことを表す。書き直しに失敗した場合は、レビュー結果を出力せずに exit 1 で止まる
+- 監査結果のファイルは、レビューの前に新規作成（既存のパスは上書きしない）で書き、レビューの後に `skillFindings` を加えたファイルで置き換える。どちらも同じディレクトリの一時ファイルへ全体を書き終えてから出力先のパスへ移すので、出力先のパスに書きかけの JSON は現れない。置き換えはパスが最初に作ったファイルを指したままの場合だけ行い、別のファイルへ差し替わっていれば失敗として扱う。`skillFindings` を書くのは、`qaEvidence` を読む skill に証拠を渡し、LLM が実行された場合だけである。欄が無いことは、証拠を読んだ skill が無かったことを表す。置き換えに失敗した場合は、レビュー前の監査結果を残し、レビュー結果を出力せずに exit 1 で止まる
 - 拒否された証拠（`accepted: false`）と、QA の 3 フラグを指定しない実行では、`qaEvidence` は available にならない。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
 - 初版で artifact を読むのは macOS 11 以降だけである。他の OS では、証拠の artifact の参照は解決されない（unresolved）
 - GitHub Action からはまだ配線していない。QA の 3 フラグを渡せるのは `river run` だけである

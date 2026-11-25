@@ -5,16 +5,20 @@
 // and exit codes are unchanged; only the enclosing function and the relative
 // import depth (static and dynamic imports) differ from the original inline
 // block. The shared render helpers live in src/cli/render.mjs.
+import { randomBytes } from 'node:crypto';
 import {
   closeSync,
   constants as fsConstants,
   fstatSync,
-  ftruncateSync,
+  fsyncSync,
+  linkSync,
   lstatSync,
   openSync,
   readSync,
   realpathSync,
+  renameSync,
   statSync,
+  unlinkSync,
   writeSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -356,8 +360,9 @@ export function qaEvidenceRedactor(security) {
  * independence stay at the production defaults inside `auditQaEvidence`: no population is
  * passed, so it is undetermined.
  *
- * The file is created with `wx` and its descriptor kept open, so the review's QA findings can be
- * added to the same file afterwards (`writeQaSkillFindings`) without opening the path again.
+ * The content is written whole to a temporary `wx` file and hard-linked to the output path, so
+ * the path appears only complete and an existing path is never overwritten. The descriptor is
+ * kept open, so `writeQaSkillFindings` can check that the path still names this file.
  *
  * @returns {Promise<{ audit: object, file: { fd: number, redact: Function } } | null>} null when
  *   the result could not be written
@@ -383,19 +388,68 @@ async function writeQaEvidenceAudit(parsed, evidence, targetPath, outputPath) {
         : {}),
     },
   });
-  let fd = null;
+  let fd;
   try {
-    fd = openSync(outputPath, 'wx');
-    writeSync(fd, JSON.stringify(result, null, 2) + '\n');
+    const temp = writeTempFile(outputPath, JSON.stringify(result, null, 2) + '\n');
+    try {
+      // link, unlike rename, fails on an existing path, so the output is still never overwritten.
+      linkSync(temp.path, outputPath);
+    } catch (error) {
+      closeSync(temp.fd);
+      throw error;
+    } finally {
+      unlinkQuietly(temp.path);
+    }
+    fd = temp.fd;
   } catch (error) {
-    if (fd !== null) closeSync(fd);
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return null;
   }
   console.error(
     `QA evidence audit (${result.accepted ? 'accepted' : 'rejected'}) written: ${parsed.qaAuditOutput}`
   );
-  return { audit: result, file: { fd, redact } };
+  return { audit: result, file: { fd, path: outputPath, redact } };
+}
+
+function unlinkQuietly(file) {
+  try {
+    unlinkSync(file);
+  } catch {
+    // Already gone, or not removable: the output path is decided either way.
+  }
+}
+
+function writeAll(fd, text) {
+  const buffer = Buffer.from(text, 'utf8');
+  let offset = 0;
+  while (offset < buffer.length) {
+    const written = writeSync(fd, buffer, offset, buffer.length - offset, offset);
+    if (!(written > 0)) throw new Error(`short write (${offset} of ${buffer.length} bytes)`);
+    offset += written;
+  }
+}
+
+/**
+ * Write `text` whole to a new file (`wx`) next to `outputPath` and flush it, so the audit file
+ * is only ever published complete. On failure the temporary file is removed.
+ *
+ * @returns {{ fd: number, path: string }}
+ */
+function writeTempFile(outputPath, text) {
+  const file = path.join(
+    path.dirname(outputPath),
+    `.${path.basename(outputPath)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`
+  );
+  const fd = openSync(file, 'wx');
+  try {
+    writeAll(fd, text);
+    fsyncSync(fd);
+  } catch (error) {
+    closeSync(fd);
+    unlinkQuietly(file);
+    throw error;
+  }
+  return { fd, path: file };
 }
 
 function redactStrings(value, redact) {
@@ -432,17 +486,35 @@ export function qaSkillFindingsForAudit(findings, redact) {
 }
 
 /**
- * Rewrite the audit file through the descriptor `writeQaEvidenceAudit` kept, adding
- * `skillFindings`. Called only when the review passed the evidence to a skill and reached the
- * LLM, so an absent `skillFindings` means no skill read the evidence.
+ * Replace the audit file with one that adds `skillFindings`. Called only when the review passed
+ * the evidence to a skill and reached the LLM, so an absent `skillFindings` means no skill read
+ * the evidence.
  *
- * @returns {boolean} false when the file could not be rewritten
+ * The new content is written whole to a temporary file and renamed over the audit file, so the
+ * audit written before the review stays until the replacement is complete. The rename happens
+ * only while the path still names the file `writeQaEvidenceAudit` created (same device and
+ * inode as the descriptor it kept), so a path swapped in the meantime is refused, not replaced.
+ *
+ * @returns {boolean} false when the file could not be replaced
  */
 function writeQaSkillFindings(parsed, file, audit, findings) {
   const content = { ...audit, skillFindings: qaSkillFindingsForAudit(findings, file.redact) };
   try {
-    ftruncateSync(file.fd, 0);
-    writeSync(file.fd, JSON.stringify(content, null, 2) + '\n', 0);
+    const temp = writeTempFile(file.path, JSON.stringify(content, null, 2) + '\n');
+    try {
+      const current = lstatSync(file.path, { bigint: true, throwIfNoEntry: false });
+      const own = fstatSync(file.fd, { bigint: true });
+      if (!current || current.dev !== own.dev || current.ino !== own.ino) {
+        throw new Error('the file was replaced after the audit was written');
+      }
+      renameSync(temp.path, file.path);
+    } catch (error) {
+      closeSync(temp.fd);
+      unlinkQuietly(temp.path);
+      throw error;
+    }
+    closeSync(file.fd);
+    file.fd = temp.fd;
   } catch (error) {
     console.error(`Error: cannot write --qa-audit-output: ${error.message}`);
     return false;
