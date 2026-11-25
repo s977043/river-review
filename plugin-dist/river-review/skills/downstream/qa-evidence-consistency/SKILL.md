@@ -2,7 +2,7 @@
 id: 'qa-evidence-consistency'
 name: QA Evidence Consistency Review
 description: 利用者が実行した QA の証拠を読み、AC ごとの記録の不足・矛盾・残余リスクの書き漏れを指摘する。verified や COMPLETE の判定は行わない。
-version: 0.1.0
+version: 0.1.1
 category: downstream
 phase: downstream
 applyTo:
