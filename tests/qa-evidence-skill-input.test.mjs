@@ -440,6 +440,8 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
       evidence = null,
       onFetch = () => {},
       prepare = () => {},
+      failRequest = () => false,
+      args = [],
     } = {}
   ) {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
@@ -455,8 +457,10 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     const requests = [];
     globalThis.fetch = async (_url, init) => {
       const body = JSON.parse(init?.body ?? '{}');
-      requests.push((body.messages ?? []).map((m) => m.content).join('\n'));
+      const text = (body.messages ?? []).map((m) => m.content).join('\n');
+      requests.push(text);
       onFetch({ auditPath });
+      if (failRequest(text)) throw new Error('provider unavailable');
       return {
         ok: true,
         status: 200,
@@ -469,7 +473,7 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     console.error = () => {};
     console.warn = () => {};
     const qaArgs = qa ? ['--qa-evidence', evidencePath, '--qa-audit-output', auditPath] : [];
-    const code = await main(['run', dir, '--phase', phase, '--output', 'json', ...qaArgs]);
+    const code = await main(['run', dir, '--phase', phase, '--output', 'json', ...qaArgs, ...args]);
     console.log = saved.log;
     const artifact = out.length > 0 ? JSON.parse(out.join('\n')) : null;
     return { code, artifact, auditPath, work, requests };
@@ -672,6 +676,56 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     assert.equal('skillFindings' in audit, false);
   });
 
+  // A provider failure is not a skip (llmNotExecuted stays false), so it must not read as a
+  // completed read that found nothing (`skillFindings: []`).
+  test('no skillFindings field when the LLM call fails', async (t) => {
+    const run = await runWith(t, `${appLine}\n${qaLine}`, { failRequest: () => true });
+    assert.equal(run.code, 0);
+    assert.ok(
+      run.requests.some((text) => text.includes('### QA Evidence')),
+      'the QA call'
+    );
+    assert.notEqual(run.artifact.llmNotExecuted, true);
+    const audit = JSON.parse(readFileSync(run.auditPath, 'utf8'));
+    assert.equal(audit.accepted, true);
+    assert.equal('skillFindings' in audit, false);
+  });
+
+  test('no skillFindings field when one --reviewers role fails', async (t) => {
+    const roles = ['--reviewers', 'bug-hunter,test-gap'];
+    const failTestGap = (text) => text.includes('You are the Test Gap Finder reviewer');
+    const partial = await runWith(t, `${appLine}\n${qaLine}`, {
+      args: roles,
+      failRequest: failTestGap,
+    });
+    assert.equal(partial.code, 0);
+    assert.ok(partial.requests.some(failTestGap), 'the failing role was called');
+    assert.equal('skillFindings' in JSON.parse(readFileSync(partial.auditPath, 'utf8')), false);
+
+    const complete = await runWith(t, `${appLine}\n${qaLine}`, { args: roles });
+    assert.equal(JSON.parse(readFileSync(complete.auditPath, 'utf8')).skillFindings.length, 1);
+  });
+
+  test('security.redact.enabled false still redacts the evidence sent and audited', async (t) => {
+    const prepare = (dir) =>
+      writeFileSync(
+        join(dir, '.river-review.json'),
+        JSON.stringify({ security: { redact: { enabled: false } } })
+      );
+    const run = await runWith(t, `${appLine}\n${qaLine}`, { prepare });
+    assert.equal(run.code, 0);
+    const sent = run.requests.join('\n');
+    assert.match(sent, /### QA Evidence/);
+    assert.ok(sent.includes('npm test --token=<REDACTED'), 'the redacted command');
+    assert.ok(!sent.includes(TOKEN), 'the secret in the request');
+    const text = readFileSync(run.auditPath, 'utf8');
+    const audit = JSON.parse(text);
+    assert.equal(audit.skillFindings.length, 1);
+    assert.ok(audit.redaction.replaced > 0);
+    assert.ok(!text.includes(TOKEN), 'the evidence secret in the audit file');
+    assert.ok(!text.includes(token), 'the skill finding secret in the audit file');
+  });
+
   test('qaSkillFindingsForAudit maps the whole-evidence anchor to a null target', () => {
     const redact = (text) => ({ text: text.replace('secret', '<R>'), count: 1 });
     assert.deepEqual(
@@ -703,12 +757,20 @@ describe('qaEvidenceRedactor (security.redact)', () => {
     assert.equal(count, 1);
   });
 
-  test('follows security.redact as the repo context does', () => {
-    for (const redact of [{ enabled: false }, { allowlist: [token] }]) {
-      const { text, count } = qaEvidenceRedactor({ redact })(`npm test --token=${token}`);
-      assert.ok(text.includes(token), JSON.stringify(redact));
-      assert.equal(count, 0);
-    }
+  test('follows the security.redact allowlist as the repo context does', () => {
+    const { text, count } = qaEvidenceRedactor({ redact: { allowlist: [token] } })(
+      `npm test --token=${token}`
+    );
+    assert.ok(text.includes(token));
+    assert.equal(count, 0);
+  });
+
+  test('redacts even when security.redact.enabled is false', () => {
+    const { text, count } = qaEvidenceRedactor({ redact: { enabled: false } })(
+      `npm test --token=${token}`
+    );
+    assert.ok(!text.includes(token));
+    assert.equal(count, 1);
   });
 
   test('river run applies the setting to the audit the skill input is built from', async (t) => {

@@ -334,12 +334,18 @@ function resolveQaAuditOutput(parsed) {
 /**
  * The redactor for QA evidence strings, built from `security.redact` the same way as the repo
  * context the prompt receives (`createRedactionPrimitives`), with the count the audit records.
+ * `enabled: false` is not followed: the config is read from the reviewed working tree, so the
+ * change under review could otherwise send its evidence unredacted (contract §7 stage 2). The
+ * other settings, such as `allowlist`, still apply.
  *
  * @param {object | undefined} security - the loaded config's `security` section.
  * @returns {(text: string) => { text: string, count: number }}
  */
 export function qaEvidenceRedactor(security) {
-  const { maybeRedact, totalHits } = createRedactionPrimitives(security);
+  const { maybeRedact, totalHits } = createRedactionPrimitives({
+    ...security,
+    redact: { ...security?.redact, enabled: true },
+  });
   const hitCount = () => [...totalHits.values()].reduce((sum, count) => sum + count, 0);
   return (text) => {
     const before = hitCount();
@@ -486,9 +492,23 @@ export function qaSkillFindingsForAudit(findings, redact) {
 }
 
 /**
+ * True when every review unit finished its LLM call (Review Coverage, #2212). Every unit receives
+ * the QA evidence, so a skipped, failed or timed-out unit (one `--reviewers` role is enough)
+ * leaves the read incomplete, and `skillFindings: []` would not mean that the read found nothing.
+ */
+function qaSkillReadCompleted(result) {
+  const coverage = result.reviewCoverage;
+  return (
+    result.status === 'ok' &&
+    coverage?.expectedUnits > 0 &&
+    coverage.completedUnits === coverage.expectedUnits
+  );
+}
+
+/**
  * Replace the audit file with one that adds `skillFindings`. Called only when the review passed
- * the evidence to a skill and reached the LLM, so an absent `skillFindings` means no skill read
- * the evidence.
+ * the evidence to a skill and every LLM call completed, so an absent `skillFindings` means no
+ * skill finished reading the evidence.
  *
  * The new content is written whole to a temporary file and renamed over the audit file, so the
  * audit written before the review stays until the replacement is complete. The rename happens
@@ -719,15 +739,16 @@ Dependencies: ${
   });
 
   // ADR-017 D2: the review's findings on the QA evidence go to the audit result, never to the
-  // issues. Written only when a skill received the evidence and the LLM ran, before any output.
-  if (
-    qa.file !== null &&
-    result.status === 'ok' &&
-    result.llmNotExecuted !== true &&
-    qaEvidenceForReview(context) !== undefined &&
-    !writeQaSkillFindings(parsed, qa.file, qaAudit, result.qaEvidenceFindings)
-  ) {
-    return 1;
+  // issues. Written only when a skill received the evidence and every LLM call of the review
+  // completed, before any output.
+  if (qa.file !== null && qaEvidenceForReview(context) !== undefined) {
+    if (!qaSkillReadCompleted(result)) {
+      console.error(
+        'QA evidence skill findings not written: the LLM review did not complete for every reviewer'
+      );
+    } else if (!writeQaSkillFindings(parsed, qa.file, qaAudit, result.qaEvidenceFindings)) {
+      return 1;
+    }
   }
 
   if (parsed.explain) {
