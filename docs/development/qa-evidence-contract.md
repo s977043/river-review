@@ -353,7 +353,76 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 - `INCOMPLETE`（確認した不成立）は、completion-assessment の evidence に `missing` / `unreadable` が無い場合だけ許される（`:464-488`）。QA の投影は tests の evidence を `present` にせず、初版の独立性は常に `unknown` なので、初版では QA 証拠から `INCOMPLETE` は生じない。利用者が報告した `FAIL` は、監査結果に「利用者が報告した不成立」として残す
 - 初版で QA 証拠から `COMPLETE` と `INCOMPLETE` が生じないことを、テストで固定する
 
-### 8.3 QA 証拠を読む skill の所見
+### 8.3 completion capability
+
+`src/lib/qa-completion.mjs` が、§8.1 の投影に state を補った completion-assessment を組み立てる。
+組み立てた文書は `schemas/completion-assessment.schema.json` で検証し、適合しなければ例外を投げる。
+Flow には `executeFlow` の `capabilities['evaluate-completion']` として注入する。gate の入力は増やさない。
+
+入力は次の 4 つとする。
+
+| 入力                    | 内容                                                                                                                                                             |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 監査結果                | `auditQaEvidence` の戻り値。QA 証拠が無いときは `null`                                                                                                           |
+| 投影                    | `projectQaEvidence` を import して監査結果から得る。件数と reasonCode を再計算しない                                                                             |
+| QA artifact             | 保存した監査結果のパスと sha256（`serializeQaArtifact` の出力）。sha256 が監査結果と一致しなければ拒否する。確認済みの `FAIL` の一覧は、この artifact の側に残す |
+| completion-judge の部分 | scope ごとに下表。tests・diff などの evidence も completion-judge が渡す。acceptanceCriteria の evidence は本モジュールだけが書く                                |
+
+| scope   | completion-judge が渡すもの                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `task`  | `tasks`（schema `:211-225`）。AC の件数があれば `requirements` も渡す                                                                                   |
+| `final` | `validation` と `requirements`（schema `:228-239`）。母集団を確定できず投影が無いときは、AC の件数も渡す。この件数の `verified` は 0 でなければならない |
+
+判定表（監査結果の区分と state）:
+
+| 区分                      | 条件                                             | state        |
+| ------------------------- | ------------------------------------------------ | ------------ |
+| `evidence-absent`         | QA 証拠が無い                                    | `UNVERIFIED` |
+| `evidence-rejected`       | 証拠を全体で拒否した                             | `UNVERIFIED` |
+| `population-undetermined` | 母集団を確定できない（初版の本番経路は常にこれ） | `UNVERIFIED` |
+| `all-verified`            | unverified が 0                                  | `UNVERIFIED` |
+| `unconfirmed-only`        | unverified がすべて確認不能                      | `UNVERIFIED` |
+| `failed-only`             | unverified がすべて確認済みの `FAIL`             | `INCOMPLETE` |
+| `mixed`                   | 確認済みの `FAIL` と確認不能が混在               | `INCOMPLETE` |
+
+- 確認済みの `FAIL` は、`status` が `FAIL` で、§5 の不成立が `QA_VERIFICATION_NOT_PASS` と `QA_VERIFICATION_ASSERTIONS_MISSING` だけの AC を指す。独立性が `unknown` の初版では、どの `FAIL` もこれに当たらない
+- 表は `COMPLETE` を持たない。全 AC が verified でも、QA 証拠だけでは `COMPLETE` にしない（§8.2）
+- evidence に `missing` / `unreadable` があれば、`INCOMPLETE` は `UNVERIFIED` に倒す。schema（`:464-488`）が禁じるのは `missing` だけだが、§8.2 に合わせて `unreadable` も含める
+- `validation.state` が `REQUIRES_HUMAN_JUDGMENT` なら `HUMAN_JUDGMENT_REQUIRED`、completion-judge が `blockedBy` を渡せば `BLOCKED` を、表より優先する
+- 次の入力は黙って直さず、例外にする
+  - `tasks.unsupportedClaims` と `unsupportedClaims` の件数の不一致
+  - completion の語彙に無い reasonCode
+  - `UNVERIFIED` / `INCOMPLETE` と `ALL_REQUIREMENTS_SATISFIED` の組
+  - `total` が `verified + unverified` と一致しない投影、`verified` の件数が監査結果の AC と一致しない投影
+  - `verified` が 0 でない、または `unverified` が `total` と一致しない fallback の件数
+
+#### 8.3.1 後続の配線（T12）が守る条件
+
+QA artifact の hash の確定順序:
+
+- hash の対象は、後で足す欄（`skillFindings` など）も含めた監査結果の全体とする。保存形式は `JSON.stringify(audit, null, 2)` の末尾に改行 1 つ
+- host は次の順に処理する。assessment を作った後に、そのパスの中身を書き換えない
+  1. 最終の監査結果を確定する
+  2. `serializeQaArtifact(finalAudit)` を呼ぶ
+  3. その `content` を書き込み、書き込みの完了を確かめる
+  4. 同じ `finalAudit` と `{path, sha256}` で capability を作る
+- 本モジュールはファイルを読まない。実ファイルと sha256 の一致は host の責務とする
+
+degraded の表示:
+
+- capability が例外を投げると、`executeFlow` は step を degraded にして続ける（`src/lib/flow-runner.mjs:453`）
+- `review exec` の JSON では `steps` に出る（`src/cli/commands/review.mjs:302`）。Markdown と `--summary-file`（`src/lib/review-plan-summary.mjs:24`）には出ず、終了コードも変わらない
+- T12 では人向けの出力に、completion の成否、degraded の理由、assessment が作られなかったことを表示する。gate と Review Only の終了コードは変えない
+
+scope と利用モード:
+
+- scope は Flow の `intent.purpose` から決まる（`task-completion` は task、`final-convergence` は final）。ADR-017 の 3 モードとは別の軸である
+- T12 で `qa-only` など別の purpose を使うなら、scope の解決を拡張する
+- 既存の task / final の Flow は `diff` を必須の入力にしている（`flows/task-completion-review.flow.json:8`、`flows/final-review.flow.json:12`）。差分の無い QA Only には inputs の定義が要る
+- Review Only の Flow には、この capability を注入しない
+- completion-judge の必須部分は、capability を作る前に揃える経路が要る。task では `tasks`、final では `validation` と `requirements`、投影が無いときは AC の件数が必須になる。既存の Flow の inputs はパスを渡すだけで、これらの値へ自動では変換されない
+
+### 8.4 QA 証拠を読む skill の所見
 
 ADR-017 D2 のとおり、QA 証拠を読む skill の所見はレビューの指摘（issues）にしない。
 
