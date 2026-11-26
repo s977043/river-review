@@ -36649,7 +36649,9 @@ async function runFindingCriticStage({
         diff,
         originalAsk,
         acceptanceCriteria,
-        skill,
+        // Same rule as the review's verifier stage (review-engine.mjs): an LLM finding belongs to
+        // no single selected skill, so plan.selected[0]'s severity does not bound it.
+        skill: finding?.origin === 'llm' ? {} : skill,
         fileTypes,
         diffFiles,
         llm,
@@ -47518,9 +47520,9 @@ async function generateReview({
   const qaEvidenceComments = comments.filter(isQaEvidenceFinding);
   comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
   // ADR-017 D2: the review's fallbacks and its verifier stage get only the review's own skills.
-  // The stage judges a finding against plan.selected[0], and the fallback warning names each
-  // selected skill, so a selected QA skill would otherwise change the review's issues whenever
-  // QA evidence is passed.
+  // The stage judges heuristic and fallback comments against plan.selected[0] (LLM comments take
+  // no skill severity bound), and the fallback warning names each selected skill, so a selected
+  // QA skill would otherwise change the review's issues whenever QA evidence is passed.
   const qaSkills = (plan?.selected ?? []).filter(utils/* readsQaEvidence */.jf);
   const reviewPlan = qaSkills.length
     ? { ...plan, selected: plan.selected.filter((skill) => !(0,utils/* readsQaEvidence */.jf)(skill)) }

@@ -671,9 +671,9 @@ export async function generateReview({
   const qaEvidenceComments = comments.filter(isQaEvidenceFinding);
   comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
   // ADR-017 D2: the review's fallbacks and its verifier stage get only the review's own skills.
-  // The stage judges a finding against plan.selected[0], and the fallback warning names each
-  // selected skill, so a selected QA skill would otherwise change the review's issues whenever
-  // QA evidence is passed.
+  // The stage judges heuristic and fallback comments against plan.selected[0] (LLM comments take
+  // no skill severity bound), and the fallback warning names each selected skill, so a selected
+  // QA skill would otherwise change the review's issues whenever QA evidence is passed.
   const qaSkills = (plan?.selected ?? []).filter(readsQaEvidence);
   const reviewPlan = qaSkills.length
     ? { ...plan, selected: plan.selected.filter((skill) => !readsQaEvidence(skill)) }

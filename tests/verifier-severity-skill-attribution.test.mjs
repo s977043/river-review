@@ -46,13 +46,18 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-async function runWithLlm(t, reply) {
-  globalThis.fetch = async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({ choices: [{ message: { content: reply } }] }),
-    text: async () => '',
-  });
+// The first call is the review; later calls (the Finding Critic) get `criticReply`.
+async function runWithLlm(t, reply, { env = {}, criticReply = 'NO_REPLY' } = {}) {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    const content = calls++ === 0 ? reply : criticReply;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content } }] }),
+      text: async () => '',
+    };
+  };
   const { dir, cleanup } = await createTempGitRepo({
     prefix: 'river-review-severity-attribution-',
     initialFiles: { 'src/app.js': 'export const value = 1;\n' },
@@ -64,7 +69,7 @@ async function runWithLlm(t, reply) {
   await runGit(['add', '.'], dir);
   const { code, stdout } = await runCliInProcess(['run', '.', '--gate', '--output', 'json'], {
     cwd: dir,
-    env: ENV,
+    env: { ...ENV, ...env },
   });
   return { exit: code, output: JSON.parse(stdout) };
 }
@@ -93,5 +98,29 @@ describe('LLM findings are not capped by the first selected skill severity', () 
     assert.equal(output.gate.decision, 'NO_GO');
     assert.equal(output.gate.reasonCode, 'BLOCKING_FINDINGS');
     assert.equal(exit, 1);
+  });
+
+  // The Finding Critic's deterministic pre-check runs the same verifier; enabling the Critic must
+  // not drop the blocker again and loosen the gate.
+  it('with the Finding Critic on, an agreed blocker still escalates the gate', async (t) => {
+    const agree = JSON.stringify({
+      finding_id: 'rr-1',
+      verdict: 'AGREE',
+      reason: 'eval runs the input',
+      ask_relevance: 'in-ask',
+      evidence: [
+        { artifact: 'src/app.js', line_start: 2, line_end: 2, observation: 'eval(input)' },
+      ],
+    });
+    const { exit, output } = await runWithLlm(t, llmFinding('blocker'), {
+      env: { RIVER_FINDING_CRITIC: '1' },
+      criticReply: agree,
+    });
+    assert.deepEqual(
+      output.issues.map((issue) => issue.severity),
+      ['critical']
+    );
+    assert.equal(output.gate.decision, 'ESCALATE');
+    assert.equal(exit, 3);
   });
 });
