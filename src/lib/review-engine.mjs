@@ -17,7 +17,7 @@ import {
   HEURISTIC_SKILL_IDS,
   HEURISTIC_KIND_PRESENTATIONS,
 } from './heuristic-review.mjs';
-import { isOfflineMode } from './utils.mjs';
+import { isOfflineMode, readsQaEvidence } from './utils.mjs';
 import { getReviewDepthConfig } from './review-plan-generator.mjs';
 import { buildRepoContextSection } from './repo-context.mjs';
 import { redactText, resolveRedactOptions } from './secret-redactor.mjs';
@@ -663,8 +663,22 @@ export async function generateReview({
     debug.llmSkipped = skipReason;
   }
 
+  // ADR-017 D2: the review's fallbacks (heuristic when empty, degrade when the verifier rejects
+  // all) decide on the review's own comments, so a reply holding only QA findings reviews the
+  // diff as NO_ISSUES does. QA findings are verified on their own, without a fallback.
+  const qaEvidenceComments = comments.filter(isQaEvidenceFinding);
+  comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+  // ADR-017 D2: the review's fallbacks and its verifier stage get only the review's own skills.
+  // The stage judges a finding against plan.selected[0], and the fallback warning names each
+  // selected skill, so a selected QA skill would otherwise change the review's issues whenever
+  // QA evidence is passed.
+  const qaSkills = (plan?.selected ?? []).filter(readsQaEvidence);
+  const reviewPlan = qaSkills.length
+    ? { ...plan, selected: plan.selected.filter((skill) => !readsQaEvidence(skill)) }
+    : plan;
+
   if (!comments.length) {
-    const heuristic = buildHeuristicComments({ diff, plan });
+    const heuristic = buildHeuristicComments({ diff, plan: reviewPlan });
     debug.heuristicsUsed = true;
     if (heuristic.length) {
       comments = normalizeHeuristicComments(heuristic);
@@ -676,14 +690,16 @@ export async function generateReview({
       if (debug.llmSkipped) {
         comments = [];
       } else {
-        comments = includeFallback ? buildFallbackComments(diff, plan, { llmSkipReason }) : [];
+        comments = includeFallback
+          ? buildFallbackComments(diff, reviewPlan, { llmSkipReason })
+          : [];
       }
       debug.heuristicsCount = 0;
       debug.fallbackIncluded = includeFallback;
     }
   }
 
-  const formatChecks = comments.map((c) => ({
+  const formatChecks = [...comments, ...qaEvidenceComments].map((c) => ({
     file: c.file,
     line: c.line,
     ...validateFindingMessage(c.message),
@@ -716,18 +732,33 @@ export async function generateReview({
   const verifierStage = await runVerifierStage({
     comments,
     diff,
-    plan,
+    plan: reviewPlan,
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
     heuristicsFound: debug.heuristicsUsed === true && debug.heuristicsCount > 0,
     llmSkipped: debug.llmSkipped,
     llmError: debug.llmError,
-    qaEvidencePaths: qaEvidencePublicPaths(qaEvidence),
   });
   Object.assign(debug, verifierStage.debugPatch);
   // Replace comments with verified-only set
   comments = verifierStage.comments;
+  if (qaEvidenceComments.length > 0) {
+    // heuristicsUsed: true turns the stage's degrade off; only the verifier pass runs.
+    const qaStage = await runVerifierStage({
+      comments: qaEvidenceComments,
+      diff,
+      plan: qaSkills.length ? { ...plan, selected: qaSkills } : plan,
+      fileTypes,
+      includeFallback: false,
+      heuristicsUsed: true,
+      heuristicsFound: false,
+      qaEvidencePaths: qaEvidencePublicPaths(qaEvidence),
+    });
+    debug.qaEvidenceVerifierStats = qaStage.debugPatch.verifierStats;
+    debug.qaEvidenceVerifierRejected = qaStage.debugPatch.verifierRejected;
+    comments = [...comments, ...qaStage.comments];
+  }
 
   // #1597: Output-stage filter for findings that point at a machine-generated
   // build-artifact directory (a `dist/` path segment). #1570 excluded these

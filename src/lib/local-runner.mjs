@@ -38,6 +38,7 @@ import {
   QA_EVIDENCE_CONTEXT,
   isLlmEnabled,
   isOfflineMode,
+  readsQaEvidence,
   resolveAvailableContexts as resolveAvailableContextsShared,
   resolveAvailableDependencies as resolveAvailableDependenciesShared,
   shouldExclude,
@@ -564,10 +565,7 @@ export function filterSuppressedComments(comments, suppressedFindings) {
  */
 export function qaEvidenceForReview(context) {
   if (!context?.qaEvidence) return undefined;
-  const reads = (context.plan?.selected ?? []).some((skill) =>
-    (skill?.metadata ?? skill)?.inputContext?.includes(QA_EVIDENCE_CONTEXT)
-  );
-  return reads ? context.qaEvidence : undefined;
+  return (context.plan?.selected ?? []).some(readsQaEvidence) ? context.qaEvidence : undefined;
 }
 
 /**

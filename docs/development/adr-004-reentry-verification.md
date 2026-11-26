@@ -3,7 +3,8 @@
 ADR-017 を Accepted にする条件の 1 つ目「ADR-004 の再参入条件 1・2 の CI 検証が、入力の配線まで含めてマージされている」（`docs/adr/017-qa-evidence-intake.md:9`）を扱います。
 条件の文言を観測できる形に落とし、どのテストで確かめるかを対応させます。
 
-テストは `tests/adr-004-reentry-conditions.test.mjs` にあり、既存の `npm test` で走ります。新しい CI ジョブは足していません。
+テストは `tests/adr-004-reentry-conditions.test.mjs` にあり、既存の `npm test`（`.github/workflows/test.yml`）で走ります。新しい CI ジョブは足していません。
+表の結果と変異の結果は、配線の PR #2952 が入った main（`0e1645d8`）にこのブランチを合わせた状態で測ったものです。
 
 ## この文書を分けた理由
 
@@ -13,10 +14,13 @@ ADR-017 を Accepted にする条件の 1 つ目「ADR-004 の再参入条件 1�
 
 ## 前提にした解釈
 
-ADR-017 D2（`docs/adr/017-qa-evidence-intake.md:73-98`）の次の 2 つの解釈で表を作っています。どちらも ADR-017 の承認者が判断する事項です（`:85-90`）。
+ADR-017 D2（`docs/adr/017-qa-evidence-intake.md:73-98`）の次の 2 つの解釈で表を作っています。
+どちらも ADR-017 の承認者が判断する事項で（`:85-90`）、2026-11-26 にリポジトリの持ち主（承認者）が承認しました。
+ADR-017 の Status（`:7-11`）は、この 2 つの承認を明示的に求めています。
+承認を ADR-017 の本文へ反映すること（Status の更新）と、ADR-004 に注記を加えるかの判断は、`docs/adr/**` が崖（ADR-016）なので人間が行います。この文書は ADR の本文を変えません。
 
 - 条件 1 は「registry 追加とスキーマ拡張」に加えて、QA 証拠を available にする入力の配線を含む
-- 条件 2 の「`NO_REVIEW` へ退避」は、既存の入力不足の skip で skill が選ばれず、その理由が利用者の見る出力に残ることを指す。理由の文字列は `runners/core/review-runner.mjs` の `missingInputContexts` が出す `missing inputContext: qaEvidence`
+- 条件 2 の「`NO_REVIEW` へ退避」は、既存の入力不足の skip で skill が選ばれず、その理由が利用者の見る出力に残ることを指す。理由の文字列は `runners/core/review-runner.mjs` の `missingInputContexts`（`:86-91`）をもとに `:130-132` で作られる `missing inputContext: qaEvidence`
 
 ## 対応表
 
@@ -51,19 +55,21 @@ Action 経路は T12 で配線し、そのとき次の 2 つを Action の成果
 ## 配線の各段を外す変異
 
 配線を 1 段ずつ外し、`tests/adr-004-reentry-conditions.test.mjs` が落ちることを確かめました（落ちたテストの件数）。
+どの変異でも、7 件のうち少なくとも 1 件が落ちました。
 
-| 外した段                                                                              | 落ちたテスト                         |
-| ------------------------------------------------------------------------------------- | ------------------------------------ |
-| CLI → `planLocalReview`（`src/cli/commands/run.mjs` が `qaEvidence` を渡さない）      | 条件 1 の受理 2 件                   |
-| `planLocalReview` が `qaEvidence` を available にしない（`src/lib/local-runner.mjs`） | 条件 1 の受理 2 件                   |
-| `runLocalReview` → `generateReview`（`qaEvidenceForReview` を通さない）               | 条件 1 の受理 2 件                   |
-| `generateReview` → 従来のプロンプト（`src/lib/review-engine.mjs`）                    | 条件 1 の受理（従来の経路）1 件      |
-| `generateReview` → compiled プロンプト（同）                                          | 条件 1 の受理（Prompt Compiler）1 件 |
-| プロンプトの節（`buildQaEvidenceSection` が常に空）                                   | 条件 1 の受理 2 件                   |
-| 拒否された監査結果も skill の入力にする（`qaEvidenceSkillInput`）                     | 条件 1 の拒否 1 件                   |
-| 計画の入力不足の判定（`missingInputContexts` が常に空）                               | 条件 1 の拒否・なし、条件 2 の 3 件  |
-| text 出力の skip 理由（`printPlan`）                                                  | 条件 1 の拒否・なし、条件 2 の 2 件  |
-| `--debug` の skip 理由（`printDebugInfo`）                                            | 条件 2 の `--debug` 1 件             |
+| 外した段                                                                                       | 落ちたテスト                             |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| CLI → `planLocalReview`（`src/cli/commands/run.mjs` が `qaEvidence` を渡さない）               | 条件 1 の受理 2 件                       |
+| `planLocalReview` が `qaEvidence` を available にしない（`src/lib/local-runner.mjs`）          | 条件 1 の受理 2 件                       |
+| `runLocalReview` → `generateReview`（`qaEvidenceForReview` を通さない）                        | 条件 1 の受理 2 件                       |
+| QA の skill を見分ける判定（`src/lib/utils.mjs` の `readsQaEvidence` が常に false）            | 条件 1 の受理 2 件                       |
+| `generateReview` → 従来のプロンプト（`src/lib/review-engine.mjs`）                             | 条件 1 の受理（従来の経路）1 件          |
+| `generateReview` → compiled プロンプト（同）                                                   | 条件 1 の受理（Prompt Compiler）1 件     |
+| プロンプトの節（`src/prompt/sections.mjs` の `buildQaEvidenceSection` が常に空）               | 条件 1 の受理 2 件                       |
+| 拒否された監査結果も skill の入力にする（`src/lib/qa-evidence.mjs` の `qaEvidenceSkillInput`） | 条件 1 の拒否 1 件                       |
+| 計画の入力不足の判定（`runners/core/review-runner.mjs` の `missingInputContexts` が常に空）    | 条件 1 の拒否・なし 2 件、条件 2 の 3 件 |
+| text 出力の skip 理由（`src/cli/render.mjs` の `printPlan`）                                   | 条件 1 の拒否・なし 2 件、条件 2 の 2 件 |
+| `--debug` の skip 理由（同 `printDebugInfo`）                                                  | 条件 2 の `--debug` 1 件                 |
 
 ## 関連するテスト
 

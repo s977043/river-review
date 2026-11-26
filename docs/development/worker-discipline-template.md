@@ -265,6 +265,7 @@
 - `generateReview` / `buildPrompt` を呼ぶテストファイルを新設したら、`docs/development/pipeline-params-checklist.md` の call site 一覧に同じ書式で 1 行足し、`scripts/node22.sh npm run meta:validate` が exit 0 になることを確かめること（2026-11-13 の PR #2914 で漏れ、Meta consistency と Unit tests の 2 件が落ちた）。
 - 変更した Markdown の `npx textlint --no-cache <files>` が exit 0 になったのを見てから `git commit` を実行し、同じターンで並行に投げないこと。pre-commit の textlint で止まると lint-staged は変更を stage したまま元に戻すので、指摘を直してから commit し直す（2026-11-20、QA 証拠 schema のウェーブで、並行に投げた commit が 2 回止まった）。
 - 新しいディレクトリやファイルを足したら、件数や一覧を数える検査（`npm run meta:validate` の Doc enumerations など）は `git add` してから流すこと。この検査は git が追跡しているものだけを数えるので、未追跡のまま流すと件数が合っているように見えて exit 0 になり、CI で初めて落ちる（2026-11-23、PR #2941 で skill を 1 つ足した後の件数の記述が古いまま通り、Meta consistency と Unit tests が落ちた）。
+- Bash の `cd` は次の呼び出しに引き継がれない。worktree を cwd にして（`EnterWorktree`）、`scripts/node22.sh` は相対パスで、git は素の `git` で呼ぶこと。絶対パスや `bash scripts/node22.sh` で呼ぶと許可リストに当たらず、実行のたびに確認が出る。`cd` に頼ると別の作業ツリーで `npm ci` が走る（2026-11-24、範囲レビューで両方が起きた）。
 ```
 
 ## 委託プロンプト骨格
