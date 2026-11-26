@@ -30,6 +30,7 @@
 - [ ] `tests/finding-critic-stage.test.mjs`—Finding Critic の opt-in 配線テスト。`deferFindingCritic` の伝播と、既定 off で挙動が変わらないことの突合（#2334 / #1978）
 - [ ] `tests/finding-critic-detector-origin.test.mjs`—Finding Critic active でも detector の finding が残り、gate に届くことの回帰テスト（#2871）
 - [ ] `tests/review-viewpoint-active-mode.test.mjs`—Review Viewpoint active/observe 配線と `generateReview` / `buildPrompt` への Obligation 伝播テスト（#2252）
+- [ ] `tests/qa-evidence-skill-input.test.mjs`—受理された QA 証拠の本体（redaction 後）が `qaEvidence` を読む skill のプロンプトへ届くことのテスト（ADR-017 手順 5）
 - [ ] `scripts/measure-review-viewpoints.mjs`—Phase 8 効果測定ハーネスの `generateReview` 呼び出し（mode 別の prompt / comment / latency 比較、#2252）
 - [ ] `tests/integration/local-review.test.mjs`—統合テスト（関連する場合）
 
@@ -59,7 +60,8 @@
 - [ ] `tests/heuristic-review.test.mjs`—本番 plan 経路を通したヒューリスティック検出器のテスト
 - [ ] `tests/skill-routing-regression.test.mjs`—ADR/依存有無による routing 回帰テスト
 - [ ] `tests/qa-evidence-skill-selection.test.mjs`—`qaEvidence` の有無による QA 証拠 skill の選択と skip 理由のテスト
-- [ ] `tests/cli-qa-evidence-intake.test.mjs`—`river run --qa-evidence` が渡す context で、downstream の QA 証拠 skill が skip されることのテスト
+- [ ] `tests/cli-qa-evidence-intake.test.mjs`—`river run --qa-evidence` が渡す context で、受理された証拠では downstream の QA 証拠 skill が選ばれ、拒否された証拠では skip されることのテスト
+- [ ] `tests/qa-evidence-skill-input.test.mjs`—`qaEvidence` を available にした計画で QA 証拠 skill が選ばれ、その本体がプロンプトへ届くことのテスト
 - [ ] plan 経由で下流関数に渡される場合は下流関数のチェックリストも確認
 
 ## 機械検証（#1827）

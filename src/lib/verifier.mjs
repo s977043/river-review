@@ -25,6 +25,8 @@ const RE_SEVERITY = /Severity:\s*(\w+)/;
 // (`stripSelfReportedScope`) must target exactly the labels read here.
 const RE_ACTIONABLE = /(?:Fix|Suggestion):\s*(.{10,})/;
 const RE_FILE_REF = /[\w/-]+(?:\.[\w]+)+/g;
+// The file a QA evidence finding is anchored to (`QA-EVIDENCE:<AC id>:0` / `QA-EVIDENCE:0`).
+export const QA_EVIDENCE_ANCHOR = /^QA-EVIDENCE(?::|$)/;
 // Same shape as RE_FILE_REF but only where an anchor fragment follows
 // (`plan.md#AC-4`). Used to exempt artifact citations from the diff check.
 const RE_ANCHORED_FILE_REF = /[\w/-]+(?:\.[\w]+)+(?=#)/g;
@@ -99,11 +101,15 @@ function checkSuggestionActionable(finding) {
  * Check that file names referenced in the Evidence text actually appear
  * in the diff. Lenient: returns true when no file references are found
  * in the evidence (to avoid false negatives on prose-only evidence).
- * @param {{ message?: string }} finding
+ * A finding anchored to the QA evidence (`QA-EVIDENCE:<AC id>` / `QA-EVIDENCE`) may also cite
+ * one of `qaEvidencePaths`: the public artifact paths of the evidence handed to the review
+ * (ADR-017). Other findings, and paths outside that list, are checked against the diff only.
+ * @param {{ file?: string, message?: string }} finding
  * @param {string} diffText
+ * @param {Iterable<string>} [qaEvidencePaths]
  * @returns {boolean}
  */
-function checkEvidenceInDiff(finding, diffText) {
+function checkEvidenceInDiff(finding, diffText, qaEvidencePaths = []) {
   const text = String(finding?.message ?? '');
   const evidenceMatch = RE_EVIDENCE.exec(text);
   if (!evidenceMatch) return true;
@@ -130,7 +136,10 @@ function checkEvidenceInDiff(finding, diffText) {
   if (checkable.length === 0) return true;
 
   const diff = String(diffText ?? '');
-  return checkable.some((ref) => diff.includes(ref));
+  const evidencePaths = QA_EVIDENCE_ANCHOR.test(String(finding?.file ?? ''))
+    ? new Set(qaEvidencePaths)
+    : new Set();
+  return checkable.some((ref) => diff.includes(ref) || evidencePaths.has(ref));
 }
 
 /**
@@ -267,7 +276,9 @@ export function resolveFindingScope({ finding, diffFiles }) {
 }
 
 /**
- * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null, deterministicSource?: boolean }} params
+ * @param {{ finding: object, diff: string, skill: object, fileTypes?: object, diffFiles?: Array<object>|null, deterministicSource?: boolean, qaEvidencePaths?: string[] }} params
+ *   qaEvidencePaths: public artifact paths of the QA evidence handed to the review; only a
+ *   `QA-EVIDENCE` finding may cite them as evidence (see checkEvidenceInDiff).
  *   deterministicSource: the finding comes from a detector, so its severity and
  *   evidence are code constants rather than claims to check. Callers derive it
  *   from the batch's provenance, never from the finding text.
@@ -280,6 +291,7 @@ export function verifyFinding({
   fileTypes,
   diffFiles,
   deterministicSource = false,
+  qaEvidencePaths = [],
 }) {
   // #1666: traceability refs are additive metadata and MUST NOT move the
   // `verified` decision in either direction. RE_EVIDENCE / RE_ACTIONABLE are
@@ -295,7 +307,7 @@ export function verifyFinding({
       : finding;
   const checks = {
     evidenceExists: checkEvidenceExists(findingForLengthChecks),
-    evidenceInDiff: deterministicSource || checkEvidenceInDiff(finding, diff),
+    evidenceInDiff: deterministicSource || checkEvidenceInDiff(finding, diff, qaEvidencePaths),
     phaseCoherent: checkPhaseCoherent(finding, skill),
     filePhaseCoherent: checkFilePhaseCoherent(finding, fileTypes),
     severityJustified: deterministicSource || checkSeverityJustified(findingForLengthChecks, skill),

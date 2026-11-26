@@ -54,7 +54,7 @@ function qaFlags(evidencePath, auditPath, artifactsDir) {
 const QA_SKILL_ID = 'qa-evidence-consistency';
 
 const IGNORED_CONTEXT_WARNING =
-  /--context qaEvidence is ignored; no CLI input makes it available yet \(river run --qa-evidence records the audit only\)/;
+  /--context qaEvidence is ignored; only river run --qa-evidence with evidence the audit accepts makes it available\./;
 
 function contextsLine(stderr) {
   return stderr.split('\n').find((line) => line.startsWith('Contexts:'));
@@ -97,11 +97,11 @@ describe('river run --qa-evidence', () => {
     assert.ok(audit.criteria.every((criterion) => criterion.verified === false));
     // Restricted artifacts (no `sensitivity`) leave the output by id only.
     assert.doesNotMatch(readFileSync(auditPath, 'utf8'), /logs\/pass\.txt/);
-    // Accepted evidence is recorded only: no skill receives its body yet (ADR-017 rollout step 5).
-    assert.doesNotMatch(contextsLine(run.stderr), /\bqaEvidence\b/);
+    // Accepted evidence makes the context available (ADR-017 rollout step 5).
+    assert.match(contextsLine(run.stderr), /\bqaEvidence\b/);
   });
 
-  test('the review output and exit code are those of the same run without QA evidence', async (t) => {
+  test('a run whose plan selects no QA skill keeps the output and exit code', async (t) => {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
     t.after(cleanup);
     const work = scratch(t);
@@ -118,14 +118,21 @@ describe('river run --qa-evidence', () => {
     assert.equal(JSON.parse(readFileSync(join(work, 'a.json'), 'utf8')).accepted, true);
     assert.equal(withQa.code, plain.code);
     assert.deepEqual(JSON.parse(withQa.stdout), JSON.parse(plain.stdout));
-    assert.equal(contextsLine(withQa.stderr), contextsLine(plain.stderr));
+    const contextsOf = (stderr) =>
+      contextsLine(stderr)
+        .replace(/^Contexts:\s*/, '')
+        .split(', ');
+    assert.deepEqual(
+      contextsOf(withQa.stderr).sort(),
+      [...contextsOf(plain.stderr), 'qaEvidence'].sort()
+    );
     assert.doesNotMatch(contextsLine(plain.stderr), /\bqaEvidence\b/);
     assert.doesNotMatch(plain.stderr, /QA evidence audit/);
   });
 
   // A dry run skips the QA skill as LLM-only before it reaches inputContext, so the contexts the
   // downstream run hands to planning are replayed into buildExecutionPlan to see the selection.
-  test('accepted evidence leaves the QA skill skipped for missing qaEvidence downstream', async (t) => {
+  test('accepted evidence selects the QA skill downstream', async (t) => {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
     t.after(cleanup);
     const work = scratch(t);
@@ -158,18 +165,52 @@ describe('river run --qa-evidence', () => {
       availableContexts: contexts,
     });
     const idOf = (skill) => (skill.metadata ?? skill).id;
-    assert.ok(!plan.selected.map(idOf).includes(QA_SKILL_ID));
+    assert.ok(plan.selected.map(idOf).includes(QA_SKILL_ID));
+    assert.ok(!plan.skipped.some((entry) => idOf(entry.skill) === QA_SKILL_ID));
+  });
+
+  test('rejected evidence leaves the QA skill skipped for missing qaEvidence downstream', async (t) => {
+    const { dir, cleanup } = await createRepoWithSilentCatchChange();
+    t.after(cleanup);
+    const work = scratch(t);
+    const evidencePath = join(work, 'evidence.json');
+    const auditPath = join(work, 'audit.json');
+    writeFileSync(evidencePath, '{ not json');
+
+    const run = await runCliAsSubprocess(
+      [
+        'run',
+        '.',
+        '--dry-run',
+        '--phase',
+        'downstream',
+        '--output',
+        'json',
+        ...qaFlags(evidencePath, auditPath),
+      ],
+      { cwd: dir }
+    );
+    assert.equal(run.code, 0, run.stderr);
+    assert.equal(JSON.parse(readFileSync(auditPath, 'utf8')).accepted, false);
+    const plan = await buildExecutionPlan({
+      phase: 'downstream',
+      changedFiles: ['src/app.js'],
+      availableContexts: contextsLine(run.stderr)
+        .replace(/^Contexts:\s*/, '')
+        .split(', '),
+    });
+    const idOf = (skill) => (skill.metadata ?? skill).id;
     const skipped = plan.skipped.find((entry) => idOf(entry.skill) === QA_SKILL_ID);
     assert.ok(skipped, `${QA_SKILL_ID} must be skipped`);
     assert.deepEqual(skipped.reasons, ['missing inputContext: qaEvidence']);
   });
 
-  test('--help states that input/output errors stop the run with exit 1', async () => {
+  test('--help states what accepted evidence changes and that I/O errors exit 1', async () => {
     const help = await runCliAsSubprocess(['--help']);
     assert.equal(help.code, 0, help.stderr);
     assert.match(
       help.stdout,
-      /The audit result alone does not change the review output, gate\s+or exit code; input\/output errors stop the run with exit 1/
+      /Accepted evidence is passed, redacted, to skills that read the\s+qaEvidence context; their findings go to this file \(skillFindings\),\s+not to the review issues, score or gate\.\s+Input\/output errors stop the run with exit 1/
     );
   });
 
@@ -466,7 +507,7 @@ describe('river review exec --plan with a QA evidence skill', () => {
       assert.equal(run.code, 1, run.stderr);
       assert.match(
         run.stderr,
-        /review exec --plan cannot run qa-evidence-consistency: it requires the qaEvidence input context, and the main CLI does not pass QA evidence to skills yet/
+        /review exec --plan cannot run qa-evidence-consistency: it requires the qaEvidence input context, and a replay does not pass QA evidence to skills \(use river run --qa-evidence\)/
       );
       assert.equal(run.stdout, '');
     });

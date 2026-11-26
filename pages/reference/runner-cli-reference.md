@@ -151,16 +151,21 @@ river run . --output json \
 ### 挙動
 
 - QA の 3 フラグを指定しない実行は、従来どおりである
-- 入出力に成功した場合、監査の結果はレビューの判定・gate・終了コードに影響しない。監査結果は記録だけである
+- 監査結果と、`qaEvidence` を読む skill の所見は、レビューの指摘（issues）・score・判定・gate・終了コードの入力にならない（ADR-017 D2）
 - 証拠ファイルを読めない場合と、`--qa-audit-output` の事前検証に通らない場合は、HEAD の観測とレビューの前に exit 1 で止まる（fail-fast）
 - 事前検証の後の実際の書き込みに失敗した場合（権限・容量・検証後に同名のパスができた競合など）も exit 1 で、レビューの前に止まる。ただし HEAD の観測の後になり得る
 - 監査結果は `--output` の成果物に載せず、`--qa-audit-output` のファイルにだけ書く。`--output json` の成果物は `schemas/output.schema.json` に従い、定義に無い欄を持てないため
 - 照合に使う HEAD は `git rev-parse HEAD` である。`dirty` と変わったファイルの一覧は、追跡中のファイルだけで判定する（`git status --porcelain --untracked-files=no` 相当）。未追跡のファイルは `dirty` にしない。レビュー側の判定は変えない
 - AC の母集団は渡さず、独立性は `unknown` のままである。そのため初版では、どの AC も verified にならない
-- 入力コンテキスト `qaEvidence` は、証拠が監査で受理された（`accepted: true`）ときも available にならない。監査結果は記録だけで、`qaEvidence` を skill の入力にする配線は後続（ADR-017 Rollout 手順 5）にあたる。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
+- 証拠が監査で受理された（`accepted: true`）ときだけ、入力コンテキスト `qaEvidence` が available になる。`inputContext` に `qaEvidence` を宣言した skill（`qa-evidence-consistency` など）が計画で選ばれると、レビューのプロンプトに証拠の本体が渡る。渡すのは監査結果に含まれる redaction 後の写し（restricted の artifact はパスを除いたもの）と、監査結果の残りの欄だけで、`--qa-audit-output` のファイルに無い値は渡さない。`qaEvidence` を宣言した skill が選ばれない実行では、プロンプトは変わらない
+- 証拠の文字列の redaction は、設定 `security.redact` の `allowlist` などの調整に従う（レビューのプロンプトに載るリポジトリの文脈と同じ扱い）。ただし `enabled: false` は QA 証拠には効かず、常に redaction を掛ける。設定はレビュー対象の作業ツリーから読むため、変更自身が redaction を切れないようにする
+- 対象が `QA-EVIDENCE` で始まる所見（`QA-EVIDENCE:<AC id>:0` / `QA-EVIDENCE:0`）は、レビューの指摘から取り除き、Finding Critic・score・gate にも渡さない。代わりに `--qa-audit-output` のファイルの `skillFindings` 欄へ書く。根拠には差分のほか、渡した証拠の public な artifact のパスを引用できる
+- `skillFindings` は配列で、要素は `target`（AC の id。証拠全体なら `null`）・`severity`・`confidence`・`title`・`message`・`evidence`・`suggestion` を持つ。文字列は redaction 後の値だけを書く
+- 監査結果のファイルは、レビューの前に新規作成（既存のパスは上書きしない）で書き、レビューの後に `skillFindings` を加えたファイルで置き換える。どちらも同じディレクトリの一時ファイルへ全体を書き終えてから出力先のパスへ移すので、出力先のパスに書きかけの JSON は現れない。置き換えはパスが最初に作ったファイルを指したままの場合だけ行い、別のファイルへ差し替わっていれば失敗として扱う。`skillFindings` を書くのは、`qaEvidence` を読む skill に証拠を渡し、レビューのすべての LLM 呼び出しが完了した場合だけである。LLM を実行しなかった場合に加え、通信・応答・解析の失敗やタイムアウトが 1 件でもあれば（`--reviewers` の一部のロールだけの失敗を含む）書かない。欄が無いことは、証拠を読み終えた skill が無かったことを表し、`skillFindings: []` は読み終えて所見が 0 件だったことを表す。置き換えに失敗した場合は、レビュー前の監査結果を残し、レビュー結果を出力せずに exit 1 で止まる
+- 拒否された証拠（`accepted: false`）と、QA の 3 フラグを指定しない実行では、`qaEvidence` は available にならない。`--context qaEvidence` は警告を出して取り除き、環境変数 `RIVER_AVAILABLE_CONTEXTS` の `qaEvidence` は無視する
 - 初版で artifact を読むのは macOS 11 以降だけである。他の OS では、証拠の artifact の参照は解決されない（unresolved）
 - GitHub Action からはまだ配線していない。QA の 3 フラグを渡せるのは `river run` だけである
-- `river review exec --plan <file>` は、保存済みの計画が `inputContext` に `qaEvidence` を要求する skill を選んでいると、再生の前に exit 1 で止まる。選んだ id の metadata が無く、読み込みに失敗した skill ファイルがある場合も、`inputContext` を確かめられないので同じく止まる。どの skill を選んだかは再生と同じ規則で読み、計画の形式の誤りは従来どおり exit 3 になる。`--dry-run` の echo は対象外である
+- `river review exec --plan <file>` は、保存済みの計画が `inputContext` に `qaEvidence` を要求する skill を選んでいると、再生の前に exit 1 で止まる。再生には監査した証拠が無く、skill に本体を渡せないためである。選んだ id の metadata が無く、読み込みに失敗した skill ファイルがある場合も、`inputContext` を確かめられないので同じく止まる。どの skill を選んだかは再生と同じ規則で読み、計画の形式の誤りは従来どおり exit 3 になる。`--dry-run` の echo は対象外である
 - 変更が無い（`No changes to review`）場合も、監査結果を書き出す
 - JSON として解釈できない・上限（1 MiB）を超える証拠は、終了コードを変えずに、監査結果の側で拒否として記録する
 - 監査で証拠が全体として拒否された場合（`accepted: false`）も、監査結果は書き出し、レビューは続け、終了コードは QA を指定しない場合と同じになる

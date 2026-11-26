@@ -48,11 +48,21 @@ export function isLlmEnabled(env = process.env) {
 }
 
 /**
- * The input context for QA evidence (ADR-017 D2). Nothing makes it available yet: `river run`
- * records the `--qa-evidence` audit only, and passing the evidence to skills is a later wiring
+ * The input context for QA evidence (ADR-017 D2). Only `river run --qa-evidence` makes it
+ * available, when the audit accepts the evidence and its redacted copy is passed to skills
  * (ADR-017 rollout step 5).
  */
 export const QA_EVIDENCE_CONTEXT = 'qaEvidence';
+
+/**
+ * True for a skill that declares the {@link QA_EVIDENCE_CONTEXT} input context. Accepts a loaded
+ * skill (`{ metadata }`) or bare metadata.
+ * @param {object | null | undefined} skill
+ * @returns {boolean}
+ */
+export function readsQaEvidence(skill) {
+  return Boolean((skill?.metadata ?? skill)?.inputContext?.includes(QA_EVIDENCE_CONTEXT));
+}
 
 /**
  * Resolve the effective `availableContexts` for `buildExecutionPlan`'s

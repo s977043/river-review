@@ -107,6 +107,7 @@ export function runPromptCompilerStage({
   riskAssessment,
   repoContext,
   prBody,
+  qaEvidence,
   reviewObligations,
   language,
   openAIConfig,
@@ -139,6 +140,7 @@ export function runPromptCompilerStage({
       riskAssessment,
       repoContext,
       prDescription: prBody,
+      qaEvidence,
       reviewObligations,
     },
     constraints: {

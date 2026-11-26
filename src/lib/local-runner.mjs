@@ -35,8 +35,10 @@ import { loadReviewMemory } from './memory-context.mjs';
 import { collectRepoContext } from './repo-context.mjs';
 import { loadSkills } from '../../runners/core/skill-loader.mjs';
 import {
+  QA_EVIDENCE_CONTEXT,
   isLlmEnabled,
   isOfflineMode,
+  readsQaEvidence,
   resolveAvailableContexts as resolveAvailableContextsShared,
   resolveAvailableDependencies as resolveAvailableDependenciesShared,
   shouldExclude,
@@ -123,6 +125,7 @@ async function collectLocalContext({
   availableContexts,
   availableDependencies,
   baseRef = null,
+  qaEvidence = null,
 } = {}) {
   const repoRoot = await ensureGitRepo(cwd);
   const { config, path: configPath, source: configSource } = await configLoader.load(repoRoot);
@@ -201,10 +204,13 @@ async function collectLocalContext({
   });
   // Expose `prDescription` as an available input context only when a PR body is
   // present, so the pr-description skill activates exactly when it has input.
+  // ADR-017 D2: `qaEvidence` likewise, only when the run holds the skill input built from
+  // accepted evidence; `--context` and `RIVER_AVAILABLE_CONTEXTS` never carry it.
   const contexts = resolveAvailableContexts(availableContexts, {
     alwaysInclude: [
       ...(prBody ? ['prDescription'] : []),
       ...(fullFileSupply.available ? ['fullFile'] : []),
+      ...(qaEvidence ? [QA_EVIDENCE_CONTEXT] : []),
     ],
   });
   const dependencies = resolveAvailableDependencies(availableDependencies);
@@ -229,6 +235,7 @@ async function collectLocalContext({
     fullFileSupply,
     prLabels,
     prBody,
+    qaEvidence,
     debug,
   };
 }
@@ -254,6 +261,9 @@ export async function planLocalReview({
   baseRef = null,
   skillIds = null,
   manualReviewMode = null,
+  // ADR-017 rollout step 5: `qaEvidenceSkillInput` (src/lib/qa-evidence.mjs) of accepted
+  // evidence, or null.
+  qaEvidence = null,
 } = {}) {
   const base = await collectLocalContext({
     cwd,
@@ -263,6 +273,7 @@ export async function planLocalReview({
     availableContexts,
     availableDependencies,
     baseRef,
+    qaEvidence,
   });
   const {
     repoRoot,
@@ -284,6 +295,7 @@ export async function planLocalReview({
     configSource,
     prLabels,
     prBody,
+    qaEvidence: qaEvidenceInput,
   } = base;
   const requestedPlannerMode = normalizePlannerMode(plannerMode ?? process.env.RIVER_PLANNER_MODE, {
     defaultMode: 'off',
@@ -414,6 +426,7 @@ export async function planLocalReview({
     fullFileSupply,
     prLabels,
     prBody,
+    qaEvidence: qaEvidenceInput,
     config,
     configPath,
     configSource,
@@ -540,6 +553,19 @@ export function filterSuppressedComments(comments, suppressedFindings) {
     if (suppressedV2.has(computeFingerprintV2(key))) return false;
     return true;
   });
+}
+
+/**
+ * The QA evidence the review prompt receives: the plan's skill input, only when a selected skill
+ * declares the `qaEvidence` input context, so a run whose plan selects no QA skill keeps its
+ * prompt unchanged.
+ *
+ * @param {{ plan?: { selected?: object[] }, qaEvidence?: object | null }} context
+ * @returns {object | undefined}
+ */
+export function qaEvidenceForReview(context) {
+  if (!context?.qaEvidence) return undefined;
+  return (context.plan?.selected ?? []).some(readsQaEvidence) ? context.qaEvidence : undefined;
 }
 
 /**
@@ -735,6 +761,7 @@ export async function runLocalReview({
     reviewMode: context.plan?.reviewMode,
     repoContext,
     prBody: context.prBody,
+    qaEvidence: qaEvidenceForReview(context),
     config: context.config,
     // #1545 P1: formalized stage/risk/artifact routing signals for `--reviewers
     // auto`. Populated by the host/PlanGate via the plan; undefined here keeps
@@ -890,6 +917,9 @@ export async function runLocalReview({
     files: context.diff.filesForReview ?? context.diff.files,
     comments: keptComments,
     findings: keptFindings,
+    // ADR-017 D2: findings on the QA evidence, kept out of `findings` (and so out of the issues,
+    // the score and the gate). `river run --qa-evidence` writes them to the audit result.
+    qaEvidenceFindings: review.qaEvidenceFindings ?? [],
     suppressedFindings,
     classified: review.classified,
     reviewerResults: review.reviewerResults ?? null,
