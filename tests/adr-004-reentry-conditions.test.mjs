@@ -30,13 +30,18 @@ function evidenceFor(head) {
 }
 
 // `npm test` runs every file in one process (--experimental-test-isolation=none), so the state
-// a run replaces is restored per test rather than through file-level hooks.
+// a run replaces is restored per test rather than through file-level hooks. The PR body sources
+// (src/lib/pr-context.mjs) are cleared too: on a CI pull_request run the PR description would
+// otherwise reach the prompt, and a description quoting the section heading breaks the checks.
 function isolate(t) {
   const fetch = globalThis.fetch;
-  const env = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'RIVER_OFFLINE'].map((name) => [
-    name,
-    process.env[name],
-  ]);
+  const env = [
+    'OPENAI_API_KEY',
+    'ANTHROPIC_API_KEY',
+    'RIVER_OFFLINE',
+    'RIVER_PR_BODY',
+    'GITHUB_EVENT_PATH',
+  ].map((name) => [name, process.env[name]]);
   const { log, error, warn } = console;
   t.after(() => {
     globalThis.fetch = fetch;
@@ -48,6 +53,8 @@ function isolate(t) {
   });
   delete process.env.RIVER_OFFLINE;
   delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.RIVER_PR_BODY;
+  delete process.env.GITHUB_EVENT_PATH;
   return { log, error, warn };
 }
 
