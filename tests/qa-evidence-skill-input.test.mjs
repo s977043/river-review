@@ -492,6 +492,45 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     assert.equal(audit.skillFindings.length, 1);
   });
 
+  // The fallback warning a review emits without usable findings must not name the QA skill.
+  const withoutExecutionIds = (value) =>
+    JSON.parse(JSON.stringify(value, (key, v) => (key === 'sourceExecutionIds' ? undefined : v)));
+  const reviewers = ['--reviewers', 'bug-hunter,security-scanner'];
+  for (const [name, llmOutput, options] of [
+    ['a single reviewer answering NO_ISSUES', 'NO_ISSUES', {}],
+    [
+      'a single reviewer whose LLM calls all fail',
+      `${appLine}\n${qaLine}`,
+      { failRequest: () => true },
+    ],
+    ['--reviewers roles all answering NO_ISSUES', 'NO_ISSUES', { args: reviewers }],
+    [
+      'one failing --reviewers role',
+      `${appLine}\n${qaLine}`,
+      {
+        args: reviewers,
+        failRequest: (text) => text.includes('You are the Security Scanner reviewer'),
+      },
+    ],
+  ]) {
+    test(`the fallback issues are the same with and without QA evidence: ${name}`, async (t) => {
+      const view = (run) =>
+        withoutExecutionIds({
+          code: run.code,
+          issues: run.artifact.issues,
+          decision: run.artifact.decision,
+          gate: run.artifact.gate,
+        });
+      const plain = await runWith(t, llmOutput, { ...options, qa: false });
+      const withQa = await runWith(t, llmOutput, options);
+      assert.ok(
+        plain.artifact.issues.some((issue) => /自動指摘を生成できなかった/.test(issue.title)),
+        'the fallback warning'
+      );
+      assert.deepEqual(view(withQa), view(plain));
+    });
+  }
+
   test('the LLM request carries the redacted evidence and its audit result', async (t) => {
     const run = await runWith(t, appLine);
     assert.equal(run.code, 0);

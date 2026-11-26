@@ -47515,9 +47515,17 @@ async function generateReview({
   // diff as NO_ISSUES does. QA findings are verified on their own, without a fallback.
   const qaEvidenceComments = comments.filter(isQaEvidenceFinding);
   comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+  // ADR-017 D2: the review's fallbacks and its verifier stage get only the review's own skills.
+  // The stage judges a finding against plan.selected[0], and the fallback warning names each
+  // selected skill, so a selected QA skill would otherwise change the review's issues whenever
+  // QA evidence is passed.
+  const qaSkills = (plan?.selected ?? []).filter(utils/* readsQaEvidence */.jf);
+  const reviewPlan = qaSkills.length
+    ? { ...plan, selected: plan.selected.filter((skill) => !(0,utils/* readsQaEvidence */.jf)(skill)) }
+    : plan;
 
   if (!comments.length) {
-    const heuristic = (0,heuristic_review/* buildHeuristicComments */.zq)({ diff, plan });
+    const heuristic = (0,heuristic_review/* buildHeuristicComments */.zq)({ diff, plan: reviewPlan });
     debug.heuristicsUsed = true;
     if (heuristic.length) {
       comments = normalizeHeuristicComments(heuristic);
@@ -47529,7 +47537,9 @@ async function generateReview({
       if (debug.llmSkipped) {
         comments = [];
       } else {
-        comments = includeFallback ? buildFallbackComments(diff, plan, { llmSkipReason }) : [];
+        comments = includeFallback
+          ? buildFallbackComments(diff, reviewPlan, { llmSkipReason })
+          : [];
       }
       debug.heuristicsCount = 0;
       debug.fallbackIncluded = includeFallback;
@@ -47566,13 +47576,6 @@ async function generateReview({
   // 段の本体は runVerifierStage（同ファイル、上）にある。#1644 の scope 判定と
   // 全件棄却時の fail-safe もその内側にある。debug への反映は patch の
   // Object.assign 1 回だけで、key の挿入順は抽出前と同一である。
-  // ADR-017 D2: the stage judges a finding against plan.selected[0], so each batch gets only its
-  // own skills. Otherwise a selected QA skill (severity minor) would reject the review's blocker
-  // findings, and the review would verify differently whenever QA evidence is passed.
-  const qaSkills = (plan?.selected ?? []).filter(utils/* readsQaEvidence */.jf);
-  const reviewPlan = qaSkills.length
-    ? { ...plan, selected: plan.selected.filter((skill) => !(0,utils/* readsQaEvidence */.jf)(skill)) }
-    : plan;
   const verifierStage = await runVerifierStage({
     comments,
     diff,
