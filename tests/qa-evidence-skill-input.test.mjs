@@ -59,6 +59,21 @@ function stringsOf(value, out = []) {
 
 const idOf = (skill) => (skill.metadata ?? skill).id;
 
+// CI の pull_request 実行では PR 本文がプロンプトに入るため、本文に
+// `### QA Evidence` があると「QA セクションが無い」ことを確かめるテストが落ちる。
+const PR_BODY_ENV_KEYS = ['RIVER_PR_BODY', 'GITHUB_EVENT_PATH'];
+let savedPrBodyEnv;
+beforeEach(() => {
+  savedPrBodyEnv = Object.fromEntries(PR_BODY_ENV_KEYS.map((k) => [k, process.env[k]]));
+  for (const k of PR_BODY_ENV_KEYS) delete process.env[k];
+});
+afterEach(() => {
+  for (const [k, v] of Object.entries(savedPrBodyEnv)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+});
+
 describe('qaEvidenceSkillInput', () => {
   test('holds the redacted copy and the rest of the audit, nothing more', async () => {
     const head = BASE.evidence.target.subjectRevision;
