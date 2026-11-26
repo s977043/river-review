@@ -61,18 +61,22 @@ const idOf = (skill) => (skill.metadata ?? skill).id;
 
 // CI の pull_request 実行では PR 本文がプロンプトに入るため、本文に
 // `### QA Evidence` があると「QA セクションが無い」ことを確かめるテストが落ちる。
+// `npm test` は --experimental-test-isolation=none で全ファイルを同じプロセスで
+// 流すため、ファイル直下ではなく describe の中で登録する（直下だと他ファイルにも効く）。
 const PR_BODY_ENV_KEYS = ['RIVER_PR_BODY', 'GITHUB_EVENT_PATH'];
-let savedPrBodyEnv;
-beforeEach(() => {
-  savedPrBodyEnv = Object.fromEntries(PR_BODY_ENV_KEYS.map((k) => [k, process.env[k]]));
-  for (const k of PR_BODY_ENV_KEYS) delete process.env[k];
-});
-afterEach(() => {
-  for (const [k, v] of Object.entries(savedPrBodyEnv)) {
-    if (v === undefined) delete process.env[k];
-    else process.env[k] = v;
-  }
-});
+function isolatePrBodyEnv() {
+  let saved;
+  beforeEach(() => {
+    saved = Object.fromEntries(PR_BODY_ENV_KEYS.map((k) => [k, process.env[k]]));
+    for (const k of PR_BODY_ENV_KEYS) delete process.env[k];
+  });
+  afterEach(() => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+}
 
 describe('qaEvidenceSkillInput', () => {
   test('holds the redacted copy and the rest of the audit, nothing more', async () => {
@@ -102,6 +106,8 @@ describe('qaEvidenceSkillInput', () => {
 });
 
 describe('the QA evidence handed to the review', () => {
+  isolatePrBodyEnv();
+
   test('is redacted, holds no restricted path, and reaches the prompt', async (t) => {
     const { dir, cleanup } = await createRepoWithSilentCatchChange();
     t.after(cleanup);
@@ -415,6 +421,8 @@ index 1111111..2222222 100644
 });
 
 describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
+  isolatePrBodyEnv();
+
   const token = `ghp_${'B'.repeat(36)}`;
   const saved = {};
   beforeEach(() => {
