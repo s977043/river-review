@@ -8,6 +8,8 @@ import {
   normalizeSeverity,
   normalizeScope,
 } from './finding-factory.mjs';
+import { qaEvidencePublicPaths } from './qa-evidence.mjs';
+import { QA_EVIDENCE_ANCHOR } from './verifier.mjs';
 import { defaultConfig } from '../config/default.mjs';
 import { summarizeSkill } from '../../runners/core/review-runner.mjs';
 import {
@@ -15,7 +17,7 @@ import {
   HEURISTIC_SKILL_IDS,
   HEURISTIC_KIND_PRESENTATIONS,
 } from './heuristic-review.mjs';
-import { isOfflineMode } from './utils.mjs';
+import { isOfflineMode, readsQaEvidence } from './utils.mjs';
 import { getReviewDepthConfig } from './review-plan-generator.mjs';
 import { buildRepoContextSection } from './repo-context.mjs';
 import { redactText, resolveRedactOptions } from './secret-redactor.mjs';
@@ -31,6 +33,7 @@ import {
   buildHandoffSection,
   buildPrDescriptionSection,
   buildProjectRulesSection,
+  buildQaEvidenceSection,
   buildReviewObligationsSection,
   buildRiskAssessmentSection,
   buildSkillSummary,
@@ -58,6 +61,11 @@ const LINE_COMMENT_REGEX = /^(.+?):(\d+):\s*(.+)$/;
  */
 // Backward-compatible internal export. The SSoT now lives with redactText.
 export { resolveRedactOptions };
+
+/** True for a finding anchored to the QA evidence (`QA-EVIDENCE:<AC id>` / `QA-EVIDENCE`). */
+export function isQaEvidenceFinding(finding) {
+  return QA_EVIDENCE_ANCHOR.test(String(finding?.file ?? ''));
+}
 
 function sanitizeSkillName(name) {
   if (!name) return '';
@@ -92,6 +100,7 @@ export function buildPrompt({
   reviewMode,
   repoContext,
   prBody,
+  qaEvidence,
   reviewObligations,
   maxChars = MAX_PROMPT_CHARS,
   config = defaultConfig,
@@ -114,7 +123,7 @@ ${buildFileSummary(diffFiles)}
 Relevant skills:
 ${buildSkillSummary(plan)}
 
-${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${buildRepoContextSection(repoContext)}${buildPrDescriptionSection(prBody)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(
+${buildProjectRulesSection(projectRules)}${buildRiskAssessmentSection(riskAssessment)}${buildADRContextSection(relatedADRs)}${buildRepoContextSection(repoContext)}${buildPrDescriptionSection(prBody)}${buildQaEvidenceSection(qaEvidence)}${buildWalkthroughSection(wantWalkthrough)}${buildHandoffSection(wantHandoff)}${buildReviewObligationsSection(reviewObligations, language)}${buildFindingContractSection(
     {
       language,
       severity,
@@ -307,6 +316,7 @@ function redactSecrets(text) {
  * @param {boolean} params.heuristicsFound 一次集合が detector の finding か。fallback は含まない
  * @param {string|null|undefined} params.llmSkipped debug.llmSkipped
  * @param {string|null|undefined} params.llmError debug.llmError
+ * @param {string[]} [params.qaEvidencePaths] QA 証拠の public な artifact のパス。`QA-EVIDENCE` の所見だけが根拠に使える
  * @returns {Promise<{comments: Array<object>, debugPatch: object}>}
  */
 async function runVerifierStage({
@@ -319,6 +329,7 @@ async function runVerifierStage({
   heuristicsFound,
   llmSkipped,
   llmError,
+  qaEvidencePaths = [],
 }) {
   const { verifyFinding } = await import('./verifier.mjs');
   const skill = plan?.selected?.[0] ?? {};
@@ -334,6 +345,7 @@ async function runVerifierStage({
         // machine determination of finding scope (in-diff / pre-existing).
         diffFiles: diff.files,
         deterministicSource,
+        qaEvidencePaths,
       }),
     }));
 
@@ -440,6 +452,9 @@ export async function generateReview({
   reviewMode,
   repoContext,
   prBody,
+  // ADR-017 rollout step 5: `qaEvidenceSkillInput` (src/lib/qa-evidence.mjs), passed only when a
+  // selected skill declares the `qaEvidence` input context.
+  qaEvidence,
   maxPromptChars = MAX_PROMPT_CHARS,
   config,
   signal,
@@ -472,6 +487,7 @@ export async function generateReview({
     reviewMode,
     repoContext,
     prBody,
+    qaEvidence,
     reviewObligations,
     maxChars: maxPromptChars,
     config: effectiveConfig,
@@ -543,6 +559,7 @@ export async function generateReview({
     riskAssessment,
     repoContext,
     prBody,
+    qaEvidence,
     reviewObligations,
     language,
     openAIConfig,
@@ -646,8 +663,22 @@ export async function generateReview({
     debug.llmSkipped = skipReason;
   }
 
+  // ADR-017 D2: the review's fallbacks (heuristic when empty, degrade when the verifier rejects
+  // all) decide on the review's own comments, so a reply holding only QA findings reviews the
+  // diff as NO_ISSUES does. QA findings are verified on their own, without a fallback.
+  const qaEvidenceComments = comments.filter(isQaEvidenceFinding);
+  comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+  // ADR-017 D2: the review's fallbacks and its verifier stage get only the review's own skills.
+  // The stage judges a finding against plan.selected[0], and the fallback warning names each
+  // selected skill, so a selected QA skill would otherwise change the review's issues whenever
+  // QA evidence is passed.
+  const qaSkills = (plan?.selected ?? []).filter(readsQaEvidence);
+  const reviewPlan = qaSkills.length
+    ? { ...plan, selected: plan.selected.filter((skill) => !readsQaEvidence(skill)) }
+    : plan;
+
   if (!comments.length) {
-    const heuristic = buildHeuristicComments({ diff, plan });
+    const heuristic = buildHeuristicComments({ diff, plan: reviewPlan });
     debug.heuristicsUsed = true;
     if (heuristic.length) {
       comments = normalizeHeuristicComments(heuristic);
@@ -659,14 +690,16 @@ export async function generateReview({
       if (debug.llmSkipped) {
         comments = [];
       } else {
-        comments = includeFallback ? buildFallbackComments(diff, plan, { llmSkipReason }) : [];
+        comments = includeFallback
+          ? buildFallbackComments(diff, reviewPlan, { llmSkipReason })
+          : [];
       }
       debug.heuristicsCount = 0;
       debug.fallbackIncluded = includeFallback;
     }
   }
 
-  const formatChecks = comments.map((c) => ({
+  const formatChecks = [...comments, ...qaEvidenceComments].map((c) => ({
     file: c.file,
     line: c.line,
     ...validateFindingMessage(c.message),
@@ -699,7 +732,7 @@ export async function generateReview({
   const verifierStage = await runVerifierStage({
     comments,
     diff,
-    plan,
+    plan: reviewPlan,
     fileTypes,
     includeFallback,
     heuristicsUsed: debug.heuristicsUsed,
@@ -710,6 +743,22 @@ export async function generateReview({
   Object.assign(debug, verifierStage.debugPatch);
   // Replace comments with verified-only set
   comments = verifierStage.comments;
+  if (qaEvidenceComments.length > 0) {
+    // heuristicsUsed: true turns the stage's degrade off; only the verifier pass runs.
+    const qaStage = await runVerifierStage({
+      comments: qaEvidenceComments,
+      diff,
+      plan: qaSkills.length ? { ...plan, selected: qaSkills } : plan,
+      fileTypes,
+      includeFallback: false,
+      heuristicsUsed: true,
+      heuristicsFound: false,
+      qaEvidencePaths: qaEvidencePublicPaths(qaEvidence),
+    });
+    debug.qaEvidenceVerifierStats = qaStage.debugPatch.verifierStats;
+    debug.qaEvidenceVerifierRejected = qaStage.debugPatch.verifierRejected;
+    comments = [...comments, ...qaStage.comments];
+  }
 
   // #1597: Output-stage filter for findings that point at a machine-generated
   // build-artifact directory (a `dist/` path segment). #1570 excluded these
@@ -780,6 +829,14 @@ export async function generateReview({
     };
   });
 
+  // ADR-017 D2: findings on the QA evidence are not review issues. They leave here, before the
+  // Finding Critic, the issue list, the score and the gate, and go to the QA audit result.
+  const qaEvidenceFindings = findings.filter(isQaEvidenceFinding);
+  if (qaEvidenceFindings.length > 0) {
+    findings = findings.filter((finding) => !isQaEvidenceFinding(finding));
+    comments = comments.filter((comment) => !isQaEvidenceFinding(comment));
+  }
+
   findings.sort((a, b) => {
     const bA = computeFindingBreakdown(a);
     const bB = computeFindingBreakdown(b);
@@ -838,6 +895,8 @@ export async function generateReview({
   return {
     comments,
     findings,
+    // ADR-017 D2: QA 証拠に付いた所見。issues・score・gate には入れず、QA 監査結果へ出す。
+    qaEvidenceFindings,
     // #2871: strict_block の判定だけが読む。artifact には載せない。
     preCriticFindings,
     classified,

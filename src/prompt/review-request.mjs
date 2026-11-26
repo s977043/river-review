@@ -65,6 +65,7 @@ export function buildReviewRequest({
       riskAssessment: context?.riskAssessment ?? null,
       repoContext: context?.repoContext ?? null,
       prDescription: context?.prDescription ?? null,
+      qaEvidence: context?.qaEvidence ?? null,
       reviewObligations: context?.reviewObligations ?? [],
     },
     constraints: {

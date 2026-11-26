@@ -33,7 +33,7 @@ Upgrade to `v0.51.0` or later. The plan layer now defaults `availableContexts` t
 
 Declare the artifacts this environment can supply so that skills gated on them are selected. There is no way to declare a context of your own: the vocabulary is a closed enum defined in `schemas/skill.schema.json` (`$defs.inputContext`)—`diff`, `fullFile`, `tests`, `adr`, `commitMessage`, `repoConfig`, `reviewSelf`, `reviewExternal`, `findingsPool`, `prDescription`, `qaEvidence`—and a skill's `inputContext` is validated against it. Matching is exact and case-sensitive, so a name outside that list can never make a skill eligible. If your CI produces an artifact with no entry here, there is nothing to declare; the skill that would consume it does not exist yet.
 
-`qaEvidence` cannot be declared this way on the main CLI (`river`, `src/cli.mjs`): `--context qaEvidence` is removed with a warning and `qaEvidence` in `RIVER_AVAILABLE_CONTEXTS` is ignored. No input makes it available there yet: `river run --qa-evidence` records the audit only, even when the audit accepts the evidence, and wiring `qaEvidence` as a skill input comes later (ADR-017 rollout step 5; see [`--qa-evidence`](../../pages/reference/runner-cli-reference.en.md#qa-evidence)). The separate runner CLI under `runners/cli/` (not published to npm) passes its `--context` list through unchanged.
+`qaEvidence` cannot be declared this way on the main CLI (`river`, `src/cli.mjs`): `--context qaEvidence` is removed with a warning and `qaEvidence` in `RIVER_AVAILABLE_CONTEXTS` is ignored. Only `river run --qa-evidence` makes it available, and only when the audit accepts the evidence; the redacted copy is then passed to skills that read it (ADR-017 rollout step 5; see [`--qa-evidence`](../../pages/reference/runner-cli-reference.en.md#qa-evidence)). Rejected evidence leaves it unavailable. Findings of those skills do not appear in the review issues; look for them in the `skillFindings` field of the `--qa-audit-output` file. The separate runner CLI under `runners/cli/` (not published to npm) passes its `--context` list through unchanged.
 
 Set `RIVER_AVAILABLE_CONTEXTS` before invoking the CLI:
 
@@ -61,7 +61,7 @@ A skill declares `inputContext: ['<X>']` but `<X>` is not in the effective `avai
 
 **Resolution options:**
 
-1. Add `<X>` to `RIVER_AVAILABLE_CONTEXTS` or `--context` if the artifact is genuinely available in this environment. This does not apply to `qaEvidence` on the main CLI, where no input makes it available yet (see above).
+1. Add `<X>` to `RIVER_AVAILABLE_CONTEXTS` or `--context` if the artifact is genuinely available in this environment. This does not apply to `qaEvidence` on the main CLI, where only evidence accepted by `river run --qa-evidence` makes it available (see above).
 2. Drop the `inputContext` constraint from the skill metadata if it should always run.
 3. Leave the skill skipped—`skippedSkills` is the correct outcome when the input is missing.
 
