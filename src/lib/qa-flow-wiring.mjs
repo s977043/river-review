@@ -41,7 +41,8 @@ function deepFreeze(value) {
  *
  * Throws, instead of returning `judge-invalid`, when the failure does not come from the judge:
  * an unknown `purpose`, an audit whose projection disagrees with its criteria, or a completion
- * schema that cannot be read or compiled. The audit is already stored when the last two throw.
+ * schema that cannot be read or compiled. All three throw before the writer is called, so nothing
+ * is stored.
  *
  * @param {object} input
  * @param {object | null} input.finalAudit - the audit result after every later field was added
@@ -67,6 +68,10 @@ export async function prepareQaCompletionCapability({
     throw new TypeError(`purpose must be task-completion or final-convergence: ${purpose}`);
   }
   if (typeof write !== 'function') throw new TypeError('write must be a function');
+  // The checks that do not depend on the judge run before the store and throw, so an
+  // inconsistent audit is not stored and whatever the dry run below throws comes from the judge.
+  classifyQaAudit(finalAudit);
+  validateCompletionAssessment({});
 
   let qaArtifact;
   if (finalAudit !== null && finalAudit !== undefined) {
@@ -86,11 +91,6 @@ export async function prepareQaCompletionCapability({
     }
     qaArtifact = { path, sha256 };
   }
-
-  // The checks that do not depend on the judge run first and throw, so whatever the dry run
-  // below throws comes from the judge parts.
-  classifyQaAudit(finalAudit);
-  validateCompletionAssessment({});
 
   let checkedJudge;
   try {

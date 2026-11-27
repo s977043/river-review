@@ -294,6 +294,12 @@ describe('the assessment conforms and is never COMPLETE', () => {
 });
 
 describe('the scope comes from the Flow purpose, as the capability resolves it', () => {
+  // Restated literally, as $defs/completionScope pairs them, so a swapped table fails here.
+  test('task-completion resolves to task and final-convergence to final', () => {
+    assert.equal(completionScopeForPurpose('task-completion'), 'task');
+    assert.equal(completionScopeForPurpose('final-convergence'), 'final');
+  });
+
   for (const document of [TASK_FLOW, FINAL_FLOW]) {
     const { purpose } = document.intent;
     test(`${purpose}: the prepared capability assesses the scope createQaCompletionCapability uses`, async () => {
@@ -389,7 +395,7 @@ describe('the scope comes from the Flow purpose, as the capability resolves it',
 });
 
 describe('a failure outside the judge parts is not judge-invalid', () => {
-  test('an audit whose projection disagrees with its criteria throws, after it is stored', async () => {
+  test('an audit whose projection disagrees with its criteria throws before it is stored', async () => {
     const audit = await projectedAudit();
     audit.projection.total += 1;
     const { write, calls } = fileWriter();
@@ -403,7 +409,7 @@ describe('a failure outside the judge parts is not judge-invalid', () => {
       }),
       /projection is not consistent with its criteria/
     );
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 0);
   });
 
   test('a judge that cannot be copied is judge-invalid', async () => {
