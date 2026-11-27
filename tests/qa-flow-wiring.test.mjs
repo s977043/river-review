@@ -11,6 +11,11 @@ import { after, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { executeFlow } from '../src/lib/flow-runner.mjs';
+import {
+  completionScopeForPurpose,
+  createQaCompletionCapability,
+  serializeQaArtifact,
+} from '../src/lib/qa-completion.mjs';
 import { auditQaEvidence, evaluateQaEvidence } from '../src/lib/qa-evidence.mjs';
 import { prepareQaCompletionCapability } from '../src/lib/qa-flow-wiring.mjs';
 import { compileCompletionAssessmentValidator } from './helpers/schema-validator.mjs';
@@ -23,9 +28,10 @@ const ROOTS = Object.fromEntries(
     fileURLToPath(new URL(dir, FIXTURES)),
   ])
 );
-const TASK_FLOW = JSON.parse(
-  readFileSync(new URL('../flows/task-completion-review.flow.json', import.meta.url), 'utf8')
-);
+const readFlow = (name) =>
+  JSON.parse(readFileSync(new URL(`../flows/${name}`, import.meta.url), 'utf8'));
+const TASK_FLOW = readFlow('task-completion-review.flow.json');
+const FINAL_FLOW = readFlow('final-review.flow.json');
 
 const validateAssessment = compileCompletionAssessmentValidator();
 const workDir = mkdtempSync(join(tmpdir(), 'qa-flow-wiring-'));
@@ -84,14 +90,38 @@ function fileWriter() {
   return { write, calls };
 }
 
-async function runTaskFlow(capability) {
-  const inputs = Object.fromEntries(TASK_FLOW.inputs.map((input) => [input.name, 'x']));
+async function runFlow(document, capability) {
+  const inputs = Object.fromEntries(document.inputs.map((input) => [input.name, 'x']));
   const result = await executeFlow({
-    document: TASK_FLOW,
+    document,
     inputs,
     capabilities: { 'evaluate-completion': capability },
   });
   return result.steps.find((record) => record.id === 'evaluate-completion');
+}
+const runTaskFlow = (capability) => runFlow(TASK_FLOW, capability);
+
+// An audit with a determined QA population, so the projection gives AC counts.
+async function projectedAudit() {
+  return {
+    ...(await evaluateQaEvidence({
+      evidence: JSON.stringify(BASE.evidence),
+      population: BASE.context.population,
+      observed: BASE.context.observed,
+      roots: ROOTS,
+      independence: 'known',
+      trustedSourceIds: BASE.context.trustedSourceIds,
+    })),
+    skillFindings: [],
+  };
+}
+
+// Judge parts that both scopes accept for a projected audit.
+function bothScopesJudge() {
+  return {
+    ...taskJudge({ requirements: { total: 1, satisfied: 1, violated: 0, unverified: 0 } }),
+    validation: { state: 'GOAL_MET', rationale: 'judge says the goal is met' },
+  };
 }
 
 const pinnedSha256 = (assessment) =>
@@ -107,7 +137,7 @@ describe('the hash covers the final audit', () => {
     const prepared = await prepareQaCompletionCapability({
       finalAudit: audit,
       path,
-      scope: 'task',
+      purpose: 'task-completion',
       judge: taskJudge(),
       write,
     });
@@ -131,7 +161,7 @@ describe('the hash covers the final audit', () => {
     await prepareQaCompletionCapability({
       finalAudit: audit,
       path,
-      scope: 'task',
+      purpose: 'task-completion',
       judge: taskJudge(),
       write,
     });
@@ -147,7 +177,7 @@ test('the capability comes only after a slow writer finished storing', async () 
   const prepared = await prepareQaCompletionCapability({
     finalAudit: await finalAudit(),
     path,
-    scope: 'task',
+    purpose: 'task-completion',
     judge: taskJudge(),
     write: async (file) => {
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -183,7 +213,7 @@ describe('no capability without a confirmed store', () => {
       const prepared = await prepareQaCompletionCapability({
         finalAudit: await finalAudit(),
         path: nextPath(),
-        scope: 'task',
+        purpose: 'task-completion',
         judge: taskJudge(),
         write,
       });
@@ -203,7 +233,7 @@ describe('no capability without the judge parts', () => {
     const prepared = await prepareQaCompletionCapability({
       finalAudit: await finalAudit(),
       path,
-      scope: 'task',
+      purpose: 'task-completion',
       judge,
       write,
     });
@@ -219,7 +249,7 @@ describe('no capability without the judge parts', () => {
     const prepared = await prepareQaCompletionCapability({
       finalAudit: await finalAudit(),
       path: nextPath(),
-      scope: 'final',
+      purpose: 'final-convergence',
       judge: taskJudge(),
       write: fileWriter().write,
     });
@@ -235,17 +265,7 @@ describe('the assessment conforms and is never COMPLETE', () => {
     'production (population undetermined)': { make: () => finalAudit() },
     'rejected evidence': { make: () => productionAudit('{') },
     'every AC verified (independence known, population trusted)': {
-      make: async () => ({
-        ...(await evaluateQaEvidence({
-          evidence: JSON.stringify(BASE.evidence),
-          population: BASE.context.population,
-          observed: BASE.context.observed,
-          roots: ROOTS,
-          independence: 'known',
-          trustedSourceIds: BASE.context.trustedSourceIds,
-        })),
-        skillFindings: [],
-      }),
+      make: projectedAudit,
       judge: { requirements },
     },
     'no QA evidence': { make: () => null },
@@ -257,7 +277,7 @@ describe('the assessment conforms and is never COMPLETE', () => {
       const prepared = await prepareQaCompletionCapability({
         finalAudit: audit,
         path: nextPath(),
-        scope: 'task',
+        purpose: 'task-completion',
         judge: taskJudge(judge),
         write,
       });
@@ -271,4 +291,176 @@ describe('the assessment conforms and is never COMPLETE', () => {
       assert.equal(assessment.scope, 'task');
     });
   }
+});
+
+describe('the scope comes from the Flow purpose, as the capability resolves it', () => {
+  for (const document of [TASK_FLOW, FINAL_FLOW]) {
+    const { purpose } = document.intent;
+    test(`${purpose}: the prepared capability assesses the scope createQaCompletionCapability uses`, async () => {
+      const audit = await projectedAudit();
+      const reference = await runFlow(
+        document,
+        createQaCompletionCapability({
+          audit,
+          qaArtifact: {
+            path: 'qa/audit.json',
+            sha256: serializeQaArtifact(audit).sha256,
+          },
+          judge: bothScopesJudge(),
+        })
+      );
+      assert.equal(reference.outcome, 'executed', reference.reason);
+
+      const prepared = await prepareQaCompletionCapability({
+        finalAudit: audit,
+        path: nextPath(),
+        purpose,
+        judge: bothScopesJudge(),
+        write: fileWriter().write,
+      });
+      assert.equal(prepared.ok, true, prepared.message);
+      const step = await runFlow(document, prepared.capability);
+      assert.equal(step.outcome, 'executed', step.reason);
+      assert.equal(step.result.assessment.scope, reference.result.assessment.scope);
+      assert.equal(step.result.assessment.scope, completionScopeForPurpose(purpose));
+    });
+  }
+
+  test('the dry run checks the scope of the purpose it was given', async () => {
+    const judge = taskJudge({
+      requirements: { total: 1, satisfied: 1, violated: 0, unverified: 0 },
+    });
+    const prepare = (purpose) =>
+      prepareQaCompletionCapability({
+        finalAudit: null,
+        path: nextPath(),
+        purpose,
+        judge: {
+          ...judge,
+          acceptanceCriteria: { total: 1, verified: 0, unverified: 1 },
+        },
+        write: fileWriter().write,
+      });
+    assert.equal((await prepare('task-completion')).ok, true);
+    // final scope needs judge.validation, which this judge lacks.
+    assert.equal((await prepare('final-convergence')).reason, 'judge-invalid');
+  });
+
+  const mismatches = [
+    ['task-completion', FINAL_FLOW],
+    ['final-convergence', TASK_FLOW],
+  ];
+  for (const [purpose, document] of mismatches) {
+    test(`a capability prepared for ${purpose} refuses a ${document.intent.purpose} Flow`, async () => {
+      const prepared = await prepareQaCompletionCapability({
+        finalAudit: await projectedAudit(),
+        path: nextPath(),
+        purpose,
+        judge: bothScopesJudge(),
+        write: fileWriter().write,
+      });
+      assert.equal(prepared.ok, true, prepared.message);
+      const step = await runFlow(document, prepared.capability);
+      assert.equal(step.outcome, 'degraded');
+      assert.equal(step.result, undefined);
+      assert.match(step.reason, new RegExp(`prepared for a ${purpose} Flow`));
+    });
+  }
+
+  for (const purpose of [undefined, 'task', 'final', 'toString', 'plan-review']) {
+    test(`purpose ${String(purpose)} throws before anything is written`, async () => {
+      const { write, calls } = fileWriter();
+      await assert.rejects(
+        prepareQaCompletionCapability({
+          finalAudit: await finalAudit(),
+          path: nextPath(),
+          purpose,
+          judge: taskJudge(),
+          write,
+        }),
+        {
+          name: 'TypeError',
+          message: /purpose must be task-completion or final-convergence/,
+        }
+      );
+      assert.equal(calls.length, 0);
+    });
+  }
+});
+
+describe('a failure outside the judge parts is not judge-invalid', () => {
+  test('an audit whose projection disagrees with its criteria throws, after it is stored', async () => {
+    const audit = await projectedAudit();
+    audit.projection.total += 1;
+    const { write, calls } = fileWriter();
+    await assert.rejects(
+      prepareQaCompletionCapability({
+        finalAudit: audit,
+        path: nextPath(),
+        purpose: 'task-completion',
+        judge: bothScopesJudge(),
+        write,
+      }),
+      /projection is not consistent with its criteria/
+    );
+    assert.equal(calls.length, 1);
+  });
+
+  test('a judge that cannot be copied is judge-invalid', async () => {
+    const prepared = await prepareQaCompletionCapability({
+      finalAudit: await finalAudit(),
+      path: nextPath(),
+      purpose: 'task-completion',
+      judge: { ...taskJudge(), tasks: () => ({ total: 1 }) },
+      write: fileWriter().write,
+    });
+    assert.equal(prepared.ok, false);
+    assert.equal(prepared.reason, 'judge-invalid');
+  });
+});
+
+describe('the capability uses the judge as it was checked', () => {
+  test('changing the judge after prepare does not reach the capability', async () => {
+    const judge = taskJudge();
+    const prepared = await prepareQaCompletionCapability({
+      finalAudit: await finalAudit(),
+      path: nextPath(),
+      purpose: 'task-completion',
+      judge,
+      write: fileWriter().write,
+    });
+    assert.equal(prepared.ok, true, prepared.message);
+
+    // Each change alone would make the assessment invalid or different.
+    judge.tasks.unsupportedClaims = 3;
+    judge.evidence.push({ kind: 'diff', state: 'missing' });
+    judge.reasonCodes = ['NOT_A_REASON_CODE'];
+
+    const step = await runTaskFlow(prepared.capability);
+    assert.equal(step.outcome, 'executed', step.reason);
+    const { assessment } = step.result;
+    assert.ok(validateAssessment(assessment), JSON.stringify(validateAssessment.errors));
+    assert.deepEqual(assessment.tasks, taskJudge().tasks);
+    assert.deepEqual(
+      assessment.evidence.map((entry) => entry.kind),
+      ['diff', 'tests', 'tasks', 'acceptanceCriteria']
+    );
+  });
+
+  test('the checked judge cannot be changed through an assessment', async () => {
+    const prepared = await prepareQaCompletionCapability({
+      finalAudit: await finalAudit(),
+      path: nextPath(),
+      purpose: 'task-completion',
+      judge: taskJudge(),
+      write: fileWriter().write,
+    });
+    const first = await runTaskFlow(prepared.capability);
+    assert.throws(() => {
+      first.result.assessment.tasks.unsupportedClaims = 3;
+    }, TypeError);
+    const second = await runTaskFlow(prepared.capability);
+    assert.equal(second.outcome, 'executed', second.reason);
+    assert.deepEqual(second.result.assessment.tasks, taskJudge().tasks);
+  });
 });
