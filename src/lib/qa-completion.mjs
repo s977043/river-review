@@ -276,16 +276,26 @@ export function buildQaCompletionAssessment({ scope, audit, qaArtifact, judge = 
 }
 
 /**
+ * The completion scope a Flow intent resolves to, as `$defs/completionScope` in the schema pairs
+ * them. `undefined` for any other purpose, inherited property names included.
+ *
+ * @param {unknown} purpose - a Flow's `intent.purpose`
+ * @returns {'task' | 'final' | undefined}
+ */
+export function completionScopeForPurpose(purpose) {
+  return Object.hasOwn(SCOPE_BY_INTENT, purpose) ? SCOPE_BY_INTENT[purpose] : undefined;
+}
+
+/**
  * The `evaluate-completion` capability for `executeFlow` (src/lib/flow-runner.mjs), injected as
- * `capabilities['evaluate-completion']`. The scope follows the Flow's intent, as
- * `$defs/completionScope` in the schema pairs them.
+ * `capabilities['evaluate-completion']`. The scope follows the Flow's intent
+ * (`completionScopeForPurpose`).
  *
  * @param {Omit<Parameters<typeof buildQaCompletionAssessment>[0], 'scope'>} input
  */
 export function createQaCompletionCapability({ audit, qaArtifact, judge = {} }) {
   return (context) => {
-    const purpose = context?.document?.intent?.purpose;
-    const scope = Object.hasOwn(SCOPE_BY_INTENT, purpose) ? SCOPE_BY_INTENT[purpose] : undefined;
+    const scope = completionScopeForPurpose(context?.document?.intent?.purpose);
     if (scope === undefined) {
       throw new Error(
         'evaluate-completion runs only in a task-completion or final-convergence Flow'
