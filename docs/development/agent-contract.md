@@ -23,13 +23,13 @@ Skill は「何を判断するか」、Agent は「誰が責任を持つか」�
 
 ## 5 つの Agent と既存実装の対応
 
-| Agent                 | 責務                                            | 既存実装の有無 | 参照先                                                                                                                   |
-| --------------------- | ----------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `review-orchestrator` | resolve-intent / plan-execution / select-agents | 既存を参照     | `src/lib/reviewer-orchestrator.mjs`（`runReviewerOrchestration`）、`src/lib/review-mode-router.mjs`（`routeReviewMode`） |
-| `specialist-reviewer` | generate-candidate-findings                     | 既存を参照     | `src/lib/reviewer-orchestrator.mjs`（`REVIEWER_ROLES`）、`src/lib/review-engine.mjs`（`generateReview`）                 |
-| `finding-verifier`    | verify-findings                                 | 既存を参照     | `src/lib/verifier.mjs`（`verifyFinding` / `resolveFindingScope`）                                                        |
-| `consistency-judge`   | judge-cross-artifact-consistency                | 新設           | 実装なし。既存 skill 6 本の合成として宣言する                                                                            |
-| `completion-judge`    | evaluate-completion                             | 部分既存       | `src/lib/gate-decision.mjs`（`deriveGateDecision`）、`src/lib/team-lead-synthesizer.mjs`（`synthesizeTeamLeadReport`）   |
+| Agent                 | 責務                                            | 既存実装の有無 | 参照先                                                                                                                                                                                                                                      |
+| --------------------- | ----------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review-orchestrator` | resolve-intent / plan-execution / select-agents | 既存を参照     | `src/lib/reviewer-orchestrator.mjs`（`runReviewerOrchestration`）、`src/lib/review-mode-router.mjs`（`routeReviewMode`）                                                                                                                    |
+| `specialist-reviewer` | generate-candidate-findings                     | 既存を参照     | `src/lib/reviewer-orchestrator.mjs`（`REVIEWER_ROLES`）、`src/lib/review-engine.mjs`（`generateReview`）                                                                                                                                    |
+| `finding-verifier`    | verify-findings                                 | 既存を参照     | `src/lib/verifier.mjs`（`verifyFinding` / `resolveFindingScope`）                                                                                                                                                                           |
+| `consistency-judge`   | judge-cross-artifact-consistency                | 新設           | 実装なし。既存 skill 6 本の合成として宣言する                                                                                                                                                                                               |
+| `completion-judge`    | evaluate-completion                             | 部分既存       | `src/lib/gate-decision.mjs`（`deriveGateDecision`）、`src/lib/team-lead-synthesizer.mjs`（`synthesizeTeamLeadReport`）、`src/lib/qa-completion.mjs`（`createQaCompletionCapability`。どの呼び出し元からも未注入で、ADR-017 T12 で配線する） |
 
 責務語彙は 1 つの Agent だけが所有します。重複と欠落はテストが機械的に検査します。
 

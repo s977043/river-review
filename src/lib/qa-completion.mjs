@@ -43,10 +43,21 @@ const UNSATISFIED_STATES = new Set(['UNVERIFIED', 'INCOMPLETE']);
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const SCOPE_BY_INTENT = Object.freeze({ 'task-completion': 'task', 'final-convergence': 'final' });
 
-const SCHEMA = JSON.parse(
-  readFileSync(new URL('../../schemas/completion-assessment.schema.json', import.meta.url), 'utf8')
-);
-const REASON_CODE_ORDER = SCHEMA.$defs.completionReasonCode.enum;
+// Read on first use, as schemaValidator in qa-evidence.mjs does, so importing this module reads
+// no file.
+let schema = null;
+function completionSchema() {
+  if (!schema) {
+    schema = JSON.parse(
+      readFileSync(
+        new URL('../../schemas/completion-assessment.schema.json', import.meta.url),
+        'utf8'
+      )
+    );
+  }
+  return schema;
+}
+const reasonCodeOrder = () => completionSchema().$defs.completionReasonCode.enum;
 
 let compiledSchema = null;
 function schemaValidator() {
@@ -54,7 +65,7 @@ function schemaValidator() {
     // Ajv's default strictness, as compileCompletionAssessmentValidator (tests/helpers) uses:
     // the schema's if/then branches omit `type` and do not compile with `strict: true`.
     const ajv = new Ajv2020({ allErrors: true, logger: false });
-    compiledSchema = ajv.compile(SCHEMA);
+    compiledSchema = ajv.compile(completionSchema());
   }
   return compiledSchema;
 }
@@ -212,7 +223,8 @@ export function buildQaCompletionAssessment({ scope, audit, qaArtifact, judge = 
   ];
 
   const judgeReasonCodes = Array.isArray(judge.reasonCodes) ? judge.reasonCodes : [];
-  const unknownCode = judgeReasonCodes.find((code) => !REASON_CODE_ORDER.includes(code));
+  const order = reasonCodeOrder();
+  const unknownCode = judgeReasonCodes.find((code) => !order.includes(code));
   if (unknownCode !== undefined) {
     throw new Error(
       `judge.reasonCodes has a value outside the completion vocabulary: ${unknownCode}`
@@ -234,7 +246,7 @@ export function buildQaCompletionAssessment({ scope, audit, qaArtifact, judge = 
       blockedBy: judge.blockedBy,
       evidence,
     }),
-    reasonCodes: REASON_CODE_ORDER.filter((code) => reasonCodes.has(code)),
+    reasonCodes: order.filter((code) => reasonCodes.has(code)),
   };
   if (UNSATISFIED_STATES.has(assessment.state) && reasonCodes.has('ALL_REQUIREMENTS_SATISFIED')) {
     throw new Error(`ALL_REQUIREMENTS_SATISFIED contradicts state ${assessment.state}`);
