@@ -355,6 +355,8 @@ AC を verified に数えるのは、次をすべて満たす場合だけとす�
 
 ### 8.3 completion capability
 
+本モジュールは completion-judge の実装（`agents/contracts/completion-judge.agent.json` の `implementedBy`）であり、QA 証拠を扱う側のモジュールではない。完了の state を QA 証拠のコードが決めないという ADR-017（`:119`）の規則は、この区分で守る。
+
 `src/lib/qa-completion.mjs` が、§8.1 の投影に state を補った completion-assessment を組み立てる。
 組み立てた文書は `schemas/completion-assessment.schema.json` で検証し、適合しなければ例外を投げる。
 Flow には `executeFlow` の `capabilities['evaluate-completion']` として注入する。gate の入力は増やさない。
@@ -398,6 +400,20 @@ Flow には `executeFlow` の `capabilities['evaluate-completion']` として注
 
 #### 8.3.1 後続の配線（T12）が守る条件
 
+行番号の基準:
+
+- 本節の行番号も main `e78b5234` 時点の値を示す
+- 次の引用先は、`e78b5234` から main `cf26e08a` まで変わっていない
+  - `src/lib/flow-runner.mjs`、`src/lib/review-plan-summary.mjs`
+  - `flows/*.flow.json`、`schemas/completion-assessment.schema.json`
+- `src/cli/commands/review.mjs` は PR #2949 で変わった。main `cf26e08a` では `:295` が `:435`、`:302` が `:442` にあたる
+- ADR-017 は `e78b5234` の後に追加したので、その行番号だけは追加後（PR #2934）の版を指す
+
+現状の配線:
+
+- capability は、まだどの呼び出し元も注入していない
+- `executeFlow` の唯一の呼び出し元の `review exec` は `capabilities: {}` を渡す（`src/cli/commands/review.mjs:295`）
+
 QA artifact の hash の確定順序:
 
 - hash の対象は、後で足す欄（`skillFindings` など）も含めた監査結果の全体とする。保存形式は `JSON.stringify(audit, null, 2)` の末尾に改行 1 つ
@@ -411,6 +427,8 @@ QA artifact の hash の確定順序:
 degraded の表示:
 
 - capability が例外を投げると、`executeFlow` は step を degraded にして続ける（`src/lib/flow-runner.mjs:453`）
+  - degraded になるのは、既存 2 Flow の completion step が `onUnsatisfied: "degrade"` を持つため（`flows/task-completion-review.flow.json:39`、`flows/final-review.flow.json:52`）
+  - 例外時の outcome は `onUnsatisfied` で決まり、省くと stopped になる（`src/lib/flow-runner.mjs:220-227`）
 - `review exec` の JSON では `steps` に出る（`src/cli/commands/review.mjs:302`）。Markdown と `--summary-file`（`src/lib/review-plan-summary.mjs:24`）には出ず、終了コードも変わらない
 - T12 では人向けの出力に、completion の成否、degraded の理由、assessment が作られなかったことを表示する。gate と Review Only の終了コードは変えない
 
@@ -421,6 +439,9 @@ scope と利用モード:
 - 既存の task / final の Flow は `diff` を必須の入力にしている（`flows/task-completion-review.flow.json:8`、`flows/final-review.flow.json:12`）。差分の無い QA Only には inputs の定義が要る
 - Review Only の Flow には、この capability を注入しない
 - completion-judge の必須部分は、capability を作る前に揃える経路が要る。task では `tasks`、final では `validation` と `requirements`、投影が無いときは AC の件数が必須になる。既存の Flow の inputs はパスを渡すだけで、これらの値へ自動では変換されない
+- 配線で completion-judge の入力を足すときは、同じ変更で次の 2 つを更新する（ADR-017 `:270`）
+  - `agents/contracts/completion-judge.agent.json` の `inputs`
+  - `schemas/agent-contract.schema.json` の `inputKind`（閉じた enum）
 
 ### 8.4 QA 証拠を読む skill の所見
 

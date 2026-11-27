@@ -28,7 +28,7 @@
     {
       "path": "src/lib/qa-completion.mjs",
       "symbol": "createQaCompletionCapability",
-      "note": "evaluate-completion for QA evidence: assembles and validates a completion-assessment from the QA audit result and its projection, never COMPLETE from QA evidence alone, and adds no gate input."
+      "note": "evaluate-completion for QA evidence: assembles and validates a completion-assessment from the QA audit result and its projection, never COMPLETE from QA evidence alone, and adds no gate input. Not yet injected by any caller: the only executeFlow call site (src/cli/commands/review.mjs) passes `capabilities: {}`; ADR-017 T12 wires it."
     }
   ]
 }
