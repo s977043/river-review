@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.140.0](https://github.com/s977043/river-review/compare/v1.139.5...v1.140.0) (2026-11-27)
+
+
+### Features
+
+* **cli:** river run で QA 証拠を監査する（ADR-017 手順 5 の入力配線） ([#2947](https://github.com/s977043/river-review/issues/2947)) ([ef5058d](https://github.com/s977043/river-review/commit/ef5058dc215e74535ff2a6ac94dfd742237bf133))
+* **cli:** 受理された QA 証拠を skill に渡し、その所見を監査結果の skillFindings に出す（ADR-017 手順 5） ([#2952](https://github.com/s977043/river-review/issues/2952)) ([0e1645d](https://github.com/s977043/river-review/commit/0e1645d8a8a0318dce8ca660eabe681d7f6749df))
+* **critic:** keep detector findings through the Finding Critic ([#2871](https://github.com/s977043/river-review/issues/2871)) ([#2894](https://github.com/s977043/river-review/issues/2894)) ([861feb6](https://github.com/s977043/river-review/commit/861feb6573b2c674778ba9bbdf35379592b47121))
+* **heuristic:** run explicit-token and merge-conflict detectors on every file ([#2870](https://github.com/s977043/river-review/issues/2870)) ([#2893](https://github.com/s977043/river-review/issues/2893)) ([7dc38ee](https://github.com/s977043/river-review/commit/7dc38eeff59bb7189a18865b4481b222b1880706))
+* **prompt:** verify safety claims in the PR body against code ([#2884](https://github.com/s977043/river-review/issues/2884)) ([#2901](https://github.com/s977043/river-review/issues/2901)) ([252b2bc](https://github.com/s977043/river-review/commit/252b2bcc1c289ca2e382ce55a21b2d66f83deeab))
+* **qa:** add the deterministic QA evidence validator (ADR-017 step 3) ([#2939](https://github.com/s977043/river-review/issues/2939)) ([5de5117](https://github.com/s977043/river-review/commit/5de51176235000205e4665f61283b6a27416c2f2))
+* **qa:** add the QA completion capability for evaluate-completion (ADR-017 T11) ([#2951](https://github.com/s977043/river-review/issues/2951)) ([cf26e08](https://github.com/s977043/river-review/commit/cf26e08a63220479340b7f2d8763490f2374aab3))
+* **qa:** project QA evidence counts onto completion-assessment (ADR-017 step 3) ([#2946](https://github.com/s977043/river-review/issues/2946)) ([175a4ee](https://github.com/s977043/river-review/commit/175a4eee028b06278a271f642ad27e97686f4528))
+* **schemas:** add QA evidence schema as Experimental (ADR-017 step 2) ([#2938](https://github.com/s977043/river-review/issues/2938)) ([a52767e](https://github.com/s977043/river-review/commit/a52767eada86da3b54f3ae3ec9f5c030f09e1738))
+* **schemas:** add QA plan schema and builder as Experimental (ADR-017 step 4) ([#2940](https://github.com/s977043/river-review/issues/2940)) ([0c533ba](https://github.com/s977043/river-review/commit/0c533bac8a1c5d9851f7869741b3d73f2628966a))
+* **scripts:** add preflight.sh and per-worker scratch dirs (ADR-016 P2) ([#2876](https://github.com/s977043/river-review/issues/2876)) ([43600ab](https://github.com/s977043/river-review/commit/43600ab9a57df9012977ce9fb58a20436e6a899e))
+* **skills:** add qaEvidence inputContext and the qa-evidence-consistency skill (ADR-017 step 4) ([#2941](https://github.com/s977043/river-review/issues/2941)) ([fbde6e0](https://github.com/s977043/river-review/commit/fbde6e0b4671a76a49bb61d675d9b690d2b6d402))
+* **verifier:** stop rejecting deterministic detector findings ([#2872](https://github.com/s977043/river-review/issues/2872)) ([287e543](https://github.com/s977043/river-review/commit/287e543153ad1c48e2f72852108914b0bb35a629))
+
+
+### Bug Fixes
+
+* **action:** post PR comment when gate fails the River step ([#2869](https://github.com/s977043/river-review/issues/2869)) ([#2882](https://github.com/s977043/river-review/issues/2882)) ([98fa7d1](https://github.com/s977043/river-review/commit/98fa7d19cdb90e376b60fc86731c866dd26096da))
+* **agents:** resolve plugin root via body substitution ([#2879](https://github.com/s977043/river-review/issues/2879)) ([1525707](https://github.com/s977043/river-review/commit/1525707ca7033f7121cc70218df54898079dae54))
+* **cli:** run の QA 証拠監査を記録だけにし、範囲レビューの指摘を直す ([#2949](https://github.com/s977043/river-review/issues/2949)) ([b43b0a1](https://github.com/s977043/river-review/commit/b43b0a1ef11f2fb972ad92b06e1f1ea1d7b1f5d1))
+* **diff:** keep hunks whose comment closes before code or hides format characters ([#2880](https://github.com/s977043/river-review/issues/2880)) ([#2892](https://github.com/s977043/river-review/issues/2892)) ([b6649c5](https://github.com/s977043/river-review/commit/b6649c5956355738740dad95a01aaa83f678cd9c))
+* **eval:** reject incomplete review coverage in convergence metric ([#2863](https://github.com/s977043/river-review/issues/2863)) ([d106a55](https://github.com/s977043/river-review/commit/d106a5582c1e85da60625cfe7662e2ef7478a879)), closes [#2701](https://github.com/s977043/river-review/issues/2701)
+* **qa:** lazy-load the completion schema and record T12 wiring conditions ([#2951](https://github.com/s977043/river-review/issues/2951) follow-up, cliff) ([#2953](https://github.com/s977043/river-review/issues/2953)) ([6e0de28](https://github.com/s977043/river-review/commit/6e0de282007f291613c104ef5689003b18846d22))
+* **review:** suppress the fallback warning when the LLM was skipped ([#2868](https://github.com/s977043/river-review/issues/2868)) ([#2885](https://github.com/s977043/river-review/issues/2885)) ([0d5316c](https://github.com/s977043/river-review/commit/0d5316cba85fd6f7285a2c6740d6532b98239ce0))
+
 ## [1.139.5](https://github.com/s977043/river-review/compare/v1.139.4...v1.139.5) (2026-11-05)
 
 
