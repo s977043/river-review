@@ -676,6 +676,26 @@ describe('river run --qa-evidence with a reviewer that reaches the LLM', () => {
     });
   }
 
+  // LLM findings, QA findings included, carry no skill severity ceiling (#2956): a QA warning or
+  // blocker keeps its severity in skillFindings and still leaves the review untouched.
+  for (const [severity, expected] of [
+    ['warning', 'major'],
+    ['blocker', 'critical'],
+  ]) {
+    test(`a ${severity} QA finding stays in skillFindings and leaves the review unchanged`, async (t) => {
+      const line = qaLine.replace('Severity: nit', `Severity: ${severity}`);
+      const without = await runWith(t, appLine);
+      const withQa = await runWith(t, `${appLine}\n${line}`);
+      assert.equal(withQa.code, without.code);
+      assert.deepEqual(withQa.artifact, without.artifact);
+      const audit = JSON.parse(readFileSync(withQa.auditPath, 'utf8'));
+      assert.deepEqual(
+        audit.skillFindings.map((finding) => finding.severity),
+        [expected]
+      );
+    });
+  }
+
   test('the audit result carries the redacted skill findings', async (t) => {
     const run = await runWith(t, `${appLine}\n${qaLine}`);
     assert.equal(run.code, 0);

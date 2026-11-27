@@ -262,7 +262,9 @@ export async function runFindingCriticStage({
         diff,
         originalAsk,
         acceptanceCriteria,
-        skill,
+        // Same rule as the review's verifier stage (review-engine.mjs): an LLM finding belongs to
+        // no single selected skill, so plan.selected[0]'s severity does not bound it.
+        skill: finding?.origin === 'llm' ? {} : skill,
         fileTypes,
         diffFiles,
         llm,
