@@ -93,17 +93,19 @@ function unverifiableMessage(finding) {
 let originalFetch;
 let originalOffline;
 
-beforeEach(() => {
-  originalFetch = globalThis.fetch;
-  originalOffline = process.env.RIVER_OFFLINE;
-  delete process.env.RIVER_OFFLINE;
-});
+function isolateFetchAndOffline() {
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    originalOffline = process.env.RIVER_OFFLINE;
+    delete process.env.RIVER_OFFLINE;
+  });
 
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-  if (originalOffline === undefined) delete process.env.RIVER_OFFLINE;
-  else process.env.RIVER_OFFLINE = originalOffline;
-});
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    if (originalOffline === undefined) delete process.env.RIVER_OFFLINE;
+    else process.env.RIVER_OFFLINE = originalOffline;
+  });
+}
 
 /** LLM 応答を固定して generateReview を 1 回走らせる。 */
 async function runReview({ diffText, llmOutput }) {
@@ -130,6 +132,8 @@ function findingAtLine(result, line) {
 }
 
 describe('#1644: 機械判定した scope が findings[].scope へ伝播する（通常経路）', () => {
+  isolateFetchAndOffline();
+
   it('機械判定が自己申告に勝ち、申告が無い場合も機械判定が載る', async () => {
     const llmOutput = [
       `src/app.ts:9: ${verifiableMessage({ finding: '文脈行の実装に問題がある', scopeLabel: 'in-diff' })}`,
@@ -158,6 +162,8 @@ describe('#1644: 機械判定した scope が findings[].scope へ伝播する�
 });
 
 describe('#1644: fail-safe 経路（verifier 全件棄却）でも scope が伝播する', () => {
+  isolateFetchAndOffline();
+
   it('degrade 先の heuristic finding にも機械判定の scope が載る', async () => {
     const llmOutput = [
       `src/handler.ts:23: ${unverifiableMessage('Evidence も Fix も無いので verifier に棄却される')}`,

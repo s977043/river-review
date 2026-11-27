@@ -19,9 +19,11 @@ import {
 
 const originalFetch = global.fetch;
 
-afterEach(() => {
-  global.fetch = originalFetch;
-});
+function restoreFetchAfterEach() {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+}
 
 function okResponse(content) {
   return {
@@ -58,6 +60,8 @@ describe('computeBackoffMs cap', () => {
 });
 
 describe('callChatCompletion', () => {
+  restoreFetchAfterEach();
+
   test('returns trimmed assistant content on success', async () => {
     global.fetch = async () => okResponse('  hello  ');
     assert.equal(await callChatCompletion(baseParams), 'hello');
@@ -176,6 +180,8 @@ describe('callChatCompletion', () => {
 });
 
 describe('callChatCompletion — network-error retry path (#1357)', () => {
+  restoreFetchAfterEach();
+
   test('recovers when a transient network error is followed by success', async () => {
     let calls = 0;
     const fetchImpl = async () => {
