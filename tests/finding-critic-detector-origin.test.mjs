@@ -68,21 +68,23 @@ let originalFetch;
 let originalOffline;
 let originalCritic;
 
-beforeEach(() => {
-  originalFetch = globalThis.fetch;
-  originalOffline = process.env.RIVER_OFFLINE;
-  originalCritic = process.env.RIVER_FINDING_CRITIC;
-  delete process.env.RIVER_OFFLINE;
-  delete process.env.RIVER_FINDING_CRITIC;
-});
+function isolateFetchAndCriticEnv() {
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    originalOffline = process.env.RIVER_OFFLINE;
+    originalCritic = process.env.RIVER_FINDING_CRITIC;
+    delete process.env.RIVER_OFFLINE;
+    delete process.env.RIVER_FINDING_CRITIC;
+  });
 
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-  if (originalOffline === undefined) delete process.env.RIVER_OFFLINE;
-  else process.env.RIVER_OFFLINE = originalOffline;
-  if (originalCritic === undefined) delete process.env.RIVER_FINDING_CRITIC;
-  else process.env.RIVER_FINDING_CRITIC = originalCritic;
-});
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    if (originalOffline === undefined) delete process.env.RIVER_OFFLINE;
+    else process.env.RIVER_OFFLINE = originalOffline;
+    if (originalCritic === undefined) delete process.env.RIVER_FINDING_CRITIC;
+    else process.env.RIVER_FINDING_CRITIC = originalCritic;
+  });
+}
 
 /**
  * fetch stub. 1 本目はレビュー本体、2 本目以降は Critic / Reviewer の順に
@@ -118,6 +120,8 @@ const detectorBlockers = (findings) =>
   findings.filter((f) => f.ruleId === 'logging-observability' && f.severity === 'critical');
 
 describe('#2871 detector findings survive the active Critic', () => {
+  isolateFetchAndCriticEnv();
+
   it('TC1 — active + key: the detector blocker stays and is sent to the stubbed Critic only', async () => {
     const calls = stubLlm('NO_ISSUES', ['not a verdict']);
     const result = await review();
@@ -176,6 +180,8 @@ const VERIFIABLE_LLM =
   'src/app.js:2: Finding: b が未使用のまま残っている Evidence: src/app.js の const b = 2 が追加された Impact: 不要なコードが残る Fix: b を削除する Severity: warning Confidence: high';
 
 describe('#2871 non-detector findings keep the existing Critic behavior', () => {
+  isolateFetchAndCriticEnv();
+
   const CLEAN_DIFF = `diff --git a/src/app.js b/src/app.js
 index 1111111..2222222 100644
 --- a/src/app.js
@@ -219,6 +225,8 @@ index 1111111..2222222 100644
 });
 
 describe('#2871 strict_block sees the pre-Critic findings', () => {
+  isolateFetchAndCriticEnv();
+
   const runExec = (review) =>
     runReviewPlan({
       planOnly: true,
@@ -253,6 +261,8 @@ describe('#2871 strict_block sees the pre-Critic findings', () => {
 });
 
 describe('#2871 orchestrator path', () => {
+  isolateFetchAndCriticEnv();
+
   it('TC7 — the merged detector finding survives the post-merge Critic', async () => {
     // DISAGREE_CONCERN: the orchestrator's rendered diff does not ground the
     // DISAGREE_EVIDENCE citation, which would already retain the finding.
@@ -288,6 +298,8 @@ describe('#2871 orchestrator path', () => {
 });
 
 describe('#2871 review follow-up: a detector member represents its cluster', () => {
+  isolateFetchAndCriticEnv();
+
   const llm = {
     id: 'rr-1',
     ruleId: 'unknown',
@@ -356,6 +368,8 @@ describe('#2871 review follow-up: a detector member represents its cluster', () 
 });
 
 describe('#2871 review follow-up: the strict_block safety net joins detector findings only', () => {
+  isolateFetchAndCriticEnv();
+
   const runExec = (review) =>
     runReviewPlan({
       planOnly: true,
