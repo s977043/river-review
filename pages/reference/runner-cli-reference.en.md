@@ -241,7 +241,7 @@ None of these surfaces ever read the value, so **dropping the flag from the call
 
 #### `--entry` acceptance scope (Internal) {#entry-acceptance-scope}
 
-`river review plan --entry <name>` pins the emitted Review Artifact to a review Flow entry (#2054 PR-3). `<name>` is a key of `entries` in `flows/entry-map.json` (`review-plan` / `review-task` / `review-final` / `review-replan` / `review-research` / `review-requirements` / `review-design` / `review-technical`). When given, two fields are **appended** to the artifact:
+`river review plan --entry <name>` pins the emitted Review Artifact to a review Flow entry (#2054 PR-3). `<name>` is a key of `entries` in `flows/entry-map.json` (`review-plan` / `review-task` / `review-final` / `review-replan` / `review-research` / `review-requirements` / `review-design` / `review-technical` / `review-qa-only` / `review-qa`; the last two, QA Only and Review + QA, are Experimental and the input wiring for QA evidence is not implemented yet). When given, two fields are **appended** to the artifact:
 
 - `flow`: `{ entry, id, version, sha256 }`; `sha256` is the hash of the Flow document's canonical JSON, computed by `deriveFlowPin` in `src/lib/execution-manifest.mjs`
 - `evidenceRequirements`: the sorted names of the inputs that Flow declares `required: true`

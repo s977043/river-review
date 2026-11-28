@@ -91,7 +91,8 @@ const QA_FLOW_IDS = ['qa-only-review', 'qa-review'];
 /**
  * Entries of the QA Flows. The SKILL.md entry table is the copy the plugins ship, and the plugin
  * wiring of ADR-017 is a later change (T12b), so these two have no row there yet. Remove this
- * exemption in the change that adds the rows.
+ * exemption in the change that adds the rows. The trigger-column sync test uses the same
+ * exemption.
  */
 const QA_ENTRY_NAMES = ['review-qa', 'review-qa-only'];
 
@@ -602,7 +603,21 @@ describe('QA review Flow definitions (ADR-017 D6)', () => {
     for (const { name, doc } of qaFlows) {
       const diff = (doc.inputs ?? []).find((input) => input.name === 'diff');
       assert.notEqual(diff?.required, true, `${name}: diff must not be a required input`);
+      const intent = intentByPurpose.get(doc.intent.purpose);
+      const evidence = intent.evidence.find((entry) => entry.artifact === 'diff');
+      assert.notEqual(
+        evidence?.requirement,
+        'required',
+        `${name}: the Review Intent must not require a diff`
+      );
     }
+    const qaOnly = intentByPurpose.get(flowById.get('qa-only-review').intent.purpose);
+    assert.equal(qaOnly.subject.includes('diff'), false, 'qa-only: diff in subject');
+    assert.equal(
+      qaOnly.evidence.some((entry) => entry.artifact === 'diff'),
+      false,
+      'qa-only: diff in evidence'
+    );
   });
 
   test('QA evidence is an optional input whose absence degrades the completion judgment', () => {
