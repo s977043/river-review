@@ -45,12 +45,12 @@
     "review-qa-only": {
       "flow": "qa-only-review",
       "flowVersion": "0.1.0",
-      "description": "Does the QA evidence run against the confirmed acceptance criteria support declaring this task DONE, with no code review? Experimental: the input wiring for QA evidence is not implemented yet (planned), so the completion evaluation is currently degraded."
+      "description": "Does the QA evidence run against the confirmed acceptance criteria support declaring this task DONE, with no code review? Experimental: the input wiring for QA evidence is not implemented yet (planned), so the completion evaluation does not run yet and its step is recorded as not-implemented."
     },
     "review-qa": {
       "flow": "qa-review",
       "flowVersion": "0.1.0",
-      "description": "Do the review of the change and the QA evidence against the confirmed acceptance criteria together support declaring this task DONE? Experimental: the input wiring for QA evidence is not implemented yet (planned), so the completion evaluation is currently degraded."
+      "description": "Do the review of the change and the QA evidence against the confirmed acceptance criteria together support declaring this task DONE? Experimental: the input wiring for QA evidence is not implemented yet (planned), so the completion evaluation does not run yet and its step is recorded as not-implemented."
     }
   },
   "triggers": {
