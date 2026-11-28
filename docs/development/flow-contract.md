@@ -5,11 +5,12 @@ River Review でもっとも利用頻度が高い 4 レビューを Flow とし�
 - Flow スキーマ: `schemas/flow.schema.json`（#2013 が所有。本 Issue では変更しない）
 - Review Intent スキーマ: `schemas/review-intent.schema.json`（本 Issue で追加）
 - entry map スキーマ: `schemas/flow-entry-map.schema.json`（本 Issue で追加）
-- Flow の実体: `flows/*.flow.json`（core 4 本 + #2017 の上流 4 本 = 計 8 本）
-- Review Intent の実体: `flows/intents/*.intent.json`（本 Issue で core 4 本。#2017 の上流 4 本を加えて計 8 本）
+- Flow の実体: `flows/*.flow.json`（core 4 本 + #2017 の上流 4 本 + ADR-017 の QA 2 本 = 計 10 本）
+- Review Intent の実体: `flows/intents/*.intent.json`（本 Issue で core 4 本。#2017 の上流 4 本と ADR-017 の QA 2 本を加えて計 10 本）
+- QA の 2 入口: `review-qa-only`（QA Only、Flow `qa-only-review`）と `review-qa`（Review + QA、Flow `qa-review`）。Experimental で、QA evidence の入力配線は未実装
 - entry map の実体: `flows/entry-map.json`
 - 検証: `tests/flow-definitions.test.mjs`
-- 上流 4 Flow（#2017）: `docs/development/upstream-review-flows.md`。**本ドキュメントの表は core 4 Flow だけを載せる**。上流 4 入口を含む全 8 入口の正本は `flows/entry-map.json` であり、上流側の表は上記の別ドキュメントにある
+- 上流 4 Flow（#2017）: `docs/development/upstream-review-flows.md`。**本ドキュメントの表は core 4 Flow だけを載せる**。上流 4 入口と QA 2 入口を含む全 10 入口の正本は `flows/entry-map.json` であり、上流側の表は上記の別ドキュメントにある
 
 Skill は「何を判断するか」、Agent は「誰が責任を持つか」、Flow は「いつ・どう判断を実行するか」を担います。本ドキュメントは Flow 軸だけを説明し、判断基準は `skills/**` と `docs/review/**` に残します。
 

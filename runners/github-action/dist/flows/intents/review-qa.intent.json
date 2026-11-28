@@ -1,0 +1,45 @@
+{
+  "purpose": "review-qa",
+  "version": "0.1.0",
+  "question": "レビューの所見と、確定した受け入れ条件に対する QA の証拠を合わせて、この Task を DONE と宣言できるか。",
+  "description": "Review + QA mode of ADR-017 D6: the review of the change and the audit of the QA evidence run in one Flow and their results are combined. The completion scope is task, the same scope as task-completion. The diff is optional, so the QA audit still runs when there is no change to review.",
+  "stage": "qa",
+  "phase": "midstream",
+  "subject": ["tasks", "diff", "tests", "qa-evidence"],
+  "baseline": {
+    "kind": "none",
+    "description": "A task is judged against its own acceptance evidence, not against a previous run."
+  },
+  "evidence": [
+    {
+      "artifact": "tasks",
+      "requirement": "required",
+      "onMissing": "stop",
+      "description": "Without the task record there are no confirmed acceptance criteria to judge the completion claim against."
+    },
+    {
+      "artifact": "diff",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent diff skips the review steps and records the reason; the QA audit and the completion judgment still run."
+    },
+    {
+      "artifact": "tests",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent test evidence does not skip the completion judgment: it runs in a reduced form and the missing evidence is recorded."
+    },
+    {
+      "artifact": "plan",
+      "requirement": "optional",
+      "onMissing": "skip",
+      "description": "Absent plan skips the task-versus-plan cross-check and records the reason."
+    },
+    {
+      "artifact": "qa-evidence",
+      "requirement": "optional",
+      "onMissing": "degrade",
+      "description": "Absent QA evidence does not skip the completion judgment: it runs in a reduced form and the missing evidence is recorded, and the judgment is never COMPLETE (ADR-017 D3)."
+    }
+  ]
+}

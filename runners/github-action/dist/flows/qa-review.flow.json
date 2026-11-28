@@ -1,0 +1,76 @@
+{
+  "id": "qa-review",
+  "version": "0.1.0",
+  "description": "Review + QA review (ADR-017 D6). Reviews the change and audits the QA evidence against the confirmed acceptance criteria in one Flow, then judges task completion from both. The diff is optional: without it the review steps are skipped and the QA audit still runs, because the basic QA is never omitted.",
+  "intent": { "purpose": "review-qa" },
+  "inputs": [
+    {
+      "name": "tasks",
+      "required": true,
+      "description": "The task and its confirmed acceptance criteria."
+    },
+    {
+      "name": "diff",
+      "description": "The change claimed to complete the task. Optional: absence skips the review steps."
+    },
+    {
+      "name": "tests",
+      "description": "Test evidence. Optional: absence degrades the completion judgment."
+    },
+    {
+      "name": "plan",
+      "description": "The plan the task belongs to. Optional: absence skips the task-versus-plan cross-check."
+    },
+    {
+      "name": "qa-evidence",
+      "description": "The QA evidence a person ran. Optional: absence degrades the completion judgment, which is then never COMPLETE."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    {
+      "use": "resolve-artifacts",
+      "description": "Missing `tasks` stops here (the only required input)."
+    },
+    { "use": "deterministic-check" },
+    {
+      "use": "select-skills",
+      "description": "Existing midstream-phase selection.",
+      "when": { "input": "diff", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "select-agents",
+      "when": { "input": "diff", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "reviewer": "bug-hunter",
+      "parallel": true,
+      "when": { "input": "diff", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "reviewer": "test-gap",
+      "parallel": true,
+      "when": { "input": "diff", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    {
+      "use": "cross-artifact-review",
+      "description": "Task against the plan it belongs to.",
+      "when": { "input": "plan", "state": "present" },
+      "onUnsatisfied": "skip"
+    },
+    { "use": "verify-findings" },
+    {
+      "use": "evaluate-completion",
+      "description": "Without QA evidence or test evidence this runs in a reduced form and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["findings", "coverage", "completion", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED", "BLOCKING_FINDINGS"]
+}

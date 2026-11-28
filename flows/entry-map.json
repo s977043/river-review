@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
-  "description": "User-facing entry names for the review Flows: the four core stage entries from #2016 and the four upstream review entries from #2017. The entry name is what a person types or asks for; the Flow id and version are what the judgment is recorded against. This document carries no host vocabulary on purpose: how an entry is surfaced belongs to agents/contracts/adapter-map.json, and which Flow it resolves to belongs here, so the two hosts have nothing to disagree about.",
+  "version": "0.4.0",
+  "description": "User-facing entry names for the review Flows: the four core stage entries from #2016, the four upstream review entries from #2017, and the QA Only and Review + QA entries from ADR-017 D6. The entry name is what a person types or asks for; the Flow id and version are what the judgment is recorded against. This document carries no host vocabulary on purpose: how an entry is surfaced belongs to agents/contracts/adapter-map.json, and which Flow it resolves to belongs here, so the two hosts have nothing to disagree about.",
   "entries": {
     "review-plan": {
       "flow": "plan-review",
@@ -41,6 +41,16 @@
       "flow": "technical-review",
       "flowVersion": "0.1.0",
       "description": "Do the declared technical premises hold on the evidence supplied?"
+    },
+    "review-qa-only": {
+      "flow": "qa-only-review",
+      "flowVersion": "0.1.0",
+      "description": "Does the QA evidence run against the confirmed acceptance criteria support declaring this task DONE, with no code review? Experimental: the input wiring for QA evidence is not implemented yet (planned), so the completion evaluation does not run yet and its step is recorded as not-implemented."
+    },
+    "review-qa": {
+      "flow": "qa-review",
+      "flowVersion": "0.1.0",
+      "description": "Do the review of the change and the QA evidence against the confirmed acceptance criteria together support declaring this task DONE? Experimental: the input wiring for QA evidence is not implemented yet (planned), so the completion evaluation does not run yet and its step is recorded as not-implemented."
     }
   },
   "triggers": {

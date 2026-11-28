@@ -194,7 +194,8 @@ describe('completion-assessment.schema.json — task vs final semantics', () => 
   test('the two scopes match the two Flows that emit a completion output', () => {
     // The scope vocabulary must stay tied to the Flows (#2016) that declare
     // `completion` as an output, otherwise a third semantic could appear here
-    // with nothing producing it.
+    // with nothing producing it. The two QA Flows of ADR-017 D6 (`qa-only`,
+    // `review-qa`) answer the task scope, so they add no third semantic.
     assert.deepEqual(schema.$defs.completionScope.enum, ['task', 'final']);
     const emittingFlows = readdirSync(FLOWS_DIR)
       .filter((name) => name.endsWith('.flow.json'))
@@ -202,7 +203,12 @@ describe('completion-assessment.schema.json — task vs final semantics', () => 
       .filter((flow) => (flow.outputs ?? []).includes('completion'))
       .map((flow) => flow.intent.purpose)
       .sort();
-    assert.deepEqual(emittingFlows, ['final-convergence', 'task-completion']);
+    assert.deepEqual(emittingFlows, [
+      'final-convergence',
+      'qa-only',
+      'review-qa',
+      'task-completion',
+    ]);
   });
 
   test('a task-scope assessment cannot validate the goal', () => {

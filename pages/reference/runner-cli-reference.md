@@ -247,7 +247,7 @@ usage error のときにデータ書き込み（feedback / suppression のエン
 
 #### `--entry` の受理範囲（Internal） {#entry-acceptance-scope}
 
-`river review plan --entry <name>` は、出力する Review Artifact をレビュー Flow の entry に固定します（#2054 PR-3）。`<name>` は `flows/entry-map.json` の `entries` キーです。現在の 8 件は `review-plan` / `review-task` / `review-final` / `review-replan` / `review-research` / `review-requirements` / `review-design` / `review-technical` です。指定すると artifact の末尾に次の 2 フィールドが**追加**されます。
+`river review plan --entry <name>` は、出力する Review Artifact をレビュー Flow の entry に固定します（#2054 PR-3）。`<name>` は `flows/entry-map.json` の `entries` キーです。現在は 10 件です。うち 8 件は `review-plan` / `review-task` / `review-final` / `review-replan` / `review-research` / `review-requirements` / `review-design` / `review-technical` です。残る 2 件は `review-qa-only`（QA Only）と `review-qa`（Review + QA）で、Experimental です。この 2 件では QA evidence の入力配線が未実装です。指定すると artifact の末尾に次の 2 フィールドが**追加**されます。
 
 - `flow`: `{ entry, id, version, sha256 }`。`sha256` は Flow 文書の正規化 JSON のハッシュで、`src/lib/execution-manifest.mjs` の `deriveFlowPin` が算出する
 - `evidenceRequirements`: その Flow が `required: true` で宣言する入力名の一覧（ソート済み）

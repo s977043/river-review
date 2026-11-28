@@ -33,7 +33,7 @@
     },
     "description": { "type": "string", "minLength": 1 },
     "stage": {
-      "description": "Where in the work this review sits, named after the `review-<stage>` entry it answers for (`flows/entry-map.json`): the four core reviews of #2016 plus the four before-implementation reviews of #2017. `stage` and `phase` are different axes and are not interchangeable: `stage` is the moment in the work whose question is being asked, while `phase` is the skill-selection vocabulary below — all four #2017 stages sit in `phase: upstream`, so a single phase value carries four distinct stages and collapsing the two would erase that distinction. Still a closed set: adding a ninth stage is a schema change rather than a new spelling in a data file, and extending it is additive, so every Intent valid against the previous enum stays valid.",
+      "description": "Where in the work this review sits, named after the `review-<stage>` entry it answers for (`flows/entry-map.json`): the four core reviews of #2016, the four before-implementation reviews of #2017, plus the QA Only (`qa-only`) and Review + QA (`qa`) modes of ADR-017 D6. `stage` and `phase` are different axes and are not interchangeable: `stage` is the moment in the work whose question is being asked, while `phase` is the skill-selection vocabulary below — all four #2017 stages sit in `phase: upstream`, so a single phase value carries four distinct stages and collapsing the two would erase that distinction. Still a closed set: adding a stage is a schema change rather than a new spelling in a data file, and extending it is additive, so every Intent valid against the previous enum stays valid.",
       "enum": [
         "research",
         "requirements",
@@ -42,7 +42,9 @@
         "plan",
         "replan",
         "task-completion",
-        "final"
+        "final",
+        "qa-only",
+        "qa"
       ]
     },
     "phase": {
@@ -86,7 +88,7 @@
   },
   "$defs": {
     "artifactKind": {
-      "description": "Artifact kinds. Deliberately a subset of the `inputKind` enum in `schemas/agent-contract.schema.json` (#2014) rather than a parallel ledger; `tests/flow-definitions.test.mjs` asserts the subset relation so a new kind cannot be minted here alone. `artifacts` is the generic host-supplied bundle that `flows/research-review.flow.json` (#2017) takes as its subject: no dedicated research kind is minted, in line with that Flow's own note.",
+      "description": "Artifact kinds. Deliberately a subset of the `inputKind` enum in `schemas/agent-contract.schema.json` (#2014) rather than a parallel ledger; `tests/flow-definitions.test.mjs` asserts the subset relation so a new kind cannot be minted here alone. `artifacts` is the generic host-supplied bundle that `flows/research-review.flow.json` (#2017) takes as its subject: no dedicated research kind is minted, in line with that Flow's own note. `qa-evidence` is the QA evidence a person ran (`schemas/qa-evidence.schema.json`, ADR-017), taken by the two QA Flows.",
       "enum": [
         "artifacts",
         "requirements",
@@ -96,7 +98,8 @@
         "tests",
         "diff",
         "findings",
-        "baseline"
+        "baseline",
+        "qa-evidence"
       ]
     },
     "evidenceRequirement": {

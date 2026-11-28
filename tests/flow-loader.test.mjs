@@ -90,10 +90,10 @@ describe('flow-loader: loading and validating the shipped assets', () => {
 
   test('loads the entry map, every Flow document and every Review Intent', () => {
     assert.equal(loaded.flowsDir, FLOWS_DIR);
-    assert.equal(Object.keys(loaded.registry.entries).length, 8);
+    assert.equal(Object.keys(loaded.registry.entries).length, 10);
     assert.ok(loaded.registry.triggers, 'the PR-1 triggers block is passed through');
-    assert.equal(loaded.flowDocuments.length, 8);
-    assert.equal(loaded.intents.length, 8);
+    assert.equal(loaded.flowDocuments.length, 10);
+    assert.equal(loaded.intents.length, 10);
   });
 
   test('agrees with the test-side validators on every shipped document', () => {
