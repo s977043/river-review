@@ -132,7 +132,8 @@
         "findings",
         "candidate-findings",
         "verified-findings",
-        "baseline"
+        "baseline",
+        "qa-evidence"
       ]
     },
     "outputKind": {

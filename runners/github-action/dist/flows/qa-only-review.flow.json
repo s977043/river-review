@@ -1,0 +1,34 @@
+{
+  "id": "qa-only-review",
+  "version": "0.1.0",
+  "description": "QA Only review (ADR-017 D6). Audits the QA evidence a person ran against the confirmed acceptance criteria and judges task completion from it, with no code review, so it needs no diff. No skill is selected: with no changed file none applies (ADR-017 D2), and the deterministic checks and the completion judgment run regardless.",
+  "intent": { "purpose": "qa-only" },
+  "inputs": [
+    {
+      "name": "tasks",
+      "required": true,
+      "description": "The task and its confirmed acceptance criteria."
+    },
+    {
+      "name": "qa-evidence",
+      "description": "The QA evidence a person ran. Optional: absence degrades the completion judgment, which is then never COMPLETE."
+    }
+  ],
+  "steps": [
+    { "use": "resolve-intent" },
+    {
+      "use": "resolve-artifacts",
+      "description": "Missing `tasks` stops here (the only required input)."
+    },
+    { "use": "deterministic-check" },
+    {
+      "use": "evaluate-completion",
+      "description": "Without QA evidence this runs in a reduced form and records the degradation.",
+      "onUnsatisfied": "degrade"
+    },
+    { "use": "derive-gate" },
+    { "use": "persist-artifact" }
+  ],
+  "outputs": ["completion", "gate", "run-record"],
+  "stopConditions": ["DETERMINISTIC_UNRUNNABLE", "HUMAN_APPROVAL_REQUIRED"]
+}

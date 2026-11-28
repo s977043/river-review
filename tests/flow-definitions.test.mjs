@@ -85,7 +85,17 @@ const UPSTREAM_FLOW_IDS = [
   'technical-review',
 ];
 
-const EXPECTED_FLOW_IDS = [...CORE_FLOW_IDS, ...UPSTREAM_FLOW_IDS].sort();
+/** The QA Only and Review + QA Flows of ADR-017 D6 (T12 B1). */
+const QA_FLOW_IDS = ['qa-only-review', 'qa-review'];
+
+/**
+ * Entries of the QA Flows. The SKILL.md entry table is the copy the plugins ship, and the plugin
+ * wiring of ADR-017 is a later change (T12b), so these two have no row there yet. Remove this
+ * exemption in the change that adds the rows.
+ */
+const QA_ENTRY_NAMES = ['review-qa', 'review-qa-only'];
+
+const EXPECTED_FLOW_IDS = [...CORE_FLOW_IDS, ...UPSTREAM_FLOW_IDS, ...QA_FLOW_IDS].sort();
 
 /** Flows that must be joined to a Review Intent document: every shipped Flow. */
 const intentBackedFlows = flows;
@@ -141,6 +151,8 @@ describe('core review Flow definitions (#2016)', () => {
       'design',
       'final',
       'plan',
+      'qa',
+      'qa-only',
       'replan',
       'requirements',
       'research',
@@ -345,11 +357,13 @@ describe('flow entry map (#2016)', () => {
     assert.equal(validateEntryMap(entryMap), true, errorsOf(validateEntryMap));
   });
 
-  test('the user-facing entry names from #2016 and #2017 are present', () => {
+  test('the user-facing entry names from #2016, #2017 and ADR-017 are present', () => {
     assert.deepEqual(Object.keys(entryMap.entries).sort(), [
       'review-design',
       'review-final',
       'review-plan',
+      'review-qa',
+      'review-qa-only',
       'review-replan',
       'review-requirements',
       'review-research',
@@ -418,7 +432,9 @@ describe('flow entry map (#2016)', () => {
     }
 
     const expected = Object.fromEntries(
-      Object.entries(entryMap.entries).map(([name, entry]) => [name, entry.flow])
+      Object.entries(entryMap.entries)
+        .filter(([name]) => !QA_ENTRY_NAMES.includes(name))
+        .map(([name, entry]) => [name, entry.flow])
     );
     assert.deepEqual(table, expected);
   });
@@ -554,6 +570,70 @@ describe('upstream review Flow definitions (#2017)', () => {
           step.use === 'parallel-review'
       );
       assert.ok(judgmentSteps.length >= 2, `${name}: only ${judgmentSteps.length} judgment steps`);
+    }
+  });
+});
+
+describe('QA review Flow definitions (ADR-017 D6)', () => {
+  const qaFlows = flows.filter(({ doc }) => QA_FLOW_IDS.includes(doc.id));
+  const REVIEW_PRIMITIVES = [
+    'select-skills',
+    'select-agents',
+    'parallel-review',
+    'cross-artifact-review',
+    'verify-findings',
+  ];
+  const isReviewStep = (step) =>
+    step.reviewer !== undefined || REVIEW_PRIMITIVES.includes(step.use);
+
+  test('the two QA Flows ship, one file per Flow', () => {
+    assert.deepEqual(qaFlows.map(({ doc }) => doc.id).sort(), QA_FLOW_IDS);
+  });
+
+  test('the QA entry exemption names exactly the entries of the QA Flows', () => {
+    const qaEntries = Object.entries(entryMap.entries)
+      .filter(([, entry]) => QA_FLOW_IDS.includes(entry.flow))
+      .map(([name]) => name)
+      .sort();
+    assert.deepEqual(qaEntries, QA_ENTRY_NAMES);
+  });
+
+  test('no QA Flow requires a diff', () => {
+    for (const { name, doc } of qaFlows) {
+      const diff = (doc.inputs ?? []).find((input) => input.name === 'diff');
+      assert.notEqual(diff?.required, true, `${name}: diff must not be a required input`);
+    }
+  });
+
+  test('QA evidence is an optional input whose absence degrades the completion judgment', () => {
+    for (const { name, doc } of qaFlows) {
+      const qaEvidence = (doc.inputs ?? []).find((input) => input.name === 'qa-evidence');
+      assert.ok(qaEvidence, `${name}: no qa-evidence input`);
+      assert.notEqual(qaEvidence.required, true, `${name}: qa-evidence must be optional`);
+      const completion = doc.steps.filter((step) => step.use === 'evaluate-completion');
+      assert.equal(completion.length, 1, `${name}: evaluate-completion steps`);
+      assert.equal(completion[0].onUnsatisfied, 'degrade', name);
+      assert.equal(completion[0].when, undefined, `${name}: evaluate-completion is unconditional`);
+    }
+  });
+
+  test('QA Only runs no review step', () => {
+    const doc = flowById.get('qa-only-review');
+    assert.deepEqual(doc.steps.filter(isReviewStep), []);
+    assert.equal(doc.outputs.includes('findings'), false);
+  });
+
+  test('Review + QA skips every diff-reading review step when the diff is absent', () => {
+    const doc = flowById.get('qa-review');
+    const reviewSteps = doc.steps.filter(
+      (step) =>
+        isReviewStep(step) && !['cross-artifact-review', 'verify-findings'].includes(step.use)
+    );
+    assert.ok(reviewSteps.length > 0, 'qa-review has review steps');
+    for (const step of reviewSteps) {
+      const label = step.use ?? step.reviewer;
+      assert.deepEqual(step.when, { input: 'diff', state: 'present' }, label);
+      assert.equal(step.onUnsatisfied, 'skip', label);
     }
   });
 });
@@ -921,7 +1001,9 @@ describe('trigger registry (#2054 PR-1)', () => {
     }
 
     const expected = {};
-    for (const entryName of Object.keys(entryMap.entries)) expected[entryName] = [];
+    for (const entryName of Object.keys(entryMap.entries)) {
+      if (!QA_ENTRY_NAMES.includes(entryName)) expected[entryName] = [];
+    }
     for (const [name, trigger] of Object.entries(triggers)) {
       for (const entry of trigger.entries) expected[entry].push(name);
     }
